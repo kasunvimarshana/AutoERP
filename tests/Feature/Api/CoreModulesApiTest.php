@@ -309,7 +309,7 @@ final class CoreModulesApiTest extends TestCase
     {
         $guard = (string) config('auth.defaults.guard', 'web');
         $now = now();
-        $userId = (int) DB::table('users')->insertGetId([
+        $userId = (int) \Tests\Support\TenantUserFixture::create([
             'tenant_id' => $tenantId,
             'first_name' => 'Item',
             'last_name' => 'Administrator',
@@ -321,7 +321,7 @@ final class CoreModulesApiTest extends TestCase
         ]);
         $roleId = (int) DB::table('roles')->insertGetId([
             'tenant_id' => $tenantId,
-            'name' => UserPermission::SUPER_ADMIN_ROLE,
+            'name' => \Modules\User\Constants\UserSystemRole::SUPER_ADMIN,
             'guard_name' => $guard,
             'created_at' => $now,
             'updated_at' => $now,

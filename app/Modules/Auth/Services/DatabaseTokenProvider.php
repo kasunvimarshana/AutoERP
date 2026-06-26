@@ -48,7 +48,7 @@ final class DatabaseTokenProvider implements TokenProviderInterface
         if ($data->tokenScope === AuthTokenScope::PLATFORM) {
             $access = $this->platformAccessTokens->create([
                 'platform_session_id' => $data->platformSessionId,
-                'user_id' => $data->userId,
+                'platform_operator_id' => $data->platformOperatorId,
                 'token_key' => $accessKey,
                 'token_hash' => $this->passwordHasher->hash($accessSecret),
                 'scopes' => $data->scopes,
@@ -62,7 +62,7 @@ final class DatabaseTokenProvider implements TokenProviderInterface
             $refresh = $this->platformRefreshTokens->create([
                 'access_token_id' => (int) $access->id(),
                 'platform_session_id' => $data->platformSessionId,
-                'user_id' => $data->userId,
+                'platform_operator_id' => $data->platformOperatorId,
                 'refresh_key' => $refreshKey,
                 'refresh_hash' => $this->passwordHasher->hash($refreshSecret),
                 'status' => 'active',
@@ -79,7 +79,7 @@ final class DatabaseTokenProvider implements TokenProviderInterface
                 'client_id' => $data->clientId,
                 'identity_id' => $data->identityId,
                 'session_id' => $data->sessionId,
-                'user_id' => $data->userId,
+                'user_id' => $data->tenantUserId,
                 'token_key' => $accessKey,
                 'token_hash' => $this->passwordHasher->hash($accessSecret),
                 'scopes' => $data->scopes,
@@ -98,7 +98,7 @@ final class DatabaseTokenProvider implements TokenProviderInterface
                 'client_id' => $data->clientId,
                 'identity_id' => $data->identityId,
                 'session_id' => $data->sessionId,
-                'user_id' => $data->userId,
+                'user_id' => $data->tenantUserId,
                 'refresh_key' => $refreshKey,
                 'refresh_hash' => $this->passwordHasher->hash($refreshSecret),
                 'status' => 'active',
@@ -136,7 +136,7 @@ final class DatabaseTokenProvider implements TokenProviderInterface
         }
         if ($scope === AuthTokenScope::PLATFORM && ! $this->platformSessionUsable(
             $this->positiveInt($existing->get('platform_session_id')),
-            $this->positiveInt($existing->get('user_id')),
+            $this->positiveInt($existing->get('platform_operator_id')),
         )) {
             return null;
         }
@@ -164,7 +164,7 @@ final class DatabaseTokenProvider implements TokenProviderInterface
 
         $accessRepository = $this->accessRepository($scope);
         $accessToken = $accessRepository->findById((int) $existing->get('access_token_id'));
-        if ($accessToken === null || (int) $accessToken->get('user_id', 0) !== (int) $existing->get('user_id', 0)) {
+        if ($accessToken === null || $this->principalId($accessToken, $scope) !== $this->principalId($existing, $scope)) {
             return null;
         }
 
@@ -182,7 +182,8 @@ final class DatabaseTokenProvider implements TokenProviderInterface
             'identity_id' => $scope === AuthTokenScope::TENANT ? $existing->get('identity_id') : null,
             'session_id' => $scope === AuthTokenScope::TENANT ? $existing->get('session_id') : null,
             'platform_session_id' => $scope === AuthTokenScope::PLATFORM ? $existing->get('platform_session_id') : null,
-            'user_id' => $existing->get('user_id'),
+            'tenant_user_id' => $scope === AuthTokenScope::TENANT ? $this->principalId($existing, $scope) : null,
+            'platform_operator_id' => $scope === AuthTokenScope::PLATFORM ? $this->principalId($existing, $scope) : null,
             'token_scope' => $scope,
             'grant_type' => 'refresh_token',
             'scopes' => $scopes,
@@ -211,7 +212,7 @@ final class DatabaseTokenProvider implements TokenProviderInterface
         }
         if ($scope === AuthTokenScope::PLATFORM && ! $this->platformSessionUsable(
             $this->positiveInt($record->get('platform_session_id')),
-            $this->positiveInt($record->get('user_id')),
+            $this->positiveInt($record->get('platform_operator_id')),
         )) {
             return null;
         }
@@ -293,11 +294,10 @@ final class DatabaseTokenProvider implements TokenProviderInterface
 
     private function assertIssueData(TokenIssueData $data): void
     {
-        if ($data->userId === null || $data->userId < 1) {
-            throw new LogicException('Authentication tokens require a valid user identity.');
-        }
-
         if ($data->tokenScope === AuthTokenScope::PLATFORM) {
+            if ($data->platformOperatorId === null || $data->platformOperatorId < 1 || $data->tenantUserId !== null) {
+                throw new LogicException('Platform authentication tokens require exactly one platform operator identity.');
+            }
             foreach ([
                 'tenant_id' => $data->tenantId,
                 'organization_unit_id' => $data->organizationUnitId,
@@ -311,13 +311,16 @@ final class DatabaseTokenProvider implements TokenProviderInterface
                 }
             }
 
-            if (! $this->platformSessionUsable($data->platformSessionId, $data->userId, false)) {
+            if (! $this->platformSessionUsable($data->platformSessionId, $data->platformOperatorId, false)) {
                 throw new LogicException('Platform session is not active.');
             }
 
             return;
         }
 
+        if ($data->tenantUserId === null || $data->tenantUserId < 1 || $data->platformOperatorId !== null) {
+            throw new LogicException('Tenant authentication tokens require exactly one tenant user identity.');
+        }
         if ($data->tenantId === null || $data->tenantId < 1) {
             throw new LogicException('Tenant authentication tokens require tenant ownership.');
         }
@@ -352,7 +355,9 @@ final class DatabaseTokenProvider implements TokenProviderInterface
     private function recordMatchesScope(DataRecord $record, ?int $expectedTenantId, string $scope): bool
     {
         if ($scope === AuthTokenScope::PLATFORM) {
-            return $expectedTenantId === null;
+            return $expectedTenantId === null
+                && $this->positiveInt($record->get('platform_operator_id')) !== null
+                && $record->get('tenant_id') === null;
         }
 
         $recordTenantId = $this->positiveInt($record->get('tenant_id'));
@@ -361,15 +366,15 @@ final class DatabaseTokenProvider implements TokenProviderInterface
             && ($expectedTenantId === null || $recordTenantId === $expectedTenantId);
     }
 
-    private function platformSessionUsable(?int $sessionId, ?int $userId, bool $touch = true): bool
+    private function platformSessionUsable(?int $sessionId, ?int $platformOperatorId, bool $touch = true): bool
     {
-        if ($sessionId === null || $sessionId < 1 || $userId === null || $userId < 1) {
+        if ($sessionId === null || $sessionId < 1 || $platformOperatorId === null || $platformOperatorId < 1) {
             return false;
         }
 
         $session = $this->platformSessions->newQuery()
             ->whereKey($sessionId)
-            ->where('user_id', $userId)
+            ->where('platform_operator_id', $platformOperatorId)
             ->where('status', 'active')
             ->first();
         if (! $session instanceof AuthPlatformSessionModel) {
@@ -414,8 +419,17 @@ final class DatabaseTokenProvider implements TokenProviderInterface
             'tenant_id' => $scope === AuthTokenScope::TENANT ? $record->get('tenant_id') : null,
             'organization_unit_id' => $scope === AuthTokenScope::TENANT ? $record->get('organization_unit_id') : null,
             'platform_session_id' => $scope === AuthTokenScope::PLATFORM ? $record->get('platform_session_id') : null,
+            'tenant_user_id' => $scope === AuthTokenScope::TENANT ? $record->get('user_id') : null,
+            'platform_operator_id' => $scope === AuthTokenScope::PLATFORM ? $record->get('platform_operator_id') : null,
             'token_scope' => $scope,
         ]);
+    }
+
+    private function principalId(DataRecord $record, string $scope): ?int
+    {
+        return $this->positiveInt($record->get(
+            $scope === AuthTokenScope::PLATFORM ? 'platform_operator_id' : 'user_id'
+        ));
     }
 
     /** @return list<string> */

@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\Route;
 use Modules\Configuration\Constants\ConfigurationScope;
 use Modules\Configuration\Http\Controllers\ConfigurationController;
 use Modules\Configuration\Http\Controllers\Platform\PlatformConfigurationController;
-use Modules\User\Constants\PlatformPermission;
+use Modules\Core\Authorization\PlatformPermission;
 
 $guard = (string) config('module-auth.protected_route_guard', 'auth-api');
 $platformGuard = (string) config('module-auth.platform_protected_route_guard', 'platform-api');

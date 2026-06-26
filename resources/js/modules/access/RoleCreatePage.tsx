@@ -6,8 +6,7 @@ import { CapabilityNotice } from '@/shared/components/CapabilityNotice';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { FormActions } from '@/shared/components/FormActions';
-import { LoadingState } from '@/shared/components/LoadingState';
-import { useApi } from '@/shared/hooks/useApi';
+import { Panel } from '@/shared/components/Panel';
 import { useUnsavedChanges } from '@/shared/hooks/useUnsavedChanges';
 import { useAuth } from '@/modules/auth/AuthProvider';
 import { accessApi } from './accessApi';
@@ -21,8 +20,6 @@ export default function RoleCreatePage() {
     const [error, setError] = useState<ApiError | null>(null);
     const [submitting, setSubmitting] = useState(false);
     const canCreate = hasAccessPermission(auth, accessPermissions.rolesCreate);
-    const canAssignPermissions = hasAccessPermission(auth, accessPermissions.rolesAssignPermissions);
-    const permissions = useApi((signal) => accessApi.listPermissions({ per_page: 100 }, signal), []);
     const dirty = useMemo(() => JSON.stringify(form) !== JSON.stringify(emptyRoleForm()), [form]);
     const confirmDiscard = useUnsavedChanges(dirty && !submitting);
 
@@ -32,10 +29,10 @@ export default function RoleCreatePage() {
         setError(null);
         try {
             const created = await accessApi.createRole({
-                ...form,
-                permission_ids: canAssignPermissions ? form.permission_ids : [],
+                name: form.name,
+                description: form.description || null,
             });
-            navigate(`/access/roles/${created.id}`);
+            navigate(`/access/roles/${created.id}/edit`);
         } catch (caught) {
             setError(toApiError(caught));
         } finally {
@@ -54,23 +51,18 @@ export default function RoleCreatePage() {
 
     return (
         <>
-            <ContentHeader title="Create Role" description="Create a tenant role and assign system-defined permissions." />
-            <ErrorAlert error={error ?? permissions.error} />
-            {permissions.loading ? <LoadingState label="Loading permissions..." /> : (
-                <form className="space-y-5" onSubmit={(event) => { event.preventDefault(); void save(); }}>
-                    <RoleForm
-                        value={form}
-                        permissions={permissions.data?.data ?? []}
-                        error={error}
-                        canAssignPermissions={canAssignPermissions}
-                        onChange={setForm}
-                    />
-                    <FormActions>
-                        <Button type="button" variant="secondary" onClick={() => confirmDiscard() && navigate('/access/roles')}>Cancel</Button>
-                        <Button type="submit" loading={submitting}>Create Role</Button>
-                    </FormActions>
-                </form>
-            )}
+            <ContentHeader title="Create Role" description="Create the role first, then assign system-defined permissions in the guided management screen." />
+            <ErrorAlert error={error} />
+            <form className="space-y-5" onSubmit={(event) => { event.preventDefault(); void save(); }}>
+                <RoleForm value={form} error={error} onChange={setForm} />
+                <Panel title="Permission assignment">
+                    <p className="text-sm text-slate-600">Permission assignment is a separate privileged action. After creation, authorized administrators can assign permissions without coupling that action to role-profile editing.</p>
+                </Panel>
+                <FormActions>
+                    <Button type="button" variant="secondary" onClick={() => confirmDiscard() && navigate('/access/roles')}>Cancel</Button>
+                    <Button type="submit" loading={submitting}>Create Role</Button>
+                </FormActions>
+            </form>
         </>
     );
 }

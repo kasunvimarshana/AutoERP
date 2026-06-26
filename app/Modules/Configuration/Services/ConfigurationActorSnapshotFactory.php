@@ -30,9 +30,11 @@ final class ConfigurationActorSnapshotFactory
         $firstName = trim((string) ($user->getAttribute('first_name') ?? ''));
         $lastName = trim((string) ($user->getAttribute('last_name') ?? ''));
         $name = trim($firstName.' '.$lastName);
-        $email = trim((string) ($user->getAttribute('platform_login_email') ?? $user->getAttribute('email') ?? ''));
-        $platformOperator = (bool) ($user->getAttribute('is_platform_operator') ?? false)
-            && $user->getAttribute('tenant_id') === null;
+        $email = trim((string) ($user->getAttribute('email') ?? ''));
+        $platformOperator = $context->guard() === (string) config(
+            'module-auth.platform_protected_route_guard',
+            'platform-api',
+        );
 
         return [
             'type' => $platformOperator

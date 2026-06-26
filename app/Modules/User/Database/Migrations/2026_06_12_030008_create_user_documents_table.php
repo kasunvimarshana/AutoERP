@@ -10,34 +10,35 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('user_documents', function (Blueprint $table) {
+        Schema::create('user_documents', function (Blueprint $table): void {
             $table->id();
-            $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete()->comment('Multi-tenant owner reference');
-            $table->unsignedBigInteger('organization_unit_id')->nullable()->comment('Optional organization-unit scope');
-            $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
-
-            // $table->string('uuid')->unique('user_documents_uuid_uk');
+            $table->unsignedBigInteger('row_version')->default(1);
+            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
             $table->unsignedBigInteger('user_id');
             $table->string('name');
-            $table->string('file_path');
-            $table->string('mime_type')->nullable();
-            $table->unsignedInteger('size')->nullable();
-            $table->string('type')->nullable();
-
+            $table->string('active_name_key')->nullable();
+            $table->string('document_type', 50);
+            $table->string('object_key');
+            $table->string('original_filename');
+            $table->string('mime_type', 100);
+            $table->unsignedBigInteger('size_bytes');
+            $table->char('checksum_sha256', 64);
+            $table->string('scan_engine', 100);
+            $table->timestamp('scanned_at');
+            $table->unsignedBigInteger('uploaded_by_user_id');
+            $table->unsignedBigInteger('updated_by_user_id')->nullable();
             $table->timestamps();
-
-            $table->foreign(['organization_unit_id', 'tenant_id'], 'ud_org_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('organization_units')
-                ->restrictOnDelete();
-            $table->foreign(['user_id', 'tenant_id'], 'ud_user_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('users')
-                ->cascadeOnDelete();
-            $table->unique(['tenant_id', 'user_id', 'name'], 'user_documents_user_name_uk');
+            $table->softDeletes();
 
             $table->unique(['id', 'tenant_id'], 'user_documents_id_tenant_uk');
+            $table->unique(['tenant_id', 'object_key'], 'user_documents_object_key_uk');
+            $table->unique(['tenant_id', 'user_id', 'active_name_key'], 'user_documents_active_name_uk');
+            $table->foreign(['user_id', 'tenant_id'], 'user_documents_user_tenant_fk')
+                ->references(['id', 'tenant_id'])->on('users')->restrictOnDelete();
+            foreach (['uploaded_by_user_id', 'updated_by_user_id'] as $column) {
+                $table->foreign([$column, 'tenant_id'], 'user_documents_'.$column.'_tenant_fk')
+                    ->references(['id', 'tenant_id'])->on('users')->restrictOnDelete();
+            }
         });
     }
 

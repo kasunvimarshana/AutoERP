@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Services\Plans;
 
+use Modules\Core\Tenancy\TenantPlanLimit;
+
 use Illuminate\Validation\ValidationException;
 
 final class TenantPlanSchema
@@ -45,10 +47,10 @@ final class TenantPlanSchema
 
     /** @var list<string> */
     public const SUPPORTED_LIMITS = [
-        'max_users',
+        TenantPlanLimit::USERS,
         'max_organization_units',
-        'max_warehouses',
-        'max_storage_mb',
+        TenantPlanLimit::WAREHOUSES,
+        TenantPlanLimit::STORAGE_MEGABYTES,
     ];
 
 

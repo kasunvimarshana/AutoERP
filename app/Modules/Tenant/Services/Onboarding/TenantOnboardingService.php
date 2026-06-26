@@ -19,7 +19,7 @@ use Modules\Tenant\Constants\TenantOnboardingStep;
 use Modules\Tenant\Constants\TenantStatus;
 use Modules\Tenant\Exceptions\TenantOnboardingOperationException;
 use Modules\Tenant\Repositories\TenantRepositoryInterface;
-use Modules\Tenant\Services\Contracts\TenantAccessProvisionerInterface;
+use Modules\Core\Contracts\TenantAccessProvisionerInterface;
 use Modules\Tenant\Services\Contracts\TenantAuthenticationProvisionerInterface;
 use Modules\Tenant\Services\Contracts\TenantOrganizationProvisionerInterface;
 use Psr\Log\LoggerInterface;

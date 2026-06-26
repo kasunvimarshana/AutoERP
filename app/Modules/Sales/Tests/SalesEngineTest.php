@@ -612,7 +612,7 @@ final class SalesEngineTest extends TestCase
     {
         $tenantId = $this->createTenant('AUTH'.Str::upper(Str::random(2)));
         $otherTenantId = $this->createTenant('AUTH'.Str::upper(Str::random(2)));
-        $userId = (int) DB::table('users')->insertGetId([
+        $userId = (int) \Tests\Support\TenantUserFixture::create([
             'tenant_id' => $tenantId,
             'first_name' => 'Sales',
             'last_name' => 'Auth',
@@ -1007,7 +1007,7 @@ final class SalesEngineTest extends TestCase
         return (int) DB::table('permissions')->insertGetId([
             'tenant_id' => $tenantId,
             'name' => $name,
-            'guard_name' => 'web',
+            'guard_name' => 'auth-api',
             'module' => 'Sales',
             'description' => SalesAuthorizationService::descriptions()[$name] ?? $name,
             'created_at' => now(),
@@ -1020,7 +1020,7 @@ final class SalesEngineTest extends TestCase
         return (int) DB::table('roles')->insertGetId([
             'tenant_id' => $tenantId,
             'name' => $name,
-            'guard_name' => 'web',
+            'guard_name' => 'auth-api',
             'description' => $name,
             'created_at' => now(),
             'updated_at' => now(),

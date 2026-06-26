@@ -17,6 +17,7 @@ final class AuthRegistrationInvitationModel extends TenantOwnedModel
     protected $fillable = [
         'public_id',
         'tenant_id',
+        'user_id',
         'organization_unit_id',
         'role_id',
         'email',
@@ -40,6 +41,7 @@ final class AuthRegistrationInvitationModel extends TenantOwnedModel
     {
         return array_merge(parent::casts(), [
             'tenant_id' => 'integer',
+            'user_id' => 'integer',
             'organization_unit_id' => 'integer',
             'role_id' => 'integer',
             'accepted_by_user_id' => 'integer',

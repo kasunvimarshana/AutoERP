@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Auth;
 
-use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\Core\Contracts\CurrentTenantContextResolverInterface;
 use Modules\Core\Contracts\PasswordHasherInterface;
+use Modules\Tenant\Database\Seeders\TenantSeeder;
+use Tests\Support\TenantUserFixture;
 use Tests\TestCase;
 
 final class AuthFoundationTest extends TestCase
@@ -46,48 +47,35 @@ final class AuthFoundationTest extends TestCase
             ]);
     }
 
-    public function test_seeded_local_admin_can_login_without_tenant_id_from_domain(): void
+    public function test_tenant_seeder_creates_a_draft_tenant_without_a_seeded_tenant_user(): void
     {
-        $this->seed(DatabaseSeeder::class);
-
-        $response = $this->withHeaders(['Host' => 'localhost:5173'])
-            ->postJson('/api/v1/auth/login', [
-                'login_identifier' => 'admin@example.com',
-                'password' => 'password',
-            ]);
-
-        $response->assertOk()
-            ->assertJsonPath('token_type', 'Bearer')
-            ->assertJsonPath('user.email', 'admin@example.com')
-            ->assertJsonPath('user.username', 'admin')
-            ->assertJsonPath('tenant.code', 'AUTOERP')
-            ->assertJsonPath('organization_unit.code', 'HQ')
-            ->assertJsonStructure([
-                'token',
-                'user' => ['id', 'name', 'email'],
-                'tenant' => ['id', 'code', 'name'],
-                'organization_unit' => ['id', 'code', 'name'],
-            ]);
-    }
-
-    public function test_default_tenant_domains_are_seeded_for_local_development(): void
-    {
-        $this->seed(DatabaseSeeder::class);
+        $this->seed(TenantSeeder::class);
 
         $tenantId = (int) DB::table('tenants')->where('code', 'AUTOERP')->value('id');
 
+        $this->assertGreaterThan(0, $tenantId);
+        $this->assertDatabaseHas('tenants', [
+            'id' => $tenantId,
+            'status' => 'draft',
+        ]);
+        $this->assertDatabaseMissing('users', ['tenant_id' => $tenantId]);
+        $this->assertDatabaseMissing('auth_user_password_credentials', ['tenant_id' => $tenantId]);
+    }
+
+    public function test_tenant_seeder_does_not_persist_localhost_or_loopback_domains(): void
+    {
+        $this->seed(TenantSeeder::class);
+
         foreach (['localhost', '127.0.0.1', 'autoerp.local', 'autoerp.test'] as $domain) {
-            $this->assertDatabaseHas('tenant_domains', [
-                'tenant_id' => $tenantId,
-                'domain' => $domain,
-                'status' => 'active',
-            ]);
+            $this->assertDatabaseMissing('tenant_domains', ['domain' => $domain]);
         }
     }
 
-    public function test_tenant_resolver_strips_port_and_resolves_localhost_domain(): void
+    public function test_tenant_resolver_uses_explicit_local_fallback_without_a_persisted_domain(): void
     {
-        $this->seed(DatabaseSeeder::class);
+        config()->set('tenant.resolution.local_fallback_enabled', true);
+        config()->set('tenant.resolution.local_fallback_tenant_code', 'AUTOERP');
+        $this->seed(TenantSeeder::class);
 
         $request = Request::create(
             '/api/v1/auth/login',
@@ -102,27 +90,30 @@ final class AuthFoundationTest extends TestCase
 
         $this->assertNotNull($context);
         $this->assertSame('AUTOERP', $context->tenantCode());
-        $this->assertSame('localhost', $context->domain());
+        $this->assertSame('local_fallback', $context->source());
+        $this->assertDatabaseMissing('tenant_domains', ['domain' => 'localhost']);
     }
 
-    public function test_invalid_password_without_tenant_id_fails_after_domain_resolution(): void
+    public function test_invalid_password_fails_after_explicit_tenant_resolution(): void
     {
-        $this->seed(DatabaseSeeder::class);
+        $context = $this->createAuthContext();
 
-        $response = $this->withHeaders(['Host' => 'localhost'])
+        $response = $this->withHeaders(['Host' => 'acme.example.test'])
             ->postJson('/api/v1/auth/login', [
-                'login_identifier' => 'admin@example.com',
+                'tenant_id' => $context['tenant_id'],
+                'organization_unit_id' => $context['organization_unit_id'],
+                'login_identifier' => 'admin@example.test',
                 'password' => 'wrong-password',
             ]);
 
         $response->assertUnauthorized()
             ->assertJsonPath('success', false)
-            ->assertJsonPath('message', 'Credentials are invalid.');
+            ->assertJsonPath('error.code', 'AUTH_INVALID_CREDENTIALS');
     }
 
     public function test_unknown_domain_returns_tenant_resolution_error_before_login_lookup(): void
     {
-        $this->seed(DatabaseSeeder::class);
+        $this->seed(TenantSeeder::class);
 
         $response = $this->call(
             'POST',
@@ -165,18 +156,20 @@ final class AuthFoundationTest extends TestCase
             ->assertJsonPath('error.code', 'AUTH_INVALID_CREDENTIALS');
     }
 
-    public function test_seeded_local_admin_can_login_with_username(): void
+    public function test_provisioned_tenant_user_can_login_with_username(): void
     {
-        $this->seed(DatabaseSeeder::class);
+        $context = $this->createAuthContext(['username' => 'admin']);
 
-        $this->withHeaders(['Host' => 'localhost'])
+        $this->withHeaders(['Host' => 'acme.example.test'])
             ->postJson('/api/v1/auth/login', [
+                'tenant_id' => $context['tenant_id'],
+                'organization_unit_id' => $context['organization_unit_id'],
                 'login_identifier' => 'admin',
-                'password' => 'password',
+                'password' => 'secret-password',
             ])
             ->assertOk()
             ->assertJsonPath('user.username', 'admin')
-            ->assertJsonPath('user.email', 'admin@example.com');
+            ->assertJsonPath('user.email', 'admin@example.test');
     }
 
     public function test_inactive_user_cannot_login(): void
@@ -311,20 +304,28 @@ final class AuthFoundationTest extends TestCase
     private function createPlatformOperator(): int
     {
         $now = now();
-
-        return (int) DB::table('users')->insertGetId([
-            'tenant_id' => null,
+        $operatorId = (int) DB::table('platform_operators')->insertGetId([
             'first_name' => 'Platform',
             'last_name' => 'Operator',
             'email' => 'platform@example.test',
-            'platform_login_email' => 'platform@example.test',
-            'password' => app(PasswordHasherInterface::class)->hash('platform-password'),
             'status' => 'active',
-            'is_platform_operator' => true,
+            'credentials_ready_at' => $now,
+            'activated_at' => $now,
             'row_version' => 1,
             'created_at' => $now,
             'updated_at' => $now,
         ]);
+        DB::table('auth_platform_operator_password_credentials')->insert([
+            'platform_operator_id' => $operatorId,
+            'password_hash' => app(PasswordHasherInterface::class)->hash('platform-password'),
+            'status' => 'active',
+            'changed_at' => $now,
+            'row_version' => 1,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        return $operatorId;
     }
 
     /**
@@ -367,12 +368,13 @@ final class AuthFoundationTest extends TestCase
             'created_at' => $now,
             'updated_at' => $now,
         ]);
-        $userId = (int) DB::table('users')->insertGetId([
+        $userId = TenantUserFixture::create([
             'tenant_id' => $tenantId,
             'first_name' => 'Ada',
             'last_name' => 'Lovelace',
             'email' => 'admin@example.test',
-            'password' => app(PasswordHasherInterface::class)->hash('secret-password'),
+            'username' => $userOverrides['username'] ?? null,
+            'password' => 'secret-password',
             'status' => $userOverrides['status'] ?? 'active',
             'row_version' => 1,
             'created_at' => $now,

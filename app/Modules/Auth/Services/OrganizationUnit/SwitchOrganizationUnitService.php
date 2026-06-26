@@ -15,9 +15,9 @@ use Modules\Auth\Models\AuthRefreshTokenModel;
 use Modules\Auth\Models\AuthSessionModel;
 use Modules\Core\Contracts\CurrentTenantContextAccessorInterface;
 use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
+use Modules\Core\Contracts\OrganizationUnitDirectoryInterface;
 use Modules\Core\Contracts\OrganizationUnitUserAccessCheckerInterface;
 use Modules\Core\DTOs\DataRecord;
-use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 
 final class SwitchOrganizationUnitService
 {
@@ -25,6 +25,7 @@ final class SwitchOrganizationUnitService
         private readonly CurrentUserContextAccessorInterface $currentUser,
         private readonly CurrentTenantContextAccessorInterface $currentTenant,
         private readonly OrganizationUnitUserAccessCheckerInterface $access,
+        private readonly OrganizationUnitDirectoryInterface $organizationUnits,
         private readonly AuditRecorderInterface $audit,
     ) {}
 
@@ -46,16 +47,7 @@ final class SwitchOrganizationUnitService
             $accessTokenId,
             $sessionId,
         ): DataRecord {
-            $unit = OrganizationUnitModel::query()
-                ->where('tenant_id', $tenantId)
-                ->whereKey($targetOrganizationUnitId)
-                ->where('is_active', true)
-                ->whereNull('retired_at')
-                ->lockForUpdate()
-                ->first();
-            if (! $unit instanceof OrganizationUnitModel) {
-                throw new DomainException('The selected organization unit is inactive, retired, or unavailable.');
-            }
+            $this->organizationUnits->assertActive($tenantId, [$targetOrganizationUnitId], true);
             if (! $this->access->canAccessOrganizationUnit(
                 $user->userId(),
                 $tenantId,
@@ -156,12 +148,14 @@ final class SwitchOrganizationUnitService
                 tags: ['authentication', 'organization-unit', 'scope-switch'],
             ));
 
+            $unit = $this->organizationUnits->summaries($tenantId, [$targetOrganizationUnitId])[$targetOrganizationUnitId] ?? null;
+            if ($unit === null) {
+                throw new DomainException('The selected organization unit is no longer available.');
+            }
+
             return new DataRecord([
-                'id' => (int) $unit->getKey(),
+                ...$unit,
                 'tenant_id' => $tenantId,
-                'name' => (string) $unit->getAttribute('name'),
-                'code' => $unit->getAttribute('code'),
-                'path' => (string) $unit->getAttribute('path'),
                 'is_active' => true,
             ]);
         }, 3);

@@ -12,10 +12,11 @@ return new class extends Migration
     {
         Schema::create('auth_platform_mfa_methods', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('user_id')->unique('auth_platform_mfa_methods_user_uk')->constrained('users', 'id')->cascadeOnDelete();
+            $table->foreignId('platform_operator_id')->unique('auth_platform_mfa_operator_uk')
+                ->constrained('platform_operators', 'id')->cascadeOnDelete();
             $table->text('secret');
             $table->text('backup_code_hashes')->nullable();
-            $table->enum('status', ['pending', 'active', 'disabled'])->default('pending');
+            $table->string('status', 30)->default('pending');
             $table->timestamp('confirmed_at')->nullable();
             $table->timestamp('last_used_at')->nullable();
             $table->unsignedBigInteger('row_version')->default(1);

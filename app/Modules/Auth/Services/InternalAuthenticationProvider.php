@@ -9,7 +9,7 @@ use Modules\Auth\Contracts\Providers\IdentityProviderInterface;
 use Modules\Auth\DTOs\LoginData;
 use Modules\Auth\DTOs\RegistrationData;
 use Modules\Auth\Repositories\AuthProviderRepositoryInterface;
-use Modules\Core\Contracts\PasswordHasherInterface;
+use Modules\Auth\Services\Credentials\PasswordCredentialService;
 use Modules\User\Repositories\UserOrganizationUnitRepositoryInterface;
 use Modules\User\Repositories\UserRepositoryInterface;
 
@@ -20,7 +20,7 @@ final class InternalAuthenticationProvider implements AuthenticationProviderInte
         private readonly AuthProviderRepositoryInterface $providers,
         private readonly IdentityProviderInterface $identities,
         private readonly UserOrganizationUnitRepositoryInterface $organizationUnitAssignments,
-        private readonly PasswordHasherInterface $passwordHasher,
+        private readonly PasswordCredentialService $credentials,
     ) {}
 
     public function key(): string
@@ -56,8 +56,7 @@ final class InternalAuthenticationProvider implements AuthenticationProviderInte
             return null;
         }
 
-        $hashedPassword = (string) $user->get('password', '');
-        if (! $this->passwordHasher->verify($data->password, $hashedPassword)) {
+        if (! $this->credentials->verifyTenantUser($data->tenantId, (int) $user->id(), $data->password)) {
             return null;
         }
 

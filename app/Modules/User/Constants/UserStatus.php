@@ -7,35 +7,20 @@ namespace Modules\User\Constants;
 final class UserStatus
 {
     public const INVITED = 'invited';
-
     public const ACTIVE = 'active';
-
     public const INACTIVE = 'inactive';
-
     public const SUSPENDED = 'suspended';
 
-    /**
-     * @return list<string>
-     */
+    /** @return list<string> */
     public static function values(): array
     {
-        return [
-            self::ACTIVE,
-            self::INACTIVE,
-            self::SUSPENDED,
-        ];
+        return [self::INVITED, self::ACTIVE, self::INACTIVE, self::SUSPENDED];
     }
 
     /** @return list<string> */
-    public static function platformOperatorListValues(): array
+    public static function mutableValues(): array
     {
-        return [self::INVITED, self::ACTIVE, self::INACTIVE];
-    }
-
-    /** @return list<string> */
-    public static function platformOperatorMutableValues(): array
-    {
-        return [self::ACTIVE, self::INACTIVE];
+        return [self::ACTIVE, self::INACTIVE, self::SUSPENDED];
     }
 
     private function __construct() {}

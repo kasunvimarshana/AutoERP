@@ -10,7 +10,7 @@ use Modules\Core\Contracts\CurrentTenantContextAccessorInterface;
 use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
 use Modules\Core\Contracts\PermissionCheckerInterface;
 use Modules\Core\Contracts\PlatformPermissionCheckerInterface;
-use Modules\User\Constants\PlatformPermission;
+use Modules\Core\Authorization\PlatformPermission;
 
 final class ConfigurationAuthorizationService
 {

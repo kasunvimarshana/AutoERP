@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Modules\Core\DTOs\DataRecord;
 use Modules\Core\Repositories\EloquentRepository;
+use Modules\User\Constants\UserGuard;
 use Modules\User\Models\UserRoleModel;
 
 final class EloquentUserRoleRepository extends EloquentRepository implements UserRoleRepositoryInterface
@@ -44,6 +45,7 @@ final class EloquentUserRoleRepository extends EloquentRepository implements Use
             })
             ->where('user_roles.tenant_id', $tenantId)
             ->where('user_roles.user_id', $userId)
+            ->where('roles.guard_name', UserGuard::TENANT_API)
             ->whereNull('roles.deleted_at')
             ->select(['roles.id', 'roles.name']);
 

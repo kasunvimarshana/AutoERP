@@ -5,38 +5,35 @@ declare(strict_types=1);
 namespace Modules\User\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Core\Models\TenantOwnedModel;
-use Modules\OrganizationUnit\Models\OrganizationUnitModel;
-use Modules\Tenant\Models\TenantModel;
 
 final class UserDocumentModel extends TenantOwnedModel
 {
-    protected $table = 'user_documents';
+    use SoftDeletes;
 
-    protected $guarded = ['id'];
+    protected $table = 'user_documents';
+    protected $fillable = [
+        'tenant_id', 'row_version', 'user_id', 'name',
+        'active_name_key', 'document_type', 'object_key', 'original_filename',
+        'mime_type', 'size_bytes', 'checksum_sha256', 'scan_engine', 'scanned_at',
+        'uploaded_by_user_id', 'updated_by_user_id',
+    ];
+    protected $hidden = ['object_key', 'active_name_key'];
+
+    protected static function booted(): void
+    {
+        static::saving(function (self $document): void {
+            $name = trim((string) $document->getAttribute('name'));
+            $document->setAttribute('name', $name);
+            $document->setAttribute('active_name_key', $document->getAttribute('deleted_at') === null ? mb_strtolower($name) : null);
+        });
+    }
 
     protected function casts(): array
     {
-        return array_merge(parent::casts(), [
-            'tenant_id' => 'integer',
-            'organization_unit_id' => 'integer',
-            'user_id' => 'integer',
-            'size' => 'integer',
-        ]);
+        return array_merge(parent::casts(), ['row_version' => 'integer', 'size_bytes' => 'integer', 'scanned_at' => 'datetime']);
     }
 
-    public function tenant(): BelongsTo
-    {
-        return $this->belongsTo(TenantModel::class, 'tenant_id');
-    }
-
-    public function organizationUnit(): BelongsTo
-    {
-        return $this->belongsTo(OrganizationUnitModel::class, 'organization_unit_id');
-    }
-
-    public function user(): BelongsTo
-    {
-        return $this->belongsTo(UserModel::class, 'user_id');
-    }
+    public function user(): BelongsTo { return $this->belongsTo(UserModel::class, 'user_id'); }
 }

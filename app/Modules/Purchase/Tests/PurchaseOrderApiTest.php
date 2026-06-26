@@ -1242,7 +1242,7 @@ final class PurchaseOrderApiTest extends TestCase
     {
         $now = now();
         $email = 'purchase-'.Str::lower($suffix).'@example.test';
-        $userId = (int) DB::table('users')->insertGetId([
+        $userId = (int) \Tests\Support\TenantUserFixture::create([
             'tenant_id' => $tenantId,
             'first_name' => 'Purchase',
             'last_name' => 'Tester',
@@ -1269,7 +1269,7 @@ final class PurchaseOrderApiTest extends TestCase
         $roleId = (int) DB::table('roles')->insertGetId([
             'tenant_id' => $tenantId,
             'name' => 'Purchase Test Role',
-            'guard_name' => 'web',
+            'guard_name' => 'auth-api',
             'description' => 'Purchase test role',
             'row_version' => 1,
             'created_at' => $now,
@@ -1333,7 +1333,7 @@ final class PurchaseOrderApiTest extends TestCase
             $permissionId = (int) DB::table('permissions')->insertGetId([
                 'tenant_id' => $context['tenant_id'],
                 'name' => $permission,
-                'guard_name' => 'web',
+                'guard_name' => 'auth-api',
                 'module' => 'Purchase',
                 'description' => PurchaseAuthorizationService::descriptions()[$permission] ?? 'Purchase test permission',
                 'row_version' => 1,
@@ -1375,7 +1375,7 @@ final class PurchaseOrderApiTest extends TestCase
             $ids[] = (int) DB::table('permissions')->insertGetId([
                 'tenant_id' => $tenantId,
                 'name' => $name,
-                'guard_name' => 'web',
+                'guard_name' => 'auth-api',
                 'module' => $supplierDescription === null ? 'Purchase' : 'Supplier',
                 'description' => $supplierDescription ?? PurchaseAuthorizationService::descriptions()[$name] ?? 'Purchase test permission',
                 'row_version' => 1,

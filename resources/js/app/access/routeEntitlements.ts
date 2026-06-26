@@ -63,7 +63,12 @@ const rules: readonly EntitlementRule[] = [
     operational('/vouchers/*'),
     // Tenant administration and access control.
     operational('/access/users/create', undefined, [accessPermissions.usersCreate]),
-    operational('/access/users/:id/edit', undefined, [accessPermissions.usersUpdate]),
+    operational('/access/users/:id/edit', undefined, [
+        accessPermissions.usersUpdate,
+        accessPermissions.usersAssignRoles,
+        accessPermissions.usersAssignPermissions,
+        accessPermissions.usersManageOrganizationAccess,
+    ]),
     operational('/access/users/:id', undefined, [accessPermissions.usersView]),
     operational('/access/users', undefined, [accessPermissions.usersView]),
     operational('/access/roles/create', undefined, [accessPermissions.rolesCreate]),

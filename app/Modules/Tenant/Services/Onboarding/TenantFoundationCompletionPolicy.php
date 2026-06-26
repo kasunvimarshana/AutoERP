@@ -8,7 +8,7 @@ use Modules\Tenant\Constants\TenantOnboardingStep;
 use Modules\Tenant\Constants\TenantOnboardingStepStatus;
 use Modules\Tenant\Models\TenantOnboardingStateModel;
 use Modules\Tenant\Models\TenantOnboardingStepModel;
-use Modules\Tenant\Services\Contracts\TenantAccessProvisionerInterface;
+use Modules\Core\Contracts\TenantAccessProvisionerInterface;
 use Modules\Tenant\Services\Contracts\TenantAuthenticationProvisionerInterface;
 use Modules\Tenant\Services\Contracts\TenantOrganizationProvisionerInterface;
 

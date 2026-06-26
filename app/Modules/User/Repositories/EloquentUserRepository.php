@@ -14,101 +14,50 @@ use Modules\User\Models\UserModel;
 
 final class EloquentUserRepository extends EloquentRepository implements UserRepositoryInterface
 {
-    public function __construct(
-        UserModel $model,
-        private readonly TenantExecutionContextInterface $executionContext,
-    ) {
-        parent::__construct($model);
-    }
-
-    public function findActivePlatformOperatorCredentials(string $email): ?DataRecord
+    public function __construct(UserModel $model, private readonly TenantExecutionContextInterface $executionContext)
     {
-        return $this->executionContext->runAsControlPlane(function () use ($email): ?DataRecord {
-            $model = $this->query()
-                ->whereNull('tenant_id')
-                ->where('is_platform_operator', true)
-                ->where('status', 'active')
-                ->where('platform_login_email', strtolower(trim($email)))
-                ->first();
-
-            if (! $model instanceof UserModel) {
-                return null;
-            }
-
-            return new DataRecord([
-                'id' => (int) $model->getKey(),
-                'first_name' => $model->getAttribute('first_name'),
-                'last_name' => $model->getAttribute('last_name'),
-                'email' => $model->getAttribute('platform_login_email'),
-                'password_hash' => $model->getAttribute('password'),
-                'status' => $model->getAttribute('status'),
-                'is_platform_operator' => true,
-            ]);
-        });
+        parent::__construct($model);
     }
 
     public function countByTenant(int $tenantId): int
     {
-        return $this->query()->where('tenant_id', $tenantId)->count();
+        return $this->executionContext->runForTenant($tenantId, fn (): int => $this->query()->where('tenant_id', $tenantId)->count());
     }
 
     public function lockByIdForTenant(int|string $id, int $tenantId): ?DataRecord
     {
-        $model = $this->query()
-            ->where('tenant_id', $tenantId)
-            ->whereKey($id)
-            ->lockForUpdate()
-            ->first();
-
-        return $model instanceof Model ? $this->toRecord($model) : null;
+        return $this->executionContext->runForTenant($tenantId, function () use ($id, $tenantId): ?DataRecord {
+            $model = $this->query()->where('tenant_id', $tenantId)->whereKey($id)->lockForUpdate()->first();
+            return $model instanceof Model ? $this->toRecord($model) : null;
+        });
     }
 
-    public function findByTenantAndEmail(?int $tenantId, string $email, ?int $excludeId = null): ?DataRecord
+    public function findByTenantAndEmail(int $tenantId, string $email, ?int $excludeId = null, bool $includeDeleted = false): ?DataRecord
     {
-        $query = $this->query()->where('email', strtolower(trim($email)));
-
-        $this->applyTenantScope($query, $tenantId);
-
-        if ($excludeId !== null) {
-            $query->where('id', '!=', $excludeId);
-        }
-
-        $model = $query->first();
-
-        return $model instanceof Model ? new DataRecord($model->getAttributes()) : null;
+        return $this->findByNormalizedKey($tenantId, 'email', strtolower(trim($email)), $excludeId, $includeDeleted);
     }
 
-    public function findByTenantAndUsername(?int $tenantId, string $username, ?int $excludeId = null): ?DataRecord
+    public function findByTenantAndUsername(int $tenantId, string $username, ?int $excludeId = null, bool $includeDeleted = false): ?DataRecord
     {
-        $query = $this->query()->where('username', strtolower(trim($username)));
-
-        $this->applyTenantScope($query, $tenantId);
-
-        if ($excludeId !== null) {
-            $query->where('id', '!=', $excludeId);
-        }
-
-        $model = $query->first();
-
-        return $model instanceof Model ? new DataRecord($model->getAttributes()) : null;
+        return $this->findByNormalizedKey($tenantId, 'username', strtolower(trim($username)), $excludeId, $includeDeleted);
     }
 
     public function findByTenantAndLoginIdentifier(int $tenantId, string $identifier): ?DataRecord
     {
-        $normalized = strtolower(trim($identifier));
-        $model = $this->query()
-            ->where('tenant_id', $tenantId)
-            ->where(function (Builder $query) use ($normalized): void {
-                $query->where('email', $normalized)
-                    ->orWhere('username', $normalized);
-            })
-            ->first();
-
-        return $model instanceof Model ? new DataRecord($model->getAttributes()) : null;
+        return $this->executionContext->runForTenant($tenantId, function () use ($tenantId, $identifier): ?DataRecord {
+            $normalized = strtolower(trim($identifier));
+            $model = $this->query()
+                ->where('tenant_id', $tenantId)
+                ->where(function (Builder $query) use ($normalized): void {
+                    $query->where('email', $normalized)->orWhere('username', $normalized);
+                })
+                ->first();
+            return $model instanceof Model ? $this->toRecord($model) : null;
+        });
     }
 
     public function pageByFilters(
-        ?int $tenantId,
+        int $tenantId,
         ?string $search,
         ?string $status,
         ?int $roleId,
@@ -116,90 +65,61 @@ final class EloquentUserRepository extends EloquentRepository implements UserRep
         int $perPage,
         int $page,
     ): PagedResult {
-        $query = $this->query();
-
-        $this->applyTenantScope($query, $tenantId);
-
-        if ($status !== null && trim($status) !== '') {
-            $query->where('status', trim(strtolower($status)));
-        }
-
-        if ($roleId !== null) {
-            $query->whereExists(function ($subquery) use ($roleId, $tenantId): void {
-                $subquery->selectRaw('1')
-                    ->from('user_roles')
-                    ->whereColumn('user_roles.user_id', 'users.id')
-                    ->where('user_roles.role_id', $roleId);
-
-                if ($tenantId === null) {
-                    $subquery->whereNull('user_roles.tenant_id');
-                } else {
-                    $subquery->where('user_roles.tenant_id', $tenantId);
-                }
-            });
-        }
-
-        if ($organizationUnitId !== null) {
-            $query->whereExists(function ($subquery) use ($organizationUnitId, $tenantId): void {
-                $subquery->selectRaw('1')
-                    ->from('user_organization_units')
-                    ->whereColumn('user_organization_units.user_id', 'users.id')
-                    ->where('user_organization_units.organization_unit_id', $organizationUnitId)
-                    ->where('user_organization_units.status', 'active');
-
-                if ($tenantId !== null) {
-                    $subquery->where('user_organization_units.tenant_id', $tenantId);
-                }
-            });
-        }
-
-        if ($search !== null && trim($search) !== '') {
-            $term = trim($search);
-            $query->where(function (Builder $builder) use ($term): void {
-                $builder->where('first_name', 'like', '%'.$term.'%')
-                    ->orWhere('last_name', 'like', '%'.$term.'%')
-                    ->orWhere('username', 'like', '%'.$term.'%')
-                    ->orWhere('email', 'like', '%'.$term.'%')
-                    ->orWhere('phone', 'like', '%'.$term.'%');
-            });
-        }
-
-        $paginator = $query
-            ->orderBy('first_name')
-            ->orderBy('last_name')
-            ->paginate(max(1, $perPage), ['*'], 'page', max(1, $page));
-
-        $items = [];
-        foreach ($paginator->items() as $model) {
-            if ($model instanceof Model) {
-                $items[] = $this->toRecord($model);
+        return $this->executionContext->runForTenant($tenantId, function () use (
+            $tenantId, $search, $status, $roleId, $organizationUnitId, $perPage, $page,
+        ): PagedResult {
+            $query = $this->query()->where('tenant_id', $tenantId);
+            if ($status !== null && trim($status) !== '') {
+                $query->where('status', strtolower(trim($status)));
             }
-        }
-
-        return new PagedResult($items, $paginator->total(), $paginator->currentPage(), $paginator->perPage());
+            if ($roleId !== null) {
+                $query->whereHas('roles', fn (Builder $roles): Builder => $roles->where('role_id', $roleId));
+            }
+            if ($organizationUnitId !== null) {
+                $query->whereHas('organizationUnitAssignments', fn (Builder $assignments): Builder => $assignments
+                    ->where('organization_unit_id', $organizationUnitId)
+                    ->where('status', 'active'));
+            }
+            $term = trim((string) $search);
+            if ($term !== '') {
+                $prefix = $term.'%';
+                $query->where(function (Builder $builder) use ($prefix): void {
+                    $builder->where('first_name', 'like', $prefix)
+                        ->orWhere('last_name', 'like', $prefix)
+                        ->orWhere('username', 'like', $prefix)
+                        ->orWhere('email', 'like', $prefix)
+                        ->orWhere('phone', 'like', $prefix);
+                });
+            }
+            $paginator = $query->orderBy('first_name')->orderBy('last_name')
+                ->paginate(max(1, $perPage), ['*'], 'page', max(1, $page));
+            $items = array_values(array_filter(array_map(
+                fn (mixed $model): ?DataRecord => $model instanceof Model ? $this->toRecord($model) : null,
+                $paginator->items(),
+            )));
+            return new PagedResult($items, $paginator->total(), $paginator->currentPage(), $paginator->perPage());
+        });
     }
 
-    public function findByTenantAndIdentityReference(
+    private function findByNormalizedKey(
         int $tenantId,
-        string $providerKey,
-        string $providerUserKey,
+        string $column,
+        string $value,
+        ?int $excludeId,
+        bool $includeDeleted,
     ): ?DataRecord {
-        $query = $this->query()->where('tenant_id', $tenantId);
-        $query->where('metadata->identity_references->'.$providerKey, $providerUserKey);
-
-        $model = $query->first();
-
-        return $model instanceof Model ? $this->toRecord($model) : null;
-    }
-
-    private function applyTenantScope(Builder $query, ?int $tenantId): void
-    {
-        if ($tenantId === null) {
-            $query->whereNull('tenant_id');
-
-            return;
-        }
-
-        $query->where('tenant_id', $tenantId);
+        return $this->executionContext->runForTenant($tenantId, function () use (
+            $tenantId, $column, $value, $excludeId, $includeDeleted,
+        ): ?DataRecord {
+            $query = $this->query()->where('tenant_id', $tenantId)->where($column, $value);
+            if ($includeDeleted) {
+                $query->withTrashed();
+            }
+            if ($excludeId !== null) {
+                $query->where($query->getModel()->getKeyName(), '!=', $excludeId);
+            }
+            $model = $query->first();
+            return $model instanceof Model ? $this->toRecord($model) : null;
+        });
     }
 }

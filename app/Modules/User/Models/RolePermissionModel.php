@@ -6,38 +6,12 @@ namespace Modules\User\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Core\Models\TenantOwnedModel;
-use Modules\Tenant\Models\TenantModel;
 
 final class RolePermissionModel extends TenantOwnedModel
 {
     protected $table = 'role_permissions';
+    protected $fillable = ['tenant_id', 'row_version', 'role_id', 'permission_id', 'created_by_user_id', 'updated_by_user_id'];
 
-    protected $guarded = ['id'];
-
-    public $timestamps = false;
-
-    protected function casts(): array
-    {
-        return array_merge(parent::casts(), [
-            'tenant_id' => 'integer',
-            'role_id' => 'integer',
-            'permission_id' => 'integer',
-        ]);
-    }
-
-    public function tenant(): BelongsTo
-    {
-        return $this->belongsTo(TenantModel::class, 'tenant_id');
-    }
-
-
-    public function role(): BelongsTo
-    {
-        return $this->belongsTo(RoleModel::class, 'role_id');
-    }
-
-    public function permission(): BelongsTo
-    {
-        return $this->belongsTo(PermissionModel::class, 'permission_id');
-    }
+    public function role(): BelongsTo { return $this->belongsTo(RoleModel::class, 'role_id'); }
+    public function permission(): BelongsTo { return $this->belongsTo(PermissionModel::class, 'permission_id'); }
 }

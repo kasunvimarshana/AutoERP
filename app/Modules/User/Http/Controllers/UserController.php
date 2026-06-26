@@ -5,114 +5,121 @@ declare(strict_types=1);
 namespace Modules\User\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
-use Modules\User\Constants\UserErrorCode;
-use Modules\User\Constants\UserPermission;
-use Modules\User\Http\Requests\AssignUserToOrganizationUnitRequest;
-use Modules\User\Http\Requests\ListUserEntityRequest;
-use Modules\User\Http\Requests\ResolveUserByIdentityRequest;
-use Modules\User\Http\Requests\UpsertUserRequest;
+use Modules\User\Http\Requests\Users\ChangeUserStatusRequest;
+use Modules\User\Http\Requests\Users\CreateUserRequest;
+use Modules\User\Http\Requests\Users\ListUsersRequest;
+use Modules\User\Http\Requests\Users\SyncUserOrganizationAccessRequest;
+use Modules\User\Http\Requests\Users\SyncUserPermissionsRequest;
+use Modules\User\Http\Requests\Users\SyncUserRolesRequest;
+use Modules\User\Http\Requests\Users\UpdateUserProfileRequest;
+use Modules\User\Http\Requests\Users\VersionedUserActionRequest;
 use Modules\User\Http\Resources\UserRecordResource;
-use Modules\User\Services\UserService;
+use Modules\User\Services\UserAccountService;
+use Modules\User\Services\UserOrganizationAccessService;
+use Modules\User\Services\UserPermissionAssignmentService;
+use Modules\User\Services\UserReadService;
+use Modules\User\Services\UserRoleAssignmentService;
 
 final class UserController extends AbstractUserCrudController
 {
-    public function __construct(private readonly UserService $service) {}
+    public function __construct(
+        private readonly UserReadService $queries,
+        private readonly UserAccountService $accounts,
+        private readonly UserRoleAssignmentService $roles,
+        private readonly UserPermissionAssignmentService $permissions,
+        private readonly UserOrganizationAccessService $organizationAccess,
+    ) {}
 
-    public function index(ListUserEntityRequest $request): JsonResponse
+    public function index(ListUsersRequest $request): JsonResponse
     {
-        return $this->responseForList($this->service->list($request->validated()));
+        return $this->responseForList($this->queries->list($request->validated()));
     }
 
     public function show(int|string $user): JsonResponse|UserRecordResource
     {
-        if (! $this->canUse(UserPermission::USERS_VIEW)) {
-            return $this->forbidden();
-        }
-
-        return $this->responseForShow($this->service->get($user));
+        return $this->responseForShow($this->queries->get($user));
     }
 
-    public function store(UpsertUserRequest $request): JsonResponse|UserRecordResource
+    public function store(CreateUserRequest $request): JsonResponse|UserRecordResource
     {
-        return $this->responseForStore($this->service->create($request->validated()));
+        return $this->responseForStore($this->accounts->create($request->validated()));
     }
 
-    public function update(UpsertUserRequest $request, int|string $user): JsonResponse|UserRecordResource
+    public function update(UpdateUserProfileRequest $request, int|string $user): JsonResponse|UserRecordResource
     {
-        return $this->responseForUpdate($this->service->update($user, $request->validated()));
+        $payload = $request->validated();
+        $expectedVersion = (int) $payload['expected_version'];
+        unset($payload['expected_version']);
+
+        return $this->responseForUpdate($this->accounts->updateProfile($user, $expectedVersion, $payload));
     }
 
-    public function destroy(int|string $user): JsonResponse
+    public function changeStatus(ChangeUserStatusRequest $request, int|string $user): JsonResponse|UserRecordResource
     {
-        if (! $this->canUse(UserPermission::USERS_DELETE)) {
-            return $this->forbidden();
-        }
-
-        return $this->responseForDelete($this->service->delete($user));
-    }
-
-    public function activate(int|string $user): JsonResponse|UserRecordResource
-    {
-        if (! $this->canUse(UserPermission::USERS_ACTIVATE)) {
-            return $this->forbidden();
-        }
-
-        return $this->responseForUpdate($this->service->activate($user));
-    }
-
-    public function deactivate(int|string $user): JsonResponse|UserRecordResource
-    {
-        if (! $this->canUse(UserPermission::USERS_DEACTIVATE)) {
-            return $this->forbidden();
-        }
-
-        return $this->responseForUpdate($this->service->deactivate($user));
-    }
-
-    public function suspend(int|string $user): JsonResponse|UserRecordResource
-    {
-        if (! $this->canUse(UserPermission::USERS_DEACTIVATE)) {
-            return $this->forbidden();
-        }
-
-        return $this->responseForUpdate($this->service->suspend($user));
-    }
-
-    public function assignOrganizationUnit(
-        AssignUserToOrganizationUnitRequest $request,
-        int|string $user,
-    ): JsonResponse|UserRecordResource {
-        return $this->responseForStore($this->service->assignUserToOrganizationUnit($user, $request->validated()));
-    }
-
-    public function removeOrganizationUnit(
-        int|string $user,
-        int|string $organizationUnit,
-    ): JsonResponse {
-        if (! $this->canUse(UserPermission::USERS_MANAGE_ORGANIZATION_ACCESS)) {
-            return $this->forbidden();
-        }
-
-        return $this->responseForDelete(
-            $this->service->removeUserFromOrganizationUnit($user, $organizationUnit),
-            UserErrorCode::ASSIGNMENT_NOT_FOUND,
-        );
-    }
-
-    public function resolveByIdentity(
-        ResolveUserByIdentityRequest $request,
-    ): JsonResponse|UserRecordResource {
-        if (! $this->canUse(UserPermission::USERS_VIEW)) {
-            return $this->forbidden();
-        }
-
         $payload = $request->validated();
 
-        return $this->responseForShow(
-            $this->service->resolveByIdentity(
-                (string) $payload['provider_key'],
-                (string) $payload['provider_user_key'],
-            ),
-        );
+        return $this->responseForUpdate($this->accounts->changeStatus(
+            $user,
+            (int) $payload['expected_version'],
+            (string) $payload['status'],
+            (string) $payload['reason'],
+        ));
+    }
+
+    public function syncRoles(SyncUserRolesRequest $request, int|string $user): JsonResponse|UserRecordResource
+    {
+        $payload = $request->validated();
+
+        return $this->responseForUpdate($this->roles->sync(
+            $user,
+            (int) $payload['expected_version'],
+            $payload['role_ids'],
+        ));
+    }
+
+    public function syncPermissions(SyncUserPermissionsRequest $request, int|string $user): JsonResponse|UserRecordResource
+    {
+        $payload = $request->validated();
+
+        return $this->responseForUpdate($this->permissions->sync(
+            $user,
+            (int) $payload['expected_version'],
+            $payload['permission_ids'],
+        ));
+    }
+
+    public function syncOrganizationAccess(
+        SyncUserOrganizationAccessRequest $request,
+        int|string $user,
+    ): JsonResponse|UserRecordResource {
+        $payload = $request->validated();
+
+        return $this->responseForUpdate($this->organizationAccess->sync(
+            $user,
+            (int) $payload['expected_version'],
+            $payload['organization_unit_ids'],
+            (int) $payload['default_organization_unit_id'],
+        ));
+    }
+
+    public function resendInvitation(
+        VersionedUserActionRequest $request,
+        int|string $user,
+    ): JsonResponse|UserRecordResource {
+        return $this->responseForUpdate($this->accounts->resendInvitation(
+            $user,
+            (int) $request->validated('expected_version'),
+        ));
+    }
+
+    public function destroy(VersionedUserActionRequest $request, int|string $user): JsonResponse
+    {
+        $payload = $request->validated();
+
+        return $this->responseForDelete($this->accounts->delete(
+            $user,
+            (int) $payload['expected_version'],
+            (string) $payload['reason'],
+        ));
     }
 }

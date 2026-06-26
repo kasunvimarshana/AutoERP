@@ -8,7 +8,10 @@ use Illuminate\Routing\Router;
 use Illuminate\Support\ServiceProvider;
 use LogicException;
 use Modules\Core\Contracts\CurrentTenantContextResolverInterface;
+use Modules\Core\Contracts\TenantAggregateLockInterface;
+use Modules\Core\Contracts\TenantEntitlementReaderInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
+use Modules\Core\Contracts\TenantPrivateFileServiceInterface;
 use Modules\Tenant\Console\Commands\TenantActivateCommand;
 use Modules\Tenant\Console\Commands\TenantCreateCommand;
 use Modules\Tenant\Console\Commands\TenantDeactivateCommand;
@@ -51,6 +54,7 @@ use Modules\Configuration\Contracts\ConfigurationTargetPopulationInterface;
 use Modules\Configuration\Contracts\ConfigurationTargetValidatorInterface;
 use Modules\Tenant\Services\Configuration\TenantConfigurationTargetPopulation;
 use Modules\Tenant\Services\Configuration\TenantConfigurationTargetValidator;
+use Modules\Tenant\Services\Concurrency\TenantAggregateLock;
 use Modules\Tenant\Services\CurrentTenantContextResolver;
 use Modules\Tenant\Services\Domains\DnsTenantDomainOwnershipVerifier;
 use Modules\Tenant\Services\Domains\TenantDomainReadinessPolicy;
@@ -60,6 +64,7 @@ use Modules\Tenant\Services\Documents\Scanning\TrustedLocalTenantDocumentScanner
 use Modules\Tenant\Services\Hosts\PlatformHostPolicy;
 use Modules\Tenant\Services\Rules\TenantValueNormalizer;
 use Modules\Tenant\Services\Storage\TenantBrandingAssetReader;
+use Modules\Tenant\Services\Storage\TenantPrivateFileService;
 use Modules\Tenant\Services\Subscriptions\TenantStorageLimitUsageContributor;
 use Modules\Tenant\Services\Subscriptions\TenantSubscriptionReadinessService;
 use Modules\Tenant\Services\Subscriptions\TenantSubscriptionPresenter;
@@ -90,6 +95,9 @@ final class TenantServiceProvider extends ServiceProvider
             };
         });
         $this->app->singleton(PlatformHostPolicy::class);
+        $this->app->scoped(TenantAggregateLockInterface::class, TenantAggregateLock::class);
+        $this->app->scoped(TenantEntitlementReaderInterface::class, \Modules\Tenant\Services\TenantEntitlementService::class);
+        $this->app->singleton(TenantPrivateFileServiceInterface::class, TenantPrivateFileService::class);
         $this->app->singleton(TenantRepositoryInterface::class, fn ($app): TenantRepositoryInterface => new EloquentTenantRepository(
             new TenantModel,
             $app->make(\Modules\Core\Contracts\ClockInterface::class),

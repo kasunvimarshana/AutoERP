@@ -629,7 +629,7 @@ final class ItemApiTest extends TestCase
             'updated_at' => $now,
         ]);
         $email = (string) ($overrides['email'] ?? 'item-admin@example.test');
-        $userId = (int) DB::table('users')->insertGetId([
+        $userId = (int) \Tests\Support\TenantUserFixture::create([
             'tenant_id' => $tenantId,
             'first_name' => 'Item',
             'last_name' => 'Tester',
@@ -654,7 +654,7 @@ final class ItemApiTest extends TestCase
         $roleId = (int) DB::table('roles')->insertGetId([
             'tenant_id' => $tenantId,
             'name' => 'Item Test Role',
-            'guard_name' => 'web',
+            'guard_name' => 'auth-api',
             'description' => 'Item test role',
             'row_version' => 1,
             'created_at' => $now,
@@ -714,7 +714,7 @@ final class ItemApiTest extends TestCase
             $ids[] = (int) DB::table('permissions')->insertGetId([
                 'tenant_id' => $tenantId,
                 'name' => $name,
-                'guard_name' => 'web',
+                'guard_name' => 'auth-api',
                 'module' => 'Item',
                 'description' => ItemAuthorizationService::descriptions()[$name] ?? 'Item test permission',
                 'row_version' => 1,

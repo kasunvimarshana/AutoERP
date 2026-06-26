@@ -1,9 +1,9 @@
 export const endpoints = {
     auth: '/api/v1/auth',
     auditLogs: '/api/v1/audit-logs',
-    users: '/api/user/users',
-    roles: '/api/user/roles',
-    permissions: '/api/user/permissions',
+    users: '/api/v1/users',
+    roles: '/api/v1/roles',
+    permissions: '/api/v1/permissions',
     organizationUnits: '/api/v1/organization-units',
     configuration: '/api/v1/configuration',
     countries: '/api/v1/countries',

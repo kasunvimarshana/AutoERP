@@ -10,15 +10,16 @@ use Illuminate\Support\Str;
 use Modules\Auth\Constants\InvitationDeliveryStatus;
 use Modules\Auth\Constants\RegistrationInvitationPurpose;
 use Modules\Auth\Constants\RegistrationInvitationStatus;
-use Modules\Auth\Jobs\DeliverInitialAdministratorInvitation;
+use Modules\Auth\Jobs\DeliverRegistrationInvitation;
 use Modules\Auth\Models\AuthRegistrationInvitationDeliveryModel;
 use Modules\Auth\Models\AuthRegistrationInvitationModel;
 use Modules\Core\Contracts\ClockInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\Core\DTOs\DataRecord;
+use Modules\User\Contracts\TenantUserInvitationIssuerInterface;
 use RuntimeException;
 
-final class RegistrationInvitationService
+final class RegistrationInvitationService implements TenantUserInvitationIssuerInterface
 {
     private const DEFAULT_EXPIRY_HOURS = 72;
     private const REPLACED_REASON = 'Replaced by a newer initial administrator invitation.';
@@ -30,6 +31,97 @@ final class RegistrationInvitationService
         private readonly TenantExecutionContextInterface $executionContext,
         private readonly ClockInterface $clock,
     ) {}
+
+    /** @return array{invitation_id:int,expires_at:string,delivery_status:string} */
+    public function issueForUser(int $tenantId, int $userId, string $email): array
+    {
+        $email = strtolower(trim($email));
+        $plainToken = bin2hex(random_bytes(32));
+        $expiresAt = $this->invitationExpiry();
+
+        [$invitation, $delivery] = DB::transaction(function () use ($tenantId, $userId, $email, $plainToken, $expiresAt): array {
+            $pendingInvitations = $this->invitations->newQuery()
+                ->where('tenant_id', $tenantId)
+                ->where('user_id', $userId)
+                ->where('purpose', RegistrationInvitationPurpose::USER_INVITATION)
+                ->where('status', RegistrationInvitationStatus::PENDING)
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+
+            foreach ($pendingInvitations as $pendingInvitation) {
+                $this->revokeLocked($pendingInvitation, 'Replaced by a newer user invitation.');
+            }
+
+            $invitation = $this->invitations->newQuery()->create([
+                'public_id' => (string) Str::uuid(),
+                'tenant_id' => $tenantId,
+                'user_id' => $userId,
+                'organization_unit_id' => null,
+                'role_id' => null,
+                'email' => $email,
+                'token_hash' => hash('sha256', $plainToken),
+                'delivery_token' => $plainToken,
+                'purpose' => RegistrationInvitationPurpose::USER_INVITATION,
+                'status' => RegistrationInvitationStatus::PENDING,
+                'expires_at' => $expiresAt,
+                'row_version' => 1,
+            ]);
+            $delivery = $this->createDelivery($invitation, 1);
+
+            return [$invitation, $delivery];
+        }, 3);
+
+        $this->dispatchDelivery($tenantId, (int) $delivery->getKey());
+
+        return [
+            'invitation_id' => (int) $invitation->getKey(),
+            'expires_at' => $expiresAt->format(DATE_ATOM),
+            'delivery_status' => InvitationDeliveryStatus::QUEUED,
+        ];
+    }
+
+    /** @return array{invitation_id:int,expires_at:string,delivery_status:string} */
+    public function resendForUser(int $tenantId, int $userId): array
+    {
+        [$invitation, $delivery] = DB::transaction(function () use ($tenantId, $userId): array {
+            $invitation = $this->invitations->newQuery()
+                ->where('tenant_id', $tenantId)
+                ->where('user_id', $userId)
+                ->where('purpose', RegistrationInvitationPurpose::USER_INVITATION)
+                ->where('status', RegistrationInvitationStatus::PENDING)
+                ->where('expires_at', '>', $this->clock->now())
+                ->orderByDesc('id')
+                ->lockForUpdate()
+                ->first();
+
+            if (! $invitation instanceof AuthRegistrationInvitationModel) {
+                throw new RuntimeException('A pending user invitation was not found.');
+            }
+            if (trim((string) $invitation->getAttribute('delivery_token')) === '') {
+                throw new RuntimeException('The invitation delivery token is no longer available. Issue a new invitation.');
+            }
+
+            $latestAttempt = (int) $this->deliveries->newQuery()
+                ->where('tenant_id', $tenantId)
+                ->where('invitation_id', $invitation->getKey())
+                ->lockForUpdate()
+                ->max('attempt_number');
+            $invitation->forceFill([
+                'row_version' => (int) $invitation->getAttribute('row_version') + 1,
+            ])->save();
+
+            return [$invitation, $this->createDelivery($invitation, $latestAttempt + 1)];
+        }, 3);
+
+        $this->dispatchDelivery($tenantId, (int) $delivery->getKey());
+
+        return [
+            'invitation_id' => (int) $invitation->getKey(),
+            'expires_at' => $invitation->getAttribute('expires_at')->toAtomString(),
+            'delivery_status' => InvitationDeliveryStatus::QUEUED,
+        ];
+    }
 
     /** @return array{invitation_id:int,invitation_expires_at:string,delivery_status:string} */
     public function issueInitialAdministrator(
@@ -457,7 +549,7 @@ final class RegistrationInvitationService
 
     private function dispatchDelivery(int $tenantId, int $deliveryId): void
     {
-        DeliverInitialAdministratorInvitation::dispatch($tenantId, $deliveryId)->afterCommit();
+        DeliverRegistrationInvitation::dispatch($tenantId, $deliveryId)->afterCommit();
     }
 
     private function revokeLocked(AuthRegistrationInvitationModel $invitation, string $reason): void

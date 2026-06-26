@@ -74,11 +74,17 @@ use Modules\Auth\Services\ValidateTokenService;
 use Modules\Core\Contracts\CurrentUserContextResolverInterface;
 use Modules\Core\Contracts\OrganizationUnitAuthScopeRevokerInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
+use Modules\User\Contracts\PlatformOperatorCredentialProvisionerInterface;
+use Modules\User\Contracts\TenantUserAccessRevokerInterface;
+use Modules\User\Contracts\TenantUserInvitationIssuerInterface;
 use Modules\Tenant\Events\TenantStatusChanged;
+use Modules\User\Models\PlatformOperatorModel;
 use Modules\User\Models\UserModel;
 use Modules\Auth\Models\AuthRegistrationInvitationModel;
 use Modules\Auth\Services\Provisioning\TenantAuthenticationProvisioner;
 use Modules\Auth\Services\Registration\RegistrationInvitationService;
+use Modules\Auth\Services\Credentials\PasswordCredentialService;
+use Modules\Auth\Services\UserIntegration\TenantUserAccessRevoker;
 use Modules\Configuration\Contracts\ConfigurationDefinitionRegistryInterface;
 use Modules\Tenant\Services\Contracts\TenantAuthenticationProvisionerInterface;
 use Modules\User\Contracts\PlatformOperatorSessionRevokerInterface;
@@ -86,6 +92,7 @@ use Modules\Auth\Services\PlatformSessionService;
 
 use Modules\Auth\Services\OrganizationUnit\AuthOrganizationUnitLifecycleBlocker;
 use Modules\Auth\Services\OrganizationUnit\RevokeOrganizationUnitAuthScopeService;
+
 final class AuthServiceProvider extends ServiceProvider
 {
     public function register(): void
@@ -96,6 +103,10 @@ final class AuthServiceProvider extends ServiceProvider
 
         $this->app->singleton(AuthDomainServiceInterface::class, AuthDomainService::class);
         $this->app->singleton(RegistrationInvitationService::class);
+        $this->app->singleton(PasswordCredentialService::class);
+        $this->app->singleton(TenantUserInvitationIssuerInterface::class, RegistrationInvitationService::class);
+        $this->app->singleton(TenantUserAccessRevokerInterface::class, TenantUserAccessRevoker::class);
+        $this->app->singleton(PlatformOperatorCredentialProvisionerInterface::class, PasswordCredentialService::class);
         $this->app->singleton(TenantAuthenticationProvisionerInterface::class, TenantAuthenticationProvisioner::class);
         $this->app->singleton(PlatformOperatorSessionRevokerInterface::class, PlatformSessionService::class);
 
@@ -206,7 +217,7 @@ final class AuthServiceProvider extends ServiceProvider
             (string) config('module-auth.token_guard_driver', 'module-auth-token'),
             function (Request $request): ?UserModel {
                 $payload = $this->validatedBearerPayload($request);
-                $userId = $payload['user_id'] ?? null;
+                $userId = $payload['tenant_user_id'] ?? null;
                 $tenantId = $payload['tenant_id'] ?? null;
                 if (
                     ($payload['token_scope'] ?? null) !== AuthTokenScope::TENANT
@@ -220,7 +231,7 @@ final class AuthServiceProvider extends ServiceProvider
                     ->runForTenant((int) $tenantId, static fn (): ?UserModel => UserModel::query()
                         ->whereKey((int) $userId)
                         ->where('status', 'active')
-                        ->where('is_platform_operator', false)
+                        ->whereNotNull('credentials_ready_at')
                         ->first());
                 if (! $user instanceof UserModel) {
                     return null;
@@ -234,32 +245,30 @@ final class AuthServiceProvider extends ServiceProvider
 
         Auth::viaRequest(
             (string) config('module-auth.platform_token_guard_driver', 'module-platform-token'),
-            function (Request $request): ?UserModel {
+            function (Request $request): ?PlatformOperatorModel {
                 $payload = $this->validatedBearerPayload($request);
-                $userId = $payload['user_id'] ?? null;
+                $operatorId = $payload['platform_operator_id'] ?? null;
                 if (
                     ($payload['token_scope'] ?? null) !== AuthTokenScope::PLATFORM
-                    || ! is_numeric($userId)
+                    || ! is_numeric($operatorId)
                     || ($payload['tenant_id'] ?? null) !== null
                 ) {
                     return null;
                 }
 
-                $user = $this->app->make(TenantExecutionContextInterface::class)
-                    ->runAsControlPlane(fn (): ?UserModel => UserModel::query()
-                        ->whereKey((int) $userId)
-                        ->whereNull('tenant_id')
+                $operator = $this->app->make(TenantExecutionContextInterface::class)
+                    ->runAsControlPlane(fn (): ?PlatformOperatorModel => PlatformOperatorModel::query()
+                        ->whereKey((int) $operatorId)
                         ->where('status', 'active')
-                        ->where('is_platform_operator', true)
-                        ->whereNotNull('platform_login_email')
+                        ->whereNotNull('credentials_ready_at')
                         ->first());
-                if (! $user instanceof UserModel) {
+                if (! $operator instanceof PlatformOperatorModel) {
                     return null;
                 }
 
                 $request->attributes->set('auth_access_token', $payload);
 
-                return $user;
+                return $operator;
             },
         );
 

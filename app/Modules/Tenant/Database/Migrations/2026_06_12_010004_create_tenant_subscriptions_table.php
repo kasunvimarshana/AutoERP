@@ -39,7 +39,7 @@ return new class extends Migration
             $table->string('created_by_type', 40)->default('system');
             $table->string('created_by_name')->nullable();
             $table->string('created_by_email')->nullable();
-            $table->timestamp('created_at');
+            $table->timestamp('created_at')->useCurrent();
 
             $table->unique(['tenant_id', 'revision_number'], 'tenant_subscriptions_tenant_revision_uk');
             $table->unique(['id', 'tenant_id'], 'tenant_subscriptions_id_tenant_uk');

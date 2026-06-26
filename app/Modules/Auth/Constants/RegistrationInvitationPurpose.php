@@ -8,5 +8,7 @@ final class RegistrationInvitationPurpose
 {
     public const INITIAL_ADMINISTRATOR = 'initial_administrator';
 
+    public const USER_INVITATION = 'user_invitation';
+
     private function __construct() {}
 }

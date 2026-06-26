@@ -8,20 +8,20 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\DatabaseManager;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\Audit\Constants\AuditEventCategory;
 use Modules\Audit\Contracts\AuditRecorderInterface;
 use Modules\Audit\Data\AuditEventData;
 use Modules\Auth\Models\AuthPlatformAccessTokenModel;
 use Modules\Auth\Models\AuthPlatformMfaMethodModel;
-use Modules\Auth\Models\AuthPlatformSessionModel;
 use Modules\Auth\Models\AuthPlatformRefreshTokenModel;
+use Modules\Auth\Models\AuthPlatformSessionModel;
 use Modules\Core\Contracts\ClockInterface;
 use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\User\Contracts\PlatformOperatorSessionRevokerInterface;
-use Modules\User\Models\UserModel;
-use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
+use Modules\User\Models\PlatformOperatorModel;
 
 final class PlatformSessionService implements PlatformOperatorSessionRevokerInterface
 {
@@ -30,7 +30,7 @@ final class PlatformSessionService implements PlatformOperatorSessionRevokerInte
         private readonly AuthPlatformAccessTokenModel $accessTokens,
         private readonly AuthPlatformRefreshTokenModel $refreshTokens,
         private readonly AuthPlatformMfaMethodModel $mfaMethods,
-        private readonly UserModel $users,
+        private readonly PlatformOperatorModel $operators,
         private readonly ClockInterface $clock,
         private readonly CurrentUserContextAccessorInterface $currentUser,
         private readonly TenantExecutionContextInterface $executionContext,
@@ -39,24 +39,25 @@ final class PlatformSessionService implements PlatformOperatorSessionRevokerInte
     ) {}
 
     public function create(
-        int $userId,
+        int $operatorId,
         ?string $ipAddress,
         ?string $userAgent,
         ?string $deviceName,
         int $lifetimeSeconds,
     ): AuthPlatformSessionModel {
         return $this->executionContext->runAsControlPlane(function () use (
-            $userId,
+            $operatorId,
             $ipAddress,
             $userAgent,
             $deviceName,
             $lifetimeSeconds,
         ): AuthPlatformSessionModel {
+            $this->assertPlatformOperator($operatorId);
             $now = $this->clock->now();
 
             return $this->sessions->newQuery()->create([
                 'public_id' => (string) Str::uuid(),
-                'user_id' => $userId,
+                'platform_operator_id' => $operatorId,
                 'status' => 'active',
                 'ip_address' => $this->nullableString($ipAddress),
                 'user_agent' => $this->truncate($userAgent, 1024),
@@ -69,12 +70,12 @@ final class PlatformSessionService implements PlatformOperatorSessionRevokerInte
         });
     }
 
-    public function page(?int $userId, int $page, int $perPage): LengthAwarePaginator
+    public function page(?int $operatorId, int $page, int $perPage): LengthAwarePaginator
     {
-        return $this->executionContext->runAsControlPlane(function () use ($userId, $page, $perPage): LengthAwarePaginator {
+        return $this->executionContext->runAsControlPlane(function () use ($operatorId, $page, $perPage): LengthAwarePaginator {
             return $this->sessions->newQuery()
-                ->with('user:id,first_name,last_name,platform_login_email,status')
-                ->when($userId !== null, fn (Builder $query) => $query->where('user_id', $userId))
+                ->with('operator:id,first_name,last_name,email,status')
+                ->when($operatorId !== null, fn (Builder $query) => $query->where('platform_operator_id', $operatorId))
                 ->orderByDesc('last_activity_at')
                 ->paginate($perPage, ['*'], 'page', $page);
         });
@@ -84,26 +85,21 @@ final class PlatformSessionService implements PlatformOperatorSessionRevokerInte
     {
         return $this->executionContext->runAsControlPlane(function () use ($publicId, $reason): AuthPlatformSessionModel {
             return $this->database->transaction(function () use ($publicId, $reason): AuthPlatformSessionModel {
-                $session = $this->sessions->newQuery()
-                    ->where('public_id', trim($publicId))
-                    ->lockForUpdate()
-                    ->first();
+                $session = $this->sessions->newQuery()->where('public_id', trim($publicId))->lockForUpdate()->first();
                 if (! $session instanceof AuthPlatformSessionModel) {
                     throw (new ModelNotFoundException())->setModel(AuthPlatformSessionModel::class, [$publicId]);
                 }
-
                 if ($session->getAttribute('status') === 'active') {
                     $this->revokeTokens((int) $session->getKey());
                     $session->forceFill([
                         'status' => 'revoked',
                         'revoked_at' => $this->clock->now(),
-                        'row_version' => ((int) $session->getAttribute('row_version')) + 1,
+                        'row_version' => (int) $session->getAttribute('row_version') + 1,
                     ])->save();
                 }
-
                 $this->recordAudit('session_revoked', $session, $reason);
 
-                return $session->fresh(['user']) ?? $session;
+                return $session->fresh(['operator']) ?? $session;
             }, 3);
         });
     }
@@ -111,10 +107,7 @@ final class PlatformSessionService implements PlatformOperatorSessionRevokerInte
     public function revokeAllForOperator(int $operatorId, string $reason): int
     {
         return $this->executionContext->runAsControlPlane(function () use ($operatorId, $reason): int {
-            return $this->database->transaction(
-                fn (): int => $this->revokeAllLocked($operatorId, $reason),
-                3,
-            );
+            return $this->database->transaction(fn (): int => $this->revokeAllLocked($operatorId, $reason), 3);
         });
     }
 
@@ -124,22 +117,18 @@ final class PlatformSessionService implements PlatformOperatorSessionRevokerInte
             $this->database->transaction(function () use ($operatorId, $reason): void {
                 $operator = $this->assertPlatformOperator($operatorId, true);
                 $this->mfaMethods->newQuery()
-                    ->where('user_id', $operatorId)
-                    ->lockForUpdate()
-                    ->get()
-                    ->each(static fn (AuthPlatformMfaMethodModel $method): bool => (bool) $method->delete());
-
+                    ->where('platform_operator_id', $operatorId)
+                    ->lockForUpdate()->delete();
                 $this->revokeAllLocked($operatorId, 'MFA reset: '.$reason, false);
-
                 $this->audit->recordPlatform(new AuditEventData(
                     eventName: 'platform.operator.mfa_reset',
                     eventCategory: AuditEventCategory::SECURITY,
                     sourceModule: 'auth',
                     subjectType: 'platform_operator',
                     subjectId: (string) $operatorId,
-                    subjectReference: (string) $operator->getAttribute('platform_login_email'),
+                    subjectReference: (string) $operator->getAttribute('email'),
                     changes: ['new' => ['mfa_status' => 'not_enrolled']],
-                    metadata: ['reason' => $reason],
+                    metadata: ['reason' => trim($reason)],
                     tags: ['platform', 'operator', 'mfa', 'security'],
                 ));
             }, 3);
@@ -151,23 +140,18 @@ final class PlatformSessionService implements PlatformOperatorSessionRevokerInte
         if ($assertOperator) {
             $this->assertPlatformOperator($operatorId, true);
         }
-
         $sessions = $this->sessions->newQuery()
-            ->where('user_id', $operatorId)
-            ->where('status', 'active')
-            ->lockForUpdate()
-            ->get();
-
+            ->where('platform_operator_id', $operatorId)
+            ->where('status', 'active')->lockForUpdate()->get();
         foreach ($sessions as $session) {
             if (! $session instanceof AuthPlatformSessionModel) {
                 continue;
             }
-
             $this->revokeTokens((int) $session->getKey());
             $session->forceFill([
                 'status' => 'revoked',
                 'revoked_at' => $this->clock->now(),
-                'row_version' => ((int) $session->getAttribute('row_version')) + 1,
+                'row_version' => (int) $session->getAttribute('row_version') + 1,
             ])->save();
             $this->recordAudit('session_revoked', $session, $reason);
         }
@@ -178,29 +162,27 @@ final class PlatformSessionService implements PlatformOperatorSessionRevokerInte
     private function revokeTokens(int $sessionId): void
     {
         $now = $this->clock->now();
-        $this->accessTokens->newQuery()
-            ->where('platform_session_id', $sessionId)
-            ->where('status', 'active')
-            ->update(['status' => 'revoked', 'revoked_at' => $now, 'updated_at' => $now]);
-        $this->refreshTokens->newQuery()
-            ->where('platform_session_id', $sessionId)
-            ->where('status', 'active')
-            ->update(['status' => 'revoked', 'revoked_at' => $now, 'updated_at' => $now]);
+        $attributes = [
+            'status' => 'revoked',
+            'revoked_at' => $now,
+            'row_version' => DB::raw('row_version + 1'),
+            'updated_at' => $now,
+        ];
+        $this->accessTokens->newQuery()->where('platform_session_id', $sessionId)
+            ->where('status', 'active')->update($attributes);
+        $this->refreshTokens->newQuery()->where('platform_session_id', $sessionId)
+            ->where('status', 'active')->update($attributes);
     }
 
-    private function assertPlatformOperator(int $operatorId, bool $lock = false): UserModel
+    private function assertPlatformOperator(int $operatorId, bool $lock = false): PlatformOperatorModel
     {
-        $query = $this->users->newQuery()
-            ->whereKey($operatorId)
-            ->whereNull('tenant_id')
-            ->where('is_platform_operator', true)
-            ->whereNull('deleted_at');
+        $query = $this->operators->newQuery()->whereKey($operatorId);
         if ($lock) {
             $query->lockForUpdate();
         }
 
         return $query->first()
-            ?? throw (new ModelNotFoundException())->setModel(UserModel::class, [$operatorId]);
+            ?? throw (new ModelNotFoundException())->setModel(PlatformOperatorModel::class, [$operatorId]);
     }
 
     private function recordAudit(string $action, AuthPlatformSessionModel $session, string $reason): void
@@ -214,7 +196,7 @@ final class PlatformSessionService implements PlatformOperatorSessionRevokerInte
             subjectReference: (string) $session->getAttribute('public_id'),
             changes: ['new' => ['status' => $session->getAttribute('status')]],
             metadata: [
-                'operator_id' => (int) $session->getAttribute('user_id'),
+                'operator_id' => (int) $session->getAttribute('platform_operator_id'),
                 'reason' => trim($reason),
                 'performed_by' => $this->currentUser->currentUserId(),
             ],

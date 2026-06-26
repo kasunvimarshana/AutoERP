@@ -19,7 +19,7 @@ final class AuthPlatformRefreshTokenModel extends CoreModel
         'metadata',
         'access_token_id',
         'platform_session_id',
-        'user_id',
+        'platform_operator_id',
         'refresh_key',
         'refresh_hash',
         'rotated',
@@ -34,6 +34,7 @@ final class AuthPlatformRefreshTokenModel extends CoreModel
     protected function casts(): array
     {
         return array_merge(parent::casts(), [
+            'platform_operator_id' => 'integer',
             'rotated' => 'boolean',
             'issued_at' => 'datetime',
             'rotated_at' => 'datetime',

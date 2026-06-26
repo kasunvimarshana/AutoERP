@@ -349,7 +349,7 @@ final class AuthController extends Controller
     {
         $context = $this->currentUser->requireCurrent();
 
-        $payload['user_id'] = $context->userId();
+        $payload['tenant_user_id'] = $context->userId();
 
         $tenantId = $this->currentTenant->currentTenantId();
         if ($tenantId !== null) {

@@ -12,14 +12,14 @@ final class PlatformSessionResource extends JsonResource
     /** @return array<string, mixed> */
     public function toArray(Request $request): array
     {
-        $user = $this->resource->relationLoaded('user') ? $this->resource->user : null;
+        $user = $this->resource->relationLoaded('operator') ? $this->resource->operator : null;
 
         return [
             'id' => (string) $this->resource->getAttribute('public_id'),
             'operator' => $user === null ? null : [
                 'id' => (int) $user->getKey(),
                 'name' => trim((string) $user->getAttribute('first_name').' '.(string) $user->getAttribute('last_name')),
-                'email' => (string) $user->getAttribute('platform_login_email'),
+                'email' => (string) $user->getAttribute('email'),
                 'status' => (string) $user->getAttribute('status'),
             ],
             'status' => (string) $this->resource->getAttribute('status'),

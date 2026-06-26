@@ -1118,7 +1118,7 @@ final class PurchaseEngineTest extends TestCase
     {
         $tenantId = $this->createTenant('AUTHA');
         $otherTenantId = $this->createTenant('AUTHB');
-        $userId = (int) DB::table('users')->insertGetId([
+        $userId = (int) \Tests\Support\TenantUserFixture::create([
             'tenant_id' => $tenantId,
             'first_name' => 'Purchase',
             'last_name' => 'Auth',
@@ -1443,7 +1443,7 @@ final class PurchaseEngineTest extends TestCase
         return (int) DB::table('permissions')->insertGetId([
             'tenant_id' => $tenantId,
             'name' => $name,
-            'guard_name' => 'web',
+            'guard_name' => 'auth-api',
             'module' => 'Purchase',
             'description' => PurchaseAuthorizationService::descriptions()[$name] ?? $name,
             'created_at' => now(),
@@ -1456,7 +1456,7 @@ final class PurchaseEngineTest extends TestCase
         return (int) DB::table('roles')->insertGetId([
             'tenant_id' => $tenantId,
             'name' => $name,
-            'guard_name' => 'web',
+            'guard_name' => 'auth-api',
             'description' => $name,
             'created_at' => now(),
             'updated_at' => now(),

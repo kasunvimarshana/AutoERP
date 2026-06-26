@@ -606,7 +606,7 @@ final class ItemBaseUomTest extends TestCase
             'updated_at' => $now,
         ]);
         $email ??= strtolower($code).'@example.test';
-        $userId = (int) DB::table('users')->insertGetId([
+        $userId = (int) \Tests\Support\TenantUserFixture::create([
             'tenant_id' => $tenantId,
             'first_name' => 'UOM',
             'last_name' => 'Tester',
@@ -631,7 +631,7 @@ final class ItemBaseUomTest extends TestCase
         $roleId = (int) DB::table('roles')->insertGetId([
             'tenant_id' => $tenantId,
             'name' => 'Item Base UOM Test Role',
-            'guard_name' => 'web',
+            'guard_name' => 'auth-api',
             'description' => 'Item Base UOM test role',
             'row_version' => 1,
             'created_at' => $now,
@@ -691,7 +691,7 @@ final class ItemBaseUomTest extends TestCase
             $ids[] = (int) DB::table('permissions')->insertGetId([
                 'tenant_id' => $tenantId,
                 'name' => $name,
-                'guard_name' => 'web',
+                'guard_name' => 'auth-api',
                 'module' => 'Item',
                 'description' => ItemAuthorizationService::descriptions()[$name],
                 'row_version' => 1,

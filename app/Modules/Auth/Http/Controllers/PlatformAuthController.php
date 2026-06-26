@@ -99,7 +99,7 @@ final class PlatformAuthController extends Controller
                 'id' => $context->userId(),
                 'first_name' => $user->getAttribute('first_name'),
                 'last_name' => $user->getAttribute('last_name'),
-                'email' => $user->getAttribute('platform_login_email') ?? $user->getAttribute('email'),
+                'email' => $user->getAttribute('email'),
                 'is_platform_operator' => true,
             ],
             'tenant' => null,

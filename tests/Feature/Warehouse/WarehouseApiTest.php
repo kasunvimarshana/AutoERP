@@ -303,7 +303,7 @@ final class WarehouseApiTest extends TestCase
             'updated_at' => $now]);
         $organizationUnitId = $this->createOrganizationUnit($tenantId, 'Main', 'MAIN');
         $email = (string) ($overrides['email'] ?? Str::lower($code).'@example.test');
-        $userId = (int) DB::table('users')->insertGetId([
+        $userId = (int) \Tests\Support\TenantUserFixture::create([
             'tenant_id' => $tenantId,
             'first_name' => 'Warehouse',
             'last_name' => 'Tester',
@@ -317,7 +317,7 @@ final class WarehouseApiTest extends TestCase
         $roleId = (int) DB::table('roles')->insertGetId([
             'tenant_id' => $tenantId,
             'name' => 'Warehouse Test Role',
-            'guard_name' => 'web',
+            'guard_name' => 'auth-api',
             'description' => 'Warehouse test role',
             'row_version' => 1,
             'created_at' => $now,
@@ -410,7 +410,7 @@ final class WarehouseApiTest extends TestCase
             $permissionId = (int) DB::table('permissions')->insertGetId([
                 'tenant_id' => $tenantId,
                 'name' => $name,
-                'guard_name' => 'web',
+                'guard_name' => 'auth-api',
                 'module' => 'Warehouse',
                 'description' => WarehouseAuthorizationService::descriptions()[$name] ?? 'Warehouse test permission',
                 'row_version' => 1,

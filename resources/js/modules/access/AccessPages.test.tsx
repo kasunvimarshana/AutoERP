@@ -10,14 +10,18 @@ import UserDetailPage from './UserDetailPage';
 import UserListPage from './UserListPage';
 import { accessPermissions } from './accessPermissions';
 const apiMocks = vi.hoisted(() => ({
-    activateUser: vi.fn(),
+    archiveUser: vi.fn(),
     createUser: vi.fn(),
-    deactivateUser: vi.fn(),
+    changeUserStatus: vi.fn(),
     getUser: vi.fn(),
-    listOrganizationUnits: vi.fn(),
+    listAllOrganizationUnits: vi.fn(),
+    listAllPermissions: vi.fn(),
     listPermissions: vi.fn(),
-    listRoles: vi.fn(),
+    listPermissionModules: vi.fn(),
+    listAllRoles: vi.fn(),
     listUsers: vi.fn(),
+    listUserDocuments: vi.fn(),
+    listUserDevices: vi.fn(),
 }));
 const authState = vi.hoisted(() => ({
     permissions: [] as string[],
@@ -47,15 +51,18 @@ describe('Access pages', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         authState.roles = [];
-        authState.permissions = Object.values(accessPermissions);
+        authState.permissions = Object.values(accessPermissions).filter((permission) => ![
+            accessPermissions.userDocumentsManage,
+            accessPermissions.userDevicesManage,
+        ].includes(permission));
         apiMocks.listUsers.mockResolvedValue(collection([accessUser()]));
         apiMocks.getUser.mockResolvedValue(accessUser());
-        apiMocks.listRoles.mockResolvedValue(collection([{ id: 5, name: 'Manager' }]));
-        apiMocks.listOrganizationUnits.mockResolvedValue(collection([
+        apiMocks.listAllRoles.mockResolvedValue([{ id: 5, row_version: 1, name: 'Manager' }]);
+        apiMocks.listAllOrganizationUnits.mockResolvedValue([
             { id: 1, name: 'Head Office', is_default: true },
             { id: 2, name: 'Branch Office', is_default: false },
-        ]));
-        apiMocks.listPermissions.mockResolvedValue(collection([
+        ]);
+        apiMocks.listAllPermissions.mockResolvedValue([
             {
                 id: 10,
                 name: accessPermissions.usersView,
@@ -66,15 +73,28 @@ describe('Access pages', () => {
                 status: 'system_defined',
                 is_read_only: true,
             },
-        ]));
+        ]);
+        apiMocks.listPermissions.mockResolvedValue(collection([{
+            id: 10,
+            name: accessPermissions.usersView,
+            module: 'Users',
+            resource: 'users',
+            action: 'view',
+            description: 'View users.',
+            status: 'system_defined',
+            is_read_only: true,
+        }]));
+        apiMocks.listPermissionModules.mockResolvedValue(['User']);
+        apiMocks.listUserDocuments.mockResolvedValue(collection([]));
+        apiMocks.listUserDevices.mockResolvedValue(collection([]));
     });
-    it('renders create user as a separate sectioned page without tabs', async () => {
+    it('renders create user as a focused invitation flow without password entry', async () => {
         renderPage(<CreateUserPage />, ['/access/users/create']);
-        expect(screen.getByRole('heading', { name: 'Create User' })).toBeInTheDocument();
-        expect(await screen.findByText('Basic')).toBeInTheDocument();
-        expect(screen.getByText('Access')).toBeInTheDocument();
-        expect(screen.getByText('Organization Access')).toBeInTheDocument();
-        expect(screen.getByLabelText('Temporary password')).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: 'Invite User' })).toBeInTheDocument();
+        expect(await screen.findByText('Invitation workflow')).toBeInTheDocument();
+        expect(screen.getByText('Role assignments')).toBeInTheDocument();
+        expect(screen.getByText('Organization access')).toBeInTheDocument();
+        expect(screen.queryByLabelText('Temporary password')).not.toBeInTheDocument();
         expect(screen.queryByRole('tab')).not.toBeInTheDocument();
     });
     it('uses server-side user filters without sending organization_unit_id as context', async () => {
@@ -96,8 +116,9 @@ describe('Access pages', () => {
     it('renders user detail read-only', async () => {
         renderPage(<RoutePage page={<UserDetailPage />} path="/access/users/:id" />, ['/access/users/7']);
         expect(await screen.findByRole('heading', { name: 'Ada User' })).toBeInTheDocument();
-        expect(screen.getByText('Roles & Permissions')).toBeInTheDocument();
-        expect(screen.getByText('Organization Access')).toBeInTheDocument();
+        expect(screen.getByText('Role-based access')).toBeInTheDocument();
+        expect(screen.getByText('Direct permission exceptions')).toBeInTheDocument();
+        expect(screen.getByText('Organization access')).toBeInTheDocument();
         expect(screen.queryByLabelText('Temporary password')).not.toBeInTheDocument();
         expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
         expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
@@ -136,8 +157,10 @@ function accessUser() {
         phone: '+94110000000',
         status: 'active',
         roles: [{ id: 5, name: 'Manager' }],
-        permissions: [{ id: 10, name: accessPermissions.usersView, module: 'Users' }],
+        direct_permissions: [{ id: 10, name: accessPermissions.usersView, module: 'Users' }],
         organization_units: [{ id: 1, name: 'Head Office', is_default: true }],
+        default_organization_unit_id: 1,
+        credentials_ready: true,
         last_login_at: '2026-06-17T10:00:00.000000Z',
     };
 }

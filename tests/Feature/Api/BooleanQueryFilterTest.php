@@ -136,7 +136,7 @@ final class BooleanQueryFilterTest extends TestCase
     private function userWithWarehousePermissions(int $tenantId, int $organizationUnitId, string $suffix): int
     {
         $now = now();
-        $userId = (int) DB::table('users')->insertGetId([
+        $userId = (int) \Tests\Support\TenantUserFixture::create([
             'tenant_id' => $tenantId,
             'first_name' => 'Warehouse',
             'last_name' => 'Filter',
@@ -150,7 +150,7 @@ final class BooleanQueryFilterTest extends TestCase
         $roleId = (int) DB::table('roles')->insertGetId([
             'tenant_id' => $tenantId,
             'name' => 'Warehouse Filter Role',
-            'guard_name' => 'web',
+            'guard_name' => 'auth-api',
             'description' => 'Warehouse filter test role',
             'row_version' => 1,
             'created_at' => $now,
@@ -161,7 +161,7 @@ final class BooleanQueryFilterTest extends TestCase
             $permissionId = (int) DB::table('permissions')->insertGetId([
                 'tenant_id' => $tenantId,
                 'name' => $permissionName,
-                'guard_name' => 'web',
+                'guard_name' => 'auth-api',
                 'module' => 'Warehouse',
                 'description' => WarehouseAuthorizationService::descriptions()[$permissionName],
                 'row_version' => 1,

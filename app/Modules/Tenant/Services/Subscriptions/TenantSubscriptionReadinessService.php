@@ -9,7 +9,7 @@ use Modules\Tenant\Constants\TenantStatus;
 use Modules\Tenant\Repositories\TenantPlanRevisionRepositoryInterface;
 use Modules\Tenant\Repositories\TenantRepositoryInterface;
 use Modules\Tenant\Repositories\TenantSubscriptionRepositoryInterface;
-use Modules\Tenant\Services\Contracts\TenantLimitUsageContributorInterface;
+use Modules\Core\Contracts\TenantLimitUsageContributorInterface;
 use Modules\Tenant\Services\Plans\TenantPlanSchema;
 
 final class TenantSubscriptionReadinessService

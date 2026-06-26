@@ -32,7 +32,7 @@ export default function RoleDetailPage() {
         setDeleting(true);
         setActionError(null);
         try {
-            await accessApi.deleteRole(record.id);
+            await accessApi.deleteRole(record.id, record.row_version);
             navigate('/access/roles');
         } catch (caught) {
             setActionError(toApiError(caught));
@@ -50,8 +50,8 @@ export default function RoleDetailPage() {
                 actions={(
                     <>
                         <Button variant="secondary" onClick={() => navigate('/access/roles')}>Back</Button>
-                        {record && canUpdate && record.status !== 'protected' && <LinkButton variant="secondary" to={`/access/roles/${record.id}/edit`}>Edit</LinkButton>}
-                        {record && canDelete && record.status !== 'protected' && <Button variant="danger" loading={deleting} onClick={() => void deleteRole(record)}>Delete</Button>}
+                        {record && canUpdate && !record.is_system && <LinkButton variant="secondary" to={`/access/roles/${record.id}/edit`}>Edit</LinkButton>}
+                        {record && canDelete && !record.is_system && <Button variant="danger" loading={deleting} onClick={() => void deleteRole(record)}>Delete</Button>}
                     </>
                 )}
             />
@@ -61,11 +61,11 @@ export default function RoleDetailPage() {
                     <Panel title="Summary">
                         <DetailGrid items={[
                             { label: 'Name', value: record.name },
-                            { label: 'Code', value: record.code ?? record.guard_name ?? '-' },
+                            { label: 'Authorization guard', value: record.guard_name ?? '-' },
                             { label: 'Description', value: record.description ?? '-' },
                             { label: 'Assigned Users', value: record.assigned_users_count ?? 0 },
                             { label: 'Permissions', value: record.permissions_count ?? 0 },
-                            { label: 'Status', value: <StatusBadge status={record.status ?? 'active'} /> },
+                            { label: 'Type', value: <StatusBadge status={record.is_system ? 'system' : 'custom'} /> },
                         ]} />
                     </Panel>
                     <Panel title="Permissions">

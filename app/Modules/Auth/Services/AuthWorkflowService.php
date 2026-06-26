@@ -30,7 +30,8 @@ use Modules\Core\Results\Result;
 use Modules\OrganizationUnit\Repositories\OrganizationUnitRepositoryInterface;
 use Modules\Tenant\Repositories\TenantRepositoryInterface;
 use Modules\User\Repositories\UserOrganizationUnitRepositoryInterface;
-use Modules\User\Services\UserService;
+use Modules\Auth\Services\Credentials\PasswordCredentialService;
+use Modules\User\Contracts\TenantUserRegistrationInterface;
 use Throwable;
 
 final class AuthWorkflowService
@@ -41,7 +42,8 @@ final class AuthWorkflowService
         private readonly AuthIdentityRepositoryInterface $identities,
         private readonly AuthLoginAttemptRepositoryInterface $loginAttempts,
         private readonly AuthDomainServiceInterface $domain,
-        private readonly UserService $userService,
+        private readonly TenantUserRegistrationInterface $userRegistration,
+        private readonly PasswordCredentialService $passwordCredentials,
         private readonly TransactionManagerInterface $transactions,
         private readonly ErrorNormalizerInterface $errorNormalizer,
         private readonly TenantRepositoryInterface $tenants,
@@ -114,7 +116,7 @@ final class AuthWorkflowService
                     'provider_id' => $providerRecord['id'] ?? null,
                     'identity_id' => $identity['id'] ?? null,
                     'session_id' => $session['id'] ?? null,
-                    'user_id' => $user['id'],
+                    'tenant_user_id' => $user['id'],
                     'grant_type' => 'password',
                     'scopes' => [],
                 ]));
@@ -175,79 +177,86 @@ final class AuthWorkflowService
                 if ($authorization->isFailure()) {
                     return Result::failure($authorization->errorOrFail());
                 }
+                if ($data->tenantId === null) {
+                    return $this->failure(AuthErrorCode::TENANT_RESOLUTION_FAILED, 'A resolved tenant is required.');
+                }
 
                 $invitation = $authorization->valueOrFail();
-                $organizationUnitId = $invitation instanceof \Modules\Core\DTOs\DataRecord
-                    && is_numeric($invitation->get('organization_unit_id'))
-                        ? (int) $invitation->get('organization_unit_id')
-                        : null;
-                $roleIds = $invitation instanceof \Modules\Core\DTOs\DataRecord
-                    && is_numeric($invitation->get('role_id'))
-                        ? [(int) $invitation->get('role_id')]
-                        : [];
-
-                $provider = $this->registry->authenticationProvider($data->tenantId, $data->providerKey);
-                if ($provider === null) {
-                    return $this->failure(AuthErrorCode::PROVIDER_NOT_FOUND, 'Auth provider is not available.');
-                }
-
-                $createdByProvider = $provider->register($data);
-                if ($createdByProvider !== null) {
-                    return Result::success($createdByProvider);
-                }
-
-                $createdUser = $this->userService->create([
-                    'tenant_id' => $data->tenantId,
-                    'organization_unit_ids' => $organizationUnitId === null ? [] : [$organizationUnitId],
-                    'default_organization_unit_id' => $organizationUnitId,
-                    'role_ids' => $roleIds,
-                    'first_name' => $data->firstName,
-                    'last_name' => $data->lastName,
-                    'email' => $data->email,
-                    'password' => $data->password,
-                    'metadata' => $data->metadata,
-                    'status' => 'active',
-                ]);
-
-                if ($createdUser->isFailure()) {
-                    return Result::failure($createdUser->errorOrFail());
-                }
-
-                $userRecord = $createdUser->valueOrFail()->toArray();
-                $providerRecord = $this->providers->findActiveByKey($data->tenantId, $data->providerKey);
-                if ($providerRecord !== null) {
-                    $existingIdentity = $this->identities->findByProviderAndSubject(
-                        $data->tenantId,
-                        (int) $providerRecord->id(),
-                        strtolower($data->email),
-                    );
-
-                    if ($existingIdentity === null) {
-                        $identity = $this->identities->create([
-                            'tenant_id' => $data->tenantId,
-                            'organization_unit_id' => $organizationUnitId,
-                            'provider_id' => (int) $providerRecord->id(),
-                            'user_id' => (int) $userRecord['id'],
-                            'provider_user_key' => strtolower($data->email),
-                            'status' => 'active',
-                            'is_primary' => true,
-                            'metadata' => $data->metadata,
-                            'row_version' => 1,
-                        ]);
-
-                    }
-                }
-
-                if ($invitation instanceof \Modules\Core\DTOs\DataRecord) {
-                    $this->registrationInvitations->accept(
-                        (int) $data->tenantId,
-                        (int) $invitation->id(),
-                        (int) $userRecord['id'],
-                        (int) $invitation->require('row_version'),
+                if (! $invitation instanceof \Modules\Core\DTOs\DataRecord) {
+                    return $this->failure(
+                        AuthErrorCode::INVITATION_INVALID,
+                        'Registration requires an invitation tied to an account.',
                     );
                 }
 
-                return Result::success($userRecord);
+                $provider = $this->providers->findActiveByKey($data->tenantId, $data->providerKey);
+                if ($provider === null || $data->providerKey !== 'internal') {
+                    return $this->failure(
+                        AuthErrorCode::PROVIDER_NOT_FOUND,
+                        'Password registration requires the active internal authentication provider.',
+                    );
+                }
+
+                $targetUserId = is_numeric($invitation->get('user_id'))
+                    ? (int) $invitation->get('user_id')
+                    : null;
+                $organizationUnitId = is_numeric($invitation->get('organization_unit_id'))
+                    ? (int) $invitation->get('organization_unit_id')
+                    : null;
+                $roleId = is_numeric($invitation->get('role_id'))
+                    ? (int) $invitation->get('role_id')
+                    : null;
+
+                $existingIdentity = $this->identities->findByProviderAndSubject(
+                    $data->tenantId,
+                    (int) $provider->id(),
+                    strtolower($data->email),
+                );
+                if ($existingIdentity !== null
+                    && ($targetUserId === null || (int) $existingIdentity->get('user_id') !== $targetUserId)
+                ) {
+                    return $this->failure(
+                        AuthErrorCode::INVITATION_INVALID,
+                        'The invitation email is already linked to another account.',
+                    );
+                }
+
+                $userId = $this->userRegistration->prepareFromInvitation(
+                    $data->tenantId,
+                    $targetUserId,
+                    $organizationUnitId,
+                    $roleId,
+                    $data->firstName,
+                    $data->lastName,
+                    $data->email,
+                );
+
+                $this->passwordCredentials->setTenantUserPassword($data->tenantId, $userId, $data->password);
+
+                if ($existingIdentity === null) {
+                    $this->identities->create([
+                        'tenant_id' => $data->tenantId,
+                        'organization_unit_id' => $organizationUnitId,
+                        'provider_id' => (int) $provider->id(),
+                        'user_id' => $userId,
+                        'provider_user_key' => strtolower($data->email),
+                        'status' => 'active',
+                        'is_primary' => true,
+                        'metadata' => $data->metadata,
+                        'row_version' => 1,
+                    ]);
+                }
+
+                $this->registrationInvitations->accept(
+                    $data->tenantId,
+                    (int) $invitation->id(),
+                    $userId,
+                    (int) $invitation->require('row_version'),
+                );
+
+                return Result::success(
+                    $this->userRegistration->activateAfterCredentialSetup($data->tenantId, $userId),
+                );
             });
         } catch (Throwable $exception) {
             return $this->fromThrowable($exception);
@@ -384,7 +393,7 @@ final class AuthWorkflowService
                     'client_id' => $context['client_id'] ?? null,
                     'identity_id' => $context['identity_id'] ?? null,
                     'session_id' => $context['session_id'] ?? null,
-                    'user_id' => $context['user_id'] ?? null,
+                    'tenant_user_id' => $context['user_id'] ?? null,
                     'grant_type' => 'authorization_code',
                     'scopes' => $context['scopes'] ?? [],
                     'access_token_ttl_seconds' => $data->accessTokenTtlSeconds,

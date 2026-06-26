@@ -4,32 +4,31 @@ declare(strict_types=1);
 
 namespace Modules\User\Models;
 
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\SoftDeletes;
+use LogicException;
 use Modules\Core\Models\TenantOwnedModel;
-use Modules\Tenant\Models\TenantModel;
 
 final class PermissionModel extends TenantOwnedModel
 {
-    use SoftDeletes;
-
     protected $table = 'permissions';
 
-    protected $guarded = ['id'];
+    protected $fillable = [
+        'tenant_id', 'row_version', 'name', 'guard_name', 'module', 'description', 'is_active',
+    ];
+
+    protected static function booted(): void
+    {
+        static::updating(function (self $permission): void {
+            if ($permission->isDirty(['tenant_id', 'name', 'guard_name', 'module'])) {
+                throw new LogicException('Permission catalogue identity is immutable; synchronize the owning module catalogue instead.');
+            }
+        });
+    }
 
     protected function casts(): array
     {
-        return array_merge(parent::casts(), [
-            'tenant_id' => 'integer',
-        ]);
+        return array_merge(parent::casts(), ['is_active' => 'boolean', 'row_version' => 'integer']);
     }
-
-    public function tenant(): BelongsTo
-    {
-        return $this->belongsTo(TenantModel::class, 'tenant_id');
-    }
-
 
     public function roles(): HasMany
     {

@@ -10,24 +10,20 @@ return new class extends Migration
 {
     public function up(): void
     {
-        $guardName = (string) config('auth.defaults.guard', 'api');
-
-        Schema::create('permissions', function (Blueprint $table) use ($guardName) {
+        Schema::create('permissions', function (Blueprint $table): void {
             $table->id();
-            $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
-            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete()->comment('Multi-tenant owner reference');
-            $table->json('metadata')->nullable()->comment('Extensible custom dynamic data');
-
+            $table->unsignedBigInteger('row_version')->default(1);
+            $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
             $table->string('name');
-            $table->string('guard_name')->default($guardName);
-            $table->string('module')->nullable();
-            $table->string('description')->nullable();
-
+            $table->string('guard_name', 100);
+            $table->string('module', 100);
+            $table->string('description', 500)->nullable();
+            $table->boolean('is_active')->default(true);
             $table->timestamps();
-            $table->softDeletes();
 
             $table->unique(['id', 'tenant_id'], 'permissions_id_tenant_uk');
             $table->unique(['tenant_id', 'name', 'guard_name'], 'permissions_name_guard_uk');
+            $table->index(['tenant_id', 'module', 'is_active'], 'permissions_module_active_idx');
         });
     }
 

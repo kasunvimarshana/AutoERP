@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { fieldError, firstFieldError, type ApiError } from '@/shared/api/apiError';
+import { useMemo } from 'react';
+import { fieldError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { Input } from '@/shared/components/Input';
 import { Panel } from '@/shared/components/Panel';
@@ -8,58 +8,34 @@ import type { AccessPermission } from './accessApi';
 
 export interface RoleFormState {
     name: string;
-    guard_name: string;
     description: string;
-    permission_ids: number[];
     row_version?: number;
 }
 
 export function emptyRoleForm(): RoleFormState {
-    return { name: '', guard_name: 'web', description: '', permission_ids: [] };
+    return { name: '', description: '' };
 }
 
 export function RoleForm({
     value,
-    permissions,
     error,
-    canAssignPermissions,
     onChange,
 }: {
     value: RoleFormState;
-    permissions: AccessPermission[];
     error: ApiError | null;
-    canAssignPermissions: boolean;
     onChange: (value: RoleFormState) => void;
 }) {
-    const [search, setSearch] = useState('');
     const set = (patch: Partial<RoleFormState>) => onChange({ ...value, ...patch });
 
     return (
-        <div className="space-y-5">
-            <Panel title="Basic">
-                <div className="grid gap-4 md:grid-cols-2">
-                    <Input label="Role name" required value={value.name} error={fieldError(error, 'name')} onChange={(event) => set({ name: event.target.value })} />
-                    <Input label="Guard" value={value.guard_name} error={fieldError(error, 'guard_name')} onChange={(event) => set({ guard_name: event.target.value })} />
-                </div>
-                <div className="mt-4">
-                    <Textarea label="Description" value={value.description} error={fieldError(error, 'description')} onChange={(event) => set({ description: event.target.value })} />
-                </div>
-            </Panel>
-            <Panel title="Permissions">
-                {canAssignPermissions ? (
-                    <PermissionSelector
-                        permissions={permissions}
-                        selectedIds={value.permission_ids}
-                        search={search}
-                        error={firstFieldError(error, ['permission_ids', 'permission_ids.0'])}
-                        onSearchChange={setSearch}
-                        onChange={(permissionIds) => set({ permission_ids: permissionIds })}
-                    />
-                ) : (
-                    <p className="text-sm text-slate-500">Permission assignment is not available for your account.</p>
-                )}
-            </Panel>
-        </div>
+        <Panel title="Role details">
+            <div className="grid gap-4 md:grid-cols-2">
+                <Input label="Role name" required value={value.name} error={fieldError(error, 'name')} onChange={(event) => set({ name: event.target.value })} />
+            </div>
+            <div className="mt-4">
+                <Textarea label="Description" value={value.description} error={fieldError(error, 'description')} onChange={(event) => set({ description: event.target.value })} />
+            </div>
+        </Panel>
     );
 }
 
@@ -95,7 +71,7 @@ export function PermissionSelector({
             if (checked) next.add(id);
             else next.delete(id);
         });
-        onChange([...next]);
+        onChange([...next].sort((left, right) => left - right));
     };
 
     return (
@@ -120,7 +96,7 @@ export function PermissionSelector({
                                         <p className="text-xs text-slate-500">{group.permissions.length} permissions</p>
                                     </div>
                                     {!readOnly && (
-                                        <Button variant="secondary" className="min-h-8 px-3 py-1 text-xs" onClick={() => setGroup(ids, !allSelected)}>
+                                        <Button type="button" variant="secondary" className="min-h-8 px-3 py-1 text-xs" onClick={() => setGroup(ids, !allSelected)}>
                                             {allSelected ? 'Clear' : 'Select All'}
                                         </Button>
                                     )}
@@ -136,8 +112,9 @@ export function PermissionSelector({
                                                 onChange={() => toggle(permission.id)}
                                             />
                                             <span className="min-w-0">
-                                                <span className="block font-medium text-slate-900">{permission.action ?? permission.name}</span>
+                                                <span className="block font-medium text-slate-900">{permission.action ?? humanizePermission(permission.name)}</span>
                                                 <span className="block break-words font-mono text-xs text-slate-500">{permission.name}</span>
+                                                {permission.description ? <span className="mt-1 block text-xs text-slate-500">{permission.description}</span> : null}
                                             </span>
                                         </label>
                                     ))}
@@ -167,7 +144,7 @@ function groupedPermissions(permissions: AccessPermission[], search: string) {
     filtered.forEach((permission) => {
         const module = permission.module || permission.resource || 'Other';
         const key = module.toLowerCase();
-        const group = map.get(key) ?? { key, label: module, permissions: [] };
+        const group = map.get(key) ?? { key, label: humanizePermission(module), permissions: [] };
         group.permissions.push(permission);
         map.set(key, group);
     });
@@ -176,4 +153,8 @@ function groupedPermissions(permissions: AccessPermission[], search: string) {
         ...group,
         permissions: group.permissions.sort((left, right) => left.name.localeCompare(right.name)),
     })).sort((left, right) => left.label.localeCompare(right.label));
+}
+
+function humanizePermission(value: string): string {
+    return value.replace(/[._-]+/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
 }

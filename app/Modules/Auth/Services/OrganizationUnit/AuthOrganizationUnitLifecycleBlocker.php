@@ -6,7 +6,7 @@ namespace Modules\Auth\Services\OrganizationUnit;
 
 use Illuminate\Support\Facades\DB;
 use Modules\Auth\Constants\AuthStatus;
-use Modules\OrganizationUnit\Contracts\OrganizationUnitLifecycleBlockerInterface;
+use Modules\Core\Contracts\OrganizationUnitLifecycleBlockerInterface;
 
 final class AuthOrganizationUnitLifecycleBlocker implements OrganizationUnitLifecycleBlockerInterface
 {

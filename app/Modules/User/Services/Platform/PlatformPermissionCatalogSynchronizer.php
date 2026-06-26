@@ -6,7 +6,7 @@ namespace Modules\User\Services\Platform;
 
 use Illuminate\Support\Facades\DB;
 use Modules\Core\Contracts\ClockInterface;
-use Modules\User\Constants\PlatformPermission;
+use Modules\Core\Authorization\PlatformPermission;
 use Modules\User\Models\PlatformPermissionModel;
 
 final class PlatformPermissionCatalogSynchronizer

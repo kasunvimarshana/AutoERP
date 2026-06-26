@@ -13,8 +13,8 @@ final class PlatformOperatorResource extends JsonResource
     /** @return array<string, mixed> */
     public function toArray(Request $request): array
     {
-        $permissions = $this->resource->relationLoaded('platformPermissionAssignments')
-            ? $this->resource->platformPermissionAssignments
+        $permissions = $this->resource->relationLoaded('permissionAssignments')
+            ? $this->resource->permissionAssignments
                 ->map(fn (PlatformOperatorPermissionModel $assignment): ?string => $assignment->permission?->name)
                 ->filter()
                 ->sort()
@@ -27,7 +27,7 @@ final class PlatformOperatorResource extends JsonResource
             'first_name' => (string) $this->resource->getAttribute('first_name'),
             'last_name' => $this->resource->getAttribute('last_name'),
             'display_name' => trim((string) $this->resource->getAttribute('first_name').' '.(string) $this->resource->getAttribute('last_name')),
-            'email' => (string) $this->resource->getAttribute('platform_login_email'),
+            'email' => (string) $this->resource->getAttribute('email'),
             'status' => (string) $this->resource->getAttribute('status'),
             'invitation' => $this->invitation(),
             'permissions' => $permissions,
@@ -40,22 +40,25 @@ final class PlatformOperatorResource extends JsonResource
     /** @return array<string,mixed>|null */
     private function invitation(): ?array
     {
-        if (! $this->resource->relationLoaded('latestPlatformOperatorInvitation')) {
+        if (! $this->resource->relationLoaded('latestInvitation')) {
             return null;
         }
 
-        $invitation = $this->resource->latestPlatformOperatorInvitation;
+        $invitation = $this->resource->latestInvitation;
         if (! $invitation instanceof \Modules\User\Models\PlatformOperatorInvitationModel) {
             return null;
         }
+        $delivery = $invitation->relationLoaded('deliveries')
+            ? $invitation->deliveries->sortByDesc('attempt_number')->first()
+            : null;
 
         return [
             'status' => (string) $invitation->getAttribute('status'),
-            'delivery_status' => (string) $invitation->getAttribute('delivery_status'),
+            'delivery_status' => $delivery?->getAttribute('status'),
             'expires_at' => $invitation->getAttribute('expires_at')?->toISOString(),
-            'sent_at' => $invitation->getAttribute('sent_at')?->toISOString(),
-            'failed_at' => $invitation->getAttribute('failed_at')?->toISOString(),
-            'error_message' => $invitation->getAttribute('error_message'),
+            'sent_at' => $delivery?->getAttribute('sent_at')?->toISOString(),
+            'failed_at' => $delivery?->getAttribute('failed_at')?->toISOString(),
+            'error_message' => $delivery?->getAttribute('error_message'),
         ];
     }
 }

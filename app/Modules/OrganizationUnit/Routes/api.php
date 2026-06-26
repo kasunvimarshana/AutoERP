@@ -8,7 +8,7 @@ use Modules\OrganizationUnit\Http\Controllers\OrganizationUnitController;
 use Modules\OrganizationUnit\Http\Controllers\OrganizationUnitDocumentController;
 use Modules\OrganizationUnit\Http\Controllers\OrganizationUnitTypeController;
 use Modules\OrganizationUnit\Http\Controllers\Platform\PlatformConfigurationOrganizationTargetController;
-use Modules\User\Constants\PlatformPermission;
+use Modules\Core\Authorization\PlatformPermission;
 
 $protectedGuard = (string) config('module-auth.protected_route_guard', 'auth-api');
 $currentUser = (string) config('core.current_user.middleware_alias', 'current.user');

@@ -4,43 +4,48 @@ declare(strict_types=1);
 
 namespace Modules\User\Services;
 
-use InvalidArgumentException;
+use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Modules\Core\Contracts\CurrentTenantContextAccessorInterface;
-use Modules\Core\Contracts\TransactionManagerInterface;
+use Modules\Core\Contracts\TenantAggregateLockInterface;
+use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
 use Modules\Core\DTOs\DataRecord;
 use Modules\Core\DTOs\PagedResult;
 use Modules\Core\Results\Result;
-use Modules\User\Constants\UserErrorCode;
+use Modules\User\Constants\UserGuard;
 use Modules\User\Constants\UserPermission;
-use Modules\User\Repositories\RoleRepositoryInterface;
-use Modules\User\Services\Contracts\UserDomainServiceInterface;
+use Modules\User\Models\RoleModel;
+use Modules\User\Services\Audit\UserAuditService;
+use RuntimeException;
 use Throwable;
 
 final class RoleService extends AbstractUserCrudService
 {
     public function __construct(
-        private readonly RoleRepositoryInterface $roles,
-        private readonly UserDomainServiceInterface $domain,
-        private readonly CurrentTenantContextAccessorInterface $currentTenant,
-        private readonly TransactionManagerInterface $transactions,
+        private readonly CurrentTenantContextAccessorInterface $tenant,
+        private readonly CurrentUserContextAccessorInterface $actor,
+        private readonly UserAuthorizationService $authorization,
+        private readonly UserAccessResolver $access,
+        private readonly UserAuditService $audit,
+        private readonly TenantAggregateLockInterface $tenantLock,
     ) {}
 
     public function list(array $filters): Result
     {
         try {
-            $perPage = max(1, (int) ($filters['per_page'] ?? 15));
-            $page = max(1, (int) ($filters['page'] ?? 1));
-            $tenantId = $this->resolveTenantId($this->toNullableInt($filters['tenant_id'] ?? null));
-            $search = $this->domain->normalizeNullableString((string) ($filters['search'] ?? ''));
-            $result = $this->roles->pageByFilters($tenantId, $search, $perPage, $page);
-
-            return $this->success(new PagedResult(
-                array_map(fn (DataRecord $record): DataRecord => $this->withRoleRelations($record), $result->items),
-                $result->total,
-                $result->page,
-                $result->perPage,
-            ));
+            $this->requirePermission(UserPermission::ROLES_VIEW);
+            $query = $this->baseQuery()->where('tenant_id', $this->tenantId());
+            $search = trim((string) ($filters['search'] ?? ''));
+            if ($search !== '') {
+                $query->where('name', 'like', $search.'%');
+            }
+            $perPage = min(max((int) ($filters['per_page'] ?? 25), 1), 100);
+            $page = max((int) ($filters['page'] ?? 1), 1);
+            $paginator = $query->orderByDesc('is_system')->orderBy('name')
+                ->paginate($perPage, ['*'], 'page', $page);
+            $items = array_map(fn (mixed $role): DataRecord => $this->record($role), array_values($paginator->items()));
+            return Result::success(new PagedResult($items, $paginator->total(), $paginator->currentPage(), $paginator->perPage()));
         } catch (Throwable $exception) {
             return $this->fromThrowable($exception);
         }
@@ -49,12 +54,9 @@ final class RoleService extends AbstractUserCrudService
     public function get(int|string $id): Result
     {
         try {
-            $record = $this->roles->findById($id);
-            if ($record === null || (int) $record->require('tenant_id') !== $this->resolveTenantId(null)) {
-                return $this->notFound('Role not found.');
-            }
-
-            return $this->success($this->withRoleRelations($record));
+            $this->requirePermission(UserPermission::ROLES_VIEW);
+            $role = $this->baseQuery()->where('tenant_id', $this->tenantId())->whereKey($id)->first();
+            return $role instanceof RoleModel ? Result::success($this->record($role)) : $this->notFound('Role not found.');
         } catch (Throwable $exception) {
             return $this->fromThrowable($exception);
         }
@@ -63,29 +65,27 @@ final class RoleService extends AbstractUserCrudService
     public function create(array $payload): Result
     {
         try {
-            return $this->transactions->runInTransaction(function () use ($payload): Result {
-                $tenantId = $this->resolveTenantId($this->toNullableInt($payload['tenant_id'] ?? null));
-                $name = $this->domain->normalizeRequiredString((string) ($payload['name'] ?? ''), 'Role name');
-                $guardName = $this->domain->normalizeNullableString($payload['guard_name'] ?? null)
-                    ?? (string) config('auth.defaults.guard', 'api');
-
-                if ($this->roles->findByTenantNameGuard($tenantId, $name, $guardName) !== null) {
-                    return $this->failure(UserErrorCode::DUPLICATE_ROLE, 'Role already exists in tenant scope.');
-                }
-
-                $permissionIds = $this->validatePermissionIds($tenantId, $payload['permission_ids'] ?? []);
-                $created = $this->roles->create([
+            $this->requirePermission(UserPermission::ROLES_CREATE);
+            $tenantId = $this->tenantId();
+            $role = DB::transaction(function () use ($tenantId, $payload): RoleModel {
+                $this->tenantLock->lock($tenantId);
+                $name = trim((string) ($payload['name'] ?? ''));
+                $this->assertUniqueName($tenantId, $name, null);
+                $role = RoleModel::query()->create([
                     'tenant_id' => $tenantId,
-                    'metadata' => $this->domain->normalizeMetadata($payload['metadata'] ?? null),
-                    'name' => $name,
-                    'guard_name' => $guardName,
-                    'description' => $this->domain->normalizeNullableString($payload['description'] ?? null),
                     'row_version' => 1,
+                    'name' => $name,
+                    'guard_name' => UserGuard::TENANT_API,
+                    'system_key' => null,
+                    'is_system' => false,
+                    'description' => $this->nullableString($payload['description'] ?? null),
+                    'created_by_user_id' => $this->actor->currentUserId(),
+                    'updated_by_user_id' => $this->actor->currentUserId(),
                 ]);
-                $this->syncRolePermissions((int) $created->id(), $tenantId, $permissionIds);
-
-                return $this->success($this->getCreatedOrUpdatedRole($created));
-            });
+                $this->audit->record('role.created', 'role', $role, null, $role->attributesToArray());
+                return $role;
+            }, 3);
+            return Result::success($this->record($this->baseQuery()->whereKey($role->getKey())->firstOrFail()));
         } catch (Throwable $exception) {
             return $this->fromThrowable($exception);
         }
@@ -94,254 +94,145 @@ final class RoleService extends AbstractUserCrudService
     public function update(int|string $id, array $payload): Result
     {
         try {
-            $existing = $this->roles->findById($id);
-            if ($existing === null || (int) $existing->require('tenant_id') !== $this->resolveTenantId(null)) {
-                return $this->notFound('Role not found.');
-            }
-
-            return $this->transactions->runInTransaction(function () use ($id, $payload, $existing): Result {
-                if ($this->isProtectedRole($existing)) {
-                    return $this->failure(
-                        UserErrorCode::PROTECTED_ACCOUNT,
-                        'Protected system roles cannot be modified.',
-                    );
+            $this->requirePermission(UserPermission::ROLES_UPDATE);
+            $tenantId = $this->tenantId();
+            $expectedVersion = (int) ($payload['expected_version'] ?? 0);
+            $role = DB::transaction(function () use ($tenantId, $id, $payload, $expectedVersion): RoleModel {
+                $this->tenantLock->lock($tenantId);
+                $role = RoleModel::query()->where('tenant_id', $tenantId)->whereKey($id)->lockForUpdate()->first();
+                if (! $role instanceof RoleModel) {
+                    throw new RuntimeException('Role not found.');
                 }
-
-                if (
-                    array_key_exists('row_version', $payload)
-                    && (int) $payload['row_version'] !== (int) $existing->get('row_version', 1)
-                ) {
-                    return $this->failure(
-                        UserErrorCode::STALE_RECORD,
-                        'Role was changed by someone else. Reload before saving.',
-                    );
+                $this->assertVersion($role, $expectedVersion);
+                if ((bool) $role->getAttribute('is_system')) {
+                    throw new RuntimeException('System roles are immutable.');
                 }
-
-                $recordId = (int) $existing->id();
-                $tenantId = (int) $existing->require('tenant_id');
-                if (
-                    array_key_exists('tenant_id', $payload)
-                    && $this->toNullableInt($payload['tenant_id']) !== $tenantId
-                ) {
-                    return $this->failure(UserErrorCode::TENANT_MISMATCH, 'Role tenant cannot be changed.');
-                }
-
-                $name = array_key_exists('name', $payload)
-                    ? $this->domain->normalizeRequiredString((string) $payload['name'], 'Role name')
-                    : (string) $existing->get('name');
-                $guardName = array_key_exists('guard_name', $payload)
-                    ? ($this->domain->normalizeNullableString($payload['guard_name']) ?? 'api')
-                    : (string) $existing->get('guard_name', 'api');
-
-                if ($this->roles->findByTenantNameGuard($tenantId, $name, $guardName, $recordId) !== null) {
-                    return $this->failure(UserErrorCode::DUPLICATE_ROLE, 'Role already exists in tenant scope.');
-                }
-
-                $updated = $this->roles->update($id, [
-                    'tenant_id' => $tenantId,
-                    'metadata' => array_key_exists('metadata', $payload)
-                        ? $this->domain->normalizeMetadata($payload['metadata'])
-                        : $existing->get('metadata'),
+                $before = $role->attributesToArray();
+                $name = array_key_exists('name', $payload) ? trim((string) $payload['name']) : (string) $role->getAttribute('name');
+                $this->assertUniqueName($tenantId, $name, (int) $role->getKey());
+                $role->forceFill([
                     'name' => $name,
-                    'guard_name' => $guardName,
                     'description' => array_key_exists('description', $payload)
-                        ? $this->domain->normalizeNullableString($payload['description'])
-                        : $existing->get('description'),
-                    'row_version' => (int) $existing->get('row_version', 1) + 1,
-                ]);
-
-                if (array_key_exists('permission_ids', $payload)) {
-                    $this->syncRolePermissions(
-                        $recordId,
-                        $tenantId,
-                        $this->validatePermissionIds($tenantId, $payload['permission_ids']),
-                    );
-                }
-
-                return $this->success($this->getCreatedOrUpdatedRole($updated));
-            });
+                        ? $this->nullableString($payload['description']) : $role->getAttribute('description'),
+                    'row_version' => $expectedVersion + 1,
+                    'updated_by_user_id' => $this->actor->currentUserId(),
+                ])->save();
+                $this->access->forgetForRoleTenant((int) $role->getKey(), $tenantId);
+                $this->audit->record('role.updated', 'role', $role, $before, $role->attributesToArray());
+                return $role;
+            }, 3);
+            return Result::success($this->record($this->baseQuery()->whereKey($role->getKey())->firstOrFail()));
         } catch (Throwable $exception) {
             return $this->fromThrowable($exception);
         }
     }
 
-    public function delete(int|string $id): Result
+    public function delete(int|string $id, int $expectedVersion): Result
     {
         try {
-            $existing = $this->roles->findById($id);
-            if ($existing === null || (int) $existing->require('tenant_id') !== $this->resolveTenantId(null)) {
-                return $this->notFound('Role not found.');
-            }
-
-            if ($this->isProtectedRole($existing)) {
-                return $this->failure(UserErrorCode::PROTECTED_ACCOUNT, 'Protected system roles cannot be deleted.');
-            }
-
-            if (DB::table('user_roles')
-                ->where('tenant_id', (int) $existing->require('tenant_id'))
-                ->where('role_id', (int) $existing->id())
-                ->exists()) {
-                return $this->failure(UserErrorCode::INVALID_VALUE, 'Role is assigned to users and cannot be deleted.');
-            }
-
-            return $this->transactions->runInTransaction(function () use ($id, $existing): Result {
-                DB::table('role_permissions')
-                    ->where('tenant_id', (int) $existing->require('tenant_id'))
-                    ->where('role_id', (int) $existing->id())
-                    ->delete();
-
-                if (! $this->roles->delete($id)) {
-                    return $this->notFound('Role not found.');
+            $this->requirePermission(UserPermission::ROLES_DELETE);
+            $tenantId = $this->tenantId();
+            DB::transaction(function () use ($tenantId, $id, $expectedVersion): void {
+                $this->tenantLock->lock($tenantId);
+                $role = RoleModel::query()->where('tenant_id', $tenantId)->whereKey($id)->lockForUpdate()->first();
+                if (! $role instanceof RoleModel) {
+                    throw new RuntimeException('Role not found.');
                 }
-
-                return $this->success(true);
-            });
+                $this->assertVersion($role, $expectedVersion);
+                if ((bool) $role->getAttribute('is_system')) {
+                    throw new RuntimeException('System roles cannot be archived.');
+                }
+                if ($role->users()->select('user_roles.id')->lockForUpdate()->first() !== null) {
+                    throw new RuntimeException('Remove this role from all users before archiving it.');
+                }
+                $before = $role->attributesToArray();
+                $role->forceFill([
+                    'deleted_at' => now(),
+                    'active_name_key' => null,
+                    'deleted_by_user_id' => $this->actor->currentUserId(),
+                    'row_version' => $expectedVersion + 1,
+                ])->save();
+                $this->access->forgetForRoleTenant((int) $role->getKey(), $tenantId);
+                $this->audit->record('role.archived', 'role', $role, $before, null);
+            }, 3);
+            return Result::success(true);
         } catch (Throwable $exception) {
             return $this->fromThrowable($exception);
         }
     }
 
-    private function resolveTenantId(?int $requestedTenantId): int
+    private function baseQuery(): Builder
     {
-        $currentTenantId = $this->currentTenant->currentTenantId();
-        if ($currentTenantId !== null && $requestedTenantId !== null && $requestedTenantId !== $currentTenantId) {
-            throw new InvalidArgumentException('Tenant scope mismatch for role operation.');
-        }
-
-        $resolvedTenantId = $requestedTenantId ?? $currentTenantId;
-        if ($resolvedTenantId === null || $resolvedTenantId < 1) {
-            throw new InvalidArgumentException('Tenant context is required for role operations.');
-        }
-
-        return $resolvedTenantId;
+        return RoleModel::query()
+            ->with(['permissions.permission:id,tenant_id,name,module,description,is_active'])
+            ->withCount(['users as assigned_users_count', 'permissions as permissions_count']);
     }
 
-    private function getCreatedOrUpdatedRole(DataRecord $record): DataRecord
+    private function record(RoleModel $role): DataRecord
     {
-        $fresh = $this->roles->findById($record->id());
-
-        return $this->withRoleRelations($fresh ?? $record);
+        return new DataRecord([
+            'id' => (int) $role->getKey(),
+            'row_version' => (int) $role->getAttribute('row_version'),
+            'name' => (string) $role->getAttribute('name'),
+            'guard_name' => (string) $role->getAttribute('guard_name'),
+            'description' => $role->getAttribute('description'),
+            'system_key' => $role->getAttribute('system_key'),
+            'is_system' => (bool) $role->getAttribute('is_system'),
+            'assigned_users_count' => (int) ($role->getAttribute('assigned_users_count') ?? 0),
+            'permissions_count' => (int) ($role->getAttribute('permissions_count') ?? 0),
+            'permissions' => $role->relationLoaded('permissions')
+                ? $role->permissions->map(static fn ($assignment): ?array => $assignment->permission === null ? null : [
+                    'id' => (int) $assignment->permission->getKey(),
+                    'name' => (string) $assignment->permission->getAttribute('name'),
+                    'module' => (string) $assignment->permission->getAttribute('module'),
+                    'description' => $assignment->permission->getAttribute('description'),
+                ])->filter()->values()->all()
+                : [],
+        ]);
     }
 
-    private function withRoleRelations(DataRecord $record): DataRecord
+    private function assertUniqueName(int $tenantId, string $name, ?int $excludingId): void
     {
-        $roleId = (int) $record->id();
-        $tenantId = (int) $record->require('tenant_id');
-        $payload = $record->toArray();
-        $payload['code'] = $payload['guard_name'] ?? null;
-        $payload['status'] = $this->isProtectedRole($record) ? 'protected' : 'active';
-        $payload['assigned_users_count'] = DB::table('user_roles')
-            ->where('tenant_id', $tenantId)
-            ->where('role_id', $roleId)
-            ->distinct('user_id')
-            ->count('user_id');
-        $payload['permissions_count'] = DB::table('role_permissions')
-            ->where('tenant_id', $tenantId)
-            ->where('role_id', $roleId)
-            ->count();
-        $payload['permissions'] = DB::table('role_permissions')
-            ->join('permissions', function ($join): void {
-                $join->on('permissions.id', '=', 'role_permissions.permission_id')
-                    ->on('permissions.tenant_id', '=', 'role_permissions.tenant_id');
-            })
-            ->where('role_permissions.tenant_id', $tenantId)
-            ->where('role_permissions.role_id', $roleId)
-            ->whereNull('permissions.deleted_at')
-            ->orderBy('permissions.module')
-            ->orderBy('permissions.name')
-            ->get(['permissions.id', 'permissions.name', 'permissions.module', 'permissions.description'])
-            ->map(static fn (object $row): array => [
-                'id' => (int) $row->id,
-                'name' => (string) $row->name,
-                'module' => $row->module !== null ? (string) $row->module : null,
-                'description' => $row->description !== null ? (string) $row->description : null,
-            ])
-            ->values()
-            ->all();
-
-        return new DataRecord($payload);
-    }
-
-    /**
-     * @return list<int>
-     */
-    private function validatePermissionIds(int $tenantId, mixed $value): array
-    {
-        if ($value === null || $value === '') {
-            return [];
+        if ($name === '') {
+            throw new RuntimeException('Role name is required.');
         }
-
-        if (! is_array($value)) {
-            throw new InvalidArgumentException('Permission list must be an array.');
+        $query = RoleModel::query()->where('tenant_id', $tenantId)->where('guard_name', UserGuard::TENANT_API)
+            ->where('active_name_key', mb_strtolower($name));
+        if ($excludingId !== null) {
+            $query->where($query->getModel()->getKeyName(), '!=', $excludingId);
         }
-
-        $permissionIds = [];
-        foreach ($value as $entry) {
-            $id = $this->toNullableInt($entry);
-            if ($id !== null) {
-                $permissionIds[] = $id;
-            }
-        }
-
-        $permissionIds = array_values(array_unique($permissionIds));
-        if ($permissionIds === []) {
-            return [];
-        }
-
-        $availablePermissionIds = DB::table('permissions')
-            ->where('tenant_id', $tenantId)
-            ->whereIn('id', $permissionIds)
-            ->whereNull('deleted_at')
-            ->pluck('id')
-            ->map(static fn (mixed $id): int => (int) $id)
-            ->all();
-
-        sort($permissionIds);
-        sort($availablePermissionIds);
-
-        if ($permissionIds !== $availablePermissionIds) {
-            throw new InvalidArgumentException('One or more selected permissions are not available for this tenant.');
-        }
-
-        return $permissionIds;
-    }
-
-    /**
-     * @param  list<int>  $permissionIds
-     */
-    private function syncRolePermissions(int $roleId, int $tenantId, array $permissionIds): void
-    {
-        $existingPermissionIds = DB::table('role_permissions')
-            ->where('tenant_id', $tenantId)
-            ->where('role_id', $roleId)
-            ->pluck('permission_id')
-            ->map(static fn (mixed $id): int => (int) $id)
-            ->all();
-
-        $removeIds = array_values(array_diff($existingPermissionIds, $permissionIds));
-        if ($removeIds !== []) {
-            DB::table('role_permissions')
-                ->where('tenant_id', $tenantId)
-                ->where('role_id', $roleId)
-                ->whereIn('permission_id', $removeIds)
-                ->delete();
-        }
-
-        $addIds = array_values(array_diff($permissionIds, $existingPermissionIds));
-        foreach ($addIds as $permissionId) {
-            DB::table('role_permissions')->insert([
-                'tenant_id' => $tenantId,
-                'role_id' => $roleId,
-                'permission_id' => $permissionId,
-                'row_version' => 1,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+        if ($query->exists()) {
+            throw new RuntimeException('An active role with this name already exists.');
         }
     }
 
-    private function isProtectedRole(DataRecord $role): bool
+    private function assertVersion(RoleModel $role, int $expected): void
     {
-        return trim((string) $role->get('name')) === UserPermission::SUPER_ADMIN_ROLE;
+        if ($expected < 1 || (int) $role->getAttribute('row_version') !== $expected) {
+            throw new RuntimeException('The role changed after it was loaded. Refresh and try again.');
+        }
+    }
+
+    private function requirePermission(string $permission): void
+    {
+        if (! $this->authorization->canCurrent($permission)) {
+            throw new AuthorizationException('This role action is not authorized.');
+        }
+    }
+
+    private function tenantId(): int
+    {
+        $id = $this->tenant->currentTenantId();
+        if ($id === null) {
+            throw new RuntimeException('A tenant context is required.');
+        }
+        return $id;
+    }
+
+
+    private function nullableString(mixed $value): ?string
+    {
+        $value = is_scalar($value) ? trim((string) $value) : '';
+        return $value === '' ? null : $value;
     }
 }

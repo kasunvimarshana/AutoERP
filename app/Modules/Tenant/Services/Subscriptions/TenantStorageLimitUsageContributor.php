@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Services\Subscriptions;
 
+use Modules\Core\Tenancy\TenantPlanLimit;
+
 use Modules\Tenant\Models\TenantDocumentModel;
-use Modules\Tenant\Services\Contracts\TenantLimitUsageContributorInterface;
+use Modules\Core\Contracts\TenantLimitUsageContributorInterface;
 
 final class TenantStorageLimitUsageContributor implements TenantLimitUsageContributorInterface
 {
@@ -20,7 +22,7 @@ final class TenantStorageLimitUsageContributor implements TenantLimitUsageContri
             ->sum('size_bytes');
 
         return [
-            'max_storage_mb' => (int) ceil($bytes / self::BYTES_PER_MEGABYTE),
+            TenantPlanLimit::STORAGE_MEGABYTES => (int) ceil($bytes / self::BYTES_PER_MEGABYTE),
         ];
     }
 }

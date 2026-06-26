@@ -4,40 +4,43 @@ declare(strict_types=1);
 
 namespace Modules\User\Services;
 
-use InvalidArgumentException;
+use Illuminate\Auth\Access\AuthorizationException;
 use Modules\Core\Contracts\CurrentTenantContextAccessorInterface;
 use Modules\Core\DTOs\DataRecord;
 use Modules\Core\DTOs\PagedResult;
 use Modules\Core\Results\Result;
-use Modules\User\Constants\UserErrorCode;
-use Modules\User\Repositories\PermissionRepositoryInterface;
-use Modules\User\Services\Contracts\UserDomainServiceInterface;
+use Modules\User\Constants\UserGuard;
+use Modules\User\Constants\UserPermission;
+use Modules\User\Models\PermissionModel;
+use RuntimeException;
 use Throwable;
 
 final class PermissionService extends AbstractUserCrudService
 {
     public function __construct(
-        private readonly PermissionRepositoryInterface $permissions,
-        private readonly UserDomainServiceInterface $domain,
-        private readonly CurrentTenantContextAccessorInterface $currentTenant,
+        private readonly CurrentTenantContextAccessorInterface $tenant,
+        private readonly UserAuthorizationService $authorization,
     ) {}
 
     public function list(array $filters): Result
     {
         try {
-            $perPage = max(1, (int) ($filters['per_page'] ?? 15));
-            $page = max(1, (int) ($filters['page'] ?? 1));
-            $tenantId = $this->resolveTenantId($this->toNullableInt($filters['tenant_id'] ?? null));
-            $module = $this->domain->normalizeNullableString($filters['module'] ?? null);
-            $search = $this->domain->normalizeNullableString((string) ($filters['search'] ?? ''));
-            $result = $this->permissions->pageByFilters($tenantId, $module, $search, $perPage, $page);
-
-            return $this->success(new PagedResult(
-                array_map(fn (DataRecord $record): DataRecord => $this->withCatalogueFields($record), $result->items),
-                $result->total,
-                $result->page,
-                $result->perPage,
-            ));
+            $this->authorize();
+            $query = PermissionModel::query()->where('tenant_id', $this->tenantId())
+                ->where('guard_name', UserGuard::TENANT_API)->where('is_active', true);
+            $module = trim((string) ($filters['module'] ?? ''));
+            if ($module !== '') {
+                $query->where('module', $module);
+            }
+            $search = trim((string) ($filters['search'] ?? ''));
+            if ($search !== '') {
+                $query->where('name', 'like', $search.'%');
+            }
+            $perPage = min(max((int) ($filters['per_page'] ?? 50), 1), 100);
+            $page = max((int) ($filters['page'] ?? 1), 1);
+            $paginator = $query->orderBy('module')->orderBy('name')->paginate($perPage, ['*'], 'page', $page);
+            $items = array_map(fn (mixed $permission): DataRecord => $this->record($permission), array_values($paginator->items()));
+            return Result::success(new PagedResult($items, $paginator->total(), $paginator->currentPage(), $paginator->perPage()));
         } catch (Throwable $exception) {
             return $this->fromThrowable($exception);
         }
@@ -46,133 +49,52 @@ final class PermissionService extends AbstractUserCrudService
     public function get(int|string $id): Result
     {
         try {
-            $record = $this->permissions->findById($id);
-            if ($record === null || (int) $record->require('tenant_id') !== $this->resolveTenantId(null)) {
-                return $this->notFound('Permission not found.');
-            }
-
-            return $this->success($this->withCatalogueFields($record));
+            $this->authorize();
+            $permission = PermissionModel::query()->where('tenant_id', $this->tenantId())
+                ->where('guard_name', UserGuard::TENANT_API)->whereKey($id)->first();
+            return $permission instanceof PermissionModel ? Result::success($this->record($permission)) : $this->notFound('Permission not found.');
         } catch (Throwable $exception) {
             return $this->fromThrowable($exception);
         }
     }
 
-    public function create(array $payload): Result
+    /** @return Result list<string> */
+    public function modules(): Result
     {
         try {
-            $tenantId = $this->toNullableInt($payload['tenant_id'] ?? null);
-            $name = $this->domain->normalizeRequiredString((string) ($payload['name'] ?? ''), 'Permission name');
-            $guardName = $this->domain->normalizeNullableString($payload['guard_name'] ?? null)
-                ?? (string) config('auth.defaults.guard', 'api');
-
-            if ($this->permissions->findByTenantNameGuard($tenantId, $name, $guardName) !== null) {
-                return $this->failure(
-                    UserErrorCode::DUPLICATE_PERMISSION,
-                    'Permission already exists in tenant scope.',
-                );
-            }
-
-            return $this->success($this->permissions->create([
-                'tenant_id' => $tenantId,
-                'metadata' => $this->domain->normalizeMetadata($payload['metadata'] ?? null),
-                'name' => $name,
-                'guard_name' => $guardName,
-                'module' => $this->domain->normalizeNullableString($payload['module'] ?? null),
-                'description' => $this->domain->normalizeNullableString($payload['description'] ?? null),
-                'row_version' => 1,
-            ]));
+            $this->authorize();
+            return Result::success(PermissionModel::query()->where('tenant_id', $this->tenantId())
+                ->where('guard_name', UserGuard::TENANT_API)->where('is_active', true)
+                ->distinct()->orderBy('module')->pluck('module')->map(static fn ($module): string => (string) $module)->all());
         } catch (Throwable $exception) {
             return $this->fromThrowable($exception);
         }
     }
 
-    public function update(int|string $id, array $payload): Result
+    private function record(PermissionModel $permission): DataRecord
     {
-        try {
-            $existing = $this->permissions->findById($id);
-            if ($existing === null) {
-                return $this->notFound('Permission not found.');
-            }
+        return new DataRecord([
+            'id' => (int) $permission->getKey(),
+            'name' => (string) $permission->getAttribute('name'),
+            'module' => (string) $permission->getAttribute('module'),
+            'description' => $permission->getAttribute('description'),
+            'is_read_only' => true,
+        ]);
+    }
 
-            $recordId = (int) $existing->id();
-            $tenantId = $this->toNullableInt($payload['tenant_id'] ?? $existing->get('tenant_id'));
-            $name = array_key_exists('name', $payload)
-                ? $this->domain->normalizeRequiredString(
-                    (string) $payload['name'],
-                    'Permission name',
-                )
-                : (string) $existing->get('name');
-            $guardName = array_key_exists('guard_name', $payload)
-                ? ($this->domain->normalizeNullableString($payload['guard_name']) ?? 'api')
-                : (string) $existing->get('guard_name', 'api');
-
-            if ($this->permissions->findByTenantNameGuard($tenantId, $name, $guardName, $recordId) !== null) {
-                return $this->failure(
-                    UserErrorCode::DUPLICATE_PERMISSION,
-                    'Permission already exists in tenant scope.',
-                );
-            }
-
-            return $this->success(
-                $this->permissions->update($id, [
-                    'tenant_id' => $tenantId,
-                    'metadata' => array_key_exists('metadata', $payload)
-                        ? $this->domain->normalizeMetadata($payload['metadata'])
-                        : $existing->get('metadata'),
-                    'name' => $name,
-                    'guard_name' => $guardName,
-                    'module' => array_key_exists('module', $payload)
-                        ? $this->domain->normalizeNullableString($payload['module'])
-                        : $existing->get('module'),
-                    'description' => array_key_exists('description', $payload)
-                        ? $this->domain->normalizeNullableString($payload['description'])
-                        : $existing->get('description'),
-                    'row_version' => (int) $existing->get('row_version', 1) + 1,
-                ]),
-            );
-        } catch (Throwable $exception) {
-            return $this->fromThrowable($exception);
+    private function authorize(): void
+    {
+        if (! $this->authorization->canCurrent(UserPermission::PERMISSIONS_VIEW)) {
+            throw new AuthorizationException('Permission catalogue access is not authorized.');
         }
     }
 
-    public function delete(int|string $id): Result
+    private function tenantId(): int
     {
-        try {
-            if (! $this->permissions->delete($id)) {
-                return $this->notFound('Permission not found.');
-            }
-
-            return $this->success(true);
-        } catch (Throwable $exception) {
-            return $this->fromThrowable($exception);
+        $id = $this->tenant->currentTenantId();
+        if ($id === null) {
+            throw new RuntimeException('A tenant context is required.');
         }
-    }
-
-    private function resolveTenantId(?int $requestedTenantId): int
-    {
-        $currentTenantId = $this->currentTenant->currentTenantId();
-        if ($currentTenantId !== null && $requestedTenantId !== null && $requestedTenantId !== $currentTenantId) {
-            throw new InvalidArgumentException('Tenant scope mismatch for permission operation.');
-        }
-
-        $resolvedTenantId = $requestedTenantId ?? $currentTenantId;
-        if ($resolvedTenantId === null || $resolvedTenantId < 1) {
-            throw new InvalidArgumentException('Tenant context is required for permission operations.');
-        }
-
-        return $resolvedTenantId;
-    }
-
-    private function withCatalogueFields(DataRecord $record): DataRecord
-    {
-        $payload = $record->toArray();
-        $name = (string) ($payload['name'] ?? '');
-        $segments = explode('.', $name);
-        $payload['resource'] = $segments[0] ?? null;
-        $payload['action'] = count($segments) > 1 ? implode('.', array_slice($segments, 1)) : null;
-        $payload['status'] = 'system_defined';
-        $payload['is_read_only'] = true;
-
-        return new DataRecord($payload);
+        return $id;
     }
 }

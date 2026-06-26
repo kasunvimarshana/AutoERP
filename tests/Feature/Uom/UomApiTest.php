@@ -306,7 +306,7 @@ final class UomApiTest extends TestCase
             'updated_at' => $now,
         ]);
         $email = (string) ($overrides['email'] ?? 'admin@example.test');
-        $userId = (int) DB::table('users')->insertGetId([
+        $userId = (int) \Tests\Support\TenantUserFixture::create([
             'tenant_id' => $tenantId,
             'first_name' => 'Unit',
             'last_name' => 'Tester',

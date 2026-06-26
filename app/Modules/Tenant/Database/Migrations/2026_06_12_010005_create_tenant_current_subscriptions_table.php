@@ -17,7 +17,7 @@ return new class extends Migration
             $table->string('state_reason', 500)->nullable();
             $table->timestamp('state_changed_at');
             $table->unsignedBigInteger('row_version')->default(1);
-            $table->timestamp('assigned_at');
+            $table->timestamp('assigned_at')->useCurrent();
             $table->unsignedBigInteger('assigned_by')->nullable()->index('tenant_current_subscriptions_assigned_by_idx');
             $table->timestamps();
 

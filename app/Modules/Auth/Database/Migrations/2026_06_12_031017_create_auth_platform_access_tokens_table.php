@@ -12,10 +12,10 @@ return new class extends Migration
     {
         Schema::create('auth_platform_access_tokens', function (Blueprint $table): void {
             $table->id();
-            $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
+            $table->unsignedBigInteger('row_version')->default(1);
             $table->json('metadata')->nullable();
             $table->unsignedBigInteger('platform_session_id');
-            $table->unsignedBigInteger('user_id');
+            $table->unsignedBigInteger('platform_operator_id');
             $table->string('token_key', 120);
             $table->string('token_hash');
             $table->json('scopes')->nullable();
@@ -27,12 +27,10 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            $table->foreign(['platform_session_id', 'user_id'], 'auth_platform_access_session_user_fk')
-                ->references(['id', 'user_id'])
-                ->on('auth_platform_sessions')
-                ->cascadeOnDelete();
+            $table->foreign(['platform_session_id', 'platform_operator_id'], 'auth_platform_access_session_operator_fk')
+                ->references(['id', 'platform_operator_id'])->on('auth_platform_sessions')->cascadeOnDelete();
             $table->unique('token_key', 'auth_platform_access_tokens_key_uk');
-            $table->index(['user_id', 'status'], 'auth_platform_access_user_status_idx');
+            $table->index(['platform_operator_id', 'status'], 'auth_platform_access_operator_status_idx');
             $table->index(['platform_session_id', 'status'], 'auth_platform_access_session_status_idx');
         });
     }

@@ -13,20 +13,21 @@ use Modules\Auth\Services\Mfa\PlatformMfaPolicy;
 use Modules\Auth\Services\Mfa\PlatformMfaService;
 use Modules\Core\Contracts\ClockInterface;
 use Modules\Core\Contracts\ErrorNormalizerInterface;
-use Modules\Core\Contracts\PasswordHasherInterface;
 use Modules\Core\Contracts\PlatformPermissionCheckerInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\Core\Contracts\TransactionManagerInterface;
 use Modules\Core\Results\Error;
 use Modules\Core\Results\Result;
-use Modules\User\Repositories\UserRepositoryInterface;
+use Modules\User\Constants\PlatformOperatorStatus;
+use Modules\User\Models\PlatformOperatorModel;
+use Modules\Auth\Services\Credentials\PasswordCredentialService;
 use Throwable;
 
 final class PlatformLoginService
 {
     public function __construct(
-        private readonly UserRepositoryInterface $users,
-        private readonly PasswordHasherInterface $passwords,
+        private readonly PlatformOperatorModel $operators,
+        private readonly PasswordCredentialService $passwords,
         private readonly TokenProviderInterface $tokens,
         private readonly RateLimiter $limiter,
         private readonly ErrorNormalizerInterface $errors,
@@ -83,10 +84,14 @@ final class PlatformLoginService
         }
 
         try {
-            $operator = $this->users->findActivePlatformOperatorCredentials($email);
+            $operator = $this->operators->newQuery()
+                ->where('email', $email)
+                ->where('status', PlatformOperatorStatus::ACTIVE)
+                ->whereNotNull('credentials_ready_at')
+                ->first();
             if (
-                $operator === null
-                || ! $this->passwords->verify($password, (string) $operator->get('password_hash', ''))
+                ! $operator instanceof PlatformOperatorModel
+                || ! $this->passwords->verifyPlatformOperator((int) $operator->getKey(), $password)
             ) {
                 $this->limiter->hit($rateKey, $decaySeconds);
 
@@ -96,7 +101,7 @@ final class PlatformLoginService
                 ));
             }
 
-            $operatorId = (int) $operator->id();
+            $operatorId = (int) $operator->getKey();
             $mfaIsActive = $this->mfa->isActive($operatorId);
             $mfaEnrollmentRequired = $this->mfaPolicy->isEnrollmentRequired();
             $mfaChallengeRequired = $this->mfaPolicy->shouldChallengeLogin($mfaIsActive);
@@ -162,7 +167,7 @@ final class PlatformLoginService
                     'tenant_id' => null,
                     'organization_unit_id' => null,
                     'platform_session_id' => (int) $session->getKey(),
-                    'user_id' => $operatorId,
+                    'platform_operator_id' => $operatorId,
                     'token_scope' => AuthTokenScope::PLATFORM,
                     'grant_type' => 'platform_password',
                     'scopes' => ['platform'],
@@ -176,9 +181,9 @@ final class PlatformLoginService
                 'tokens' => $tokenPair,
                 'user' => [
                     'id' => $operatorId,
-                    'first_name' => $operator->get('first_name'),
-                    'last_name' => $operator->get('last_name'),
-                    'email' => $operator->get('email'),
+                    'first_name' => $operator->getAttribute('first_name'),
+                    'last_name' => $operator->getAttribute('last_name'),
+                    'email' => $operator->getAttribute('email'),
                     'is_platform_operator' => true,
                 ],
                 'tenant' => null,

@@ -5,7 +5,6 @@ declare(strict_types=1);
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
-use Modules\Auth\Constants\RegistrationInvitationStatus;
 
 return new class extends Migration
 {
@@ -16,18 +15,14 @@ return new class extends Migration
             $table->uuid('public_id')->unique('auth_registration_invites_public_uk');
             $table->unsignedBigInteger('row_version')->default(1);
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
+            $table->unsignedBigInteger('user_id')->nullable();
             $table->unsignedBigInteger('organization_unit_id')->nullable();
             $table->unsignedBigInteger('role_id')->nullable();
             $table->string('email');
             $table->char('token_hash', 64)->unique('auth_registration_invites_token_uk');
             $table->text('delivery_token')->nullable();
-            $table->string('purpose', 50)->default('user_registration');
-            $table->enum('status', [
-                RegistrationInvitationStatus::PENDING,
-                RegistrationInvitationStatus::ACCEPTED,
-                RegistrationInvitationStatus::REVOKED,
-                RegistrationInvitationStatus::EXPIRED,
-            ])->default(RegistrationInvitationStatus::PENDING);
+            $table->string('purpose', 50);
+            $table->string('status', 30)->default('pending');
             $table->timestamp('expires_at');
             $table->timestamp('accepted_at')->nullable();
             $table->unsignedBigInteger('accepted_by_user_id')->nullable();
@@ -38,22 +33,16 @@ return new class extends Migration
             $table->timestamps();
 
             $table->unique(['id', 'tenant_id'], 'auth_registration_invites_id_tenant_uk');
+            $table->index(['tenant_id', 'user_id', 'purpose', 'status'], 'auth_registration_invites_user_status_idx');
+            $table->foreign(['user_id', 'tenant_id'], 'auth_reg_invites_target_user_tenant_fk')
+                ->references(['id', 'tenant_id'])->on('users')->cascadeOnDelete();
             $table->foreign(['organization_unit_id', 'tenant_id'], 'auth_reg_invites_org_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('organization_units')
-                ->restrictOnDelete();
+                ->references(['id', 'tenant_id'])->on('organization_units')->restrictOnDelete();
             $table->foreign(['role_id', 'tenant_id'], 'auth_reg_invites_role_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('roles')
-                ->restrictOnDelete();
+                ->references(['id', 'tenant_id'])->on('roles')->restrictOnDelete();
             $table->foreign(['accepted_by_user_id', 'tenant_id'], 'auth_reg_invites_user_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('users')
-                ->restrictOnDelete();
-            $table->index(
-                ['tenant_id', 'email', 'status', 'expires_at'],
-                'auth_registration_invites_lookup_idx',
-            );
+                ->references(['id', 'tenant_id'])->on('users')->restrictOnDelete();
+            $table->index(['tenant_id', 'email', 'status', 'expires_at'], 'auth_registration_invites_lookup_idx');
         });
     }
 

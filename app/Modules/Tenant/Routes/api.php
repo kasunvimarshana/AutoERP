@@ -13,7 +13,7 @@ use Modules\Tenant\Http\Controllers\TenantProfileController;
 use Modules\Tenant\Http\Controllers\TenantSubscriptionController;
 use Modules\Tenant\Http\Controllers\Platform\PlatformTenantHealthController;
 use Modules\Tenant\Http\Controllers\Platform\PlatformTenantTargetController;
-use Modules\User\Constants\PlatformPermission;
+use Modules\Core\Authorization\PlatformPermission;
 use Modules\Tenant\Constants\TenantDomainProbe;
 use Modules\Tenant\Http\Controllers\Public\TenantDomainProbeController;
 

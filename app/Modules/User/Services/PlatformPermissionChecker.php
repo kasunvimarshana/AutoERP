@@ -5,59 +5,54 @@ declare(strict_types=1);
 namespace Modules\User\Services;
 
 use Modules\Core\Contracts\PlatformPermissionCheckerInterface;
+use Modules\User\Constants\PlatformOperatorStatus;
+use Modules\User\Models\PlatformOperatorModel;
 use Modules\User\Models\PlatformOperatorPermissionModel;
-use Modules\User\Models\UserModel;
 
 final class PlatformPermissionChecker implements PlatformPermissionCheckerInterface
 {
     public function __construct(
-        private readonly UserModel $users,
+        private readonly PlatformOperatorModel $operators,
         private readonly PlatformOperatorPermissionModel $assignments,
     ) {}
 
-    public function hasPermission(int $userId, string $permission): bool
+    public function allows(int $operatorId, string $permission): bool
     {
-        $permission = strtolower(trim($permission));
-        if ($userId < 1 || $permission === '') {
+        if ($operatorId < 1 || trim($permission) === '' || ! $this->isActive($operatorId)) {
             return false;
         }
 
-        return $this->isActivePlatformOperator($userId)
-            && $this->assignments->newQuery()
-                ->where('user_id', $userId)
-                ->whereHas('permission', fn ($query) => $query
-                    ->where('name', $permission)
-                    ->where('is_active', true))
-                ->exists();
+        return $this->assignments->newQuery()
+            ->where('platform_operator_id', $operatorId)
+            ->whereHas('permission', fn ($query) => $query
+                ->where('name', trim($permission))
+                ->where('is_active', true))
+            ->exists();
     }
 
-    public function permissions(int $userId): array
+    /** @return list<string> */
+    public function permissions(int $operatorId): array
     {
-        if ($userId < 1 || ! $this->isActivePlatformOperator($userId)) {
+        if (! $this->isActive($operatorId)) {
             return [];
         }
 
         return $this->assignments->newQuery()
-            ->where('user_id', $userId)
+            ->where('platform_operator_id', $operatorId)
             ->whereHas('permission', fn ($query) => $query->where('is_active', true))
             ->with('permission:id,name')
             ->get()
-            ->map(fn (PlatformOperatorPermissionModel $assignment): string => (string) $assignment->permission?->name)
-            ->filter()
-            ->unique()
-            ->sort()
-            ->values()
-            ->all();
+            ->map(fn (PlatformOperatorPermissionModel $assignment): ?string => $assignment->permission?->name)
+            ->filter(static fn (mixed $name): bool => is_string($name) && $name !== '')
+            ->sort()->values()->all();
     }
 
-    private function isActivePlatformOperator(int $userId): bool
+    private function isActive(int $operatorId): bool
     {
-        return $this->users->newQuery()
-            ->whereKey($userId)
-            ->whereNull('tenant_id')
-            ->where('is_platform_operator', true)
-            ->where('status', 'active')
-            ->whereNull('deleted_at')
+        return $this->operators->newQuery()
+            ->whereKey($operatorId)
+            ->where('status', PlatformOperatorStatus::ACTIVE)
+            ->whereNotNull('credentials_ready_at')
             ->exists();
     }
 }

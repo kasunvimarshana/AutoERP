@@ -8,7 +8,7 @@ use Modules\Auth\Http\Controllers\PlatformAuthController;
 use Modules\Auth\Http\Controllers\PlatformMfaController;
 use Modules\Auth\Http\Controllers\PlatformSecurityController;
 use Modules\Auth\Http\Controllers\OrganizationUnitContextController;
-use Modules\User\Constants\PlatformPermission;
+use Modules\Core\Authorization\PlatformPermission;
 use Modules\Auth\Http\Controllers\InitialAdministratorInvitationController;
 
 $protectedGuard = (string) config('module-auth.protected_route_guard', 'auth-api');

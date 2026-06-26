@@ -7,16 +7,14 @@ namespace Modules\Auth\Services;
 use Modules\Auth\Constants\AuthErrorCode;
 use Modules\Configuration\Contracts\ConfigurationResolverInterface;
 use Modules\Core\Contracts\OrganizationUnitUserAccessCheckerInterface;
-use Modules\Core\Contracts\PlatformOperatorCheckerInterface;
 use Modules\Core\Results\Error;
 use Modules\Core\Results\Result;
 use Modules\OrganizationUnit\Repositories\OrganizationUnitRepositoryInterface;
 use Modules\Tenant\Repositories\TenantRepositoryInterface;
 use Modules\Tenant\Services\TenantEntitlementService;
-use Modules\User\Repositories\RolePermissionRepositoryInterface;
-use Modules\User\Repositories\UserPermissionRepositoryInterface;
 use Modules\User\Repositories\UserRepositoryInterface;
 use Modules\User\Repositories\UserRoleRepositoryInterface;
+use Modules\User\Services\UserAccessResolver;
 
 final class GetCurrentAuthProfileService
 {
@@ -26,11 +24,9 @@ final class GetCurrentAuthProfileService
         private readonly OrganizationUnitRepositoryInterface $organizationUnits,
         private readonly OrganizationUnitUserAccessCheckerInterface $organizationUnitAccess,
         private readonly UserRoleRepositoryInterface $userRoles,
-        private readonly UserPermissionRepositoryInterface $userPermissions,
-        private readonly RolePermissionRepositoryInterface $rolePermissions,
+        private readonly UserAccessResolver $access,
         private readonly ConfigurationResolverInterface $configuration,
         private readonly TenantEntitlementService $entitlements,
-        private readonly PlatformOperatorCheckerInterface $platformOperators,
     ) {}
 
     public function getProfile(
@@ -60,7 +56,7 @@ final class GetCurrentAuthProfileService
             return $this->failure(AuthErrorCode::TENANT_RESOLUTION_FAILED, 'Authenticated tenant context is unavailable.');
         }
 
-        if ((int) $user->get('tenant_id', 0) !== $tenantId || (bool) $user->get('is_platform_operator', false)) {
+        if ((int) $user->get('tenant_id', 0) !== $tenantId) {
             return $this->failure(AuthErrorCode::TENANT_MISMATCH, 'Authenticated user does not belong to this tenant.');
         }
 
@@ -74,15 +70,11 @@ final class GetCurrentAuthProfileService
         $resolvedTenantId = $tenantId;
         $resolvedOrganizationUnitId = $organizationUnitId;
         $roleSummaries = $this->userRoles->listRoleSummariesForTenantUser($resolvedTenantId, $userId);
-        $roleIds = array_map(static fn (array $role): int => (int) $role['id'], $roleSummaries);
         $roles = array_values(array_unique(array_map(
             static fn (array $role): string => (string) $role['name'],
             $roleSummaries,
         )));
-        $directPermissions = $this->userPermissions->listPermissionNamesForTenantUser($resolvedTenantId, $userId);
-        $rolePermissions = $this->rolePermissions->listPermissionNamesForTenantRoles($resolvedTenantId, $roleIds);
-        $permissions = array_values(array_unique(array_merge($directPermissions, $rolePermissions)));
-        sort($permissions);
+        $permissions = $this->access->effectivePermissionNames($userId, $resolvedTenantId);
 
         return Result::success([
             'user_id' => $userId,
@@ -91,7 +83,7 @@ final class GetCurrentAuthProfileService
             'guard' => $guard,
             'provider' => $provider,
             'application_id' => $applicationId,
-            'is_platform_operator' => $this->platformOperators->isPlatformOperator($userId),
+            'is_platform_operator' => false,
             'roles' => $roles,
             'permissions' => $permissions,
             'enabled_modules' => $this->enabledModules($resolvedTenantId),
@@ -103,10 +95,9 @@ final class GetCurrentAuthProfileService
                 'last_name' => $this->nullableString($user->get('last_name')),
                 'email' => (string) $user->get('email', ''),
                 'status' => $status,
-                'is_platform_operator' => $this->platformOperators->isPlatformOperator($userId),
+                'is_platform_operator' => false,
                 'roles' => $roles,
                 'permissions' => $permissions,
-                'metadata' => $this->safeMetadata($user->get('metadata')),
             ],
             'tenant' => $this->tenantSummary($resolvedTenantId),
             'organization_unit' => $this->organizationUnitSummary($resolvedTenantId, $resolvedOrganizationUnitId),
@@ -197,20 +188,6 @@ final class GetCurrentAuthProfileService
     private function enabledModules(?int $tenantId): ?array
     {
         return $tenantId === null ? null : $this->entitlements->enabledModules($tenantId);
-    }
-
-    /**
-     * @return array<string,mixed>
-     */
-    private function safeMetadata(mixed $metadata): array
-    {
-        if (! is_array($metadata)) {
-            return [];
-        }
-
-        unset($metadata['password'], $metadata['password_hash'], $metadata['token'], $metadata['token_hash']);
-
-        return $metadata;
     }
 
     /**

@@ -6,37 +6,26 @@ namespace Modules\User\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Core\Models\TenantOwnedModel;
-use Modules\OrganizationUnit\Models\OrganizationUnitModel;
-use Modules\Tenant\Models\TenantModel;
 
 final class UserDeviceModel extends TenantOwnedModel
 {
     protected $table = 'user_devices';
-
-    protected $guarded = ['id'];
+    protected $fillable = [
+        'tenant_id', 'row_version', 'user_id',
+        'device_token_hash', 'device_token_encrypted', 'platform', 'device_name',
+        'last_active_at', 'revoked_at', 'registered_by_user_id', 'revoked_by_user_id',
+    ];
+    protected $hidden = ['device_token_hash', 'device_token_encrypted'];
 
     protected function casts(): array
     {
         return array_merge(parent::casts(), [
-            'tenant_id' => 'integer',
-            'organization_unit_id' => 'integer',
-            'user_id' => 'integer',
+            'row_version' => 'integer',
+            'device_token_encrypted' => 'encrypted',
             'last_active_at' => 'datetime',
+            'revoked_at' => 'datetime',
         ]);
     }
 
-    public function tenant(): BelongsTo
-    {
-        return $this->belongsTo(TenantModel::class, 'tenant_id');
-    }
-
-    public function organizationUnit(): BelongsTo
-    {
-        return $this->belongsTo(OrganizationUnitModel::class, 'organization_unit_id');
-    }
-
-    public function user(): BelongsTo
-    {
-        return $this->belongsTo(UserModel::class, 'user_id');
-    }
+    public function user(): BelongsTo { return $this->belongsTo(UserModel::class, 'user_id'); }
 }

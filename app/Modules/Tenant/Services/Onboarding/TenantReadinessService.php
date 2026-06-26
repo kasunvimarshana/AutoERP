@@ -12,7 +12,7 @@ use Modules\Tenant\Models\TenantOnboardingStateModel;
 use Modules\Tenant\Repositories\TenantDomainRepositoryInterface;
 use Modules\Tenant\Repositories\TenantRepositoryInterface;
 use Modules\Tenant\Repositories\TenantSubscriptionRepositoryInterface;
-use Modules\Tenant\Services\Contracts\TenantAccessProvisionerInterface;
+use Modules\Core\Contracts\TenantAccessProvisionerInterface;
 use Modules\Tenant\Services\Contracts\TenantAuthenticationProvisionerInterface;
 use Modules\Tenant\Services\Contracts\TenantBaseCurrencyReadinessInterface;
 use Modules\Tenant\Services\Contracts\TenantOrganizationProvisionerInterface;

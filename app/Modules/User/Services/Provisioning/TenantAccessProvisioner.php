@@ -6,135 +6,89 @@ namespace Modules\User\Services\Provisioning;
 
 use Illuminate\Support\Facades\DB;
 use Modules\Core\Contracts\PermissionDefinitionRegistryInterface;
-use Modules\Tenant\Services\Contracts\TenantAccessProvisionerInterface;
-use Modules\User\Constants\UserPermission;
+use Modules\Core\Contracts\TenantAggregateLockInterface;
+use Modules\Core\Contracts\TenantAccessProvisionerInterface;
+use Modules\User\Constants\UserGuard;
+use Modules\User\Constants\UserStatus;
+use Modules\User\Constants\UserSystemRole;
 use Modules\User\Models\PermissionModel;
 use Modules\User\Models\RoleModel;
+use Modules\User\Models\RolePermissionModel;
 
 final class TenantAccessProvisioner implements TenantAccessProvisionerInterface
 {
-    private const GUARD_NAME = 'api';
-    private const SYSTEM_DEFINED = 'system_defined';
-
     public function __construct(
         private readonly PermissionDefinitionRegistryInterface $permissionDefinitions,
+        private readonly TenantAggregateLockInterface $tenantLock,
     ) {}
 
     public function provision(int $tenantId): array
     {
         return DB::transaction(function () use ($tenantId): array {
+            $this->tenantLock->lock($tenantId);
             $definitions = $this->permissionDefinitions->all();
             ksort($definitions);
 
             $permissionIds = [];
             foreach ($definitions as $name => $definition) {
-                $permission = PermissionModel::withTrashed()
-                    ->where('tenant_id', $tenantId)
-                    ->where('name', $name)
-                    ->where('guard_name', self::GUARD_NAME)
-                    ->first();
-                if ($permission instanceof PermissionModel) {
-                    $permission->forceFill([
-                        'module' => $definition['module'],
-                        'description' => $definition['description'],
-                        'metadata' => [self::SYSTEM_DEFINED => true],
-                        'deleted_at' => null,
-                        'row_version' => max(1, (int) $permission->getAttribute('row_version')) + 1,
-                    ])->save();
-                } else {
-                    $permission = PermissionModel::query()->create([
-                        'tenant_id' => $tenantId,
-                        'name' => $name,
-                        'guard_name' => self::GUARD_NAME,
-                        'module' => $definition['module'],
-                        'description' => $definition['description'],
-                        'metadata' => [self::SYSTEM_DEFINED => true],
-                        'row_version' => 1,
-                    ]);
-                }
+                $permission = PermissionModel::query()->firstOrNew([
+                    'tenant_id' => $tenantId,
+                    'name' => $name,
+                    'guard_name' => UserGuard::TENANT_API,
+                ]);
+                $permission->forceFill([
+                    'tenant_id' => $tenantId,
+                    'name' => $name,
+                    'guard_name' => UserGuard::TENANT_API,
+                    'module' => (string) $definition['module'],
+                    'description' => (string) $definition['description'],
+                    'is_active' => true,
+                    'row_version' => $permission->exists
+                        ? max(1, (int) $permission->getAttribute('row_version')) + 1
+                        : 1,
+                ])->save();
                 $permissionIds[] = (int) $permission->getKey();
             }
 
-            $stalePermissionIds = PermissionModel::query()
+            PermissionModel::query()
                 ->where('tenant_id', $tenantId)
-                ->where('guard_name', self::GUARD_NAME)
-                ->where('metadata->'.self::SYSTEM_DEFINED, true)
+                ->where('guard_name', UserGuard::TENANT_API)
                 ->when($permissionIds !== [], fn ($query) => $query->whereNotIn('id', $permissionIds))
-                ->pluck('id')
-                ->map(static fn (mixed $id): int => (int) $id)
-                ->all();
+                ->update(['is_active' => false, 'row_version' => DB::raw('row_version + 1')]);
 
-            if ($stalePermissionIds !== []) {
-                DB::table('role_permissions')
-                    ->where('tenant_id', $tenantId)
-                    ->whereIn('permission_id', $stalePermissionIds)
-                    ->delete();
-                PermissionModel::query()
-                    ->where('tenant_id', $tenantId)
-                    ->whereIn('id', $stalePermissionIds)
-                    ->delete();
-            }
-
-            $role = RoleModel::withTrashed()
-                ->where('tenant_id', $tenantId)
-                ->where('name', UserPermission::SUPER_ADMIN_ROLE)
-                ->where('guard_name', self::GUARD_NAME)
-                ->first();
-            if ($role instanceof RoleModel) {
-                $role->forceFill([
-                    'description' => 'Protected tenant super administrator role.',
-                    'metadata' => [self::SYSTEM_DEFINED => true, 'protected' => true],
-                    'deleted_at' => null,
-                    'row_version' => max(1, (int) $role->getAttribute('row_version')) + 1,
-                ])->save();
-            } else {
-                $role = RoleModel::query()->create([
-                    'tenant_id' => $tenantId,
-                    'name' => UserPermission::SUPER_ADMIN_ROLE,
-                    'guard_name' => self::GUARD_NAME,
-                    'description' => 'Protected tenant super administrator role.',
-                    'metadata' => [self::SYSTEM_DEFINED => true, 'protected' => true],
-                    'row_version' => 1,
-                ]);
-            }
+            $role = RoleModel::withTrashed()->firstOrNew([
+                'tenant_id' => $tenantId,
+                'system_key' => UserSystemRole::SUPER_ADMIN,
+            ]);
+            $role->forceFill([
+                'tenant_id' => $tenantId,
+                'name' => UserSystemRole::SUPER_ADMIN_NAME,
+                'active_name_key' => mb_strtolower(UserSystemRole::SUPER_ADMIN_NAME),
+                'guard_name' => UserGuard::TENANT_API,
+                'system_key' => UserSystemRole::SUPER_ADMIN,
+                'is_system' => true,
+                'description' => 'Protected tenant super administrator role.',
+                'deleted_at' => null,
+                'row_version' => $role->exists
+                    ? max(1, (int) $role->getAttribute('row_version')) + 1
+                    : 1,
+            ])->save();
             $roleId = (int) $role->getKey();
 
-            DB::table('role_permissions')
+            RolePermissionModel::query()
                 ->where('tenant_id', $tenantId)
                 ->where('role_id', $roleId)
                 ->when($permissionIds !== [], fn ($query) => $query->whereNotIn('permission_id', $permissionIds))
                 ->delete();
-
-            $assignedIds = DB::table('role_permissions')
-                ->where('tenant_id', $tenantId)
-                ->where('role_id', $roleId)
-                ->pluck('permission_id')
-                ->map(static fn (mixed $id): int => (int) $id)
-                ->all();
-
-            $now = now();
-            $rows = [];
-            foreach (array_values(array_diff($permissionIds, $assignedIds)) as $permissionId) {
-                $rows[] = [
+            foreach ($permissionIds as $permissionId) {
+                RolePermissionModel::query()->firstOrCreate([
                     'tenant_id' => $tenantId,
                     'role_id' => $roleId,
                     'permission_id' => $permissionId,
-                    'metadata' => json_encode([self::SYSTEM_DEFINED => true], JSON_THROW_ON_ERROR),
-                    'row_version' => 1,
-                    'created_by' => null,
-                    'updated_by' => null,
-                    'created_at' => $now,
-                    'updated_at' => $now,
-                ];
-            }
-            if ($rows !== []) {
-                DB::table('role_permissions')->insert($rows);
+                ], ['row_version' => 1]);
             }
 
-            return [
-                'role_id' => $roleId,
-                'permission_count' => count($permissionIds),
-            ];
+            return ['role_id' => $roleId, 'permission_count' => count($permissionIds)];
         }, 3);
     }
 
@@ -142,35 +96,28 @@ final class TenantAccessProvisioner implements TenantAccessProvisionerInterface
     {
         $expectedNames = array_keys($this->permissionDefinitions->all());
         sort($expectedNames);
-
         $query = PermissionModel::query()
             ->where('tenant_id', $tenantId)
-            ->where('guard_name', self::GUARD_NAME)
-            ->whereNull('deleted_at');
+            ->where('guard_name', UserGuard::TENANT_API)
+            ->where('is_active', true);
         if ($lockForUpdate) {
             $query->lockForUpdate();
         }
+        $actual = $query->pluck('name')->map(static fn ($name): string => (string) $name)->sort()->values()->all();
 
-        $catalogueNames = $query->pluck('name')
-            ->map(static fn (mixed $name): string => (string) $name)
-            ->sort()
-            ->values()
-            ->all();
-
-        return $catalogueNames === $expectedNames;
+        return $actual === $expectedNames;
     }
 
     public function protectedSuperAdminRoleId(int $tenantId, bool $lockForUpdate = false): ?int
     {
         $query = RoleModel::query()
             ->where('tenant_id', $tenantId)
-            ->where('name', UserPermission::SUPER_ADMIN_ROLE)
-            ->where('guard_name', self::GUARD_NAME)
-            ->whereNull('deleted_at');
+            ->where('system_key', UserSystemRole::SUPER_ADMIN)
+            ->where('guard_name', UserGuard::TENANT_API)
+            ->where('is_system', true);
         if ($lockForUpdate) {
             $query->lockForUpdate();
         }
-
         $id = $query->value('id');
 
         return is_numeric($id) && (int) $id > 0 ? (int) $id : null;
@@ -180,18 +127,16 @@ final class TenantAccessProvisioner implements TenantAccessProvisionerInterface
     {
         $expectedNames = array_keys($this->permissionDefinitions->all());
         sort($expectedNames);
-
         $roleQuery = RoleModel::query()
             ->where('tenant_id', $tenantId)
             ->whereKey($roleId)
-            ->where('name', UserPermission::SUPER_ADMIN_ROLE)
-            ->where('guard_name', self::GUARD_NAME)
-            ->whereNull('deleted_at');
+            ->where('system_key', UserSystemRole::SUPER_ADMIN)
+            ->where('guard_name', UserGuard::TENANT_API)
+            ->where('is_system', true);
         if ($lockForUpdate) {
             $roleQuery->lockForUpdate();
         }
-        $role = $roleQuery->first(['id']);
-        if (! $role instanceof RoleModel) {
+        if (! $roleQuery->exists()) {
             return false;
         }
 
@@ -201,16 +146,14 @@ final class TenantAccessProvisioner implements TenantAccessProvisionerInterface
                     ->on('permissions.tenant_id', '=', 'role_permissions.tenant_id');
             })
             ->where('role_permissions.tenant_id', $tenantId)
-            ->where('role_permissions.role_id', (int) $role->getKey())
-            ->whereNull('permissions.deleted_at')
+            ->where('role_permissions.role_id', $roleId)
+            ->where('permissions.is_active', true)
+            ->where('permissions.guard_name', UserGuard::TENANT_API)
             ->orderBy('permissions.name');
         if ($lockForUpdate) {
             $assignedQuery->lockForUpdate();
         }
-
-        $assignedNames = $assignedQuery->pluck('permissions.name')
-            ->map(static fn (mixed $name): string => (string) $name)
-            ->all();
+        $assignedNames = $assignedQuery->pluck('permissions.name')->map(static fn ($name): string => (string) $name)->all();
 
         return $assignedNames === $expectedNames;
     }
@@ -225,8 +168,8 @@ final class TenantAccessProvisioner implements TenantAccessProvisionerInterface
     {
         return PermissionModel::query()
             ->where('tenant_id', $tenantId)
-            ->where('guard_name', self::GUARD_NAME)
-            ->whereNull('deleted_at')
+            ->where('guard_name', UserGuard::TENANT_API)
+            ->where('is_active', true)
             ->count();
     }
 
@@ -240,33 +183,30 @@ final class TenantAccessProvisioner implements TenantAccessProvisionerInterface
         if (! $this->isReady($tenantId, $superAdminRoleId, $lockForUpdate)) {
             return false;
         }
-
-        $activeUserExists = DB::table('users')
+        $activeUser = DB::table('users')
             ->where('tenant_id', $tenantId)
             ->where('id', $userId)
-            ->where('status', 'active')
+            ->where('status', UserStatus::ACTIVE)
+            ->whereNotNull('credentials_ready_at')
             ->whereNull('deleted_at')
             ->when($lockForUpdate, static fn ($query) => $query->lockForUpdate())
             ->exists();
-        if (! $activeUserExists) {
+        if (! $activeUser) {
             return false;
         }
-
         $roleAssigned = DB::table('user_roles')
-            ->where('tenant_id', $tenantId)
-            ->where('user_id', $userId)
+            ->where('tenant_id', $tenantId)->where('user_id', $userId)
             ->where('role_id', $superAdminRoleId)
             ->when($lockForUpdate, static fn ($query) => $query->lockForUpdate())
             ->exists();
-
         $rootAssigned = DB::table('user_organization_units')
-            ->where('tenant_id', $tenantId)
-            ->where('user_id', $userId)
+            ->where('tenant_id', $tenantId)->where('user_id', $userId)
             ->where('organization_unit_id', $rootOrganizationUnitId)
-            ->where('status', 'active')
+            ->where('status', 'active')->where('is_default', true)
             ->when($lockForUpdate, static fn ($query) => $query->lockForUpdate())
             ->exists();
 
         return $roleAssigned && $rootAssigned;
     }
+
 }

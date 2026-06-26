@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Services\Documents;
 
+use Modules\Core\Tenancy\TenantPlanLimit;
+
 use InvalidArgumentException;
 use Modules\Audit\Constants\AuditEventCategory;
 use Modules\Audit\Contracts\AuditRecorderInterface;
@@ -350,7 +352,7 @@ final class TenantDocumentService
 
     private function assertStorageCapacity(int $tenantId, int $newSize, int $replacedSize = 0): void
     {
-        $limitMb = $this->entitlements->limit($tenantId, 'max_storage_mb');
+        $limitMb = $this->entitlements->limit($tenantId, TenantPlanLimit::STORAGE_MEGABYTES);
         if ($limitMb === null) {
             return;
         }

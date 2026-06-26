@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Modules\Warehouse\Services\Warehouses;
 
+use Modules\Core\Tenancy\TenantPlanLimit;
+
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Core\Results\Error;
@@ -40,7 +42,7 @@ final class CreateWarehouseService
                 if ($this->tenants->lockById($tenantId) === null) {
                     return Result::failure(new Error(WarehouseErrorCode::SCOPE_MISMATCH, 'Tenant not found.'));
                 }
-                $warehouseLimit = $this->entitlements->limit($tenantId, 'max_warehouses');
+                $warehouseLimit = $this->entitlements->limit($tenantId, TenantPlanLimit::WAREHOUSES);
                 if ($warehouseLimit !== null && $this->warehouses->countByTenant($tenantId) >= $warehouseLimit) {
                     return Result::failure(new Error(
                         WarehouseErrorCode::PLAN_LIMIT_REACHED,

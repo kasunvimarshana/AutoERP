@@ -11,7 +11,7 @@ use Modules\Auth\Constants\InvitationDeliveryStatus;
 use Modules\Auth\Constants\RegistrationInvitationStatus;
 use Modules\Auth\Models\AuthRegistrationInvitationDeliveryModel;
 use Modules\Auth\Models\AuthRegistrationInvitationModel;
-use Modules\Auth\Notifications\InitialAdministratorInvitationNotification;
+use Modules\Auth\Notifications\RegistrationInvitationNotification;
 use Modules\Core\Contracts\ClockInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Psr\Log\LoggerInterface;
@@ -55,10 +55,11 @@ final class RegistrationInvitationDeliveryService
 
             $registrationUrl = $this->registrationUrl((string) $claim['token']);
             Notification::route('mail', (string) $claim['email'])->notify(
-                new InitialAdministratorInvitationNotification(
+                new RegistrationInvitationNotification(
                     (string) $claim['tenant_name'],
                     $registrationUrl,
                     (string) $claim['expires_at'],
+                    (string) $claim['purpose'],
                 ),
             );
 
@@ -75,7 +76,7 @@ final class RegistrationInvitationDeliveryService
                 ]);
             }
         } catch (Throwable $exception) {
-            $this->logger->error('Initial administrator invitation delivery failed.', [
+            $this->logger->error('Registration invitation delivery failed.', [
                 'tenant_id' => $tenantId,
                 'delivery_id' => $deliveryId,
                 'exception' => $exception,
@@ -179,6 +180,7 @@ final class RegistrationInvitationDeliveryService
                 'tenant_name' => (string) ($invitation->tenant?->getAttribute('name') ?? 'your organization'),
                 'token' => $token,
                 'expires_at' => $invitation->getAttribute('expires_at')->toAtomString(),
+                'purpose' => (string) $invitation->getAttribute('purpose'),
             ];
         }, 3);
     }
@@ -269,7 +271,7 @@ final class RegistrationInvitationDeliveryService
             || filter_var($baseUrl, FILTER_VALIDATE_URL) === false
             || ! in_array(strtolower((string) parse_url($baseUrl, PHP_URL_SCHEME)), ['http', 'https'], true)
         ) {
-            throw new RuntimeException('The platform administrator invitation URL is not configured correctly.');
+            throw new RuntimeException('The tenant registration invitation URL is not configured correctly.');
         }
 
         return $baseUrl.'#token='.rawurlencode($token);

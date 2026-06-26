@@ -22,11 +22,12 @@ final class TenantActorSnapshotFactory
         $firstName = trim((string) ($user->getAttribute('first_name') ?? ''));
         $lastName = trim((string) ($user->getAttribute('last_name') ?? ''));
         $name = trim($firstName.' '.$lastName);
-        $email = trim((string) ($user->getAttribute('platform_login_email') ?? $user->getAttribute('email') ?? ''));
+        $email = trim((string) ($user->getAttribute('email') ?? ''));
+        $platformGuard = (string) config('module-auth.platform_protected_route_guard', 'platform-api');
 
         return [
             'id' => $context->userId(),
-            'type' => $context->guard() === 'platform' ? 'platform_operator' : 'tenant_user',
+            'type' => $context->guard() === $platformGuard ? 'platform_operator' : 'tenant_user',
             'name' => $name !== '' ? $name : ($email !== '' ? $email : null),
             'email' => $email !== '' ? $email : null,
         ];

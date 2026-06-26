@@ -6,8 +6,6 @@ namespace Modules\User\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Core\Models\TenantOwnedModel;
-use Modules\OrganizationUnit\Models\OrganizationUnitModel;
-use Modules\Tenant\Models\TenantModel;
 use Modules\User\Constants\UserOrganizationUnitStatus;
 
 final class UserOrganizationUnitModel extends TenantOwnedModel
@@ -53,16 +51,6 @@ final class UserOrganizationUnitModel extends TenantOwnedModel
             'user_id' => 'integer',
             'is_default' => 'boolean',
         ]);
-    }
-
-    public function tenant(): BelongsTo
-    {
-        return $this->belongsTo(TenantModel::class, 'tenant_id');
-    }
-
-    public function organizationUnit(): BelongsTo
-    {
-        return $this->belongsTo(OrganizationUnitModel::class, 'organization_unit_id');
     }
 
     public function user(): BelongsTo

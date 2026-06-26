@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Modules\OrganizationUnit\Services\TenantLimits;
 
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
-use Modules\Tenant\Services\Contracts\TenantLimitUsageContributorInterface;
+use Modules\Core\Contracts\TenantLimitUsageContributorInterface;
 
 final class OrganizationUnitLimitUsageContributor implements TenantLimitUsageContributorInterface
 {

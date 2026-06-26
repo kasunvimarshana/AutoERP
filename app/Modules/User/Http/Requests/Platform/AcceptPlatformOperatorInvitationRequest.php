@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Modules\User\Http\Requests\Platform;
 
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rules\Password;
+use Modules\Core\Security\PasswordPolicy;
 
 final class AcceptPlatformOperatorInvitationRequest extends FormRequest
 {
@@ -16,7 +16,7 @@ final class AcceptPlatformOperatorInvitationRequest extends FormRequest
     {
         return [
             'token' => ['required', 'string', 'size:72'],
-            'password' => ['required', 'confirmed', Password::defaults()],
+            'password' => ['required', 'confirmed', PasswordPolicy::rule()],
         ];
     }
 }

@@ -27,13 +27,11 @@ export default function PermissionCataloguePage() {
         page,
         per_page: 25,
     }, signal), [debouncedSearch, module, page], canView);
-    const moduleLookup = useApi((signal) => accessApi.listPermissions({ per_page: 100 }, signal), [], canView);
+    const moduleLookup = useApi((signal) => accessApi.listPermissionModules(signal), [], canView);
 
     const moduleOptions = useMemo(() => {
         const modules = new Set<string>();
-        (moduleLookup.data?.data ?? []).forEach((permission) => {
-            if (permission.module) modules.add(permission.module);
-        });
+        (moduleLookup.data ?? []).forEach((moduleName) => modules.add(moduleName));
         return [...modules].sort((left, right) => left.localeCompare(right)).map((value) => ({
             value,
             label: value,

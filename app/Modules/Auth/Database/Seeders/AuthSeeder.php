@@ -8,6 +8,7 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Modules\Auth\Models\AuthProviderModel;
+use Modules\User\Constants\UserGuard;
 use Database\Seeders\Concerns\ResolvesSeedContext;
 
 final class AuthSeeder extends Seeder
@@ -41,7 +42,7 @@ final class AuthSeeder extends Seeder
             [
                 'config' => null,
                 'driver' => 'internal',
-                'guard_name' => 'web',
+                'guard_name' => UserGuard::TENANT_API,
                 'is_sso' => false,
                 'metadata' => json_encode(['seed_source' => 'auth_module'], JSON_THROW_ON_ERROR),
                 'name' => 'Internal Authentication',

@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Modules\Auth\Models\AuthProviderModel;
 use Modules\Auth\Services\Registration\RegistrationInvitationService;
 use Modules\Tenant\Services\Contracts\TenantAuthenticationProvisionerInterface;
+use Modules\User\Constants\UserGuard;
 
 final class TenantAuthenticationProvisioner implements TenantAuthenticationProvisionerInterface
 {
@@ -29,7 +30,7 @@ final class TenantAuthenticationProvisioner implements TenantAuthenticationProvi
             $attributes = [
                 'organization_unit_id' => null,
                 'name' => 'Internal authentication',
-                'guard_name' => 'web',
+                'guard_name' => UserGuard::TENANT_API,
                 'provider_name' => 'users',
                 'driver' => self::INTERNAL_PROVIDER_KEY,
                 'status' => 'active',

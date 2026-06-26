@@ -8,9 +8,7 @@ use Modules\Auth\Constants\AuthTokenScope;
 
 final readonly class TokenIssueData
 {
-    /**
-     * @param  list<string>  $scopes
-     */
+    /** @param list<string> $scopes */
     public function __construct(
         public ?int $tenantId,
         public ?int $organizationUnitId,
@@ -19,7 +17,8 @@ final readonly class TokenIssueData
         public ?int $identityId,
         public ?int $sessionId,
         public ?int $platformSessionId,
-        public ?int $userId,
+        public ?int $tenantUserId,
+        public ?int $platformOperatorId,
         public string $tokenScope,
         public array $scopes,
         public string $grantType,
@@ -28,9 +27,7 @@ final readonly class TokenIssueData
         public ?array $metadata,
     ) {}
 
-    /**
-     * @param  array<string, mixed>  $payload
-     */
+    /** @param array<string, mixed> $payload */
     public static function fromArray(array $payload): self
     {
         return new self(
@@ -41,7 +38,8 @@ final readonly class TokenIssueData
             isset($payload['identity_id']) ? (int) $payload['identity_id'] : null,
             isset($payload['session_id']) ? (int) $payload['session_id'] : null,
             isset($payload['platform_session_id']) ? (int) $payload['platform_session_id'] : null,
-            isset($payload['user_id']) ? (int) $payload['user_id'] : null,
+            isset($payload['tenant_user_id']) ? (int) $payload['tenant_user_id'] : null,
+            isset($payload['platform_operator_id']) ? (int) $payload['platform_operator_id'] : null,
             AuthTokenScope::normalize((string) ($payload['token_scope'] ?? AuthTokenScope::TENANT)),
             isset($payload['scopes']) && is_array($payload['scopes']) ? array_values($payload['scopes']) : [],
             (string) ($payload['grant_type'] ?? 'password'),

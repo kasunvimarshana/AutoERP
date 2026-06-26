@@ -37,7 +37,7 @@ export default function RoleListPage() {
         setDeletingId(role.id);
         setActionError(null);
         try {
-            await accessApi.deleteRole(role.id);
+            await accessApi.deleteRole(role.id, role.row_version);
             roles.reload();
         } catch (caught) {
             setActionError(toApiError(caught));
@@ -48,11 +48,10 @@ export default function RoleListPage() {
 
     const columns: DataColumn<AccessRole>[] = [
         { key: 'name', header: 'Name', render: (row) => <span className="font-semibold text-slate-900">{row.name}</span> },
-        { key: 'code', header: 'Code', render: (row) => row.code ?? row.guard_name ?? '-' },
         { key: 'description', header: 'Description', render: (row) => row.description ?? '-' },
         { key: 'users', header: 'Assigned Users', render: (row) => row.assigned_users_count ?? 0 },
         { key: 'permissions', header: 'Permissions', render: (row) => row.permissions_count ?? 0 },
-        { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.status ?? 'active'} /> },
+        { key: 'type', header: 'Type', render: (row) => <StatusBadge status={row.is_system ? 'system' : 'custom'} /> },
         {
             key: 'actions',
             header: 'Actions',
@@ -60,8 +59,8 @@ export default function RoleListPage() {
             render: (row) => (
                 <div className="flex justify-end gap-2">
                     <LinkButton variant="secondary" className="min-h-8 px-3 py-1 text-xs" to={`/access/roles/${row.id}`}>View</LinkButton>
-                    {canUpdate && row.status !== 'protected' && <LinkButton variant="secondary" className="min-h-8 px-3 py-1 text-xs" to={`/access/roles/${row.id}/edit`}>Edit</LinkButton>}
-                    {canDelete && row.status !== 'protected' && (
+                    {canUpdate && !row.is_system && <LinkButton variant="secondary" className="min-h-8 px-3 py-1 text-xs" to={`/access/roles/${row.id}/edit`}>Edit</LinkButton>}
+                    {canDelete && !row.is_system && (
                         <Button variant="danger" className="min-h-8 px-3 py-1 text-xs" loading={deletingId === row.id} onClick={() => void deleteRole(row)}>Delete</Button>
                     )}
                 </div>

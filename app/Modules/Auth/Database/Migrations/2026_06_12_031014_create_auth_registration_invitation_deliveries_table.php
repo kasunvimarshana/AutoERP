@@ -5,7 +5,6 @@ declare(strict_types=1);
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
-use Modules\Auth\Constants\InvitationDeliveryStatus;
 
 return new class extends Migration
 {
@@ -18,8 +17,7 @@ return new class extends Migration
             $table->foreignId('tenant_id')->constrained('tenants', 'id')->restrictOnDelete();
             $table->unsignedBigInteger('invitation_id');
             $table->unsignedInteger('attempt_number');
-            $table->enum('status', InvitationDeliveryStatus::values())
-                ->default(InvitationDeliveryStatus::QUEUED);
+            $table->string('status', 30)->default('queued');
             $table->unsignedInteger('processing_attempt_count')->default(0);
             $table->uuid('claim_token')->nullable();
             $table->timestamp('claimed_at')->nullable();

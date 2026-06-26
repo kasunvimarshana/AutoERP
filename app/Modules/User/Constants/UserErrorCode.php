@@ -8,6 +8,14 @@ final class UserErrorCode
 {
     public const INVALID_VALUE = 'USER_INVALID_VALUE';
 
+    public const FORBIDDEN = 'USER_FORBIDDEN';
+
+    public const CONFLICT = 'USER_CONFLICT';
+
+    public const STORAGE_FAILURE = 'USER_STORAGE_FAILURE';
+
+    public const AUTH_INTEGRATION_FAILURE = 'USER_AUTH_INTEGRATION_FAILURE';
+
     public const NOT_FOUND = 'USER_NOT_FOUND';
 
     public const TENANT_REQUIRED = 'USER_TENANT_REQUIRED';

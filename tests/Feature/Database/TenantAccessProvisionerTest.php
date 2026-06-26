@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\Core\Contracts\PermissionDefinitionRegistryInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
-use Modules\Tenant\Services\Contracts\TenantAccessProvisionerInterface;
+use Modules\Core\Contracts\TenantAccessProvisionerInterface;
 use Modules\User\Constants\UserPermission;
 use Tests\TestCase;
 
@@ -69,7 +69,7 @@ final class TenantAccessProvisionerTest extends TestCase
             1,
             DB::table('roles')
                 ->where('tenant_id', $firstTenantId)
-                ->where('name', UserPermission::SUPER_ADMIN_ROLE)
+                ->where('name', \Modules\User\Constants\UserSystemRole::SUPER_ADMIN)
                 ->count(),
         );
         self::assertTrue($executionContext->runForTenant(

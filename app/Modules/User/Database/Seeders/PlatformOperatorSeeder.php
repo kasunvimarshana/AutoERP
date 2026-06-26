@@ -5,13 +5,14 @@ declare(strict_types=1);
 namespace Modules\User\Database\Seeders;
 
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Modules\Core\Contracts\PasswordHasherInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
-use Modules\User\Constants\UserStatus;
+use Modules\User\Constants\PlatformOperatorStatus;
+use Modules\User\Models\PlatformOperatorModel;
 use Modules\User\Models\PlatformOperatorPermissionModel;
 use Modules\User\Models\PlatformPermissionModel;
-use Modules\User\Models\UserModel;
+use Modules\User\Services\Platform\Invitations\PlatformOperatorInvitationService;
 use Modules\User\Services\Platform\PlatformPermissionCatalogSynchronizer;
 use RuntimeException;
 
@@ -22,82 +23,44 @@ final class PlatformOperatorSeeder extends Seeder
         if (! $this->enabled()) {
             return;
         }
-        if (! Schema::hasTable('users')
-            || ! Schema::hasTable('platform_permissions')
-            || ! Schema::hasTable('platform_operator_permissions')
-        ) {
-            return;
+        foreach (['platform_operators', 'platform_permissions', 'platform_operator_permissions'] as $table) {
+            if (! Schema::hasTable($table)) {
+                return;
+            }
         }
 
         $email = $this->requiredEmail();
-
         app(TenantExecutionContextInterface::class)->runAsControlPlane(function () use ($email): void {
-            $operator = UserModel::query()->firstOrNew([
-                'platform_login_email' => $email,
-            ]);
-            $isNew = ! $operator->exists;
-            if ($operator->exists && (
-                $operator->getAttribute('tenant_id') !== null
-                || ! (bool) $operator->getAttribute('is_platform_operator')
-            )) {
-                throw new RuntimeException('The configured platform login email belongs to a non-platform identity.');
-            }
-
-            $metadata = is_array($operator->getAttribute('metadata'))
-                ? $operator->getAttribute('metadata')
-                : [];
-
-            $attributes = [
-                'tenant_id' => null,
-                'platform_login_email' => $email,
-                'email' => $email,
-                'username' => null,
-                'status' => UserStatus::ACTIVE,
-                'is_platform_operator' => true,
-                'metadata' => [
-                    ...$metadata,
-                    'seed_source' => 'platform_operator_seeder',
-                    'account_scope' => 'platform',
-                ],
-            ];
-            if ($isNew) {
-                $attributes = [
-                    ...$attributes,
-                    'first_name' => 'Platform',
-                    'last_name' => 'Administrator',
-                    'email_verified_at' => now(),
-                    'password' => app(PasswordHasherInterface::class)->hash($this->requiredPassword()),
-                    'row_version' => 1,
-                ];
-            } else {
-                $operator->forceFill($attributes);
-                if ($operator->isDirty()) {
-                    $attributes['row_version'] = max(1, (int) $operator->getAttribute('row_version')) + 1;
+            DB::transaction(function () use ($email): void {
+                app(PlatformPermissionCatalogSynchronizer::class)->synchronize();
+                $operator = PlatformOperatorModel::query()->where('email', $email)->lockForUpdate()->first();
+                if (! $operator instanceof PlatformOperatorModel) {
+                    $operator = PlatformOperatorModel::query()->create([
+                        'row_version' => 1,
+                        'first_name' => 'Platform',
+                        'last_name' => 'Administrator',
+                        'email' => $email,
+                        'status' => PlatformOperatorStatus::INVITED,
+                        'invited_at' => now(),
+                    ]);
                 }
-            }
 
-            if ($isNew || $operator->isDirty()) {
-                $operator->forceFill($attributes)->save();
-            }
+                $permissionIds = PlatformPermissionModel::query()->where('is_active', true)->pluck('id')->all();
+                PlatformOperatorPermissionModel::query()->where('platform_operator_id', $operator->getKey())
+                    ->whereNotIn('platform_permission_id', $permissionIds)->delete();
+                foreach ($permissionIds as $permissionId) {
+                    PlatformOperatorPermissionModel::query()->firstOrCreate([
+                        'platform_operator_id' => $operator->getKey(),
+                        'platform_permission_id' => (int) $permissionId,
+                    ]);
+                }
 
-            app(PlatformPermissionCatalogSynchronizer::class)->synchronize();
-            $permissionIds = PlatformPermissionModel::query()
-                ->where('is_active', true)
-                ->pluck('id')
-                ->map(static fn (mixed $id): int => (int) $id)
-                ->all();
-
-            PlatformOperatorPermissionModel::query()
-                ->where('user_id', $operator->getKey())
-                ->whereNotIn('platform_permission_id', $permissionIds)
-                ->delete();
-
-            foreach ($permissionIds as $permissionId) {
-                PlatformOperatorPermissionModel::query()->firstOrCreate([
-                    'user_id' => $operator->getKey(),
-                    'platform_permission_id' => $permissionId,
-                ]);
-            }
+                if ($operator->getAttribute('status') === PlatformOperatorStatus::INVITED
+                    && ! $operator->invitations()->where('status', 'pending')->exists()
+                ) {
+                    app(PlatformOperatorInvitationService::class)->issueForOperator($operator);
+                }
+            }, 3);
         });
     }
 
@@ -110,23 +73,9 @@ final class PlatformOperatorSeeder extends Seeder
     {
         $email = strtolower(trim((string) env('AUTOERP_PLATFORM_ADMIN_EMAIL', '')));
         if (filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
-            throw new RuntimeException(
-                'AUTOERP_PLATFORM_ADMIN_EMAIL must be a valid email when platform operator seeding is enabled.',
-            );
+            throw new RuntimeException('AUTOERP_PLATFORM_ADMIN_EMAIL must be valid when platform operator seeding is enabled.');
         }
 
         return $email;
-    }
-
-    private function requiredPassword(): string
-    {
-        $password = (string) env('AUTOERP_PLATFORM_ADMIN_PASSWORD', '');
-        if (mb_strlen($password) < 12) {
-            throw new RuntimeException(
-                'AUTOERP_PLATFORM_ADMIN_PASSWORD must contain at least 12 characters when platform operator seeding is enabled.',
-            );
-        }
-
-        return $password;
     }
 }

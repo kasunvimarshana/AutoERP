@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Modules\User\Services\OrganizationUnit;
 
 use Illuminate\Support\Facades\DB;
-use Modules\OrganizationUnit\Contracts\OrganizationUnitLifecycleBlockerInterface;
+use Modules\Core\Contracts\OrganizationUnitLifecycleBlockerInterface;
 use Modules\User\Constants\UserOrganizationUnitStatus;
 
 final class UserOrganizationUnitLifecycleBlocker implements OrganizationUnitLifecycleBlockerInterface

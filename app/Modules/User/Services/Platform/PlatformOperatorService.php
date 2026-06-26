@@ -9,34 +9,31 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\DatabaseManager;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Modules\Audit\Constants\AuditEventCategory;
 use Modules\Audit\Contracts\AuditRecorderInterface;
 use Modules\Audit\Data\AuditEventData;
 use Modules\Core\Contracts\ClockInterface;
 use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
-use Modules\Core\Contracts\PasswordHasherInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
-use Modules\User\Constants\PlatformPermission;
-use Modules\User\Constants\UserStatus;
+use Modules\User\Constants\PlatformOperatorStatus;
+use Modules\Core\Authorization\PlatformPermission;
 use Modules\User\Contracts\PlatformOperatorSessionRevokerInterface;
+use Modules\User\Models\PlatformOperatorModel;
 use Modules\User\Models\PlatformOperatorPermissionModel;
 use Modules\User\Models\PlatformPermissionModel;
-use Modules\User\Models\UserModel;
 use Modules\User\Services\Platform\Invitations\PlatformOperatorInvitationService;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 final class PlatformOperatorService
 {
     public function __construct(
-        private readonly UserModel $users,
+        private readonly PlatformOperatorModel $operators,
         private readonly PlatformPermissionModel $permissions,
         private readonly PlatformOperatorPermissionModel $assignments,
         private readonly PlatformPermissionCatalogSynchronizer $catalogue,
         private readonly PlatformOperatorSessionRevokerInterface $sessions,
         private readonly PlatformOperatorInvitationService $invitations,
-        private readonly PasswordHasherInterface $passwords,
         private readonly ClockInterface $clock,
         private readonly CurrentUserContextAccessorInterface $currentUser,
         private readonly TenantExecutionContextInterface $executionContext,
@@ -50,107 +47,99 @@ final class PlatformOperatorService
             $query = $this->operatorQuery()
                 ->when($status !== null && trim($status) !== '', fn (Builder $builder) => $builder->where('status', trim($status)))
                 ->when($search !== null && trim($search) !== '', function (Builder $builder) use ($search): void {
-                    $term = trim($search);
-                    $builder->where(function (Builder $nested) use ($term): void {
-                        $nested
-                            ->where('platform_login_email', 'like', "%{$term}%")
-                            ->orWhere('first_name', 'like', "%{$term}%")
-                            ->orWhere('last_name', 'like', "%{$term}%");
+                    $prefix = trim($search).'%';
+                    $builder->where(function (Builder $nested) use ($prefix): void {
+                        $nested->where('email', 'like', $prefix)
+                            ->orWhere('first_name', 'like', $prefix)
+                            ->orWhere('last_name', 'like', $prefix);
                     });
                 })
                 ->orderBy('first_name')
-                ->orderBy('platform_login_email');
+                ->orderBy('email');
 
-            return $query->paginate($perPage, ['*'], 'page', $page);
+            return $query->paginate(max(1, min(100, $perPage)), ['*'], 'page', max(1, $page));
         });
     }
 
-    public function find(int $operatorId, bool $lockForUpdate = false): UserModel
+    public function find(int $operatorId, bool $lockForUpdate = false): PlatformOperatorModel
     {
-        return $this->executionContext->runAsControlPlane(function () use ($operatorId, $lockForUpdate): UserModel {
+        return $this->executionContext->runAsControlPlane(function () use ($operatorId, $lockForUpdate): PlatformOperatorModel {
             $query = $this->operatorQuery()->whereKey($operatorId);
             if ($lockForUpdate) {
                 $query->lockForUpdate();
             }
 
             return $query->first()
-                ?? throw (new ModelNotFoundException())->setModel(UserModel::class, [$operatorId]);
+                ?? throw (new ModelNotFoundException())->setModel(PlatformOperatorModel::class, [$operatorId]);
         });
     }
 
     /** @param array<string, mixed> $payload */
-    public function create(array $payload): UserModel
+    public function create(array $payload): PlatformOperatorModel
     {
-        return $this->executionContext->runAsControlPlane(function () use ($payload): UserModel {
+        return $this->executionContext->runAsControlPlane(function () use ($payload): PlatformOperatorModel {
             $email = strtolower(trim((string) ($payload['email'] ?? '')));
+            $firstName = trim((string) ($payload['first_name'] ?? ''));
+            $lastName = $this->nullableString($payload['last_name'] ?? null);
             $permissionNames = $this->normalizePermissionNames($payload['permissions'] ?? []);
             $this->assertKnownPermissions($permissionNames);
 
-            return $this->database->transaction(function () use ($payload, $email, $permissionNames): UserModel {
+            return $this->database->transaction(function () use ($email, $firstName, $lastName, $permissionNames): PlatformOperatorModel {
                 $this->catalogue->synchronize();
-                if ($this->users->newQuery()->where('platform_login_email', $email)->exists()) {
-                    throw new ConflictHttpException('A platform operator with this email already exists.');
+                if ($this->operators->newQuery()->where('email', $email)->select('id')->lockForUpdate()->first() !== null) {
+                    throw ValidationException::withMessages(['email' => ['A platform operator already uses this email address.']]);
                 }
 
-                $operator = new UserModel();
-                $operator->forceFill([
-                    'tenant_id' => null,
-                    'platform_login_email' => $email,
-                    'email' => $email,
-                    'username' => null,
-                    'first_name' => trim((string) ($payload['first_name'] ?? '')),
-                    'last_name' => $this->nullableString($payload['last_name'] ?? null),
-                    'email_verified_at' => null,
-                    'password' => $this->passwords->hash(Str::random(72)),
-                    'status' => UserStatus::INVITED,
-                    'is_platform_operator' => true,
+                $actorId = $this->currentUser->currentUserId();
+                $now = $this->clock->now();
+                $operator = $this->operators->newQuery()->create([
                     'row_version' => 1,
+                    'first_name' => $firstName,
+                    'last_name' => $lastName,
+                    'email' => $email,
+                    'status' => PlatformOperatorStatus::INVITED,
+                    'invited_at' => $now,
+                    'created_by_operator_id' => $actorId,
+                    'updated_by_operator_id' => $actorId,
                 ]);
-                $operator->save();
                 $this->syncPermissions($operator, $permissionNames);
                 $this->invitations->issueForOperator($operator);
-                $this->recordAudit('invited', $operator, null, $this->snapshot($operator));
+                $operator = $this->reload($operator);
+                $this->recordAudit('created', $operator, null, $this->snapshot($operator));
 
-                return $this->reload($operator);
+                return $operator;
             }, 3);
         });
     }
 
     /** @param list<string> $permissionNames */
-    public function synchronizePermissions(int $operatorId, int $expectedVersion, array $permissionNames): UserModel
+    public function synchronizePermissions(int $operatorId, int $expectedVersion, array $permissionNames): PlatformOperatorModel
     {
-        return $this->executionContext->runAsControlPlane(function () use ($operatorId, $expectedVersion, $permissionNames): UserModel {
+        return $this->executionContext->runAsControlPlane(function () use ($operatorId, $expectedVersion, $permissionNames): PlatformOperatorModel {
             $permissionNames = $this->normalizePermissionNames($permissionNames);
             $this->assertKnownPermissions($permissionNames);
 
-            return $this->database->transaction(function () use ($operatorId, $expectedVersion, $permissionNames): UserModel {
-                $this->catalogue->synchronize();
+            return $this->database->transaction(function () use ($operatorId, $expectedVersion, $permissionNames): PlatformOperatorModel {
+                $this->lockActiveOperators();
                 $operator = $this->find($operatorId, true);
                 $this->assertVersion($operator, $expectedVersion);
                 $before = $this->snapshot($operator);
-                $currentOperatorId = $this->currentUser->currentUserId();
 
-                if (
-                    $currentOperatorId === $operatorId
+                if ($this->hasPermission($operatorId, PlatformPermission::OPERATORS_MANAGE)
                     && ! in_array(PlatformPermission::OPERATORS_MANAGE, $permissionNames, true)
-                ) {
-                    throw new AuthorizationException('You cannot remove your own operator-management permission.');
-                }
-
-                if (
-                    ! in_array(PlatformPermission::OPERATORS_MANAGE, $permissionNames, true)
                     && $this->isLastActiveManager($operatorId)
                 ) {
-                    throw new ConflictHttpException('At least one active platform operator must retain operator-management permission.');
+                    throw new ConflictHttpException('The last active platform manager must retain operator-management permission.');
                 }
 
                 $this->syncPermissions($operator, $permissionNames);
-                $this->incrementVersion($operator, $expectedVersion);
+                $operator->forceFill([
+                    'row_version' => $expectedVersion + 1,
+                    'updated_by_operator_id' => $this->currentUser->currentUserId(),
+                    'updated_at' => $this->clock->now(),
+                ])->save();
                 $operator = $this->reload($operator);
-                $this->sessions->revokeAllForOperator(
-                    $operatorId,
-                    'Platform permissions changed; re-authentication is required.',
-                );
+                $this->sessions->revokeAllForOperator($operatorId, 'Platform permissions changed.');
                 $this->recordAudit('permissions_updated', $operator, $before, $this->snapshot($operator));
 
                 return $operator;
@@ -158,11 +147,11 @@ final class PlatformOperatorService
         });
     }
 
-    public function changeStatus(int $operatorId, int $expectedVersion, string $status, string $reason): UserModel
+    public function changeStatus(int $operatorId, int $expectedVersion, string $status, string $reason): PlatformOperatorModel
     {
-        return $this->executionContext->runAsControlPlane(function () use ($operatorId, $expectedVersion, $status, $reason): UserModel {
+        return $this->executionContext->runAsControlPlane(function () use ($operatorId, $expectedVersion, $status, $reason): PlatformOperatorModel {
             $status = strtolower(trim($status));
-            if (! in_array($status, UserStatus::platformOperatorMutableValues(), true)) {
+            if (! in_array($status, [PlatformOperatorStatus::ACTIVE, PlatformOperatorStatus::INACTIVE], true)) {
                 throw ValidationException::withMessages(['status' => ['Operator status must be active or inactive.']]);
             }
             $reason = trim($reason);
@@ -170,19 +159,21 @@ final class PlatformOperatorService
                 throw ValidationException::withMessages(['reason' => ['A reason is required.']]);
             }
 
-            return $this->database->transaction(function () use ($operatorId, $expectedVersion, $status, $reason): UserModel {
+            return $this->database->transaction(function () use ($operatorId, $expectedVersion, $status, $reason): PlatformOperatorModel {
+                $this->lockActiveOperators();
                 $operator = $this->find($operatorId, true);
                 $this->assertVersion($operator, $expectedVersion);
-                if ((string) $operator->getAttribute('status') === UserStatus::INVITED) {
-                    throw new ConflictHttpException(
-                        'Invited operators must complete or revoke their invitation; they cannot be activated manually.',
-                    );
-                }
-                if ((string) $operator->getAttribute('status') === $status) {
+                $currentStatus = (string) $operator->getAttribute('status');
+                if ($currentStatus === $status) {
                     return $operator;
                 }
-
-                if ($status !== UserStatus::ACTIVE) {
+                if ($currentStatus === PlatformOperatorStatus::INVITED) {
+                    throw new ConflictHttpException('Invited operators must complete or revoke their invitation.');
+                }
+                if ($status === PlatformOperatorStatus::ACTIVE && $operator->getAttribute('credentials_ready_at') === null) {
+                    throw new ConflictHttpException('The operator must complete credential setup before activation.');
+                }
+                if ($status === PlatformOperatorStatus::INACTIVE) {
                     if ($this->currentUser->currentUserId() === $operatorId) {
                         throw new AuthorizationException('You cannot deactivate your own platform account.');
                     }
@@ -194,18 +185,19 @@ final class PlatformOperatorService
                 }
 
                 $before = $this->snapshot($operator);
+                $now = $this->clock->now();
                 $operator->forceFill([
                     'status' => $status,
+                    'activated_at' => $status === PlatformOperatorStatus::ACTIVE ? $now : $operator->getAttribute('activated_at'),
+                    'deactivated_at' => $status === PlatformOperatorStatus::INACTIVE ? $now : null,
                     'row_version' => $expectedVersion + 1,
-                    'updated_at' => $this->clock->now(),
+                    'updated_by_operator_id' => $this->currentUser->currentUserId(),
+                    'updated_at' => $now,
                 ])->save();
-                $operator = $this->reload($operator);
-                if ($status !== UserStatus::ACTIVE) {
-                    $this->sessions->revokeAllForOperator(
-                        $operatorId,
-                        'Platform operator deactivated: '.$reason,
-                    );
+                if ($status === PlatformOperatorStatus::INACTIVE) {
+                    $this->sessions->revokeAllForOperator($operatorId, 'Platform operator deactivated: '.$reason);
                 }
+                $operator = $this->reload($operator);
                 $this->recordAudit('status_changed', $operator, $before, $this->snapshot($operator), $reason);
 
                 return $operator;
@@ -219,71 +211,61 @@ final class PlatformOperatorService
         return $this->executionContext->runAsControlPlane(function (): array {
             $this->catalogue->synchronize();
 
-            return $this->permissions->newQuery()
-                ->where('is_active', true)
-                ->orderBy('name')
-                ->pluck('name')
-                ->map(static fn (mixed $name): string => (string) $name)
-                ->all();
+            return $this->permissions->newQuery()->where('is_active', true)->orderBy('name')
+                ->pluck('name')->map(static fn (mixed $name): string => (string) $name)->all();
         });
     }
 
     private function operatorQuery(): Builder
     {
-        return $this->users->newQuery()
-            ->whereNull('tenant_id')
-            ->where('is_platform_operator', true)
-            ->whereNull('deleted_at')
-            ->with(['platformPermissionAssignments.permission', 'latestPlatformOperatorInvitation']);
+        return $this->operators->newQuery()->with([
+            'permissionAssignments.permission',
+            'latestInvitation.deliveries' => fn ($query) => $query->latest('attempt_number'),
+        ]);
     }
 
     /** @param list<string> $permissionNames */
-    private function syncPermissions(UserModel $operator, array $permissionNames): void
+    private function syncPermissions(PlatformOperatorModel $operator, array $permissionNames): void
     {
-        $ids = $this->permissions->newQuery()
-            ->where('is_active', true)
-            ->whereIn('name', $permissionNames)
-            ->pluck('id', 'name');
+        $ids = $this->permissions->newQuery()->where('is_active', true)
+            ->whereIn('name', $permissionNames)->pluck('id', 'name');
         if ($ids->count() !== count($permissionNames)) {
             throw ValidationException::withMessages(['permissions' => ['One or more platform permissions are invalid or inactive.']]);
         }
 
-        $this->assignments->newQuery()
-            ->where('user_id', $operator->getKey())
-            ->whereNotIn('platform_permission_id', $ids->values()->all())
-            ->delete();
-
+        $this->assignments->newQuery()->where('platform_operator_id', $operator->getKey())
+            ->whereNotIn('platform_permission_id', $ids->values()->all())->delete();
         foreach ($ids as $permissionId) {
             $this->assignments->newQuery()->updateOrCreate(
-                ['user_id' => $operator->getKey(), 'platform_permission_id' => (int) $permissionId],
-                ['granted_by' => $this->currentUser->currentUserId()],
+                ['platform_operator_id' => $operator->getKey(), 'platform_permission_id' => (int) $permissionId],
+                ['granted_by_operator_id' => $this->currentUser->currentUserId()],
             );
         }
+    }
+
+    private function lockActiveOperators(): void
+    {
+        $this->operators->newQuery()->where('status', PlatformOperatorStatus::ACTIVE)
+            ->orderBy('id')->lockForUpdate()->get(['id']);
     }
 
     private function isLastActiveManager(int $excludingOperatorId): bool
     {
         return ! $this->assignments->newQuery()
-            ->where('user_id', '!=', $excludingOperatorId)
+            ->where('platform_operator_id', '!=', $excludingOperatorId)
             ->whereHas('operator', fn (Builder $query) => $query
-                ->whereNull('tenant_id')
-                ->where('is_platform_operator', true)
-                ->where('status', UserStatus::ACTIVE)
-                ->whereNull('deleted_at'))
+                ->where('status', PlatformOperatorStatus::ACTIVE)
+                ->whereNotNull('credentials_ready_at'))
             ->whereHas('permission', fn (Builder $query) => $query
-                ->where('name', PlatformPermission::OPERATORS_MANAGE)
-                ->where('is_active', true))
+                ->where('name', PlatformPermission::OPERATORS_MANAGE)->where('is_active', true))
             ->exists();
     }
 
     private function hasPermission(int $operatorId, string $permission): bool
     {
-        return $this->assignments->newQuery()
-            ->where('user_id', $operatorId)
+        return $this->assignments->newQuery()->where('platform_operator_id', $operatorId)
             ->whereHas('permission', fn (Builder $query) => $query
-                ->where('name', $permission)
-                ->where('is_active', true))
-            ->exists();
+                ->where('name', $permission)->where('is_active', true))->exists();
     }
 
     /** @param list<string> $permissions */
@@ -291,9 +273,7 @@ final class PlatformOperatorService
     {
         $unknown = array_values(array_diff($permissions, PlatformPermission::values()));
         if ($unknown !== []) {
-            throw ValidationException::withMessages([
-                'permissions' => ['Unknown platform permissions: '.implode(', ', $unknown)],
-            ]);
+            throw ValidationException::withMessages(['permissions' => ['Unknown platform permissions: '.implode(', ', $unknown)]]);
         }
     }
 
@@ -303,7 +283,6 @@ final class PlatformOperatorService
         if (! is_array($permissions)) {
             return [];
         }
-
         $normalized = [];
         foreach ($permissions as $permission) {
             if (is_string($permission) && trim($permission) !== '') {
@@ -315,44 +294,30 @@ final class PlatformOperatorService
         return array_values($normalized);
     }
 
-    private function assertVersion(UserModel $operator, int $expectedVersion): void
+    private function assertVersion(PlatformOperatorModel $operator, int $expectedVersion): void
     {
         if ((int) $operator->getAttribute('row_version') !== $expectedVersion) {
             throw new ConflictHttpException('The platform operator changed after it was loaded. Refresh and try again.');
         }
     }
 
-    private function incrementVersion(UserModel $operator, int $expectedVersion): void
-    {
-        $updated = $this->users->newQuery()
-            ->whereKey($operator->getKey())
-            ->where('row_version', $expectedVersion)
-            ->update(['row_version' => $expectedVersion + 1, 'updated_at' => $this->clock->now()]);
-        if ($updated !== 1) {
-            throw new ConflictHttpException('The platform operator changed after it was loaded. Refresh and try again.');
-        }
-    }
-
-    private function reload(UserModel $operator): UserModel
+    private function reload(PlatformOperatorModel $operator): PlatformOperatorModel
     {
         return $this->operatorQuery()->whereKey($operator->getKey())->firstOrFail();
     }
 
     /** @return array<string, mixed> */
-    private function snapshot(UserModel $operator): array
+    private function snapshot(PlatformOperatorModel $operator): array
     {
-        $permissions = $operator->relationLoaded('platformPermissionAssignments')
-            ? $operator->platformPermissionAssignments
-                ->map(fn (PlatformOperatorPermissionModel $assignment): ?string => $assignment->permission?->name)
-                ->filter()
-                ->sort()
-                ->values()
-                ->all()
+        $permissions = $operator->relationLoaded('permissionAssignments')
+            ? $operator->permissionAssignments->map(
+                fn (PlatformOperatorPermissionModel $assignment): ?string => $assignment->permission?->name,
+            )->filter()->sort()->values()->all()
             : [];
 
         return [
             'id' => (int) $operator->getKey(),
-            'email' => (string) $operator->getAttribute('platform_login_email'),
+            'email' => (string) $operator->getAttribute('email'),
             'name' => trim((string) $operator->getAttribute('first_name').' '.(string) $operator->getAttribute('last_name')),
             'status' => (string) $operator->getAttribute('status'),
             'permissions' => $permissions,
@@ -361,20 +326,15 @@ final class PlatformOperatorService
     }
 
     /** @param array<string,mixed>|null $before @param array<string,mixed> $after */
-    private function recordAudit(
-        string $action,
-        UserModel $operator,
-        ?array $before,
-        array $after,
-        ?string $reason = null,
-    ): void {
+    private function recordAudit(string $action, PlatformOperatorModel $operator, ?array $before, array $after, ?string $reason = null): void
+    {
         $this->audit->recordPlatform(new AuditEventData(
             eventName: "platform.operator.{$action}",
             eventCategory: AuditEventCategory::SECURITY,
             sourceModule: 'user',
             subjectType: 'platform_operator',
             subjectId: (string) $operator->getKey(),
-            subjectReference: (string) $operator->getAttribute('platform_login_email'),
+            subjectReference: (string) $operator->getAttribute('email'),
             changes: ['old' => $before, 'new' => $after],
             metadata: $reason === null ? [] : ['reason' => $reason],
             tags: ['platform', 'operator', 'security'],

@@ -18,7 +18,7 @@ final class AuthPlatformAccessTokenModel extends CoreModel
         'row_version',
         'metadata',
         'platform_session_id',
-        'user_id',
+        'platform_operator_id',
         'token_key',
         'token_hash',
         'scopes',
@@ -32,6 +32,7 @@ final class AuthPlatformAccessTokenModel extends CoreModel
     protected function casts(): array
     {
         return array_merge(parent::casts(), [
+            'platform_operator_id' => 'integer',
             'scopes' => 'array',
             'issued_at' => 'datetime',
             'expires_at' => 'datetime',

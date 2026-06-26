@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Services;
 
+use Modules\Core\Contracts\TenantEntitlementReaderInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\Tenant\Repositories\TenantSubscriptionRepositoryInterface;
 use Modules\Tenant\Services\Plans\TenantPlanSchema;
 use Modules\Tenant\Services\Subscriptions\TenantSubscriptionPolicy;
 
-final class TenantEntitlementService
+final class TenantEntitlementService implements TenantEntitlementReaderInterface
 {
     public function __construct(
         private readonly TenantSubscriptionRepositoryInterface $subscriptions,

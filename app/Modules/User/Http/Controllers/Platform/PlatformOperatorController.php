@@ -6,7 +6,7 @@ namespace Modules\User\Http\Controllers\Platform;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
-use Modules\User\Constants\UserStatus;
+use Modules\User\Constants\PlatformOperatorStatus;
 use Modules\User\Http\Requests\Platform\ChangePlatformOperatorStatusRequest;
 use Modules\User\Http\Requests\Platform\CreatePlatformOperatorRequest;
 use Modules\User\Http\Requests\Platform\ListPlatformOperatorRequest;
@@ -76,7 +76,7 @@ final class PlatformOperatorController extends Controller
         return new PlatformOperatorResource($this->operators->changeStatus(
             $operator,
             (int) $request->validated('expected_version'),
-            UserStatus::ACTIVE,
+            PlatformOperatorStatus::ACTIVE,
             (string) $request->validated('reason'),
         ));
     }
@@ -86,7 +86,7 @@ final class PlatformOperatorController extends Controller
         return new PlatformOperatorResource($this->operators->changeStatus(
             $operator,
             (int) $request->validated('expected_version'),
-            UserStatus::INACTIVE,
+            PlatformOperatorStatus::INACTIVE,
             (string) $request->validated('reason'),
         ));
     }

@@ -6,6 +6,7 @@ namespace Modules\OrganizationUnit\Providers;
 
 use Illuminate\Support\ServiceProvider;
 use Modules\Core\Contracts\CurrentOrganizationUnitContextResolverInterface;
+use Modules\Core\Contracts\OrganizationUnitDirectoryInterface;
 use Modules\Core\Contracts\PermissionDefinitionRegistryInterface;
 use Modules\OrganizationUnit\Constants\OrganizationUnitPermission;
 use Modules\OrganizationUnit\Contracts\OrganizationUnitBrandingReaderInterface;
@@ -17,6 +18,7 @@ use Modules\OrganizationUnit\Repositories\EloquentOrganizationUnitRepository;
 use Modules\OrganizationUnit\Repositories\OrganizationUnitRepositoryInterface;
 use Modules\OrganizationUnit\Services\Contracts\OrganizationUnitDomainServiceInterface;
 use Modules\OrganizationUnit\Services\CurrentOrganizationUnitContextResolver;
+use Modules\OrganizationUnit\Services\Directory\OrganizationUnitDirectory;
 use Modules\OrganizationUnit\Services\Hierarchy\OrganizationUnitHierarchyReader;
 use Modules\OrganizationUnit\Services\Hierarchy\OrganizationUnitPopulationReader;
 use Modules\OrganizationUnit\Services\Lifecycle\OrganizationUnitLifecycleGuard;
@@ -36,6 +38,7 @@ final class OrganizationUnitServiceProvider extends ServiceProvider
         $this->mergeConfigFrom(__DIR__.'/../Config/organization-unit.php', 'organization-unit');
         $this->app->tag([OrganizationUnitLimitUsageContributor::class], 'tenant.limit_usage');
         $this->app->bind(CurrentOrganizationUnitContextResolverInterface::class, CurrentOrganizationUnitContextResolver::class);
+        $this->app->scoped(OrganizationUnitDirectoryInterface::class, OrganizationUnitDirectory::class);
         $this->app->singleton(OrganizationUnitDomainServiceInterface::class, OrganizationUnitDomainService::class);
         $this->app->singleton(OrganizationUnitOwnershipCheckerInterface::class, OrganizationUnitOwnershipChecker::class);
         $this->app->singleton(OrganizationUnitHierarchyReaderInterface::class, OrganizationUnitHierarchyReader::class);
