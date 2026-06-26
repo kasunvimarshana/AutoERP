@@ -12,7 +12,11 @@ return new class extends Migration
     {
         Schema::create('auth_platform_operator_password_credentials', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('platform_operator_id')->constrained('platform_operators')->restrictOnDelete();
+            $table->foreignId('platform_operator_id');
+            $table->foreign('platform_operator_id', 'auth_plat_credential_operator_fk')
+                ->references('id')
+                ->on('platform_operators')
+                ->restrictOnDelete();
             $table->string('password_hash');
             $table->string('status', 30);
             $table->timestamp('changed_at');

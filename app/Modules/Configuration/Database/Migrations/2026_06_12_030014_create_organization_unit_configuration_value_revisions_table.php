@@ -15,7 +15,11 @@ return new class extends Migration
     {
         Schema::create('organization_unit_configuration_value_revisions', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
+            $table->foreignId('tenant_id');
+            $table->foreign('tenant_id', 'org_config_revision_tenant_fk')
+                ->references('id')
+                ->on('tenants')
+                ->restrictOnDelete();
             $table->unsignedBigInteger('organization_unit_id');
             $table->string('key', 191);
             $table->unsignedInteger('definition_version');
