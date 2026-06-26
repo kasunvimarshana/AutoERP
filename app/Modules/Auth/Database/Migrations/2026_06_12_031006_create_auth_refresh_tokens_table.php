@@ -30,6 +30,10 @@ return new class extends Migration
             $table->unsignedBigInteger('row_version')->default(1);
             $table->timestamps();
 
+            // The composite parent index must exist before the self-referencing foreign key is added.
+            $table->unique(['id', 'tenant_id'], 'auth_refresh_id_tenant_uk');
+            $table->unique('refresh_key', 'auth_refresh_key_uk');
+
             $table->foreign(['access_token_id', 'tenant_id', 'session_id', 'user_id'], 'auth_refresh_access_fk')
                 ->references(['id', 'tenant_id', 'session_id', 'user_id'])->on('auth_access_tokens')->restrictOnDelete();
             $table->foreign(['parent_refresh_token_id', 'tenant_id'], 'auth_refresh_parent_fk')
@@ -38,8 +42,6 @@ return new class extends Migration
                 ->references(['id', 'tenant_id', 'user_id'])->on('auth_sessions')->restrictOnDelete();
             $table->foreign(['client_id', 'tenant_id'], 'auth_refresh_client_fk')
                 ->references(['id', 'tenant_id'])->on('auth_clients')->restrictOnDelete();
-            $table->unique('refresh_key', 'auth_refresh_key_uk');
-            $table->unique(['id', 'tenant_id'], 'auth_refresh_id_tenant_uk');
             $table->index(['family_id', 'status'], 'auth_refresh_family_idx');
             $table->index(['session_id', 'status', 'expires_at'], 'auth_refresh_session_idx');
         });
