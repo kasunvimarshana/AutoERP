@@ -15,7 +15,7 @@ return new class extends Migration
             $table->unsignedBigInteger('tenant_subscription_id')->unique('tenant_current_subscriptions_subscription_uk');
             $table->enum('state', ['assigned', 'cancelled', 'expired'])->default('assigned');
             $table->string('state_reason', 500)->nullable();
-            $table->timestamp('state_changed_at');
+            $table->dateTime('state_changed_at');
             $table->unsignedBigInteger('row_version')->default(1);
             $table->timestamp('assigned_at')->useCurrent();
             $table->unsignedBigInteger('assigned_by')->nullable()->index('tenant_current_subscriptions_assigned_by_idx');

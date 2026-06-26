@@ -16,7 +16,7 @@ return new class extends Migration
             $table->string('source_system', 100);
             $table->uuid('event_id');
             $table->string('event_type', 160);
-            $table->timestamp('processed_at');
+            $table->dateTime('processed_at');
             $table->timestamps();
 
             $table->unique(['tenant_id', 'source_system', 'event_id'], 'auth_event_idempotency_uk');

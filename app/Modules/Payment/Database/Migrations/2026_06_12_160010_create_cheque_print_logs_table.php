@@ -18,7 +18,7 @@ return new class extends Migration
             $table->foreignId('payment_line_id')->nullable();
             $table->foreignId('cheque_template_id');
             $table->unsignedBigInteger('printed_by')->nullable();
-            $table->timestamp('printed_at');
+            $table->dateTime('printed_at');
             $table->enum('print_status', ['previewed', 'printed', 'cancelled'])->default('printed');
             $table->text('notes')->nullable();
             $table->timestamps();

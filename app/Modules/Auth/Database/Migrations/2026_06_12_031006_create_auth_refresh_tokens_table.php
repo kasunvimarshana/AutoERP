@@ -22,8 +22,8 @@ return new class extends Migration
             $table->string('refresh_key', 64);
             $table->string('refresh_digest', 64);
             $table->string('status', 30);
-            $table->timestamp('issued_at');
-            $table->timestamp('expires_at');
+            $table->dateTime('issued_at');
+            $table->dateTime('expires_at');
             $table->timestamp('rotated_at')->nullable();
             $table->timestamp('revoked_at')->nullable();
             $table->string('revocation_reason', 255)->nullable();

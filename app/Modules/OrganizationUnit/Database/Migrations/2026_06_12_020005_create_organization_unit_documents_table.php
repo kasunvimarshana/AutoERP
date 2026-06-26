@@ -25,7 +25,7 @@ return new class extends Migration
             $table->unsignedBigInteger('size_bytes');
             $table->char('checksum_sha256', 64);
             $table->string('scan_engine', 100);
-            $table->timestamp('scanned_at');
+            $table->dateTime('scanned_at');
 
             $table->timestamps();
             $table->softDeletes();

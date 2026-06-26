@@ -22,8 +22,8 @@ return new class extends Migration
             $table->string('code_challenge', 128);
             $table->string('redirect_uri', 2048);
             $table->string('status', 30);
-            $table->timestamp('issued_at');
-            $table->timestamp('expires_at');
+            $table->dateTime('issued_at');
+            $table->dateTime('expires_at');
             $table->timestamp('consumed_at')->nullable();
             $table->timestamp('revoked_at')->nullable();
             $table->unsignedBigInteger('row_version')->default(1);

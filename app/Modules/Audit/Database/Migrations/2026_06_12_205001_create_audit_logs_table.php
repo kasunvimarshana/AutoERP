@@ -55,7 +55,7 @@ return new class extends Migration
             $table->string('ip_address', 45)->nullable();
             $table->string('user_agent', 500)->nullable();
 
-            $table->timestamp('occurred_at');
+            $table->dateTime('occurred_at');
             $table->timestamp('recorded_at')->useCurrent();
 
             $table->index(

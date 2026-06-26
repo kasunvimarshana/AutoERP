@@ -18,7 +18,7 @@ return new class extends Migration
             $table->string('owner_type')->nullable();
             $table->unsignedBigInteger('owner_id')->nullable();
             $table->string('ownership_type');
-            $table->timestamp('started_at');
+            $table->dateTime('started_at');
             $table->timestamp('ended_at')->nullable();
             $table->boolean('is_current')->default(true);
             $table->text('notes')->nullable();

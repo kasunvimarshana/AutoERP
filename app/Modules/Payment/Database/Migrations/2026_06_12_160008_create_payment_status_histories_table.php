@@ -19,7 +19,7 @@ return new class extends Migration
             $table->string('to_status', 50);
             $table->text('reason')->nullable();
             $table->unsignedBigInteger('changed_by')->nullable();
-            $table->timestamp('changed_at');
+            $table->dateTime('changed_at');
             $table->json('metadata')->nullable();
             $table->timestamps();
 

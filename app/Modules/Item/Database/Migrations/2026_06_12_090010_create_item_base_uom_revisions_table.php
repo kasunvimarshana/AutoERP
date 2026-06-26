@@ -18,7 +18,7 @@ return new class extends Migration
             $table->foreignId('old_base_uom_id');
             $table->foreignId('new_base_uom_id');
             $table->decimal('conversion_factor', 20, 6);
-            $table->timestamp('effective_at');
+            $table->dateTime('effective_at');
             $table->text('reason')->nullable();
             $table->string('status', 20)->default('draft');
             $table->json('validation_summary')->nullable();

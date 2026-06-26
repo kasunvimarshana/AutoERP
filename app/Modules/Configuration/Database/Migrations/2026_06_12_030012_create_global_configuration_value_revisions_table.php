@@ -30,7 +30,7 @@ return new class extends Migration
             $table->string('actor_name')->nullable();
             $table->string('actor_email')->nullable();
             $table->string('reason', 1000)->nullable();
-            $table->timestamp('created_at');
+            $table->dateTime('created_at');
 
             $table->index(['key', 'created_at'], 'global_configuration_revisions_key_created_idx');
         });

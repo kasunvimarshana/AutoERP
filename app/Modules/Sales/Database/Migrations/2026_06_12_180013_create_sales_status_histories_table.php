@@ -20,7 +20,7 @@ return new class extends Migration
             $table->string('to_status');
             $table->text('reason')->nullable();
             $table->unsignedBigInteger('changed_by')->nullable();
-            $table->timestamp('changed_at');
+            $table->dateTime('changed_at');
             $table->timestamps();
 
             $table->index(['tenant_id', 'organization_unit_id'], 'sales_status_histories_scope_idx');

@@ -20,7 +20,7 @@ return new class extends Migration
             $table->unsignedInteger('attempts')->default(0);
             $table->string('last_error_code', 100)->nullable();
             $table->string('last_error_message', 255)->nullable();
-            $table->timestamp('available_at');
+            $table->dateTime('available_at');
             $table->uuid('claim_token')->nullable();
             $table->timestamp('claimed_at')->nullable();
             $table->timestamp('claim_lease_expires_at')->nullable();

@@ -23,7 +23,7 @@ return new class extends Migration
             $table->foreignId('base_currency_id')->nullable()->constrained('currencies', 'id')->restrictOnDelete();
             $table->enum('status', ['draft', 'active', 'inactive', 'suspended', 'archived'])->default('draft');
             $table->string('status_reason', 500)->nullable();
-            $table->timestamp('status_changed_at');
+            $table->dateTime('status_changed_at');
             $table->timestamp('activated_at')->nullable();
             $table->timestamp('suspended_at')->nullable();
             $table->timestamp('archived_at')->nullable();

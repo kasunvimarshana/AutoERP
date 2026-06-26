@@ -21,7 +21,7 @@ return new class extends Migration
             $table->string('actor_type', 40)->default('system');
             $table->string('actor_name')->nullable();
             $table->string('actor_email')->nullable();
-            $table->timestamp('occurred_at');
+            $table->dateTime('occurred_at');
 
             $table->foreign(
                 ['tenant_subscription_id', 'tenant_id'],

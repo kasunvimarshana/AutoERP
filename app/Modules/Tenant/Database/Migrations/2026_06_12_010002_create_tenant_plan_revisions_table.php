@@ -21,7 +21,7 @@ return new class extends Migration
             $table->decimal('price', 20, 6)->default('0.000000');
             $table->foreignId('currency_id')->nullable()->constrained('currencies', 'id')->restrictOnDelete();
             $table->enum('billing_interval', ['month', 'quarter', 'year']);
-            $table->timestamp('effective_at');
+            $table->dateTime('effective_at');
             $table->string('change_note', 1000);
             $table->unsignedBigInteger('created_by')->nullable()->index('tenant_plan_revisions_created_by_idx');
             $table->timestamp('created_at')->useCurrent();

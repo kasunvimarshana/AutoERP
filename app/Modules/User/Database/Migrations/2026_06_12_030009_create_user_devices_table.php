@@ -19,7 +19,7 @@ return new class extends Migration
             $table->text('device_token_encrypted');
             $table->string('platform', 30);
             $table->string('device_name')->nullable();
-            $table->timestamp('last_active_at');
+            $table->dateTime('last_active_at');
             $table->timestamp('revoked_at')->nullable();
             $table->unsignedBigInteger('registered_by_user_id');
             $table->unsignedBigInteger('revoked_by_user_id')->nullable();

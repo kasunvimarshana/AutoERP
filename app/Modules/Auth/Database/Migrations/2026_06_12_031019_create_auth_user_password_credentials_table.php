@@ -16,7 +16,7 @@ return new class extends Migration
             $table->unsignedBigInteger('user_id');
             $table->string('password_hash');
             $table->string('status', 30);
-            $table->timestamp('changed_at');
+            $table->dateTime('changed_at');
             $table->timestamp('revoked_at')->nullable();
             $table->unsignedBigInteger('row_version')->default(1);
             $table->timestamps();

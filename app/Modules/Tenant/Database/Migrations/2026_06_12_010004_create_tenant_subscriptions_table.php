@@ -18,7 +18,7 @@ return new class extends Migration
             $table->foreignId('tenant_plan_revision_id')->constrained('tenant_plan_revisions', 'id')->restrictOnDelete();
             $table->unsignedBigInteger('supersedes_subscription_id')->nullable();
             $table->enum('contract_status', ['trial', 'active']);
-            $table->timestamp('starts_at');
+            $table->dateTime('starts_at');
             $table->timestamp('trial_ends_at')->nullable();
             $table->timestamp('ends_at')->nullable();
             $table->string('change_reason', 500)->nullable();

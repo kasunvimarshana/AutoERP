@@ -20,7 +20,7 @@ return new class extends Migration
             $table->char('token_hash', 64)->unique('platform_operator_invitations_token_uk');
             $table->text('delivery_token')->nullable();
             $table->string('status', 30)->default(self::PENDING_STATUS);
-            $table->timestamp('expires_at');
+            $table->dateTime('expires_at');
             $table->timestamp('accepted_at')->nullable();
             $table->timestamp('revoked_at')->nullable();
             $table->string('revocation_reason', 500)->nullable();

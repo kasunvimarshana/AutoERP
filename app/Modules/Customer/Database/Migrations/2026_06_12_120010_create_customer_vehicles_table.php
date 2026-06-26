@@ -17,7 +17,7 @@ return new class extends Migration
             $table->foreignId('customer_id');
             $table->foreignId('vehicle_id');
             $table->string('relationship_type')->nullable();
-            $table->timestamp('started_at');
+            $table->dateTime('started_at');
             $table->timestamp('ended_at')->nullable();
             $table->boolean('is_current')->default(false);
             $table->unsignedTinyInteger('current_guard')->nullable();

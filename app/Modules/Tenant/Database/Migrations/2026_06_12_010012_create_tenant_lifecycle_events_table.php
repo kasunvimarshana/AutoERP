@@ -20,7 +20,7 @@ return new class extends Migration
             $table->string('actor_type', 40)->default('system');
             $table->string('actor_name')->nullable();
             $table->string('actor_email')->nullable();
-            $table->timestamp('occurred_at');
+            $table->dateTime('occurred_at');
 
             $table->index(['tenant_id', 'occurred_at'], 'tenant_lifecycle_events_tenant_time_idx');
         });

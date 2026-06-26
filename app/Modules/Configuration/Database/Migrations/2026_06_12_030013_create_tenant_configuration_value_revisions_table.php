@@ -29,7 +29,7 @@ return new class extends Migration
             $table->string('actor_name')->nullable();
             $table->string('actor_email')->nullable();
             $table->string('reason', 1000)->nullable();
-            $table->timestamp('created_at');
+            $table->dateTime('created_at');
 
             $table->unique(['id', 'tenant_id'], 'tenant_configuration_revisions_id_tenant_uk');
             $table->foreign(

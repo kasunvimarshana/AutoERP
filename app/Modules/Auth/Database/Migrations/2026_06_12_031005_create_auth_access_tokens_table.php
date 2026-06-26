@@ -21,8 +21,8 @@ return new class extends Migration
             $table->json('scopes');
             $table->string('grant_type', 40);
             $table->string('status', 30);
-            $table->timestamp('issued_at');
-            $table->timestamp('expires_at');
+            $table->dateTime('issued_at');
+            $table->dateTime('expires_at');
             $table->timestamp('revoked_at')->nullable();
             $table->string('revocation_reason', 255)->nullable();
             $table->unsignedBigInteger('row_version')->default(1);

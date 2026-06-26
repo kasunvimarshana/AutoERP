@@ -18,10 +18,10 @@ return new class extends Migration
             $table->string('ip_address', 45);
             $table->string('user_agent', 1024)->nullable();
             $table->string('device_name', 160)->nullable();
-            $table->timestamp('authenticated_at');
+            $table->dateTime('authenticated_at');
             $table->timestamp('mfa_verified_at')->nullable();
-            $table->timestamp('last_activity_at');
-            $table->timestamp('expires_at');
+            $table->dateTime('last_activity_at');
+            $table->dateTime('expires_at');
             $table->timestamp('revoked_at')->nullable();
             $table->string('revocation_reason', 255)->nullable();
             $table->unsignedBigInteger('row_version')->default(1);

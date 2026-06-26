@@ -18,7 +18,7 @@ return new class extends Migration
             $table->string('new_status');
             $table->text('reason')->nullable();
             $table->unsignedBigInteger('changed_by')->nullable();
-            $table->timestamp('changed_at');
+            $table->dateTime('changed_at');
             $table->timestamps();
             $table->index(['tenant_id', 'employee_id', 'changed_at'], 'hr_employee_status_history_idx');
 

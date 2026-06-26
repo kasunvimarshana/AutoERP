@@ -19,7 +19,7 @@ return new class extends Migration
             $table->string('new_status', 30);
             $table->text('reason')->nullable();
             $table->unsignedBigInteger('changed_by')->nullable();
-            $table->timestamp('changed_at');
+            $table->dateTime('changed_at');
             $table->timestamps();
 
             $table->index(['tenant_id', 'organization_unit_id'], 'vehicle_service_status_histories_tenant_org_idx');

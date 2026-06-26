@@ -23,7 +23,7 @@ return new class extends Migration
             $table->text('delivery_token')->nullable();
             $table->string('purpose', 50);
             $table->string('status', 30)->default('pending');
-            $table->timestamp('expires_at');
+            $table->dateTime('expires_at');
             $table->timestamp('accepted_at')->nullable();
             $table->unsignedBigInteger('accepted_by_user_id')->nullable();
             $table->timestamp('revoked_at')->nullable();

@@ -18,7 +18,7 @@ return new class extends Migration
             $table->string('failure_code', 80)->nullable();
             $table->string('ip_address', 45);
             $table->string('user_agent', 1024)->nullable();
-            $table->timestamp('attempted_at');
+            $table->dateTime('attempted_at');
             $table->timestamps();
 
             $table->foreign('platform_operator_id', 'auth_plat_login_operator_fk')
