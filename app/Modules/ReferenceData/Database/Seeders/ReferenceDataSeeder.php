@@ -85,12 +85,12 @@ final class ReferenceDataSeeder extends Seeder
                 foreach (ReferenceDataPermission::descriptions() as $name => $description) {
                     $identity = ['tenant_id' => (int) $tenantId, 'name' => $name, 'guard_name' => $guard];
                     $existing = DB::table('permissions')->where($identity)->first([
-                        'id', 'module', 'description', 'row_version', 'deleted_at',
+                        'id', 'module', 'description', 'is_active', 'row_version',
                     ]);
                     $values = [
                         'module' => 'ReferenceData',
                         'description' => $description,
-                        'deleted_at' => null,
+                        'is_active' => true,
                     ];
 
                     if ($existing === null) {
@@ -104,7 +104,7 @@ final class ReferenceDataSeeder extends Seeder
                     } elseif (
                         $existing->module !== 'ReferenceData'
                         || $existing->description !== $description
-                        || $existing->deleted_at !== null
+                        || ! (bool) $existing->is_active
                     ) {
                         DB::table('permissions')
                             ->where('tenant_id', (int) $tenantId)

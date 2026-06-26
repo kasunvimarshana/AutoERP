@@ -30,12 +30,12 @@ final class ConfigurationSeeder extends Seeder
                         'guard_name' => $guard,
                     ];
                     $existing = DB::table('permissions')->where($identity)->first([
-                        'id', 'module', 'description', 'row_version', 'deleted_at',
+                        'id', 'module', 'description', 'is_active', 'row_version',
                     ]);
                     $values = [
                         'module' => 'Configuration',
                         'description' => $description,
-                        'deleted_at' => null,
+                        'is_active' => true,
                     ];
 
                     if ($existing === null) {
@@ -53,7 +53,7 @@ final class ConfigurationSeeder extends Seeder
                     if (
                         $existing->module !== 'Configuration'
                         || $existing->description !== $description
-                        || $existing->deleted_at !== null
+                        || ! (bool) $existing->is_active
                     ) {
                         DB::table('permissions')
                             ->where('tenant_id', (int) $tenantId)

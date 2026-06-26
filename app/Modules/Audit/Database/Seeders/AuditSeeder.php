@@ -28,13 +28,13 @@ final class AuditSeeder extends Seeder
                         'id',
                         'module',
                         'description',
+                        'is_active',
                         'row_version',
-                        'deleted_at',
                     ]);
                     $catalogueValues = [
                         'module' => 'Audit',
                         'description' => $description,
-                        'deleted_at' => null,
+                        'is_active' => true,
                     ];
 
                     if ($existing === null) {
@@ -51,7 +51,7 @@ final class AuditSeeder extends Seeder
 
                     $isCurrent = $existing->module === 'Audit'
                         && $existing->description === $description
-                        && $existing->deleted_at === null;
+                        && (bool) $existing->is_active;
 
                     if (! $isCurrent) {
                         DB::table('permissions')
