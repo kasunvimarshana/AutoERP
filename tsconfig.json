@@ -19,10 +19,9 @@
         "isolatedModules": true,
         "noEmit": true,
         "jsx": "react-jsx",
-        "baseUrl": ".",
         "paths": {
             "@/*": [
-                "resources/js/*"
+                "./resources/js/*"
             ]
         },
         "types": [

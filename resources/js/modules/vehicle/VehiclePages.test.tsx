@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactElement } from 'react';
 import { Route, Routes } from 'react-router-dom';
@@ -94,7 +94,10 @@ describe('Vehicle route pages', () => {
         await user.click(screen.getByRole('button', { name: 'Create Vehicle' }));
         await user.click(screen.getByRole('button', { name: /Create Vehicle/ }));
         expect(apiMocks.createVehicle).toHaveBeenCalledOnce();
-        resolveCreate?.(vehicle);
+        await act(async () => {
+            resolveCreate?.(vehicle);
+        });
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Create Vehicle' })).not.toBeDisabled());
     });
     it('renders edit as a separate editable page without ownership or review tabs', async () => {
         renderPage(<RoutePage page={<VehicleEditPage />} path="/vehicles/:id/edit" />, ['/vehicles/10/edit']);

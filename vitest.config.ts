@@ -2,6 +2,8 @@ import { fileURLToPath, URL } from 'node:url';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vitest/config';
 
+const TEST_WORKER_COUNT = 2;
+
 export default defineConfig({
     plugins: [react()],
     resolve: {
@@ -17,8 +19,8 @@ export default defineConfig({
         restoreMocks: true,
         clearMocks: true,
         fileParallelism: true,
-        maxWorkers: 4,
-        pool: 'threads',
+        maxWorkers: TEST_WORKER_COUNT,
+        pool: 'vmThreads',
         testTimeout: 10_000,
         hookTimeout: 10_000,
         teardownTimeout: 5_000,
