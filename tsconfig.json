@@ -2,13 +2,16 @@
     "compilerOptions": {
         "target": "ES2022",
         "useDefineForClassFields": true,
-        "lib": ["ES2022", "DOM", "DOM.Iterable"],
+        "lib": [
+            "ES2022",
+            "DOM",
+            "DOM.Iterable"
+        ],
         "allowJs": false,
         "skipLibCheck": true,
         "esModuleInterop": true,
         "allowSyntheticDefaultImports": true,
         "strict": true,
-        "ignoreDeprecations": "6.0",
         "forceConsistentCasingInFileNames": true,
         "module": "ESNext",
         "moduleResolution": "Bundler",
@@ -18,9 +21,18 @@
         "jsx": "react-jsx",
         "baseUrl": ".",
         "paths": {
-            "@/*": ["resources/js/*"]
+            "@/*": [
+                "resources/js/*"
+            ]
         },
-        "types": ["vite/client", "vitest/globals"]
+        "types": [
+            "vite/client",
+            "vitest/globals"
+        ]
     },
-    "include": ["resources/js/**/*.ts", "resources/js/**/*.tsx", "vite.config.ts"]
+    "include": [
+        "resources/js/**/*.ts",
+        "resources/js/**/*.tsx",
+        "vite.config.ts"
+    ]
 }

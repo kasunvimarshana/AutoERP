@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { useBeforeUnload, useBlocker } from 'react-router-dom';
+import { useBeforeUnload, useBlocker, type BlockerFunction } from 'react-router-dom';
 
 const defaultMessage = 'You have unsaved changes. Leave this page and discard them?';
 
@@ -12,14 +12,16 @@ export function useUnsavedChanges(active: boolean, message = defaultMessage) {
         event.returnValue = '';
     }, [active]));
 
-    const blocker = useBlocker(useCallback(({ currentLocation, nextLocation }) => {
+    const shouldBlock = useCallback<BlockerFunction>(({ currentLocation, nextLocation }) => {
         if (bypassNextNavigation.current) {
             bypassNextNavigation.current = false;
             return false;
         }
 
         return active && !isTabOnlyChange(currentLocation, nextLocation);
-    }, [active]));
+    }, [active]);
+
+    const blocker = useBlocker(shouldBlock);
 
     useEffect(() => {
         if (blocker.state !== 'blocked') return;
