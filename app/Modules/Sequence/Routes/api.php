@@ -13,7 +13,7 @@ $currentOrganizationUnitMiddleware = (string) config(
     'current.organization-unit',
 ).':required';
 
-Route::prefix('api/sequence')
+Route::prefix('api/v1/sequence')
     ->middleware([
         'api',
         'auth:'.$protectedGuard,
@@ -21,7 +21,7 @@ Route::prefix('api/sequence')
         $currentTenantMiddleware,
         $currentOrganizationUnitMiddleware,
     ])
-    ->name('sequence.')
+    ->name('api.v1.sequence.')
     ->group(function (): void {
         Route::post('sequences/preview-number', [SequenceController::class, 'previewNumber'])
             ->name('sequences.preview-number');

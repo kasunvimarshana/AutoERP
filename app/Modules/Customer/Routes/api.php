@@ -18,51 +18,118 @@ $middleware = [
 ];
 
 Route::prefix('api/v1')->middleware($middleware)->name('api.v1.')->group(function (): void {
-    Route::get('customer-vehicles', [CustomerVehicleController::class, 'index']);
-    Route::post('customer-vehicles', [CustomerVehicleController::class, 'store']);
-    Route::get('customer-vehicles/{relationship}', [CustomerVehicleController::class, 'show'])->whereNumber('relationship');
-    Route::match(['put', 'patch'], 'customer-vehicles/{relationship}', [CustomerVehicleController::class, 'update'])->whereNumber('relationship');
-    Route::post('customer-vehicles/{relationship}/set-current', [CustomerVehicleController::class, 'setCurrent'])->whereNumber('relationship');
-    Route::post('customer-vehicles/{relationship}/clear-current', [CustomerVehicleController::class, 'clearCurrent'])->whereNumber('relationship');
-    Route::delete('customer-vehicles/{relationship}', [CustomerVehicleController::class, 'destroy'])->whereNumber('relationship');
+    Route::prefix('customer-vehicles')->name('customer-vehicles.')->group(function (): void {
+        Route::get('/', [CustomerVehicleController::class, 'index'])->name('index');
+        Route::post('/', [CustomerVehicleController::class, 'store'])->name('store');
+        Route::get('{relationship}', [CustomerVehicleController::class, 'show'])
+            ->whereNumber('relationship')
+            ->name('show');
+        Route::match(['put', 'patch'], '{relationship}', [CustomerVehicleController::class, 'update'])
+            ->whereNumber('relationship')
+            ->name('update');
+        Route::post('{relationship}/set-current', [CustomerVehicleController::class, 'setCurrent'])
+            ->whereNumber('relationship')
+            ->name('set-current');
+        Route::post('{relationship}/clear-current', [CustomerVehicleController::class, 'clearCurrent'])
+            ->whereNumber('relationship')
+            ->name('clear-current');
+        Route::delete('{relationship}', [CustomerVehicleController::class, 'destroy'])
+            ->whereNumber('relationship')
+            ->name('destroy');
+    });
+
     Route::get('customers/lookup/{kind?}', [CustomerController::class, 'lookup'])
         ->whereIn('kind', ['active', 'credit-allowed'])
         ->name('customers.lookup');
-    Route::post('customers/with-relations', [CustomerController::class, 'storeWithRelations'])->name('customers.with-relations.store');
-    Route::patch('customers/{customer}/activate', [CustomerController::class, 'activate'])->whereNumber('customer')->name('customers.activate');
-    Route::patch('customers/{customer}/deactivate', [CustomerController::class, 'deactivate'])->whereNumber('customer')->name('customers.deactivate');
-    Route::patch('customers/{customer}/status', [CustomerController::class, 'changeStatus'])->whereNumber('customer')->name('customers.status');
+    Route::post('customers/with-relations', [CustomerController::class, 'storeWithRelations'])
+        ->name('customers.with-relations.store');
+    Route::patch('customers/{customer}/activate', [CustomerController::class, 'activate'])
+        ->whereNumber('customer')
+        ->name('customers.activate');
+    Route::patch('customers/{customer}/deactivate', [CustomerController::class, 'deactivate'])
+        ->whereNumber('customer')
+        ->name('customers.deactivate');
+    Route::patch('customers/{customer}/status', [CustomerController::class, 'changeStatus'])
+        ->whereNumber('customer')
+        ->name('customers.status');
 
-    Route::get('customers/{customer}/contacts', [CustomerRelationController::class, 'contacts'])->whereNumber('customer');
-    Route::post('customers/{customer}/contacts', [CustomerRelationController::class, 'storeContact'])->whereNumber('customer');
-    Route::put('customers/{customer}/contacts/{contact}', [CustomerRelationController::class, 'updateContact'])->whereNumber(['customer', 'contact']);
-    Route::delete('customers/{customer}/contacts/{contact}', [CustomerRelationController::class, 'deleteContact'])->whereNumber(['customer', 'contact']);
+    Route::prefix('customers/{customer}')->name('customers.')->group(function (): void {
+        Route::get('contacts', [CustomerRelationController::class, 'contacts'])
+            ->whereNumber('customer')
+            ->name('contacts.index');
+        Route::post('contacts', [CustomerRelationController::class, 'storeContact'])
+            ->whereNumber('customer')
+            ->name('contacts.store');
+        Route::put('contacts/{contact}', [CustomerRelationController::class, 'updateContact'])
+            ->whereNumber(['customer', 'contact'])
+            ->name('contacts.update');
+        Route::delete('contacts/{contact}', [CustomerRelationController::class, 'deleteContact'])
+            ->whereNumber(['customer', 'contact'])
+            ->name('contacts.destroy');
 
-    Route::get('customers/{customer}/addresses', [CustomerRelationController::class, 'addresses'])->whereNumber('customer');
-    Route::post('customers/{customer}/addresses', [CustomerRelationController::class, 'storeAddress'])->whereNumber('customer');
-    Route::put('customers/{customer}/addresses/{address}', [CustomerRelationController::class, 'updateAddress'])->whereNumber(['customer', 'address']);
-    Route::delete('customers/{customer}/addresses/{address}', [CustomerRelationController::class, 'deleteAddress'])->whereNumber(['customer', 'address']);
+        Route::get('addresses', [CustomerRelationController::class, 'addresses'])
+            ->whereNumber('customer')
+            ->name('addresses.index');
+        Route::post('addresses', [CustomerRelationController::class, 'storeAddress'])
+            ->whereNumber('customer')
+            ->name('addresses.store');
+        Route::put('addresses/{address}', [CustomerRelationController::class, 'updateAddress'])
+            ->whereNumber(['customer', 'address'])
+            ->name('addresses.update');
+        Route::delete('addresses/{address}', [CustomerRelationController::class, 'deleteAddress'])
+            ->whereNumber(['customer', 'address'])
+            ->name('addresses.destroy');
 
-    Route::get('customers/{customer}/bank-accounts', [CustomerRelationController::class, 'bankAccounts'])->whereNumber('customer');
-    Route::post('customers/{customer}/bank-accounts', [CustomerRelationController::class, 'storeBankAccount'])->whereNumber('customer');
-    Route::put('customers/{customer}/bank-accounts/{bankAccount}', [CustomerRelationController::class, 'updateBankAccount'])->whereNumber(['customer', 'bankAccount']);
-    Route::delete('customers/{customer}/bank-accounts/{bankAccount}', [CustomerRelationController::class, 'deleteBankAccount'])->whereNumber(['customer', 'bankAccount']);
+        Route::get('bank-accounts', [CustomerRelationController::class, 'bankAccounts'])
+            ->whereNumber('customer')
+            ->name('bank-accounts.index');
+        Route::post('bank-accounts', [CustomerRelationController::class, 'storeBankAccount'])
+            ->whereNumber('customer')
+            ->name('bank-accounts.store');
+        Route::put('bank-accounts/{bankAccount}', [CustomerRelationController::class, 'updateBankAccount'])
+            ->whereNumber(['customer', 'bankAccount'])
+            ->name('bank-accounts.update');
+        Route::delete('bank-accounts/{bankAccount}', [CustomerRelationController::class, 'deleteBankAccount'])
+            ->whereNumber(['customer', 'bankAccount'])
+            ->name('bank-accounts.destroy');
 
-    Route::get('customers/{customer}/categories', [CustomerRelationController::class, 'categories'])->whereNumber('customer');
-    Route::post('customers/{customer}/categories', [CustomerRelationController::class, 'assignCategory'])->whereNumber('customer');
-    Route::delete('customers/{customer}/categories/{category}', [CustomerRelationController::class, 'deleteCategory'])->whereNumber(['customer', 'category']);
+        Route::get('categories', [CustomerRelationController::class, 'categories'])
+            ->whereNumber('customer')
+            ->name('categories.index');
+        Route::post('categories', [CustomerRelationController::class, 'assignCategory'])
+            ->whereNumber('customer')
+            ->name('categories.store');
+        Route::delete('categories/{category}', [CustomerRelationController::class, 'deleteCategory'])
+            ->whereNumber(['customer', 'category'])
+            ->name('categories.destroy');
 
-    Route::get('customers/{customer}/documents', [CustomerRelationController::class, 'documents'])->whereNumber('customer');
-    Route::post('customers/{customer}/documents', [CustomerRelationController::class, 'storeDocument'])->whereNumber('customer');
-    Route::put('customers/{customer}/documents/{document}', [CustomerRelationController::class, 'updateDocument'])->whereNumber(['customer', 'document']);
-    Route::delete('customers/{customer}/documents/{document}', [CustomerRelationController::class, 'deleteDocument'])->whereNumber(['customer', 'document']);
+        Route::get('documents', [CustomerRelationController::class, 'documents'])
+            ->whereNumber('customer')
+            ->name('documents.index');
+        Route::post('documents', [CustomerRelationController::class, 'storeDocument'])
+            ->whereNumber('customer')
+            ->name('documents.store');
+        Route::put('documents/{document}', [CustomerRelationController::class, 'updateDocument'])
+            ->whereNumber(['customer', 'document'])
+            ->name('documents.update');
+        Route::delete('documents/{document}', [CustomerRelationController::class, 'deleteDocument'])
+            ->whereNumber(['customer', 'document'])
+            ->name('documents.destroy');
 
-    Route::get('customers/{customer}/credit-profile', [CustomerRelationController::class, 'creditProfile'])->whereNumber('customer');
-    Route::put('customers/{customer}/credit-profile', [CustomerRelationController::class, 'updateCreditProfile'])->whereNumber('customer');
-    Route::get('customers/{customer}/status-history', [CustomerRelationController::class, 'statusHistory'])->whereNumber('customer');
+        Route::get('credit-profile', [CustomerRelationController::class, 'creditProfile'])
+            ->whereNumber('customer')
+            ->name('credit-profile.show');
+        Route::put('credit-profile', [CustomerRelationController::class, 'updateCreditProfile'])
+            ->whereNumber('customer')
+            ->name('credit-profile.update');
+        Route::get('status-history', [CustomerRelationController::class, 'statusHistory'])
+            ->whereNumber('customer')
+            ->name('status-history.index');
+    });
 
     Route::apiResource('customers', CustomerController::class);
 
-    Route::get('customer-categories/lookup', [CustomerCategoryController::class, 'lookup'])->name('customer-categories.lookup');
+    Route::get('customer-categories/lookup', [CustomerCategoryController::class, 'lookup'])
+        ->name('customer-categories.lookup');
     Route::apiResource('customer-categories', CustomerCategoryController::class);
 });

@@ -4,7 +4,11 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Tests;
 
+use Modules\Tenant\Services\Subscriptions\TenantSubscriptionLifecycleService;
+use Modules\Tenant\Services\TenantActorSnapshotFactory;
 use PHPUnit\Framework\TestCase;
+use ReflectionClass;
+use ReflectionNamedType;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 use SplFileInfo;
@@ -73,6 +77,26 @@ final class TenantArchitectureTest extends TestCase
             self::assertStringContainsString('function middleware()', $source, $file->getPathname());
             self::assertStringContainsString('RestoreTenantJobContext', $source, $file->getPathname());
         }
+    }
+
+    public function test_subscription_lifecycle_actor_snapshot_dependency_resolves_to_tenant_owner_service(): void
+    {
+        $constructor = (new ReflectionClass(TenantSubscriptionLifecycleService::class))->getConstructor();
+
+        self::assertNotNull($constructor);
+
+        $parameter = null;
+        foreach ($constructor->getParameters() as $candidate) {
+            if ($candidate->getName() === 'actorSnapshots') {
+                $parameter = $candidate;
+                break;
+            }
+        }
+
+        self::assertNotNull($parameter);
+        self::assertInstanceOf(ReflectionNamedType::class, $parameter->getType());
+        self::assertSame(TenantActorSnapshotFactory::class, $parameter->getType()->getName());
+        self::assertTrue(class_exists(TenantActorSnapshotFactory::class));
     }
 
     /** @return list<SplFileInfo> */

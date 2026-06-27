@@ -24,6 +24,6 @@ Sequence aggregate boundary is defined by:
 
 ## API Surface
 
-Prefix: api/sequence
+Prefix: api/v1/sequence
 
 - sequences

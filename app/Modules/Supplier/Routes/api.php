@@ -18,56 +18,131 @@ $middleware = [
 ];
 
 Route::prefix('api/v1')->middleware($middleware)->name('api.v1.')->group(function (): void {
-    Route::get('supplier-vehicles', [SupplierVehicleController::class, 'index']);
-    Route::post('supplier-vehicles', [SupplierVehicleController::class, 'store']);
-    Route::get('supplier-vehicles/{relationship}', [SupplierVehicleController::class, 'show'])->whereNumber('relationship');
-    Route::match(['put', 'patch'], 'supplier-vehicles/{relationship}', [SupplierVehicleController::class, 'update'])->whereNumber('relationship');
-    Route::post('supplier-vehicles/{relationship}/set-current', [SupplierVehicleController::class, 'setCurrent'])->whereNumber('relationship');
-    Route::post('supplier-vehicles/{relationship}/clear-current', [SupplierVehicleController::class, 'clearCurrent'])->whereNumber('relationship');
-    Route::delete('supplier-vehicles/{relationship}', [SupplierVehicleController::class, 'destroy'])->whereNumber('relationship');
+    Route::prefix('supplier-vehicles')->name('supplier-vehicles.')->group(function (): void {
+        Route::get('/', [SupplierVehicleController::class, 'index'])->name('index');
+        Route::post('/', [SupplierVehicleController::class, 'store'])->name('store');
+        Route::get('{relationship}', [SupplierVehicleController::class, 'show'])
+            ->whereNumber('relationship')
+            ->name('show');
+        Route::match(['put', 'patch'], '{relationship}', [SupplierVehicleController::class, 'update'])
+            ->whereNumber('relationship')
+            ->name('update');
+        Route::post('{relationship}/set-current', [SupplierVehicleController::class, 'setCurrent'])
+            ->whereNumber('relationship')
+            ->name('set-current');
+        Route::post('{relationship}/clear-current', [SupplierVehicleController::class, 'clearCurrent'])
+            ->whereNumber('relationship')
+            ->name('clear-current');
+        Route::delete('{relationship}', [SupplierVehicleController::class, 'destroy'])
+            ->whereNumber('relationship')
+            ->name('destroy');
+    });
+
     Route::get('suppliers/lookup/{kind?}', [SupplierController::class, 'lookup'])
         ->whereIn('kind', ['active', 'credit-allowed', 'by-item'])
         ->name('suppliers.lookup');
-    Route::post('suppliers/with-relations', [SupplierController::class, 'storeWithRelations'])->name('suppliers.with-relations.store');
-    Route::patch('suppliers/{supplier}/activate', [SupplierController::class, 'activate'])->whereNumber('supplier')->name('suppliers.activate');
-    Route::patch('suppliers/{supplier}/deactivate', [SupplierController::class, 'deactivate'])->whereNumber('supplier')->name('suppliers.deactivate');
-    Route::patch('suppliers/{supplier}/status', [SupplierController::class, 'changeStatus'])->whereNumber('supplier')->name('suppliers.status');
+    Route::post('suppliers/with-relations', [SupplierController::class, 'storeWithRelations'])
+        ->name('suppliers.with-relations.store');
+    Route::patch('suppliers/{supplier}/activate', [SupplierController::class, 'activate'])
+        ->whereNumber('supplier')
+        ->name('suppliers.activate');
+    Route::patch('suppliers/{supplier}/deactivate', [SupplierController::class, 'deactivate'])
+        ->whereNumber('supplier')
+        ->name('suppliers.deactivate');
+    Route::patch('suppliers/{supplier}/status', [SupplierController::class, 'changeStatus'])
+        ->whereNumber('supplier')
+        ->name('suppliers.status');
 
-    Route::get('suppliers/{supplier}/contacts', [SupplierRelationController::class, 'contacts'])->whereNumber('supplier');
-    Route::post('suppliers/{supplier}/contacts', [SupplierRelationController::class, 'storeContact'])->whereNumber('supplier');
-    Route::put('suppliers/{supplier}/contacts/{contact}', [SupplierRelationController::class, 'updateContact'])->whereNumber(['supplier', 'contact']);
-    Route::delete('suppliers/{supplier}/contacts/{contact}', [SupplierRelationController::class, 'deleteContact'])->whereNumber(['supplier', 'contact']);
+    Route::prefix('suppliers/{supplier}')->name('suppliers.')->group(function (): void {
+        Route::get('contacts', [SupplierRelationController::class, 'contacts'])
+            ->whereNumber('supplier')
+            ->name('contacts.index');
+        Route::post('contacts', [SupplierRelationController::class, 'storeContact'])
+            ->whereNumber('supplier')
+            ->name('contacts.store');
+        Route::put('contacts/{contact}', [SupplierRelationController::class, 'updateContact'])
+            ->whereNumber(['supplier', 'contact'])
+            ->name('contacts.update');
+        Route::delete('contacts/{contact}', [SupplierRelationController::class, 'deleteContact'])
+            ->whereNumber(['supplier', 'contact'])
+            ->name('contacts.destroy');
 
-    Route::get('suppliers/{supplier}/addresses', [SupplierRelationController::class, 'addresses'])->whereNumber('supplier');
-    Route::post('suppliers/{supplier}/addresses', [SupplierRelationController::class, 'storeAddress'])->whereNumber('supplier');
-    Route::put('suppliers/{supplier}/addresses/{address}', [SupplierRelationController::class, 'updateAddress'])->whereNumber(['supplier', 'address']);
-    Route::delete('suppliers/{supplier}/addresses/{address}', [SupplierRelationController::class, 'deleteAddress'])->whereNumber(['supplier', 'address']);
+        Route::get('addresses', [SupplierRelationController::class, 'addresses'])
+            ->whereNumber('supplier')
+            ->name('addresses.index');
+        Route::post('addresses', [SupplierRelationController::class, 'storeAddress'])
+            ->whereNumber('supplier')
+            ->name('addresses.store');
+        Route::put('addresses/{address}', [SupplierRelationController::class, 'updateAddress'])
+            ->whereNumber(['supplier', 'address'])
+            ->name('addresses.update');
+        Route::delete('addresses/{address}', [SupplierRelationController::class, 'deleteAddress'])
+            ->whereNumber(['supplier', 'address'])
+            ->name('addresses.destroy');
 
-    Route::get('suppliers/{supplier}/bank-accounts', [SupplierRelationController::class, 'bankAccounts'])->whereNumber('supplier');
-    Route::post('suppliers/{supplier}/bank-accounts', [SupplierRelationController::class, 'storeBankAccount'])->whereNumber('supplier');
-    Route::put('suppliers/{supplier}/bank-accounts/{bankAccount}', [SupplierRelationController::class, 'updateBankAccount'])->whereNumber(['supplier', 'bankAccount']);
-    Route::delete('suppliers/{supplier}/bank-accounts/{bankAccount}', [SupplierRelationController::class, 'deleteBankAccount'])->whereNumber(['supplier', 'bankAccount']);
+        Route::get('bank-accounts', [SupplierRelationController::class, 'bankAccounts'])
+            ->whereNumber('supplier')
+            ->name('bank-accounts.index');
+        Route::post('bank-accounts', [SupplierRelationController::class, 'storeBankAccount'])
+            ->whereNumber('supplier')
+            ->name('bank-accounts.store');
+        Route::put('bank-accounts/{bankAccount}', [SupplierRelationController::class, 'updateBankAccount'])
+            ->whereNumber(['supplier', 'bankAccount'])
+            ->name('bank-accounts.update');
+        Route::delete('bank-accounts/{bankAccount}', [SupplierRelationController::class, 'deleteBankAccount'])
+            ->whereNumber(['supplier', 'bankAccount'])
+            ->name('bank-accounts.destroy');
 
-    Route::get('suppliers/{supplier}/categories', [SupplierRelationController::class, 'categories'])->whereNumber('supplier');
-    Route::post('suppliers/{supplier}/categories', [SupplierRelationController::class, 'assignCategory'])->whereNumber('supplier');
-    Route::delete('suppliers/{supplier}/categories/{category}', [SupplierRelationController::class, 'deleteCategory'])->whereNumber(['supplier', 'category']);
+        Route::get('categories', [SupplierRelationController::class, 'categories'])
+            ->whereNumber('supplier')
+            ->name('categories.index');
+        Route::post('categories', [SupplierRelationController::class, 'assignCategory'])
+            ->whereNumber('supplier')
+            ->name('categories.store');
+        Route::delete('categories/{category}', [SupplierRelationController::class, 'deleteCategory'])
+            ->whereNumber(['supplier', 'category'])
+            ->name('categories.destroy');
 
-    Route::get('suppliers/{supplier}/documents', [SupplierRelationController::class, 'documents'])->whereNumber('supplier');
-    Route::post('suppliers/{supplier}/documents', [SupplierRelationController::class, 'storeDocument'])->whereNumber('supplier');
-    Route::put('suppliers/{supplier}/documents/{document}', [SupplierRelationController::class, 'updateDocument'])->whereNumber(['supplier', 'document']);
-    Route::delete('suppliers/{supplier}/documents/{document}', [SupplierRelationController::class, 'deleteDocument'])->whereNumber(['supplier', 'document']);
+        Route::get('documents', [SupplierRelationController::class, 'documents'])
+            ->whereNumber('supplier')
+            ->name('documents.index');
+        Route::post('documents', [SupplierRelationController::class, 'storeDocument'])
+            ->whereNumber('supplier')
+            ->name('documents.store');
+        Route::put('documents/{document}', [SupplierRelationController::class, 'updateDocument'])
+            ->whereNumber(['supplier', 'document'])
+            ->name('documents.update');
+        Route::delete('documents/{document}', [SupplierRelationController::class, 'deleteDocument'])
+            ->whereNumber(['supplier', 'document'])
+            ->name('documents.destroy');
 
-    Route::get('suppliers/{supplier}/item-mappings', [SupplierRelationController::class, 'itemMappings'])->whereNumber('supplier');
-    Route::post('suppliers/{supplier}/item-mappings', [SupplierRelationController::class, 'storeItemMapping'])->whereNumber('supplier');
-    Route::put('suppliers/{supplier}/item-mappings/{mapping}', [SupplierRelationController::class, 'updateItemMapping'])->whereNumber(['supplier', 'mapping']);
-    Route::delete('suppliers/{supplier}/item-mappings/{mapping}', [SupplierRelationController::class, 'deleteItemMapping'])->whereNumber(['supplier', 'mapping']);
+        Route::get('item-mappings', [SupplierRelationController::class, 'itemMappings'])
+            ->whereNumber('supplier')
+            ->name('item-mappings.index');
+        Route::post('item-mappings', [SupplierRelationController::class, 'storeItemMapping'])
+            ->whereNumber('supplier')
+            ->name('item-mappings.store');
+        Route::put('item-mappings/{mapping}', [SupplierRelationController::class, 'updateItemMapping'])
+            ->whereNumber(['supplier', 'mapping'])
+            ->name('item-mappings.update');
+        Route::delete('item-mappings/{mapping}', [SupplierRelationController::class, 'deleteItemMapping'])
+            ->whereNumber(['supplier', 'mapping'])
+            ->name('item-mappings.destroy');
 
-    Route::get('suppliers/{supplier}/credit-profile', [SupplierRelationController::class, 'creditProfile'])->whereNumber('supplier');
-    Route::put('suppliers/{supplier}/credit-profile', [SupplierRelationController::class, 'updateCreditProfile'])->whereNumber('supplier');
-    Route::get('suppliers/{supplier}/status-history', [SupplierRelationController::class, 'statusHistory'])->whereNumber('supplier');
+        Route::get('credit-profile', [SupplierRelationController::class, 'creditProfile'])
+            ->whereNumber('supplier')
+            ->name('credit-profile.show');
+        Route::put('credit-profile', [SupplierRelationController::class, 'updateCreditProfile'])
+            ->whereNumber('supplier')
+            ->name('credit-profile.update');
+        Route::get('status-history', [SupplierRelationController::class, 'statusHistory'])
+            ->whereNumber('supplier')
+            ->name('status-history.index');
+    });
 
     Route::apiResource('suppliers', SupplierController::class);
 
-    Route::get('supplier-categories/lookup', [SupplierCategoryController::class, 'lookup'])->name('supplier-categories.lookup');
+    Route::get('supplier-categories/lookup', [SupplierCategoryController::class, 'lookup'])
+        ->name('supplier-categories.lookup');
     Route::apiResource('supplier-categories', SupplierCategoryController::class);
 });

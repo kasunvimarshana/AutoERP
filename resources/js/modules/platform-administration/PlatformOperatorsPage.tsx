@@ -270,15 +270,15 @@ export default function PlatformOperatorsPage() {
                         A secure email invitation is sent to the recipient. Platform managers never choose or know the operator&apos;s password. The account remains inactive until the invitation is accepted.
                     </p>
                     <div className="grid gap-4 sm:grid-cols-2">
-                        <Input label="First name" required value={createForm.first_name} onChange={(event) => setCreateForm({ ...createForm, first_name: event.target.value })} />
-                        <Input label="Last name" value={createForm.last_name ?? ''} onChange={(event) => setCreateForm({ ...createForm, last_name: event.target.value })} />
+                        <Input label="First name" required value={createForm.first_name} onChange={(event) => setCreateForm((current) => ({ ...current, first_name: event.target.value }))} />
+                        <Input label="Last name" value={createForm.last_name ?? ''} onChange={(event) => setCreateForm((current) => ({ ...current, last_name: event.target.value }))} />
                     </div>
                     <Input
                         label="Platform email"
                         type="email"
                         required
                         value={createForm.email}
-                        onChange={(event) => setCreateForm({ ...createForm, email: event.target.value })}
+                        onChange={(event) => setCreateForm((current) => ({ ...current, email: event.target.value }))}
                         hint="The invitation and all control-plane security notifications are sent to this address."
                     />
                     <PermissionSelector permissions={availablePermissions} selected={createForm.permissions} onToggle={(permission) => setCreateForm((current) => ({ ...current, permissions: current.permissions.includes(permission) ? current.permissions.filter((item) => item !== permission) : [...current.permissions, permission].sort() }))} />

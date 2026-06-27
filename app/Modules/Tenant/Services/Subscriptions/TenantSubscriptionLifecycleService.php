@@ -26,6 +26,7 @@ use Modules\Tenant\Repositories\TenantPlanRevisionRepositoryInterface;
 use Modules\Tenant\Repositories\TenantRepositoryInterface;
 use Modules\Tenant\Repositories\TenantSubscriptionRepositoryInterface;
 use Modules\Tenant\Services\Plans\TenantPlanSchema;
+use Modules\Tenant\Services\TenantActorSnapshotFactory;
 use Psr\Log\LoggerInterface;
 use RuntimeException;
 use Throwable;

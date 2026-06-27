@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\User\Repositories;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 use Modules\Core\DTOs\DataRecord;
 use Modules\Core\Repositories\EloquentRepository;
 use Modules\User\Constants\UserOrganizationUnitStatus;
@@ -104,7 +105,7 @@ final class EloquentUserOrganizationUnitRepository extends EloquentRepository im
         $query->update([
             'is_default' => false,
             'default_marker' => null,
-            'row_version' => \DB::raw('row_version + 1'),
+            'row_version' => DB::raw('row_version + 1'),
             'updated_at' => now(),
         ]);
     }
@@ -122,7 +123,7 @@ final class EloquentUserOrganizationUnitRepository extends EloquentRepository im
             ->update([
                 'is_default' => true,
                 'default_marker' => UserOrganizationUnitStatus::DEFAULT_MARKER,
-                'row_version' => \DB::raw('row_version + 1'),
+                'row_version' => DB::raw('row_version + 1'),
                 'updated_at' => now(),
             ]) === 1;
     }

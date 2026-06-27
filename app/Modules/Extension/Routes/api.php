@@ -15,7 +15,7 @@ $currentOrganizationUnitMiddleware = (string) config(
     'current.organization-unit',
 ).':required';
 
-Route::prefix('api/extension')
+Route::prefix('api/v1/extension')
     ->middleware([
         'api',
         'auth:'.$protectedGuard,
@@ -23,7 +23,7 @@ Route::prefix('api/extension')
         $currentTenantMiddleware,
         $currentOrganizationUnitMiddleware,
     ])
-    ->name('extension.')
+    ->name('api.v1.extension.')
     ->group(function (): void {
         Route::apiResource('attachments', AttachmentController::class);
         Route::apiResource('entity-attributes', EntityAttributeController::class);
