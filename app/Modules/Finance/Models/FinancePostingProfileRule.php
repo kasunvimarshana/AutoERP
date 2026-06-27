@@ -11,24 +11,18 @@ final class FinancePostingProfileRule extends TenantOwnedModel
 {
     protected $table = 'finance_posting_profile_rules';
 
-    protected $guarded = ['id'];
+    protected $guarded = ['id', 'tenant_id', 'row_version'];
 
     protected function casts(): array
     {
         return array_merge(parent::casts(), [
+            'row_version' => 'integer',
             'tenant_id' => 'integer',
             'posting_profile_id' => 'integer',
-            'account_id' => 'integer',
+            'account_role_id' => 'integer',
         ]);
     }
 
-    public function postingProfile(): BelongsTo
-    {
-        return $this->belongsTo(FinancePostingProfile::class, 'posting_profile_id');
-    }
-
-    public function account(): BelongsTo
-    {
-        return $this->belongsTo(FinanceAccount::class, 'account_id');
-    }
+    public function postingProfile(): BelongsTo { return $this->belongsTo(FinancePostingProfile::class, 'posting_profile_id'); }
+    public function accountRole(): BelongsTo { return $this->belongsTo(FinanceAccountRole::class, 'account_role_id'); }
 }

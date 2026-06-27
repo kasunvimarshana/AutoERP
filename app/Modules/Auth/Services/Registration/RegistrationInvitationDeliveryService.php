@@ -185,6 +185,7 @@ final class RegistrationInvitationDeliveryService
                 'claim_token' => $claimToken,
                 'row_version' => $nextVersion,
                 'invitation_id' => (int) $invitation->getKey(),
+                'invitation_row_version' => (int) $invitation->getAttribute('row_version'),
                 'email' => (string) $invitation->getAttribute('email'),
                 'tenant_name' => $tenant['name'],
                 'token' => $token,
@@ -203,8 +204,12 @@ final class RegistrationInvitationDeliveryService
             ->where('status', InvitationDeliveryStatus::SENDING)
             ->where('claim_token', (string) $claim['claim_token'])
             ->where('row_version', (int) $claim['row_version'])
-            ->whereHas('invitation', function ($query): void {
-                $query->where('status', RegistrationInvitationStatus::PENDING)
+            ->where('lease_expires_at', '>', $this->clock->now())
+            ->whereHas('invitation', function ($query) use ($claim): void {
+                $query->whereKey((int) $claim['invitation_id'])
+                    ->where('row_version', (int) $claim['invitation_row_version'])
+                    ->where('email', (string) $claim['email'])
+                    ->where('status', RegistrationInvitationStatus::PENDING)
                     ->where('expires_at', '>', $this->clock->now())
                     ->whereNotNull('delivery_token');
             })

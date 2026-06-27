@@ -12,6 +12,7 @@ use Modules\Vehicle\Enums\VehicleAttributeDataType;
 use Modules\Vehicle\Enums\VehicleDocumentStatus;
 use Modules\Vehicle\Enums\VehicleDocumentType;
 use Modules\Vehicle\Enums\VehicleFuelType;
+use Modules\Vehicle\Enums\VehicleOwnerType;
 use Modules\Vehicle\Enums\VehicleOwnershipType;
 use Modules\Vehicle\Enums\VehicleStatus;
 use Modules\Vehicle\Enums\VehicleTransmissionType;
@@ -67,10 +68,10 @@ trait MapsVehicleData
     private function mapOwnership(array $row): VehicleOwnershipData
     {
         return new VehicleOwnershipData(
+            ownerType: VehicleOwnerType::from((string) $row['owner_type']),
+            ownerId: isset($row['owner_id']) ? (int) $row['owner_id'] : null,
             ownershipType: VehicleOwnershipType::from((string) $row['ownership_type']),
             startedAt: (string) $row['started_at'],
-            ownerType: (string) $row['owner_type'],
-            ownerId: isset($row['owner_id']) ? (int) $row['owner_id'] : null,
             endedAt: $row['ended_at'] ?? null,
             isCurrent: (bool) ($row['is_current'] ?? true),
             notes: $row['notes'] ?? null,

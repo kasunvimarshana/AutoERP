@@ -6,13 +6,14 @@ namespace Modules\Supplier\Providers;
 
 use Illuminate\Support\ServiceProvider;
 use Modules\Supplier\Services\SupplierAuthorizationService;
+use Modules\Supplier\Services\SupplierVehicleOwnerResolver;
 use Modules\Core\Contracts\PermissionDefinitionRegistryInterface;
 
 final class SupplierServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        //
+        $this->app->tag([SupplierVehicleOwnerResolver::class], 'vehicle.owner_resolvers');
     }
 
     public function boot(): void

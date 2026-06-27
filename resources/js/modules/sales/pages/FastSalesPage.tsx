@@ -72,7 +72,6 @@ export default function FastSalesPage() {
     const [lines, setLines] = useState<FastSalesLineRow[]>([blankFastSalesLine()]);
     const [paymentAmount, setPaymentAmount] = useState('');
     const [paymentMethodId, setPaymentMethodId] = useState('');
-    const [paymentAccountId, setPaymentAccountId] = useState('');
     const [paymentReference, setPaymentReference] = useState('');
     const [instrumentNumber, setInstrumentNumber] = useState('');
     const [instrumentDate, setInstrumentDate] = useState('');
@@ -97,7 +96,6 @@ export default function FastSalesPage() {
         if (!workflowRecordsReceipt(nextMode)) {
             setPaymentAmount('');
             setPaymentMethodId('');
-            setPaymentAccountId('');
             setPaymentReference('');
             setInstrumentNumber('');
             setInstrumentDate('');
@@ -121,8 +119,8 @@ export default function FastSalesPage() {
         && customerReference.trim()
         && lines.some((line) => line.item?.id)
         && (!needsWarehouse || warehouse?.id)
-        && (!recordReceipt || (paymentAmount.trim() && paymentAccountId)),
-    ), [customer, customerReference, lines, needsWarehouse, paymentAccountId, paymentAmount, recordReceipt, warehouse]);
+        && (!recordReceipt || (paymentAmount.trim() && paymentMethodId)),
+    ), [customer, customerReference, lines, needsWarehouse, paymentAmount, paymentMethodId, recordReceipt, warehouse]);
 
     const payload = (): FastSalesPayload => ({
         idempotency_key: idempotencyKey,
@@ -153,7 +151,6 @@ export default function FastSalesPage() {
         payment: recordReceipt ? {
             amount: paymentAmount || undefined,
             payment_method_id: paymentMethodId ? Number(paymentMethodId) : undefined,
-            destination_account_id: paymentAccountId ? Number(paymentAccountId) : undefined,
             reference: paymentReference || undefined,
             instrument_number: instrumentNumber || undefined,
             instrument_date: instrumentDate || undefined,
@@ -255,13 +252,6 @@ export default function FastSalesPage() {
                                     error={errorFor('payment.payment_method_id')}
                                 />
                                 <DecimalInput label="Received amount" value={paymentAmount} onChange={(event) => setPaymentAmount(event.target.value)} error={errorFor('payment.amount')} />
-                                <Select
-                                    label="Deposit account"
-                                    value={paymentAccountId}
-                                    onChange={(event) => setPaymentAccountId(event.target.value)}
-                                    options={(context.data?.payment_accounts ?? []).map((account) => ({ value: account.id, label: `${account.code ?? ''} ${account.name ?? ''}`.trim() }))}
-                                    error={errorFor('payment.destination_account_id')}
-                                />
                                 <Input label="Reference" value={paymentReference} onChange={(event) => setPaymentReference(event.target.value)} error={errorFor('payment.reference')} />
                                 <Input label="Cheque / card no." value={instrumentNumber} onChange={(event) => setInstrumentNumber(event.target.value)} error={errorFor('payment.instrument_number')} />
                                 <Input label="Instrument date" type="date" value={instrumentDate} onChange={(event) => setInstrumentDate(event.target.value)} error={errorFor('payment.instrument_date')} />

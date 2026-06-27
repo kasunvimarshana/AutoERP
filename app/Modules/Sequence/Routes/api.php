@@ -19,13 +19,19 @@ Route::prefix('api/v1/sequence')
         'auth:'.$protectedGuard,
         $currentUserMiddleware,
         $currentTenantMiddleware,
+    'tenant.feature:sequence',
+    'tenant.permission:sequences.view',
         $currentOrganizationUnitMiddleware,
     ])
     ->name('api.v1.sequence.')
     ->group(function (): void {
         Route::post('sequences/preview-number', [SequenceController::class, 'previewNumber'])
+            ->middleware('tenant.permission:sequences.view')
             ->name('sequences.preview-number');
         Route::post('sequences/generate-number', [SequenceController::class, 'generateNumber'])
+            ->middleware('tenant.permission:sequences.generate')
             ->name('sequences.generate-number');
-        Route::apiResource('sequences', SequenceController::class);
+        Route::apiResource('sequences', SequenceController::class)->only(['index', 'show']);
+        Route::apiResource('sequences', SequenceController::class)->except(['index', 'show'])
+            ->middleware('tenant.permission:sequences.manage');
     });

@@ -19,10 +19,4 @@ return [
         'special_treatment',
     ],
 
-    'posting_directions' => [
-        'input',
-        'output',
-        'withholding',
-        'tax',
-    ],
 ];

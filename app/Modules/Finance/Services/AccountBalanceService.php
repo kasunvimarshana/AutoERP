@@ -111,12 +111,8 @@ final class AccountBalanceService
             $normalBalance = $account->normal_balance instanceof NormalBalance
                 ? $account->normal_balance
                 : NormalBalance::from((string) $account->normal_balance);
-            $openingDebit = $normalBalance === NormalBalance::Debit
-                ? $this->math->normalize((string) $account->opening_balance)
-                : '0.000000';
-            $openingCredit = $normalBalance === NormalBalance::Credit
-                ? $this->math->normalize((string) $account->opening_balance)
-                : '0.000000';
+            $openingDebit = '0.000000';
+            $openingCredit = '0.000000';
             $periodDebit = '0.000000';
             $periodCredit = '0.000000';
 
@@ -163,7 +159,12 @@ final class AccountBalanceService
             ? $account->normal_balance
             : NormalBalance::from((string) $account->normal_balance);
 
-        $current = $this->math->normalize((string) $account->current_balance);
+        $latestBalance = FinanceLedgerEntry::query()
+            ->where('tenant_id', $account->tenant_id)
+            ->where('account_id', $account->getKey())
+            ->orderByDesc('id')
+            ->value('balance_after');
+        $current = $this->math->normalize((string) ($latestBalance ?? '0.000000'));
 
         return $normalBalance === NormalBalance::Debit
             ? $this->math->sub($this->math->add($current, $debit), $credit)

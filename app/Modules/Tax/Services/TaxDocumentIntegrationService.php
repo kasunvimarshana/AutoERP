@@ -351,8 +351,8 @@ final class TaxDocumentIntegrationService
     public function withholdingPostingContextForInvoice(
         Invoice $invoice,
         string $postingDate,
-        string $counterpartyAccountCode,
-        string $counterpartyAccountName,
+        string $counterpartyProfileKey,
+        string $postingProfileCode,
     ): TaxPostingContext {
         $tenantId = (int) $invoice->tenant_id;
         $sourceType = 'invoice';
@@ -388,8 +388,8 @@ final class TaxDocumentIntegrationService
             ),
             postingDate: $postingDate,
             taxLines: $taxLines,
-            counterpartyAccountCode: $counterpartyAccountCode,
-            counterpartyAccountName: $counterpartyAccountName,
+            counterpartyProfileKey: $counterpartyProfileKey,
+            postingProfileCode: $postingProfileCode,
             description: 'Withholding tax '.$invoice->invoice_number,
         );
     }
@@ -397,8 +397,8 @@ final class TaxDocumentIntegrationService
     public function withholdingPostingContextForPayment(
         Payment $payment,
         string $postingDate,
-        string $counterpartyAccountCode,
-        string $counterpartyAccountName,
+        string $counterpartyProfileKey,
+        string $postingProfileCode,
     ): TaxPostingContext {
         $payment->loadMissing('allocations');
         $tenantId = (int) $payment->tenant_id;
@@ -449,8 +449,8 @@ final class TaxDocumentIntegrationService
             ),
             postingDate: $postingDate,
             taxLines: $taxLines,
-            counterpartyAccountCode: $counterpartyAccountCode,
-            counterpartyAccountName: $counterpartyAccountName,
+            counterpartyProfileKey: $counterpartyProfileKey,
+            postingProfileCode: $postingProfileCode,
             description: 'Withholding tax '.$payment->payment_number,
         );
     }

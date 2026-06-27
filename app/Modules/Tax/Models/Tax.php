@@ -49,8 +49,4 @@ final class Tax extends TenantOwnedModel
         return $this->hasMany(TaxGroupLine::class, 'tax_id');
     }
 
-    public function postingProfiles(): HasMany
-    {
-        return $this->hasMany(TaxPostingProfile::class, 'tax_id');
-    }
 }

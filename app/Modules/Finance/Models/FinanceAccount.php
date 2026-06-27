@@ -6,7 +6,7 @@ namespace Modules\Finance\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\SoftDeletes;
+use LogicException;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\Finance\Enums\NormalBalance;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
@@ -14,15 +14,14 @@ use Modules\Tenant\Models\TenantModel;
 
 final class FinanceAccount extends TenantOwnedModel
 {
-    use SoftDeletes;
-
     protected $table = 'finance_accounts';
 
-    protected $guarded = ['id'];
+    protected $guarded = ['id', 'tenant_id', 'row_version'];
 
     protected function casts(): array
     {
         return array_merge(parent::casts(), [
+            'row_version' => 'integer',
             'tenant_id' => 'integer',
             'organization_unit_id' => 'integer',
             'account_type_id' => 'integer',
@@ -36,54 +35,25 @@ final class FinanceAccount extends TenantOwnedModel
             'is_tax_account' => 'boolean',
             'is_system' => 'boolean',
             'is_active' => 'boolean',
-            'opening_balance' => 'decimal:6',
-            'current_balance' => 'decimal:6',
             'metadata' => 'array',
         ]);
     }
 
-    public function tenant(): BelongsTo
+    protected static function booted(): void
     {
-        return $this->belongsTo(TenantModel::class, 'tenant_id');
+        static::deleting(static function (): never {
+            throw new LogicException('Finance accounts cannot be deleted. Deactivate the account to preserve ledger history.');
+        });
     }
 
-    public function organizationUnit(): BelongsTo
-    {
-        return $this->belongsTo(OrganizationUnitModel::class, 'organization_unit_id');
-    }
-
-    public function accountType(): BelongsTo
-    {
-        return $this->belongsTo(FinanceAccountType::class, 'account_type_id');
-    }
-
-    public function accountCategory(): BelongsTo
-    {
-        return $this->belongsTo(FinanceAccountCategory::class, 'account_category_id');
-    }
-
-    public function parent(): BelongsTo
-    {
-        return $this->belongsTo(self::class, 'parent_id');
-    }
-
-    public function children(): HasMany
-    {
-        return $this->hasMany(self::class, 'parent_id');
-    }
-
-    public function journalLines(): HasMany
-    {
-        return $this->hasMany(FinanceJournalLine::class, 'account_id');
-    }
-
-    public function ledgerEntries(): HasMany
-    {
-        return $this->hasMany(FinanceLedgerEntry::class, 'account_id');
-    }
-
-    public function balances(): HasMany
-    {
-        return $this->hasMany(FinanceAccountBalance::class, 'account_id');
-    }
+    public function tenant(): BelongsTo { return $this->belongsTo(TenantModel::class, 'tenant_id'); }
+    public function organizationUnit(): BelongsTo { return $this->belongsTo(OrganizationUnitModel::class, 'organization_unit_id'); }
+    public function accountType(): BelongsTo { return $this->belongsTo(FinanceAccountType::class, 'account_type_id'); }
+    public function accountCategory(): BelongsTo { return $this->belongsTo(FinanceAccountCategory::class, 'account_category_id'); }
+    public function parent(): BelongsTo { return $this->belongsTo(self::class, 'parent_id'); }
+    public function children(): HasMany { return $this->hasMany(self::class, 'parent_id'); }
+    public function journalLines(): HasMany { return $this->hasMany(FinanceJournalLine::class, 'account_id'); }
+    public function ledgerEntries(): HasMany { return $this->hasMany(FinanceLedgerEntry::class, 'account_id'); }
+    public function balances(): HasMany { return $this->hasMany(FinanceAccountBalance::class, 'account_id'); }
+    public function assignments(): HasMany { return $this->hasMany(FinanceAccountAssignment::class, 'account_id'); }
 }

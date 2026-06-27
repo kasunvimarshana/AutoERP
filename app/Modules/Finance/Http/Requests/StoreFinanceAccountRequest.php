@@ -14,21 +14,16 @@ final class StoreFinanceAccountRequest extends TenantScopedRequest
     public function rules(): array
     {
         $accountId = $this->route('account');
+        $updating = is_numeric($accountId);
 
         return [
             'tenant_id' => ['required', 'integer', 'min:1'],
             'organization_unit_id' => ['nullable', 'integer', 'min:1'],
-            'account_type_id' => [
-                'required',
-                'integer',
-                $this->tenantExists('finance_account_types', 'id'),
-            ],
+            'expected_version' => [$updating ? 'required' : 'nullable', 'integer', 'min:1'],
+            'account_type_id' => ['required', 'integer', $this->tenantExists('finance_account_types', 'id')],
             'code' => [
-                'required',
-                'string',
-                'max:100',
-                $this->tenantUnique('finance_accounts', 'code')
-                    ->ignore(is_numeric($accountId) ? (int) $accountId : null),
+                'required', 'string', 'max:100',
+                $this->tenantUnique('finance_accounts', 'code')->ignore($updating ? (int) $accountId : null),
             ],
             'name' => ['required', 'string', 'max:255'],
             'normal_balance' => ['required', Rule::enum(NormalBalance::class)],
@@ -41,7 +36,6 @@ final class StoreFinanceAccountRequest extends TenantScopedRequest
             'is_bank_account' => ['nullable', 'boolean'],
             'is_tax_account' => ['nullable', 'boolean'],
             'is_active' => ['nullable', 'boolean'],
-            'opening_balance' => ['nullable', 'decimal:0,6', 'min:0'],
             'metadata' => ['nullable', 'array'],
         ];
     }
@@ -64,8 +58,8 @@ final class StoreFinanceAccountRequest extends TenantScopedRequest
             isBankAccount: $this->boolean('is_bank_account'),
             isTaxAccount: $this->boolean('is_tax_account'),
             isActive: $this->boolean('is_active', true),
-            openingBalance: (string) $this->input('opening_balance', '0.000000'),
             metadata: $this->input('metadata'),
+            expectedVersion: $this->filled('expected_version') ? (int) $this->input('expected_version') : null,
         );
     }
 }

@@ -10,7 +10,6 @@ use Illuminate\Support\Facades\Schema;
 use Database\Seeders\Concerns\ResolvesSeedContext;
 use Modules\Warehouse\Models\WarehouseLocationModel;
 use Modules\Warehouse\Models\WarehouseModel;
-use Modules\Warehouse\Services\WarehouseAuthorizationService;
 
 final class WarehouseSeeder extends Seeder
 {
@@ -21,8 +20,6 @@ final class WarehouseSeeder extends Seeder
         if (! Schema::hasTable('warehouses')) {
             return;
         }
-
-        $this->seedPermissions();
 
         $tenant = $this->defaultTenant();
         $organizationUnit = $this->defaultOrganizationUnit($tenant);
@@ -96,26 +93,4 @@ final class WarehouseSeeder extends Seeder
         }, 3);
     }
 
-    private function seedPermissions(): void
-    {
-        if (! Schema::hasTable('permissions')) {
-            return;
-        }
-
-        $guard = (string) config('auth.defaults.guard', 'web');
-        foreach (DB::table('tenants')->pluck('id') as $tenantId) {
-            foreach (WarehouseAuthorizationService::descriptions() as $name => $description) {
-                DB::table('permissions')->updateOrInsert(
-                    ['tenant_id' => $tenantId, 'name' => $name, 'guard_name' => $guard],
-                    [
-                        'module' => 'Warehouse',
-                        'description' => $description,
-                        'row_version' => 1,
-                        'updated_at' => now(),
-                        'created_at' => now(),
-                    ],
-                );
-            }
-        }
-    }
 }

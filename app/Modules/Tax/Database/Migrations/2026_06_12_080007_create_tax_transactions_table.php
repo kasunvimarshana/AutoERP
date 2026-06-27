@@ -33,7 +33,6 @@ return new class extends Migration
             $table->boolean('recoverable')->default(false);
             $table->boolean('payable')->default(false);
             $table->boolean('receivable')->default(false);
-            $table->foreignId('account_id')->nullable();
             $table->json('metadata')->nullable();
             $table->timestamps();
 
@@ -54,10 +53,6 @@ return new class extends Migration
             $table->foreign(['tax_document_snapshot_id', 'tenant_id'], 'tax_transactions_tax_document_snapshot_id_tenant_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('tax_document_snapshots')
-                ->restrictOnDelete();
-            $table->foreign(['account_id', 'tenant_id'], 'tax_transactions_account_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('finance_accounts')
                 ->restrictOnDelete();
         });
     }

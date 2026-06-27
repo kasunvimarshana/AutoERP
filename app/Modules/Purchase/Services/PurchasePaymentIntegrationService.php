@@ -7,7 +7,6 @@ namespace Modules\Purchase\Services;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
-use Modules\Finance\Models\FinanceAccount;
 use Modules\Invoice\Contracts\InvoiceBalanceProviderInterface;
 use Modules\Invoice\Enums\InvoiceDirection;
 use Modules\Invoice\Enums\InvoiceType;
@@ -34,13 +33,12 @@ final class PurchasePaymentIntegrationService
     ) {}
 
     /**
-     * @return array{payment_methods: list<array<string, mixed>>, payment_accounts: list<array<string, mixed>>}
+     * @return array{payment_methods: list<array<string, mixed>>}
      */
     public function context(int $tenantId, ?int $organizationUnitId, string $search = '', int $limit = 100): array
     {
         return [
             'payment_methods' => $this->paymentMethodOptions($tenantId, $organizationUnitId, $search, $limit),
-            'payment_accounts' => $this->paymentAccountOptions($tenantId, $organizationUnitId, $search, $limit),
         ];
     }
 
@@ -65,7 +63,6 @@ final class PurchasePaymentIntegrationService
         PaymentStatus $status = PaymentStatus::Draft,
         ?int $createdBy = null,
         ?string $notes = null,
-        ?int $bankAccountId = null,
         ?array $metadata = null,
     ): CreatePaymentData {
         return new CreatePaymentData(
@@ -84,7 +81,6 @@ final class PurchasePaymentIntegrationService
             createdBy: $createdBy,
             lines: $lines === [] ? [new PaymentLineData($amount, referenceNumber: $referenceNumber)] : $lines,
             allocations: $allocations,
-            bankAccountId: $bankAccountId,
             metadata: $metadata,
         );
     }
@@ -385,29 +381,11 @@ final class PurchasePaymentIntegrationService
             'amount' => $this->math->normalize($line->amount),
             'payment_method_id' => $line->paymentMethodId,
             'reference_number' => $line->referenceNumber,
-            'source_account_id' => $line->metadata['source_account_id'] ?? null,
-            'internal_bank_account_id' => $line->internalBankAccountId,
             'instrument_direction' => $line->instrumentDirection,
             'instrument_number' => $line->instrumentNumber,
             'instrument_date' => $line->instrumentDate,
             'notes' => $line->notes,
         ], $lines);
-    }
-
-    public function assertPaymentSourceAccount(int $tenantId, ?int $organizationUnitId, int $accountId): FinanceAccount
-    {
-        $account = FinanceAccount::query()->find($accountId);
-        if (! $account instanceof FinanceAccount
-            || (int) $account->tenant_id !== $tenantId
-            || $account->organization_unit_id !== $organizationUnitId
-            || ! (bool) $account->is_active
-            || ! (bool) $account->is_posting_account
-            || (! (bool) $account->is_cash_account && ! (bool) $account->is_bank_account)
-        ) {
-            throw new InvalidArgumentException('The selected payment source account is not available.');
-        }
-
-        return $account;
     }
 
     /**
@@ -440,35 +418,6 @@ final class PurchasePaymentIntegrationService
                 'method_type' => $this->enumValue($method->method_type),
                 'requires_reference' => (bool) $method->requires_reference,
                 'requires_bank_account' => (bool) $method->requires_bank_account,
-            ])
-            ->all();
-    }
-
-    /**
-     * @return list<array<string, mixed>>
-     */
-    private function paymentAccountOptions(int $tenantId, ?int $organizationUnitId, string $search, int $limit): array
-    {
-        return FinanceAccount::query()
-            ->where('tenant_id', $tenantId)
-            ->when($organizationUnitId === null, fn ($query) => $query->whereNull('organization_unit_id'), fn ($query) => $query->where('organization_unit_id', $organizationUnitId))
-            ->where('is_active', true)
-            ->where('is_posting_account', true)
-            ->where(function ($query): void {
-                $query->where('is_cash_account', true)->orWhere('is_bank_account', true);
-            })
-            ->when($search !== '', fn ($query) => $query->where(function ($scope) use ($search): void {
-                $scope->where('code', 'like', '%'.$search.'%')->orWhere('name', 'like', '%'.$search.'%');
-            }))
-            ->orderBy('code')
-            ->limit(max(1, min(100, $limit)))
-            ->get(['id', 'code', 'name', 'is_cash_account', 'is_bank_account'])
-            ->map(fn (FinanceAccount $account): array => [
-                'id' => (int) $account->getKey(),
-                'code' => $account->code,
-                'name' => $account->name,
-                'is_cash_account' => (bool) $account->is_cash_account,
-                'is_bank_account' => (bool) $account->is_bank_account,
             ])
             ->all();
     }

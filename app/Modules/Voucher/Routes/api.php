@@ -10,6 +10,8 @@ $middleware = [
     'auth:'.(string) config('module-auth.protected_route_guard', 'auth-api'),
     (string) config('core.current_user.middleware_alias', 'current.user'),
     (string) config('core.current_tenant.middleware_alias', 'current.tenant'),
+    'tenant.feature:voucher',
+    'tenant.permission:vouchers.view',
     (string) config('core.current_organization_unit.middleware_alias', 'current.organization-unit').':required',
 ];
 
@@ -21,5 +23,6 @@ Route::prefix('api/v1/vouchers')->middleware($middleware)->name('api.v1.vouchers
         ->name('show');
     Route::get('{voucherType}/{source}/print', [VoucherController::class, 'print'])
         ->whereNumber('source')
+        ->middleware('tenant.permission:vouchers.print')
         ->name('print');
 });

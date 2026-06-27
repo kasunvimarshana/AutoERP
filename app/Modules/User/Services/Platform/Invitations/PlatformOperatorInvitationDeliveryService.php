@@ -22,6 +22,12 @@ use Throwable;
 
 final class PlatformOperatorInvitationDeliveryService
 {
+    private const DELIVERY_FAILURE_CODE = 'PLATFORM_OPERATOR_INVITATION_DELIVERY_FAILED';
+    private const DELIVERY_FAILURE_MESSAGE = 'The invitation email could not be sent. Check the mail transport and retry.';
+    private const DEFAULT_LEASE_SECONDS = 300;
+    private const INVITATION_EXPIRED_CODE = 'PLATFORM_OPERATOR_INVITATION_EXPIRED';
+    private const INVITATION_UNAVAILABLE_CODE = 'PLATFORM_OPERATOR_INVITATION_UNAVAILABLE';
+
     public function __construct(
         private readonly PlatformOperatorInvitationModel $invitations,
         private readonly PlatformOperatorInvitationDeliveryModel $deliveries,
@@ -39,12 +45,25 @@ final class PlatformOperatorInvitationDeliveryService
             if (! is_array($claim)) {
                 return;
             }
+            if (! $this->executionContext->runAsControlPlane(
+                fn (): bool => $this->isClaimSendable($claim),
+            )) {
+                return;
+            }
             Notification::route('mail', (string) $claim['email'])->notify(new PlatformOperatorInvitationNotification(
                 (string) $claim['name'],
                 $this->acceptanceUrl((string) $claim['token']),
                 (string) $claim['expires_at'],
             ));
-            $this->executionContext->runAsControlPlane(fn (): int => $this->finalizeSent($claim));
+            $updated = $this->executionContext->runAsControlPlane(
+                fn (): int => $this->finalizeSent($claim),
+            );
+            if ($updated !== 1) {
+                $this->logger->warning('Platform operator invitation email was handed to the mail transport after its delivery claim changed.', [
+                    'invitation_id' => $invitationId,
+                    'delivery_id' => $claim['delivery_id'],
+                ]);
+            }
         } catch (Throwable $exception) {
             $this->logger->error('Platform operator invitation delivery failed.', [
                 'invitation_id' => $invitationId,
@@ -63,9 +82,16 @@ final class PlatformOperatorInvitationDeliveryService
         return $this->database->transaction(function () use ($invitationId): ?array {
             $invitation = $this->invitations->newQuery()->with('operator')->whereKey($invitationId)
                 ->lockForUpdate()->first();
-            if (! $invitation instanceof PlatformOperatorInvitationModel
-                || $invitation->getAttribute('status') !== PlatformOperatorInvitationStatus::PENDING
-            ) {
+            if (! $invitation instanceof PlatformOperatorInvitationModel) {
+                return null;
+            }
+            if ($invitation->getAttribute('status') !== PlatformOperatorInvitationStatus::PENDING) {
+                $this->cancelOpenDeliveries(
+                    $invitationId,
+                    self::INVITATION_UNAVAILABLE_CODE,
+                    'The invitation is no longer pending.',
+                );
+
                 return null;
             }
             if ($invitation->getAttribute('expires_at')->toImmutable() <= $this->clock->now()) {
@@ -74,6 +100,12 @@ final class PlatformOperatorInvitationDeliveryService
                     'delivery_token' => null,
                     'row_version' => (int) $invitation->getAttribute('row_version') + 1,
                 ])->save();
+                $this->cancelOpenDeliveries(
+                    $invitationId,
+                    self::INVITATION_EXPIRED_CODE,
+                    'The invitation expired before delivery completed.',
+                );
+
                 return null;
             }
             $operator = $invitation->operator;
@@ -82,6 +114,12 @@ final class PlatformOperatorInvitationDeliveryService
                 || $operator->getAttribute('status') !== PlatformOperatorStatus::INVITED
                 || $token === ''
             ) {
+                $this->cancelOpenDeliveries(
+                    $invitationId,
+                    self::INVITATION_UNAVAILABLE_CODE,
+                    'The invitation recipient or delivery token is no longer available.',
+                );
+
                 return null;
             }
 
@@ -118,7 +156,10 @@ final class PlatformOperatorInvitationDeliveryService
 
             $claimToken = (string) Str::uuid();
             $claimedAt = $this->clock->now();
-            $leaseSeconds = max(30, (int) config('user.platform.operator_invitation_delivery_lease_seconds', 300));
+            $leaseSeconds = max(30, (int) config(
+                'user.platform.operator_invitation_delivery_lease_seconds',
+                self::DEFAULT_LEASE_SECONDS,
+            ));
             $nextVersion = (int) $delivery->getAttribute('row_version') + 1;
             $delivery->forceFill([
                 'status' => PlatformOperatorInvitationDeliveryStatus::SENDING,
@@ -133,6 +174,10 @@ final class PlatformOperatorInvitationDeliveryService
 
             return [
                 'delivery_id' => (int) $delivery->getKey(),
+                'invitation_id' => (int) $invitation->getKey(),
+                'invitation_row_version' => (int) $invitation->getAttribute('row_version'),
+                'operator_id' => (int) $operator->getKey(),
+                'operator_row_version' => (int) $operator->getAttribute('row_version'),
                 'claim_token' => $claimToken,
                 'row_version' => $nextVersion,
                 'email' => (string) $operator->getAttribute('email'),
@@ -141,6 +186,51 @@ final class PlatformOperatorInvitationDeliveryService
                 'expires_at' => $invitation->getAttribute('expires_at')->toAtomString(),
             ];
         }, 3);
+    }
+
+    private function cancelOpenDeliveries(int $invitationId, string $errorCode, string $message): void
+    {
+        $this->deliveries->newQuery()
+            ->where('invitation_id', $invitationId)
+            ->whereIn('status', [
+                PlatformOperatorInvitationDeliveryStatus::QUEUED,
+                PlatformOperatorInvitationDeliveryStatus::SENDING,
+                PlatformOperatorInvitationDeliveryStatus::FAILED,
+            ])
+            ->increment('row_version', 1, [
+                'status' => PlatformOperatorInvitationDeliveryStatus::CANCELLED,
+                'claim_token' => null,
+                'claimed_at' => null,
+                'lease_expires_at' => null,
+                'error_code' => $errorCode,
+                'error_message' => $message,
+                'updated_at' => $this->clock->now(),
+            ]);
+    }
+
+    /** @param array<string,mixed> $claim */
+    private function isClaimSendable(array $claim): bool
+    {
+        return $this->deliveries->newQuery()
+            ->whereKey((int) $claim['delivery_id'])
+            ->where('status', PlatformOperatorInvitationDeliveryStatus::SENDING)
+            ->where('claim_token', (string) $claim['claim_token'])
+            ->where('row_version', (int) $claim['row_version'])
+            ->where('lease_expires_at', '>', $this->clock->now())
+            ->whereHas('invitation', function ($query) use ($claim): void {
+                $query->whereKey((int) $claim['invitation_id'])
+                    ->where('row_version', (int) $claim['invitation_row_version'])
+                    ->where('status', PlatformOperatorInvitationStatus::PENDING)
+                    ->where('expires_at', '>', $this->clock->now())
+                    ->whereNotNull('delivery_token')
+                    ->whereHas('operator', function ($operatorQuery) use ($claim): void {
+                        $operatorQuery->whereKey((int) $claim['operator_id'])
+                            ->where('row_version', (int) $claim['operator_row_version'])
+                            ->where('email', (string) $claim['email'])
+                            ->where('status', PlatformOperatorStatus::INVITED);
+                    });
+            })
+            ->exists();
     }
 
     /** @param array<string,mixed> $claim */
@@ -169,8 +259,8 @@ final class PlatformOperatorInvitationDeliveryService
             'claim_token' => null,
             'claimed_at' => null,
             'lease_expires_at' => null,
-            'error_code' => 'PLATFORM_OPERATOR_INVITATION_DELIVERY_FAILED',
-            'error_message' => 'The invitation email could not be sent. Check the mail transport and retry.',
+            'error_code' => self::DELIVERY_FAILURE_CODE,
+            'error_message' => self::DELIVERY_FAILURE_MESSAGE,
             'row_version' => (int) $claim['row_version'] + 1,
             'updated_at' => $this->clock->now(),
         ]);

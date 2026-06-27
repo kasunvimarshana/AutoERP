@@ -34,8 +34,6 @@ return new class extends Migration
             $table->decimal('remaining_amount', 20, 6)->default('0.000000');
             $table->string('cost_treatment', 80)->nullable();
             $table->string('tax_treatment', 80)->nullable();
-            $table->unsignedBigInteger('finance_posting_profile_id')->nullable();
-            $table->unsignedBigInteger('finance_account_id')->nullable();
             $table->string('entry_type', 30)->default('allocation');
             $table->unsignedBigInteger('reversal_of_id')->nullable();
             $table->string('correlation_key', 160)->nullable();
@@ -66,14 +64,6 @@ return new class extends Migration
             $table->foreign(['target_purchase_header_adjustment_id', 'tenant_id'], 'purchase_adj_alloc_target_tenant_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('purchase_header_adjustments')
-                ->restrictOnDelete();
-            $table->foreign(['finance_posting_profile_id', 'tenant_id'], 'purchase_adj_alloc_profile_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('finance_posting_profiles')
-                ->restrictOnDelete();
-            $table->foreign(['finance_account_id', 'tenant_id'], 'purchase_adj_alloc_account_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('finance_accounts')
                 ->restrictOnDelete();
             $table->foreign(['reversal_of_id', 'tenant_id'], 'purchase_adj_alloc_reversal_tenant_fk')
                 ->references(['id', 'tenant_id'])

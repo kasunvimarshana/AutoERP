@@ -31,9 +31,25 @@ final class TenantAccessProvisionerTest extends TestCase
             $firstTenantId,
             static fn (): array => $provisioner->provision($firstTenantId),
         );
+        $permissionVersions = DB::table('permissions')
+            ->where('tenant_id', $firstTenantId)
+            ->orderBy('id')
+            ->pluck('row_version', 'id')
+            ->all();
+        $roleVersion = (int) DB::table('roles')->where('id', $first['role_id'])->value('row_version');
+
         $executionContext->runForTenant(
             $firstTenantId,
             static fn (): array => $provisioner->provision($firstTenantId),
+        );
+
+        self::assertSame(
+            $permissionVersions,
+            DB::table('permissions')->where('tenant_id', $firstTenantId)->orderBy('id')->pluck('row_version', 'id')->all(),
+        );
+        self::assertSame(
+            $roleVersion,
+            (int) DB::table('roles')->where('id', $first['role_id'])->value('row_version'),
         );
         $second = $executionContext->runForTenant(
             $secondTenantId,

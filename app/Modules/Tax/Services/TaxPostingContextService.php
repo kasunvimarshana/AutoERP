@@ -4,19 +4,24 @@ declare(strict_types=1);
 
 namespace Modules\Tax\Services;
 
-use Illuminate\Database\Eloquent\Builder;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Finance\DTOs\PostingContext;
 use Modules\Finance\DTOs\PostingLine;
 use Modules\Finance\DTOs\PostingSourceData;
-use Modules\Finance\Models\FinanceAccount;
 use Modules\Tax\DTOs\TaxAmountData;
 use Modules\Tax\DTOs\TaxPostingContext;
-use Modules\Tax\Models\TaxPostingProfile;
 
 final class TaxPostingContextService
 {
+    private const PROFILE_KEY_TAX_RECEIVABLE = 'tax_receivable';
+    private const PROFILE_KEY_TAX_PAYABLE = 'tax_payable';
+    private const PROFILE_KEY_WITHHOLDING_RECEIVABLE = 'withholding_receivable';
+    private const PROFILE_KEY_WITHHOLDING_PAYABLE = 'withholding_payable';
+
+    private const COUNTERPARTY_RECEIVABLE = 'receivable';
+    private const COUNTERPARTY_PAYABLE = 'payable';
+
     public function __construct(private readonly DecimalMath $math) {}
 
     /**
@@ -26,13 +31,18 @@ final class TaxPostingContextService
         PostingSourceData $source,
         string $postingDate,
         array $taxLines,
-        string $counterpartyAccountCode,
-        string $counterpartyAccountName,
+        string $counterpartyProfileKey,
+        string $postingProfileCode,
         ?string $description = null,
-        ?string $postingProfileCode = null,
     ): TaxPostingContext {
         if ($source->tenantId === null) {
             throw new InvalidArgumentException('Tax posting source tenant is required.');
+        }
+        if (! in_array($counterpartyProfileKey, [self::COUNTERPARTY_RECEIVABLE, self::COUNTERPARTY_PAYABLE], true)) {
+            throw new InvalidArgumentException('Tax posting counterparty must be receivable or payable.');
+        }
+        if (trim($postingProfileCode) === '') {
+            throw new InvalidArgumentException('Tax posting profile code is required.');
         }
 
         $financeLines = [];
@@ -41,34 +51,28 @@ final class TaxPostingContextService
                 continue;
             }
 
-            $account = $this->resolveAccount(
-                (int) $source->tenantId,
-                $source->organizationUnitId,
-                $taxLine,
-            );
+            $taxProfileKey = $this->taxProfileKey($taxLine, $counterpartyProfileKey);
+            $taxLineCredits = $this->taxLineCredits($taxLine, $counterpartyProfileKey);
             $lineDescription = $taxLine->taxCode.' '.$taxLine->taxName;
-            $counterparty = new PostingLine(
-                accountCode: $counterpartyAccountCode,
-                accountName: $counterpartyAccountName,
-                debit: $this->taxCreditsAccount($taxLine) ? $taxLine->taxAmount : '0.000000',
-                credit: $this->taxCreditsAccount($taxLine) ? '0.000000' : $taxLine->taxAmount,
+
+            $financeLines[] = new PostingLine(
+                profileKey: $counterpartyProfileKey,
+                debit: $taxLineCredits ? $taxLine->taxAmount : '0.000000',
+                credit: $taxLineCredits ? '0.000000' : $taxLine->taxAmount,
                 description: $lineDescription.' counterparty',
                 sourceLineType: 'tax',
                 sourceLineId: $taxLine->taxId,
             );
-            $taxPostingLine = new PostingLine(
-                accountCode: (string) $account->code,
-                accountName: (string) $account->name,
-                debit: $this->taxCreditsAccount($taxLine) ? '0.000000' : $taxLine->taxAmount,
-                credit: $this->taxCreditsAccount($taxLine) ? $taxLine->taxAmount : '0.000000',
+            $financeLines[] = new PostingLine(
+                profileKey: $taxProfileKey,
+                debit: $taxLineCredits ? '0.000000' : $taxLine->taxAmount,
+                credit: $taxLineCredits ? $taxLine->taxAmount : '0.000000',
                 description: $lineDescription,
-                profileKey: null,
                 sourceLineType: 'tax',
                 sourceLineId: $taxLine->taxId,
+                contextType: 'tax',
+                contextId: $taxLine->taxId,
             );
-
-            $financeLines[] = $counterparty;
-            $financeLines[] = $taxPostingLine;
         }
 
         return new TaxPostingContext(
@@ -85,51 +89,29 @@ final class TaxPostingContextService
         );
     }
 
-    private function resolveAccount(int $tenantId, ?int $organizationUnitId, TaxAmountData $taxLine): FinanceAccount
-    {
-        $direction = $this->directionFor($taxLine);
-        $query = TaxPostingProfile::query()
-            ->with('account')
-            ->where('tenant_id', $tenantId)
-            ->where('tax_id', $taxLine->taxId)
-            ->where('direction', $direction)
-            ->where('active', true);
-        $organizationUnitId === null
-            ? $query->whereNull('organization_unit_id')
-            : $query->where('organization_unit_id', $organizationUnitId);
-
-        $profile = $query->first();
-        $account = $profile?->account;
-        if (! $profile instanceof TaxPostingProfile || ! $account instanceof FinanceAccount) {
-            throw new InvalidArgumentException("Tax account mapping is missing for tax [{$taxLine->taxCode}] direction [{$direction}].");
-        }
-        if (! (bool) $account->is_active || ! (bool) $account->is_posting_account) {
-            throw new InvalidArgumentException("Tax account mapping for [{$taxLine->taxCode}] is inactive or not postable.");
-        }
-        if ((int) $account->tenant_id !== $tenantId || $account->organization_unit_id !== $organizationUnitId) {
-            throw new InvalidArgumentException('Tax account mapping belongs to a different scope.');
-        }
-
-        return $account;
-    }
-
-    private function directionFor(TaxAmountData $taxLine): string
+    private function taxProfileKey(TaxAmountData $taxLine, string $counterpartyProfileKey): string
     {
         if ($taxLine->isWithholding) {
-            return 'withholding';
+            return $counterpartyProfileKey === self::COUNTERPARTY_RECEIVABLE
+                ? self::PROFILE_KEY_WITHHOLDING_RECEIVABLE
+                : self::PROFILE_KEY_WITHHOLDING_PAYABLE;
         }
         if ($taxLine->receivable || $taxLine->recoverable) {
-            return 'input';
+            return self::PROFILE_KEY_TAX_RECEIVABLE;
         }
         if ($taxLine->payable) {
-            return 'output';
+            return self::PROFILE_KEY_TAX_PAYABLE;
         }
 
-        return 'tax';
+        throw new InvalidArgumentException("Tax direction is not defined for tax [{$taxLine->taxCode}].");
     }
 
-    private function taxCreditsAccount(TaxAmountData $taxLine): bool
+    private function taxLineCredits(TaxAmountData $taxLine, string $counterpartyProfileKey): bool
     {
+        if ($taxLine->isWithholding) {
+            return $counterpartyProfileKey === self::COUNTERPARTY_PAYABLE;
+        }
+
         return ! ($taxLine->receivable || $taxLine->recoverable);
     }
 }

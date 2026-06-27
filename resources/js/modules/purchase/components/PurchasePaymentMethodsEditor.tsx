@@ -8,7 +8,6 @@ import type { FastPurchaseOptionResource } from '../purchaseTypes';
 export interface PurchasePaymentMethodRow {
     key: string;
     payment_method_id: string;
-    source_account_id: string;
     amount: string;
     reference: string;
     instrument_number: string;
@@ -21,7 +20,6 @@ export function blankPaymentMethodRow(amount = ''): PurchasePaymentMethodRow {
     return {
         key: typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
         payment_method_id: '',
-        source_account_id: '',
         amount,
         reference: '',
         instrument_number: '',
@@ -35,10 +33,9 @@ export function paymentRowsTotal(rows: PurchasePaymentMethodRow[]): string {
     return sumDecimals(rows.map((row) => row.amount || '0.000000'));
 }
 
-export function PurchasePaymentMethodsEditor({ rows, methods, accounts, errorFor, errorIndexForRow, onChange }: {
+export function PurchasePaymentMethodsEditor({ rows, methods, errorFor, errorIndexForRow, onChange }: {
     rows: PurchasePaymentMethodRow[];
     methods: FastPurchaseOptionResource[];
-    accounts: FastPurchaseOptionResource[];
     errorFor: (field: string) => string | undefined;
     errorIndexForRow?: (row: PurchasePaymentMethodRow, index: number) => number;
     onChange: (rows: PurchasePaymentMethodRow[]) => void;
@@ -66,13 +63,6 @@ export function PurchasePaymentMethodsEditor({ rows, methods, accounts, errorFor
                                     onChange={(event) => update(index, { payment_method_id: event.target.value })}
                                     error={errorFor(`lines.${errorIndex}.payment_method_id`) ?? errorFor(`payment.lines.${errorIndex}.payment_method_id`)}
                                 />
-                                <Select
-                                    label="Account"
-                                    value={row.source_account_id}
-                                    options={accounts.map((account) => ({ value: account.id, label: optionLabel(account) }))}
-                                    onChange={(event) => update(index, { source_account_id: event.target.value })}
-                                    error={errorFor(`lines.${errorIndex}.source_account_id`) ?? errorFor(`payment.lines.${errorIndex}.source_account_id`)}
-                                />
                                 <Input
                                     label="Reference"
                                     value={row.reference}
@@ -99,7 +89,6 @@ export function PurchasePaymentMethodsEditor({ rows, methods, accounts, errorFor
                     <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500">
                         <tr>
                             <th className="w-44 px-3 py-2">Method</th>
-                            <th className="w-52 px-3 py-2">Account</th>
                             <th className="px-3 py-2">Reference</th>
                             <th className="w-40 px-3 py-2">Amount</th>
                             <th className="w-24 px-3 py-2" />
@@ -118,14 +107,6 @@ export function PurchasePaymentMethodsEditor({ rows, methods, accounts, errorFor
                                         options={methods.map((option) => ({ value: option.id, label: optionLabel(option) }))}
                                         onChange={(event) => update(index, { payment_method_id: event.target.value })}
                                         error={errorFor(`lines.${errorIndex}.payment_method_id`) ?? errorFor(`payment.lines.${errorIndex}.payment_method_id`)}
-                                    />
-                                </td>
-                                <td className="px-3 py-3">
-                                    <Select
-                                        value={row.source_account_id}
-                                        options={accounts.map((account) => ({ value: account.id, label: optionLabel(account) }))}
-                                        onChange={(event) => update(index, { source_account_id: event.target.value })}
-                                        error={errorFor(`lines.${errorIndex}.source_account_id`) ?? errorFor(`payment.lines.${errorIndex}.source_account_id`)}
                                     />
                                 </td>
                                 <td className="px-3 py-3">

@@ -25,6 +25,27 @@ class VehicleAuthorizationService
 
     public const CHANGE_STATUS = 'vehicle.status.change';
 
+    public const VIEW_OWNERSHIPS = 'vehicle.ownerships.view';
+
+    public const MANAGE_OWNERSHIPS = 'vehicle.ownerships.manage';
+
+    /** @return array<string,string> */
+    public static function descriptions(): array
+    {
+        return [
+            self::VIEW => 'View vehicles and vehicle lookups.',
+            self::CREATE => 'Create vehicle master records.',
+            self::UPDATE => 'Update vehicle master records.',
+            self::DELETE => 'Archive unreferenced vehicle master records.',
+            self::MANAGE_DOCUMENTS => 'Manage vehicle documents.',
+            self::DOWNLOAD_DOCUMENTS => 'Preview and download vehicle documents.',
+            self::MANAGE_ATTRIBUTES => 'Manage vehicle attributes.',
+            self::CHANGE_STATUS => 'Change vehicle status through the governed workflow.',
+            self::VIEW_OWNERSHIPS => 'View current and historical vehicle ownership relationships.',
+            self::MANAGE_OWNERSHIPS => 'Create, supersede, end, and change current vehicle ownership relationships.',
+        ];
+    }
+
     public function __construct(private readonly UserAccessResolver $access) {}
 
     public function assert(?int $userId, int $tenantId, string $permission): void

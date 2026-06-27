@@ -36,6 +36,7 @@ readonly class PostingContext
         ?int $sourceId = null,
         ?string $sourceNumber = null,
         ?string $sourceDate = null,
+        string $postingKey = PostingSourceData::DEFAULT_POSTING_KEY,
         ?int $tenantId = null,
         ?int $organizationUnitId = null,
     ) {
@@ -50,6 +51,7 @@ readonly class PostingContext
             sourceModule: $sourceModule,
             sourceNumber: $sourceNumber,
             sourceDate: $sourceDate,
+            postingKey: $postingKey,
         );
         $this->postingDate = (string) $postingDate;
         $this->currencyId = $currencyId;

@@ -4,7 +4,6 @@ import { requestLookup } from '@/shared/api/lookupRequest';
 import type { ApiCollection, ApiResource, ListParams } from '@/shared/types/api';
 import type { NamedResource } from '@/shared/types/common';
 import type { LookupLoadParams, LookupResult } from '@/shared/types/lookup';
-import type { PartyVehiclePayload, PartyVehicleRelationship } from '@/shared/types/partyVehicle';
 import type {
     Supplier,
     SupplierAddress,
@@ -129,11 +128,3 @@ export const updateSupplierCreditProfile = (supplierId: number, payload: Supplie
 
 export const listSupplierStatusHistory = (supplierId: number, params: ListParams, signal?: AbortSignal) =>
     apiClient.get<ApiCollection<SupplierStatusHistory>>(relationPath(supplierId, 'status-history'), { params, signal }).then((response) => response.data);
-
-export const listSupplierVehicles = (params: ListParams, signal?: AbortSignal) => apiClient.get<ApiCollection<PartyVehicleRelationship>>(endpoints.supplierVehicles, { params, signal }).then((r) => r.data);
-export const getSupplierVehicle = (id: number, signal?: AbortSignal) => apiClient.get<ApiResource<PartyVehicleRelationship>>(`${endpoints.supplierVehicles}/${id}`, { signal }).then((r) => r.data.data);
-export const createSupplierVehicle = (payload: PartyVehiclePayload) => apiClient.post<ApiResource<PartyVehicleRelationship>>(endpoints.supplierVehicles, payload).then((r) => r.data.data);
-export const updateSupplierVehicle = (id: number, payload: Partial<PartyVehiclePayload>) => apiClient.patch<ApiResource<PartyVehicleRelationship>>(`${endpoints.supplierVehicles}/${id}`, payload).then((r) => r.data.data);
-export const setSupplierVehicleCurrent = (id: number) => apiClient.post<ApiResource<PartyVehicleRelationship>>(`${endpoints.supplierVehicles}/${id}/set-current`).then((r) => r.data.data);
-export const clearSupplierVehicleCurrent = (id: number) => apiClient.post<ApiResource<PartyVehicleRelationship>>(`${endpoints.supplierVehicles}/${id}/clear-current`).then((r) => r.data.data);
-export const endSupplierVehicle = (id: number) => apiClient.delete<ApiResource<PartyVehicleRelationship>>(`${endpoints.supplierVehicles}/${id}`).then((r) => r.data.data);

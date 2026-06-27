@@ -1,5 +1,8 @@
 import { PartyVehicleFormPage } from '@/modules/party-vehicle/PartyVehicleFormPage';
-import { VehicleLookupSelect } from '@/modules/vehicle/components/VehicleLookupSelect';
 import { CustomerLookupSelect } from './components/CustomerLookupSelect';
-import { createCustomerVehicle, getCustomerVehicle, updateCustomerVehicle } from './customerApi';
-export default function CustomerVehicleFormPage(){return <PartyVehicleFormPage partyKey="customer" title="Customer Vehicle" listPath="/customer-vehicles" PartyLookup={CustomerLookupSelect} VehicleLookup={VehicleLookupSelect} get={getCustomerVehicle} create={createCustomerVehicle} update={updateCustomerVehicle}/>}
+import { VehicleLookupSelect } from '@/modules/vehicle/components/VehicleLookupSelect';
+import { createVehicleOwnership, getVehicleOwnership, supersedeVehicleOwnership } from '@/modules/vehicle/vehicleOwnershipApi';
+
+export default function CustomerVehicleFormPage() {
+    return <PartyVehicleFormPage ownerType="customer" title="Customer Vehicle Ownership" listPath="/customer-vehicles" PartyLookup={CustomerLookupSelect} VehicleLookup={VehicleLookupSelect} get={getVehicleOwnership} create={createVehicleOwnership} supersede={supersedeVehicleOwnership} />;
+}

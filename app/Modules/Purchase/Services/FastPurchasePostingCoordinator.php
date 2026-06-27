@@ -11,7 +11,6 @@ use Modules\Finance\DTOs\FinancePostingLine;
 use Modules\Finance\DTOs\FinancePostingRequest;
 use Modules\Finance\DTOs\PostingResultData;
 use Modules\Finance\DTOs\PostingSourceData;
-use Modules\Finance\Models\FinanceAccount;
 use Modules\Invoice\Models\Invoice;
 use Modules\Invoice\Models\InvoiceAdjustment;
 use Modules\Payment\Models\Payment;
@@ -27,7 +26,6 @@ final class FastPurchasePostingCoordinator
         private readonly FastPurchaseDocumentBuilder $documents,
         private readonly PurchaseAcquisitionCostAllocator $costs,
         private readonly PurchaseAdjustmentAllocationService $adjustmentAllocations,
-        private readonly PurchaseAdjustmentPolicyResolver $adjustmentPolicies,
     ) {}
 
     /**
@@ -95,8 +93,8 @@ final class FastPurchasePostingCoordinator
             currencyId: $resolved['currency_id'],
             exchangeRate: (string) $resolved['exchange_rate'],
             lines: [
-                new FinancePostingLine(null, 'Inventory', debit: $amount, profileKey: 'inventory'),
-                new FinancePostingLine(null, 'Goods received payable', credit: $amount, profileKey: 'payable'),
+                new FinancePostingLine(profileKey: 'inventory', debit: $amount, description: 'Inventory'),
+                new FinancePostingLine(profileKey: 'payable', credit: $amount, description: 'Goods received payable'),
             ],
             description: 'Fast purchase stock receipt '.$goodsReceipt->grn_number,
             postingProfileCode: 'inventory_receipt',
@@ -120,16 +118,16 @@ final class FastPurchasePostingCoordinator
         $creditPayable = $this->math->sub($this->math->add($directTaxable, $tax), $withholding);
         $lines = [];
         if (! $this->math->isZero($directTaxable)) {
-            $lines[] = new FinancePostingLine(null, 'Purchase expense', debit: $directTaxable, profileKey: 'expense');
+            $lines[] = new FinancePostingLine(profileKey: 'expense', debit: $directTaxable, description: 'Purchase expense');
         }
         if (! $this->math->isZero($tax)) {
-            $lines[] = new FinancePostingLine(null, 'Input tax', debit: $tax, profileKey: 'tax_receivable');
+            $lines[] = new FinancePostingLine(profileKey: 'tax_receivable', debit: $tax, description: 'Input tax');
         }
         if (! $this->math->isZero($creditPayable)) {
-            $lines[] = new FinancePostingLine(null, 'Supplier payable', credit: $creditPayable, profileKey: 'payable');
+            $lines[] = new FinancePostingLine(profileKey: 'payable', credit: $creditPayable, description: 'Supplier payable');
         }
         if (! $this->math->isZero($withholding)) {
-            $lines[] = new FinancePostingLine(null, 'Withholding payable', credit: $withholding, profileKey: 'payable');
+            $lines[] = new FinancePostingLine(profileKey: 'withholding_payable', credit: $withholding, description: 'Withholding payable');
         }
         $lines = array_merge($lines, $nonTaxAdjustments);
 
@@ -158,18 +156,26 @@ final class FastPurchasePostingCoordinator
      */
     private function postPaymentFinance(array $resolved, Payment $payment): array
     {
+        $payment->loadMissing('lines');
         $lines = [
-            new FinancePostingLine(null, 'Supplier payable', debit: (string) $payment->total_amount, profileKey: 'payable'),
+            new FinancePostingLine(
+                profileKey: 'payable',
+                debit: (string) $payment->total_amount,
+                description: 'Supplier payable',
+                sourceLineType: 'payment',
+                sourceLineId: (int) $payment->getKey(),
+            ),
         ];
 
-        foreach ($resolved['payment']['source_accounts'] as $row) {
-            /** @var FinanceAccount $account */
-            $account = $row['account'];
+        foreach ($payment->lines as $line) {
             $lines[] = new FinancePostingLine(
-                accountCode: (string) $account->code,
-                accountName: (string) $account->name,
-                credit: (string) $row['amount'],
-                description: 'Fast purchase payment source',
+                profileKey: 'settlement',
+                credit: (string) $line->amount,
+                description: 'Fast purchase payment settlement',
+                sourceLineType: 'payment_line',
+                sourceLineId: (int) $line->getKey(),
+                contextType: 'payment_method',
+                contextId: (int) $line->payment_method_id,
             );
         }
 
@@ -230,27 +236,30 @@ final class FastPurchasePostingCoordinator
                 continue;
             }
 
-            $account = $this->configuredAccount($sourceAdjustment, $invoice);
-            $accountCode = $account instanceof FinanceAccount ? (string) $account->code : null;
-            $accountName = $account instanceof FinanceAccount ? (string) $account->name : (string) $adjustment->name;
-            $profileKey = $account instanceof FinanceAccount
-                ? null
-                : 'expense';
+            $adjustmentLine = new FinancePostingLine(
+                profileKey: 'adjustment',
+                debit: $adjustment->effect->value === 'increase' ? $amount : '0.000000',
+                credit: $adjustment->effect->value === 'increase' ? '0.000000' : $amount,
+                description: (string) $adjustment->name,
+                sourceLineType: 'purchase_header_adjustment',
+                sourceLineId: (int) $sourceAdjustment->getKey(),
+                contextType: 'purchase_adjustment',
+                contextId: (int) $sourceAdjustment->getKey(),
+            );
+            $payableLine = new FinancePostingLine(
+                profileKey: 'payable',
+                debit: $adjustment->effect->value === 'increase' ? '0.000000' : $amount,
+                credit: $adjustment->effect->value === 'increase' ? $amount : '0.000000',
+                description: 'Supplier payable',
+                sourceLineType: 'purchase_header_adjustment',
+                sourceLineId: (int) $sourceAdjustment->getKey(),
+            );
 
-            if ($adjustment->effect->value === 'increase') {
-                $lines[] = new FinancePostingLine($accountCode, $accountName, debit: $amount, profileKey: $profileKey);
-                $lines[] = new FinancePostingLine(null, 'Supplier payable', credit: $amount, profileKey: 'payable');
-            } else {
-                $lines[] = new FinancePostingLine(null, 'Supplier payable', debit: $amount, profileKey: 'payable');
-                $lines[] = new FinancePostingLine($accountCode, $accountName, credit: $amount, profileKey: $profileKey);
-            }
+            $lines[] = $adjustmentLine;
+            $lines[] = $payableLine;
         }
 
         return $lines;
     }
 
-    private function configuredAccount(PurchaseHeaderAdjustment $adjustment, Invoice $invoice): ?FinanceAccount
-    {
-        return $this->adjustmentPolicies->accountForAdjustment($adjustment, lock: true);
-    }
 }

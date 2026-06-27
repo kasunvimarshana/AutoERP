@@ -33,7 +33,6 @@ final class FinanceValidationService
             throw new InvalidArgumentException('Finance account code and name are required.');
         }
 
-        $this->assertNonNegative($data->openingBalance, 'Opening balance');
 
         $duplicate = FinanceAccount::query()
             ->where('tenant_id', $data->tenantId)

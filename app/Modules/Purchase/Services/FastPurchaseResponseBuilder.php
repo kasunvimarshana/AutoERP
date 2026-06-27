@@ -157,8 +157,6 @@ final class FastPurchaseResponseBuilder
                     'mapping_source' => $accounting['mapping_source'] ?? $data->mappingSource,
                     'final_treatment' => $accounting['final_treatment'] ?? null,
                     'profile_key' => $accounting['profile_key'] ?? null,
-                    'finance_posting_profile_id' => $accounting['finance_posting_profile_id'] ?? null,
-                    'finance_account_id' => $accounting['finance_account_id'] ?? null,
                 ],
             ];
         }, $adjustments);

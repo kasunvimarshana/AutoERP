@@ -13,13 +13,18 @@ use Modules\Finance\Http\Requests\ListFinanceRequest;
 use Modules\Finance\Http\Requests\StoreFinanceAccountRequest;
 use Modules\Finance\Http\Requests\StoreJournalEntryRequest;
 use Modules\Finance\Http\Requests\UpdateFiscalStatusRequest;
+use Modules\Finance\Http\Requests\UpsertAccountAssignmentRequest;
 use Modules\Finance\Http\Requests\UpsertPostingProfileRequest;
+use Modules\Finance\Http\Resources\AccountAssignmentResource;
 use Modules\Finance\Http\Resources\AccountBalanceReportResource;
+use Modules\Finance\Http\Resources\AccountRoleResource;
 use Modules\Finance\Http\Resources\FinanceAccountResource;
 use Modules\Finance\Http\Resources\JournalEntryResource;
 use Modules\Finance\Http\Resources\LedgerEntryResource;
 use Modules\Finance\Http\Resources\PostingProfileResource;
 use Modules\Finance\Models\FinanceAccount;
+use Modules\Finance\Models\FinanceAccountAssignment;
+use Modules\Finance\Models\FinanceAccountRole;
 use Modules\Finance\Models\FinanceAccountCategory;
 use Modules\Finance\Models\FinanceAccountType;
 use Modules\Finance\Models\FinanceBankReconciliation;
@@ -29,6 +34,7 @@ use Modules\Finance\Models\FinanceFiscalPeriod;
 use Modules\Finance\Models\FinanceFiscalYear;
 use Modules\Finance\Models\FinanceJournalEntry;
 use Modules\Finance\Models\FinancePostingProfile;
+use Modules\Finance\Services\AccountAssignmentService;
 use Modules\Finance\Services\AccountBalanceService;
 use Modules\Finance\Services\AgingReportService;
 use Modules\Finance\Services\BankReconciliationService;
@@ -50,7 +56,7 @@ final class FinanceController
 {
     public function accounts(ListFinanceRequest $request): AnonymousResourceCollection
     {
-        $query = $this->scope(FinanceAccount::query(), $request)->with(['accountType', 'accountCategory', 'parent']);
+        $query = $this->sharedScope(FinanceAccount::query(), $request)->with(['accountType', 'accountCategory', 'parent']);
         if ($request->filled('search')) {
             $search = trim((string) $request->input('search'));
             $query->where(fn (Builder $scope): Builder => $scope
@@ -76,15 +82,17 @@ final class FinanceController
         int $account,
         ChartOfAccountsService $service,
     ): FinanceAccountResource {
+        $model = $this->sharedScope(FinanceAccount::query(), $request)->findOrFail($account);
+
         return new FinanceAccountResource($service->updateAccount(
-            $this->scope(FinanceAccount::query(), $request)->findOrFail($account),
-            $request->toData(),
+            $model,
+            $request->toData()->forOrganizationUnit($model->organization_unit_id),
         ));
     }
 
     public function showAccount(ListFinanceRequest $request, int $account): FinanceAccountResource
     {
-        return new FinanceAccountResource($this->scope(FinanceAccount::query(), $request)
+        return new FinanceAccountResource($this->sharedScope(FinanceAccount::query(), $request)
             ->with(['accountType', 'accountCategory', 'parent', 'children', 'balances'])->findOrFail($account));
     }
 
@@ -125,6 +133,7 @@ final class FinanceController
                 'fiscalPeriod.fiscalYear',
                 'postingProfile',
                 'lines.account',
+                'lines.accountRole',
                 'lines.dimension',
                 'ledgerEntries.account',
                 'ledgerEntries.journalLine',
@@ -152,12 +161,19 @@ final class FinanceController
         int $journal,
         JournalEntryCreationService $service,
     ): JournalEntryResource {
-        return new JournalEntryResource($service->cancel($this->findJournal($request, $journal)));
+        return new JournalEntryResource($service->cancel(
+            $this->findJournal($request, $journal),
+            $request->expectedVersion(),
+        ));
     }
 
     public function postJournal(FinanceActionRequest $request, int $journal, JournalPostingService $service): JsonResponse
     {
-        $result = $service->post($this->findJournal($request, $journal), $request->currentUserId());
+        $result = $service->post(
+            $this->findJournal($request, $journal),
+            $request->currentUserId(),
+            $request->expectedVersion(),
+        );
 
         return response()->json(['data' => get_object_vars($result)]);
     }
@@ -174,6 +190,7 @@ final class FinanceController
             (string) $request->input('reversal_date'),
             $request->currentUserId(),
             (string) $request->input('reversal_reason'),
+            $request->expectedVersion(),
         ));
     }
 
@@ -191,7 +208,7 @@ final class FinanceController
 
     public function accountBalance(ListFinanceRequest $request, int $account, AccountBalanceService $service): JsonResponse
     {
-        $model = $this->scope(FinanceAccount::query(), $request)->findOrFail($account);
+        $model = $this->sharedScope(FinanceAccount::query(), $request)->findOrFail($account);
         [$dateFrom, $dateTo] = $this->reportDates($request);
 
         return response()->json([
@@ -203,7 +220,7 @@ final class FinanceController
 
     public function accountBalances(ListFinanceRequest $request, AccountBalanceService $service): AnonymousResourceCollection
     {
-        $query = $this->scope(FinanceAccount::query(), $request);
+        $query = $this->sharedScope(FinanceAccount::query(), $request);
         if ($request->filled('search')) {
             $search = trim((string) $request->input('search'));
             $query->where(fn (Builder $scope): Builder => $scope
@@ -346,8 +363,6 @@ final class FinanceController
     public function lookups(ListFinanceRequest $request): JsonResponse
     {
         $tenantId = $request->tenantId();
-        $organizationUnitId = $request->organizationUnitId();
-
         $types = FinanceAccountType::query()
             ->where('tenant_id', $tenantId)
             ->where('is_active', true)
@@ -358,22 +373,16 @@ final class FinanceController
             ->where('is_active', true)
             ->orderBy('sort_order')
             ->get(['id', 'account_type_id', 'code', 'name']);
-        $accounts = $this->scope(FinanceAccount::query(), $request)
+        $accounts = $this->sharedScope(FinanceAccount::query(), $request)
             ->orderBy('code')
             ->get(['id', 'code', 'name', 'is_posting_account', 'is_active']);
         $periods = $this->scope(FinanceFiscalPeriod::query(), $request)
             ->with('fiscalYear:id,name,status')
             ->orderByDesc('start_date')
             ->get();
-        $profiles = FinancePostingProfile::query()
-            ->where('tenant_id', $tenantId)
+        $profiles = $this->sharedScope(FinancePostingProfile::query(), $request)
             ->where('is_active', true)
-            ->when(
-                $organizationUnitId === null,
-                fn ($query) => $query->whereNull('organization_unit_id'),
-                fn ($query) => $query->where('organization_unit_id', $organizationUnitId),
-            )
-            ->with('rules.account:id,code,name')
+            ->with('rules.accountRole:id,code,name,owning_module')
             ->orderBy('code')
             ->get();
 
@@ -382,20 +391,87 @@ final class FinanceController
             ->orderBy('dimension_type')
             ->orderBy('code')
             ->get(['id', 'code', 'name', 'dimension_type']);
-        $bankAccounts = $this->scope(FinanceAccount::query(), $request)
+        $bankAccounts = $this->sharedScope(FinanceAccount::query(), $request)
             ->where('is_bank_account', true)
             ->where('is_active', true)
             ->orderBy('code')
             ->get(['id', 'code', 'name', 'is_posting_account', 'is_active']);
 
-        return response()->json(['data' => compact('types', 'categories', 'accounts', 'periods', 'profiles', 'dimensions', 'bankAccounts')]);
+        $roles = FinanceAccountRole::query()
+            ->where('tenant_id', $tenantId)
+            ->where('is_active', true)
+            ->orderBy('owning_module')
+            ->orderBy('code')
+            ->get(['id', 'code', 'owning_module', 'name']);
+
+        return response()->json(['data' => compact('types', 'categories', 'accounts', 'periods', 'profiles', 'roles', 'dimensions', 'bankAccounts')]);
+    }
+
+    public function accountRoles(ListFinanceRequest $request): AnonymousResourceCollection
+    {
+        $query = FinanceAccountRole::query()->where('tenant_id', $request->tenantId());
+        if ($request->filled('search')) {
+            $search = trim((string) $request->input('search'));
+            $query->where(fn (Builder $scope): Builder => $scope
+                ->where('code', 'like', "%{$search}%")
+                ->orWhere('name', 'like', "%{$search}%")
+                ->orWhere('owning_module', 'like', "%{$search}%"));
+        }
+        if ($request->filled('is_active')) {
+            $query->where('is_active', $request->boolean('is_active'));
+        }
+
+        return AccountRoleResource::collection(
+            $query->orderBy('owning_module')->orderBy('code')->paginate($request->perPage()),
+        );
+    }
+
+    public function accountAssignments(ListFinanceRequest $request): AnonymousResourceCollection
+    {
+        $query = FinanceAccountAssignment::query()
+            ->where('tenant_id', $request->tenantId())
+            ->where(function (Builder $scope) use ($request): void {
+                $scope->whereNull('organization_unit_id');
+                if ($request->organizationUnitId() !== null) {
+                    $scope->orWhere('organization_unit_id', $request->organizationUnitId());
+                }
+            })
+            ->with(['role', 'account', 'organizationUnit']);
+        foreach (['account_role_id', 'context_type', 'context_id', 'is_active'] as $filter) {
+            if ($request->filled($filter)) {
+                $query->where($filter, $request->input($filter));
+            }
+        }
+
+        return AccountAssignmentResource::collection(
+            $query->orderBy('account_role_id')->orderByDesc('effective_from')->paginate($request->perPage()),
+        );
+    }
+
+    public function createAccountAssignment(
+        UpsertAccountAssignmentRequest $request,
+        AccountAssignmentService $service,
+    ): AccountAssignmentResource {
+        return new AccountAssignmentResource($service->save($request->toData()));
+    }
+
+    public function updateAccountAssignment(
+        UpsertAccountAssignmentRequest $request,
+        int $assignment,
+        AccountAssignmentService $service,
+    ): AccountAssignmentResource {
+        $model = FinanceAccountAssignment::query()
+            ->where('tenant_id', $request->tenantId())
+            ->findOrFail($assignment);
+
+        return new AccountAssignmentResource($service->save($request->toData(), $model));
     }
 
     public function postingProfiles(ListFinanceRequest $request): AnonymousResourceCollection
     {
         return PostingProfileResource::collection(
-            $this->scope(FinancePostingProfile::query(), $request)
-                ->with('rules.account')
+            $this->sharedScope(FinancePostingProfile::query(), $request)
+                ->with('rules.accountRole')
                 ->orderBy('code')
                 ->paginate($request->perPage()),
         );
@@ -413,6 +489,7 @@ final class FinanceController
             $request->filled('description') ? (string) $request->input('description') : null,
             $request->boolean('is_active', true),
             $request->input('rules'),
+            expectedVersion: $request->filled('expected_version') ? (int) $request->input('expected_version') : null,
         ));
     }
 
@@ -421,17 +498,18 @@ final class FinanceController
         int $profile,
         PostingProfileService $service,
     ): PostingProfileResource {
-        $model = $this->scope(FinancePostingProfile::query(), $request)->findOrFail($profile);
+        $model = $this->sharedScope(FinancePostingProfile::query(), $request)->findOrFail($profile);
 
         return new PostingProfileResource($service->save(
             $request->tenantId(),
-            $request->organizationUnitId(),
+            $model->organization_unit_id,
             (string) $request->input('code'),
             (string) $request->input('name'),
             $request->filled('description') ? (string) $request->input('description') : null,
             $request->boolean('is_active', true),
             $request->input('rules'),
             $model,
+            (int) $request->input('expected_version'),
         ));
     }
 
@@ -673,6 +751,21 @@ final class FinanceController
         return $request->organizationUnitId() === null
             ? $query->whereNull('organization_unit_id')
             : $query->where('organization_unit_id', $request->organizationUnitId());
+    }
+
+    private function sharedScope(
+        Builder $query,
+        ListFinanceRequest|StoreFinanceAccountRequest|UpsertPostingProfileRequest $request,
+    ): Builder {
+        $query->where('tenant_id', $request->tenantId());
+
+        return $query->where(function (Builder $scope) use ($request): void {
+            $scope->whereNull('organization_unit_id');
+
+            if ($request->organizationUnitId() !== null) {
+                $scope->orWhere('organization_unit_id', $request->organizationUnitId());
+            }
+        });
     }
 
     private function dateRange(Builder $query, ListFinanceRequest $request, string $column): void

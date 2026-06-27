@@ -64,14 +64,14 @@ final class VehicleCreationService
                     });
                 }
                 foreach ($data->ownerships as $ownership) {
-                    $this->ownerships->assign($vehicle, $ownership);
+                    $this->ownerships->assign($vehicle, $ownership, $data->createdBy);
                 }
                 foreach ($data->attributes as $attribute) {
                     $this->attributes->create($vehicle, $attribute);
                 }
                 $this->statuses->recordInitial($vehicle, $data->createdBy);
 
-                return $vehicle->refresh()->load(['make', 'model', 'type', 'category', 'documents', 'ownerships', 'currentOwnerships', 'currentCustomerVehicles.customer', 'currentSupplierVehicles.supplier', 'attributes', 'statusHistories']);
+                return $vehicle->refresh()->load(['make', 'model', 'type', 'category', 'documents', 'ownerships', 'currentOwnerships', 'attributes', 'statusHistories']);
             });
         } catch (Throwable $exception) {
             foreach ($storedDocumentPaths as $path) {

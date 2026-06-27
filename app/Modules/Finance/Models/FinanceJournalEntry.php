@@ -6,26 +6,24 @@ namespace Modules\Finance\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use LogicException;
-use Modules\ReferenceData\Models\CurrencyModel;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\Finance\Enums\JournalStatus;
 use Modules\Finance\Enums\JournalType;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
+use Modules\ReferenceData\Models\CurrencyModel;
 use Modules\Tenant\Models\TenantModel;
 
 final class FinanceJournalEntry extends TenantOwnedModel
 {
-    use SoftDeletes;
-
     protected $table = 'finance_journal_entries';
 
-    protected $guarded = ['id'];
+    protected $guarded = ['id', 'tenant_id', 'row_version', 'source_identity_key', 'source_fingerprint'];
 
     protected function casts(): array
     {
         return array_merge(parent::casts(), [
+            'row_version' => 'integer',
             'tenant_id' => 'integer',
             'organization_unit_id' => 'integer',
             'fiscal_year_id' => 'integer',
@@ -49,55 +47,16 @@ final class FinanceJournalEntry extends TenantOwnedModel
         ]);
     }
 
-    public function tenant(): BelongsTo
-    {
-        return $this->belongsTo(TenantModel::class, 'tenant_id');
-    }
-
-    public function organizationUnit(): BelongsTo
-    {
-        return $this->belongsTo(OrganizationUnitModel::class, 'organization_unit_id');
-    }
-
-    public function fiscalYear(): BelongsTo
-    {
-        return $this->belongsTo(FinanceFiscalYear::class, 'fiscal_year_id');
-    }
-
-    public function fiscalPeriod(): BelongsTo
-    {
-        return $this->belongsTo(FinanceFiscalPeriod::class, 'fiscal_period_id');
-    }
-
-    public function currency(): BelongsTo
-    {
-        return $this->belongsTo(CurrencyModel::class, 'currency_id');
-    }
-
-    public function postingProfile(): BelongsTo
-    {
-        return $this->belongsTo(FinancePostingProfile::class, 'posting_profile_id');
-    }
-
-    public function lines(): HasMany
-    {
-        return $this->hasMany(FinanceJournalLine::class, 'journal_entry_id');
-    }
-
-    public function ledgerEntries(): HasMany
-    {
-        return $this->hasMany(FinanceLedgerEntry::class, 'journal_entry_id');
-    }
-
-    public function reversalOf(): BelongsTo
-    {
-        return $this->belongsTo(self::class, 'reversal_of_id');
-    }
-
-    public function reversals(): HasMany
-    {
-        return $this->hasMany(self::class, 'reversal_of_id');
-    }
+    public function tenant(): BelongsTo { return $this->belongsTo(TenantModel::class, 'tenant_id'); }
+    public function organizationUnit(): BelongsTo { return $this->belongsTo(OrganizationUnitModel::class, 'organization_unit_id'); }
+    public function fiscalYear(): BelongsTo { return $this->belongsTo(FinanceFiscalYear::class, 'fiscal_year_id'); }
+    public function fiscalPeriod(): BelongsTo { return $this->belongsTo(FinanceFiscalPeriod::class, 'fiscal_period_id'); }
+    public function currency(): BelongsTo { return $this->belongsTo(CurrencyModel::class, 'currency_id'); }
+    public function postingProfile(): BelongsTo { return $this->belongsTo(FinancePostingProfile::class, 'posting_profile_id'); }
+    public function lines(): HasMany { return $this->hasMany(FinanceJournalLine::class, 'journal_entry_id'); }
+    public function ledgerEntries(): HasMany { return $this->hasMany(FinanceLedgerEntry::class, 'journal_entry_id'); }
+    public function reversalOf(): BelongsTo { return $this->belongsTo(self::class, 'reversal_of_id'); }
+    public function reversals(): HasMany { return $this->hasMany(self::class, 'reversal_of_id'); }
 
     protected static function booted(): void
     {
@@ -108,7 +67,7 @@ final class FinanceJournalEntry extends TenantOwnedModel
                 : JournalStatus::from((string) $originalStatus);
 
             if ($status === JournalStatus::Posted) {
-                $allowed = ['status', 'reversed_by', 'reversed_at', 'reversal_reason', 'updated_at'];
+                $allowed = ['status', 'row_version', 'reversed_by', 'reversed_at', 'reversal_reason', 'updated_at'];
                 if (array_diff(array_keys($journal->getDirty()), $allowed) !== []) {
                     throw new LogicException('Posted journals are immutable and must be corrected by reversal.');
                 }
@@ -117,16 +76,14 @@ final class FinanceJournalEntry extends TenantOwnedModel
             if ($status === JournalStatus::Reversed) {
                 throw new LogicException('Reversed journals are immutable.');
             }
+
+            if ($journal->isDirty('source_identity_key') || $journal->isDirty('source_fingerprint')) {
+                throw new LogicException('Journal source identity and fingerprint are immutable.');
+            }
         });
 
-        self::deleting(function (self $journal): void {
-            $status = $journal->status instanceof JournalStatus
-                ? $journal->status
-                : JournalStatus::from((string) $journal->status);
-
-            if (in_array($status, [JournalStatus::Posted, JournalStatus::Reversed], true)) {
-                throw new LogicException('Posted journals cannot be deleted.');
-            }
+        self::deleting(static function (): never {
+            throw new LogicException('Finance journals cannot be deleted. Cancel drafts or reverse posted journals.');
         });
     }
 }

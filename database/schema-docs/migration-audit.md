@@ -185,7 +185,6 @@ Migration/table: `create_audit_logs_table` / `audit_logs`.
 
 ### Extension
 
-Migrations/tables: `create_attachments_table`, `create_entity_attributes_table`, `create_comments_table`.
 
 ## Mega Migrations Split
 

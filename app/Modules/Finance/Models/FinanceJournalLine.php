@@ -16,7 +16,10 @@ final class FinanceJournalLine extends TenantOwnedModel
 {
     protected $table = 'finance_journal_lines';
 
-    protected $guarded = ['id'];
+    protected $guarded = [
+        'id', 'tenant_id', 'organization_unit_id', 'journal_entry_id',
+        'account_code_snapshot', 'account_name_snapshot', 'account_role_code_snapshot',
+    ];
 
     protected function casts(): array
     {
@@ -25,6 +28,7 @@ final class FinanceJournalLine extends TenantOwnedModel
             'organization_unit_id' => 'integer',
             'journal_entry_id' => 'integer',
             'account_id' => 'integer',
+            'account_role_id' => 'integer',
             'debit' => 'decimal:6',
             'credit' => 'decimal:6',
             'dimension_id' => 'integer',
@@ -33,35 +37,13 @@ final class FinanceJournalLine extends TenantOwnedModel
         ]);
     }
 
-    public function tenant(): BelongsTo
-    {
-        return $this->belongsTo(TenantModel::class, 'tenant_id');
-    }
-
-    public function organizationUnit(): BelongsTo
-    {
-        return $this->belongsTo(OrganizationUnitModel::class, 'organization_unit_id');
-    }
-
-    public function journalEntry(): BelongsTo
-    {
-        return $this->belongsTo(FinanceJournalEntry::class, 'journal_entry_id');
-    }
-
-    public function account(): BelongsTo
-    {
-        return $this->belongsTo(FinanceAccount::class, 'account_id');
-    }
-
-    public function dimension(): BelongsTo
-    {
-        return $this->belongsTo(FinanceDimension::class, 'dimension_id');
-    }
-
-    public function ledgerEntry(): HasOne
-    {
-        return $this->hasOne(FinanceLedgerEntry::class, 'journal_line_id');
-    }
+    public function tenant(): BelongsTo { return $this->belongsTo(TenantModel::class, 'tenant_id'); }
+    public function organizationUnit(): BelongsTo { return $this->belongsTo(OrganizationUnitModel::class, 'organization_unit_id'); }
+    public function journalEntry(): BelongsTo { return $this->belongsTo(FinanceJournalEntry::class, 'journal_entry_id'); }
+    public function account(): BelongsTo { return $this->belongsTo(FinanceAccount::class, 'account_id'); }
+    public function accountRole(): BelongsTo { return $this->belongsTo(FinanceAccountRole::class, 'account_role_id'); }
+    public function dimension(): BelongsTo { return $this->belongsTo(FinanceDimension::class, 'dimension_id'); }
+    public function ledgerEntry(): HasOne { return $this->hasOne(FinanceLedgerEntry::class, 'journal_line_id'); }
 
     protected static function booted(): void
     {

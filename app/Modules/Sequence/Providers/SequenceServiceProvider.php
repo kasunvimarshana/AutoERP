@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Modules\Sequence\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use Modules\Core\Contracts\PermissionDefinitionRegistryInterface;
+use Modules\Sequence\Constants\SequencePermission;
 use Modules\Sequence\Models\SequenceModel;
 use Modules\Sequence\Repositories\EloquentSequenceRepository;
 use Modules\Sequence\Repositories\SequenceRepositoryInterface;
@@ -25,6 +27,9 @@ final class SequenceServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        $this->app->make(PermissionDefinitionRegistryInterface::class)
+            ->register('sequence', SequencePermission::descriptions());
+
         $this->loadRoutesFrom(__DIR__.'/../Routes/api.php');
         $this->loadMigrationsFrom(__DIR__.'/../Database/Migrations');
     }

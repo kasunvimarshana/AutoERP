@@ -9,7 +9,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Modules\ReferenceData\Constants\ReferenceDataPermission;
 use Modules\ReferenceData\Models\CountryModel;
 use Modules\ReferenceData\Models\CurrencyModel;
 use Modules\ReferenceData\Models\LanguageModel;
@@ -22,7 +21,6 @@ final class ReferenceDataSeeder extends Seeder
     public function run(): void
     {
         $this->seedCatalogues();
-        $this->seedPermissions();
     }
 
     private function seedCatalogues(): void
@@ -72,53 +70,6 @@ final class ReferenceDataSeeder extends Seeder
         }
     }
 
-    private function seedPermissions(): void
-    {
-        if (! Schema::hasTable('permissions') || ! Schema::hasTable('tenants')) {
-            return;
-        }
-
-        $guard = (string) config('module-auth.protected_route_guard', 'auth-api');
-
-        DB::transaction(function () use ($guard): void {
-            foreach (DB::table('tenants')->where('status', '!=', 'archived')->pluck('id') as $tenantId) {
-                foreach (ReferenceDataPermission::descriptions() as $name => $description) {
-                    $identity = ['tenant_id' => (int) $tenantId, 'name' => $name, 'guard_name' => $guard];
-                    $existing = DB::table('permissions')->where($identity)->first([
-                        'id', 'module', 'description', 'is_active', 'row_version',
-                    ]);
-                    $values = [
-                        'module' => 'ReferenceData',
-                        'description' => $description,
-                        'is_active' => true,
-                    ];
-
-                    if ($existing === null) {
-                        DB::table('permissions')->insert([
-                            ...$identity,
-                            ...$values,
-                            'row_version' => 1,
-                            'created_at' => now(),
-                            'updated_at' => now(),
-                        ]);
-                    } elseif (
-                        $existing->module !== 'ReferenceData'
-                        || $existing->description !== $description
-                        || ! (bool) $existing->is_active
-                    ) {
-                        DB::table('permissions')
-                            ->where('tenant_id', (int) $tenantId)
-                            ->where('id', $existing->id)
-                            ->update([
-                            ...$values,
-                            'row_version' => max(1, (int) $existing->row_version) + 1,
-                            'updated_at' => now(),
-                        ]);
-                    }
-                }
-            }
-        }, 3);
-    }
 
     private function ensureActive(Model $model): void
     {

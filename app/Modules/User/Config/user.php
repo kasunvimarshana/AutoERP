@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 return [
     'guard' => env('USER_MODULE_GUARD', (string) config('auth.defaults.guard', 'api')),
+    'permission_middleware_alias' => env('TENANT_PERMISSION_MIDDLEWARE_ALIAS', 'tenant.permission'),
     'platform' => [
         'permission_middleware_alias' => env('PLATFORM_PERMISSION_MIDDLEWARE_ALIAS', 'platform.permission'),
         'operator_invitation_url' => env('PLATFORM_OPERATOR_INVITATION_URL', rtrim((string) env('PLATFORM_PUBLIC_URL', env('APP_URL')), '/').'/register/platform-operator'),

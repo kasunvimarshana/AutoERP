@@ -9,6 +9,7 @@ use Modules\Finance\DTOs\JournalPostingResult;
 use Modules\Finance\Enums\JournalStatus;
 use Modules\Finance\Models\FinanceJournalEntry;
 use Modules\Finance\Validators\FinanceValidationService;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 final class JournalPostingService
 {
@@ -18,20 +19,27 @@ final class JournalPostingService
         private readonly LedgerPostingService $ledger,
     ) {}
 
-    public function post(FinanceJournalEntry $journal, ?int $postedBy = null): JournalPostingResult
-    {
-        return DB::transaction(function () use ($journal, $postedBy): JournalPostingResult {
+    public function post(
+        FinanceJournalEntry $journal,
+        ?int $postedBy = null,
+        ?int $expectedVersion = null,
+    ): JournalPostingResult {
+        return DB::transaction(function () use ($journal, $postedBy, $expectedVersion): JournalPostingResult {
             $journal = FinanceJournalEntry::query()
-                ->with(['lines.account', 'fiscalPeriod'])
+                ->with(['lines.account', 'lines.accountRole', 'fiscalPeriod'])
                 ->lockForUpdate()
                 ->findOrFail($journal->getKey());
 
+            if ($expectedVersion !== null && $expectedVersion !== (int) $journal->row_version) {
+                throw new ConflictHttpException('Finance journal was changed by another request.');
+            }
+
             $this->periods->assertOpen($journal->fiscalPeriod);
             $this->validator->validateForPosting($journal);
-
             $ledgerCount = $this->ledger->post($journal);
 
             $journal->forceFill([
+                'row_version' => (int) $journal->row_version + 1,
                 'status' => JournalStatus::Posted->value,
                 'posted_by' => $postedBy,
                 'posted_at' => now(),
@@ -45,6 +53,6 @@ final class JournalPostingService
                 totalCredit: (string) $journal->total_credit,
                 ledgerEntryCount: $ledgerCount,
             );
-        });
+        }, 3);
     }
 }

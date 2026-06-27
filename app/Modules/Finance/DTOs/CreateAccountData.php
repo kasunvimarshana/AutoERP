@@ -8,9 +8,7 @@ use Modules\Finance\Enums\NormalBalance;
 
 final readonly class CreateAccountData
 {
-    /**
-     * @param  array<string, mixed>|null  $metadata
-     */
+    /** @param array<string, mixed>|null $metadata */
     public function __construct(
         public int $tenantId,
         public int $accountTypeId,
@@ -28,7 +26,31 @@ final readonly class CreateAccountData
         public bool $isTaxAccount = false,
         public bool $isSystem = false,
         public bool $isActive = true,
-        public string $openingBalance = '0.000000',
         public ?array $metadata = null,
+        public ?int $expectedVersion = null,
     ) {}
+
+    public function forOrganizationUnit(?int $organizationUnitId): self
+    {
+        return new self(
+            tenantId: $this->tenantId,
+            accountTypeId: $this->accountTypeId,
+            code: $this->code,
+            name: $this->name,
+            normalBalance: $this->normalBalance,
+            organizationUnitId: $organizationUnitId,
+            accountCategoryId: $this->accountCategoryId,
+            parentId: $this->parentId,
+            description: $this->description,
+            isControlAccount: $this->isControlAccount,
+            isPostingAccount: $this->isPostingAccount,
+            isCashAccount: $this->isCashAccount,
+            isBankAccount: $this->isBankAccount,
+            isTaxAccount: $this->isTaxAccount,
+            isSystem: $this->isSystem,
+            isActive: $this->isActive,
+            metadata: $this->metadata,
+            expectedVersion: $this->expectedVersion,
+        );
+    }
 }

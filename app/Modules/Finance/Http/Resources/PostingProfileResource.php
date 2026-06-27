@@ -13,6 +13,7 @@ final class PostingProfileResource extends JsonResource
     {
         return [
             'id' => (int) $this->getKey(),
+            'row_version' => (int) $this->row_version,
             'code' => (string) $this->code,
             'name' => (string) $this->name,
             'description' => $this->description,

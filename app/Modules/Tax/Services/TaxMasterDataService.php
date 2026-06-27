@@ -9,14 +9,12 @@ use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Customer\Models\Customer;
-use Modules\Finance\Models\FinanceAccount;
 use Modules\Supplier\Models\Supplier;
 use Modules\Tax\Models\CustomerTaxProfile;
 use Modules\Tax\Models\SupplierTaxProfile;
 use Modules\Tax\Models\Tax;
 use Modules\Tax\Models\TaxGroup;
 use Modules\Tax\Models\TaxGroupLine;
-use Modules\Tax\Models\TaxPostingProfile;
 use Modules\Tax\Models\TaxRate;
 
 final class TaxMasterDataService
@@ -258,54 +256,6 @@ final class TaxMasterDataService
         ])->save();
 
         return $profile->refresh()->load(['supplier', 'taxGroup']);
-    }
-
-    /**
-     * @param  array<string, mixed>  $data
-     */
-    public function savePostingProfile(array $data, ?TaxPostingProfile $profile = null): TaxPostingProfile
-    {
-        $tenantId = (int) $data['tenant_id'];
-        $organizationUnitId = $this->nullableInt($data, 'organization_unit_id');
-        $tax = Tax::query()->findOrFail((int) $data['tax_id']);
-        $this->assertTaxInScope($tax, $tenantId, $organizationUnitId);
-
-        $account = FinanceAccount::query()->findOrFail((int) $data['account_id']);
-        if ((int) $account->tenant_id !== $tenantId || $account->organization_unit_id !== $organizationUnitId) {
-            throw new InvalidArgumentException('Tax posting profile account belongs to a different scope.');
-        }
-        if (! (bool) $account->is_active || ! (bool) $account->is_posting_account) {
-            throw new InvalidArgumentException('Tax posting profile account must be active and postable.');
-        }
-
-        $direction = trim((string) ($data['direction'] ?? 'tax'));
-        $duplicate = TaxPostingProfile::query()
-            ->where('tenant_id', $tenantId)
-            ->where('tax_id', $tax->getKey())
-            ->where('direction', $direction)
-            ->when(
-                $organizationUnitId === null,
-                fn (Builder $query): Builder => $query->whereNull('organization_unit_id'),
-                fn (Builder $query): Builder => $query->where('organization_unit_id', $organizationUnitId),
-            )
-            ->when($profile instanceof TaxPostingProfile && $profile->exists, fn (Builder $query): Builder => $query->whereKeyNot($profile->getKey()))
-            ->exists();
-        if ($duplicate) {
-            throw new InvalidArgumentException('Tax posting profile already exists for this tax and direction.');
-        }
-
-        $profile ??= new TaxPostingProfile;
-        $profile->forceFill([
-            'tenant_id' => $tenantId,
-            'organization_unit_id' => $organizationUnitId,
-            'tax_id' => $tax->getKey(),
-            'direction' => $direction,
-            'account_id' => $account->getKey(),
-            'posting_key' => $data['posting_key'] ?? null,
-            'active' => (bool) ($data['active'] ?? true),
-        ])->save();
-
-        return $profile->refresh()->load(['tax', 'account']);
     }
 
     private function assertTaxInScope(Tax $tax, int $tenantId, ?int $organizationUnitId): void

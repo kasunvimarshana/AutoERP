@@ -10,7 +10,7 @@ use Modules\Auth\Models\AuthPlatformOperatorPasswordCredentialModel;
 use Modules\Auth\Models\AuthUserPasswordCredentialModel;
 use Modules\Auth\Security\PasswordPolicy;
 use Modules\Core\Contracts\ClockInterface;
-use Modules\Core\Contracts\PasswordHasherInterface;
+use Modules\Auth\Contracts\PasswordHasherInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\User\Contracts\PlatformOperatorCredentialProvisionerInterface;
 

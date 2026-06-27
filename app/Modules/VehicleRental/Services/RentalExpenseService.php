@@ -143,7 +143,7 @@ final class RentalExpenseService
         return [
             'agreement.customer', 'agreement.supplier', 'vehicleAllocation', 'usageLog', 'vehicle.make', 'vehicle.model',
             'supplier', 'employee', 'currency', 'taxGroup', 'allocations.targetAgreement', 'allocations.customer',
-            'allocations.supplier', 'allocations.employee', 'attachments',
+            'allocations.supplier', 'allocations.employee', 'documents.privateObject',
         ];
     }
 

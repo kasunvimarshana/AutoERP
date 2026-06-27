@@ -11,40 +11,8 @@ use Illuminate\Validation\ValidationException;
 final class TenantPlanSchema
 {
     public const SCHEMA_VERSION = 1;
-    /**
-     * Foundation capabilities are required for every tenant workspace and are
-     * never toggled by commercial subscriptions.
-     *
-     * @var list<string>
-     */
-    public const ALWAYS_ON_MODULES = [
-        'auth',
-        'tenant',
-        'user',
-        'organization-unit',
-        'configuration',
-        'reference-data',
-        'audit',
-    ];
 
-    /** Plan-controlled commercial feature modules. @var array<string, string> */
-    public const SUPPORTED_MODULES = [
-        'customer' => 'Customers',
-        'supplier' => 'Suppliers',
-        'item' => 'Items',
-        'warehouse' => 'Warehouses',
-        'inventory' => 'Inventory',
-        'purchase' => 'Purchasing',
-        'sales' => 'Sales',
-        'vehicle' => 'Vehicles',
-        'vehicle-service' => 'Vehicle service',
-        'vehicle-rental' => 'Vehicle rental',
-        'invoice' => 'Invoicing',
-        'payment' => 'Payments',
-        'finance' => 'Finance',
-        'reporting' => 'Reporting',
-    ];
-
+    public function __construct(private readonly TenantModuleCatalogue $modules) {}
     /** @var list<string> */
     public const SUPPORTED_LIMITS = [
         TenantPlanLimit::USERS,
@@ -53,23 +21,6 @@ final class TenantPlanSchema
         TenantPlanLimit::STORAGE_MEGABYTES,
     ];
 
-
-    /** @return list<array{code:string,label:string}> */
-    public function commercialModuleCatalogue(): array
-    {
-        $catalogue = [];
-        foreach (self::SUPPORTED_MODULES as $code => $label) {
-            $catalogue[] = ['code' => $code, 'label' => $label];
-        }
-
-        return $catalogue;
-    }
-
-    /** @return list<string> */
-    public function supportedModuleCodes(): array
-    {
-        return array_keys(self::SUPPORTED_MODULES);
-    }
 
     /** @return array{enabled_modules:list<string>} */
     public function normalizeFeatures(mixed $features): array
@@ -104,7 +55,7 @@ final class TenantPlanSchema
             }
 
             $module = strtolower(trim($module));
-            if (! array_key_exists($module, self::SUPPORTED_MODULES)) {
+            if (! $this->modules->isPlanControlled($module)) {
                 throw ValidationException::withMessages([
                     'features.enabled_modules' => ["Unsupported module [{$module}]."],
                 ]);

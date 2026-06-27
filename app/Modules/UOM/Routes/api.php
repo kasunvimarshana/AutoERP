@@ -20,6 +20,8 @@ $middleware = [
     'auth:'.$protectedGuard,
     $currentUserMiddleware,
     $currentTenantMiddleware,
+    'tenant.feature:uom',
+    'tenant.permission:uom.view',
     $currentOrganizationUnitMiddleware,
 ];
 
@@ -33,18 +35,28 @@ Route::prefix('api/v1')
         Route::get('uoms/types', [UnitOfMeasureController::class, 'types'])->name('uoms.types');
         Route::patch('uoms/{uom}/activate', [UnitOfMeasureController::class, 'activate'])
             ->whereNumber('uom')
+            ->middleware('tenant.permission:uom.manage')
             ->name('uoms.activate');
         Route::patch('uoms/{uom}/deactivate', [UnitOfMeasureController::class, 'deactivate'])
             ->whereNumber('uom')
+            ->middleware('tenant.permission:uom.manage')
             ->name('uoms.deactivate');
-        Route::apiResource('uoms', UnitOfMeasureController::class)->parameters(['uoms' => 'uom']);
+        Route::apiResource('uoms', UnitOfMeasureController::class)->only(['index', 'show'])
+            ->parameters(['uoms' => 'uom']);
+        Route::apiResource('uoms', UnitOfMeasureController::class)->except(['index', 'show'])
+            ->parameters(['uoms' => 'uom'])
+            ->middleware('tenant.permission:uom.manage');
 
-        Route::post('uom-conversions/convert', ConvertUomController::class)->name('uom-conversions.convert');
+        Route::post('uom-conversions/convert', ConvertUomController::class)->middleware('tenant.permission:uom.convert')->name('uom-conversions.convert');
         Route::patch('uom-conversions/{uom_conversion}/activate', [UomConversionController::class, 'activate'])
             ->whereNumber('uom_conversion')
+            ->middleware('tenant.permission:uom.manage')
             ->name('uom-conversions.activate');
         Route::patch('uom-conversions/{uom_conversion}/deactivate', [UomConversionController::class, 'deactivate'])
             ->whereNumber('uom_conversion')
+            ->middleware('tenant.permission:uom.manage')
             ->name('uom-conversions.deactivate');
-        Route::apiResource('uom-conversions', UomConversionController::class);
+        Route::apiResource('uom-conversions', UomConversionController::class)->only(['index', 'show']);
+        Route::apiResource('uom-conversions', UomConversionController::class)->except(['index', 'show'])
+            ->middleware('tenant.permission:uom.manage');
     });

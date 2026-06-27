@@ -88,15 +88,28 @@ final class VehicleServiceJobResource extends JsonResource
 
     private function vehicleCurrentOwnerships(): array
     {
-        $rows = [];
-        if ($this->vehicle->relationLoaded('currentCustomerVehicles') && ($relationship = $this->vehicle->currentCustomerVehicles->first())) {
-            $rows[] = ['id' => (int) $relationship->getKey(), 'owner_type' => 'customer', 'owner_id' => (int) $relationship->customer_id, 'owner' => $this->customerRelation($relationship->customer), 'ownership_type' => $relationship->relationship_type, 'started_at' => $relationship->started_at?->toISOString(), 'ended_at' => null, 'is_current' => true];
-        }
-        if ($this->vehicle->relationLoaded('currentSupplierVehicles') && ($relationship = $this->vehicle->currentSupplierVehicles->first())) {
-            $rows[] = ['id' => (int) $relationship->getKey(), 'owner_type' => 'supplier', 'owner_id' => (int) $relationship->supplier_id, 'owner' => $this->namedRelation($relationship->supplier), 'ownership_type' => $relationship->relationship_type, 'started_at' => $relationship->started_at?->toISOString(), 'ended_at' => null, 'is_current' => true];
+        if (! $this->vehicle->relationLoaded('currentOwnerships')) {
+            return [];
         }
 
-        return $rows;
+        return $this->vehicle->currentOwnerships
+            ->map(static fn ($ownership): array => [
+                'id' => (int) $ownership->getKey(),
+                'row_version' => (int) $ownership->row_version,
+                'owner_type' => $ownership->owner_type->value,
+                'owner_id' => $ownership->owner_id === null ? null : (int) $ownership->owner_id,
+                'owner' => [
+                    'id' => $ownership->owner_id === null ? null : (int) $ownership->owner_id,
+                    'code' => $ownership->owner_code_snapshot,
+                    'name' => $ownership->owner_name_snapshot,
+                ],
+                'ownership_type' => $ownership->ownership_type->value,
+                'started_at' => $ownership->started_at?->toISOString(),
+                'ended_at' => $ownership->ended_at?->toISOString(),
+                'is_current' => (bool) $ownership->is_current,
+            ])
+            ->values()
+            ->all();
     }
 
     private function employeeSummary(mixed $employee): ?array
@@ -114,15 +127,6 @@ final class VehicleServiceJobResource extends JsonResource
             'id' => (int) $model->getKey(),
             'code' => $model->code,
             'name' => $model->name,
-        ];
-    }
-
-    private function customerRelation(mixed $customer): ?array
-    {
-        return $customer === null ? null : [
-            'id' => (int) $customer->getKey(),
-            'code' => $customer->code,
-            'name' => $customer->display_name ?? $customer->name,
         ];
     }
 }

@@ -224,7 +224,7 @@ export interface TenantPlan {
 
 export interface TenantPlanCapabilities {
     commercial_modules: Array<{ code: TenantModuleCode; label: string }>;
-    always_on_modules: string[];
+    always_on_modules: Array<{ code: TenantModuleCode; label: string }>;
     limits: Array<keyof TenantPlanLimits>;
 }
 

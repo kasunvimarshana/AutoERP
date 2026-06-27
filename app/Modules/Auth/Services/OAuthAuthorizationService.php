@@ -18,7 +18,7 @@ use Modules\Auth\Models\AuthSessionModel;
 use Modules\Auth\Services\Security\AuthSecurityConfig;
 use Modules\Auth\Services\Security\OpaqueTokenCodec;
 use Modules\Core\Contracts\ClockInterface;
-use Modules\Core\Contracts\PasswordHasherInterface;
+use Modules\Auth\Contracts\PasswordHasherInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
 
 final readonly class OAuthAuthorizationService

@@ -15,8 +15,6 @@ import type {
     VehicleMakePayload,
     VehicleModel,
     VehicleModelPayload,
-    VehicleOwnership,
-    VehicleOwnershipPayload,
     VehiclePayload,
     VehicleStatusHistory,
     VehicleSummary,
@@ -123,14 +121,6 @@ export const downloadVehicleDocumentUrl = (vehicleId: number, id: number) => `${
 export const fetchVehicleDocumentFile = (vehicleId: number, id: number, mode: 'preview' | 'download') =>
     apiClient.get<Blob>(mode === 'preview' ? previewVehicleDocumentUrl(vehicleId, id) : downloadVehicleDocumentUrl(vehicleId, id), { responseType: 'blob' })
         .then((response) => response.data);
-
-export const listVehicleOwnerships = (vehicleId: number, params: ListParams, signal?: AbortSignal) =>
-    apiClient.get<ApiCollection<VehicleOwnership>>(relationPath(vehicleId, 'ownerships'), { params, signal }).then((response) => response.data);
-export const createVehicleOwnership = (vehicleId: number, payload: VehicleOwnershipPayload) =>
-    apiClient.post<ApiResource<VehicleOwnership>>(relationPath(vehicleId, 'ownerships'), payload).then((response) => response.data.data);
-export const updateVehicleOwnership = (vehicleId: number, id: number, payload: VehicleOwnershipPayload) =>
-    apiClient.put<ApiResource<VehicleOwnership>>(`${relationPath(vehicleId, 'ownerships')}/${id}`, payload).then((response) => response.data.data);
-export const deleteVehicleOwnership = (vehicleId: number, id: number) => apiClient.delete(`${relationPath(vehicleId, 'ownerships')}/${id}`);
 
 export const listVehicleAttributes = (vehicleId: number, params: ListParams, signal?: AbortSignal) =>
     apiClient.get<ApiCollection<VehicleAttribute>>(relationPath(vehicleId, 'attributes'), { params, signal }).then((response) => response.data);
