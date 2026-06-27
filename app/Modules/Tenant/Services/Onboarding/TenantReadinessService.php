@@ -47,7 +47,17 @@ final class TenantReadinessService
      *   onboarding_status:string,
      *   checks:array<string,bool>,
      *   blockers:list<array{code:string,stage:string,owner:string,action:string,message:string,context?:array<string,mixed>}>,
-     *   routing:array{ready:bool,mode:string,message:string},
+     *   routing:array{
+     *       ready:bool,
+     *       mode:string,
+     *       message:string,
+     *       local_fallback?:array{
+     *           supported:bool,
+     *           enabled:bool,
+     *           configured_tenant_code:?string,
+     *           matches_tenant:bool
+     *       }
+     *   },
      *   infrastructure:array<string,mixed>
      * }
      */

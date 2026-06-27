@@ -13,6 +13,7 @@ use Modules\Auth\Models\AuthRegistrationInvitationDeliveryModel;
 use Modules\Auth\Models\AuthRegistrationInvitationModel;
 use Modules\Auth\Notifications\RegistrationInvitationNotification;
 use Modules\Core\Contracts\ClockInterface;
+use Modules\Core\Contracts\TenantDirectoryInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Psr\Log\LoggerInterface;
 use RuntimeException;
@@ -28,6 +29,7 @@ final class RegistrationInvitationDeliveryService
     public function __construct(
         private readonly AuthRegistrationInvitationDeliveryModel $deliveries,
         private readonly TenantExecutionContextInterface $executionContext,
+        private readonly TenantDirectoryInterface $tenants,
         private readonly ClockInterface $clock,
         private readonly LoggerInterface $logger,
     ) {}
@@ -98,13 +100,20 @@ final class RegistrationInvitationDeliveryService
     {
         return DB::transaction(function () use ($tenantId, $deliveryId): ?array {
             $delivery = $this->deliveries->newQuery()
-                ->with(['invitation.tenant:id,name'])
+                ->with('invitation')
                 ->whereKey($deliveryId)
                 ->where('tenant_id', $tenantId)
                 ->lockForUpdate()
                 ->first();
 
             if (! $delivery instanceof AuthRegistrationInvitationDeliveryModel) {
+                return null;
+            }
+
+            $tenant = $this->tenants->summary($tenantId);
+            if ($tenant === null) {
+                $this->cancelInvalidDelivery($delivery, 'The tenant record is unavailable.');
+
                 return null;
             }
 
@@ -177,7 +186,7 @@ final class RegistrationInvitationDeliveryService
                 'row_version' => $nextVersion,
                 'invitation_id' => (int) $invitation->getKey(),
                 'email' => (string) $invitation->getAttribute('email'),
-                'tenant_name' => (string) ($invitation->tenant?->getAttribute('name') ?? 'your organization'),
+                'tenant_name' => $tenant['name'],
                 'token' => $token,
                 'expires_at' => $invitation->getAttribute('expires_at')->toAtomString(),
                 'purpose' => (string) $invitation->getAttribute('purpose'),

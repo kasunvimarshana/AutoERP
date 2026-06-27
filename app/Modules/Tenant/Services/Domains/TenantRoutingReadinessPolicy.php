@@ -20,23 +20,37 @@ final class TenantRoutingReadinessPolicy
 
     /**
      * @param array<string, mixed>|DataRecord|null $primaryDomain
-     * @return array{ready:bool,mode:string,message:string}
+     * @return array{
+     *     ready:bool,
+     *     mode:string,
+     *     message:string,
+     *     local_fallback:array{
+     *         supported:bool,
+     *         enabled:bool,
+     *         configured_tenant_code:?string,
+     *         matches_tenant:bool
+     *     }
+     * }
      */
     public function inspect(string $tenantCode, array|DataRecord|null $primaryDomain): array
     {
+        $localFallback = $this->localFallbackDetails($tenantCode);
+
         if ($primaryDomain !== null && $this->domains->isReady($primaryDomain)) {
             return [
                 'ready' => true,
                 'mode' => self::MODE_VERIFIED_DOMAIN,
                 'message' => 'The verified primary tenant domain is operational.',
+                'local_fallback' => $localFallback,
             ];
         }
 
-        if ($this->localFallbackMatches($tenantCode)) {
+        if ($localFallback['matches_tenant']) {
             return [
                 'ready' => true,
                 'mode' => self::MODE_LOCAL_FALLBACK,
                 'message' => 'Local/testing tenant routing is explicitly configured for this tenant.',
+                'local_fallback' => $localFallback,
             ];
         }
 
@@ -46,19 +60,33 @@ final class TenantRoutingReadinessPolicy
             'message' => $this->app->environment(['local', 'testing'])
                 ? 'Enable and configure the local tenant fallback, or verify a public tenant domain.'
                 : 'Verify a public primary tenant domain including ownership, routing, TLS, and reachability.',
+            'local_fallback' => $localFallback,
         ];
     }
 
-    private function localFallbackMatches(string $tenantCode): bool
+    /**
+     * @return array{
+     *     supported:bool,
+     *     enabled:bool,
+     *     configured_tenant_code:?string,
+     *     matches_tenant:bool
+     * }
+     */
+    private function localFallbackDetails(string $tenantCode): array
     {
-        if (! $this->app->environment(['local', 'testing'])
-            || ! (bool) config('tenant.resolution.local_fallback_enabled', false)
-        ) {
-            return false;
-        }
+        $supported = $this->app->environment(['local', 'testing']);
+        $enabled = $supported && (bool) config('tenant.resolution.local_fallback_enabled', false);
 
         $configuredCode = strtoupper(trim((string) config('tenant.resolution.local_fallback_tenant_code', '')));
+        $matchesTenant = $enabled
+            && $configuredCode !== ''
+            && $configuredCode === strtoupper(trim($tenantCode));
 
-        return $configuredCode !== '' && $configuredCode === strtoupper(trim($tenantCode));
+        return [
+            'supported' => $supported,
+            'enabled' => $enabled,
+            'configured_tenant_code' => $supported && $configuredCode !== '' ? $configuredCode : null,
+            'matches_tenant' => $matchesTenant,
+        ];
     }
 }

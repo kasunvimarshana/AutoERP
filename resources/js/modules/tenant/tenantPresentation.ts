@@ -34,6 +34,9 @@ const READINESS_STEPS: Record<string, string> = {
     primary_domain_ready: 'tenant-domain-step',
 };
 
+const RESERVED_PUBLIC_HOSTNAMES = new Set(['localhost', 'localhost.localdomain']);
+const RESERVED_PUBLIC_TLDS = new Set(['example', 'invalid', 'localhost', 'local', 'test', 'internal']);
+
 export function readinessLabel(key: string): string {
     return READINESS_LABELS[key.toLowerCase()] ?? humanize(key);
 }
@@ -102,13 +105,25 @@ export function hostnameError(value: string): string | null {
     if (hostname.includes('://') || hostname.includes('/') || hostname.includes(':') || hostname.includes('?') || hostname.includes('#')) {
         return 'Enter a hostname only, without a protocol, port, path, query, or fragment.';
     }
+    if (RESERVED_PUBLIC_HOSTNAMES.has(hostname) || isIpv4Address(hostname)) {
+        return 'Localhost and IP addresses are not public tenant domains. Use the configured local/testing fallback shown in readiness.';
+    }
     if (hostname.length > 253) return 'Hostname must be 253 characters or fewer.';
     const labels = hostname.split('.');
     if (labels.length < 2) return 'Use a fully qualified hostname such as erp.example.com.';
+    if (RESERVED_PUBLIC_TLDS.has(labels[labels.length - 1] ?? '')) {
+        return 'Use a public hostname. Reserved local, test, internal, and example domains cannot become tenant domains.';
+    }
     if (labels.some((label) => label.length === 0 || label.length > 63 || !/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(label))) {
         return 'Hostname labels may contain letters, numbers, and internal hyphens only.';
     }
     return null;
+}
+
+function isIpv4Address(value: string): boolean {
+    const octets = value.split('.');
+    return octets.length === 4
+        && octets.every((octet) => /^\d{1,3}$/.test(octet) && Number(octet) <= 255);
 }
 
 export function isFuture(value: string | null | undefined): boolean {

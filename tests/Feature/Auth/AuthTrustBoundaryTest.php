@@ -129,6 +129,18 @@ final class AuthTrustBoundaryTest extends TestCase
         self::assertStringNotContainsString('deleted_at', $validator);
     }
 
+    public function test_registration_invitation_delivery_uses_the_tenant_directory_boundary(): void
+    {
+        $delivery = $this->source(
+            'app/Modules/Auth/Services/Registration/RegistrationInvitationDeliveryService.php',
+        );
+
+        self::assertStringContainsString('TenantDirectoryInterface', $delivery);
+        self::assertStringContainsString('$this->tenants->summary($tenantId)', $delivery);
+        self::assertStringNotContainsString('invitation.tenant', $delivery);
+        self::assertStringNotContainsString('$invitation->tenant', $delivery);
+    }
+
     private function source(string $relativePath): string
     {
         $path = $this->root.'/'.$relativePath;

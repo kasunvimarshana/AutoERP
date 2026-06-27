@@ -13,10 +13,15 @@ describe('tenant presentation rules', () => {
         expect(normalizeHostname(' ERP.Example.com. ')).toBe('erp.example.com');
     });
 
-    it.each(['https://erp.example.com', 'erp.example.com/path', 'erp.example.com:443', 'localhost', '-erp.example.com'])(
+    it.each(['https://erp.example.com', 'erp.example.com/path', 'erp.example.com:443', 'localhost', '127.0.0.1', '-erp.example.com'])(
         'rejects invalid hostname input %s',
         (value) => expect(hostnameError(value)).not.toBeNull(),
     );
+
+    it('directs local addresses to the explicit local/testing fallback', () => {
+        expect(hostnameError('127.0.0.1')).toContain('local/testing fallback');
+        expect(hostnameError('localhost')).toContain('local/testing fallback');
+    });
 
     it('uses a safe fallback for missing enum values', () => {
         expect(humanize(undefined)).toBe('Not available');

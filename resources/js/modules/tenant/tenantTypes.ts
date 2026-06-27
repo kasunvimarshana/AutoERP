@@ -305,6 +305,12 @@ export interface TenantOnboardingReadiness {
         ready: boolean;
         mode: 'verified_domain' | 'local_fallback' | 'unavailable';
         message: string;
+        local_fallback?: {
+            supported: boolean;
+            enabled: boolean;
+            configured_tenant_code: string | null;
+            matches_tenant: boolean;
+        };
     };
     infrastructure: {
         database: { strategy: string; tenant_specific_profiles_supported: boolean };
