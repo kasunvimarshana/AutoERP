@@ -296,8 +296,7 @@ final class SalesDocumentContextService
     private function priceSourceLabel(string $source): string
     {
         return match ($source) {
-            'specific_price' => 'Sales price list',
-            'standard_price' => 'Standard price',
+            'item_price_revision' => 'Effective item price revision',
             default => 'Manual price required',
         };
     }

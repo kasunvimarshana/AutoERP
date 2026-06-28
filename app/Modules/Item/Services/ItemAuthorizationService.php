@@ -57,7 +57,7 @@ final class ItemAuthorizationService
             self::CHANGE_BASE_UOM => 'Preview and apply item base UOM changes.',
             self::MANAGE_VARIANTS => 'Create, update, and delete item variants.',
             self::MANAGE_BUNDLES => 'Create, update, and delete item bundle lines.',
-            self::MANAGE_PRICES => 'Create, update, and delete item prices.',
+            self::MANAGE_PRICES => 'Create and supersede immutable item price revisions.',
             self::MANAGE_CODES => 'Create, update, and delete item codes.',
             self::MANAGE_USAGE_RULES => 'Create, update, and delete item usage rules.',
             self::MANAGE_CATEGORIES => 'Create, update, and delete item categories.',

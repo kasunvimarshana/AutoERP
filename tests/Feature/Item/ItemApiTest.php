@@ -20,6 +20,7 @@ final class ItemApiTest extends TestCase
     public function test_item_create_update_lookup_and_readable_resource(): void
     {
         $context = $this->createAuthContext();
+        $currencyId = $this->createCurrency('LKR');
         $uomId = $this->createUom($context, 'PCS');
         $categoryId = $this->createCategory($context, 'PARTS');
         $brandId = $this->createBrand($context, 'GEN');
@@ -28,12 +29,11 @@ final class ItemApiTest extends TestCase
             'item_category_id' => $categoryId,
             'item_brand_id' => $brandId,
             'base_uom_id' => $uomId,
-            'standard_price' => '12.340000',
         ]))->assertCreated()
             ->assertJsonPath('data.category.code', 'PARTS')
             ->assertJsonPath('data.brand.code', 'GEN')
             ->assertJsonPath('data.base_uom.code', 'PCS')
-            ->assertJsonPath('data.standard_price', '12.340000')
+            ->assertJsonMissingPath('data.standard_price')
             ->assertJsonMissingPath('data.item_category_id')
             ->assertJsonMissingPath('data.item_brand_id')
             ->assertJsonMissingPath('data.base_uom_id');
@@ -43,146 +43,116 @@ final class ItemApiTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.name', 'Updated Item');
 
-        $newBaseUomId = $this->createUom($context, 'BOX');
-        $this->withAuth($context)->putJson('/api/v1/items/'.$itemId, ['base_uom_id' => $newBaseUomId])
+        $this->withAuth($context)->putJson('/api/v1/items/'.$itemId, ['standard_price' => '12.340000'])
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['base_uom_id', 'standard_price']);
-
-        $this->withAuth($context)->putJson('/api/v1/items/'.$itemId, ['standard_price' => '0'])
-            ->assertOk()
-            ->assertJsonPath('data.standard_price', '0.000000');
-        $this->withAuth($context)->putJson('/api/v1/items/'.$itemId, ['standard_price' => null])
-            ->assertOk()
-            ->assertJsonPath('data.standard_price', null);
-        $this->withAuth($context)->postJson('/api/v1/items', $this->itemPayload([
-            'code' => 'NO-BASE-PRICE',
-            'standard_price' => '1.000000',
-        ]))->assertUnprocessable()->assertJsonValidationErrors(['standard_price', 'base_uom_id']);
+            ->assertJsonValidationErrors(['standard_price']);
 
         $this->withAuth($context)->getJson('/api/v1/items/lookup?search=ITM-001')
             ->assertOk()
             ->assertJsonPath('data.0.code', 'ITM-001');
     }
 
-    public function test_standard_price_resolution_policy_and_conversion(): void
+    public function test_item_price_revisions_are_effective_dated_immutable_and_conflict_aware(): void
     {
         $context = $this->createAuthContext(['code' => 'ITEM-PRICE', 'email' => 'item-price@example.test']);
         $currencyId = $this->createCurrency('LKR');
         DB::table('tenants')->where('id', $context['tenant_id'])->update(['base_currency_id' => $currencyId]);
         $otherCurrencyId = $this->createCurrency('USD');
         $pcsUomId = $this->createUom($context, 'PCS');
-        $boxUomId = $this->createUom($context, 'BOX');
-        $caseUomId = $this->createUom($context, 'CASE');
-        $itemId = $this->createItem($context, $this->itemPayload([
-            'base_uom_id' => $pcsUomId,
-            'standard_price' => '100.000000',
-        ]));
+        $itemId = $this->createItem($context, $this->itemPayload(['base_uom_id' => $pcsUomId]));
 
-        $this->withAuth($context)->postJson("/api/v1/items/{$itemId}/units", [
-            'uom_id' => $boxUomId,
-            'unit_role' => 'sales',
-            'conversion_factor' => '10.000000',
-            'is_default' => true,
-        ])->assertCreated();
+        $created = $this->withAuth($context)->postJson("/api/v1/items/{$itemId}/prices", [
+            'price_type' => 'sales',
+            'amount' => '100.000000',
+            'currency_id' => $currencyId,
+            'uom_id' => $pcsUomId,
+            'effective_from' => '2026-01-01',
+        ])->assertCreated()
+            ->assertJsonPath('data.revision_no', 1)
+            ->assertJsonPath('data.row_version', 1)
+            ->assertJsonPath('data.is_current_revision', true);
 
-        $item = Item::query()->findOrFail($itemId);
-        $resolver = app(ItemPriceResolutionService::class);
-
-        $fallback = $resolver->resolvePrice(
-            item: $item,
-            context: ItemPriceResolutionService::CONTEXT_SALES,
-            uomId: $boxUomId,
-            organizationUnitId: $context['organization_unit_id'],
-            currencyId: $currencyId,
-            date: '2026-06-18',
-        );
-        $this->assertSame('standard_price', $fallback->source);
-        $this->assertSame('1000.000000', $fallback->amount);
-        $this->assertSame('10.000000', $fallback->metadata['conversion_factor']);
+        $priceId = (int) $created->json('data.id');
+        $lineageKey = (string) DB::table('item_prices')->where('id', $priceId)->value('lineage_key');
+        $created->assertJsonMissingPath('data.scope_key')
+            ->assertJsonMissingPath('data.lineage_key')
+            ->assertJsonMissingPath('data.supersedes_price_id');
 
         $this->withAuth($context)->postJson("/api/v1/items/{$itemId}/prices", [
             'price_type' => 'sales',
-            'amount' => '900.000000',
+            'amount' => '120.000000',
             'currency_id' => $currencyId,
-            'uom_id' => $boxUomId,
-        ])->assertCreated();
-        $specific = $resolver->resolvePrice(
-            item: $item->refresh(),
+            'uom_id' => $pcsUomId,
+            'effective_from' => '2026-06-01',
+        ])->assertUnprocessable()->assertJsonValidationErrors(['effective_from', 'effective_to']);
+
+        $superseded = $this->withAuth($context)->postJson("/api/v1/items/{$itemId}/prices/{$priceId}/supersede", [
+            'price_type' => 'sales',
+            'amount' => '125.000000',
+            'currency_id' => $currencyId,
+            'uom_id' => $pcsUomId,
+            'effective_from' => '2026-01-01',
+            'expected_version' => 1,
+            'correction_reason' => 'Approved annual price correction.',
+        ])->assertOk()
+            ->assertJsonPath('data.revision_no', 2)
+            ->assertJsonPath('data.amount', '125.000000')
+            ->assertJsonMissingPath('data.scope_key')
+            ->assertJsonMissingPath('data.lineage_key')
+            ->assertJsonMissingPath('data.supersedes_price_id');
+
+        $newPriceId = (int) $superseded->json('data.id');
+        $this->assertNotNull(DB::table('item_prices')->where('id', $priceId)->value('recorded_to'));
+        $this->assertDatabaseHas('item_prices', [
+            'id' => $newPriceId,
+            'recorded_to' => null,
+            'revision_no' => 2,
+            'lineage_key' => $lineageKey,
+            'supersedes_price_id' => $priceId,
+        ]);
+
+        $this->withAuth($context)->postJson("/api/v1/items/{$itemId}/prices/{$newPriceId}/supersede", [
+            'price_type' => 'sales',
+            'amount' => '130.000000',
+            'currency_id' => $currencyId,
+            'uom_id' => $pcsUomId,
+            'effective_from' => '2026-01-01',
+            'expected_version' => 99,
+            'correction_reason' => 'Stale correction attempt.',
+        ])->assertUnprocessable()->assertJsonValidationErrors(['expected_version']);
+
+        $item = Item::query()->findOrFail($itemId);
+        $resolver = app(ItemPriceResolutionService::class);
+        $resolved = $resolver->resolvePrice(
+            item: $item,
             context: ItemPriceResolutionService::CONTEXT_SALES,
-            uomId: $boxUomId,
+            uomId: $pcsUomId,
             organizationUnitId: $context['organization_unit_id'],
             currencyId: $currencyId,
             date: '2026-06-18',
         );
-        $this->assertSame('specific_price', $specific->source);
-        $this->assertSame('900.000000', $specific->amount);
+        $this->assertSame('item_price_revision', $resolved->source);
+        $this->assertSame('125.000000', $resolved->amount);
+        $this->assertSame(2, $resolved->metadata['revision_no']);
 
-        $serviceFallback = $resolver->resolvePrice(
-            item: $item->refresh(),
-            context: ItemPriceResolutionService::CONTEXT_SERVICE,
-            uomId: $boxUomId,
+        $missingCurrency = $resolver->resolvePrice(
+            item: $item,
+            context: ItemPriceResolutionService::CONTEXT_SALES,
+            uomId: $pcsUomId,
             organizationUnitId: $context['organization_unit_id'],
-            currencyId: $currencyId,
+            currencyId: $otherCurrencyId,
             date: '2026-06-18',
         );
-        $this->assertSame('specific_price', $serviceFallback->source);
-        $this->assertSame('sales', $serviceFallback->priceType);
+        $this->assertSame('manual', $missingCurrency->source);
+        $this->assertNull($missingCurrency->amount);
 
-        $purchase = $resolver->resolvePrice(
-            item: $item->refresh(),
-            context: ItemPriceResolutionService::CONTEXT_PURCHASE,
-            uomId: $boxUomId,
-            organizationUnitId: $context['organization_unit_id'],
-            currencyId: $currencyId,
-            date: '2026-06-18',
-        );
-        $this->assertSame('manual', $purchase->source);
-        $this->assertNull($purchase->amount);
-
-        $rental = $resolver->resolvePrice(
-            item: $item->refresh(),
-            context: ItemPriceResolutionService::CONTEXT_RENTAL,
-            uomId: $boxUomId,
-            organizationUnitId: $context['organization_unit_id'],
-            currencyId: $currencyId,
-            date: '2026-06-18',
-        );
-        $this->assertSame('manual', $rental->source);
-        $this->assertNull($rental->amount);
-
-        DB::table('item_prices')->where('item_id', $itemId)->delete();
-        try {
-            $resolver->resolvePrice(
-                item: $item->refresh(),
-                context: ItemPriceResolutionService::CONTEXT_SALES,
-                uomId: $boxUomId,
-                organizationUnitId: $context['organization_unit_id'],
-                currencyId: $otherCurrencyId,
-                date: '2026-06-18',
-            );
-            $this->fail('Currency mismatch should reject Standard Price fallback.');
-        } catch (InvalidArgumentException $exception) {
-            $this->assertStringContainsString('tenant base currency', $exception->getMessage());
-        }
-
-        try {
-            $resolver->resolvePrice(
-                item: $item->refresh(),
-                context: ItemPriceResolutionService::CONTEXT_SALES,
-                uomId: $caseUomId,
-                organizationUnitId: $context['organization_unit_id'],
-                currencyId: $currencyId,
-                date: '2026-06-18',
-            );
-            $this->fail('Missing active item unit should reject Standard Price conversion.');
-        } catch (InvalidArgumentException $exception) {
-            $this->assertStringContainsString('selected UOM', $exception->getMessage());
-        }
+        $this->withAuth($context)->deleteJson("/api/v1/items/{$itemId}/prices/{$newPriceId}")->assertNotFound();
     }
 
     public function test_item_with_relations_is_created_transactionally(): void
     {
         $context = $this->createAuthContext();
+        $currencyId = $this->createCurrency('LKR');
         $uomId = $this->createUom($context, 'PCS');
         $childId = $this->createItem($context, $this->itemPayload(['code' => 'CHILD', 'name' => 'Child', 'base_uom_id' => $uomId]));
 
@@ -210,7 +180,13 @@ final class ItemApiTest extends TestCase
                 'uom_id' => $uomId,
                 'line_type' => 'stock',
             ]],
-            'prices' => [['price_type' => 'sales', 'amount' => '125.500000', 'uom_id' => $uomId]],
+            'prices' => [[
+                'price_type' => 'sales',
+                'amount' => '125.500000',
+                'currency_id' => $currencyId,
+                'uom_id' => $uomId,
+                'effective_from' => '2026-01-01',
+            ]],
             'codes' => [['code_type' => 'internal_code', 'code' => 'KIT-CODE', 'is_primary' => true]],
             'usage_rules' => [['module_code' => 'sales', 'is_enabled' => true]],
         ])
@@ -375,24 +351,26 @@ final class ItemApiTest extends TestCase
     public function test_price_code_and_usage_rule_crud(): void
     {
         $context = $this->createAuthContext();
+        $currencyId = $this->createCurrency('LKR');
         $uomId = $this->createUom($context, 'PCS');
         $foreignUomId = $this->createUom($context, 'BOX');
         $itemId = $this->createItem($context, $this->itemPayload(['base_uom_id' => $uomId]));
 
         $priceId = (int) $this->withAuth($context)->postJson("/api/v1/items/{$itemId}/prices", [
-            'price_type' => 'sales', 'amount' => '10.500000', 'uom_id' => $uomId,
+            'price_type' => 'sales', 'amount' => '10.500000', 'currency_id' => $currencyId,
+            'uom_id' => $uomId, 'effective_from' => '2026-01-01',
         ])->assertCreated()->assertJsonPath('data.uom.code', 'PCS')->json('data.id');
-        $this->withAuth($context)->putJson("/api/v1/items/{$itemId}/prices/{$priceId}", [
-            'price_type' => 'sales', 'amount' => '11.750000', 'uom_id' => $uomId,
-        ])->assertOk()->assertJsonPath('data.amount', '11.750000');
         $this->withAuth($context)->postJson("/api/v1/items/{$itemId}/prices", [
-            'price_type' => 'sales', 'amount' => '12.000000', 'uom_id' => $foreignUomId,
+            'price_type' => 'sales', 'amount' => '12.000000', 'currency_id' => $currencyId,
+            'uom_id' => $foreignUomId, 'effective_from' => '2027-01-01',
         ])->assertUnprocessable()->assertJsonValidationErrors(['uom_id']);
         $this->withAuth($context)->postJson("/api/v1/items/{$itemId}/prices", [
-            'price_type' => 'standard', 'amount' => '12.000000', 'uom_id' => $uomId,
+            'price_type' => 'standard', 'amount' => '12.000000', 'currency_id' => $currencyId,
+            'uom_id' => $uomId, 'effective_from' => '2027-01-01',
         ])->assertUnprocessable()->assertJsonValidationErrors(['price_type']);
         $this->withAuth($context)->postJson("/api/v1/items/{$itemId}/prices", [
-            'price_type' => 'cost', 'amount' => '12.000000', 'uom_id' => $uomId,
+            'price_type' => 'cost', 'amount' => '12.000000', 'currency_id' => $currencyId,
+            'uom_id' => $uomId, 'effective_from' => '2027-01-01',
         ])->assertUnprocessable()->assertJsonValidationErrors(['price_type']);
 
         $codeId = (int) $this->withAuth($context)->postJson("/api/v1/items/{$itemId}/codes", [
@@ -421,7 +399,7 @@ final class ItemApiTest extends TestCase
             'module_code' => 'purchase', 'is_enabled' => false,
         ])->assertOk()->assertJsonPath('data.is_enabled', false);
 
-        $this->withAuth($context)->deleteJson("/api/v1/items/{$itemId}/prices/{$priceId}")->assertNoContent();
+        $this->withAuth($context)->deleteJson("/api/v1/items/{$itemId}/prices/{$priceId}")->assertNotFound();
         $this->withAuth($context)->deleteJson("/api/v1/items/{$itemId}/codes/{$codeId}")->assertNoContent();
         $this->withAuth($context)->deleteJson("/api/v1/items/{$itemId}/codes/{$secondCodeId}")->assertNoContent();
         $this->withAuth($context)->deleteJson("/api/v1/items/{$itemId}/usage-rules/{$ruleId}")->assertNoContent();

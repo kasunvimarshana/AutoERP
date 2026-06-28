@@ -36,7 +36,6 @@ trait MapsItemData
             trackingType: TrackingType::from((string) ($item['tracking_type'] ?? TrackingType::None->value)),
             costingMethod: CostingMethod::from((string) ($item['costing_method'] ?? CostingMethod::None->value)),
             baseUomId: $this->nullableInt($item, 'base_uom_id'),
-            standardPrice: $this->nullableString($item, 'standard_price'),
             defaultTaxGroupId: $this->nullableInt($item, 'default_tax_group_id'),
             purchaseTaxGroupId: $this->nullableInt($item, 'purchase_tax_group_id'),
             salesTaxGroupId: $this->nullableInt($item, 'sales_tax_group_id'),
@@ -69,15 +68,15 @@ trait MapsItemData
                 isRequired: (bool) ($row['is_required'] ?? true),
                 sortOrder: (int) ($row['sort_order'] ?? 0),
             ), $relations['bundles'] ?? []),
-            prices: array_map(static fn (array $row): ItemPriceData => new ItemPriceData(
+            prices: array_map(fn (array $row): ItemPriceData => new ItemPriceData(
                 priceType: ItemPriceType::from((string) $row['price_type']),
                 amount: (string) $row['amount'],
+                currencyId: (int) $row['currency_id'],
+                uomId: (int) $row['uom_id'],
+                organizationUnitId: $this->organizationUnitId(),
+                effectiveFrom: (string) $row['effective_from'],
                 itemVariantId: isset($row['item_variant_id']) ? (int) $row['item_variant_id'] : null,
-                currencyId: isset($row['currency_id']) ? (int) $row['currency_id'] : null,
-                uomId: isset($row['uom_id']) ? (int) $row['uom_id'] : null,
-                effectiveFrom: $row['effective_from'] ?? null,
                 effectiveTo: $row['effective_to'] ?? null,
-                isActive: (bool) ($row['is_active'] ?? true),
             ), $relations['prices'] ?? []),
             codes: array_map(static fn (array $row): ItemCodeData => new ItemCodeData(
                 codeType: ItemCodeType::from((string) $row['code_type']),

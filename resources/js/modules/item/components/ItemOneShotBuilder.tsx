@@ -21,13 +21,14 @@ import {
     type ItemUsageModule,
 } from '../itemTypes';
 import { ItemLookupSelect } from './ItemLookupSelect';
+import { ItemCurrencySelect } from './ItemCurrencySelect';
 import { ItemUomSelect } from './ItemUomSelect';
 
 export interface OneShotDraft {
     units: Array<ItemUnitPayload & { uom: NamedResource }>;
     variants: ItemVariantPayload[];
     bundles: Array<ItemBundlePayload & { child_item: ItemSummary; uom?: NamedResource | null }>;
-    prices: Array<ItemPricePayload & { uom?: NamedResource | null }>;
+    prices: Array<ItemPricePayload & { currency: NamedResource; uom: NamedResource }>;
     codes: ItemCodePayload[];
     usageRules: ItemUsageRulePayload[];
 }
@@ -115,12 +116,31 @@ function BundleDraft({ value, onChange }: DraftProps) {
 function PriceDraft({ value, onChange }: DraftProps) {
     const [priceType, setPriceType] = useState('sales');
     const [amount, setAmount] = useState('0.000000');
+    const [currency, setCurrency] = useState<NamedResource | null>(null);
     const [uom, setUom] = useState<NamedResource | null>(null);
-    return <DraftSection title="Initial prices" rows={value.prices.map((row) => `${row.price_type} / ${row.amount}${row.uom ? ` / ${row.uom.code}` : ''}`)} remove={(index) => onChange({ ...value, prices: value.prices.filter((_, rowIndex) => rowIndex !== index) })}>
+    const [effectiveFrom, setEffectiveFrom] = useState('');
+    return <DraftSection title="Initial prices" rows={value.prices.map((row) => `${row.price_type} / ${row.currency.code ?? ''} ${row.amount} / ${row.uom.code ?? ''} / ${row.effective_from}`)} remove={(index) => onChange({ ...value, prices: value.prices.filter((_, rowIndex) => rowIndex !== index) })}>
         <Select label="Price type" value={priceType} onChange={(event) => setPriceType(event.target.value)} options={options(itemPriceTypes)} />
         <Input label="Amount" value={amount} onChange={(event) => setAmount(event.target.value)} />
+        <ItemCurrencySelect value={currency} onChange={setCurrency} />
         <ItemUomSelect value={uom} onChange={setUom} />
-        <Button type="button" onClick={() => onChange({ ...value, prices: [...value.prices, { price_type: priceType, amount, uom, uom_id: uom ? Number(uom.id) : null, is_active: true }] })}>Add price</Button>
+        <Input label="Effective from" type="date" value={effectiveFrom} onChange={(event) => setEffectiveFrom(event.target.value)} />
+        <Button type="button" disabled={!currency || !uom || !effectiveFrom} onClick={() => {
+            if (!currency || !uom || !effectiveFrom) return;
+            onChange({ ...value, prices: [...value.prices, {
+                price_type: priceType,
+                amount,
+                currency,
+                currency_id: Number(currency.id),
+                uom,
+                uom_id: Number(uom.id),
+                effective_from: effectiveFrom,
+                effective_to: null,
+            }] });
+            setCurrency(null);
+            setUom(null);
+            setEffectiveFrom('');
+        }}>Add price revision</Button>
     </DraftSection>;
 }
 

@@ -49,8 +49,7 @@ Route::prefix('api/v1')->middleware($middleware)->name('api.v1.')->group(functio
 
     Route::get('items/{item}/prices', [ItemRelationController::class, 'prices'])->whereNumber('item')->name('items.prices.index');
     Route::post('items/{item}/prices', [ItemRelationController::class, 'storePrice'])->whereNumber('item')->name('items.prices.store');
-    Route::put('items/{item}/prices/{price}', [ItemRelationController::class, 'updatePrice'])->whereNumber(['item', 'price'])->name('items.prices.update');
-    Route::delete('items/{item}/prices/{price}', [ItemRelationController::class, 'deletePrice'])->whereNumber(['item', 'price'])->name('items.prices.destroy');
+    Route::post('items/{item}/prices/{price}/supersede', [ItemRelationController::class, 'supersedePrice'])->whereNumber(['item', 'price'])->name('items.prices.supersede');
 
     Route::get('items/{item}/codes', [ItemRelationController::class, 'codes'])->whereNumber('item')->name('items.codes.index');
     Route::post('items/{item}/codes', [ItemRelationController::class, 'storeCode'])->whereNumber('item')->name('items.codes.store');

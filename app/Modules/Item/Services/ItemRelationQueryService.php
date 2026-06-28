@@ -21,9 +21,19 @@ final class ItemRelationQueryService
         return $item->units()->with('uom')->orderBy('unit_role')->orderBy('id')->paginate($perPage);
     }
 
-    public function variants(Item $item, int $perPage): LengthAwarePaginator
+    public function variants(Item $item, array $criteria, int $perPage): LengthAwarePaginator
     {
-        return $item->variants()->orderBy('name')->paginate($perPage);
+        $search = trim((string) ($criteria['search'] ?? ''));
+
+        return $item->variants()
+            ->when($search !== '', fn ($query) => $query->where(fn ($match) => $match
+                ->where('code', 'like', '%'.$search.'%')
+                ->orWhere('name', 'like', '%'.$search.'%')
+                ->orWhere('sku', 'like', '%'.$search.'%')
+                ->orWhere('barcode', 'like', '%'.$search.'%')))
+            ->when(array_key_exists('is_active', $criteria), fn ($query) => $query->where('is_active', (bool) $criteria['is_active']))
+            ->orderBy('name')
+            ->paginate($perPage);
     }
 
     public function bundles(Item $item, int $perPage): LengthAwarePaginator
@@ -35,9 +45,22 @@ final class ItemRelationQueryService
             ->paginate($perPage);
     }
 
-    public function prices(Item $item, int $perPage): LengthAwarePaginator
+    public function prices(Item $item, ?int $organizationUnitId, int $perPage): LengthAwarePaginator
     {
-        return $item->prices()->with(['variant', 'currency', 'uom'])->orderByDesc('effective_from')->orderByDesc('id')->paginate($perPage);
+        return $item->prices()
+            ->with(['organizationUnit', 'variant', 'currency', 'uom'])
+            ->when(
+                $organizationUnitId === null,
+                fn ($query) => $query->whereNull('organization_unit_id'),
+                fn ($query) => $query->where(fn ($scope) => $scope
+                    ->whereNull('organization_unit_id')
+                    ->orWhere('organization_unit_id', $organizationUnitId)),
+            )
+            ->orderByRaw('case when recorded_to is null then 0 else 1 end')
+            ->orderByDesc('effective_from')
+            ->orderByDesc('revision_no')
+            ->orderByDesc('id')
+            ->paginate($perPage);
     }
 
     public function codes(Item $item, int $perPage): LengthAwarePaginator

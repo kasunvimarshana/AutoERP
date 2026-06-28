@@ -15,7 +15,7 @@ export function useItemRelationCrud<T extends { id: number }, P>({
     list: (itemId: number, page: number, signal: AbortSignal) => Promise<ApiCollection<T>>;
     create: (itemId: number, payload: P) => Promise<T>;
     update: (itemId: number, id: number, payload: P) => Promise<T>;
-    remove: (itemId: number, id: number) => Promise<unknown>;
+    remove?: (itemId: number, id: number) => Promise<unknown>;
 }) {
     const [page, setPage] = useState(1);
     const [editing, setEditing] = useState<T | null>(null);
@@ -62,6 +62,7 @@ export function useItemRelationCrud<T extends { id: number }, P>({
             }
         },
         destroy: async (row: T) => {
+            if (!remove) return;
             const confirmed = await confirm({ title: 'Delete relation record', message: 'This relation record will be permanently deleted.', confirmLabel: 'Delete' });
             if (!confirmed) return;
             setActionError(null);
