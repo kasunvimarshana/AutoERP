@@ -21,6 +21,8 @@ export interface ItemSummary extends NamedResource {
     brand?: NamedResource | null;
     tenant_base_currency?: NamedResource | null;
     base_uom?: NamedResource | null;
+    standard_price?: string | null;
+    standard_price_basis?: string | null;
     default_tax_group_id?: number | null;
     purchase_tax_group_id?: number | null;
     sales_tax_group_id?: number | null;
@@ -56,6 +58,7 @@ export interface ItemPayload {
     barcode?: string | null;
     description?: string | null;
     base_uom_id?: number | null;
+    standard_price?: string | null;
     default_tax_group_id?: number | null;
     purchase_tax_group_id?: number | null;
     sales_tax_group_id?: number | null;
@@ -117,33 +120,25 @@ export interface ItemBundlePayload {
 
 export interface ItemPrice {
     id: number;
-    scope: 'Tenant' | 'Organization Unit';
-    organization_unit: NamedResource | null;
     variant: NamedResource | null;
     price_type: string;
     currency: NamedResource | null;
     uom: NamedResource | null;
     amount: string;
-    effective_from: string;
+    effective_from?: string | null;
     effective_to?: string | null;
-    revision_no: number;
-    recorded_from: string;
-    recorded_to?: string | null;
-    correction_reason?: string | null;
-    row_version: number;
-    is_current_revision: boolean;
+    is_active: boolean;
 }
 
 export interface ItemPricePayload {
     item_variant_id?: number | null;
     price_type: string;
-    currency_id: number;
-    uom_id: number;
+    currency_id?: number | null;
+    uom_id?: number | null;
     amount: string;
-    effective_from: string;
+    effective_from?: string | null;
     effective_to?: string | null;
-    expected_version?: number;
-    correction_reason?: string;
+    is_active: boolean;
 }
 
 export interface ItemCode {

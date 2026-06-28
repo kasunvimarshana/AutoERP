@@ -14,10 +14,10 @@ return new class extends Migration
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants', 'id', indexName: 'tenant_subscriptions_tenant_fk')->restrictOnDelete();
             $table->unsignedInteger('revision_number');
-            $table->string('operation', 40);
+            $table->enum('operation', ['assign', 'renew', 'extend', 'correct']);
             $table->foreignId('tenant_plan_revision_id')->constrained('tenant_plan_revisions', 'id', indexName: 'tenant_subscriptions_tenant_plan_rev_fk')->restrictOnDelete();
             $table->unsignedBigInteger('supersedes_subscription_id')->nullable();
-            $table->string('contract_status', 40);
+            $table->enum('contract_status', ['trial', 'active']);
             $table->dateTime('starts_at');
             $table->timestamp('trial_ends_at')->nullable();
             $table->timestamp('ends_at')->nullable();
@@ -33,7 +33,7 @@ return new class extends Migration
             $table->decimal('price', 20, 6)->default('0.000000');
             $table->string('currency_code', 3);
             $table->string('currency_symbol', 20)->nullable();
-            $table->string('billing_interval', 40);
+            $table->enum('billing_interval', ['month', 'quarter', 'year']);
 
             $table->unsignedBigInteger('created_by')->nullable()->index('tenant_subscriptions_created_by_ix');
             $table->string('created_by_type', 40)->default('system');

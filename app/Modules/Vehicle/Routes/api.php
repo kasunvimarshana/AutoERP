@@ -7,7 +7,6 @@ use Modules\Vehicle\Http\Controllers\VehicleCategoryController;
 use Modules\Vehicle\Http\Controllers\VehicleController;
 use Modules\Vehicle\Http\Controllers\VehicleMakeController;
 use Modules\Vehicle\Http\Controllers\VehicleModelController;
-use Modules\Vehicle\Http\Controllers\VehicleOwnershipController;
 use Modules\Vehicle\Http\Controllers\VehicleRelationController;
 use Modules\Vehicle\Http\Controllers\VehicleTypeController;
 
@@ -21,17 +20,6 @@ $middleware = [
 ];
 
 Route::prefix('api/v1')->middleware($middleware)->name('api.v1.')->group(function (): void {
-
-    Route::prefix('vehicle-ownerships')->name('vehicle-ownerships.')->group(function (): void {
-        Route::get('/', [VehicleOwnershipController::class, 'index'])->name('index');
-        Route::post('/', [VehicleOwnershipController::class, 'store'])->name('store');
-        Route::get('{ownership}', [VehicleOwnershipController::class, 'show'])->whereNumber('ownership')->name('show');
-        Route::patch('{ownership}', [VehicleOwnershipController::class, 'update'])->whereNumber('ownership')->name('update');
-        Route::post('{ownership}/set-current', [VehicleOwnershipController::class, 'setCurrent'])->whereNumber('ownership')->name('set-current');
-        Route::post('{ownership}/clear-current', [VehicleOwnershipController::class, 'clearCurrent'])->whereNumber('ownership')->name('clear-current');
-        Route::delete('{ownership}', [VehicleOwnershipController::class, 'destroy'])->whereNumber('ownership')->name('destroy');
-    });
-
     Route::get('vehicles/lookup/{kind?}', [VehicleController::class, 'lookup'])
         ->whereIn('kind', ['active', 'by-customer', 'service-available', 'rental-available'])
         ->name('vehicles.lookup');
@@ -67,6 +55,18 @@ Route::prefix('api/v1')->middleware($middleware)->name('api.v1.')->group(functio
             ->whereNumber(['vehicle', 'document'])
             ->name('documents.destroy');
 
+        Route::get('ownerships', [VehicleRelationController::class, 'ownerships'])
+            ->whereNumber('vehicle')
+            ->name('ownerships.index');
+        Route::post('ownerships', [VehicleRelationController::class, 'storeOwnership'])
+            ->whereNumber('vehicle')
+            ->name('ownerships.store');
+        Route::put('ownerships/{ownership}', [VehicleRelationController::class, 'updateOwnership'])
+            ->whereNumber(['vehicle', 'ownership'])
+            ->name('ownerships.update');
+        Route::delete('ownerships/{ownership}', [VehicleRelationController::class, 'destroyOwnership'])
+            ->whereNumber(['vehicle', 'ownership'])
+            ->name('ownerships.destroy');
 
         Route::get('attributes', [VehicleRelationController::class, 'attributes'])
             ->whereNumber('vehicle')

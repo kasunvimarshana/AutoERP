@@ -25,7 +25,6 @@ use Modules\Purchase\Models\PurchaseOrderLine;
 use Modules\Purchase\Models\PurchaseReturn;
 use Modules\Purchase\Models\PurchaseReturnAdjustmentAllocation;
 use Modules\Purchase\Models\PurchaseReturnLine;
-use Modules\Purchase\Services\Tax\PurchaseReturnTaxDocumentMapper;
 use Modules\Purchase\Validators\PurchaseValidationService;
 use Modules\Tax\Services\TaxReturnAllocationService;
 
@@ -42,7 +41,6 @@ final class PurchaseReturnService
         private readonly PurchaseReturnValuationService $valuations,
         private readonly PurchaseStatusService $statuses,
         private readonly TaxReturnAllocationService $taxReturns,
-        private readonly PurchaseReturnTaxDocumentMapper $taxReturnMapper,
         private readonly PurchaseDocumentLockService $locks,
     ) {}
 
@@ -300,10 +298,7 @@ final class PurchaseReturnService
             $return->debit_note_id = $debitNote?->getKey();
             $return->save();
 
-            $this->taxReturns->reverse($this->taxReturnMapper->map(
-                $return->refresh()->load('lines'),
-                $debitNote === null ? null : (int) $debitNote->getKey(),
-            ));
+            $this->taxReturns->reversePurchaseReturn($return->refresh()->load('lines'), $debitNote === null ? null : (int) $debitNote->getKey());
 
             return new PurchasePostingResult(
                 (int) $return->getKey(),

@@ -11,11 +11,11 @@ final readonly class ItemPriceData
     public function __construct(
         public ItemPriceType $priceType,
         public string $amount,
-        public int $currencyId,
-        public int $uomId,
-        public ?int $organizationUnitId,
-        public string $effectiveFrom,
         public ?int $itemVariantId = null,
+        public ?int $currencyId = null,
+        public ?int $uomId = null,
+        public ?string $effectiveFrom = null,
         public ?string $effectiveTo = null,
+        public bool $isActive = true,
     ) {}
 }

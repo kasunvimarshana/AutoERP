@@ -8,7 +8,6 @@ use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Models\Invoice;
-use Modules\Invoice\Services\Tax\InvoiceTaxDocumentMapper;
 use Modules\Tax\Services\TaxDocumentIntegrationService;
 
 final class InvoiceStatusService
@@ -16,7 +15,6 @@ final class InvoiceStatusService
     public function __construct(
         private readonly TaxDocumentIntegrationService $taxDocuments,
         private readonly InvoiceSourceRestorationService $sourceRestoration,
-        private readonly InvoiceTaxDocumentMapper $taxDocumentMapper,
     ) {}
 
     /**
@@ -82,7 +80,7 @@ final class InvoiceStatusService
                 $updates['approved_at'] = now();
             }
             if ($to === InvoiceStatus::Posted) {
-                $this->taxDocuments->snapshot($this->taxDocumentMapper->map($invoice));
+                $this->taxDocuments->snapshotInvoice($invoice);
                 $updates['posted_at'] = now();
             }
 
@@ -92,7 +90,7 @@ final class InvoiceStatusService
                 $this->sourceRestoration->restore($invoice);
             }
             if ($to === InvoiceStatus::Posted) {
-                $this->taxDocuments->post($this->taxDocumentMapper->map($invoice->refresh()));
+                $this->taxDocuments->postInvoice($invoice->refresh());
             }
 
             return $invoice->refresh();

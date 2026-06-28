@@ -15,15 +15,15 @@ return new class extends Migration
             $table->foreignId('tenant_id')->constrained('tenants', 'id', indexName: 'invoices_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->string('invoice_number', 100);
-            $table->string('invoice_type', 40);
-            $table->string('direction', 40);
+            $table->enum('invoice_type', ['purchase', 'sales', 'service', 'rental', 'manual', 'credit', 'debit']);
+            $table->enum('direction', ['inbound', 'outbound']);
             $table->string('party_type')->nullable();
             $table->unsignedBigInteger('party_id')->nullable();
             $table->date('invoice_date');
             $table->date('due_date')->nullable();
             $table->foreignId('currency_id')->nullable()->constrained('currencies', 'id', indexName: 'invoices_currency_fk')->nullOnDelete();
             $table->decimal('exchange_rate', 20, 6)->default('1.000000');
-            $table->string('status', 40)->default('draft');
+            $table->enum('status', ['draft', 'approved', 'posted', 'partially_paid', 'paid', 'cancelled', 'void'])->default('draft');
             $table->decimal('subtotal', 20, 6)->default('0');
             $table->decimal('discount_total', 20, 6)->default('0');
             $table->decimal('tax_total', 20, 6)->default('0');

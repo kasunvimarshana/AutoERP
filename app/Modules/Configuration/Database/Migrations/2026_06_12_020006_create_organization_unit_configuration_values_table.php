@@ -18,7 +18,7 @@ return new class extends Migration
             $table->string('key', 191);
             $table->unsignedInteger('definition_version');
             $table->longText('value')->nullable();
-            $table->string('value_type', 40);
+            $table->enum('value_type', ['string', 'integer', 'decimal', 'boolean', 'json']);
             $table->boolean('is_sensitive')->default(false);
             $table->timestamps();
 

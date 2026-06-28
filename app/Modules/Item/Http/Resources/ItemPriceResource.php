@@ -16,8 +16,6 @@ final class ItemPriceResource extends JsonResource
     {
         return [
             'id' => (int) $this->getKey(),
-            'scope' => $this->organization_unit_id === null ? 'Tenant' : 'Organization Unit',
-            'organization_unit' => $this->whenLoaded('organizationUnit', fn () => $this->namedResource($this->organizationUnit)),
             'variant' => $this->whenLoaded('variant', fn () => $this->namedResource($this->variant)),
             'price_type' => $this->enumValue($this->price_type),
             'currency' => $this->whenLoaded('currency', fn () => $this->namedResource($this->currency, true)),
@@ -25,12 +23,7 @@ final class ItemPriceResource extends JsonResource
             'amount' => (string) $this->amount,
             'effective_from' => $this->effective_from?->format('Y-m-d'),
             'effective_to' => $this->effective_to?->format('Y-m-d'),
-            'revision_no' => (int) $this->revision_no,
-            'recorded_from' => $this->recorded_from?->toISOString(),
-            'recorded_to' => $this->recorded_to?->toISOString(),
-            'correction_reason' => $this->correction_reason,
-            'row_version' => (int) $this->row_version,
-            'is_current_revision' => $this->recorded_to === null,
+            'is_active' => (bool) $this->is_active,
         ];
     }
 }

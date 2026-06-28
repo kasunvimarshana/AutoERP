@@ -15,8 +15,6 @@ return new class extends Migration
             $table->foreignId('tenant_id')->constrained('tenants', 'id', indexName: 'supplier_tax_profiles_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('supplier_id');
-            $table->string('party_code_snapshot', 100);
-            $table->string('party_name_snapshot', 255);
             $table->foreignId('tax_group_id')->nullable();
             $table->string('registration_number')->nullable();
             $table->string('exemption_status', 50)->default('taxable');
@@ -34,7 +32,7 @@ return new class extends Migration
             $table->foreign(['supplier_id', 'tenant_id'], 'supplier_tax_profiles_supplier_id_tenant_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('suppliers')
-                ->restrictOnDelete();
+                ->cascadeOnDelete();
             $table->foreign(['tax_group_id', 'tenant_id'], 'supplier_tax_profiles_tax_group_id_tenant_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('tax_groups')

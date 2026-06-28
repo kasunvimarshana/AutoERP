@@ -822,17 +822,11 @@ final class VehicleServiceEngineTest extends TestCase
             'updated_at' => now(),
         ]);
 
-        DB::table('vehicle_ownerships')->insert([
-            'row_version' => 1,
+        DB::table('customer_vehicles')->insert([
             'tenant_id' => $tenantId,
-            'organization_unit_id' => null,
             'vehicle_id' => $vehicleId,
-            'owner_type' => 'customer',
-            'owner_id' => $customerId,
-            'owner_key' => 'customer:'.$customerId,
-            'owner_code_snapshot' => $code,
-            'owner_name_snapshot' => 'Customer '.$code,
-            'ownership_type' => 'customer_owned',
+            'customer_id' => $customerId,
+            'relationship_type' => 'customer_owned',
             'started_at' => now(),
             'is_current' => true,
             'current_guard' => 1,

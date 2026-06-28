@@ -156,8 +156,9 @@ export const listItemPrices = (itemId: number, params: ListParams, signal?: Abor
     apiClient.get<ApiCollection<ItemPrice>>(relationPath(itemId, 'prices'), { params, signal }).then((response) => response.data);
 export const createItemPrice = (itemId: number, payload: ItemPricePayload) =>
     apiClient.post<ApiResource<ItemPrice>>(relationPath(itemId, 'prices'), payload).then((response) => response.data.data);
-export const supersedeItemPrice = (itemId: number, id: number, payload: ItemPricePayload) =>
-    apiClient.post<ApiResource<ItemPrice>>(`${relationPath(itemId, 'prices')}/${id}/supersede`, payload).then((response) => response.data.data);
+export const updateItemPrice = (itemId: number, id: number, payload: ItemPricePayload) =>
+    apiClient.put<ApiResource<ItemPrice>>(`${relationPath(itemId, 'prices')}/${id}`, payload).then((response) => response.data.data);
+export const deleteItemPrice = (itemId: number, id: number) => apiClient.delete(`${relationPath(itemId, 'prices')}/${id}`);
 
 export const listItemCodes = (itemId: number, params: ListParams, signal?: AbortSignal) =>
     apiClient.get<ApiCollection<ItemCode>>(relationPath(itemId, 'codes'), { params, signal }).then((response) => response.data);

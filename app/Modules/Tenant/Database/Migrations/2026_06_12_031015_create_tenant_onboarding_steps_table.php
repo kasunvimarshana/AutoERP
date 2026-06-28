@@ -15,7 +15,7 @@ return new class extends Migration
             $table->foreignId('tenant_id')->constrained('tenants', 'id', indexName: 'tenant_onboarding_steps_tenant_fk')->restrictOnDelete();
             $table->string('step', 80);
             $table->string('owner_module', 80);
-            $table->string('status', 40)->default('pending');
+            $table->enum('status', ['pending', 'running', 'completed', 'failed'])->default('pending');
             $table->unsignedInteger('attempt_count')->default(0);
             $table->uuid('operation_id')->nullable();
             $table->timestamp('started_at')->nullable();

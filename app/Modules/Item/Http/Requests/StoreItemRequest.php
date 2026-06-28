@@ -32,7 +32,7 @@ final class StoreItemRequest extends TenantScopedRequest
             'barcode' => ['nullable', 'string', 'max:120'],
             'description' => ['nullable', 'string'],
             'base_uom_id' => ['nullable', 'integer', 'min:1'],
-            'standard_price' => ['prohibited'],
+            'standard_price' => ['nullable', 'decimal:0,6', 'gte:0'],
             'default_tax_group_id' => ['nullable', 'integer', 'min:1', $this->tenantExists('tax_groups', 'id')],
             'purchase_tax_group_id' => ['nullable', 'integer', 'min:1', $this->tenantExists('tax_groups', 'id')],
             'sales_tax_group_id' => ['nullable', 'integer', 'min:1', $this->tenantExists('tax_groups', 'id')],

@@ -1,6 +1,4 @@
 # AutoERP Vehicle Rental — Complete Database Design
-
-> **Current architecture note (2026-06-28):** This document began as a clone-84 workflow/schema study. Current AutoERP ownership decisions supersede its historical implementation references: Vehicle owns `vehicle_ownerships`; the generic Extension/attachments subsystem is removed; scanned private files use owner-module metadata backed by the `PrivateObject` capability.
 ## Videos as Source of Truth + clone-84 Schema Alignment
 
 > **Source of truth**
@@ -11,7 +9,7 @@
 > - `2.mp4`
 > - `Recording 2026-06-21 132314.mp4`
 >
-> The recordings define the business behavior. The current `clone-84-ui` codebase was inspected to align the design with existing AutoERP modules and avoid duplicating Invoice, Payment, Finance, Tax, Customer, Supplier, Vehicle, HR and PrivateObject capabilities.
+> The recordings define the business behavior. The current `clone-84-ui` codebase was inspected to align the design with existing AutoERP modules and avoid duplicating Invoice, Payment, Finance, Tax, Customer, Supplier, Vehicle, HR and Attachment capabilities.
 >
 > The project is still under development, so this design assumes a **clean baseline migration rewrite** is allowed. Preserve required business behavior, but do not preserve weak legacy schema merely for migration-history compatibility.
 
@@ -91,7 +89,7 @@ These two financial sides must retain independent:
 - Approval fields on usage and expenses.
 - Generic Invoice, Payment, Finance and Tax modules already exist.
 - `invoice_sources` and `invoice_source_lines` can link rental calculations to financial documents.
-- Scanned private objects are stored through the `PrivateObject` capability; each owning module retains explicit document metadata and lifecycle records.
+- Generic `attachments` table exists and should replace JSON attachment arrays.
 
 ## 3.2 Critical gaps against the videos
 
@@ -113,7 +111,7 @@ These two financial sides must retain independent:
 11. `rental_payment_links` duplicates Payment module source/allocation capabilities.
 12. `rental_expenses` is overly wide and combines expense, recovery, tax and generated-charge concerns.
 13. Billing, run, calculation and charge tables repeatedly copy agreement, party and period data, creating drift risk.
-14. Attachment arrays and generic polymorphic attachment persistence are unsafe; rental-owned document metadata must reference scanned private objects explicitly.
+14. `attachments` are stored as JSON despite the existing reusable attachments table.
 15. Agreement conditions are stored only as one JSON snapshot.
 16. Current statuses do not fully cover suspension, termination, reversal, supersession and period reopening.
 17. Current inspection tables cannot represent accessories, missing documents, keys or individual damage items cleanly.
@@ -163,6 +161,7 @@ These two financial sides must retain independent:
 - `suppliers`
 - `vehicles`
 - `vehicle_ownerships`
+- `supplier_vehicles`
 - `hr_employees`
 - `currencies`
 - `tax_groups`
@@ -180,7 +179,7 @@ These two financial sides must retain independent:
 - `finance_journal_entries`
 - `finance_journal_lines`
 - `finance_ledger_entries`
-- owner-module document metadata backed by `PrivateObject` storage
+- `attachments`
 
 ---
 
@@ -561,7 +560,7 @@ Indexes:
 - `(vehicle_id, occurred_at)`.
 - `(vehicle_allocation_id, event_type, occurred_at)`.
 - `(status, occurred_at)`.
-- Attach photos/signatures through rental-owned document metadata backed by scanned `PrivateObject` storage.
+- Attach photos/signatures through generic `attachments` with this record as attachable.
 
 ---
 
@@ -831,7 +830,7 @@ Constraints:
 - Unique `(tenant_id, fingerprint)`.
 - Index `(vehicle_id, expense_date, status)`.
 - Index `(agreement_id, expense_type, status)`.
-- Attach files through rental-owned document metadata backed by scanned `PrivateObject` storage, not JSON arrays.
+- Attach files through `attachments`, not JSON.
 
 ---
 

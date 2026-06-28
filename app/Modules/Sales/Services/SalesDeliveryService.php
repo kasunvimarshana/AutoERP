@@ -13,7 +13,6 @@ use Modules\Sales\Models\SalesDelivery;
 use Modules\Sales\Models\SalesHeaderAdjustment;
 use Modules\Sales\Models\SalesOrder;
 use Modules\Sales\Models\SalesOrderLine;
-use Modules\Sales\Services\Tax\SalesDeliveryTaxDocumentMapper;
 use Modules\Sales\Validators\SalesValidationService;
 use Modules\Tax\Services\TaxDocumentIntegrationService;
 
@@ -28,7 +27,6 @@ final class SalesDeliveryService
         private readonly SalesNumberService $numbers,
         private readonly SalesStatusService $statuses,
         private readonly TaxDocumentIntegrationService $taxDocuments,
-        private readonly SalesDeliveryTaxDocumentMapper $taxDocumentMapper,
         private readonly SalesDocumentLockService $locks,
         private readonly SalesDocumentBlockerService $blockers,
     ) {}
@@ -166,7 +164,7 @@ final class SalesDeliveryService
             $delivery->posted_by = $userId;
             $delivery->posted_at = now();
             $delivery->save();
-            $this->taxDocuments->post($this->taxDocumentMapper->map($delivery->refresh()->load(['lines.salesOrderLine'])));
+            $this->taxDocuments->postSalesDelivery($delivery->refresh()->load(['lines.salesOrderLine']));
 
             return $this->load($delivery);
         });
@@ -207,11 +205,7 @@ final class SalesDeliveryService
             $delivery->reversed_by = $userId;
             $delivery->reversed_at = now();
             $delivery->save();
-            $this->taxDocuments->reverse(
-                $this->taxDocumentMapper->map($delivery->refresh()->load(['lines.salesOrderLine'])),
-                'sales_delivery_reversal',
-                'sales_delivery_reversal',
-            );
+            $this->taxDocuments->reverseSalesDelivery($delivery->refresh()->load(['lines.salesOrderLine']));
 
             return $this->load($delivery);
         });

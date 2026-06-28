@@ -7,7 +7,6 @@ namespace Modules\Item\Database\Seeders;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Str;
 use Database\Seeders\Concerns\ResolvesSeedContext;
 use Modules\Item\Models\Item;
 use Modules\Item\Models\ItemBrand;
@@ -15,15 +14,12 @@ use Modules\Item\Models\ItemBundle;
 use Modules\Item\Models\ItemCategory;
 use Modules\Item\Models\ItemPrice;
 use Modules\Item\Models\ItemUnit;
-use Modules\Item\Enums\ItemPriceType;
-use Modules\Item\Services\ItemPriceScopeKey;
+use Modules\Item\Services\ItemAuthorizationService;
 use Modules\UOM\Models\UnitOfMeasureModel;
 
 final class ItemSeeder extends Seeder
 {
     use ResolvesSeedContext;
-
-    private const SAMPLE_PRICE_EFFECTIVE_FROM = '2026-01-01';
 
     public function run(): void
     {
@@ -31,6 +27,7 @@ final class ItemSeeder extends Seeder
             return;
         }
 
+        $this->seedPermissions();
 
         $tenant = $this->defaultTenant();
         $organizationUnit = $this->defaultOrganizationUnit($tenant);
@@ -105,16 +102,16 @@ final class ItemSeeder extends Seeder
         ItemBrand $brand,
     ): array {
         $definitions = [
-            'ENGINE-OIL' => ['Engine Oil', 'CONSUMABLES', 'consumable', 'LTR', true, false, 'none', 'weighted_average'],
-            'OIL-FILTER' => ['Oil Filter', 'PARTS', 'stock', 'PCS', true, false, 'none', 'fifo'],
-            'BRAKE-PAD' => ['Brake Pad', 'PARTS', 'stock', 'PCS', true, false, 'none', 'fifo'],
-            'LABOUR-SERVICE' => ['Labour Service', 'LABOUR', 'labour', 'HOUR', false, false, 'none', 'none'],
-            'INSPECTION-SERVICE' => ['Inspection Service', 'SERVICES', 'service', 'HOUR', false, false, 'none', 'none'],
-            'FULL-SERVICE-PACKAGE' => ['Full Service Package', 'PACKAGES', 'package', 'PCS', false, true, 'none', 'none'],
+            'ENGINE-OIL' => ['Engine Oil', 'CONSUMABLES', 'consumable', 'LTR', true, false, 'none', 'weighted_average', '20.000000'],
+            'OIL-FILTER' => ['Oil Filter', 'PARTS', 'stock', 'PCS', true, false, 'none', 'fifo', '10.000000'],
+            'BRAKE-PAD' => ['Brake Pad', 'PARTS', 'stock', 'PCS', true, false, 'none', 'fifo', '50.000000'],
+            'LABOUR-SERVICE' => ['Labour Service', 'LABOUR', 'labour', 'HOUR', false, false, 'none', 'none', '25.000000'],
+            'INSPECTION-SERVICE' => ['Inspection Service', 'SERVICES', 'service', 'HOUR', false, false, 'none', 'none', '15.000000'],
+            'FULL-SERVICE-PACKAGE' => ['Full Service Package', 'PACKAGES', 'package', 'PCS', false, true, 'none', 'none', '100.000000'],
         ];
 
         $items = [];
-        foreach ($definitions as $code => [$name, $categoryCode, $itemType, $uomCode, $stockable, $combo, $tracking, $costing]) {
+        foreach ($definitions as $code => [$name, $categoryCode, $itemType, $uomCode, $stockable, $combo, $tracking, $costing, $standardPrice]) {
             $uom = $this->uom($tenantId, $uomCode);
             $items[$code] = Item::query()->updateOrCreate(
                 ['tenant_id' => $tenantId, 'code' => $code],
@@ -130,6 +127,7 @@ final class ItemSeeder extends Seeder
                     'tracking_type' => $tracking,
                     'costing_method' => $costing,
                     'base_uom_id' => $uom?->getKey(),
+                    'standard_price' => $standardPrice,
                     'is_stockable' => $stockable,
                     'is_combo' => $combo,
                     'is_active' => true,
@@ -205,40 +203,21 @@ final class ItemSeeder extends Seeder
 
         foreach ($prices as $itemCode => $amount) {
             $item = $items[$itemCode];
-            if ($item->base_uom_id === null) {
-                continue;
-            }
-
-            $scopeKey = ItemPriceScopeKey::for(
-                organizationUnitId: $organizationUnitId,
-                itemVariantId: null,
-                priceType: ItemPriceType::Sales,
-                currencyId: (int) $currency->getKey(),
-                uomId: (int) $item->base_uom_id,
-            );
-
-            ItemPrice::query()->firstOrCreate(
+            ItemPrice::query()->updateOrCreate(
                 [
                     'tenant_id' => $tenantId,
                     'item_id' => $item->getKey(),
-                    'scope_key' => $scopeKey,
-                    'effective_from' => self::SAMPLE_PRICE_EFFECTIVE_FROM,
-                    'recorded_to' => null,
-                ],
-                [
-                    'row_version' => 1,
-                    'organization_unit_id' => $organizationUnitId,
-                    'item_variant_id' => null,
-                    'price_type' => ItemPriceType::Sales->value,
+                    'price_type' => 'sales',
                     'currency_id' => $currency->getKey(),
                     'uom_id' => $item->base_uom_id,
+                ],
+                [
+                    'organization_unit_id' => $organizationUnitId,
+                    'item_variant_id' => null,
                     'amount' => $amount,
+                    'effective_from' => null,
                     'effective_to' => null,
-                    'lineage_key' => (string) Str::uuid(),
-                    'revision_no' => 1,
-                    'supersedes_price_id' => null,
-                    'recorded_from' => now(),
-                    'correction_reason' => null,
+                    'is_active' => true,
                 ],
             );
         }
@@ -293,4 +272,26 @@ final class ItemSeeder extends Seeder
             ->first();
     }
 
+    private function seedPermissions(): void
+    {
+        if (! Schema::hasTable('permissions')) {
+            return;
+        }
+
+        $guard = (string) config('auth.defaults.guard', 'web');
+        foreach (DB::table('tenants')->pluck('id') as $tenantId) {
+            foreach (ItemAuthorizationService::descriptions() as $name => $description) {
+                DB::table('permissions')->updateOrInsert(
+                    ['tenant_id' => $tenantId, 'name' => $name, 'guard_name' => $guard],
+                    [
+                        'module' => 'Item',
+                        'description' => $description,
+                        'row_version' => 1,
+                        'updated_at' => now(),
+                        'created_at' => now(),
+                    ],
+                );
+            }
+        }
+    }
 }

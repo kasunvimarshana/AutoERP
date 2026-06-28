@@ -50,6 +50,7 @@ export default function ItemEditPage() {
     const [category, setCategory] = useState<NamedResource | null>(null);
     const [brand, setBrand] = useState<NamedResource | null>(null);
     const [baseUom, setBaseUom] = useState<NamedResource | null>(null);
+    const [tenantBaseCurrency, setTenantBaseCurrency] = useState<NamedResource | null>(null);
     const [baseUomAudit, setBaseUomAudit] = useState<BaseUomUsageAudit | null>(null);
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
@@ -76,6 +77,7 @@ export default function ItemEditPage() {
                     sku: item.sku ?? null,
                     barcode: item.barcode ?? null,
                     description: item.description ?? null,
+                    standard_price: item.standard_price ?? null,
                     is_stockable: item.is_stockable,
                     is_combo: item.is_combo,
                     is_tax_exempt: item.is_tax_exempt ?? false,
@@ -84,6 +86,7 @@ export default function ItemEditPage() {
                 setCategory(item.category ?? null);
                 setBrand(item.brand ?? null);
                 setBaseUom(item.base_uom ?? null);
+                setTenantBaseCurrency(item.tenant_base_currency ?? null);
                 setBaseUomAudit(audit);
             })
             .catch((requestError) => !controller.signal.aborted && setError(toApiError(requestError)))
@@ -111,7 +114,7 @@ export default function ItemEditPage() {
                             onBrandChange={(next) => { formGuard.markDirty(); setBrand(next); }}
                             baseUom={baseUom}
                             onBaseUomChange={(next) => { formGuard.markDirty(); setBaseUom(next); }}
-
+                            tenantBaseCurrency={tenantBaseCurrency}
                             error={error}
                             baseUomLocked={baseUomAudit?.has_usage === true}
                             baseUomChangeHref={`/items/${itemId}/edit?tab=units`}

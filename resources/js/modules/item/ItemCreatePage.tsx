@@ -37,6 +37,7 @@ const initialItem: ItemPayload = {
     sku: null,
     barcode: null,
     description: null,
+    standard_price: null,
     is_stockable: true,
     is_combo: false,
     is_tax_exempt: false,
@@ -99,7 +100,7 @@ function toPayload(item: ItemPayload, draft: OneShotDraft): ItemWithRelationsPay
         units: draft.units.map(({ uom: _uom, ...row }) => row),
         variants: draft.variants,
         bundles: draft.bundles.map(({ child_item: _child, uom: _uom, ...row }) => row),
-        prices: draft.prices.map(({ currency: _currency, uom: _uom, ...row }) => row),
+        prices: draft.prices.map(({ uom: _uom, ...row }) => row),
         codes: draft.codes,
         usage_rules: draft.usageRules,
     };

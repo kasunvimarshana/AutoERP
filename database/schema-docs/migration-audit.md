@@ -1,143 +1,235 @@
-# AutoERP Migration and Architecture Foundation Audit
+# AutoERP Migration Audit
 
-Audit date: 2026-06-28
+Audit date: 2026-06-12
 
-Scope: canonical create migrations and the architecture-foundation ownership milestone recovered from the verified Item Pricing baseline. This is a source-level audit; runtime database migration success is a separate release gate.
+Scope: `app/Modules`, module migrations, models, relationships, services, requests, resources, seeders, tests, `resources/js`, and migration history.
 
-## Verified result
+## Result
 
-- 246 migration files create 246 unique tables.
-- Every migration creates exactly one table and drops the same table in `down()`.
-- No migration uses `Schema::table()` patching.
-- No duplicate migration timestamps or table creations remain.
-- Native database enum calls: 0. Governed values use bounded portable string columns and application/domain validation.
-- Explicit key names scanned: 2,010; longest identifier: 60 characters.
-- Production module graph: 29 modules, 183 direct edges, 0 cyclic components.
-- The generic `Extension` module and duplicate `customer_vehicles` / `supplier_vehicles` persistence were removed.
-- `Idempotency` owns idempotency persistence. `PrivateObject` owns private storage capability and intentionally has no database table.
+- 191 module migrations create 191 module-owned tables.
+- Every module migration creates exactly one table.
+- No module migration uses `Schema::table`.
+- No duplicate migration basenames remain.
+- All declared non-self FK targets are created before their referencing table.
+- All 197 created tables, including Laravel infrastructure tables, are documented in `tables.md`.
+- No application field was removed during this cleanup.
 
-## Ownership decisions
+## Execution Order
 
-- `Core` contains technical primitives only; it does not own password hashing, private-object storage, or idempotency persistence.
-- `Vehicle` owns the authoritative `vehicle_ownerships` history. Customer and Supplier provide owner snapshot resolvers only.
-- `User` is the only production writer of the tenant permission catalogue; feature modules register definitions.
-- `Invoice` publishes cancellation contexts; source modules restore their own records.
-- `Tax` consumes owner-provided immutable document/item/party DTOs rather than importing concrete business models.
-- `Item` owns base-UOM revision commands; `Inventory` owns conversion of inventory balances, reservations, allocations, and valuation records.
+| Prefix | Module/area | Dependency note |
+| --- | --- | --- |
+| `000xxx` | Configuration reference data | Countries, currencies, languages, timezones, and system configuration. |
+| `010xxx` | Tenant | Depends on configuration currencies. |
+| `015xxx` | Tenant configuration extension | Configuration-owned table with an FK to Tenant. |
+| `020xxx` | OrganizationUnit | Depends on Tenant. |
+| `030xxx` | User | Depends on Tenant and OrganizationUnit. |
+| `031xxx` | Auth | Depends on User, Tenant, and OrganizationUnit. |
+| `040xxx` | Sequence | Depends on Tenant and OrganizationUnit. |
+| `050xxx` | UOM | Depends on Tenant and OrganizationUnit. |
+| `060xxx` | Warehouse | Depends on Tenant and OrganizationUnit. |
+| `070xxx` | Finance | Depends on configuration, Tenant, and OrganizationUnit. |
+| `080xxx` | Tax master/posting/snapshots | Depends on Finance for posting accounts. |
+| `090xxx` | Item | Depends on UOM and Tax master tables. |
+| `100xxx` | Supplier | Depends on Item for supplier-item mappings. |
+| `110xxx` | Customer | Depends on configuration, Tenant, and OrganizationUnit. |
+| `115xxx` | Tax party extensions | Tax-owned customer/supplier profiles; intentionally run after both party modules. |
+| `120xxx` | Vehicle | Depends on Customer. |
+| `130xxx` | HR | Depends on configuration currencies. |
+| `140xxx` | Inventory | Depends on Item, UOM, and Warehouse. |
+| `150xxx` | Invoice | Depends on Inventory, Item, and UOM. |
+| `160xxx` | Payment | Depends on Finance and Invoice. |
+| `170xxx` | Purchase | Depends on Supplier, Inventory, Invoice, Item, and UOM. |
+| `180xxx` | Sales | Depends on Customer, Inventory, Invoice, Item, and UOM. |
+| `190xxx` | VehicleService | Depends on Vehicle, HR, Inventory, Invoice, and Payment. |
+| `200xxx` | Audit | Runs after business modules and owns no business tables. |
+| `210xxx` | Extension | Runs last and references shared business identities polymorphically. |
 
-## Migration inventory
+## Module Inventory
 
-### Infrastructure
+### Core
 
-Tables (5): `cache`, `cache_locks`, `jobs`, `job_batches`, `failed_jobs`.
+No business tables or migrations. Core provides shared application infrastructure only.
 
 ### Configuration
 
-Tables (6): `global_configuration_values`, `tenant_configuration_values`, `organization_unit_configuration_values`, `global_configuration_value_revisions`, `tenant_configuration_value_revisions`, `organization_unit_configuration_value_revisions`.
+- `2026_06_12_000001_create_countries_table`
+- `2026_06_12_000002_create_currencies_table`
+- `2026_06_12_000003_create_languages_table`
+- `2026_06_12_000004_create_timezones_table`
+- `2026_06_12_000005_create_global_configuration_values_table`
+- `2026_06_12_015001_create_tenant_configuration_values_table`
+
+Tables: `countries`, `currencies`, `languages`, `timezones`, `global_configuration_values`, `tenant_configuration_values`, `organization_unit_configuration_values`.
 
 ### Tenant
 
-Tables (14): `tenant_plans`, `tenant_plan_revisions`, `tenants`, `tenant_subscriptions`, `tenant_current_subscriptions`, `tenant_documents`, `tenant_domains`, `tenant_primary_domains`, `tenant_storage_cleanup_jobs`, `tenant_event_outbox`, `tenant_subscription_events`, `tenant_lifecycle_events`, `tenant_onboarding_states`, `tenant_onboarding_steps`.
+Migrations: `create_tenant_plans_table`, `create_tenants_table`, `create_tenant_documents_table`, `create_tenant_domains_table`, `create_tenant_storage_cleanup_jobs_table`, `create_tenant_event_outbox_table`.
+
+Tables: `tenant_plans`, `tenants`, `tenant_documents`, `tenant_domains`, `tenant_storage_cleanup_jobs`, `tenant_event_outbox`.
 
 ### OrganizationUnit
 
-Tables (3): `organization_unit_types`, `organization_units`, `organization_unit_documents`.
+Migrations: `create_organization_unit_types_table`, `create_organization_units_table`, `create_organization_unit_documents_table`.
+
+Tables: `organization_unit_types`, `organization_units`, `organization_unit_documents`.
 
 ### User
 
-Tables (14): `users`, `roles`, `permissions`, `role_permissions`, `user_roles`, `user_permissions`, `user_organization_units`, `user_documents`, `user_devices`, `platform_operators`, `platform_permissions`, `platform_operator_permissions`, `platform_operator_invitations`, `platform_operator_invitation_deliveries`.
+Migrations: `create_users_table`, `create_roles_table`, `create_permissions_table`, `create_role_permissions_table`, `create_user_roles_table`, `create_user_permissions_table`, `create_user_organization_units_table`, `create_user_documents_table`, `create_user_devices_table`.
+
+Tables: `users`, `roles`, `permissions`, `role_permissions`, `user_roles`, `user_permissions`, `user_organization_units`, `user_documents`, `user_devices`.
 
 ### Auth
 
-Tables (18): `auth_providers`, `auth_clients`, `auth_identities`, `auth_sessions`, `auth_access_tokens`, `auth_refresh_tokens`, `auth_authorization_codes`, `auth_login_attempts`, `auth_platform_login_attempts`, `auth_registration_invitations`, `auth_platform_mfa_methods`, `auth_processed_integration_events`, `auth_registration_invitation_deliveries`, `auth_platform_sessions`, `auth_platform_access_tokens`, `auth_platform_refresh_tokens`, `auth_user_password_credentials`, `auth_platform_operator_password_credentials`.
+Migrations: `create_auth_providers_table`, `create_auth_clients_table`, `create_auth_identities_table`, `create_auth_sessions_table`, `create_auth_access_tokens_table`, `create_auth_refresh_tokens_table`, `create_auth_authorization_codes_table`, `create_auth_verification_challenges_table`, `create_auth_login_attempts_table`.
 
-### Idempotency
-
-Tables (1): `idempotency_records`.
+Tables use the same names as the migrations.
 
 ### Sequence
 
-Tables (1): `sequences`.
+Migration/table: `create_sequences_table` / `sequences`.
 
 ### UOM
 
-Tables (2): `unit_of_measures`, `uom_conversions`.
+Migrations/tables: `create_unit_of_measures_table`, `create_uom_conversions_table`.
 
 ### Warehouse
 
-Tables (2): `warehouses`, `warehouse_locations`.
+Migrations/tables: `create_warehouses_table`, `create_warehouse_locations_table`.
 
 ### Finance
 
-Tables (16): `finance_account_types`, `finance_account_categories`, `finance_accounts`, `finance_fiscal_years`, `finance_fiscal_periods`, `finance_dimensions`, `finance_posting_profiles`, `finance_posting_profile_rules`, `finance_journal_entries`, `finance_journal_lines`, `finance_ledger_entries`, `finance_account_balances`, `finance_bank_reconciliations`, `finance_bank_statement_lines`, `finance_budgets`, `finance_budget_lines`.
+Migrations: `create_finance_account_types_table`, `create_finance_account_categories_table`, `create_finance_accounts_table`, `create_finance_fiscal_years_table`, `create_finance_fiscal_periods_table`, `create_finance_dimensions_table`, `create_finance_posting_profiles_table`, `create_finance_posting_profile_rules_table`, `create_finance_journal_entries_table`, `create_finance_journal_lines_table`, `create_finance_ledger_entries_table`, `create_finance_account_balances_table`, `create_finance_bank_reconciliations_table`, `create_finance_bank_statement_lines_table`, `create_finance_budgets_table`, `create_finance_budget_lines_table`.
+
+Tables use the same names as the migrations.
 
 ### Tax
 
-Tables (9): `taxes`, `tax_rates`, `tax_groups`, `tax_group_lines`, `tax_posting_profiles`, `tax_document_snapshots`, `tax_transactions`, `customer_tax_profiles`, `supplier_tax_profiles`.
+Migrations: `create_taxes_table`, `create_tax_rates_table`, `create_tax_groups_table`, `create_tax_group_lines_table`, `create_tax_posting_profiles_table`, `create_tax_document_snapshots_table`, `create_tax_transactions_table`, `create_customer_tax_profiles_table`, `create_supplier_tax_profiles_table`.
+
+Tables use the same names as the migrations. Customer and Supplier profile tables are explicitly Tax-owned extensions.
 
 ### Item
 
-Tables (10): `item_categories`, `item_brands`, `items`, `item_units`, `item_variants`, `item_bundles`, `item_prices`, `item_codes`, `item_usage_rules`, `item_base_uom_revisions`.
+Migrations: `create_item_categories_table`, `create_item_brands_table`, `create_items_table`, `create_item_units_table`, `create_item_variants_table`, `create_item_bundles_table`, `create_item_prices_table`, `create_item_codes_table`, `create_item_usage_rules_table`, `create_item_base_uom_revisions_table`.
+
+Tables use the same names as the migrations.
 
 ### Supplier
 
-Tables (10): `suppliers`, `supplier_contacts`, `supplier_addresses`, `supplier_bank_accounts`, `supplier_categories`, `supplier_category_assignments`, `supplier_documents`, `supplier_item_mappings`, `supplier_credit_profiles`, `supplier_status_histories`.
+Migrations: `create_suppliers_table`, `create_supplier_contacts_table`, `create_supplier_addresses_table`, `create_supplier_bank_accounts_table`, `create_supplier_categories_table`, `create_supplier_category_assignments_table`, `create_supplier_documents_table`, `create_supplier_item_mappings_table`, `create_supplier_credit_profiles_table`, `create_supplier_status_histories_table`.
+
+Tables use the same names as the migrations.
 
 ### Customer
 
-Tables (9): `customers`, `customer_contacts`, `customer_addresses`, `customer_bank_accounts`, `customer_categories`, `customer_category_assignments`, `customer_documents`, `customer_credit_profiles`, `customer_status_histories`.
+Migrations: `create_customers_table`, `create_customer_contacts_table`, `create_customer_addresses_table`, `create_customer_bank_accounts_table`, `create_customer_categories_table`, `create_customer_category_assignments_table`, `create_customer_documents_table`, `create_customer_credit_profiles_table`, `create_customer_status_histories_table`.
+
+Tables use the same names as the migrations.
 
 ### Vehicle
 
-Tables (9): `vehicle_makes`, `vehicle_types`, `vehicle_categories`, `vehicle_models`, `vehicles`, `vehicle_documents`, `vehicle_ownerships`, `vehicle_attributes`, `vehicle_status_histories`.
+Migrations: `create_vehicle_makes_table`, `create_vehicle_types_table`, `create_vehicle_categories_table`, `create_vehicle_models_table`, `create_vehicles_table`, `create_vehicle_documents_table`, `create_vehicle_ownerships_table`, `create_vehicle_attributes_table`, `create_vehicle_status_histories_table`.
+
+Tables use the same names as the migrations.
 
 ### Hr
 
-Tables (16): `hr_departments`, `hr_designations`, `hr_employment_types`, `hr_skills`, `hr_certifications`, `hr_licenses`, `hr_employees`, `hr_employee_contacts`, `hr_employee_addresses`, `hr_employee_documents`, `hr_employee_skill_assignments`, `hr_employee_certification_assignments`, `hr_employee_license_assignments`, `hr_employee_rates`, `hr_employee_availabilities`, `hr_employee_status_histories`.
+Migrations: `create_hr_departments_table`, `create_hr_designations_table`, `create_hr_employment_types_table`, `create_hr_skills_table`, `create_hr_certifications_table`, `create_hr_licenses_table`, `create_hr_employees_table`, `create_hr_employee_contacts_table`, `create_hr_employee_addresses_table`, `create_hr_employee_documents_table`, `create_hr_employee_skill_assignments_table`, `create_hr_employee_certification_assignments_table`, `create_hr_employee_license_assignments_table`, `create_hr_employee_rates_table`, `create_hr_employee_availabilities_table`, `create_hr_employee_status_histories_table`.
+
+Tables use the same names as the migrations.
 
 ### Inventory
 
-Tables (20): `inventory_batches`, `inventory_serial_numbers`, `inventory_stock_balances`, `inventory_movements`, `inventory_reservations`, `inventory_allocations`, `inventory_adjustments`, `inventory_adjustment_lines`, `inventory_transfers`, `inventory_transfer_lines`, `inventory_valuation_layers`, `inventory_allocation_lines`, `inventory_allocation_issues`, `inventory_valuation_consumptions`, `inventory_stock_state_changes`, `inventory_cost_adjustments`, `inventory_cost_adjustment_lines`, `inventory_stock_counts`, `inventory_stock_count_lines`, `inventory_number_sequences`.
+Migrations: `create_inventory_batches_table`, `create_inventory_serial_numbers_table`, `create_inventory_stock_balances_table`, `create_inventory_movements_table`, `create_inventory_reservations_table`, `create_inventory_allocations_table`, `create_inventory_adjustments_table`, `create_inventory_adjustment_lines_table`, `create_inventory_transfers_table`, `create_inventory_transfer_lines_table`, `create_inventory_valuation_layers_table`, `create_inventory_allocation_lines_table`, `create_inventory_allocation_issues_table`, `create_inventory_valuation_consumptions_table`, `create_inventory_stock_state_changes_table`, `create_inventory_cost_adjustments_table`, `create_inventory_cost_adjustment_lines_table`, `create_inventory_stock_counts_table`, `create_inventory_stock_count_lines_table`.
+
+Tables use the same names as the migrations.
 
 ### Invoice
 
-Tables (8): `invoices`, `invoice_lines`, `invoice_sources`, `invoice_source_lines`, `invoice_adjustments`, `invoice_adjustment_allocations`, `invoice_balances`, `invoice_credit_allocations`.
+Migrations: `create_invoices_table`, `create_invoice_lines_table`, `create_invoice_sources_table`, `create_invoice_source_lines_table`, `create_invoice_adjustments_table`, `create_invoice_adjustment_allocations_table`, `create_invoice_balances_table`, `create_invoice_credit_allocations_table`.
+
+Tables use the same names as the migrations.
 
 ### Payment
 
-Tables (10): `payments`, `payment_methods`, `payment_lines`, `payment_allocations`, `payment_unapplied_balances`, `payment_reversals`, `payment_refunds`, `payment_status_histories`, `cheque_templates`, `cheque_print_logs`.
+Migrations: `create_payments_table`, `create_payment_methods_table`, `create_payment_lines_table`, `create_payment_allocations_table`, `create_payment_unapplied_balances_table`, `create_payment_reversals_table`, `create_payment_refunds_table`, `create_payment_status_histories_table`, `create_cheque_templates_table`, `create_cheque_print_logs_table`.
+
+Tables use the same names as the migrations.
 
 ### Purchase
 
-Tables (11): `purchase_orders`, `purchase_order_lines`, `purchase_header_adjustments`, `goods_receipt_notes`, `goods_receipt_note_lines`, `purchase_invoice_links`, `purchase_returns`, `purchase_return_lines`, `purchase_return_adjustment_allocations`, `purchase_debit_notes`, `purchase_adjustment_allocations`.
+Migrations: `create_purchase_orders_table`, `create_purchase_order_lines_table`, `create_purchase_header_adjustments_table`, `create_goods_receipt_notes_table`, `create_goods_receipt_note_lines_table`, `create_purchase_invoice_links_table`, `create_purchase_returns_table`, `create_purchase_return_lines_table`, `create_purchase_return_adjustment_allocations_table`, `create_purchase_debit_notes_table`.
+
+Tables use the same names as the migrations.
 
 ### Sales
 
-Tables (15): `sales_quotations`, `sales_quotation_lines`, `sales_orders`, `sales_order_lines`, `sales_header_adjustments`, `sales_deliveries`, `sales_delivery_lines`, `sales_invoice_links`, `sales_returns`, `sales_return_lines`, `sales_return_adjustment_allocations`, `sales_credit_notes`, `sales_status_histories`, `sales_allocations`, `sales_allocation_lines`.
+Migrations: `create_sales_quotations_table`, `create_sales_quotation_lines_table`, `create_sales_orders_table`, `create_sales_order_lines_table`, `create_sales_header_adjustments_table`, `create_sales_deliveries_table`, `create_sales_delivery_lines_table`, `create_sales_invoice_links_table`, `create_sales_returns_table`, `create_sales_return_lines_table`, `create_sales_return_adjustment_allocations_table`, `create_sales_credit_notes_table`, `create_sales_status_histories_table`.
 
-### VehicleRental
-
-Tables (24): `rental_reservations`, `rental_agreements`, `rental_agreement_terms`, `rental_agreement_rate_versions`, `rental_agreement_rate_components`, `vehicle_finance_agreements`, `vehicle_finance_installments`, `vehicle_finance_status_histories`, `rental_vehicle_allocations`, `rental_driver_assignments`, `rental_vehicle_replacements`, `rental_custody_events`, `rental_custody_event_items`, `rental_usage_logs`, `rental_usage_events`, `rental_usage_contexts`, `rental_expenses`, `rental_expense_allocations`, `rental_billing_periods`, `rental_calculation_runs`, `rental_calculation_lines`, `rental_deposit_requirements`, `rental_deposit_links`, `rental_status_histories`.
+Tables use the same names as the migrations.
 
 ### VehicleService
 
-Tables (8): `vehicle_service_jobs`, `vehicle_service_inspections`, `vehicle_service_job_lines`, `vehicle_service_line_employees`, `vehicle_service_documents`, `vehicle_service_invoice_links`, `vehicle_service_payment_links`, `vehicle_service_status_histories`.
+Migrations: `create_vehicle_service_jobs_table`, `create_vehicle_service_inspections_table`, `create_vehicle_service_job_lines_table`, `create_vehicle_service_line_employees_table`, `create_vehicle_service_documents_table`, `create_vehicle_service_invoice_links_table`, `create_vehicle_service_payment_links_table`, `create_vehicle_service_status_histories_table`.
+
+Tables use the same names as the migrations.
+
+### Reporting
+
+No persisted tables or migrations. Reporting reads domain-owned data.
 
 ### Audit
 
-Tables (1): `audit_logs`.
+Migration/table: `create_audit_logs_table` / `audit_logs`.
 
-### ReferenceData
+### Extension
 
-Tables (4): `countries`, `currencies`, `languages`, `timezones`.
+Migrations/tables: `create_attachments_table`, `create_entity_attributes_table`, `create_comments_table`.
 
-## Runtime release gates
+## Mega Migrations Split
 
-- Laravel route boot is blocked in this verification environment by the missing PHP `mbstring` extension.
-- PHPUnit is blocked by missing DOM, mbstring, XML, and XMLWriter extensions.
-- Database-backed migrations, concurrency tests, and tenant/organization-unit adversarial tests must run in the deployment-equivalent environment.
-- The supplied frontend dependency snapshot lacks the Linux Rollup optional binary required by Vitest/Vite; no fake binary or source workaround was introduced.
+- HR: 1 migration containing 16 tables became 16 table migrations.
+- Sales: 1 migration containing 13 tables became 13 table migrations.
+- VehicleService: 1 migration containing 8 tables became 8 table migrations.
+- Tax master: 1 migration containing 4 tables became 4 table migrations.
+- Tax profiles/posting/snapshots: 1 migration containing 5 tables became 5 table migrations.
+- Finance reconciliation/budget and Inventory valuation/workflow were already table-wise after their patch consolidation.
 
-## Deployment note
+## Patch Consolidation Review
 
-These are corrected create migrations for a refactor/development baseline. Do not apply the archive blindly to an existing production schema. Existing deployments require a reviewed data-migration, backfill, reconciliation, and rollback plan.
+The following patches were already safely folded into final create migrations in commit `1f543d789` and were preserved:
+
+- Payment cheque details, cheque tables, status history, metadata, source tracing, and enterprise hardening.
+- Purchase backend UOM, quantity, adjustment, return, source, approval, and audit fields.
+- Finance fiscal, posting profile, ledger traceability, reconciliation, budget, and dimension hardening.
+- Inventory allocation, valuation consumption, state workflow, transfer, cost adjustment, and stock count hardening.
+- Item SKU/barcode/code/unit uniqueness.
+- Supplier bank account and supplier-item uniqueness.
+- Customer bank account uniqueness.
+- User username and tenant-scoped username uniqueness.
+
+The Tax item override patch was consolidated during this audit. `default_tax_group_id`, `purchase_tax_group_id`, `sales_tax_group_id`, and `is_tax_exempt` now live directly in the Item-owned `items` create migration.
+
+## Fields
+
+- Removed: none.
+- Retained: all fields referenced by models, casts, services, requests, resources, seeders, tests, or frontend payloads.
+- Intentional metadata JSON columns were retained where services use flexible source, audit, layout, or extension data.
+
+## Constraints And Indexes
+
+- Existing code/number uniqueness constraints were preserved.
+- Existing frequent-filter and source-trace indexes were preserved.
+- Existing cascade, restrict, and null-on-delete rules were preserved.
+- Business money, quantity, rate, and percentage columns remain `decimal(20,6)`.
+- Cheque layout coordinates retain smaller physical-layout precision by design.
+- Child tables that omit direct tenant/org columns inherit scope through a mandatory parent relationship.
+
+## Remaining Risks
+
+- Composite unique constraints containing nullable `organization_unit_id` follow database NULL semantics. They may allow more than one global-scope row with otherwise identical values. Changing this requires an explicit business rule and was not inferred during migration cleanup.
+- Several actor/source IDs are intentionally unsigned IDs or polymorphic pairs rather than hard FKs to avoid cross-module coupling and preserve historical records.
+- Migration timestamp consolidation is appropriate for the current development/refactor stage but is not suitable for an already deployed production database without a release-specific migration strategy.
+
+- `2026_06_12_020006_create_organization_unit_configuration_values_table`

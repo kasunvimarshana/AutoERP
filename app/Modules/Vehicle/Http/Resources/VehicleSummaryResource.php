@@ -27,8 +27,8 @@ final class VehicleSummaryResource extends JsonResource
             'type' => $this->relationLoaded('type') ? $this->namedResource($this->type) : null,
             'category' => $this->relationLoaded('category') ? $this->namedResource($this->category) : null,
             'current_ownerships' => $this->whenLoaded('currentOwnerships', fn () => VehicleOwnershipResource::collection($this->currentOwnerships)->resolve($request)),
-            'current_customer' => $this->whenLoaded('currentOwnerships', fn () => $this->ownershipSnapshot('customer')),
-            'current_supplier' => $this->whenLoaded('currentOwnerships', fn () => $this->ownershipSnapshot('supplier')),
+            'current_customer' => $this->whenLoaded('currentCustomerVehicles', fn () => $this->partyRelationship($this->currentCustomerVehicles->first(), 'customer')),
+            'current_supplier' => $this->whenLoaded('currentSupplierVehicles', fn () => $this->partyRelationship($this->currentSupplierVehicles->first(), 'supplier')),
             'status' => $this->enumValue($this->status),
             'odometer_reading' => (string) $this->odometer_reading,
             'odometer_unit' => $this->odometer_unit,
@@ -37,19 +37,13 @@ final class VehicleSummaryResource extends JsonResource
         ];
     }
 
-    private function ownershipSnapshot(string $ownerType): ?array
+    private function partyRelationship(mixed $relationship, string $party): ?array
     {
-        $ownership = $this->currentOwnerships->first(
-            fn ($row): bool => ($row->owner_type instanceof \BackedEnum ? $row->owner_type->value : $row->owner_type) === $ownerType,
-        );
-        if ($ownership === null) {
+        if ($relationship === null) {
             return null;
         }
+        $model = $relationship->{$party};
 
-        return [
-            'id' => $ownership->owner_id === null ? null : (int) $ownership->owner_id,
-            'code' => $ownership->owner_code_snapshot,
-            'name' => $ownership->owner_name_snapshot,
-        ];
+        return ['relationship_id' => (int) $relationship->getKey(), 'id' => (int) $model->getKey(), 'code' => $model->code, 'name' => $model->display_name ?? $model->name, 'started_at' => $relationship->started_at?->toISOString()];
     }
 }

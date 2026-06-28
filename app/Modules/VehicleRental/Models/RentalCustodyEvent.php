@@ -6,7 +6,9 @@ namespace Modules\VehicleRental\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Modules\Core\Models\TenantOwnedModel;
+use Modules\Extension\Models\AttachmentModel;
 use Modules\Hr\Models\HrEmployee;
 use Modules\Vehicle\Models\Vehicle;
 use Modules\VehicleRental\Enums\RentalCustodyEventType;
@@ -25,4 +27,5 @@ final class RentalCustodyEvent extends TenantOwnedModel
     public function handedOverByEmployee(): BelongsTo { return $this->belongsTo(HrEmployee::class, 'handed_over_by_employee_id'); }
     public function receivedByEmployee(): BelongsTo { return $this->belongsTo(HrEmployee::class, 'received_by_employee_id'); }
     public function items(): HasMany { return $this->hasMany(RentalCustodyEventItem::class, 'custody_event_id')->orderBy('sequence'); }
+    public function attachments(): MorphMany { return $this->morphMany(AttachmentModel::class, 'attachable'); }
 }

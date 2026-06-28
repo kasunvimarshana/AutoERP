@@ -108,6 +108,11 @@ final class Customer extends TenantOwnedModel
         return $this->hasMany(CustomerStatusHistory::class, 'customer_id');
     }
 
+    public function vehicles(): HasMany
+    {
+        return $this->hasMany(CustomerVehicle::class, 'customer_id');
+    }
+
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('status', CustomerStatus::Active);

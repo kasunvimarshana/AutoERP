@@ -13,7 +13,15 @@ return new class extends Migration
         Schema::create('tenant_onboarding_states', function (Blueprint $table): void {
             $table->foreignId('tenant_id')->primary('tenant_onboarding_states_tenant_pk')->constrained('tenants', 'id', indexName: 'tenant_onboarding_states_tenant_fk')->restrictOnDelete();
             $table->unsignedBigInteger('row_version')->default(1);
-            $table->string('status', 40)->default('pending');
+            $table->enum('status', [
+                'pending',
+                'provisioning',
+                'awaiting_administrator',
+                'awaiting_domain',
+                'ready',
+                'completed',
+                'failed',
+            ])->default('pending');
             $table->uuid('operation_id')->nullable()->unique('tenant_onboarding_operation_uk');
             $table->timestamp('operation_started_at')->nullable();
             $table->timestamp('operation_lease_expires_at')->nullable();

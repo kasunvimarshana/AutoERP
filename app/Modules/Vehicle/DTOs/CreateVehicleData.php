@@ -13,6 +13,7 @@ final readonly class CreateVehicleData
     /**
      * @param array<string, mixed>|null $metadata
      * @param list<VehicleDocumentData> $documents
+     * @param list<VehicleOwnershipData> $ownerships
      * @param list<VehicleAttributeData> $attributes
      */
     public function __construct(
@@ -41,6 +42,7 @@ final readonly class CreateVehicleData
         public ?array $metadata = null,
         public ?int $createdBy = null,
         public array $documents = [],
+        public array $ownerships = [],
         public array $attributes = [],
     ) {}
 }

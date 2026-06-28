@@ -12,6 +12,7 @@ final readonly class UpdateVehicleData
     /**
      * @param array<string, mixed>|null $metadata
      * @param list<VehicleDocumentData>|null $documents
+     * @param list<VehicleOwnershipData>|null $ownerships
      * @param list<VehicleAttributeData>|null $attributes
      * @param list<string> $provided
      */
@@ -37,6 +38,7 @@ final readonly class UpdateVehicleData
         public ?string $notes = null,
         public ?array $metadata = null,
         public ?array $documents = null,
+        public ?array $ownerships = null,
         public ?array $attributes = null,
         public array $provided = [],
     ) {}

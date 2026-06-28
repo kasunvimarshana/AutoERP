@@ -26,7 +26,7 @@ return new class extends Migration
             $table->string('suffix')->default('');
             $table->unsignedInteger('padding')->default(5);
             $table->bigInteger('next_number')->default(1);
-            $table->string('period_type', 40)->default('yearly');
+            $table->enum('period_type', ['yearly', 'monthly', 'infinite'])->default('yearly');
             $table->string('period_value')->nullable()->comment('e.g., 2025');
             $table->string('scope_key')->comment('Non-null organization/period scope used for portable uniqueness.');
             $table->unsignedBigInteger('created_by')->nullable()->index('sequences_created_by_ix');

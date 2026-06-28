@@ -52,11 +52,13 @@ use Modules\Tenant\Repositories\TenantRepositoryInterface;
 use Modules\Tenant\Services\Contracts\TenantBrandingAssetReaderInterface;
 use Modules\Tenant\Services\Contracts\TenantDomainOwnershipVerifierInterface;
 use Modules\Tenant\Services\Contracts\TenantValueNormalizerInterface;
+use Modules\Configuration\Contracts\ConfigurationTargetPopulationInterface;
+use Modules\Configuration\Contracts\ConfigurationTargetValidatorInterface;
+use Modules\Tenant\Services\Configuration\TenantConfigurationTargetPopulation;
+use Modules\Tenant\Services\Configuration\TenantConfigurationTargetValidator;
 use Modules\Tenant\Services\Concurrency\TenantAggregateLock;
 use Modules\Tenant\Services\Authentication\TenantAuthenticationDirectory;
-use Modules\Tenant\Services\Contracts\TenantConfigurationTargetReaderInterface;
 use Modules\Tenant\Services\CurrentTenantContextResolver;
-use Modules\Tenant\Services\Directory\TenantConfigurationTargetReader;
 use Modules\Tenant\Services\Directory\TenantDirectory;
 use Modules\Tenant\Services\Domains\DnsTenantDomainOwnershipVerifier;
 use Modules\Tenant\Services\Domains\TenantDomainReadinessPolicy;
@@ -77,7 +79,8 @@ final class TenantServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->mergeConfigFrom(__DIR__.'/../Config/tenant.php', 'tenant');
-        $this->app->singleton(TenantConfigurationTargetReaderInterface::class, TenantConfigurationTargetReader::class);
+        $this->app->singleton(ConfigurationTargetValidatorInterface::class, TenantConfigurationTargetValidator::class);
+        $this->app->singleton(ConfigurationTargetPopulationInterface::class, TenantConfigurationTargetPopulation::class);
         $this->app->bind(CurrentTenantContextResolverInterface::class, CurrentTenantContextResolver::class);
         $this->app->singleton(TenantValueNormalizerInterface::class, TenantValueNormalizer::class);
         $this->app->singleton(TenantBrandingAssetReaderInterface::class, TenantBrandingAssetReader::class);

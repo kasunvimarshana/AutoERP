@@ -11,17 +11,21 @@ final class TaxProfileResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
+        $party = $this->resource->relationLoaded('customer')
+            ? $this->customer
+            : ($this->resource->relationLoaded('supplier') ? $this->supplier : null);
+
         return [
             'id' => $this->id,
             'tenant_id' => $this->tenant_id,
             'organization_unit_id' => $this->organization_unit_id,
             'customer_id' => $this->customer_id ?? null,
             'supplier_id' => $this->supplier_id ?? null,
-            'party' => [
-                'id' => $this->customer_id ?? $this->supplier_id,
-                'code' => $this->party_code_snapshot,
-                'name' => $this->party_name_snapshot,
-            ],
+            'party' => $party ? [
+                'id' => $party->id,
+                'code' => $party->code,
+                'name' => $party->name,
+            ] : null,
             'tax_group_id' => $this->tax_group_id,
             'tax_group' => $this->whenLoaded('taxGroup', fn () => $this->taxGroup ? [
                 'id' => $this->taxGroup->id,

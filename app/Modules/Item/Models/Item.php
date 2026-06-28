@@ -43,6 +43,7 @@ final class Item extends TenantOwnedModel
             'is_combo' => 'boolean',
             'is_tax_exempt' => 'boolean',
             'is_active' => 'boolean',
+            'standard_price' => 'decimal:6',
             'metadata' => 'array',
         ]);
     }

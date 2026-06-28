@@ -20,13 +20,13 @@ return new class extends Migration
             $table->unsignedBigInteger('organization_unit_id');
             $table->string('key', 191);
             $table->unsignedInteger('definition_version');
-            $table->string('operation', 40);
+            $table->enum('operation', ['created', 'updated', 'removed', 'rolled_back']);
             $table->longText('stored_value')->nullable();
-            $table->string('value_type', 40);
+            $table->enum('value_type', ['string', 'integer', 'decimal', 'boolean', 'json']);
             $table->boolean('is_sensitive')->default(false);
             $table->unsignedBigInteger('resulting_row_version')->nullable();
             $table->unsignedBigInteger('source_revision_id')->nullable();
-            $table->string('actor_type', 40);
+            $table->enum('actor_type', ['system', 'platform_operator', 'tenant_user']);
             $table->unsignedBigInteger('actor_id')->nullable();
             $table->string('actor_name')->nullable();
             $table->string('actor_email')->nullable();

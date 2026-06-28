@@ -13,7 +13,7 @@ return new class extends Migration
         Schema::create('tenant_current_subscriptions', function (Blueprint $table): void {
             $table->unsignedBigInteger('tenant_id')->primary('tenant_current_subscriptions_tenant_pk');
             $table->unsignedBigInteger('tenant_subscription_id')->unique('tenant_current_subscriptions_subscription_uk');
-            $table->string('state', 40)->default('assigned');
+            $table->enum('state', ['assigned', 'cancelled', 'expired'])->default('assigned');
             $table->string('state_reason', 500)->nullable();
             $table->dateTime('state_changed_at');
             $table->unsignedBigInteger('row_version')->default(1);

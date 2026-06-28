@@ -18,6 +18,7 @@ final class VehicleCreationService
         private readonly VehicleValidationService $validator,
         private readonly VehicleNumberService $numbers,
         private readonly VehicleDocumentService $documents,
+        private readonly VehicleOwnershipService $ownerships,
         private readonly VehicleAttributeService $attributes,
         private readonly VehicleStatusService $statuses,
     ) {}
@@ -62,12 +63,15 @@ final class VehicleCreationService
                         $storedDocumentPaths[] = $path;
                     });
                 }
-                    foreach ($data->attributes as $attribute) {
+                foreach ($data->ownerships as $ownership) {
+                    $this->ownerships->assign($vehicle, $ownership);
+                }
+                foreach ($data->attributes as $attribute) {
                     $this->attributes->create($vehicle, $attribute);
                 }
                 $this->statuses->recordInitial($vehicle, $data->createdBy);
 
-                return $vehicle->refresh()->load(['make', 'model', 'type', 'category', 'documents', 'ownerships', 'currentOwnerships', 'attributes', 'statusHistories']);
+                return $vehicle->refresh()->load(['make', 'model', 'type', 'category', 'documents', 'ownerships', 'currentOwnerships', 'currentCustomerVehicles.customer', 'currentSupplierVehicles.supplier', 'attributes', 'statusHistories']);
             });
         } catch (Throwable $exception) {
             foreach ($storedDocumentPaths as $path) {

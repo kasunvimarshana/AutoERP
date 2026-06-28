@@ -11,9 +11,9 @@ use Modules\Audit\Constants\AuditEventCategory;
 use Modules\Audit\Contracts\AuditRecorderInterface;
 use Modules\Audit\Data\AuditEventData;
 use Modules\ReferenceData\Models\CurrencyModel;
-use Modules\Idempotency\Enums\IdempotencyStatus;
+use Modules\Core\Enums\IdempotencyStatus;
 use Modules\Core\Services\DecimalMath;
-use Modules\Idempotency\Services\IdempotencyService;
+use Modules\Core\Services\IdempotencyService;
 use Modules\Customer\Models\Customer;
 use Modules\Customer\Models\CustomerCreditProfile;
 use Modules\Finance\Contracts\FinancePostingInterface;
@@ -35,7 +35,6 @@ use Modules\Invoice\Enums\AllocationMethod;
 use Modules\Invoice\Enums\InvoiceLineType;
 use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Models\Invoice;
-use Modules\Invoice\Services\Tax\InvoiceTaxDocumentMapper;
 use Modules\Item\Enums\ItemType;
 use Modules\Item\Enums\ItemUnitRole;
 use Modules\Item\Models\Item;
@@ -87,7 +86,6 @@ final class FastSalesService
         private readonly StockAvailabilityService $stockAvailability,
         private readonly TaxCalculationService $taxes,
         private readonly TaxDocumentIntegrationService $taxDocuments,
-        private readonly InvoiceTaxDocumentMapper $invoiceTaxDocuments,
         private readonly SalesOrderService $salesOrders,
         private readonly SalesDeliveryService $deliveries,
         private readonly SalesInvoiceIntegrationService $salesInvoices,
@@ -559,8 +557,8 @@ final class FastSalesService
                 'sales_invoice',
                 'receivable',
             );
-            $context = $this->taxDocuments->withholdingPostingContextForDocument(
-                $this->invoiceTaxDocuments->map($invoice),
+            $context = $this->taxDocuments->withholdingPostingContextForInvoice(
+                $invoice,
                 (string) $resolved['transaction_date'],
                 (string) $receivableAccount->code,
                 (string) $receivableAccount->name,

@@ -108,6 +108,11 @@ final class Supplier extends TenantOwnedModel
         return $this->hasMany(SupplierStatusHistory::class, 'supplier_id');
     }
 
+    public function vehicles(): HasMany
+    {
+        return $this->hasMany(SupplierVehicle::class, 'supplier_id');
+    }
+
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('status', SupplierStatus::Active);

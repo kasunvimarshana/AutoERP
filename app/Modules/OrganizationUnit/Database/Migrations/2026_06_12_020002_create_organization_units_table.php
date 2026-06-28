@@ -22,7 +22,7 @@ return new class extends Migration
             $table->string('path', 1024)->comment('Server-derived readable materialized path.');
             $table->char('path_hash', 64)->comment('SHA-256 hierarchy uniqueness key.');
             $table->unsignedInteger('depth')->comment('Server-derived hierarchy depth.');
-            $table->string('root_marker', 40)
+            $table->enum('root_marker', ['root'])
                 ->nullable()
                 ->comment('Set only for the protected tenant root.');
             $table->boolean('is_active')->default(true);

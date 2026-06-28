@@ -16,7 +16,7 @@ use Modules\Item\Http\Requests\StoreItemUsageRuleRequest;
 use Modules\Item\Http\Requests\StoreItemVariantRequest;
 use Modules\Item\Http\Requests\UpdateItemBundleRequest;
 use Modules\Item\Http\Requests\UpdateItemCodeRequest;
-use Modules\Item\Http\Requests\SupersedeItemPriceRequest;
+use Modules\Item\Http\Requests\UpdateItemPriceRequest;
 use Modules\Item\Http\Requests\UpdateItemUnitRequest;
 use Modules\Item\Http\Requests\UpdateItemUsageRuleRequest;
 use Modules\Item\Http\Requests\UpdateItemVariantRequest;
@@ -87,11 +87,7 @@ final class ItemRelationController
     {
         $this->authorize($request, ItemAuthorizationService::VIEW);
 
-        return ItemVariantResource::collection($this->queries->variants(
-            $this->item($request, $item),
-            $request->validated(),
-            $request->perPage(),
-        ));
+        return ItemVariantResource::collection($this->queries->variants($this->item($request, $item), $request->perPage()));
     }
 
     public function storeVariant(StoreItemVariantRequest $request, int $item): JsonResponse
@@ -156,31 +152,32 @@ final class ItemRelationController
     {
         $this->authorize($request, ItemAuthorizationService::VIEW);
 
-        return ItemPriceResource::collection($this->queries->prices(
-            $this->item($request, $item),
-            $request->organizationUnitId(),
-            $request->perPage(),
-        ));
+        return ItemPriceResource::collection($this->queries->prices($this->item($request, $item), $request->perPage()));
     }
 
     public function storePrice(StoreItemPriceRequest $request, int $item): JsonResponse
     {
         $this->authorize($request, ItemAuthorizationService::MANAGE_PRICES);
-        $price = $this->prices->create($this->item($request, $item), $request->toData());
+        $price = $this->prices->create($this->item($request, $item), $request->toData())->load(['variant', 'currency', 'uom']);
 
         return (new ItemPriceResource($price))->response()->setStatusCode(201);
     }
 
-    public function supersedePrice(SupersedeItemPriceRequest $request, int $item, int $price): ItemPriceResource
+    public function updatePrice(UpdateItemPriceRequest $request, int $item, int $price): ItemPriceResource
     {
         $this->authorize($request, ItemAuthorizationService::MANAGE_PRICES);
         $parent = $this->item($request, $item);
 
-        return new ItemPriceResource($this->prices->supersede(
-            $parent,
-            $this->queries->price($parent, $price),
-            $request->toData(),
-        ));
+        return new ItemPriceResource($this->prices->update($parent, $this->queries->price($parent, $price), $request->toData()));
+    }
+
+    public function deletePrice(ListItemRequest $request, int $item, int $price): JsonResponse
+    {
+        $this->authorize($request, ItemAuthorizationService::MANAGE_PRICES);
+        $parent = $this->item($request, $item);
+        $this->prices->delete($parent, $this->queries->price($parent, $price));
+
+        return response()->json(null, 204);
     }
 
     public function codes(ListItemRequest $request, int $item): AnonymousResourceCollection

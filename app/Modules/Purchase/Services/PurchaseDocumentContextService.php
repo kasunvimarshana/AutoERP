@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Purchase\Services;
 
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
 use Modules\ReferenceData\Models\CurrencyModel;
 use Modules\Item\Enums\ItemUnitRole;
 use Modules\Item\Models\Item;
@@ -14,8 +15,7 @@ use Modules\Purchase\Models\PurchaseOrderLine;
 use Modules\Purchase\Validators\PurchaseValidationService;
 use Modules\Supplier\Models\Supplier;
 use Modules\Supplier\Models\SupplierItemMapping;
-use Modules\Tax\Contracts\TaxPartyProfileReaderInterface;
-use Modules\Tax\Data\TaxPartyProfileData;
+use Modules\Tax\Models\SupplierTaxProfile;
 use Modules\Tenant\Models\TenantModel;
 use Modules\Warehouse\Models\WarehouseLocationModel;
 use Modules\Warehouse\Models\WarehouseModel;
@@ -27,7 +27,6 @@ final class PurchaseDocumentContextService
         private readonly WarehouseDefaultResolver $warehouseDefaults,
         private readonly PurchaseValidationService $validator,
         private readonly PurchasePricingService $prices,
-        private readonly TaxPartyProfileReaderInterface $taxProfiles,
     ) {}
 
     /**
@@ -86,7 +85,20 @@ final class PurchaseDocumentContextService
         $supplier = $this->validator->supplier($tenantId, $organizationUnitId, $supplierId, 'supplier_id')
             ->load(['defaultCurrency', 'contacts']);
 
-        $taxProfile = $this->taxProfiles->supplierProfile($tenantId, $organizationUnitId, $supplierId);
+        $taxProfile = SupplierTaxProfile::query()
+            ->with('taxGroup')
+            ->where('tenant_id', $tenantId)
+            ->where('supplier_id', $supplier->getKey())
+            ->where('active', true)
+            ->when(
+                $organizationUnitId === null,
+                fn (Builder $query) => $query->whereNull('organization_unit_id'),
+                fn (Builder $query) => $query->where(fn (Builder $scope): Builder => $scope
+                    ->whereNull('organization_unit_id')
+                    ->orWhere('organization_unit_id', $organizationUnitId)),
+            )
+            ->orderByRaw($organizationUnitId === null ? 'organization_unit_id asc' : 'case when organization_unit_id = ? then 0 else 1 end', $organizationUnitId === null ? [] : [$organizationUnitId])
+            ->first();
 
         return [
             'supplier' => $this->supplierSummary($supplier),
@@ -95,14 +107,10 @@ final class PurchaseDocumentContextService
             'currency_source' => $supplier->default_currency_id === null ? 'none' : 'supplier_default',
             'payment_term_id' => $supplier->payment_term_id,
             'payment_terms_source' => $supplier->payment_term_id === null ? 'none' : 'supplier_default',
-            'tax_profile' => $taxProfile instanceof TaxPartyProfileData ? [
-                'id' => $taxProfile->profileId,
-                'tax_group_id' => $taxProfile->taxGroupId,
-                'tax_group' => $taxProfile->taxGroupId === null ? null : [
-                    'id' => $taxProfile->taxGroupId,
-                    'code' => $taxProfile->taxGroupCode,
-                    'name' => $taxProfile->taxGroupName,
-                ],
+            'tax_profile' => $taxProfile instanceof SupplierTaxProfile ? [
+                'id' => (int) $taxProfile->getKey(),
+                'tax_group_id' => $taxProfile->tax_group_id,
+                'tax_group' => $taxProfile->relationLoaded('taxGroup') ? $this->namedSummary($taxProfile->taxGroup) : null,
             ] : null,
             'delivery_terms' => $supplier->metadata['delivery_terms'] ?? null,
             'purchasing_contact' => $supplier->contacts->first() === null ? null : $this->namedSummary($supplier->contacts->first()),

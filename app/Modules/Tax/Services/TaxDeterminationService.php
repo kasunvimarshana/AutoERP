@@ -6,8 +6,7 @@ namespace Modules\Tax\Services;
 
 use Illuminate\Database\Eloquent\Builder;
 use InvalidArgumentException;
-use Modules\Tax\Contracts\TaxItemContextProviderInterface;
-use Modules\Tax\Data\TaxItemContext;
+use Modules\Item\Models\Item;
 use Modules\Tax\DTOs\ApplicableTaxData;
 use Modules\Tax\DTOs\TaxDeterminationContext;
 use Modules\Tax\DTOs\TaxDeterminationResult;
@@ -19,17 +18,12 @@ use Modules\Tax\Models\TaxRate;
 
 final class TaxDeterminationService
 {
-    public function __construct(
-        private readonly TaxItemContextProviderInterface $items,
-    ) {}
-
     public function determine(TaxDeterminationContext $context): TaxDeterminationResult
     {
-        $item = $context->itemId === null
-            ? null
-            : $this->items->find($context->tenantId, $context->organizationUnitId, $context->itemId);
-        if ($item instanceof TaxItemContext) {
-            if ($item->isTaxExempt) {
+        $item = $context->itemId !== null ? Item::query()->findOrFail($context->itemId) : null;
+        if ($item instanceof Item) {
+            $this->assertItemInScope($item, $context);
+            if ((bool) ($item->is_tax_exempt ?? false)) {
                 return new TaxDeterminationResult(null, [], 'exempt');
             }
         }
@@ -125,21 +119,21 @@ final class TaxDeterminationService
         return (string) $rate->rate;
     }
 
-    private function itemTaxGroupId(?TaxItemContext $item, TaxDeterminationContext $context): ?int
+    private function itemTaxGroupId(?Item $item, TaxDeterminationContext $context): ?int
     {
-        if (! $item instanceof TaxItemContext) {
+        if (! $item instanceof Item) {
             return null;
         }
 
         $groupId = null;
         if ($this->isPurchaseDocument($context->documentType)) {
-            $groupId = $item->purchaseTaxGroupId;
+            $groupId = $item->purchase_tax_group_id;
         }
         if ($this->isSalesDocument($context->documentType)) {
-            $groupId = $item->salesTaxGroupId;
+            $groupId = $item->sales_tax_group_id;
         }
 
-        $groupId ??= $item->defaultTaxGroupId;
+        $groupId ??= $item->default_tax_group_id;
 
         return $groupId !== null ? (int) $groupId : null;
     }
@@ -154,6 +148,14 @@ final class TaxDeterminationService
         $this->scopeOrganization($group, $context->organizationUnitId);
 
         return $group->value('id') !== null ? (int) $group->value('id') : null;
+    }
+
+    private function assertItemInScope(Item $item, TaxDeterminationContext $context): void
+    {
+        if ((int) $item->tenant_id !== $context->tenantId
+            || ($context->organizationUnitId !== null && $item->organization_unit_id !== null && (int) $item->organization_unit_id !== $context->organizationUnitId)) {
+            throw new InvalidArgumentException('Item belongs to a different tax scope.');
+        }
     }
 
     private function assertGroupInScope(TaxGroup $group, TaxDeterminationContext $context): void

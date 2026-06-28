@@ -435,16 +435,11 @@ final class ItemBaseUomTest extends TestCase
             'created_at' => $now,
             'updated_at' => $now,
         ]);
-        DB::table('vehicle_ownerships')->insert([
+        DB::table('customer_vehicles')->insert([
             ...$this->scope($context),
-            'row_version' => 1,
             'vehicle_id' => $vehicleId,
-            'owner_type' => 'customer',
-            'owner_id' => $customerId,
-            'owner_key' => 'customer:'.$customerId,
-            'owner_code_snapshot' => 'CUS-HISTORY',
-            'owner_name_snapshot' => 'History Customer',
-            'ownership_type' => 'customer_owned',
+            'customer_id' => $customerId,
+            'relationship_type' => 'customer_owned',
             'started_at' => $now,
             'is_current' => true,
             'current_guard' => 1,

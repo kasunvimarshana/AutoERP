@@ -11,7 +11,6 @@ use Modules\Invoice\DTOs\InvoiceAdjustmentData;
 use Modules\Invoice\DTOs\InvoiceCalculationResult;
 use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Models\Invoice;
-use Modules\Invoice\Services\Tax\InvoiceTaxDocumentMapper;
 use Modules\Invoice\Validators\InvoiceValidationService;
 use Modules\Tax\Services\TaxDocumentIntegrationService;
 
@@ -29,7 +28,6 @@ final class InvoiceCreationService
         private readonly InvoiceAdjustmentService $adjustments,
         private readonly InvoiceBalanceService $balances,
         private readonly TaxDocumentIntegrationService $taxDocuments,
-        private readonly InvoiceTaxDocumentMapper $taxDocumentMapper,
     ) {}
 
     public function create(CreateInvoiceData $data): Invoice
@@ -80,10 +78,9 @@ final class InvoiceCreationService
             );
             $this->adjustments->createAdjustments($invoice, $preparedAdjustments);
             $this->balances->createBalance($invoice, $calculation->grandTotal);
-            $taxDocument = $this->taxDocumentMapper->map($invoice->refresh()->load('lines'));
-            $this->taxDocuments->snapshot($taxDocument);
+            $this->taxDocuments->snapshotInvoice($invoice->refresh()->load('lines'));
             if ($data->status === InvoiceStatus::Posted) {
-                $this->taxDocuments->post($taxDocument);
+                $this->taxDocuments->postInvoice($invoice->refresh());
             }
 
             return $invoice->load([

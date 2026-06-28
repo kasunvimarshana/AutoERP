@@ -12,14 +12,18 @@ use Modules\Vehicle\Http\Requests\ListVehicleRequest;
 use Modules\Core\Http\Requests\TenantScopedRequest;
 use Modules\Vehicle\Http\Requests\StoreVehicleAttributeRequest;
 use Modules\Vehicle\Http\Requests\StoreVehicleDocumentRequest;
+use Modules\Vehicle\Http\Requests\StoreVehicleOwnershipRequest;
 use Modules\Vehicle\Http\Requests\UpdateVehicleAttributeRequest;
 use Modules\Vehicle\Http\Requests\UpdateVehicleDocumentRequest;
+use Modules\Vehicle\Http\Requests\UpdateVehicleOwnershipRequest;
 use Modules\Vehicle\Http\Resources\VehicleAttributeResource;
 use Modules\Vehicle\Http\Resources\VehicleDocumentResource;
+use Modules\Vehicle\Http\Resources\VehicleOwnershipResource;
 use Modules\Vehicle\Http\Resources\VehicleStatusHistoryResource;
 use Modules\Vehicle\Services\VehicleAttributeService;
 use Modules\Vehicle\Services\VehicleAuthorizationService;
 use Modules\Vehicle\Services\VehicleDocumentService;
+use Modules\Vehicle\Services\VehicleOwnershipService;
 use Modules\Vehicle\Services\VehicleQueryService;
 use Modules\Vehicle\Services\VehicleRelationQueryService;
 use Symfony\Component\HttpFoundation\HeaderUtils;
@@ -32,6 +36,7 @@ final class VehicleRelationController
         private readonly VehicleQueryService $vehicles,
         private readonly VehicleRelationQueryService $relations,
         private readonly VehicleDocumentService $documents,
+        private readonly VehicleOwnershipService $ownerships,
         private readonly VehicleAttributeService $attributes,
         private readonly VehicleAuthorizationService $authorization,
     ) {}
@@ -83,6 +88,37 @@ final class VehicleRelationController
         $model = $this->vehicle($request, $vehicle);
 
         return $this->documentResponse($model, $this->relations->document($model, $document), false);
+    }
+
+    public function ownerships(ListVehicleRequest $request, int $vehicle): AnonymousResourceCollection
+    {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), VehicleAuthorizationService::VIEW);
+
+        return VehicleOwnershipResource::collection($this->relations->ownerships($this->vehicle($request, $vehicle), $request->perPage()));
+    }
+
+    public function storeOwnership(StoreVehicleOwnershipRequest $request, int $vehicle): JsonResponse
+    {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), VehicleAuthorizationService::UPDATE);
+
+        return (new VehicleOwnershipResource($this->ownerships->assign($this->vehicle($request, $vehicle), $request->toData())))->response()->setStatusCode(201);
+    }
+
+    public function updateOwnership(UpdateVehicleOwnershipRequest $request, int $vehicle, int $ownership): VehicleOwnershipResource
+    {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), VehicleAuthorizationService::UPDATE);
+
+        $model = $this->vehicle($request, $vehicle);
+        return new VehicleOwnershipResource($this->ownerships->update($model, $this->relations->ownership($model, $ownership), $request->toData()));
+    }
+
+    public function destroyOwnership(ListVehicleRequest $request, int $vehicle, int $ownership): JsonResponse
+    {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), VehicleAuthorizationService::UPDATE);
+
+        $model = $this->vehicle($request, $vehicle);
+        $this->ownerships->delete($model, $this->relations->ownership($model, $ownership));
+        return response()->json(null, 204);
     }
 
     public function attributes(ListVehicleRequest $request, int $vehicle): AnonymousResourceCollection

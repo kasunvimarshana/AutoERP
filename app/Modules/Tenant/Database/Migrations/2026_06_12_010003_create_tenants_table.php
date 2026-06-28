@@ -21,7 +21,7 @@ return new class extends Migration
             $table->string('logo_mime_type', 100)->nullable();
             $table->unsignedBigInteger('logo_size_bytes')->nullable();
             $table->foreignId('base_currency_id')->nullable()->constrained('currencies', 'id', indexName: 'tenants_base_currency_fk')->restrictOnDelete();
-            $table->string('status', 40)->default('draft');
+            $table->enum('status', ['draft', 'active', 'inactive', 'suspended', 'archived'])->default('draft');
             $table->string('status_reason', 500)->nullable();
             $table->dateTime('status_changed_at');
             $table->timestamp('activated_at')->nullable();

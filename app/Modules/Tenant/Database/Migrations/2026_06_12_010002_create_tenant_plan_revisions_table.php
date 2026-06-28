@@ -20,7 +20,7 @@ return new class extends Migration
             $table->json('limits');
             $table->decimal('price', 20, 6)->default('0.000000');
             $table->foreignId('currency_id')->nullable()->constrained('currencies', 'id', indexName: 'tenant_plan_revisions_currency_fk')->restrictOnDelete();
-            $table->string('billing_interval', 40);
+            $table->enum('billing_interval', ['month', 'quarter', 'year']);
             $table->dateTime('effective_at');
             $table->string('change_note', 1000);
             $table->unsignedBigInteger('created_by')->nullable()->index('tenant_plan_revisions_created_by_ix');

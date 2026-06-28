@@ -4,8 +4,7 @@ import { requestLookup } from '@/shared/api/lookupRequest';
 import type { ApiCollection, ApiResource, ListParams } from '@/shared/types/api';
 import type { NamedResource } from '@/shared/types/common';
 import type { LookupLoadParams, LookupResult } from '@/shared/types/lookup';
-import type { PartyVehiclePayload } from '@/shared/types/partyVehicle';
-import { clearVehicleOwnershipCurrent, createVehicleOwnership, endVehicleOwnership, getVehicleOwnership, listVehicleOwnerships, setVehicleOwnershipCurrent, updateVehicleOwnership } from '@/modules/vehicle/vehicleOwnershipApi';
+import type { PartyVehiclePayload, PartyVehicleRelationship } from '@/shared/types/partyVehicle';
 import type {
     Customer,
     CustomerAddress,
@@ -109,10 +108,10 @@ export const updateCustomerCreditProfile = (customerId: number, payload: Custome
 export const listCustomerStatusHistory = (customerId: number, params: ListParams, signal?: AbortSignal) =>
     apiClient.get<ApiCollection<CustomerStatusHistory>>(relationPath(customerId, 'status-history'), { params, signal }).then((response) => response.data);
 
-export const listCustomerVehicles = (params: ListParams, signal?: AbortSignal) => listVehicleOwnerships('customer', params, signal);
-export const getCustomerVehicle = getVehicleOwnership;
-export const createCustomerVehicle = (payload: PartyVehiclePayload) => createVehicleOwnership('customer', payload);
-export const updateCustomerVehicle = updateVehicleOwnership;
-export const setCustomerVehicleCurrent = setVehicleOwnershipCurrent;
-export const clearCustomerVehicleCurrent = clearVehicleOwnershipCurrent;
-export const endCustomerVehicle = endVehicleOwnership;
+export const listCustomerVehicles = (params: ListParams, signal?: AbortSignal) => apiClient.get<ApiCollection<PartyVehicleRelationship>>(endpoints.customerVehicles, { params, signal }).then((r) => r.data);
+export const getCustomerVehicle = (id: number, signal?: AbortSignal) => apiClient.get<ApiResource<PartyVehicleRelationship>>(`${endpoints.customerVehicles}/${id}`, { signal }).then((r) => r.data.data);
+export const createCustomerVehicle = (payload: PartyVehiclePayload) => apiClient.post<ApiResource<PartyVehicleRelationship>>(endpoints.customerVehicles, payload).then((r) => r.data.data);
+export const updateCustomerVehicle = (id: number, payload: Partial<PartyVehiclePayload>) => apiClient.patch<ApiResource<PartyVehicleRelationship>>(`${endpoints.customerVehicles}/${id}`, payload).then((r) => r.data.data);
+export const setCustomerVehicleCurrent = (id: number) => apiClient.post<ApiResource<PartyVehicleRelationship>>(`${endpoints.customerVehicles}/${id}/set-current`).then((r) => r.data.data);
+export const clearCustomerVehicleCurrent = (id: number) => apiClient.post<ApiResource<PartyVehicleRelationship>>(`${endpoints.customerVehicles}/${id}/clear-current`).then((r) => r.data.data);
+export const endCustomerVehicle = (id: number) => apiClient.delete<ApiResource<PartyVehicleRelationship>>(`${endpoints.customerVehicles}/${id}`).then((r) => r.data.data);

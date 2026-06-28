@@ -15,7 +15,7 @@ return new class extends Migration
             $table->foreignId('tenant_id')->constrained('tenants', 'id', indexName: 'tenant_storage_cleanup_jobs_tenant_fk')->restrictOnDelete();
             $table->string('storage_path');
             $table->string('reason', 255);
-            $table->string('status', 40)->default('pending');
+            $table->enum('status', ['pending', 'processing', 'completed', 'dead'])->default('pending');
             $table->unsignedInteger('attempts')->default(0);
             $table->string('last_error_code', 100)->nullable();
             $table->string('last_error_message', 255)->nullable();

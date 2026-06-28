@@ -6,7 +6,7 @@ namespace Modules\Tenant\Services\Storage;
 
 use Illuminate\Support\Str;
 use Modules\Core\Contracts\ClockInterface;
-use Modules\PrivateObject\Contracts\PrivateObjectStorageInterface;
+use Modules\Core\Contracts\FileStorageServiceInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\Tenant\Models\TenantStorageCleanupJobModel;
 use Psr\Log\LoggerInterface;
@@ -25,7 +25,7 @@ final class TenantStorageCleanupService
 
     public function __construct(
         private readonly TenantStorageCleanupJobModel $jobs,
-        private readonly PrivateObjectStorageInterface $files,
+        private readonly FileStorageServiceInterface $files,
         private readonly ClockInterface $clock,
         private readonly TenantExecutionContextInterface $executionContext,
         private readonly TenantStoragePathPolicy $paths,

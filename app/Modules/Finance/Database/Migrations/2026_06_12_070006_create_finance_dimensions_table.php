@@ -16,7 +16,18 @@ return new class extends Migration
             $table->foreignId('organization_unit_id')->nullable();
             $table->string('code', 100);
             $table->string('name');
-            $table->string('dimension_type', 40);
+            $table->enum('dimension_type', [
+                'organization_unit',
+                'department',
+                'project',
+                'cost_center',
+                'branch',
+                'customer',
+                'supplier',
+                'employee',
+                'vehicle',
+                'custom',
+            ]);
             $table->boolean('is_active')->default(true);
             $table->timestamps();
 

@@ -16,20 +16,20 @@ use Modules\Customer\Enums\CustomerStatus;
 use Modules\Customer\Enums\CustomerType;
 use Modules\Customer\Models\Customer;
 use Modules\Customer\Services\CustomerCreationService;
+use Modules\Customer\Services\CustomerVehicleService;
+use Modules\Supplier\Services\SupplierVehicleService;
 use Modules\Vehicle\DTOs\CreateVehicleData;
-use Modules\Vehicle\Data\CreateVehicleOwnershipData;
-use Modules\Vehicle\Data\VersionedVehicleOwnershipCommand;
 use Modules\Vehicle\DTOs\VehicleAttributeData;
 use Modules\Vehicle\DTOs\VehicleCategoryData;
 use Modules\Vehicle\DTOs\VehicleDocumentData;
 use Modules\Vehicle\DTOs\VehicleMakeData;
 use Modules\Vehicle\DTOs\VehicleModelData;
+use Modules\Vehicle\DTOs\VehicleOwnershipData;
 use Modules\Vehicle\DTOs\VehicleStatusChangeData;
 use Modules\Vehicle\DTOs\VehicleTypeData;
 use Modules\Vehicle\Enums\VehicleAttributeDataType;
 use Modules\Vehicle\Enums\VehicleDocumentStatus;
 use Modules\Vehicle\Enums\VehicleDocumentType;
-use Modules\Vehicle\Enums\VehicleOwnerType;
 use Modules\Vehicle\Enums\VehicleOwnershipType;
 use Modules\Vehicle\Enums\VehicleStatus;
 use Modules\Vehicle\Models\Vehicle;
@@ -46,7 +46,6 @@ use Modules\Vehicle\Services\VehicleDocumentService;
 use Modules\Vehicle\Services\VehicleLookupService;
 use Modules\Vehicle\Services\VehicleMakeService;
 use Modules\Vehicle\Services\VehicleModelService;
-use Modules\Vehicle\Services\Ownership\VehicleOwnershipCommandService;
 use Modules\Vehicle\Services\VehicleStatusService;
 use Modules\Vehicle\Services\VehicleTypeService;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
@@ -86,25 +85,19 @@ final class VehicleEngineTest extends TestCase
             documents: [new VehicleDocumentData(VehicleDocumentType::Insurance, 'INS-1', status: VehicleDocumentStatus::Active)],
             attributes: [new VehicleAttributeData('body_style', 'Hatchback', VehicleAttributeDataType::Text)],
         ));
-        $ownership = $this->ownership(
-            $vehicle,
-            VehicleOwnerType::Customer,
-            (int) $customer->getKey(),
-            VehicleOwnershipType::CustomerOwned,
-            now()->toDateString(),
-            $tenantId,
-            $organizationUnitId,
-        );
+        $relationship = app(CustomerVehicleService::class)->create([
+            'customer_id' => $customer->getKey(), 'vehicle_id' => $vehicle->getKey(),
+            'started_at' => now()->toDateString(), 'is_current' => true,
+        ], $tenantId, $organizationUnitId);
 
         $this->assertSame(VehicleStatus::Active, $vehicle->status);
         $this->assertSame('25.500000', (string) $vehicle->odometer_reading);
         $this->assertCount(1, $vehicle->documents);
-        $this->assertCount(1, $vehicle->ownerships()->get());
+        $this->assertCount(0, $vehicle->ownerships);
         $this->assertCount(1, $vehicle->attributes);
         $this->assertCount(1, $vehicle->statusHistories);
-        $this->assertSame((int) $customer->getKey(), (int) $ownership->owner_id);
-        $this->assertSame($customer->name, $ownership->owner_name_snapshot);
-        $this->assertSame(1, $vehicle->currentOwnerships()->forOwnerType(VehicleOwnerType::Customer)->count());
+        $this->assertSame((int) $customer->getKey(), (int) $relationship->customer_id);
+        $this->assertSame(1, $vehicle->currentCustomerVehicles()->count());
 
         $result = app(VehicleLookupService::class)->result($vehicle);
         $this->assertSame('VEH-CREATE-1', $result->vehicleNumber);
@@ -139,22 +132,29 @@ final class VehicleEngineTest extends TestCase
         $vehicle = $this->vehicle($tenantId, $organizationUnitId, 'VEH-REL', (int) $make->getKey(), (int) $model->getKey());
 
         $document = app(VehicleDocumentService::class)->create($vehicle, new VehicleDocumentData(VehicleDocumentType::Registration, 'REG-DOC'));
-        $ownership = $this->ownership($vehicle, VehicleOwnerType::Customer, (int) $customer->getKey(), VehicleOwnershipType::CustomerOwned, now()->toDateString(), $tenantId, $organizationUnitId);
+        $ownership = app(CustomerVehicleService::class)->create([
+            'customer_id' => $customer->getKey(), 'vehicle_id' => $vehicle->getKey(),
+            'started_at' => now()->toDateString(), 'is_current' => true,
+        ], $tenantId, $organizationUnitId);
         $attribute = app(VehicleAttributeService::class)->create($vehicle, new VehicleAttributeData('seat_count', '5', VehicleAttributeDataType::Number));
 
         $this->assertDatabaseHas('vehicle_documents', ['id' => $document->getKey(), 'document_type' => VehicleDocumentType::Registration->value]);
-        $this->assertDatabaseHas('vehicle_ownerships', ['id' => $ownership->getKey(), 'owner_type' => VehicleOwnerType::Customer->value, 'is_current' => true]);
+        $this->assertDatabaseHas('customer_vehicles', ['id' => $ownership->getKey(), 'is_current' => true]);
         $this->assertDatabaseHas('vehicle_attributes', ['id' => $attribute->getKey(), 'attribute_key' => 'seat_count']);
 
-        $supplierOwnership = $this->ownership($vehicle, VehicleOwnerType::Supplier, $supplierId, VehicleOwnershipType::SupplierOwned, now()->addDay()->toDateString(), $tenantId, $organizationUnitId);
-        $replacementOwnership = $this->ownership($vehicle, VehicleOwnerType::Customer, (int) $replacementCustomer->getKey(), VehicleOwnershipType::CustomerOwned, now()->addDays(2)->toDateString(), $tenantId, $organizationUnitId);
-
+        $supplierOwnership = app(SupplierVehicleService::class)->create([
+            'supplier_id' => $supplierId, 'vehicle_id' => $vehicle->getKey(),
+            'started_at' => now()->addDay()->toDateString(), 'is_current' => true,
+        ], $tenantId, $organizationUnitId);
+        $replacementOwnership = app(CustomerVehicleService::class)->create([
+            'customer_id' => $replacementCustomer->getKey(), 'vehicle_id' => $vehicle->getKey(),
+            'started_at' => now()->addDays(2)->toDateString(), 'is_current' => true,
+        ], $tenantId, $organizationUnitId);
         $this->assertFalse((bool) $ownership->refresh()->is_current);
-        $this->assertNotNull($ownership->ended_at);
         $this->assertTrue((bool) $replacementOwnership->refresh()->is_current);
         $this->assertTrue((bool) $supplierOwnership->refresh()->is_current);
-        $this->assertSame(1, $vehicle->currentOwnerships()->forOwnerType(VehicleOwnerType::Customer)->count());
-        $this->assertSame(1, $vehicle->currentOwnerships()->forOwnerType(VehicleOwnerType::Supplier)->count());
+        $this->assertSame(1, $vehicle->currentCustomerVehicles()->count());
+        $this->assertSame(1, $vehicle->currentSupplierVehicles()->count());
 
         app(VehicleDocumentService::class)->delete($vehicle, $document);
         app(VehicleAttributeService::class)->delete($vehicle, $attribute);
@@ -236,6 +236,7 @@ final class VehicleEngineTest extends TestCase
                 'status' => 'active',
             ],
             'documents' => [['document_type' => 'insurance', 'document_number' => 'INS-API']],
+            'ownerships' => [],
             'attributes' => [['attribute_key' => 'trim', 'attribute_value' => 'G', 'data_type' => 'text']],
         ]);
 
@@ -247,13 +248,12 @@ final class VehicleEngineTest extends TestCase
             ->assertJsonStructure(['data' => ['id', 'vehicle_number', 'make', 'model', 'current_ownerships', 'documents', 'ownerships', 'attributes']]);
 
         $id = (int) $create->json('data.id');
-        $vehicle = Vehicle::query()->findOrFail($id);
-        $this->ownership($vehicle, VehicleOwnerType::Customer, (int) $customer->getKey(), VehicleOwnershipType::CustomerOwned, now()->toDateString(), $tenantId, $organizationUnitId);
-
+        app(CustomerVehicleService::class)->create([
+            'customer_id' => $customer->getKey(), 'vehicle_id' => $id,
+            'started_at' => now()->toDateString(), 'is_current' => true,
+        ], $tenantId, $organizationUnitId);
         $this->getJson("/api/v1/vehicles/{$id}?tenant_id={$tenantId}&organization_unit_id={$organizationUnitId}")
-            ->assertOk()
-            ->assertJsonPath('data.current_customer.name', $customer->name)
-            ->assertJsonPath('data.current_ownerships.0.owner.name', $customer->name);
+            ->assertOk()->assertJsonPath('data.current_customer.name', $customer->name);
         $this->getJson("/api/v1/vehicles/lookup/active?tenant_id={$tenantId}&organization_unit_id={$organizationUnitId}")
             ->assertOk()
             ->assertJsonFragment(['vehicle_number' => 'VEH-API']);
@@ -334,29 +334,53 @@ final class VehicleEngineTest extends TestCase
         $customer = $this->customer($tenantId, $organizationUnitId, 'FILTER-CUS');
         $supplierId = $this->supplier($tenantId, $organizationUnitId, 'FILTER-SUP');
 
-        $customerVehicle = $this->vehicle($tenantId, $organizationUnitId, 'VEH-CUSTOMER', (int) $make->getKey(), (int) $model->getKey());
-        $this->ownership($customerVehicle, VehicleOwnerType::Customer, (int) $customer->getKey(), VehicleOwnershipType::CustomerOwned, now()->toDateString(), $tenantId, $organizationUnitId);
+        $customerVehicle = app(VehicleCreationService::class)->create(new CreateVehicleData(
+            tenantId: $tenantId,
+            organizationUnitId: $organizationUnitId,
+            vehicleNumber: 'VEH-CUSTOMER',
+            vehicleMakeId: (int) $make->getKey(),
+            vehicleModelId: (int) $model->getKey(),
+        ));
+        app(CustomerVehicleService::class)->create(['customer_id' => $customer->getKey(), 'vehicle_id' => $customerVehicle->getKey(), 'started_at' => now()->toDateString(), 'is_current' => true], $tenantId, $organizationUnitId);
+        $supplierVehicle = app(VehicleCreationService::class)->create(new CreateVehicleData(
+            tenantId: $tenantId,
+            organizationUnitId: $organizationUnitId,
+            vehicleNumber: 'VEH-SUPPLIER',
+            vehicleMakeId: (int) $make->getKey(),
+            vehicleModelId: (int) $model->getKey(),
+        ));
+        app(SupplierVehicleService::class)->create(['supplier_id' => $supplierId, 'vehicle_id' => $supplierVehicle->getKey(), 'started_at' => now()->toDateString(), 'is_current' => true], $tenantId, $organizationUnitId);
+        app(VehicleCreationService::class)->create(new CreateVehicleData(
+            tenantId: $tenantId,
+            organizationUnitId: $organizationUnitId,
+            vehicleNumber: 'VEH-COMPANY',
+            vehicleMakeId: (int) $make->getKey(),
+            vehicleModelId: (int) $model->getKey(),
+            ownerships: [new VehicleOwnershipData(VehicleOwnershipType::CompanyOwned, now()->toDateString(), ownerType: VehicleOwnership::OWNER_TYPE_COMPANY)],
+        ));
 
-        $supplierVehicle = $this->vehicle($tenantId, $organizationUnitId, 'VEH-SUPPLIER', (int) $make->getKey(), (int) $model->getKey());
-        $this->ownership($supplierVehicle, VehicleOwnerType::Supplier, $supplierId, VehicleOwnershipType::SupplierOwned, now()->toDateString(), $tenantId, $organizationUnitId);
+        $scope = [
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => $organizationUnitId,
+        ];
 
-        $companyVehicle = $this->vehicle($tenantId, $organizationUnitId, 'VEH-COMPANY', (int) $make->getKey(), (int) $model->getKey());
-        $this->ownership($companyVehicle, VehicleOwnerType::Company, null, VehicleOwnershipType::CompanyOwned, now()->toDateString(), $tenantId, $organizationUnitId);
+        $this->getJson('/api/v1/vehicles?'.http_build_query($scope + ['ownership_scope' => 'customer']))
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.vehicle_number', 'VEH-CUSTOMER');
 
-        $scope = ['tenant_id' => $tenantId, 'organization_unit_id' => $organizationUnitId];
-        foreach ([
-            'customer' => 'VEH-CUSTOMER',
-            'supplier' => 'VEH-SUPPLIER',
-            'company' => 'VEH-COMPANY',
-        ] as $ownerType => $vehicleNumber) {
-            $this->getJson('/api/v1/vehicles?'.http_build_query($scope + ['ownership_scope' => $ownerType]))
-                ->assertOk()
-                ->assertJsonCount(1, 'data')
-                ->assertJsonPath('data.0.vehicle_number', $vehicleNumber);
-        }
+        $this->getJson('/api/v1/vehicles?'.http_build_query($scope + ['ownership_scope' => 'supplier']))
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.vehicle_number', 'VEH-SUPPLIER');
+
+        $this->getJson('/api/v1/vehicles?'.http_build_query($scope + ['ownership_scope' => 'company']))
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.vehicle_number', 'VEH-COMPANY');
     }
 
-    public function test_vehicle_ownership_service_enforces_periods_active_pairs_current_roles_and_versions(): void
+    public function test_party_vehicle_services_enforce_dates_active_pairs_and_one_current_relationship(): void
     {
         [$tenantId, $organizationUnitId] = $this->scopeContext();
         [$make, $model] = $this->masterData($tenantId, $organizationUnitId, 'REL');
@@ -366,47 +390,98 @@ final class VehicleEngineTest extends TestCase
         $firstCustomer = $this->customer($tenantId, $organizationUnitId, 'REL-CUS-1');
         $secondCustomer = $this->customer($tenantId, $organizationUnitId, 'REL-CUS-2');
         $invalidDateCustomer = $this->customer($tenantId, $organizationUnitId, 'REL-CUS-3');
+        $customerService = app(CustomerVehicleService::class);
+        $firstCustomerRelationship = $customerService->create([
+            'customer_id' => $firstCustomer->getKey(),
+            'vehicle_id' => $vehicle->getKey(),
+            'started_at' => $startedAt->toDateString(),
+            'is_current' => true,
+        ], $tenantId, $organizationUnitId);
+        $secondCustomerRelationship = $customerService->create([
+            'customer_id' => $secondCustomer->getKey(),
+            'vehicle_id' => $vehicle->getKey(),
+            'started_at' => $startedAt->toDateString(),
+            'is_current' => true,
+        ], $tenantId, $organizationUnitId);
 
-        $first = $this->ownership($vehicle, VehicleOwnerType::Customer, (int) $firstCustomer->getKey(), VehicleOwnershipType::CustomerOwned, $startedAt->toDateString(), $tenantId, $organizationUnitId);
-        $second = $this->ownership($vehicle, VehicleOwnerType::Customer, (int) $secondCustomer->getKey(), VehicleOwnershipType::CustomerOwned, $startedAt->addDay()->toDateString(), $tenantId, $organizationUnitId);
-
-        $this->assertFalse((bool) $first->refresh()->is_current);
-        $this->assertNull($first->current_guard);
-        $this->assertNull($first->active_guard);
-        $this->assertTrue((bool) $second->refresh()->is_current);
-        $this->assertSame(1, (int) $second->current_guard);
-        $this->assertSame(1, (int) $second->active_guard);
+        $this->assertFalse((bool) $firstCustomerRelationship->refresh()->is_current);
+        $this->assertNull($firstCustomerRelationship->current_guard);
+        $this->assertTrue((bool) $secondCustomerRelationship->refresh()->is_current);
+        $this->assertSame(1, (int) $secondCustomerRelationship->current_guard);
+        $this->assertSame(1, (int) $secondCustomerRelationship->active_guard);
 
         try {
-            $this->ownership($vehicle, VehicleOwnerType::Customer, (int) $secondCustomer->getKey(), VehicleOwnershipType::CustomerOwned, $startedAt->addDays(2)->toDateString(), $tenantId, $organizationUnitId, false);
-            $this->fail('Expected duplicate active owner pair validation to fail.');
+            $customerService->create([
+                'customer_id' => $firstCustomer->getKey(),
+                'vehicle_id' => $vehicle->getKey(),
+                'started_at' => $startedAt->toDateString(),
+                'is_current' => false,
+            ], $tenantId, $organizationUnitId);
+            $this->fail('Expected duplicate active customer relationship validation to fail.');
         } catch (ConflictHttpException $exception) {
-            $this->assertSame('An active relationship already exists for this vehicle and owner.', $exception->getMessage());
+            $this->assertSame('An active Customer-Vehicle relationship already exists.', $exception->getMessage());
         }
 
         try {
-            $this->ownership($vehicle, VehicleOwnerType::Customer, (int) $invalidDateCustomer->getKey(), VehicleOwnershipType::CustomerOwned, $startedAt->addDays(3)->toDateString(), $tenantId, $organizationUnitId, false, $startedAt->addDays(2)->toDateString());
-            $this->fail('Expected invalid ownership period to fail.');
+            $customerService->create([
+                'customer_id' => $invalidDateCustomer->getKey(),
+                'vehicle_id' => $vehicle->getKey(),
+                'started_at' => $startedAt->addDay()->toDateString(),
+                'ended_at' => $startedAt->toDateString(),
+            ], $tenantId, $organizationUnitId);
+            $this->fail('Expected invalid customer relationship dates to fail.');
         } catch (ConflictHttpException $exception) {
-            $this->assertSame('Ownership end date must be after its start date.', $exception->getMessage());
+            $this->assertSame('Relationship end date cannot be before its start date.', $exception->getMessage());
         }
 
-        $service = app(VehicleOwnershipCommandService::class);
-        $ended = $service->end($second->refresh(), new VersionedVehicleOwnershipCommand(
-            expectedVersion: (int) $second->refresh()->row_version,
-            endedAt: $startedAt->addDays(2)->toDateTimeString(),
-        ));
-        $this->assertFalse((bool) $ended->is_current);
-        $this->assertNull($ended->current_guard);
-        $this->assertNull($ended->active_guard);
+        $endedCustomerRelationship = $customerService->end(
+            $secondCustomerRelationship,
+            $startedAt->addDay()->toDateTimeString(),
+        );
+        $this->assertFalse((bool) $endedCustomerRelationship->is_current);
+        $this->assertNull($endedCustomerRelationship->current_guard);
+        $this->assertNull($endedCustomerRelationship->active_guard);
 
-        $supplierId = $this->supplier($tenantId, $organizationUnitId, 'REL-SUP-1');
-        $supplier = $this->ownership($vehicle, VehicleOwnerType::Supplier, $supplierId, VehicleOwnershipType::SupplierOwned, $startedAt->toDateString(), $tenantId, $organizationUnitId);
-        $this->assertTrue((bool) $supplier->is_current);
+        $firstSupplierId = $this->supplier($tenantId, $organizationUnitId, 'REL-SUP-1');
+        $secondSupplierId = $this->supplier($tenantId, $organizationUnitId, 'REL-SUP-2');
+        $invalidDateSupplierId = $this->supplier($tenantId, $organizationUnitId, 'REL-SUP-3');
+        $supplierService = app(SupplierVehicleService::class);
+        $firstSupplierRelationship = $supplierService->create([
+            'supplier_id' => $firstSupplierId,
+            'vehicle_id' => $vehicle->getKey(),
+            'started_at' => $startedAt->toDateString(),
+            'is_current' => true,
+        ], $tenantId, $organizationUnitId);
+        $secondSupplierRelationship = $supplierService->create([
+            'supplier_id' => $secondSupplierId,
+            'vehicle_id' => $vehicle->getKey(),
+            'started_at' => $startedAt->toDateString(),
+            'is_current' => true,
+        ], $tenantId, $organizationUnitId);
 
-        $this->expectException(ConflictHttpException::class);
-        $this->expectExceptionMessage('Vehicle ownership was changed by another request. Reload and try again.');
-        $service->clearCurrent($supplier, new VersionedVehicleOwnershipCommand(expectedVersion: 999));
+        $this->assertFalse((bool) $firstSupplierRelationship->refresh()->is_current);
+        $this->assertTrue((bool) $secondSupplierRelationship->refresh()->is_current);
+        $this->assertSame(1, (int) $secondSupplierRelationship->current_guard);
+
+        try {
+            $supplierService->create([
+                'supplier_id' => $invalidDateSupplierId,
+                'vehicle_id' => $vehicle->getKey(),
+                'started_at' => $startedAt->addDay()->toDateString(),
+                'ended_at' => $startedAt->toDateString(),
+            ], $tenantId, $organizationUnitId);
+            $this->fail('Expected invalid supplier relationship dates to fail.');
+        } catch (ConflictHttpException $exception) {
+            $this->assertSame('Relationship end date cannot be before its start date.', $exception->getMessage());
+        }
+
+        $endedSupplierRelationship = $supplierService->end(
+            $secondSupplierRelationship,
+            $startedAt->addDay()->toDateTimeString(),
+        );
+        $this->assertFalse((bool) $endedSupplierRelationship->is_current);
+        $this->assertNull($endedSupplierRelationship->current_guard);
+        $this->assertNull($endedSupplierRelationship->active_guard);
     }
 
     public function test_master_data_api_and_validation_errors(): void
@@ -447,41 +522,12 @@ final class VehicleEngineTest extends TestCase
         $this->assertDatabaseHas('vehicle_types', ['tenant_id' => $tenantId, 'code' => 'CAR']);
         $this->assertDatabaseHas('vehicle_categories', ['tenant_id' => $tenantId, 'code' => 'CUSTOMER']);
         $this->assertDatabaseHas('vehicles', ['tenant_id' => $tenantId, 'vehicle_number' => 'VEH-000001']);
-        $this->assertDatabaseHas('vehicle_ownerships', [
-            'tenant_id' => $tenantId,
-            'owner_type' => VehicleOwnerType::Customer->value,
-            'ownership_type' => VehicleOwnershipType::CustomerOwned->value,
-            'is_current' => true,
-        ]);
+        $this->assertDatabaseHas('customer_vehicles', ['tenant_id' => $tenantId, 'relationship_type' => 'customer_owned', 'is_current' => true]);
         foreach (['customer_id', 'current_owner_'.'type', 'current_owner_'.'id'] as $removedColumn) {
             $this->assertFalse(Schema::hasColumn('vehicles', $removedColumn));
         }
-        $this->assertFalse(Schema::hasTable('customer_vehicles'));
-        $this->assertFalse(Schema::hasTable('supplier_vehicles'));
+        $this->assertFalse(Schema::hasColumn('vehicle_ownerships', 'customer_id'));
         $this->assertSame(1, Vehicle::query()->where('tenant_id', $tenantId)->count());
-    }
-
-    private function ownership(
-        Vehicle $vehicle,
-        VehicleOwnerType $ownerType,
-        ?int $ownerId,
-        VehicleOwnershipType $ownershipType,
-        string $startedAt,
-        int $tenantId,
-        ?int $organizationUnitId,
-        bool $isCurrent = true,
-        ?string $endedAt = null,
-    ): VehicleOwnership {
-        return app(VehicleOwnershipCommandService::class)->create(new CreateVehicleOwnershipData(
-            vehicleId: (int) $vehicle->getKey(),
-            ownerType: $ownerType,
-            ownerId: $ownerId,
-            ownershipType: $ownershipType,
-            startedAt: $startedAt,
-            endedAt: $endedAt,
-            isCurrent: $isCurrent,
-            notes: null,
-        ), $tenantId, $organizationUnitId);
     }
 
     private function vehicle(

@@ -38,8 +38,6 @@ final class ItemEngineTest extends TestCase
     public function test_it_creates_item_with_units_variants_prices_codes_and_usage_rules(): void
     {
         $tenantId = $this->createTenant();
-        $currencyId = $this->createCurrency('LKR');
-        DB::table('tenants')->where('id', $tenantId)->update(['base_currency_id' => $currencyId]);
         $organizationUnitId = $this->createOrganizationUnit($tenantId, 'ITEM-A');
         $uomId = $this->createUom($tenantId, $organizationUnitId, 'PCS');
         $category = $this->createCategory($tenantId, $organizationUnitId, 'PARTS');
@@ -58,6 +56,7 @@ final class ItemEngineTest extends TestCase
             trackingType: TrackingType::Serial,
             costingMethod: CostingMethod::WeightedAverage,
             baseUomId: $uomId,
+            standardPrice: '1250.000000',
             isStockable: true,
             units: [
                 new ItemUnitData($uomId, ItemUnitRole::Base, isDefault: true),
@@ -66,14 +65,7 @@ final class ItemEngineTest extends TestCase
                 new ItemVariantData('ITM-001-RED', 'Red'),
             ],
             prices: [
-                new ItemPriceData(
-                    priceType: ItemPriceType::Sales,
-                    amount: '1275.000000',
-                    currencyId: $currencyId,
-                    uomId: $uomId,
-                    organizationUnitId: $organizationUnitId,
-                    effectiveFrom: '2026-01-01',
-                ),
+                new ItemPriceData(ItemPriceType::Sales, '1275.000000', uomId: $uomId),
             ],
             codes: [
                 new ItemCodeData(ItemCodeType::InternalCode, 'INT-001', isPrimary: true),
@@ -92,8 +84,8 @@ final class ItemEngineTest extends TestCase
         $this->assertCount(1, $item->prices);
         $this->assertCount(1, $item->codes);
         $this->assertCount(2, $item->usageRules);
+        $this->assertSame('1250.000000', (string) $item->standard_price);
         $this->assertSame('1275.000000', (string) $item->prices->first()->amount);
-        $this->assertSame(1, (int) $item->prices->first()->revision_no);
     }
 
     public function test_category_hierarchy_relationships_work(): void
@@ -280,20 +272,6 @@ final class ItemEngineTest extends TestCase
             'status' => 'active',
             'created_at' => now(),
             'updated_at' => now()]);
-    }
-
-    private function createCurrency(string $code): int
-    {
-        return (int) DB::table('currencies')->insertGetId([
-            'code' => $code.'-'.Str::upper(Str::random(4)),
-            'name' => $code.' Currency',
-            'symbol' => $code,
-            'decimal_places' => 2,
-            'is_active' => true,
-            'row_version' => 1,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
     }
 
     private function createOrganizationUnit(int $tenantId, string $code): int

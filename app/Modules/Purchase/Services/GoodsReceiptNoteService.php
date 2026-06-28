@@ -18,7 +18,6 @@ use Modules\Purchase\Models\GoodsReceiptNoteLine;
 use Modules\Purchase\Models\PurchaseHeaderAdjustment;
 use Modules\Purchase\Models\PurchaseOrder;
 use Modules\Purchase\Models\PurchaseOrderLine;
-use Modules\Purchase\Services\Tax\GoodsReceiptNoteTaxDocumentMapper;
 use Modules\Purchase\Validators\PurchaseValidationService;
 use Modules\Tax\Services\TaxDocumentIntegrationService;
 
@@ -35,7 +34,6 @@ final class GoodsReceiptNoteService
         private readonly PurchaseUomService $uoms,
         private readonly PurchaseNumberService $numbers,
         private readonly TaxDocumentIntegrationService $taxDocuments,
-        private readonly GoodsReceiptNoteTaxDocumentMapper $taxDocumentMapper,
         private readonly PurchaseDocumentLockService $locks,
         private readonly PurchaseDocumentBlockerService $blockers,
     ) {}
@@ -296,7 +294,7 @@ final class GoodsReceiptNoteService
             $locked->posted_by = $postedBy;
             $locked->posted_at = now();
             $locked->save();
-            $this->taxDocuments->post($this->taxDocumentMapper->map($locked->refresh()->load('lines')));
+            $this->taxDocuments->postGoodsReceiptNote($locked->refresh()->load('lines'));
 
             return $locked->refresh()->load(['lines', 'adjustments']);
         });
@@ -336,11 +334,7 @@ final class GoodsReceiptNoteService
                 $line->save();
             }
 
-            $this->taxDocuments->reverse(
-                $this->taxDocumentMapper->map($locked),
-                'goods_receipt_note_reversal',
-                'goods_receipt_note_reversal',
-            );
+            $this->taxDocuments->reverseGoodsReceiptNote($locked);
             $this->adjustmentAllocations->releaseForTarget('goods_receipt_note', (int) $locked->getKey(), 'goods_receipt_reverse');
 
             $locked->status = GoodsReceiptNoteStatus::Reversed;
