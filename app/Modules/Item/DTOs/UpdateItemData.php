@@ -27,7 +27,6 @@ final readonly class UpdateItemData
         public ?TrackingType $trackingType = null,
         public ?CostingMethod $costingMethod = null,
         public ?int $baseUomId = null,
-        public ?string $standardPrice = null,
         public ?int $defaultTaxGroupId = null,
         public ?int $purchaseTaxGroupId = null,
         public ?int $salesTaxGroupId = null,

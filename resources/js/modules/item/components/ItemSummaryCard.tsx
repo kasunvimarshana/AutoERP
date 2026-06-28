@@ -12,7 +12,6 @@ export function ItemSummaryCard({ item }: { item: Item }) {
         { label: 'Category', value: readableRelation(item.category) },
         { label: 'Brand', value: readableRelation(item.brand) },
         { label: 'Base UOM', value: readableRelation(item.base_uom) },
-        { label: 'Standard Price', value: item.standard_price ?? 'Not configured' },
         { label: 'Standard Currency', value: readableRelation(item.tenant_base_currency) },
         { label: 'SKU', value: item.sku },
         { label: 'Barcode', value: item.barcode },

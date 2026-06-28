@@ -236,12 +236,6 @@ final class ItemBaseUomUsageAuditService
             ->count();
         $this->addBlocker($blockers, 'unsafe_vehicle_service_lines', 'Unissued vehicle-service inventory lines without a UOM snapshot must be resolved.', $unsafeServiceLines);
 
-        $implicitPrices = $this->scoped(DB::table('item_prices'), $item)
-            ->whereNull('uom_id')
-            ->where('is_active', true)
-            ->count();
-        $this->addBlocker($blockers, 'implicit_base_prices', 'Active item prices without an explicit UOM must be assigned a UOM before conversion.', $implicitPrices);
-
         $implicitBundles = DB::table('item_bundles')
             ->where('tenant_id', $item->tenant_id)
             ->where('child_item_id', $item->getKey())
