@@ -12,12 +12,9 @@ use Modules\Finance\Enums\JournalStatus;
 use Modules\Finance\Enums\JournalType;
 use Modules\Finance\Models\FinanceJournalEntry;
 use Modules\Finance\Validators\FinanceValidationService;
-use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 final class JournalReversalService
 {
-    private const REVERSAL_POSTING_KEY_PREFIX = 'reversal:';
-
     public function __construct(
         private readonly FinanceValidationService $validator,
         private readonly JournalEntryCreationService $journals,
@@ -29,23 +26,13 @@ final class JournalReversalService
         string $reversalDate,
         ?int $reversedBy = null,
         ?string $reason = null,
-        ?int $expectedVersion = null,
     ): FinanceJournalEntry {
-        return DB::transaction(function () use (
-            $journal,
-            $reversalDate,
-            $reversedBy,
-            $reason,
-            $expectedVersion,
-        ): FinanceJournalEntry {
+        return DB::transaction(function () use ($journal, $reversalDate, $reversedBy, $reason): FinanceJournalEntry {
             $journal = FinanceJournalEntry::query()
                 ->with(['lines', 'reversals'])
                 ->lockForUpdate()
                 ->findOrFail($journal->getKey());
 
-            if ($expectedVersion !== null && $expectedVersion !== (int) $journal->row_version) {
-                throw new ConflictHttpException('Finance journal was changed by another request.');
-            }
             $this->validator->assertReversible($journal);
             if ($reversalDate < $journal->journal_date->toDateString()) {
                 throw new \InvalidArgumentException('Reversal date cannot be before the original journal date.');
@@ -53,7 +40,7 @@ final class JournalReversalService
 
             $reason = trim((string) $reason);
             if ($reason === '') {
-                throw new \InvalidArgumentException('A reversal reason is required.');
+                $reason = 'Accounting reversal';
             }
 
             $lines = [];
@@ -67,10 +54,6 @@ final class JournalReversalService
                     dimensionId: $line->dimension_id,
                     sourceLineType: $line->source_line_type,
                     sourceLineId: $line->source_line_id,
-                    accountRoleId: $line->account_role_id,
-                    accountCodeSnapshot: (string) $line->account_code_snapshot,
-                    accountNameSnapshot: (string) $line->account_name_snapshot,
-                    accountRoleCodeSnapshot: $line->account_role_code_snapshot,
                 );
             }
 
@@ -80,14 +63,13 @@ final class JournalReversalService
                 journalType: JournalType::Reversal,
                 organizationUnitId: $journal->organization_unit_id,
                 source: new PostingSourceData(
-                    sourceType: 'finance_journal_reversal',
-                    sourceId: (int) $journal->getKey(),
+                    sourceType: (string) ($journal->source_type ?: 'finance_journal_entry'),
+                    sourceId: (int) ($journal->source_id ?: $journal->getKey()),
                     tenantId: (int) $journal->tenant_id,
                     organizationUnitId: $journal->organization_unit_id,
-                    sourceModule: 'finance',
-                    sourceNumber: (string) $journal->journal_number,
-                    sourceDate: $journal->journal_date->toDateString(),
-                    postingKey: self::REVERSAL_POSTING_KEY_PREFIX.$journal->getKey(),
+                    sourceModule: (string) ($journal->source_module ?: 'finance'),
+                    sourceNumber: $journal->source_number,
+                    sourceDate: $journal->source_date?->toDateString(),
                 ),
                 description: 'Reversal of '.$journal->journal_number.': '.$reason,
                 currencyId: $journal->currency_id,
@@ -99,10 +81,9 @@ final class JournalReversalService
                 reversalReason: $reason,
             ));
 
-            $this->posting->post($reversal, $reversedBy, (int) $reversal->row_version);
+            $this->posting->post($reversal, $reversedBy);
 
             $journal->forceFill([
-                'row_version' => (int) $journal->row_version + 1,
                 'status' => JournalStatus::Reversed->value,
                 'reversed_by' => $reversedBy,
                 'reversed_at' => now(),
@@ -110,6 +91,6 @@ final class JournalReversalService
             ])->save();
 
             return $reversal->refresh()->load(['lines', 'ledgerEntries']);
-        }, 3);
+        });
     }
 }

@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace Modules\UOM\Providers;
 
 use Illuminate\Support\ServiceProvider;
-use Modules\Core\Contracts\PermissionDefinitionRegistryInterface;
-use Modules\UOM\Constants\UomPermission;
 use Modules\UOM\Contracts\Services\UomConversionServiceInterface;
 use Modules\UOM\Contracts\Services\UomUsageSummaryServiceInterface;
 use Modules\UOM\Models\UnitOfMeasureModel;
@@ -38,9 +36,6 @@ final class UomServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        $this->app->make(PermissionDefinitionRegistryInterface::class)
-            ->register('uom', UomPermission::descriptions());
-
         $this->loadRoutesFrom(__DIR__.'/../Routes/api.php');
         $this->loadMigrationsFrom(__DIR__.'/../Database/Migrations');
     }

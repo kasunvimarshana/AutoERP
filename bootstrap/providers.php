@@ -6,8 +6,7 @@ use Modules\Auth\Providers\AuthServiceProvider;
 use Modules\Configuration\Providers\ConfigurationServiceProvider;
 use Modules\Core\Providers\CoreServiceProvider;
 use Modules\Customer\Providers\CustomerServiceProvider;
-use Modules\Idempotency\Providers\IdempotencyServiceProvider;
-use Modules\PrivateObject\Providers\PrivateObjectServiceProvider;
+use Modules\Extension\Providers\ExtensionServiceProvider;
 use Modules\Finance\Providers\FinanceServiceProvider;
 use Modules\Hr\Providers\HrServiceProvider;
 use Modules\Inventory\Providers\InventoryServiceProvider;
@@ -34,8 +33,6 @@ use Modules\Warehouse\Providers\WarehouseServiceProvider;
 return [
     AppServiceProvider::class,
     CoreServiceProvider::class,
-    IdempotencyServiceProvider::class,
-    PrivateObjectServiceProvider::class,
     ReferenceDataServiceProvider::class,
     ConfigurationServiceProvider::class,
     AuthServiceProvider::class,
@@ -61,5 +58,6 @@ return [
     VehicleServiceServiceProvider::class,
     UomServiceProvider::class,
     AuditServiceProvider::class,
+    ExtensionServiceProvider::class,
     WarehouseServiceProvider::class,
 ];

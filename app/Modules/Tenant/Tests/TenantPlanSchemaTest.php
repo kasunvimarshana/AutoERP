@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modules\Tenant\Tests;
 
 use Illuminate\Validation\ValidationException;
-use Modules\Tenant\Services\Plans\TenantModuleCatalogue;
 use Modules\Tenant\Services\Plans\TenantPlanSchema;
 use Tests\TestCase;
 
@@ -13,7 +12,7 @@ final class TenantPlanSchemaTest extends TestCase
 {
     public function test_it_normalizes_unique_plan_modules_and_positive_limits(): void
     {
-        $schema = new TenantPlanSchema(new TenantModuleCatalogue());
+        $schema = new TenantPlanSchema();
 
         self::assertSame(
             ['enabled_modules' => ['inventory', 'sales']],
@@ -34,28 +33,16 @@ final class TenantPlanSchemaTest extends TestCase
     public function test_foundation_and_plan_controlled_catalogues_do_not_overlap(): void
     {
         self::assertSame([], array_values(array_intersect(
-            (new TenantModuleCatalogue())->foundationCodes(),
-            (new TenantModuleCatalogue())->planControlledCodes(),
+            TenantPlanSchema::ALWAYS_ON_MODULES,
+            array_keys(TenantPlanSchema::SUPPORTED_MODULES),
         )));
-    }
-
-    public function test_catalogue_covers_foundation_and_plan_controlled_modules(): void
-    {
-        $catalogue = new TenantModuleCatalogue();
-
-        self::assertContains('uom', $catalogue->foundationCodes());
-        self::assertContains('sequence', $catalogue->foundationCodes());
-        self::assertContains('hr', $catalogue->planControlledCodes());
-        self::assertContains('tax', $catalogue->planControlledCodes());
-        self::assertContains('voucher', $catalogue->planControlledCodes());
-        self::assertCount(count(array_unique($catalogue->allCodes())), $catalogue->allCodes());
     }
 
     public function test_unknown_modules_are_rejected_instead_of_silently_enabled(): void
     {
         $this->expectException(ValidationException::class);
 
-        (new TenantPlanSchema(new TenantModuleCatalogue()))->normalizeFeatures([
+        (new TenantPlanSchema())->normalizeFeatures([
             'enabled_modules' => ['inventory', 'unknown-module'],
         ]);
     }
@@ -64,6 +51,6 @@ final class TenantPlanSchemaTest extends TestCase
     {
         $this->expectException(ValidationException::class);
 
-        (new TenantPlanSchema(new TenantModuleCatalogue()))->normalizeLimits(['max_users' => 0]);
+        (new TenantPlanSchema())->normalizeLimits(['max_users' => 0]);
     }
 }

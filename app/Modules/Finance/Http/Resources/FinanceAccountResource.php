@@ -13,11 +13,12 @@ final class FinanceAccountResource extends JsonResource
     {
         return [
             'id' => (int) $this->getKey(),
-            'row_version' => (int) $this->row_version,
             'code' => (string) $this->code,
             'name' => (string) $this->name,
             'description' => $this->description,
             'normal_balance' => $this->enum($this->normal_balance),
+            'opening_balance' => (string) $this->opening_balance,
+            'current_balance' => (string) $this->current_balance,
             'is_control_account' => (bool) $this->is_control_account,
             'is_posting_account' => (bool) $this->is_posting_account,
             'is_cash_account' => (bool) $this->is_cash_account,

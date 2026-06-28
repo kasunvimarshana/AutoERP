@@ -20,12 +20,7 @@ final class JournalLineResource extends JsonResource
             'source_line_type' => $this->source_line_type,
             'source_line_id' => $this->source_line_id,
             'account_id' => $this->account_id,
-            'account_role_id' => $this->account_role_id,
-            'account_code' => (string) $this->account_code_snapshot,
-            'account_name' => (string) $this->account_name_snapshot,
-            'account_role_code' => $this->account_role_code_snapshot,
             'account' => FinanceAccountSummaryResource::make($this->whenLoaded('account')),
-            'account_role' => $this->whenLoaded('accountRole'),
             'dimension' => $this->whenLoaded('dimension'),
         ];
     }

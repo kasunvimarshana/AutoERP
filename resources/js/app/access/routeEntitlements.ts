@@ -2,14 +2,6 @@ import { matchPath } from 'react-router-dom';
 import { accessPermissions, protectedAccessRoles } from '@/modules/access/accessPermissions';
 import { auditPermissions } from '@/modules/audit/auditPermissions';
 import { customerPermissions } from '@/modules/customer/customerPermissions';
-import { financePermissions } from '@/modules/finance/financePermissions';
-import { hrPermissions } from '@/modules/hr/hrPermissions';
-import { inventoryPermissions } from '@/modules/inventory/inventoryPermissions';
-import { invoicePermissions } from '@/modules/invoice/invoicePermissions';
-import { taxPermissions } from '@/modules/tax/taxPermissions';
-import { uomPermissions } from '@/modules/uom/uomPermissions';
-import { vehicleServicePermissions } from '@/modules/vehicle-service/vehicleServicePermissions';
-import { voucherPermissions } from '@/modules/voucher/voucherPermissions';
 import { itemPermissions } from '@/modules/item/itemPermissions';
 import { organizationUnitPermissions } from '@/modules/organization-unit/organizationUnitPermissions';
 import { paymentPermissions } from '@/modules/payment/paymentPermissions';
@@ -64,11 +56,11 @@ const tenant = (
 const rules: readonly EntitlementRule[] = [
     // Tenant shell and plan-independent operational modules.
     rule(DASHBOARD_PATH),
-    operational('/uoms/*', ['uom'], [uomPermissions.view]),
-    operational('/uom-conversions/*', ['uom'], [uomPermissions.view]),
-    operational('/uom-convert', ['uom'], [uomPermissions.convert]),
-    operational('/hr/*', ['hr'], [hrPermissions.view]),
-    operational('/vouchers/*', ['voucher'], [voucherPermissions.view]),
+    operational('/uoms/*'),
+    operational('/uom-conversions/*'),
+    operational('/uom-convert'),
+    operational('/hr/*'),
+    operational('/vouchers/*'),
     // Tenant administration and access control.
     operational('/access/users/create', undefined, [accessPermissions.usersCreate]),
     operational('/access/users/:id/edit', undefined, [
@@ -97,16 +89,16 @@ const rules: readonly EntitlementRule[] = [
     tenant('/settings', undefined, [settingsPermissions.view]),
 
     // Supplier and customer master data.
-    operational('/supplier-vehicles/create', ['supplier', 'vehicle'], [vehiclePermissions.ownershipsManage]),
-    operational('/supplier-vehicles/:id/edit', ['supplier', 'vehicle'], [vehiclePermissions.ownershipsManage]),
-    operational('/supplier-vehicles', ['supplier', 'vehicle'], [vehiclePermissions.ownershipsView]),
+    operational('/supplier-vehicles/create', ['supplier', 'vehicle'], [supplierPermissions.vehiclesCreate]),
+    operational('/supplier-vehicles/:id/edit', ['supplier', 'vehicle'], [supplierPermissions.vehiclesUpdate]),
+    operational('/supplier-vehicles', ['supplier', 'vehicle'], [supplierPermissions.vehiclesView]),
     operational('/suppliers/create', ['supplier'], [supplierPermissions.create]),
     operational('/suppliers/:id/edit', ['supplier'], [supplierPermissions.update]),
     operational('/suppliers/:id', ['supplier'], [supplierPermissions.view]),
     operational('/suppliers', ['supplier'], [supplierPermissions.view]),
-    operational('/customer-vehicles/create', ['customer', 'vehicle'], [vehiclePermissions.ownershipsManage]),
-    operational('/customer-vehicles/:id/edit', ['customer', 'vehicle'], [vehiclePermissions.ownershipsManage]),
-    operational('/customer-vehicles', ['customer', 'vehicle'], [vehiclePermissions.ownershipsView]),
+    operational('/customer-vehicles/create', ['customer', 'vehicle'], [customerPermissions.vehiclesCreate]),
+    operational('/customer-vehicles/:id/edit', ['customer', 'vehicle'], [customerPermissions.vehiclesUpdate]),
+    operational('/customer-vehicles', ['customer', 'vehicle'], [customerPermissions.vehiclesView]),
     operational('/customers/create', ['customer'], [customerPermissions.create]),
     operational('/customers/:id/edit', ['customer'], [customerPermissions.update]),
     operational('/customers/:id', ['customer'], [customerPermissions.view]),
@@ -133,7 +125,7 @@ const rules: readonly EntitlementRule[] = [
     operational('/warehouses/:id/edit', ['warehouse'], [warehousePermissions.warehousesUpdate]),
     operational('/warehouses/:id', ['warehouse'], [warehousePermissions.warehousesView]),
     operational('/warehouses', ['warehouse'], [warehousePermissions.warehousesView]),
-    operational('/inventory/*', ['inventory'], [inventoryPermissions.view]),
+    operational('/inventory/*', ['inventory']),
 
     // Purchase workflows.
     operational('/purchase/fast-purchase', ['purchase'], [
@@ -212,10 +204,10 @@ const rules: readonly EntitlementRule[] = [
 
     // Modules whose backend currently has no granular permission contract are still
     // isolated by tenant, organization-unit, and plan entitlement boundaries.
-    operational('/vehicle-service/*', ['vehicle-service'], [vehicleServicePermissions.view]),
-    operational('/finance/*', ['finance'], [financePermissions.view]),
-    operational('/tax/*', ['tax'], [taxPermissions.view]),
-    operational('/invoices/*', ['invoice'], [invoicePermissions.view]),
+    operational('/vehicle-service/*', ['vehicle-service']),
+    operational('/finance/*', ['finance']),
+    operational('/tax/*', ['finance']),
+    operational('/invoices/*', ['invoice']),
 ];
 
 export function resolveTenantRouteEntitlement(pathname: string): TenantRouteEntitlement | null {

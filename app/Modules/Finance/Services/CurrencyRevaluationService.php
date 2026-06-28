@@ -65,16 +65,20 @@ final class CurrencyRevaluationService
 
             if ($this->math->compare($difference, '0.000000') > 0) {
                 $lines[] = new PostingLine(
-                    profileKey: $exposureKey,
+                    accountCode: null,
+                    accountName: 'Revalued exposure',
                     debit: $amount,
                     description: $description,
+                    profileKey: $exposureKey,
                     sourceLineType: $exposure['source_line_type'] ?? $exposureType,
                     sourceLineId: $exposure['source_line_id'] ?? null,
                 );
                 $lines[] = new PostingLine(
-                    profileKey: $gainProfileKey,
+                    accountCode: null,
+                    accountName: 'Unrealized gain',
                     credit: $amount,
                     description: $description,
+                    profileKey: $gainProfileKey,
                     sourceLineType: $exposure['source_line_type'] ?? $exposureType,
                     sourceLineId: $exposure['source_line_id'] ?? null,
                 );
@@ -83,16 +87,20 @@ final class CurrencyRevaluationService
             }
 
             $lines[] = new PostingLine(
-                profileKey: $lossProfileKey,
+                accountCode: null,
+                accountName: 'Unrealized loss',
                 debit: $amount,
                 description: $description,
+                profileKey: $lossProfileKey,
                 sourceLineType: $exposure['source_line_type'] ?? $exposureType,
                 sourceLineId: $exposure['source_line_id'] ?? null,
             );
             $lines[] = new PostingLine(
-                profileKey: $exposureKey,
+                accountCode: null,
+                accountName: 'Revalued exposure',
                 credit: $amount,
                 description: $description,
+                profileKey: $exposureKey,
                 sourceLineType: $exposure['source_line_type'] ?? $exposureType,
                 sourceLineId: $exposure['source_line_id'] ?? null,
             );

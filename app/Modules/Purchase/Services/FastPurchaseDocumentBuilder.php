@@ -238,7 +238,7 @@ final class FastPurchaseDocumentBuilder
             status: PaymentStatus::Posted,
             createdBy: $resolved['current_user_id'],
             notes: $resolved['notes'],
-            bankAccountId: null,
+            bankAccountId: $payment['header_bank_account_id'],
             metadata: ['fast_purchase' => true, 'supplier_reference' => $resolved['supplier_reference']],
         );
 

@@ -185,7 +185,7 @@ final class RentalCustodyService
     {
         return [
             'allocation.agreement.customer', 'allocation.agreement.supplier', 'vehicle.make', 'vehicle.model',
-            'items', 'handedOverByEmployee', 'receivedByEmployee', 'documents.privateObject', 'replacement',
+            'items', 'handedOverByEmployee', 'receivedByEmployee', 'attachments', 'replacement',
         ];
     }
 

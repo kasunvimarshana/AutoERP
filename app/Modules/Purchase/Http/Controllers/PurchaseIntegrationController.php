@@ -115,11 +115,20 @@ final class PurchaseIntegrationController
                 continue;
             }
 
+            $accountId = isset($row['source_account_id']) ? (int) $row['source_account_id'] : null;
+            $account = $accountId === null ? null : $service->assertPaymentSourceAccount(
+                $request->tenantId(),
+                $request->organizationUnitId(),
+                $accountId,
+            );
+
             $lines[] = new PaymentLineData(
                 amount: (string) $row['amount'],
                 paymentMethodId: isset($row['payment_method_id']) ? (int) $row['payment_method_id'] : null,
                 referenceNumber: isset($row['reference']) ? (string) $row['reference'] : null,
                 notes: isset($row['notes']) ? (string) $row['notes'] : null,
+                metadata: $accountId === null ? null : ['source_account_id' => $accountId],
+                internalBankAccountId: $account !== null && (bool) $account->is_bank_account ? (int) $account->getKey() : null,
                 instrumentDirection: (string) ($row['instrument_direction'] ?? 'issued'),
                 externalBankName: isset($row['external_bank_name']) ? (string) $row['external_bank_name'] : null,
                 externalBankBranch: isset($row['external_bank_branch']) ? (string) $row['external_bank_branch'] : null,

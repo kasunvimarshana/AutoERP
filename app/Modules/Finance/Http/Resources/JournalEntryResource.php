@@ -15,11 +15,9 @@ final class JournalEntryResource extends JsonResource
         $status = $this->status instanceof JournalStatus
             ? $this->status
             : JournalStatus::from((string) $this->status);
-        $manualDraft = $status === JournalStatus::Draft && $this->source_identity_key === null;
 
         return [
             'id' => (int) $this->getKey(),
-            'row_version' => (int) $this->row_version,
             'journal_number' => (string) $this->journal_number,
             'journal_date' => $this->journal_date?->toDateString(),
             'journal_type' => $this->enum($this->journal_type),
@@ -32,7 +30,6 @@ final class JournalEntryResource extends JsonResource
             'source_module' => $this->source_module,
             'source_type' => $this->source_type,
             'source_id' => $this->source_id,
-            'posting_key' => $this->posting_key,
             'source_number' => $this->source_number,
             'source_date' => $this->source_date?->toDateString(),
             'reversal_reason' => $this->reversal_reason,
@@ -44,7 +41,7 @@ final class JournalEntryResource extends JsonResource
             'ledger_entries' => LedgerEntryResource::collection($this->whenLoaded('ledgerEntries')),
             'reversal_of' => $this->whenLoaded('reversalOf'),
             'reversals' => $this->whenLoaded('reversals'),
-            'can_edit' => $manualDraft,
+            'can_edit' => $status === JournalStatus::Draft,
             'can_post' => $status === JournalStatus::Draft,
             'can_cancel' => $status === JournalStatus::Draft,
             'can_reverse' => $status === JournalStatus::Posted

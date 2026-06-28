@@ -70,11 +70,15 @@ export interface PurchaseHeaderAdjustment {
     remaining_amount?: string;
     allocation_method: string;
     is_allocatable?: boolean;
+    finance_posting_profile_id?: number | null;
+    finance_account_id?: number | null;
     cost_treatment?: string | null;
     tax_treatment?: string | null;
     mapping_source?: string | null;
     override_reason?: string | null;
     finance_mapping?: {
+        posting_profile_id?: number | null;
+        account_id?: number | null;
         cost_treatment?: string | null;
         tax_treatment?: string | null;
         source?: string | null;
@@ -185,6 +189,8 @@ export interface PurchaseOrderPayload {
         amount: string;
         allocation_method?: string;
         is_allocatable?: boolean;
+        finance_posting_profile_id?: number;
+        finance_account_id?: number;
         cost_treatment?: string;
         tax_treatment?: string;
         mapping_source?: 'catalogue' | 'override';
@@ -448,6 +454,7 @@ export interface PurchasePaymentCreatePayload {
     lines?: Array<{
         amount: string;
         payment_method_id?: number;
+        source_account_id?: number;
         reference?: string;
         instrument_direction?: 'received' | 'issued' | 'outbound';
         external_bank_name?: string;
@@ -481,6 +488,7 @@ export interface PurchasePaymentPreview {
     lines: Array<{
         amount: string;
         payment_method_id?: number | null;
+        source_account_id?: number | null;
         reference_number?: string | null;
     }>;
     allocations: Array<{
@@ -544,6 +552,7 @@ export interface FastPurchaseContext {
     warehouses: FastPurchaseOptionResource[];
     currencies: FastPurchaseOptionResource[];
     payment_methods: FastPurchaseOptionResource[];
+    payment_accounts: FastPurchaseOptionResource[];
     tax_groups: FastPurchaseOptionResource[];
 }
 
@@ -605,6 +614,7 @@ export interface FastPurchasePayload {
     payment?: {
         amount?: string;
         payment_method_id?: number;
+        source_account_id?: number;
         reference?: string;
         cheque_number?: string;
         cheque_date?: string;
@@ -616,7 +626,8 @@ export interface FastPurchasePayload {
         lines?: Array<{
             amount: string;
             payment_method_id?: number;
-                reference?: string;
+            source_account_id?: number;
+            reference?: string;
             instrument_number?: string;
             instrument_date?: string;
             external_bank_name?: string;

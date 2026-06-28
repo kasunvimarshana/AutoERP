@@ -1,9 +1,5 @@
 import { PartyVehicleListPage } from '@/modules/party-vehicle/PartyVehicleListPage';
-import { SupplierLookupSelect } from './components/SupplierLookupSelect';
 import { VehicleLookupSelect } from '@/modules/vehicle/components/VehicleLookupSelect';
-import { vehiclePermissions } from '@/modules/vehicle/vehiclePermissions';
-import { clearVehicleOwnershipCurrent, endVehicleOwnership, listVehicleOwnerships, setVehicleOwnershipCurrent } from '@/modules/vehicle/vehicleOwnershipApi';
-
-export default function SupplierVehicleListPage() {
-    return <PartyVehicleListPage ownerType="supplier" title="Supplier Vehicle Ownership" createPath="/supplier-vehicles/create" supersedePath={(id) => `/supplier-vehicles/${id}/edit`} permissions={{ view: vehiclePermissions.ownershipsView, manage: vehiclePermissions.ownershipsManage }} PartyLookup={SupplierLookupSelect} VehicleLookup={VehicleLookupSelect} list={listVehicleOwnerships} setCurrent={setVehicleOwnershipCurrent} clearCurrent={clearVehicleOwnershipCurrent} end={endVehicleOwnership} />;
-}
+import { SupplierLookupSelect } from './components/SupplierLookupSelect';
+import { clearSupplierVehicleCurrent, endSupplierVehicle, listSupplierVehicles, setSupplierVehicleCurrent } from './supplierApi';
+export default function SupplierVehicleListPage(){return <PartyVehicleListPage partyKey="supplier" title="Supplier Vehicles" createPath="/supplier-vehicles/create" editPath={(id)=>`/supplier-vehicles/${id}/edit`} permissions={{create:'supplier-vehicles.create',update:'supplier-vehicles.update',setCurrent:'supplier-vehicles.set-current',clearCurrent:'supplier-vehicles.clear-current',delete:'supplier-vehicles.delete'}} PartyLookup={SupplierLookupSelect} VehicleLookup={VehicleLookupSelect} list={listSupplierVehicles} setCurrent={setSupplierVehicleCurrent} clearCurrent={clearSupplierVehicleCurrent} end={endSupplierVehicle}/>}

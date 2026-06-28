@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Route;
 use Modules\Supplier\Http\Controllers\SupplierCategoryController;
 use Modules\Supplier\Http\Controllers\SupplierController;
 use Modules\Supplier\Http\Controllers\SupplierRelationController;
+use Modules\Supplier\Http\Controllers\SupplierVehicleController;
 
 $middleware = [
     'api',
@@ -17,6 +18,25 @@ $middleware = [
 ];
 
 Route::prefix('api/v1')->middleware($middleware)->name('api.v1.')->group(function (): void {
+    Route::prefix('supplier-vehicles')->name('supplier-vehicles.')->group(function (): void {
+        Route::get('/', [SupplierVehicleController::class, 'index'])->name('index');
+        Route::post('/', [SupplierVehicleController::class, 'store'])->name('store');
+        Route::get('{relationship}', [SupplierVehicleController::class, 'show'])
+            ->whereNumber('relationship')
+            ->name('show');
+        Route::match(['put', 'patch'], '{relationship}', [SupplierVehicleController::class, 'update'])
+            ->whereNumber('relationship')
+            ->name('update');
+        Route::post('{relationship}/set-current', [SupplierVehicleController::class, 'setCurrent'])
+            ->whereNumber('relationship')
+            ->name('set-current');
+        Route::post('{relationship}/clear-current', [SupplierVehicleController::class, 'clearCurrent'])
+            ->whereNumber('relationship')
+            ->name('clear-current');
+        Route::delete('{relationship}', [SupplierVehicleController::class, 'destroy'])
+            ->whereNumber('relationship')
+            ->name('destroy');
+    });
 
     Route::get('suppliers/lookup/{kind?}', [SupplierController::class, 'lookup'])
         ->whereIn('kind', ['active', 'credit-allowed', 'by-item'])

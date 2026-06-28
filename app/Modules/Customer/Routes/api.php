@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Route;
 use Modules\Customer\Http\Controllers\CustomerCategoryController;
 use Modules\Customer\Http\Controllers\CustomerController;
 use Modules\Customer\Http\Controllers\CustomerRelationController;
+use Modules\Customer\Http\Controllers\CustomerVehicleController;
 
 $middleware = [
     'api',
@@ -17,6 +18,25 @@ $middleware = [
 ];
 
 Route::prefix('api/v1')->middleware($middleware)->name('api.v1.')->group(function (): void {
+    Route::prefix('customer-vehicles')->name('customer-vehicles.')->group(function (): void {
+        Route::get('/', [CustomerVehicleController::class, 'index'])->name('index');
+        Route::post('/', [CustomerVehicleController::class, 'store'])->name('store');
+        Route::get('{relationship}', [CustomerVehicleController::class, 'show'])
+            ->whereNumber('relationship')
+            ->name('show');
+        Route::match(['put', 'patch'], '{relationship}', [CustomerVehicleController::class, 'update'])
+            ->whereNumber('relationship')
+            ->name('update');
+        Route::post('{relationship}/set-current', [CustomerVehicleController::class, 'setCurrent'])
+            ->whereNumber('relationship')
+            ->name('set-current');
+        Route::post('{relationship}/clear-current', [CustomerVehicleController::class, 'clearCurrent'])
+            ->whereNumber('relationship')
+            ->name('clear-current');
+        Route::delete('{relationship}', [CustomerVehicleController::class, 'destroy'])
+            ->whereNumber('relationship')
+            ->name('destroy');
+    });
 
     Route::get('customers/lookup/{kind?}', [CustomerController::class, 'lookup'])
         ->whereIn('kind', ['active', 'credit-allowed'])

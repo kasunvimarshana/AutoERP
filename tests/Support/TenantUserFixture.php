@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Support;
 
 use Illuminate\Support\Facades\DB;
-use Modules\Auth\Contracts\PasswordHasherInterface;
+use Modules\Core\Contracts\PasswordHasherInterface;
 use Modules\User\Constants\UserStatus;
 
 final class TenantUserFixture

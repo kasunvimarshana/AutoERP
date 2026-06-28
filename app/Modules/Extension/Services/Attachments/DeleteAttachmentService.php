@@ -1,0 +1,36 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Modules\Extension\Services\Attachments;
+
+use Modules\Core\Results\Error;
+use Modules\Core\Results\Result;
+use Modules\Extension\Constants\ExtensionErrorCode;
+use Modules\Extension\Repositories\AttachmentRepositoryInterface;
+use Throwable;
+
+final class DeleteAttachmentService
+{
+    public function __construct(private readonly AttachmentRepositoryInterface $repository) {}
+
+    public function execute(int|string $id): Result
+    {
+        try {
+            if ($this->repository->findById($id) === null) {
+                return Result::failure(new Error(ExtensionErrorCode::NOT_FOUND, 'Attachment not found.'));
+            }
+
+            $this->repository->delete($id);
+
+            return Result::success(null);
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return Result::failure(new Error(
+                ExtensionErrorCode::INVALID_VALUE,
+                'Unable to delete the attachment for the active tenant.',
+            ));
+        }
+    }
+}

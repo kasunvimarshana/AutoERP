@@ -36,28 +36,17 @@ final class TenantAccessProvisioner implements TenantAccessProvisionerInterface
                     'name' => $name,
                     'guard_name' => UserGuard::TENANT_API,
                 ]);
-                $desired = [
+                $permission->forceFill([
                     'tenant_id' => $tenantId,
                     'name' => $name,
                     'guard_name' => UserGuard::TENANT_API,
                     'module' => (string) $definition['module'],
                     'description' => (string) $definition['description'],
                     'is_active' => true,
-                ];
-
-                if (! $permission->exists) {
-                    $permission->forceFill([...$desired, 'row_version' => 1])->save();
-                } elseif (
-                    (string) $permission->getAttribute('module') !== $desired['module']
-                    || (string) $permission->getAttribute('description') !== $desired['description']
-                    || ! (bool) $permission->getAttribute('is_active')
-                ) {
-                    $permission->forceFill([
-                        ...$desired,
-                        'row_version' => max(1, (int) $permission->getAttribute('row_version')) + 1,
-                    ])->save();
-                }
-
+                    'row_version' => $permission->exists
+                        ? max(1, (int) $permission->getAttribute('row_version')) + 1
+                        : 1,
+                ])->save();
                 $permissionIds[] = (int) $permission->getKey();
             }
 
@@ -65,14 +54,13 @@ final class TenantAccessProvisioner implements TenantAccessProvisionerInterface
                 ->where('tenant_id', $tenantId)
                 ->where('guard_name', UserGuard::TENANT_API)
                 ->when($permissionIds !== [], fn ($query) => $query->whereNotIn('id', $permissionIds))
-                ->where('is_active', true)
                 ->update(['is_active' => false, 'row_version' => DB::raw('row_version + 1')]);
 
             $role = RoleModel::withTrashed()->firstOrNew([
                 'tenant_id' => $tenantId,
                 'system_key' => UserSystemRole::SUPER_ADMIN,
             ]);
-            $roleValues = [
+            $role->forceFill([
                 'tenant_id' => $tenantId,
                 'name' => UserSystemRole::SUPER_ADMIN_NAME,
                 'active_name_key' => mb_strtolower(UserSystemRole::SUPER_ADMIN_NAME),
@@ -81,22 +69,10 @@ final class TenantAccessProvisioner implements TenantAccessProvisionerInterface
                 'is_system' => true,
                 'description' => 'Protected tenant super administrator role.',
                 'deleted_at' => null,
-            ];
-            if (! $role->exists) {
-                $role->forceFill([...$roleValues, 'row_version' => 1])->save();
-            } elseif (
-                (string) $role->getAttribute('name') !== $roleValues['name']
-                || (string) $role->getAttribute('active_name_key') !== $roleValues['active_name_key']
-                || (string) $role->getAttribute('guard_name') !== $roleValues['guard_name']
-                || ! (bool) $role->getAttribute('is_system')
-                || (string) $role->getAttribute('description') !== $roleValues['description']
-                || $role->getAttribute('deleted_at') !== null
-            ) {
-                $role->forceFill([
-                    ...$roleValues,
-                    'row_version' => max(1, (int) $role->getAttribute('row_version')) + 1,
-                ])->save();
-            }
+                'row_version' => $role->exists
+                    ? max(1, (int) $role->getAttribute('row_version')) + 1
+                    : 1,
+            ])->save();
             $roleId = (int) $role->getKey();
 
             RolePermissionModel::query()

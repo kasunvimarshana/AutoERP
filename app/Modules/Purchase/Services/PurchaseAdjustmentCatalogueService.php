@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Modules\Purchase\Services;
 
 use Illuminate\Validation\ValidationException;
+use Modules\Finance\Models\FinanceAccount;
+use Modules\Finance\Models\FinancePostingProfile;
 use Modules\Purchase\DTOs\PurchaseHeaderAdjustmentData;
 use Modules\Purchase\Enums\PurchaseAdjustmentCalculationBase;
 use Modules\Purchase\Enums\PurchaseAdjustmentCalculationType;
@@ -56,6 +58,49 @@ final class PurchaseAdjustmentCatalogueService
             ]);
         }
 
+        if ($data->financePostingProfileId !== null) {
+            $profile = FinancePostingProfile::query()
+                ->where('tenant_id', $tenantId)
+                ->where('id', $data->financePostingProfileId)
+                ->where('is_active', true)
+                ->where(fn ($query) => $organizationUnitId === null
+                    ? $query->whereNull('organization_unit_id')
+                    : $query->whereNull('organization_unit_id')->orWhere('organization_unit_id', $organizationUnitId))
+                ->first();
+
+            if (! $profile instanceof FinancePostingProfile) {
+                throw ValidationException::withMessages([
+                    "{$fieldPrefix}.finance_posting_profile_id" => ['The selected finance posting profile is not available.'],
+                ]);
+            }
+        }
+
+        if ($data->financeAccountId !== null) {
+            $account = FinanceAccount::query()
+                ->where('tenant_id', $tenantId)
+                ->where('id', $data->financeAccountId)
+                ->where('is_active', true)
+                ->where('is_posting_account', true)
+                ->where(fn ($query) => $organizationUnitId === null
+                    ? $query->whereNull('organization_unit_id')
+                    : $query->whereNull('organization_unit_id')->orWhere('organization_unit_id', $organizationUnitId))
+                ->first();
+
+            if (! $account instanceof FinanceAccount) {
+                throw ValidationException::withMessages([
+                    "{$fieldPrefix}.finance_account_id" => ['The selected finance account is not available for posting.'],
+                ]);
+            }
+        }
+
+        if (($data->financePostingProfileId !== null || $data->financeAccountId !== null)
+            && ($data->mappingSource ?? 'catalogue') === 'override'
+            && trim((string) $data->overrideReason) === ''
+        ) {
+            throw ValidationException::withMessages([
+                "{$fieldPrefix}.override_reason" => ['A reason is required when overriding the catalogue finance mapping.'],
+            ]);
+        }
     }
 
     /**

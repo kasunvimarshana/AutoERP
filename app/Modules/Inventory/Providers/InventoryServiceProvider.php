@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace Modules\Inventory\Providers;
 
 use Illuminate\Support\ServiceProvider;
-use Modules\Core\Contracts\PermissionDefinitionRegistryInterface;
-use Modules\Inventory\Constants\InventoryPermission;
 use RuntimeException;
 use Modules\Configuration\Contracts\ConfigurationDefinitionRegistryInterface;
 
@@ -19,9 +17,6 @@ final class InventoryServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        $this->app->make(PermissionDefinitionRegistryInterface::class)
-            ->register('inventory', InventoryPermission::descriptions());
-
         $this->app->make(ConfigurationDefinitionRegistryInterface::class)
             ->register('Inventory', require __DIR__.'/../Config/configuration-definitions.php');
 

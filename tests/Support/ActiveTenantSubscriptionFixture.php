@@ -7,7 +7,6 @@ namespace Tests\Support;
 use Illuminate\Support\Facades\DB;
 use Modules\Tenant\Constants\TenantCurrentSubscriptionState;
 use Modules\Tenant\Constants\TenantSubscriptionStatus;
-use Modules\Tenant\Services\Plans\TenantModuleCatalogue;
 use Modules\Tenant\Services\Plans\TenantPlanSchema;
 use RuntimeException;
 
@@ -26,7 +25,7 @@ final class ActiveTenantSubscriptionFixture
 
         $now = now();
         $features = [
-            'enabled_modules' => $enabledModules ?? app(TenantModuleCatalogue::class)->planControlledCodes(),
+            'enabled_modules' => $enabledModules ?? array_keys(TenantPlanSchema::SUPPORTED_MODULES),
         ];
         $limits = [];
 

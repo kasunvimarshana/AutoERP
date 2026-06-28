@@ -31,6 +31,8 @@ final class PurchaseAdjustmentAllocation extends TenantOwnedModel
             'recognized_at_grn_amount' => 'decimal:6',
             'recognized_at_invoice_amount' => 'decimal:6',
             'remaining_amount' => 'decimal:6',
+            'finance_posting_profile_id' => 'integer',
+            'finance_account_id' => 'integer',
             'provenance' => 'array',
         ]);
     }

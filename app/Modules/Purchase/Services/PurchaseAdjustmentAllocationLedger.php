@@ -270,6 +270,8 @@ final class PurchaseAdjustmentAllocationLedger
                 'remaining_amount' => '0.000000',
                 'cost_treatment' => $row->cost_treatment,
                 'tax_treatment' => $row->tax_treatment,
+                'finance_posting_profile_id' => $row->finance_posting_profile_id,
+                'finance_account_id' => $row->finance_account_id,
                 'correlation_key' => $this->correlationKey($origin, 'reversal', $targetType, $targetId, (int) $row->getKey()),
                 'provenance' => ['reversal_of_id' => (int) $row->getKey(), 'event_type' => $eventType],
             ];
@@ -338,6 +340,8 @@ final class PurchaseAdjustmentAllocationLedger
             'remaining_amount' => $this->math->isNegative($remaining) ? '0.000000' : $remaining,
             'cost_treatment' => $target?->cost_treatment ?? $origin->cost_treatment,
             'tax_treatment' => $target?->tax_treatment ?? $origin->tax_treatment,
+            'finance_posting_profile_id' => $target?->finance_posting_profile_id ?? $origin->finance_posting_profile_id,
+            'finance_account_id' => $target?->finance_account_id ?? $origin->finance_account_id,
         ], $attributes);
         $this->assertEntryInvariant($entry);
         $row = PurchaseAdjustmentAllocation::query()->create($entry);

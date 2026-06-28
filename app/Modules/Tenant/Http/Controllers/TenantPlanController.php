@@ -24,7 +24,7 @@ use Modules\Tenant\Services\Plans\ListTenantPlansService;
 use Modules\Tenant\Services\Plans\ListTenantPlanAssignmentsService;
 use Modules\Tenant\Services\Plans\ListTenantPlanRevisionsService;
 use Modules\Tenant\Services\Plans\UpdateTenantPlanService;
-use Modules\Tenant\Services\Plans\TenantModuleCatalogue;
+use Modules\Tenant\Services\Plans\TenantPlanSchema;
 
 final class TenantPlanController extends Controller
 {
@@ -37,15 +37,15 @@ final class TenantPlanController extends Controller
         private readonly UpdateTenantPlanService $updatePlan,
         private readonly DeactivateTenantPlanService $deactivatePlan,
         private readonly ActivateTenantPlanService $activatePlan,
-        private readonly TenantModuleCatalogue $modules,
+        private readonly TenantPlanSchema $schema,
     ) {}
 
     public function capabilities(): JsonResponse
     {
         return response()->json([
             'data' => [
-                'commercial_modules' => $this->modules->planControlledCatalogue(),
-                'always_on_modules' => $this->modules->foundationCatalogue(),
+                'commercial_modules' => $this->schema->commercialModuleCatalogue(),
+                'always_on_modules' => TenantPlanSchema::ALWAYS_ON_MODULES,
                 'limits' => TenantPlanSchema::SUPPORTED_LIMITS,
             ],
         ]);

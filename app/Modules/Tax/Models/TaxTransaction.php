@@ -6,6 +6,7 @@ namespace Modules\Tax\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Core\Models\TenantOwnedModel;
+use Modules\Finance\Models\FinanceAccount;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Tenant\Models\TenantModel;
 
@@ -31,6 +32,7 @@ final class TaxTransaction extends TenantOwnedModel
             'recoverable' => 'boolean',
             'payable' => 'boolean',
             'receivable' => 'boolean',
+            'account_id' => 'integer',
             'transaction_date' => 'date',
             'metadata' => 'array',
         ]);
@@ -54,5 +56,10 @@ final class TaxTransaction extends TenantOwnedModel
     public function snapshot(): BelongsTo
     {
         return $this->belongsTo(TaxDocumentSnapshot::class, 'tax_document_snapshot_id');
+    }
+
+    public function account(): BelongsTo
+    {
+        return $this->belongsTo(FinanceAccount::class, 'account_id');
     }
 }

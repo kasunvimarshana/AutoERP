@@ -146,6 +146,7 @@ export function FastPurchasePaymentSection({
             <PurchasePaymentMethodsEditor
                 rows={rows}
                 methods={context?.payment_methods ?? []}
+                accounts={context?.payment_accounts ?? []}
                 errorFor={errorFor}
                 errorIndexForRow={errorIndexForRow}
                 onChange={onChange}

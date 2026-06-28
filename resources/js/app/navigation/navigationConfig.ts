@@ -14,7 +14,6 @@ import { paymentPermissions } from "@/modules/payment/paymentPermissions";
 import { purchasePermissions } from "@/modules/purchase/purchasePermissions";
 import { reportingPermissions } from "@/modules/reporting/reportingPermissions";
 import { warehousePermissions } from "@/modules/warehouse/warehousePermissions";
-import { voucherPermissions } from "@/modules/voucher/voucherPermissions";
 import {
     vehicleRentalNavigationPermissions,
     vehicleRentalPermissions,
@@ -129,7 +128,7 @@ export const tenantNavigationSections: NavigationSection[] = [
                         match: ["/supplier-vehicles"],
                         access: {
                             ...tenantAccess(["vehicle", "supplier"]),
-                            permissions: ["vehicle.ownerships.view"],
+                            permissions: ["supplier-vehicles.view"],
                         },
                     },
                     {
@@ -140,7 +139,7 @@ export const tenantNavigationSections: NavigationSection[] = [
                         match: ["/supplier-vehicles/create"],
                         access: {
                             ...tenantAccess(["vehicle", "supplier"]),
-                            permissions: ["vehicle.ownerships.manage"],
+                            permissions: ["supplier-vehicles.create"],
                         },
                     },
                 ],
@@ -182,7 +181,7 @@ export const tenantNavigationSections: NavigationSection[] = [
                         match: ["/customer-vehicles"],
                         access: {
                             ...tenantAccess(["vehicle", "customer"]),
-                            permissions: ["vehicle.ownerships.view"],
+                            permissions: ["customer-vehicles.view"],
                         },
                     },
                     {
@@ -193,7 +192,7 @@ export const tenantNavigationSections: NavigationSection[] = [
                         match: ["/customer-vehicles/create"],
                         access: {
                             ...tenantAccess(["vehicle", "customer"]),
-                            permissions: ["vehicle.ownerships.manage"],
+                            permissions: ["customer-vehicles.create"],
                         },
                     },
                 ],
@@ -921,7 +920,7 @@ export const tenantNavigationSections: NavigationSection[] = [
                 to: "/reports",
                 icon: "list",
                 access: {
-                    ...operationalAccess(["reporting"]),
+                    ...operationalAccess([]),
                     permissions: [reportingPermissions.view],
                 },
             },
@@ -1021,10 +1020,7 @@ export const tenantNavigationSections: NavigationSection[] = [
                 label: "Vouchers",
                 to: "/vouchers",
                 icon: "voucher",
-                access: {
-                    ...tenantAccess(["voucher"]),
-                    permissions: [voucherPermissions.view],
-                },
+                access: tenantAccess([]),
             },
         ],
     },

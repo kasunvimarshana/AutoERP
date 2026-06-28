@@ -30,6 +30,11 @@ final class TaxTransactionResource extends JsonResource
             'recoverable' => (bool) $this->recoverable,
             'payable' => (bool) $this->payable,
             'receivable' => (bool) $this->receivable,
+            'account' => $this->whenLoaded('account', fn () => $this->account ? [
+                'id' => $this->account->id,
+                'code' => $this->account->code,
+                'name' => $this->account->name,
+            ] : null),
         ];
     }
 }

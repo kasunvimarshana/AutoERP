@@ -13,6 +13,7 @@ use Modules\Finance\DTOs\PostingLine;
 use Modules\Finance\DTOs\PostingSourceData;
 use Modules\Payment\Enums\PaymentDirection;
 use Modules\Payment\Enums\PaymentDocumentStatus;
+use Modules\Payment\Enums\PaymentMethodType;
 use Modules\Payment\Enums\PaymentPostingStatus;
 use Modules\Payment\Enums\PaymentStatus;
 use Modules\Payment\Models\Payment;
@@ -112,19 +113,20 @@ final class PaymentPostingService
         if ($direction === PaymentDirection::Inbound) {
             foreach ($payment->lines as $line) {
                 $lines[] = new PostingLine(
-                    profileKey: 'settlement',
+                    accountCode: $this->cashAccountCode($payment, $line),
                     debit: (string) $line->amount,
+                    credit: '0.000000',
                     description: 'Payment receipt '.$payment->payment_number,
+                    profileKey: $this->cashProfileKey($line),
                     sourceLineType: 'payment_line',
                     sourceLineId: (int) $line->getKey(),
-                    contextType: 'payment_method',
-                    contextId: (int) $line->payment_method_id,
                 );
             }
             $lines[] = new PostingLine(
-                profileKey: 'receivable',
+                debit: '0.000000',
                 credit: (string) $payment->total_amount,
                 description: 'Payment receipt '.$payment->payment_number,
+                profileKey: 'receivable',
                 sourceLineType: 'payment',
                 sourceLineId: (int) $payment->getKey(),
             );
@@ -133,21 +135,22 @@ final class PaymentPostingService
         }
 
         $lines[] = new PostingLine(
-            profileKey: 'payable',
             debit: (string) $payment->total_amount,
+            credit: '0.000000',
             description: 'Payment disbursement '.$payment->payment_number,
+            profileKey: 'payable',
             sourceLineType: 'payment',
             sourceLineId: (int) $payment->getKey(),
         );
         foreach ($payment->lines as $line) {
             $lines[] = new PostingLine(
-                profileKey: 'settlement',
+                accountCode: $this->cashAccountCode($payment, $line),
+                debit: '0.000000',
                 credit: (string) $line->amount,
                 description: 'Payment disbursement '.$payment->payment_number,
+                profileKey: $this->cashProfileKey($line),
                 sourceLineType: 'payment_line',
                 sourceLineId: (int) $line->getKey(),
-                contextType: 'payment_method',
-                contextId: (int) $line->payment_method_id,
             );
         }
 
@@ -163,4 +166,18 @@ final class PaymentPostingService
         return $direction === PaymentDirection::Inbound ? 'payment_received' : 'payment_made';
     }
 
+    private function cashAccountCode(Payment $payment, PaymentLine $line): ?string
+    {
+        $account = $line->internalBankAccount ?? $payment->bankAccount;
+
+        return $account?->code === null ? null : (string) $account->code;
+    }
+
+    private function cashProfileKey(PaymentLine $line): string
+    {
+        $methodType = $line->paymentMethod?->method_type;
+        $value = $methodType instanceof PaymentMethodType ? $methodType->value : (string) $methodType;
+
+        return $value === PaymentMethodType::Cash->value ? 'cash' : 'bank';
+    }
 }

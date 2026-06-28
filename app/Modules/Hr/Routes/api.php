@@ -17,8 +17,6 @@ $middleware = [
     'auth:'.(string) config('module-auth.protected_route_guard', 'auth-api'),
     (string) config('core.current_user.middleware_alias', 'current.user'),
     (string) config('core.current_tenant.middleware_alias', 'current.tenant'),
-    'tenant.feature:hr',
-    'tenant.permission:hr.view',
     (string) config('core.current_organization_unit.middleware_alias', 'current.organization-unit').':required',
 ];
 
@@ -27,24 +25,19 @@ Route::prefix('api/v1/hr')->middleware($middleware)->name('api.v1.hr.')->group(f
         ->whereIn('kind', ['active', 'available', 'service-available', 'by-skill', 'by-designation'])
         ->name('employees.lookup');
     Route::post('employees/with-relations', [EmployeeController::class, 'storeWithRelations'])
-        ->middleware('tenant.permission:hr.manage')
-            ->name('employees.with-relations.store');
+        ->name('employees.with-relations.store');
     Route::patch('employees/{employee}/activate', [EmployeeController::class, 'activate'])
         ->whereNumber('employee')
-        ->middleware('tenant.permission:hr.manage')
-            ->name('employees.activate');
+        ->name('employees.activate');
     Route::patch('employees/{employee}/deactivate', [EmployeeController::class, 'deactivate'])
         ->whereNumber('employee')
-        ->middleware('tenant.permission:hr.manage')
-            ->name('employees.deactivate');
+        ->name('employees.deactivate');
     Route::patch('employees/{employee}/status', [EmployeeController::class, 'changeStatus'])
         ->whereNumber('employee')
-        ->middleware('tenant.permission:hr.manage')
-            ->name('employees.status');
+        ->name('employees.status');
     Route::patch('employees/{employee}/availability', [EmployeeController::class, 'changeAvailability'])
         ->whereNumber('employee')
-        ->middleware('tenant.permission:hr.manage')
-            ->name('employees.availability.update');
+        ->name('employees.availability.update');
 
     $relations = [
         'contacts' => ['storeContact', 'updateContact', 'destroyContact', 'contact'],
@@ -64,15 +57,12 @@ Route::prefix('api/v1/hr')->middleware($middleware)->name('api.v1.hr.')->group(f
             ->name("{$routeName}.index");
         Route::post("employees/{employee}/{$relation}", [EmployeeRelationController::class, $store])
             ->whereNumber('employee')
-            ->middleware('tenant.permission:hr.manage')
             ->name("{$routeName}.store");
         Route::put("employees/{employee}/{$relation}/{{$child}}", [EmployeeRelationController::class, $update])
             ->whereNumber(['employee', $child])
-            ->middleware('tenant.permission:hr.manage')
             ->name("{$routeName}.update");
         Route::delete("employees/{employee}/{$relation}/{{$child}}", [EmployeeRelationController::class, $destroy])
             ->whereNumber(['employee', $child])
-            ->middleware('tenant.permission:hr.manage')
             ->name("{$routeName}.destroy");
     }
 
@@ -81,15 +71,12 @@ Route::prefix('api/v1/hr')->middleware($middleware)->name('api.v1.hr.')->group(f
         ->name('employees.availability.show');
     Route::post('employees/{employee}/availability', [EmployeeRelationController::class, 'storeAvailability'])
         ->whereNumber('employee')
-        ->middleware('tenant.permission:hr.manage')
-            ->name('employees.availability.store');
+        ->name('employees.availability.store');
     Route::get('employees/{employee}/status-history', [EmployeeRelationController::class, 'statusHistory'])
         ->whereNumber('employee')
         ->name('employees.status-history.index');
 
-    Route::apiResource('employees', EmployeeController::class)->only(['index', 'show']);
-    Route::apiResource('employees', EmployeeController::class)->except(['index', 'show'])
-        ->middleware('tenant.permission:hr.manage');
+    Route::apiResource('employees', EmployeeController::class);
 
     foreach ([
         'departments' => HrDepartmentController::class,
@@ -100,8 +87,6 @@ Route::prefix('api/v1/hr')->middleware($middleware)->name('api.v1.hr.')->group(f
         'licenses' => HrLicenseController::class,
     ] as $path => $controller) {
         Route::get("{$path}/lookup", [$controller, 'lookup'])->name("{$path}.lookup");
-        Route::apiResource($path, $controller)->only(['index', 'show']);
-        Route::apiResource($path, $controller)->except(['index', 'show'])
-            ->middleware('tenant.permission:hr.manage');
+        Route::apiResource($path, $controller);
     }
 });

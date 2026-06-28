@@ -10,7 +10,7 @@ use Modules\Auth\Models\AuthPlatformMfaMethodModel;
 use Modules\Auth\Services\Security\AuthSecurityConfig;
 use Modules\Auth\Services\Security\OpaqueTokenCodec;
 use Modules\Core\Contracts\ClockInterface;
-use Modules\Auth\Contracts\PasswordHasherInterface;
+use Modules\Core\Contracts\PasswordHasherInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\User\Contracts\PlatformMfaEnrollmentIssuerInterface;
 

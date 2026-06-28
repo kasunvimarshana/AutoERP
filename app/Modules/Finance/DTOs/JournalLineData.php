@@ -15,9 +15,5 @@ final readonly class JournalLineData
         public ?int $dimensionId = null,
         public ?string $sourceLineType = null,
         public ?int $sourceLineId = null,
-        public ?int $accountRoleId = null,
-        public ?string $accountCodeSnapshot = null,
-        public ?string $accountNameSnapshot = null,
-        public ?string $accountRoleCodeSnapshot = null,
     ) {}
 }

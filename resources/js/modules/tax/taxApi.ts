@@ -1,7 +1,7 @@
 import { apiClient } from '@/shared/api/apiClient';
 import { endpoints } from '@/shared/api/endpoints';
 import type { ApiCollection, ApiResource, ListParams } from '@/shared/types/api';
-import type { Tax, TaxGroup, TaxLookups, TaxPayload, TaxProfile, TaxReportResult } from './taxTypes';
+import type { Tax, TaxGroup, TaxLookups, TaxPayload, TaxPostingProfile, TaxProfile, TaxReportResult } from './taxTypes';
 
 export async function getTaxLookups(signal?: AbortSignal) {
     const response = await apiClient.get<ApiResource<TaxLookups>>(`${endpoints.tax}/lookups`, { signal });
@@ -65,6 +65,18 @@ export async function saveSupplierTaxProfile(id: number | null, payload: Record<
     const response = id
         ? await apiClient.patch<ApiResource<TaxProfile>>(`${endpoints.tax}/supplier-profiles/${id}`, payload)
         : await apiClient.post<ApiResource<TaxProfile>>(`${endpoints.tax}/supplier-profiles`, payload);
+    return response.data.data;
+}
+
+export async function listTaxPostingProfiles(params: ListParams, signal?: AbortSignal) {
+    const response = await apiClient.get<ApiCollection<TaxPostingProfile>>(`${endpoints.tax}/posting-profiles`, { params, signal });
+    return response.data;
+}
+
+export async function saveTaxPostingProfile(id: number | null, payload: Record<string, unknown>) {
+    const response = id
+        ? await apiClient.patch<ApiResource<TaxPostingProfile>>(`${endpoints.tax}/posting-profiles/${id}`, payload)
+        : await apiClient.post<ApiResource<TaxPostingProfile>>(`${endpoints.tax}/posting-profiles`, payload);
     return response.data.data;
 }
 

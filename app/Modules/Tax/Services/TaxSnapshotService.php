@@ -164,6 +164,7 @@ final class TaxSnapshotService
             'recoverable' => (bool) $snapshot->recoverable,
             'payable' => (bool) $snapshot->payable,
             'receivable' => (bool) $snapshot->receivable,
+            'account_id' => $attributes['account_id'] ?? null,
             'metadata' => $attributes['metadata'] ?? null,
         ]);
     }

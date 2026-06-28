@@ -17,6 +17,17 @@ class SupplierAuthorizationService
 
     public const DELETE = 'suppliers.delete';
 
+    public const VEHICLES_VIEW = 'supplier-vehicles.view';
+
+    public const VEHICLES_CREATE = 'supplier-vehicles.create';
+
+    public const VEHICLES_UPDATE = 'supplier-vehicles.update';
+
+    public const VEHICLES_SET_CURRENT = 'supplier-vehicles.set-current';
+
+    public const VEHICLES_CLEAR_CURRENT = 'supplier-vehicles.clear-current';
+
+    public const VEHICLES_DELETE = 'supplier-vehicles.delete';
 
     public function __construct(private readonly UserAccessResolver $access) {}
 
@@ -31,7 +42,8 @@ class SupplierAuthorizationService
     public static function descriptions(): array
     {
         return [
-            self::VIEW => 'View suppliers and supplier lookups.', self::CREATE => 'Create suppliers.', self::UPDATE => 'Update and deactivate suppliers.', self::DELETE => 'Archive unreferenced suppliers.'
+            self::VIEW => 'View suppliers and supplier lookups.', self::CREATE => 'Create suppliers.', self::UPDATE => 'Update and deactivate suppliers.', self::DELETE => 'Archive unreferenced suppliers.',
+            self::VEHICLES_VIEW => 'View supplier vehicle relationships.', self::VEHICLES_CREATE => 'Create supplier vehicle relationships.', self::VEHICLES_UPDATE => 'Update supplier vehicle relationships.', self::VEHICLES_SET_CURRENT => 'Set the current supplier for a vehicle.', self::VEHICLES_CLEAR_CURRENT => 'Clear the current supplier for a vehicle.', self::VEHICLES_DELETE => 'End supplier vehicle relationships.',
         ];
     }
 }

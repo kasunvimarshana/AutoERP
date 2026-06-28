@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Modules\Tenant\Services\Storage;
 
 use Modules\Core\Contracts\ClockInterface;
-use Modules\PrivateObject\Contracts\PrivateObjectStorageInterface;
+use Modules\Core\Contracts\FileStorageServiceInterface;
 use Modules\Tenant\Models\TenantDocumentModel;
 use RuntimeException;
 use Throwable;
@@ -14,7 +14,7 @@ final class TenantStorageReconciliationService
 {
     public function __construct(
         private readonly TenantDocumentModel $documents,
-        private readonly PrivateObjectStorageInterface $files,
+        private readonly FileStorageServiceInterface $files,
         private readonly TenantStoragePathPolicy $paths,
         private readonly ClockInterface $clock,
     ) {}

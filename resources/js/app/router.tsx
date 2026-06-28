@@ -348,6 +348,9 @@ const CustomerTaxProfilePage = lazy(
 const SupplierTaxProfilePage = lazy(
     () => import("@/modules/tax/pages/SupplierTaxProfilePage"),
 );
+const TaxPostingProfilePage = lazy(
+    () => import("@/modules/tax/pages/TaxPostingProfilePage"),
+);
 const TaxReportPages = lazy(() => import("@/modules/tax/pages/TaxReportPages"));
 const ReportListPage = lazy(
     () => import("@/modules/reporting/pages/ReportListPage"),
@@ -1009,6 +1012,10 @@ const appRouter = createBrowserRouter(
                         <Route
                             path="/tax/supplier-profiles"
                             element={<SupplierTaxProfilePage />}
+                        />
+                        <Route
+                            path="/tax/posting-profiles"
+                            element={<TaxPostingProfilePage />}
                         />
                         <Route path="/tax/reports" element={<TaxReportPages />} />
                         <Route

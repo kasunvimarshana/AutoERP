@@ -6,7 +6,7 @@ namespace Modules\OrganizationUnit\Services\Storage;
 
 use InvalidArgumentException;
 use Modules\Core\Contracts\ClockInterface;
-use Modules\PrivateObject\Contracts\PrivateObjectStorageInterface;
+use Modules\Core\Contracts\FileStorageServiceInterface;
 use Modules\Core\Contracts\UuidGeneratorInterface;
 use Modules\Tenant\Services\Documents\Scanning\TenantDocumentScannerInterface;
 use Modules\Tenant\Services\Storage\TenantStorageCleanupService;
@@ -18,7 +18,7 @@ use Throwable;
 final class OrganizationUnitAssetStorageService
 {
     public function __construct(
-        private readonly PrivateObjectStorageInterface $files,
+        private readonly FileStorageServiceInterface $files,
         private readonly TenantDocumentScannerInterface $scanner,
         private readonly TenantStoragePathPolicy $tenantPaths,
         private readonly TenantStorageCleanupService $cleanup,

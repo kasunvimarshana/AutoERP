@@ -9,8 +9,6 @@ export const vehiclePermissions = {
     downloadDocuments: 'vehicle.documents.download',
     manageAttributes: 'vehicle.attributes.manage',
     changeStatus: 'vehicle.status.change',
-    ownershipsView: 'vehicle.ownerships.view',
-    ownershipsManage: 'vehicle.ownerships.manage',
 } as const;
 
 export function hasVehiclePermission(subject: AccessSubject, permission: string): boolean {

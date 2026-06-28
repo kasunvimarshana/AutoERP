@@ -332,3 +332,6 @@ No persisted tables. Reporting reads domain-owned data and does not duplicate bu
 
 | Table | Business purpose | Key relationships | Important constraints |
 | --- | --- | --- | --- |
+| `attachments` | Stores tenant-scoped file attachment metadata for polymorphic business records. | `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants`; polymorphic `source_type`/`source_id` source | tenant scoped; organization-unit aware |
+| `comments` | Stores threaded comments for polymorphic business records. | `organization_unit_id` -> `organization_units`; `author_id` -> `users`; `tenant_id` -> `tenants`; polymorphic `source_type`/`source_id` source | tenant scoped; organization-unit aware |
+| `entity_attributes` | Stores extensible typed attributes for polymorphic business records. | `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants` | unique `tenant_id,entity_type,entity_id,attribute_key`; tenant scoped; organization-unit aware |

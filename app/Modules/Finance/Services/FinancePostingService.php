@@ -17,7 +17,6 @@ use Modules\Finance\Enums\JournalStatus;
 use Modules\Finance\Enums\JournalType;
 use Modules\Finance\Models\FinanceJournalEntry;
 use Modules\Finance\Models\FinancePostingProfile;
-use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 final class FinancePostingService implements FinancePostingInterface
 {
@@ -36,7 +35,7 @@ final class FinancePostingService implements FinancePostingInterface
         $profile = $this->profiles->resolveProfile($request);
 
         $journal = $this->journals->create(new CreateJournalEntryData(
-            tenantId: (int) $request->source->tenantId,
+            tenantId: $request->source->tenantId,
             journalDate: $request->postingDate,
             journalType: $this->journalTypeForSource($request->source->sourceType),
             organizationUnitId: $request->source->organizationUnitId,
@@ -48,13 +47,12 @@ final class FinancePostingService implements FinancePostingInterface
                 sourceModule: $request->source->sourceModule ?: $request->source->sourceType,
                 sourceNumber: $request->source->sourceNumber,
                 sourceDate: $request->source->sourceDate ?: $request->postingDate,
-                postingKey: $request->source->postingKey,
             ),
             description: $request->description,
             currencyId: $request->currencyId,
             exchangeRate: $request->exchangeRate,
             lines: $this->journalLines($request, $profile),
-            postingProfileId: (int) $profile->getKey(),
+            postingProfileId: $profile?->getKey(),
         ));
 
         return $this->resultFromJournal($journal);
@@ -65,17 +63,17 @@ final class FinancePostingService implements FinancePostingInterface
         if (trim($request->postingDate) === '') {
             throw new InvalidArgumentException('Posting date is required.');
         }
+
         if ($request->lines === []) {
             throw new InvalidArgumentException('Posting request requires at least one line.');
         }
+
         if ($request->source->tenantId === null) {
             throw new InvalidArgumentException('Posting source tenant is required.');
         }
-        if (trim((string) $request->source->sourceModule) === ''
-            || trim($request->source->sourceType) === ''
-            || $request->source->sourceId < 1
-            || trim($request->source->postingKey) === '') {
-            throw new InvalidArgumentException('Posting source module, type, ID, and posting key are required.');
+
+        if (trim($request->source->sourceType) === '' || $request->source->sourceId < 1) {
+            throw new InvalidArgumentException('Posting source type and ID are required.');
         }
 
         $this->periods->resolve(
@@ -86,23 +84,22 @@ final class FinancePostingService implements FinancePostingInterface
         );
 
         $profile = $this->profiles->resolveProfile($request);
+
         if ($this->math->isNegative($request->exchangeRate) || $this->math->isZero($request->exchangeRate)) {
             throw new InvalidArgumentException('Posting exchange rate must be greater than zero.');
         }
 
         $totalDebit = '0.000000';
         $totalCredit = '0.000000';
+
         foreach ($request->lines as $line) {
             if ($this->math->isNegative($line->debit) || $this->math->isNegative($line->credit)) {
                 throw new InvalidArgumentException('Posting line debit and credit cannot be negative.');
             }
-            if (trim($line->profileKey) === '') {
-                throw new InvalidArgumentException('Every operational posting line requires a posting profile key.');
-            }
 
-            $assignment = $this->profiles->resolveAssignment($request, $line, $profile);
-            if (! $assignment->account->is_active || ! $assignment->account->is_posting_account) {
-                throw new InvalidArgumentException('Resolved posting account must be active and postable.');
+            $account = $this->profiles->resolveAccount($request, $line, $profile);
+            if (! (bool) $account->is_active || ! (bool) $account->is_posting_account) {
+                throw new InvalidArgumentException('Posting account must be active and postable.');
             }
 
             $totalDebit = $this->math->add($totalDebit, $line->debit);
@@ -118,15 +115,9 @@ final class FinancePostingService implements FinancePostingInterface
     {
         return DB::transaction(function () use ($request, $postedBy): PostingResultData {
             $draft = $this->createDraftJournal($request);
-            if ($draft->status === JournalStatus::Posted->value) {
-                return $draft;
-            }
-            if ($draft->status !== JournalStatus::Draft->value) {
-                throw new ConflictHttpException('Existing source journal is not in a postable state.');
-            }
 
             return $this->postJournal($draft->journalId, $postedBy);
-        }, 3);
+        });
     }
 
     public function postJournal(int $journalId, ?int $postedBy = null): PostingResultData
@@ -149,23 +140,29 @@ final class FinancePostingService implements FinancePostingInterface
         ?int $reversedBy = null,
         ?string $reason = null,
     ): PostingResultData {
-        return $this->resultFromJournal($this->reversals->reverse(
+        $reversal = $this->reversals->reverse(
             FinanceJournalEntry::query()->findOrFail($journalId),
             $reversalDate,
             $reversedBy,
             $reason,
-        ));
+        );
+
+        return $this->resultFromJournal($reversal);
     }
 
-    /** @return list<JournalLineData> */
-    private function journalLines(PostingContext $request, FinancePostingProfile $profile): array
-    {
+    /**
+     * @return list<JournalLineData>
+     */
+    private function journalLines(
+        PostingContext $request,
+        ?FinancePostingProfile $profile,
+    ): array {
         $lines = [];
         foreach ($request->lines as $index => $line) {
-            $assignment = $this->profiles->resolveAssignment($request, $line, $profile);
+            $account = $this->profiles->resolveAccount($request, $line, $profile);
             $dimension = $this->profiles->resolveDimension($request, $line->dimensionCode);
             $lines[] = new JournalLineData(
-                accountId: (int) $assignment->account_id,
+                accountId: (int) $account->getKey(),
                 lineNumber: $index + 1,
                 debit: $line->debit,
                 credit: $line->credit,
@@ -173,7 +170,6 @@ final class FinancePostingService implements FinancePostingInterface
                 dimensionId: $dimension?->getKey(),
                 sourceLineType: $line->sourceLineType,
                 sourceLineId: $line->sourceLineId,
-                accountRoleId: (int) $assignment->account_role_id,
             );
         }
 
@@ -195,7 +191,9 @@ final class FinancePostingService implements FinancePostingInterface
 
     private function resultFromJournal(FinanceJournalEntry $journal): PostingResultData
     {
-        $status = $journal->status instanceof JournalStatus ? $journal->status->value : (string) $journal->status;
+        $status = $journal->status instanceof JournalStatus
+            ? $journal->status->value
+            : (string) $journal->status;
 
         return new PostingResultData(
             journalId: (int) $journal->getKey(),

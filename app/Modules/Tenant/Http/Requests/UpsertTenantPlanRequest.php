@@ -6,7 +6,6 @@ namespace Modules\Tenant\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
-use Modules\Tenant\Services\Plans\TenantModuleCatalogue;
 use Modules\Tenant\Services\Plans\TenantPlanSchema;
 
 final class UpsertTenantPlanRequest extends FormRequest
@@ -17,7 +16,7 @@ final class UpsertTenantPlanRequest extends FormRequest
     }
 
     /** @return array<string, mixed> */
-    public function rules(TenantModuleCatalogue $modules): array
+    public function rules(): array
     {
         $creating = $this->isMethod('post');
         $required = $creating ? ['required'] : ['sometimes'];
@@ -33,7 +32,7 @@ final class UpsertTenantPlanRequest extends FormRequest
             'features.enabled_modules.*' => [
                 'string',
                 'distinct:strict',
-                Rule::in($modules->planControlledCodes()),
+                Rule::in(array_keys(TenantPlanSchema::SUPPORTED_MODULES)),
             ],
             'limits' => ['nullable', 'array:'.implode(',', TenantPlanSchema::SUPPORTED_LIMITS)],
             'limits.max_users' => ['nullable', 'integer', 'min:1'],

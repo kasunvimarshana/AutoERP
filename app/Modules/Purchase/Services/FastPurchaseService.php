@@ -12,14 +12,15 @@ use Modules\Audit\Constants\AuditEventCategory;
 use Modules\Audit\Contracts\AuditRecorderInterface;
 use Modules\Audit\Data\AuditEventData;
 use Modules\ReferenceData\Models\CurrencyModel;
-use Modules\Idempotency\Enums\IdempotencyStatus;
+use Modules\Core\Enums\IdempotencyStatus;
 use Modules\Core\Services\DecimalMath;
-use Modules\Idempotency\Services\IdempotencyService;
+use Modules\Core\Services\IdempotencyService;
+use Modules\Finance\Models\FinanceAccount;
+use Modules\Finance\Models\FinancePostingProfile;
 use Modules\Item\Enums\ItemType;
 use Modules\Item\Models\Item;
 use Modules\Item\Models\ItemVariant;
 use Modules\Payment\DTOs\PaymentLineData;
-use Modules\Payment\Enums\PaymentMethodDirection;
 use Modules\Payment\Models\PaymentMethod;
 use Modules\Purchase\Constants\PurchaseAuditEvent;
 use Modules\Purchase\DTOs\PurchaseHeaderAdjustmentData;
@@ -100,6 +101,7 @@ final class FastPurchaseService
             'warehouses' => $this->warehouseOptions($tenantId, $organizationUnitId, $search, $perPage),
             'currencies' => $this->currencyOptions($tenantId, $organizationUnitId, $search, $perPage),
             'payment_methods' => $this->paymentMethodOptions($tenantId, $organizationUnitId, $search, $perPage),
+            'payment_accounts' => $this->paymentAccountOptions($tenantId, $organizationUnitId, $search, $perPage),
             'tax_groups' => $this->taxGroupOptions($tenantId, $organizationUnitId, $search, $perPage),
         ];
     }
@@ -512,7 +514,7 @@ final class FastPurchaseService
     private function resolvePayment(array $payload, bool $recordPayment, array &$summary, int $tenantId, ?int $organizationUnitId, bool $lockRecords): array
     {
         if (! $recordPayment) {
-            return ['amount' => '0.000000', 'reference' => null, 'lines' => []];
+            return ['amount' => '0.000000', 'reference' => null, 'lines' => [], 'source_accounts' => [], 'header_bank_account_id' => null];
         }
 
         $payment = is_array($payload['payment'] ?? null) ? $payload['payment'] : [];
@@ -522,6 +524,7 @@ final class FastPurchaseService
             : [[
                 'amount' => $payment['amount'] ?? null,
                 'payment_method_id' => $payment['payment_method_id'] ?? null,
+                'source_account_id' => $payment['source_account_id'] ?? null,
                 'reference' => $payment['reference'] ?? null,
                 'instrument_number' => $payment['instrument_number'] ?? $payment['cheque_number'] ?? $payment['card_reference'] ?? null,
                 'instrument_date' => $payment['instrument_date'] ?? $payment['cheque_date'] ?? null,
@@ -530,7 +533,9 @@ final class FastPurchaseService
             ]];
 
         $lines = [];
+        $sourceAccounts = [];
         $amount = '0.000000';
+        $headerBankAccountId = null;
 
         foreach (array_values($linePayloads) as $index => $line) {
             if (! is_array($line) || ($line['amount'] ?? null) === null) {
@@ -540,24 +545,34 @@ final class FastPurchaseService
             $fieldPrefix = $usesPaymentLines ? "payment.lines.{$index}" : 'payment';
 
             $lineAmount = $this->math->normalize((string) $line['amount']);
-            $methodId = $this->nullableInt($line['payment_method_id'] ?? null);
-            if ($methodId === null) {
-                throw ValidationException::withMessages([
-                    "{$fieldPrefix}.payment_method_id" => ['Payment method is required for each payment line.'],
-                ]);
+            $accountId = $this->nullableInt($line['source_account_id'] ?? null);
+            if ($accountId === null) {
+                throw new InvalidArgumentException('Payment source account is required.');
             }
-            $this->paymentMethod($tenantId, $organizationUnitId, $methodId, $lockRecords, "{$fieldPrefix}.payment_method_id");
+
+            $account = $this->paymentAccount($tenantId, $organizationUnitId, $accountId, $lockRecords, "{$fieldPrefix}.source_account_id");
+            $methodId = $this->nullableInt($line['payment_method_id'] ?? null);
+            if ($methodId !== null) {
+                $this->paymentMethod($tenantId, $organizationUnitId, $methodId, $lockRecords, "{$fieldPrefix}.payment_method_id");
+            }
+
+            if ((bool) $account->is_bank_account && $headerBankAccountId === null) {
+                $headerBankAccountId = (int) $account->getKey();
+            }
 
             $lines[] = new PaymentLineData(
                 amount: $lineAmount,
                 paymentMethodId: $methodId,
                 referenceNumber: $this->nullableString($line['reference'] ?? null),
+                internalBankAccountId: (bool) $account->is_bank_account ? (int) $account->getKey() : null,
                 instrumentDirection: 'outbound',
                 externalBankName: $this->nullableString($line['external_bank_name'] ?? null),
                 externalBankBranch: $this->nullableString($line['external_bank_branch'] ?? null),
                 instrumentNumber: $this->nullableString($line['instrument_number'] ?? null),
                 instrumentDate: $this->nullableString($line['instrument_date'] ?? null),
+                metadata: ['source_account_id' => (int) $account->getKey()],
             );
+            $sourceAccounts[] = ['account' => $account, 'amount' => $lineAmount];
             $amount = $this->math->add($amount, $lineAmount);
         }
 
@@ -572,6 +587,8 @@ final class FastPurchaseService
             'amount' => $amount,
             'reference' => $this->nullableString($payment['reference'] ?? null),
             'lines' => $lines,
+            'source_accounts' => $sourceAccounts,
+            'header_bank_account_id' => $headerBankAccountId,
         ];
     }
 
@@ -628,6 +645,8 @@ final class FastPurchaseService
                 isAllocatable: (bool) ($row['is_allocatable'] ?? true),
                 sortOrder: $index,
                 description: $this->nullableString($row['description'] ?? null),
+                financePostingProfileId: $this->nullableInt($row['finance_posting_profile_id'] ?? null),
+                financeAccountId: $this->nullableInt($row['finance_account_id'] ?? null),
                 costTreatment: $this->nullableString($row['cost_treatment'] ?? null) ?? (string) $defaults['cost_treatment'],
                 taxTreatment: $this->nullableString($row['tax_treatment'] ?? null) ?? (string) $defaults['tax_treatment'],
                 mappingSource: $this->nullableString($row['mapping_source'] ?? null) ?? 'catalogue',
@@ -850,6 +869,11 @@ final class FastPurchaseService
         $this->lockModelIds(UnitOfMeasureModel::class, array_map(static fn (mixed $line): mixed => is_array($line) ? ($line['uom_id'] ?? null) : null, $lines));
         $this->lockModelIds(TaxGroup::class, array_map(static fn (mixed $line): mixed => is_array($line) ? ($line['tax_group_id'] ?? null) : null, $lines));
         $this->lockModelIds(PaymentMethod::class, array_map(static fn (mixed $line): mixed => is_array($line) ? ($line['payment_method_id'] ?? null) : null, $paymentLines));
+        $this->lockModelIds(FinancePostingProfile::class, array_map(static fn (mixed $adjustment): mixed => is_array($adjustment) ? ($adjustment['finance_posting_profile_id'] ?? null) : null, $adjustments));
+        $this->lockModelIds(FinanceAccount::class, array_merge(
+            array_map(static fn (mixed $line): mixed => is_array($line) ? ($line['source_account_id'] ?? null) : null, $paymentLines),
+            array_map(static fn (mixed $adjustment): mixed => is_array($adjustment) ? ($adjustment['finance_account_id'] ?? null) : null, $adjustments),
+        ));
     }
 
     /**
@@ -965,14 +989,28 @@ final class FastPurchaseService
         if (! (bool) $method->is_active) {
             $this->validator->invalidReference($field, 'payment method', 'The selected payment method is not active.');
         }
-        $direction = $method->direction_allowed instanceof PaymentMethodDirection
-            ? $method->direction_allowed
-            : PaymentMethodDirection::from((string) $method->direction_allowed);
-        if (! in_array($direction, [PaymentMethodDirection::Outbound, PaymentMethodDirection::Both], true)) {
-            $this->validator->invalidReference($field, 'payment method', 'The selected payment method does not support outbound payments.');
-        }
 
         return $method;
+    }
+
+    private function paymentAccount(int $tenantId, ?int $organizationUnitId, int $accountId, bool $lockRecords, string $field): FinanceAccount
+    {
+        $account = FinanceAccount::query()->when($lockRecords, fn ($query) => $query->lockForUpdate())->find($accountId);
+        if (! $account instanceof FinanceAccount) {
+            $this->validator->invalidReference($field, 'payment source account');
+        }
+
+        if ((int) $account->tenant_id !== $tenantId || $account->organization_unit_id !== $organizationUnitId) {
+            $this->validator->invalidReference($field, 'payment source account');
+        }
+        if (! (bool) $account->is_active || ! (bool) $account->is_posting_account) {
+            $this->validator->invalidReference($field, 'payment source account', 'The selected payment source account must be active and postable.');
+        }
+        if (! (bool) $account->is_cash_account && ! (bool) $account->is_bank_account) {
+            $this->validator->invalidReference($field, 'payment source account', 'The selected payment source account must be a cash or bank account.');
+        }
+
+        return $account;
     }
 
     private function enumValue(mixed $value): mixed
@@ -1172,6 +1210,29 @@ final class FastPurchaseService
             ->limit($limit)
             ->get(['id', 'code', 'name', 'method_type', 'requires_reference', 'requires_bank_account'])
             ->map(fn (PaymentMethod $method): array => ['id' => (int) $method->getKey(), 'code' => $method->code, 'name' => $method->name, 'method_type' => $this->enumValue($method->method_type), 'requires_reference' => (bool) $method->requires_reference, 'requires_bank_account' => (bool) $method->requires_bank_account])
+            ->all();
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function paymentAccountOptions(int $tenantId, ?int $organizationUnitId, string $search, int $limit): array
+    {
+        return FinanceAccount::query()
+            ->where('tenant_id', $tenantId)
+            ->when($organizationUnitId === null, fn ($query) => $query->whereNull('organization_unit_id'), fn ($query) => $query->where('organization_unit_id', $organizationUnitId))
+            ->where('is_active', true)
+            ->where('is_posting_account', true)
+            ->where(function ($query): void {
+                $query->where('is_cash_account', true)->orWhere('is_bank_account', true);
+            })
+            ->when($search !== '', fn ($query) => $query->where(function ($scope) use ($search): void {
+                $scope->where('code', 'like', '%'.$search.'%')->orWhere('name', 'like', '%'.$search.'%');
+            }))
+            ->orderBy('code')
+            ->limit($limit)
+            ->get(['id', 'code', 'name', 'is_cash_account', 'is_bank_account'])
+            ->map(fn (FinanceAccount $account): array => ['id' => (int) $account->getKey(), 'code' => $account->code, 'name' => $account->name, 'is_cash_account' => (bool) $account->is_cash_account, 'is_bank_account' => (bool) $account->is_bank_account])
             ->all();
     }
 

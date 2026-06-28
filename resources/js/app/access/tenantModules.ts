@@ -1,13 +1,4 @@
 export const TENANT_MODULES = [
-    { code: 'auth', label: 'Authentication' },
-    { code: 'tenant', label: 'Tenant workspace' },
-    { code: 'user', label: 'Users and access' },
-    { code: 'organization-unit', label: 'Organization units' },
-    { code: 'configuration', label: 'Configuration' },
-    { code: 'reference-data', label: 'Reference data' },
-    { code: 'audit', label: 'Audit' },
-    { code: 'sequence', label: 'Number sequences' },
-    { code: 'uom', label: 'Units of measure' },
     { code: 'customer', label: 'Customers' },
     { code: 'supplier', label: 'Suppliers' },
     { code: 'item', label: 'Items' },
@@ -22,9 +13,6 @@ export const TENANT_MODULES = [
     { code: 'payment', label: 'Payments' },
     { code: 'finance', label: 'Finance' },
     { code: 'reporting', label: 'Reporting' },
-    { code: 'tax', label: 'Tax' },
-    { code: 'hr', label: 'Human resources' },
-    { code: 'voucher', label: 'Vouchers' },
 ] as const;
 
 export type TenantModuleCode = (typeof TENANT_MODULES)[number]['code'];

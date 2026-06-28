@@ -7,6 +7,7 @@ namespace Modules\Tax\Http\Controllers;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Modules\Finance\Models\FinanceAccount;
 use Modules\Tax\DTOs\TaxAmountData;
 use Modules\Tax\DTOs\TaxCalculationResult;
 use Modules\Tax\DTOs\TaxLineCalculationResult;
@@ -15,9 +16,11 @@ use Modules\Tax\Http\Requests\TaxCalculationRequest;
 use Modules\Tax\Http\Requests\UpsertCustomerTaxProfileRequest;
 use Modules\Tax\Http\Requests\UpsertSupplierTaxProfileRequest;
 use Modules\Tax\Http\Requests\UpsertTaxGroupRequest;
+use Modules\Tax\Http\Requests\UpsertTaxPostingProfileRequest;
 use Modules\Tax\Http\Requests\UpsertTaxRateRequest;
 use Modules\Tax\Http\Requests\UpsertTaxRequest;
 use Modules\Tax\Http\Resources\TaxGroupResource;
+use Modules\Tax\Http\Resources\TaxPostingProfileResource;
 use Modules\Tax\Http\Resources\TaxProfileResource;
 use Modules\Tax\Http\Resources\TaxResource;
 use Modules\Tax\Http\Resources\TaxTransactionResource;
@@ -25,6 +28,7 @@ use Modules\Tax\Models\CustomerTaxProfile;
 use Modules\Tax\Models\SupplierTaxProfile;
 use Modules\Tax\Models\Tax;
 use Modules\Tax\Models\TaxGroup;
+use Modules\Tax\Models\TaxPostingProfile;
 use Modules\Tax\Services\TaxCalculationService;
 use Modules\Tax\Services\TaxMasterDataService;
 use Modules\Tax\Services\TaxReportService;
@@ -164,6 +168,33 @@ final class TaxController
         return new TaxProfileResource($service->saveSupplierProfile($request->validated(), $model));
     }
 
+    public function postingProfiles(ListTaxRequest $request): AnonymousResourceCollection
+    {
+        return TaxPostingProfileResource::collection(
+            $this->scope(TaxPostingProfile::query(), $request)
+                ->with(['tax', 'account'])
+                ->orderByDesc('id')
+                ->paginate($request->perPage()),
+        );
+    }
+
+    public function storePostingProfile(
+        UpsertTaxPostingProfileRequest $request,
+        TaxMasterDataService $service,
+    ): TaxPostingProfileResource {
+        return new TaxPostingProfileResource($service->savePostingProfile($request->validated()));
+    }
+
+    public function updatePostingProfile(
+        UpsertTaxPostingProfileRequest $request,
+        int $profile,
+        TaxMasterDataService $service,
+    ): TaxPostingProfileResource {
+        $model = $this->scope(TaxPostingProfile::query(), $request)->findOrFail($profile);
+
+        return new TaxPostingProfileResource($service->savePostingProfile($request->validated(), $model));
+    }
+
     public function calculate(TaxCalculationRequest $request, TaxCalculationService $service): JsonResponse
     {
         return response()->json(['data' => $this->calculationToArray($service->calculate($request->toData()))]);
@@ -192,19 +223,25 @@ final class TaxController
             ->where('active', true)
             ->orderBy('code')
             ->get(['id', 'code', 'name', 'is_default']);
-
+        $accounts = $this->scope(FinanceAccount::query(), $request)
+            ->where('is_active', true)
+            ->where('is_posting_account', true)
+            ->orderBy('code')
+            ->get(['id', 'code', 'name', 'is_tax_account']);
 
         return response()->json([
             'data' => [
                 'taxes' => $taxes,
                 'groups' => $groups,
+                'accounts' => $accounts,
                 'calculation_methods' => config('tax.calculation_methods', []),
                 'exemption_statuses' => config('tax.exemption_statuses', []),
+                'posting_directions' => config('tax.posting_directions', []),
             ],
         ]);
     }
 
-    private function scope(Builder $query, ListTaxRequest|UpsertTaxRequest|UpsertTaxRateRequest|UpsertTaxGroupRequest|UpsertCustomerTaxProfileRequest|UpsertSupplierTaxProfileRequest $request): Builder
+    private function scope(Builder $query, ListTaxRequest|UpsertTaxRequest|UpsertTaxRateRequest|UpsertTaxGroupRequest|UpsertCustomerTaxProfileRequest|UpsertSupplierTaxProfileRequest|UpsertTaxPostingProfileRequest $request): Builder
     {
         $query->where('tenant_id', $request->tenantId());
 

@@ -29,6 +29,10 @@ vi.mock('./vehicleApi', () => ({
     createVehicleAttribute: vi.fn(),
     updateVehicleAttribute: vi.fn(),
     deleteVehicleAttribute: vi.fn(),
+    listVehicleOwnerships: vi.fn(),
+    createVehicleOwnership: vi.fn(),
+    updateVehicleOwnership: vi.fn(),
+    deleteVehicleOwnership: vi.fn(),
 }));
 vi.mock('@/modules/auth/AuthProvider', () => ({
     useAuth: () => ({

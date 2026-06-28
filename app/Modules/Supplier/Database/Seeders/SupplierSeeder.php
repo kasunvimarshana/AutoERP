@@ -11,6 +11,7 @@ use Database\Seeders\Concerns\ResolvesSeedContext;
 use Modules\Supplier\Models\Supplier;
 use Modules\Supplier\Models\SupplierCategory;
 use Modules\Supplier\Models\SupplierCategoryAssignment;
+use Modules\Supplier\Services\SupplierAuthorizationService;
 
 final class SupplierSeeder extends Seeder
 {
@@ -21,6 +22,8 @@ final class SupplierSeeder extends Seeder
         if (! Schema::hasTable('suppliers')) {
             return;
         }
+
+        $this->seedPermissions();
 
         $tenant = $this->defaultTenant();
         $organizationUnit = $this->defaultOrganizationUnit($tenant);
@@ -76,4 +79,16 @@ final class SupplierSeeder extends Seeder
         }, 3);
     }
 
+    private function seedPermissions(): void
+    {
+        if (! Schema::hasTable('permissions')) {
+            return;
+        }
+        $guard = (string) config('auth.defaults.guard', 'web');
+        foreach (DB::table('tenants')->pluck('id') as $tenantId) {
+            foreach (SupplierAuthorizationService::descriptions() as $name => $description) {
+                DB::table('permissions')->updateOrInsert(['tenant_id' => $tenantId, 'name' => $name, 'guard_name' => $guard], ['module' => 'Supplier', 'description' => $description, 'row_version' => 1, 'created_at' => now(), 'updated_at' => now()]);
+            }
+        }
+    }
 }

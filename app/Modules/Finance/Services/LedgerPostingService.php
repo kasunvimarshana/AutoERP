@@ -49,7 +49,11 @@ final class LedgerPostingService
                 'source_line_id' => $line->source_line_id,
             ]);
 
-            $line->setRelation('account', $account);
+            $account->forceFill([
+                'current_balance' => $balanceAfter,
+            ])->save();
+
+            $line->setRelation('account', $account->refresh());
             $this->balances->applyJournalLine($journal, $line);
             $count++;
         }

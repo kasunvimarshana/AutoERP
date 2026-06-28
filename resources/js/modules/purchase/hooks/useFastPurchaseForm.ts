@@ -201,6 +201,7 @@ export function useFastPurchaseForm({ canPreviewPermission, canExecutePermission
             lines: paymentRowsOverride.map((row) => ({
                 amount: row.amount || '0.000000',
                 payment_method_id: row.payment_method_id ? Number(row.payment_method_id) : undefined,
+                source_account_id: row.source_account_id ? Number(row.source_account_id) : undefined,
                 reference: row.reference || undefined,
                 instrument_number: row.instrument_number || undefined,
                 instrument_date: row.instrument_date || undefined,
@@ -239,7 +240,7 @@ export function useFastPurchaseForm({ canPreviewPermission, canExecutePermission
         ));
         const paymentReady = !recordPayment || (
             isPositiveDecimal(paymentTotal)
-            && paymentRows.every((row) => isPositiveDecimal(row.amount) && row.payment_method_id)
+            && paymentRows.every((row) => isPositiveDecimal(row.amount) && row.payment_method_id && row.source_account_id)
         );
 
         return Boolean(
@@ -265,7 +266,7 @@ export function useFastPurchaseForm({ canPreviewPermission, canExecutePermission
         || notes
         || adjustments.length > 0
         || lines.length > 0
-        || paymentRows.some((row) => row.amount || row.reference || row.payment_method_id)
+        || paymentRows.some((row) => row.amount || row.reference || row.payment_method_id || row.source_account_id)
     );
 
     useUnsavedChanges(dirty && !result && !submitting);

@@ -91,7 +91,7 @@ export function PurchasePaymentCreateForm({ mode = 'create' }: { mode?: 'create'
     const methodsMatch = compareDecimalStrings(methodTotal, amount || '0.000000') === 0;
     const hasAllocatedInvoices = Object.values(allocations).some(isPositiveDecimal);
     const currencyLocked = Object.values(allocatedInvoices).some((invoice) => isPositiveDecimal(allocations[invoice.id] ?? '0.000000') && invoice.currency?.id);
-    const dirty = Boolean(supplier || referenceNumber || hasAllocatedInvoices || paymentRows.some((row) => row.amount || row.payment_method_id || row.reference));
+    const dirty = Boolean(supplier || referenceNumber || hasAllocatedInvoices || paymentRows.some((row) => row.amount || row.payment_method_id || row.source_account_id || row.reference));
     useUnsavedChanges(dirty && !busy);
 
     const cancelSourceRequest = useCallback((resetBusy = true) => {
@@ -262,7 +262,7 @@ export function PurchasePaymentCreateForm({ mode = 'create' }: { mode?: 'create'
         supplier?.id
         && isPositiveDecimal(amount)
         && currency?.id
-        && paymentRows.every((row) => isPositiveDecimal(row.amount) && row.payment_method_id)
+        && paymentRows.every((row) => isPositiveDecimal(row.amount) && row.payment_method_id && row.source_account_id)
         && methodsMatch
         && compareDecimalStrings(overAllocated, '0.000000') === 0
         && hasAllocatedInvoices
@@ -279,6 +279,7 @@ export function PurchasePaymentCreateForm({ mode = 'create' }: { mode?: 'create'
         lines: paymentRows.map((row) => ({
             amount: row.amount,
             payment_method_id: row.payment_method_id ? Number(row.payment_method_id) : undefined,
+            source_account_id: row.source_account_id ? Number(row.source_account_id) : undefined,
             reference: row.reference || undefined,
             instrument_direction: 'issued',
             external_bank_name: row.external_bank_name || undefined,
@@ -401,6 +402,7 @@ export function PurchasePaymentCreateForm({ mode = 'create' }: { mode?: 'create'
                     <PurchasePaymentMethodsEditor
                         rows={paymentRows}
                         methods={paymentContext.data?.payment_methods ?? []}
+                        accounts={paymentContext.data?.payment_accounts ?? []}
                         errorFor={errorFor}
                         onChange={setPaymentRows}
                     />
