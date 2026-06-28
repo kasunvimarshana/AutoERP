@@ -11,7 +11,7 @@ use Modules\Auth\Enums\GrantType;
 use Modules\Auth\Models\AuthClientModel;
 use Modules\Auth\Services\Security\AuthSecurityConfig;
 use Modules\Core\Contracts\ClockInterface;
-use Modules\Core\Contracts\PasswordHasherInterface;
+use Modules\Auth\Contracts\PasswordHasherInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Throwable;
 

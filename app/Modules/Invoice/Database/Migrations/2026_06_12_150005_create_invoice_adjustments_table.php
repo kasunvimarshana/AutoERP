@@ -20,22 +20,12 @@ return new class extends Migration
             $table->string('source_type')->nullable();
             $table->unsignedBigInteger('source_id')->nullable();
             $table->string('name');
-            $table->enum('adjustment_type', [
-                'discount',
-                'tax',
-                'freight',
-                'charge',
-                'credit_note',
-                'debit_note',
-                'withholding',
-                'rounding',
-                'other',
-            ]);
-            $table->enum('effect', ['increase', 'decrease']);
-            $table->enum('calculation_type', ['fixed', 'percentage'])->default('fixed');
+            $table->string('adjustment_type', 40);
+            $table->string('effect', 40);
+            $table->string('calculation_type', 40)->default('fixed');
             $table->decimal('rate', 20, 6)->default('0');
             $table->decimal('amount', 20, 6)->default('0');
-            $table->enum('allocation_method', ['proportional', 'manual', 'first_invoice', 'last_invoice'])->default('manual');
+            $table->string('allocation_method', 40)->default('manual');
             $table->boolean('is_system_generated')->default(false);
             $table->text('description')->nullable();
             $table->timestamps();

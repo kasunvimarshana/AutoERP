@@ -12,7 +12,7 @@ use Modules\Audit\Contracts\AuditRecorderInterface;
 use Modules\Audit\Data\AuditEventData;
 use Modules\Core\Contracts\ClockInterface;
 use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
-use Modules\Core\Contracts\FileStorageServiceInterface;
+use Modules\PrivateObject\Contracts\PrivateObjectStorageInterface;
 use Modules\Core\Contracts\TransactionManagerInterface;
 use Modules\Core\Contracts\UuidGeneratorInterface;
 use Modules\Core\DTOs\DataRecord;
@@ -40,7 +40,7 @@ final class TenantDocumentService
         private readonly TenantStorageCleanupService $storageCleanup,
         private readonly TenantStoragePathPolicy $storagePaths,
         private readonly TenantDocumentScannerInterface $scanner,
-        private readonly FileStorageServiceInterface $files,
+        private readonly PrivateObjectStorageInterface $files,
         private readonly UuidGeneratorInterface $uuid,
         private readonly ClockInterface $clock,
         private readonly CurrentUserContextAccessorInterface $currentUser,

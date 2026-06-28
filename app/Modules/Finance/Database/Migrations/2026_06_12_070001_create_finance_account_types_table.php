@@ -15,8 +15,8 @@ return new class extends Migration
             $table->foreignId('tenant_id')->constrained('tenants', 'id', indexName: 'finance_account_types_tenant_fk')->restrictOnDelete();
             $table->string('code', 100);
             $table->string('name');
-            $table->enum('normal_balance', ['debit', 'credit']);
-            $table->enum('statement_type', ['balance_sheet', 'income_statement']);
+            $table->string('normal_balance', 40);
+            $table->string('statement_type', 40);
             $table->boolean('is_system')->default(false);
             $table->boolean('is_active')->default(true);
             $table->unsignedInteger('sort_order')->default(0);

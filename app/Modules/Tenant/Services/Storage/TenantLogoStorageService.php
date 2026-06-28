@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Modules\Tenant\Services\Storage;
 
 use InvalidArgumentException;
-use Modules\Core\Contracts\FileStorageServiceInterface;
+use Modules\PrivateObject\Contracts\PrivateObjectStorageInterface;
 use Modules\Core\Contracts\UuidGeneratorInterface;
 use Modules\Tenant\Services\Documents\Scanning\TenantDocumentScannerInterface;
 use Psr\Log\LoggerInterface;
@@ -15,7 +15,7 @@ use Throwable;
 final class TenantLogoStorageService
 {
     public function __construct(
-        private readonly FileStorageServiceInterface $files,
+        private readonly PrivateObjectStorageInterface $files,
         private readonly TenantDocumentScannerInterface $scanner,
         private readonly TenantStoragePathPolicy $paths,
         private readonly TenantStorageCleanupService $cleanup,

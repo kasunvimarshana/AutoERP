@@ -18,7 +18,7 @@ return new class extends Migration
             $table->unsignedInteger('line_number');
             $table->unsignedBigInteger('item_id')->nullable();
             $table->text('description');
-            $table->enum('line_type', ['item', 'service', 'labour', 'charge', 'discount', 'tax', 'rounding', 'manual'])->default('item');
+            $table->string('line_type', 40)->default('item');
             $table->decimal('quantity', 20, 6)->default('0');
             $table->foreignId('uom_id')->nullable();
             $table->decimal('unit_price', 20, 6)->default('0');

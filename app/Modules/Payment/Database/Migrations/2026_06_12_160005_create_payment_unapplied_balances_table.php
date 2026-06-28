@@ -25,7 +25,7 @@ return new class extends Migration
             $table->decimal('allocated_amount', 20, 6)->default('0');
             $table->decimal('refunded_amount', 20, 6)->default('0');
             $table->decimal('remaining_amount', 20, 6);
-            $table->enum('status', ['available', 'partially_applied', 'fully_applied', 'refunded', 'cancelled'])->default('available');
+            $table->string('status', 40)->default('available');
             $table->json('metadata')->nullable();
             $table->timestamps();
 

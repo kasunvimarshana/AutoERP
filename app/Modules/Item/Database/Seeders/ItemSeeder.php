@@ -16,7 +16,6 @@ use Modules\Item\Models\ItemCategory;
 use Modules\Item\Models\ItemPrice;
 use Modules\Item\Models\ItemUnit;
 use Modules\Item\Enums\ItemPriceType;
-use Modules\Item\Services\ItemAuthorizationService;
 use Modules\Item\Services\ItemPriceScopeKey;
 use Modules\UOM\Models\UnitOfMeasureModel;
 
@@ -32,7 +31,6 @@ final class ItemSeeder extends Seeder
             return;
         }
 
-        $this->seedPermissions();
 
         $tenant = $this->defaultTenant();
         $organizationUnit = $this->defaultOrganizationUnit($tenant);
@@ -295,26 +293,4 @@ final class ItemSeeder extends Seeder
             ->first();
     }
 
-    private function seedPermissions(): void
-    {
-        if (! Schema::hasTable('permissions')) {
-            return;
-        }
-
-        $guard = (string) config('auth.defaults.guard', 'web');
-        foreach (DB::table('tenants')->pluck('id') as $tenantId) {
-            foreach (ItemAuthorizationService::descriptions() as $name => $description) {
-                DB::table('permissions')->updateOrInsert(
-                    ['tenant_id' => $tenantId, 'name' => $name, 'guard_name' => $guard],
-                    [
-                        'module' => 'Item',
-                        'description' => $description,
-                        'row_version' => 1,
-                        'updated_at' => now(),
-                        'created_at' => now(),
-                    ],
-                );
-            }
-        }
-    }
 }

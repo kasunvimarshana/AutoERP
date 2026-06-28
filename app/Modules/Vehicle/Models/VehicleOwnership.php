@@ -7,33 +7,24 @@ namespace Modules\Vehicle\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Core\Models\TenantOwnedModel;
-use Modules\Customer\Models\Customer;
-use Modules\Supplier\Models\Supplier;
+use Modules\OrganizationUnit\Models\OrganizationUnitModel;
+use Modules\Vehicle\Enums\VehicleOwnerType;
 use Modules\Vehicle\Enums\VehicleOwnershipType;
 
 final class VehicleOwnership extends TenantOwnedModel
 {
-    public const OWNER_TYPE_CUSTOMER = 'customer';
-    public const OWNER_TYPE_SUPPLIER = 'supplier';
-    public const OWNER_TYPE_OWNER = 'owner';
-    public const OWNER_TYPE_COMPANY = 'company';
-    public const SUPPLIER_OWNER_TYPES = [self::OWNER_TYPE_SUPPLIER, self::OWNER_TYPE_OWNER];
-    public const SUPPORTED_OWNER_TYPES = [
-        self::OWNER_TYPE_CUSTOMER,
-        self::OWNER_TYPE_SUPPLIER,
-        self::OWNER_TYPE_OWNER,
-        self::OWNER_TYPE_COMPANY,
-    ];
-
     protected $table = 'vehicle_ownerships';
-    protected $guarded = ['id'];
+
+    protected $guarded = ['id', 'tenant_id', 'organization_unit_id', 'owner_key', 'owner_code_snapshot', 'owner_name_snapshot', 'current_guard', 'active_guard'];
 
     protected function casts(): array
     {
         return array_merge(parent::casts(), [
+            'row_version' => 'integer',
             'tenant_id' => 'integer',
             'organization_unit_id' => 'integer',
             'vehicle_id' => 'integer',
+            'owner_type' => VehicleOwnerType::class,
             'owner_id' => 'integer',
             'ownership_type' => VehicleOwnershipType::class,
             'started_at' => 'datetime',
@@ -42,17 +33,23 @@ final class VehicleOwnership extends TenantOwnedModel
         ]);
     }
 
-    public function vehicle(): BelongsTo { return $this->belongsTo(Vehicle::class, 'vehicle_id'); }
-    public function customerOwner(): BelongsTo { return $this->belongsTo(Customer::class, 'owner_id'); }
-    public function supplierOwner(): BelongsTo { return $this->belongsTo(Supplier::class, 'owner_id'); }
+    public function organizationUnit(): BelongsTo
+    {
+        return $this->belongsTo(OrganizationUnitModel::class, 'organization_unit_id');
+    }
+
+    public function vehicle(): BelongsTo
+    {
+        return $this->belongsTo(Vehicle::class, 'vehicle_id')->withTrashed();
+    }
 
     public function scopeCurrent(Builder $query): Builder
     {
         return $query->where('is_current', true);
     }
 
-    public function scopeForOwnerType(Builder $query, string $ownerType): Builder
+    public function scopeForOwnerType(Builder $query, VehicleOwnerType|string $ownerType): Builder
     {
-        return $query->where('owner_type', $ownerType);
+        return $query->where('owner_type', $ownerType instanceof VehicleOwnerType ? $ownerType->value : $ownerType);
     }
 }

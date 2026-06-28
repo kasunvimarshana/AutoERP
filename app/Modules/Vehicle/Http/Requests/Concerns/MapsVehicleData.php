@@ -7,12 +7,10 @@ namespace Modules\Vehicle\Http\Requests\Concerns;
 use Modules\Vehicle\DTOs\CreateVehicleData;
 use Modules\Vehicle\DTOs\VehicleAttributeData;
 use Modules\Vehicle\DTOs\VehicleDocumentData;
-use Modules\Vehicle\DTOs\VehicleOwnershipData;
 use Modules\Vehicle\Enums\VehicleAttributeDataType;
 use Modules\Vehicle\Enums\VehicleDocumentStatus;
 use Modules\Vehicle\Enums\VehicleDocumentType;
 use Modules\Vehicle\Enums\VehicleFuelType;
-use Modules\Vehicle\Enums\VehicleOwnershipType;
 use Modules\Vehicle\Enums\VehicleStatus;
 use Modules\Vehicle\Enums\VehicleTransmissionType;
 
@@ -46,7 +44,6 @@ trait MapsVehicleData
             metadata: $vehicle['metadata'] ?? null,
             createdBy: $this->currentUserId(),
             documents: array_map(fn (array $row): VehicleDocumentData => $this->mapDocument($row), $relations['documents'] ?? []),
-            ownerships: array_map(fn (array $row): VehicleOwnershipData => $this->mapOwnership($row), $relations['ownerships'] ?? []),
             attributes: array_map(fn (array $row): VehicleAttributeData => $this->mapAttribute($row), $relations['attributes'] ?? []),
         );
     }
@@ -60,19 +57,6 @@ trait MapsVehicleData
             expiryDate: $row['expiry_date'] ?? null,
             file: $row['file'] ?? null,
             status: VehicleDocumentStatus::from((string) ($row['status'] ?? VehicleDocumentStatus::Pending->value)),
-            notes: $row['notes'] ?? null,
-        );
-    }
-
-    private function mapOwnership(array $row): VehicleOwnershipData
-    {
-        return new VehicleOwnershipData(
-            ownershipType: VehicleOwnershipType::from((string) $row['ownership_type']),
-            startedAt: (string) $row['started_at'],
-            ownerType: (string) $row['owner_type'],
-            ownerId: isset($row['owner_id']) ? (int) $row['owner_id'] : null,
-            endedAt: $row['ended_at'] ?? null,
-            isCurrent: (bool) ($row['is_current'] ?? true),
             notes: $row['notes'] ?? null,
         );
     }

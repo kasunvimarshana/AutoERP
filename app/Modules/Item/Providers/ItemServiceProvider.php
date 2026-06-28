@@ -6,13 +6,15 @@ namespace Modules\Item\Providers;
 
 use Illuminate\Support\ServiceProvider;
 use Modules\Item\Services\ItemAuthorizationService;
+use Modules\Item\Services\Tax\ItemTaxContextProvider;
+use Modules\Tax\Contracts\TaxItemContextProviderInterface;
 use Modules\Core\Contracts\PermissionDefinitionRegistryInterface;
 
 final class ItemServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        //
+        $this->app->singleton(TaxItemContextProviderInterface::class, ItemTaxContextProvider::class);
     }
 
     public function boot(): void

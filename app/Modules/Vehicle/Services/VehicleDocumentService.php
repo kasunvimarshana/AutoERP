@@ -7,7 +7,7 @@ namespace Modules\Vehicle\Services;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
-use Modules\Core\Contracts\FileStorageServiceInterface;
+use Modules\PrivateObject\Contracts\PrivateObjectStorageInterface;
 use Modules\Vehicle\DTOs\VehicleDocumentData;
 use Modules\Vehicle\Models\Vehicle;
 use Modules\Vehicle\Models\VehicleDocument;
@@ -15,7 +15,7 @@ use Throwable;
 
 final class VehicleDocumentService
 {
-    public function __construct(private readonly FileStorageServiceInterface $files) {}
+    public function __construct(private readonly PrivateObjectStorageInterface $files) {}
 
     public function create(Vehicle $vehicle, VehicleDocumentData $data, ?callable $onFileStored = null): VehicleDocument
     {

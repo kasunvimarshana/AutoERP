@@ -16,7 +16,7 @@ return new class extends Migration
             $table->string('key', 191)->unique('global_configuration_values_key_uk');
             $table->unsignedInteger('definition_version');
             $table->longText('value')->nullable();
-            $table->enum('value_type', ['string', 'integer', 'decimal', 'boolean', 'json']);
+            $table->string('value_type', 40);
             $table->boolean('is_sensitive')->default(false);
             $table->timestamps();
         });

@@ -21,8 +21,8 @@ final class VehicleLookupService
     public function vehiclesByCustomer(int $tenantId, int $customerId, ?int $organizationUnitId = null): Collection
     {
         return $this->baseQuery($tenantId, $organizationUnitId)
-            ->whereCurrentOwner(VehicleOwnership::OWNER_TYPE_CUSTOMER, $customerId)
-            ->with('currentCustomerVehicles.customer')
+            ->whereCurrentOwner('customer', $customerId)
+            ->with('currentOwnerships')
             ->get();
     }
 

@@ -11,11 +11,17 @@ use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Finance\DTOs\PostingSourceData;
 use Modules\Invoice\Models\Invoice;
+use Modules\Invoice\Services\Tax\InvoiceTaxDocumentMapper;
 use Modules\Payment\Models\Payment;
+use Modules\Payment\Services\Tax\PaymentTaxWithholdingMapper;
 use Modules\Purchase\Models\GoodsReceiptNote;
 use Modules\Purchase\Models\PurchaseReturn;
+use Modules\Purchase\Services\Tax\GoodsReceiptNoteTaxDocumentMapper;
+use Modules\Purchase\Services\Tax\PurchaseReturnTaxDocumentMapper;
 use Modules\Sales\Models\SalesDelivery;
 use Modules\Sales\Models\SalesReturn;
+use Modules\Sales\Services\Tax\SalesDeliveryTaxDocumentMapper;
+use Modules\Sales\Services\Tax\SalesReturnTaxDocumentMapper;
 use Modules\Tax\DTOs\ApplicableTaxData;
 use Modules\Tax\DTOs\TaxAmountData;
 use Modules\Tax\DTOs\TaxCalculationData;
@@ -366,7 +372,7 @@ final class TaxEngineTest extends TestCase
 
         $invoice = Invoice::query()->findOrFail($invoiceId);
         $integration = app(TaxDocumentIntegrationService::class);
-        $snapshots = $integration->snapshotInvoice($invoice);
+        $snapshots = $integration->snapshot(app(InvoiceTaxDocumentMapper::class)->map($invoice));
 
         $this->assertCount(1, $snapshots);
         $this->assertSame('INV-TAX', $snapshots[0]->tax_code);
@@ -374,8 +380,8 @@ final class TaxEngineTest extends TestCase
 
         $invoice->posted_at = now();
         $invoice->save();
-        $integration->postInvoice($invoice->refresh());
-        $integration->postInvoice($invoice->refresh());
+        $integration->post(app(InvoiceTaxDocumentMapper::class)->map($invoice->refresh()));
+        $integration->post(app(InvoiceTaxDocumentMapper::class)->map($invoice->refresh()));
 
         $this->assertTrue((bool) TaxDocumentSnapshot::query()->whereKey($snapshots[0]->getKey())->value('posted'));
         $this->assertSame(1, TaxTransaction::query()->where('tax_document_snapshot_id', $snapshots[0]->getKey())->count());
@@ -392,7 +398,7 @@ final class TaxEngineTest extends TestCase
         $itemId = $this->createItem($tenantId, 'PUR-SNAP-ITEM', defaultTaxGroupId: (int) $group->getKey());
         $grn = $this->createGoodsReceiptNote($tenantId, $supplierId, $warehouseId, $itemId, '10.000000', '100.000000');
 
-        app(TaxDocumentIntegrationService::class)->postGoodsReceiptNote($grn);
+        app(TaxDocumentIntegrationService::class)->post(app(GoodsReceiptNoteTaxDocumentMapper::class)->map($grn));
         $snapshot = TaxDocumentSnapshot::query()->where('source_type', 'goods_receipt_note')->where('source_id', $grn->getKey())->firstOrFail();
         $this->assertSame('10.000000', (string) $snapshot->rate);
         $this->assertSame('100.000000', (string) $snapshot->tax_amount);
@@ -401,7 +407,7 @@ final class TaxEngineTest extends TestCase
 
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Posted tax snapshots cannot be recalculated');
-        app(TaxDocumentIntegrationService::class)->snapshotGoodsReceiptNote($grn->refresh());
+        app(TaxDocumentIntegrationService::class)->snapshot(app(GoodsReceiptNoteTaxDocumentMapper::class)->map($grn->refresh()));
     }
 
     public function test_posted_invoice_snapshot_is_immutable_after_rate_change(): void
@@ -426,8 +432,8 @@ final class TaxEngineTest extends TestCase
         );
 
         $integration = app(TaxDocumentIntegrationService::class);
-        $integration->snapshotInvoice($invoice);
-        $integration->postInvoice($invoice->refresh());
+        $integration->snapshot(app(InvoiceTaxDocumentMapper::class)->map($invoice));
+        $integration->post(app(InvoiceTaxDocumentMapper::class)->map($invoice->refresh()));
         DB::table('tax_rates')->where('tax_id', $tax->getKey())->update([
             'rate' => '20.000000',
         ]);
@@ -441,7 +447,7 @@ final class TaxEngineTest extends TestCase
         );
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Posted tax snapshots cannot be recalculated');
-        $integration->snapshotInvoice($invoice->refresh());
+        $integration->snapshot(app(InvoiceTaxDocumentMapper::class)->map($invoice->refresh()));
     }
 
     public function test_partial_purchase_return_reverses_original_snapshot_tax_and_blocks_duplicate(): void
@@ -454,9 +460,9 @@ final class TaxEngineTest extends TestCase
         $itemId = $this->createItem($tenantId, 'PIN-ITEM', defaultTaxGroupId: (int) $group->getKey());
         $grn = $this->createGoodsReceiptNote($tenantId, $supplierId, $warehouseId, $itemId, '10.000000', '100.000000');
 
-        app(TaxDocumentIntegrationService::class)->postGoodsReceiptNote($grn);
+        app(TaxDocumentIntegrationService::class)->post(app(GoodsReceiptNoteTaxDocumentMapper::class)->map($grn));
         $return = $this->createPurchaseReturn($tenantId, $supplierId, $warehouseId, $grn->lines()->firstOrFail()->getKey(), $itemId, '2.000000', '10.000000', '100.000000');
-        $created = app(TaxReturnAllocationService::class)->reversePurchaseReturn($return);
+        $created = app(TaxReturnAllocationService::class)->reverse(app(PurchaseReturnTaxDocumentMapper::class)->map($return));
 
         $this->assertCount(1, $created);
         $this->assertSame('-20.000000', (string) $created[0]->tax_amount);
@@ -465,7 +471,7 @@ final class TaxEngineTest extends TestCase
 
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Tax reversal already exists');
-        app(TaxReturnAllocationService::class)->reversePurchaseReturn($return->refresh());
+        app(TaxReturnAllocationService::class)->reverse(app(PurchaseReturnTaxDocumentMapper::class)->map($return->refresh()));
     }
 
     public function test_partial_sales_return_reverses_original_snapshot_tax_and_blocks_duplicate(): void
@@ -478,12 +484,12 @@ final class TaxEngineTest extends TestCase
         $itemId = $this->createItem($tenantId, 'SOUT-ITEM', defaultTaxGroupId: (int) $group->getKey());
         $delivery = $this->createSalesDelivery($tenantId, $customerId, $warehouseId, $itemId, '10.000000', '100.000000');
 
-        app(TaxDocumentIntegrationService::class)->postSalesDelivery($delivery);
+        app(TaxDocumentIntegrationService::class)->post(app(SalesDeliveryTaxDocumentMapper::class)->map($delivery));
         DB::table('tax_rates')->where('tax_id', $tax->getKey())->update([
             'rate' => '20.000000',
         ]);
         $return = $this->createSalesReturn($tenantId, $customerId, $warehouseId, $delivery->lines()->firstOrFail()->getKey(), $itemId, '4.000000', '10.000000', '100.000000');
-        $created = app(TaxReturnAllocationService::class)->reverseSalesReturn($return, 123);
+        $created = app(TaxReturnAllocationService::class)->reverse(app(SalesReturnTaxDocumentMapper::class)->map($return, 123));
 
         $this->assertCount(1, $created);
         $this->assertSame('10.000000', (string) $created[0]->rate);
@@ -494,7 +500,7 @@ final class TaxEngineTest extends TestCase
 
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Tax reversal already exists');
-        app(TaxReturnAllocationService::class)->reverseSalesReturn($return->refresh());
+        app(TaxReturnAllocationService::class)->reverse(app(SalesReturnTaxDocumentMapper::class)->map($return->refresh()));
     }
 
     public function test_wht_invoice_context_generates_finance_context_and_missing_profile_fails(): void
@@ -507,11 +513,11 @@ final class TaxEngineTest extends TestCase
         $invoice = $this->createInvoice($tenantId, 'purchase', 'inbound', 'supplier', $supplierId, $itemId, '100000.000000');
 
         $integration = app(TaxDocumentIntegrationService::class);
-        $integration->snapshotInvoice($invoice);
+        $integration->snapshot(app(InvoiceTaxDocumentMapper::class)->map($invoice));
         $this->assertSame('5000.000000', (string) TaxDocumentSnapshot::query()->where('source_type', 'invoice')->where('is_withholding', true)->value('tax_amount'));
 
         try {
-            $integration->withholdingPostingContextForInvoice($invoice->refresh(), '2026-06-11', '2100', 'Supplier Control');
+            $integration->withholdingPostingContextForDocument(app(InvoiceTaxDocumentMapper::class)->map($invoice->refresh()), '2026-06-11', '2100', 'Supplier Control');
             $this->fail('Expected missing WHT posting profile to fail.');
         } catch (InvalidArgumentException $exception) {
             $this->assertStringContainsString('Tax account mapping is missing', $exception->getMessage());
@@ -527,7 +533,7 @@ final class TaxEngineTest extends TestCase
             'active' => true,
         ]);
 
-        $context = $integration->withholdingPostingContextForInvoice($invoice->refresh(), '2026-06-11', '2100', 'Supplier Control');
+        $context = $integration->withholdingPostingContextForDocument(app(InvoiceTaxDocumentMapper::class)->map($invoice->refresh()), '2026-06-11', '2100', 'Supplier Control');
         $this->assertCount(2, $context->financeContext->lines);
         $this->assertSame('5000.000000', $context->taxLines[0]->taxAmount);
         $this->assertSame('2300', $context->financeContext->lines[1]->accountCode);
@@ -545,7 +551,7 @@ final class TaxEngineTest extends TestCase
         $payment = $this->createPayment($tenantId, $invoice, '40000.000000');
 
         $integration = app(TaxDocumentIntegrationService::class);
-        $integration->snapshotInvoice($invoice);
+        $integration->snapshot(app(InvoiceTaxDocumentMapper::class)->map($invoice));
         $taxAccount = $this->createFinanceAccount($tenantId, '2350', 'Payment WHT Control', 'credit', isTax: true);
         app(TaxMasterDataService::class)->savePostingProfile([
             'tenant_id' => $tenantId,
@@ -555,7 +561,7 @@ final class TaxEngineTest extends TestCase
             'active' => true,
         ]);
 
-        $context = $integration->withholdingPostingContextForPayment($payment->refresh(), '2026-06-11', '2100', 'Supplier Control');
+        $context = $integration->withholdingPostingContextForPayment(app(PaymentTaxWithholdingMapper::class)->map($payment->refresh()), '2026-06-11', '2100', 'Supplier Control');
 
         $this->assertSame('payment', $context->source->sourceType);
         $this->assertSame('2000.000000', $context->taxLines[0]->taxAmount);

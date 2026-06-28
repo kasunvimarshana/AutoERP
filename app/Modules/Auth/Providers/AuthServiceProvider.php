@@ -15,6 +15,7 @@ use Modules\Auth\Console\Commands\AuthClientCreateCommand;
 use Modules\Auth\Console\Commands\AuthIncidentLookupCommand;
 use Modules\Auth\Console\Commands\AuthReadinessCommand;
 use Modules\Auth\Console\Commands\AuthRetentionPurgeCommand;
+use Modules\Auth\Contracts\PasswordHasherInterface;
 use Modules\Auth\Enums\AuthScope;
 use Modules\Auth\Exceptions\AuthFailure;
 use Modules\Auth\Http\Middleware\RequireRecentPlatformAuthenticationMiddleware;
@@ -32,6 +33,7 @@ use Modules\Auth\Services\Registration\RegistrationInvitationService;
 use Modules\Auth\Services\Security\AuthSecurityConfig;
 use Modules\Auth\Services\Security\AccountLoginThrottle;
 use Modules\Auth\Services\Security\OpaqueTokenCodec;
+use Modules\Auth\Services\Security\PasswordHasher;
 use Modules\Auth\Services\PlatformTokenService;
 use Modules\Auth\Services\TenantTokenService;
 use Modules\Auth\Services\AccessTokenRouter;
@@ -54,6 +56,7 @@ final class AuthServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->mergeConfigFrom(__DIR__.'/../Config/auth.php', 'module-auth');
+        $this->app->bind(PasswordHasherInterface::class, PasswordHasher::class);
 
         $this->app->singleton(AuthSecurityConfig::class, static fn (): AuthSecurityConfig => AuthSecurityConfig::fromConfig());
         $this->app->singleton(OpaqueTokenCodec::class, fn (): OpaqueTokenCodec => new OpaqueTokenCodec(

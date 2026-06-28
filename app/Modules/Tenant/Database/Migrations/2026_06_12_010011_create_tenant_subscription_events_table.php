@@ -15,7 +15,7 @@ return new class extends Migration
             $table->foreignId('tenant_id')->constrained('tenants', 'id', indexName: 'tenant_subscription_events_tenant_fk')->restrictOnDelete();
             $table->unsignedBigInteger('tenant_subscription_id');
             $table->unsignedBigInteger('previous_subscription_id')->nullable();
-            $table->enum('event_type', ['assigned', 'renewed', 'extended', 'corrected', 'cancelled', 'expired']);
+            $table->string('event_type', 40);
             $table->string('reason', 500)->nullable();
             $table->unsignedBigInteger('actor_id')->nullable()->index('tenant_subscription_events_actor_ix');
             $table->string('actor_type', 40)->default('system');

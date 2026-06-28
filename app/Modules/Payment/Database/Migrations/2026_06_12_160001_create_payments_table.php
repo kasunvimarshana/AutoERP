@@ -15,16 +15,8 @@ return new class extends Migration
             $table->foreignId('tenant_id')->constrained('tenants', 'id', indexName: 'payments_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->string('payment_number', 100);
-            $table->enum('payment_type', [
-                'supplier_payment',
-                'customer_receipt',
-                'service_receipt',
-                'rental_receipt',
-                'advance',
-                'refund',
-                'manual',
-            ]);
-            $table->enum('direction', ['inbound', 'outbound']);
+            $table->string('payment_type', 40);
+            $table->string('direction', 40);
             $table->string('party_type')->nullable();
             $table->unsignedBigInteger('party_id')->nullable();
             $table->string('source_type', 150)->nullable();
@@ -42,20 +34,7 @@ return new class extends Migration
             $table->foreignId('bank_account_id')->nullable();
             $table->string('payee_name')->nullable();
             $table->text('amount_in_words')->nullable();
-            $table->enum('status', [
-                'draft',
-                'pending_approval',
-                'approved',
-                'posted',
-                'voided',
-                'reversed',
-                'cancelled',
-                'partially_allocated',
-                'fully_allocated',
-                'allocated',
-                'refunded',
-                'void',
-            ])->default('draft');
+            $table->string('status', 40)->default('draft');
             $table->decimal('total_amount', 20, 6)->default('0');
             $table->decimal('allocated_amount', 20, 6)->default('0');
             $table->decimal('unapplied_amount', 20, 6)->default('0');

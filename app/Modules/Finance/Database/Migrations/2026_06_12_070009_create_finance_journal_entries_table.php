@@ -24,8 +24,8 @@ return new class extends Migration
             $table->unsignedBigInteger('source_id')->nullable();
             $table->string('source_number', 150)->nullable();
             $table->date('source_date')->nullable();
-            $table->enum('journal_type', ['general', 'invoice', 'payment', 'contra', 'adjustment', 'reversal', 'opening'])->default('general');
-            $table->enum('status', ['draft', 'posted', 'reversed', 'void', 'cancelled'])->default('draft');
+            $table->string('journal_type', 40)->default('general');
+            $table->string('status', 40)->default('draft');
             $table->text('description')->nullable();
             $table->decimal('total_debit', 20, 6)->default('0');
             $table->decimal('total_credit', 20, 6)->default('0');
