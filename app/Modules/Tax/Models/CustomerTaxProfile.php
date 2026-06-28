@@ -6,7 +6,6 @@ namespace Modules\Tax\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Core\Models\TenantOwnedModel;
-use Modules\Customer\Models\Customer;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Tenant\Models\TenantModel;
 
@@ -35,11 +34,6 @@ final class CustomerTaxProfile extends TenantOwnedModel
     public function organizationUnit(): BelongsTo
     {
         return $this->belongsTo(OrganizationUnitModel::class, 'organization_unit_id');
-    }
-
-    public function customer(): BelongsTo
-    {
-        return $this->belongsTo(Customer::class, 'customer_id');
     }
 
     public function taxGroup(): BelongsTo

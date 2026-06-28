@@ -21,7 +21,7 @@ return new class extends Migration
             $table->decimal('debit_allocated_amount', 20, 6)->default('0');
             $table->decimal('refunded_amount', 20, 6)->default('0');
             $table->decimal('remaining_amount', 20, 6)->default('0');
-            $table->enum('status', ['unpaid', 'partial', 'paid', 'overpaid', 'cancelled', 'void'])->default('unpaid');
+            $table->string('status', 40)->default('unpaid');
             $table->timestamps();
 
             $table->unique(['id', 'tenant_id'], 'invoice_balances_id_tenant_uk');

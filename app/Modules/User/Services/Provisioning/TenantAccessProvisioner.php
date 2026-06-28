@@ -43,16 +43,26 @@ final class TenantAccessProvisioner implements TenantAccessProvisionerInterface
                     'module' => (string) $definition['module'],
                     'description' => (string) $definition['description'],
                     'is_active' => true,
-                    'row_version' => $permission->exists
-                        ? max(1, (int) $permission->getAttribute('row_version')) + 1
-                        : 1,
-                ])->save();
+                ]);
+
+                if (! $permission->exists) {
+                    $permission->setAttribute('row_version', 1);
+                    $permission->save();
+                } elseif ($permission->isDirty()) {
+                    $permission->setAttribute(
+                        'row_version',
+                        max(1, (int) $permission->getOriginal('row_version')) + 1,
+                    );
+                    $permission->save();
+                }
+
                 $permissionIds[] = (int) $permission->getKey();
             }
 
             PermissionModel::query()
                 ->where('tenant_id', $tenantId)
                 ->where('guard_name', UserGuard::TENANT_API)
+                ->where('is_active', true)
                 ->when($permissionIds !== [], fn ($query) => $query->whereNotIn('id', $permissionIds))
                 ->update(['is_active' => false, 'row_version' => DB::raw('row_version + 1')]);
 
@@ -69,10 +79,18 @@ final class TenantAccessProvisioner implements TenantAccessProvisionerInterface
                 'is_system' => true,
                 'description' => 'Protected tenant super administrator role.',
                 'deleted_at' => null,
-                'row_version' => $role->exists
-                    ? max(1, (int) $role->getAttribute('row_version')) + 1
-                    : 1,
-            ])->save();
+            ]);
+
+            if (! $role->exists) {
+                $role->setAttribute('row_version', 1);
+                $role->save();
+            } elseif ($role->isDirty()) {
+                $role->setAttribute(
+                    'row_version',
+                    max(1, (int) $role->getOriginal('row_version')) + 1,
+                );
+                $role->save();
+            }
             $roleId = (int) $role->getKey();
 
             RolePermissionModel::query()

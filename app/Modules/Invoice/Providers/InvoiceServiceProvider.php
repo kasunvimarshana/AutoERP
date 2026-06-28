@@ -9,6 +9,7 @@ use Modules\Invoice\Contracts\InvoiceBalanceProviderInterface;
 use Modules\Invoice\Contracts\InvoiceSettlementServiceInterface;
 use Modules\Invoice\Services\InvoiceBalanceProvider;
 use Modules\Invoice\Services\InvoiceSettlementService;
+use Modules\Invoice\Services\InvoiceSourceCancellationRegistry;
 
 final class InvoiceServiceProvider extends ServiceProvider
 {
@@ -16,6 +17,9 @@ final class InvoiceServiceProvider extends ServiceProvider
     {
         $this->app->singleton(InvoiceBalanceProviderInterface::class, InvoiceBalanceProvider::class);
         $this->app->singleton(InvoiceSettlementServiceInterface::class, InvoiceSettlementService::class);
+        $this->app->singleton(InvoiceSourceCancellationRegistry::class, static fn ($app): InvoiceSourceCancellationRegistry => new InvoiceSourceCancellationRegistry(
+            $app->tagged(\Modules\Invoice\Contracts\InvoiceSourceCancellationHandlerInterface::TAG),
+        ));
     }
 
     public function boot(): void

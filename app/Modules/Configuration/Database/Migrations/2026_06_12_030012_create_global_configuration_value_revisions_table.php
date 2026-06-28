@@ -14,15 +14,15 @@ return new class extends Migration
             $table->id();
             $table->string('key', 191);
             $table->unsignedInteger('definition_version');
-            $table->enum('operation', ['created', 'updated', 'removed', 'rolled_back']);
+            $table->string('operation', 40);
             $table->longText('stored_value')->nullable();
-            $table->enum('value_type', ['string', 'integer', 'decimal', 'boolean', 'json']);
+            $table->string('value_type', 40);
             $table->boolean('is_sensitive')->default(false);
             $table->unsignedBigInteger('resulting_row_version')->nullable();
             $table->foreignId('source_revision_id')->nullable()
                 ->constrained('global_configuration_value_revisions', indexName: 'global_configuration_value_revisions_source_revision_fk')
                 ->restrictOnDelete();
-            $table->enum('actor_type', ['system', 'platform_operator', 'tenant_user']);
+            $table->string('actor_type', 40);
             $table->unsignedBigInteger('actor_id')->nullable();
             $table->string('actor_name')->nullable();
             $table->string('actor_email')->nullable();

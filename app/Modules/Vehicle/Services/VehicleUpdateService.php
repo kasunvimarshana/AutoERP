@@ -19,7 +19,6 @@ final class VehicleUpdateService
         private readonly DecimalMath $math,
         private readonly VehicleValidationService $validator,
         private readonly VehicleDocumentService $documents,
-        private readonly VehicleOwnershipService $ownerships,
         private readonly VehicleAttributeService $attributes,
     ) {}
 
@@ -66,14 +65,11 @@ final class VehicleUpdateService
                         $storedDocumentPaths[] = $path;
                     });
                 }
-                if ($data->ownerships !== null) {
-                    $this->ownerships->replace($vehicle, $data->ownerships);
-                }
-                if ($data->attributes !== null) {
+                    if ($data->attributes !== null) {
                     $this->attributes->replace($vehicle, $data->attributes);
                 }
 
-                return $vehicle->refresh()->load(['make', 'model', 'type', 'category', 'documents', 'ownerships', 'currentOwnerships', 'currentCustomerVehicles.customer', 'currentSupplierVehicles.supplier', 'attributes']);
+                return $vehicle->refresh()->load(['make', 'model', 'type', 'category', 'documents', 'ownerships', 'currentOwnerships', 'attributes']);
             });
         } catch (Throwable $exception) {
             foreach ($storedDocumentPaths as $path) {

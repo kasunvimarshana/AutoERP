@@ -18,6 +18,7 @@ use Modules\Sales\Models\SalesDelivery;
 use Modules\Sales\Models\SalesCreditNote;
 use Modules\Sales\Models\SalesOrder;
 use Modules\Sales\Models\SalesReturn;
+use Modules\Sales\Services\Tax\SalesReturnTaxDocumentMapper;
 use Modules\Tax\Services\TaxReturnAllocationService;
 
 final class SalesReturnPostingService
@@ -30,6 +31,7 @@ final class SalesReturnPostingService
         private readonly SalesReturnSourceService $sources,
         private readonly SalesDeliveryService $deliveries,
         private readonly TaxReturnAllocationService $taxReturns,
+        private readonly SalesReturnTaxDocumentMapper $taxReturnMapper,
     ) {}
 
     public function post(SalesReturn $return, ?int $userId = null): SalesPostingResult
@@ -67,10 +69,10 @@ final class SalesReturnPostingService
             $return->posted_by = $userId;
             $return->posted_at = now();
             $return->save();
-            $this->taxReturns->reverseSalesReturn(
+            $this->taxReturns->reverse($this->taxReturnMapper->map(
                 $return->refresh()->load('lines'),
                 $creditNote === null ? null : (int) $creditNote->getKey(),
-            );
+            ));
 
             return new SalesPostingResult(
                 (int) $return->getKey(),

@@ -14,16 +14,12 @@ use Modules\Core\Contracts\CurrentTenantContextAccessorInterface;
 use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
 use Modules\Core\Contracts\ErrorNormalizerInterface;
 use Modules\Core\Contracts\ExceptionParserInterface;
-use Modules\Core\Contracts\FileStorageServiceInterface;
-use Modules\Core\Contracts\PasswordHasherInterface;
 use Modules\Core\Contracts\SlugGeneratorInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\Core\Contracts\TransactionManagerInterface;
 use Modules\Core\Contracts\UuidGeneratorInterface;
 use Modules\Core\Http\Responses\ApiErrorResponseFactory;
 use Modules\Core\Services\DecimalMath;
-use Modules\Core\Services\FileStorageService;
-use Modules\Core\Services\PasswordHasher;
 use Modules\Core\Services\SlugGenerator;
 use Modules\Core\Support\ErrorNormalizer;
 use Modules\Core\Support\ExceptionParser;
@@ -56,13 +52,7 @@ final class CoreServiceProvider extends ServiceProvider
             CurrentOrganizationUnitContextAccessorInterface::class,
             RequestCurrentOrganizationUnitContextAccessor::class,
         );
-        $this->app->bind(FileStorageServiceInterface::class, FileStorageService::class);
-        $this->app->bind(PasswordHasherInterface::class, PasswordHasher::class);
         $this->app->bind(SlugGeneratorInterface::class, SlugGenerator::class);
-
-        $this->app->when(FileStorageService::class)
-            ->needs('$defaultDisk')
-            ->give(static fn (): string => (string) Config::get(CoreConfigKey::FILE_STORAGE_DEFAULT_DISK->value));
 
         $this->app->when(SlugGenerator::class)
             ->needs('$fallback')

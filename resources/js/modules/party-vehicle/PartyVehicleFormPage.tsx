@@ -53,6 +53,7 @@ export function PartyVehicleFormPage<P extends { id: number }, V extends { id: n
     const [endedAt, setEndedAt] = useState('');
     const [isCurrent, setIsCurrent] = useState(true);
     const [notes, setNotes] = useState('');
+    const [rowVersion, setRowVersion] = useState<number | null>(null);
     const [loading, setLoading] = useState(relationshipId !== null);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
@@ -78,6 +79,7 @@ export function PartyVehicleFormPage<P extends { id: number }, V extends { id: n
                 setEndedAt(relationship.ended_at?.slice(0, 10) ?? '');
                 setIsCurrent(relationship.is_current);
                 setNotes(relationship.notes ?? '');
+                setRowVersion(relationship.row_version);
             })
             .catch((requestError: unknown) => {
                 if (!controller.signal.aborted) setError(toApiError(requestError));
@@ -106,10 +108,9 @@ export function PartyVehicleFormPage<P extends { id: number }, V extends { id: n
             };
 
             if (relationshipId !== null) {
+                if (rowVersion === null) throw new Error('Vehicle ownership version is unavailable. Reload the record.');
                 await update(relationshipId, {
-                    relationship_type: payload.relationship_type,
-                    started_at: payload.started_at,
-                    ended_at: payload.ended_at,
+                    expected_version: rowVersion,
                     notes: payload.notes,
                 });
             } else {
@@ -144,48 +145,58 @@ export function PartyVehicleFormPage<P extends { id: number }, V extends { id: n
         <>
             <ContentHeader
                 title={`${relationshipId !== null ? 'Edit' : 'Create'} ${title}`}
-                description="Select the party and vehicle using guided controls. Current-relationship and date invariants are enforced by the backend."
+                description={relationshipId === null ? "Select the party and vehicle using guided controls. Current and date invariants are enforced by the backend." : "Ownership identity and effective dates are immutable. Only notes can be corrected here."}
                 actions={<LinkButton variant="secondary" to={listPath}>Back to list</LinkButton>}
             />
             <ErrorAlert error={error} />
             <div className="grid gap-5 rounded-xl border border-slate-200 bg-white p-6 shadow-sm md:grid-cols-2">
-                <PartyLookup
-                    value={party}
-                    onChange={setParty}
-                    error={fieldError(error, `${partyKey}_id`)}
-                />
-                <VehicleLookup
-                    value={vehicle}
-                    onChange={setVehicle}
-                    error={fieldError(error, 'vehicle_id')}
-                />
-                <Select
-                    label="Relationship type"
-                    value={relationshipType}
-                    onChange={(event) => setRelationshipType(event.target.value)}
-                    options={(partyKey === 'customer'
-                        ? ['customer_owned']
-                        : ['third_party', 'leased', 'rented']
-                    ).map((value) => ({ value, label: value.replaceAll('_', ' ') }))}
-                    error={fieldError(error, 'relationship_type')}
-                />
-                <Input
-                    type="date"
-                    label="Start date"
-                    required
-                    max={endedAt || undefined}
-                    value={startedAt}
-                    onChange={(event) => setStartedAt(event.target.value)}
-                    error={fieldError(error, 'started_at')}
-                />
-                <Input
-                    type="date"
-                    label="End date"
-                    min={startedAt || undefined}
-                    value={endedAt}
-                    onChange={(event) => setEndedAt(event.target.value)}
-                    error={fieldError(error, 'ended_at')}
-                />
+                {relationshipId === null ? (
+                    <>
+                        <PartyLookup
+                            value={party}
+                            onChange={setParty}
+                            error={fieldError(error, `${partyKey}_id`)}
+                        />
+                        <VehicleLookup
+                            value={vehicle}
+                            onChange={setVehicle}
+                            error={fieldError(error, 'vehicle_id')}
+                        />
+                        <Select
+                            label="Relationship type"
+                            value={relationshipType}
+                            onChange={(event) => setRelationshipType(event.target.value)}
+                            options={(partyKey === 'customer'
+                                ? ['customer_owned']
+                                : ['third_party', 'leased', 'rented']
+                            ).map((value) => ({ value, label: value.replaceAll('_', ' ') }))}
+                            error={fieldError(error, 'relationship_type')}
+                        />
+                        <Input
+                            type="date"
+                            label="Start date"
+                            required
+                            max={endedAt || undefined}
+                            value={startedAt}
+                            onChange={(event) => setStartedAt(event.target.value)}
+                            error={fieldError(error, 'started_at')}
+                        />
+                        <Input
+                            type="date"
+                            label="End date"
+                            min={startedAt || undefined}
+                            value={endedAt}
+                            onChange={(event) => setEndedAt(event.target.value)}
+                            error={fieldError(error, 'ended_at')}
+                        />
+                    </>
+                ) : (
+                    <div className="md:col-span-2 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+                        <div><span className="font-semibold">Party:</span> {(party as { name?: string } | null)?.name ?? 'Historical snapshot'}</div>
+                        <div><span className="font-semibold">Vehicle:</span> {(vehicle as { registration_number?: string | null; number?: string } | null)?.registration_number ?? (vehicle as { number?: string } | null)?.number ?? '-'}</div>
+                        <div><span className="font-semibold">Effective:</span> {startedAt} — {endedAt || 'Open'}</div>
+                    </div>
+                )}
                 {relationshipId === null && (
                     <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
                         <input

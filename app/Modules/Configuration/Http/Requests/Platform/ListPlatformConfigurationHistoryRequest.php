@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Configuration\Http\Requests\Platform;
 
-final class ListPlatformConfigurationHistoryRequest extends ListPlatformConfigurationEntriesRequest
+final class ListPlatformConfigurationHistoryRequest extends PaginatedPlatformConfigurationRequest
 {
     /** @return array<string, mixed> */
     public function rules(): array

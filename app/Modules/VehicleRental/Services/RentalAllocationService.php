@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Vehicle\Enums\VehicleStatus;
 use Modules\Vehicle\Models\Vehicle;
+use Modules\Vehicle\Enums\VehicleOwnerType;
 use Modules\Vehicle\Models\VehicleOwnership;
 use Modules\Vehicle\Services\VehicleStatusService;
 use Modules\VehicleRental\Enums\RentalAgreementKind;
@@ -324,12 +325,12 @@ final class RentalAllocationService
             throw new InvalidArgumentException('Vehicle ownership does not cover the allocation period.');
         }
         if ($agreement->agreement_kind === RentalAgreementKind::OwnerSupply
-            && (! in_array($ownership->owner_type, VehicleOwnership::SUPPLIER_OWNER_TYPES, true)
+            && ($ownership->owner_type !== VehicleOwnerType::Supplier
                 || (int) $ownership->owner_id !== (int) $agreement->supplier_id)) {
             throw new InvalidArgumentException('Vehicle ownership must belong to the owner agreement supplier.');
         }
         if ($sourceType === RentalVehicleSourceType::CompanyOwned
-            && $ownership->owner_type !== VehicleOwnership::OWNER_TYPE_COMPANY) {
+            && $ownership->owner_type !== VehicleOwnerType::Company) {
             throw new InvalidArgumentException('Company-owned allocation requires a company vehicle ownership record.');
         }
 

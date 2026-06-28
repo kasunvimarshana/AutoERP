@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\OrganizationUnit\Services\Storage;
 
-use Modules\Core\Contracts\FileStorageServiceInterface;
+use Modules\PrivateObject\Contracts\PrivateObjectStorageInterface;
 use Modules\OrganizationUnit\Contracts\OrganizationUnitBrandingReaderInterface;
 use Modules\OrganizationUnit\Data\OrganizationUnitBrandingProfile;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
@@ -13,7 +13,7 @@ use Modules\Tenant\Services\Storage\TenantStoragePathPolicy;
 final class OrganizationUnitBrandingReader implements OrganizationUnitBrandingReaderInterface
 {
     public function __construct(
-        private readonly FileStorageServiceInterface $files,
+        private readonly PrivateObjectStorageInterface $files,
         private readonly TenantStoragePathPolicy $tenantPaths,
     ) {}
 

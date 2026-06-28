@@ -20,7 +20,7 @@ final class VehicleServiceJobQueryService
     ): LengthAwarePaginator {
         $query = VehicleServiceJob::query()
             ->forContext($tenantId, $organizationUnitId)
-            ->with(['customer', 'vehicle.make', 'vehicle.model', 'vehicle.currentCustomerVehicles.customer', 'vehicle.currentSupplierVehicles.supplier', 'supervisor']);
+            ->with(['customer', 'vehicle.make', 'vehicle.model', 'vehicle.currentOwnerships', 'supervisor']);
 
         if (! empty($filters['search'])) {
             $search = trim((string) $filters['search']);
@@ -59,7 +59,7 @@ final class VehicleServiceJobQueryService
     ): Collection {
         $query = VehicleServiceJob::query()
             ->forContext($tenantId, $organizationUnitId)
-            ->with(['customer', 'vehicle.currentCustomerVehicles.customer', 'vehicle.currentSupplierVehicles.supplier']);
+            ->with(['customer', 'vehicle.currentOwnerships']);
 
         if ($search !== null && trim($search) !== '') {
             $query->where('job_number', 'like', '%'.trim($search).'%');

@@ -20,7 +20,7 @@ return new class extends Migration
             $table->string('code', 100);
             $table->string('name');
             $table->text('description')->nullable();
-            $table->enum('normal_balance', ['debit', 'credit']);
+            $table->string('normal_balance', 40);
             $table->boolean('is_control_account')->default(false);
             $table->boolean('is_posting_account')->default(true);
             $table->boolean('is_cash_account')->default(false);

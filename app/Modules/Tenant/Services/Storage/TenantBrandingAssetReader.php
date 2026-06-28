@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Services\Storage;
 
-use Modules\Core\Contracts\FileStorageServiceInterface;
+use Modules\PrivateObject\Contracts\PrivateObjectStorageInterface;
 use Modules\Tenant\Services\Contracts\TenantBrandingAssetReaderInterface;
 use Throwable;
 
 final class TenantBrandingAssetReader implements TenantBrandingAssetReaderInterface
 {
     public function __construct(
-        private readonly FileStorageServiceInterface $files,
+        private readonly PrivateObjectStorageInterface $files,
         private readonly TenantStoragePathPolicy $paths,
     ) {}
 

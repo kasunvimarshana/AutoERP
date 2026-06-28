@@ -7,6 +7,8 @@ namespace Modules\Configuration\Providers;
 use Illuminate\Support\ServiceProvider;
 use Modules\Configuration\Contracts\ConfigurationDefinitionRegistryInterface;
 use Modules\Configuration\Contracts\ConfigurationResolverInterface;
+use Modules\Configuration\Contracts\ConfigurationTargetPopulationInterface;
+use Modules\Configuration\Contracts\ConfigurationTargetValidatorInterface;
 use Modules\Configuration\Contracts\ConfigurationValueRepositoryInterface;
 use Modules\Configuration\Repositories\EloquentConfigurationValueRepository;
 use Modules\Configuration\Services\ConfigurationAuthorizationService;
@@ -14,6 +16,8 @@ use Modules\Configuration\Services\ConfigurationDefinitionRegistry;
 use Modules\Configuration\Services\ConfigurationEntryService;
 use Modules\Configuration\Services\ConfigurationScopeResolver;
 use Modules\Configuration\Services\ResolveConfiguration;
+use Modules\Configuration\Services\Targets\TenantBackedConfigurationTargetPopulation;
+use Modules\Configuration\Services\Targets\TenantBackedConfigurationTargetValidator;
 use Modules\Configuration\Constants\ConfigurationPermission;
 use Modules\Core\Contracts\PermissionDefinitionRegistryInterface;
 
@@ -31,6 +35,8 @@ final class ConfigurationServiceProvider extends ServiceProvider
             ConfigurationValueRepositoryInterface::class,
             EloquentConfigurationValueRepository::class,
         );
+        $this->app->singleton(ConfigurationTargetValidatorInterface::class, TenantBackedConfigurationTargetValidator::class);
+        $this->app->singleton(ConfigurationTargetPopulationInterface::class, TenantBackedConfigurationTargetPopulation::class);
 
         $this->app->scoped(ConfigurationScopeResolver::class);
         $this->app->scoped(ConfigurationAuthorizationService::class);

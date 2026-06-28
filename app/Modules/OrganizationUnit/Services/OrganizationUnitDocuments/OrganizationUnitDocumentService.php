@@ -6,7 +6,7 @@ namespace Modules\OrganizationUnit\Services\OrganizationUnitDocuments;
 
 use Illuminate\Support\Facades\DB;
 use Modules\Core\Contracts\ErrorNormalizerInterface;
-use Modules\Core\Contracts\FileStorageServiceInterface;
+use Modules\PrivateObject\Contracts\PrivateObjectStorageInterface;
 use Modules\Core\DTOs\DataRecord;
 use Modules\Core\DTOs\PagedResult;
 use Modules\Core\Results\Error;
@@ -33,7 +33,7 @@ final class OrganizationUnitDocumentService
         private readonly OrganizationUnitContext $context,
         private readonly OrganizationUnitAssetStorageService $assets,
         private readonly TenantStoragePathPolicy $paths,
-        private readonly FileStorageServiceInterface $files,
+        private readonly PrivateObjectStorageInterface $files,
         private readonly OrganizationUnitAuditService $audit,
         private readonly ErrorNormalizerInterface $errors,
     ) {}

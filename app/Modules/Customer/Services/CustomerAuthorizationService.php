@@ -17,17 +17,11 @@ class CustomerAuthorizationService
 
     public const DELETE = 'customers.delete';
 
-    public const VEHICLES_VIEW = 'customer-vehicles.view';
 
-    public const VEHICLES_CREATE = 'customer-vehicles.create';
 
-    public const VEHICLES_UPDATE = 'customer-vehicles.update';
 
-    public const VEHICLES_SET_CURRENT = 'customer-vehicles.set-current';
 
-    public const VEHICLES_CLEAR_CURRENT = 'customer-vehicles.clear-current';
 
-    public const VEHICLES_DELETE = 'customer-vehicles.delete';
 
     public function __construct(private readonly UserAccessResolver $access) {}
 
@@ -43,7 +37,6 @@ class CustomerAuthorizationService
     {
         return [
             self::VIEW => 'View customers and customer lookups.', self::CREATE => 'Create customers.', self::UPDATE => 'Update and deactivate customers.', self::DELETE => 'Archive unreferenced customers.',
-            self::VEHICLES_VIEW => 'View customer vehicle relationships.', self::VEHICLES_CREATE => 'Create customer vehicle relationships.', self::VEHICLES_UPDATE => 'Update customer vehicle relationships.', self::VEHICLES_SET_CURRENT => 'Set the current customer for a vehicle.', self::VEHICLES_CLEAR_CURRENT => 'Clear the current customer for a vehicle.', self::VEHICLES_DELETE => 'End customer vehicle relationships.',
         ];
     }
 }

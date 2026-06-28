@@ -8,9 +8,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
-use Modules\Customer\Models\Customer;
 use Modules\Finance\Models\FinanceAccount;
-use Modules\Supplier\Models\Supplier;
 use Modules\Tax\Models\CustomerTaxProfile;
 use Modules\Tax\Models\SupplierTaxProfile;
 use Modules\Tax\Models\Tax;
@@ -18,10 +16,14 @@ use Modules\Tax\Models\TaxGroup;
 use Modules\Tax\Models\TaxGroupLine;
 use Modules\Tax\Models\TaxPostingProfile;
 use Modules\Tax\Models\TaxRate;
+use Modules\Tax\Services\Party\TaxPartyResolverRegistry;
 
 final class TaxMasterDataService
 {
-    public function __construct(private readonly DecimalMath $math) {}
+    public function __construct(
+        private readonly DecimalMath $math,
+        private readonly TaxPartyResolverRegistry $parties,
+    ) {}
 
     /**
      * @param  array<string, mixed>  $data
@@ -205,28 +207,27 @@ final class TaxMasterDataService
     {
         $tenantId = (int) $data['tenant_id'];
         $organizationUnitId = $this->nullableInt($data, 'organization_unit_id');
-        $customer = Customer::query()->findOrFail((int) $data['customer_id']);
-        if ((int) $customer->tenant_id !== $tenantId || $customer->organization_unit_id !== $organizationUnitId) {
-            throw new InvalidArgumentException('Customer tax profile belongs to a different scope.');
-        }
+        $customer = $this->parties->resolve('customer', $tenantId, $organizationUnitId, (int) $data['customer_id']);
 
         $taxGroupId = $this->nullableInt($data, 'tax_group_id');
         if ($taxGroupId !== null) {
             $this->assertGroupInScope(TaxGroup::query()->findOrFail($taxGroupId), $tenantId, $organizationUnitId);
         }
 
-        $profile ??= CustomerTaxProfile::query()->firstOrNew(['customer_id' => $customer->getKey()]);
+        $profile ??= CustomerTaxProfile::query()->firstOrNew(['customer_id' => $customer->partyId]);
         $profile->forceFill([
             'tenant_id' => $tenantId,
             'organization_unit_id' => $organizationUnitId,
-            'customer_id' => $customer->getKey(),
+            'customer_id' => $customer->partyId,
+            'party_code_snapshot' => $customer->code,
+            'party_name_snapshot' => $customer->name,
             'tax_group_id' => $taxGroupId,
             'registration_number' => $data['registration_number'] ?? null,
             'exemption_status' => $this->validExemptionStatus((string) ($data['exemption_status'] ?? 'taxable')),
             'active' => (bool) ($data['active'] ?? true),
         ])->save();
 
-        return $profile->refresh()->load(['customer', 'taxGroup']);
+        return $profile->refresh()->load('taxGroup');
     }
 
     /**
@@ -236,28 +237,27 @@ final class TaxMasterDataService
     {
         $tenantId = (int) $data['tenant_id'];
         $organizationUnitId = $this->nullableInt($data, 'organization_unit_id');
-        $supplier = Supplier::query()->findOrFail((int) $data['supplier_id']);
-        if ((int) $supplier->tenant_id !== $tenantId || $supplier->organization_unit_id !== $organizationUnitId) {
-            throw new InvalidArgumentException('Supplier tax profile belongs to a different scope.');
-        }
+        $supplier = $this->parties->resolve('supplier', $tenantId, $organizationUnitId, (int) $data['supplier_id']);
 
         $taxGroupId = $this->nullableInt($data, 'tax_group_id');
         if ($taxGroupId !== null) {
             $this->assertGroupInScope(TaxGroup::query()->findOrFail($taxGroupId), $tenantId, $organizationUnitId);
         }
 
-        $profile ??= SupplierTaxProfile::query()->firstOrNew(['supplier_id' => $supplier->getKey()]);
+        $profile ??= SupplierTaxProfile::query()->firstOrNew(['supplier_id' => $supplier->partyId]);
         $profile->forceFill([
             'tenant_id' => $tenantId,
             'organization_unit_id' => $organizationUnitId,
-            'supplier_id' => $supplier->getKey(),
+            'supplier_id' => $supplier->partyId,
+            'party_code_snapshot' => $supplier->code,
+            'party_name_snapshot' => $supplier->name,
             'tax_group_id' => $taxGroupId,
             'registration_number' => $data['registration_number'] ?? null,
             'exemption_status' => $this->validExemptionStatus((string) ($data['exemption_status'] ?? 'taxable')),
             'active' => (bool) ($data['active'] ?? true),
         ])->save();
 
-        return $profile->refresh()->load(['supplier', 'taxGroup']);
+        return $profile->refresh()->load('taxGroup');
     }
 
     /**

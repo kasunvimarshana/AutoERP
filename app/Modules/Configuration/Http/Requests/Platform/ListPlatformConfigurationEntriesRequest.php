@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Configuration\Http\Requests\Platform;
 
-final class ListPlatformConfigurationEntriesRequest extends ViewPlatformConfigurationRequest
+final class ListPlatformConfigurationEntriesRequest extends PaginatedPlatformConfigurationRequest
 {
     /** @return array<string, mixed> */
     public function rules(): array
@@ -17,13 +17,4 @@ final class ListPlatformConfigurationEntriesRequest extends ViewPlatformConfigur
         ];
     }
 
-    public function page(): int
-    {
-        return max(1, (int) $this->input('page', 1));
-    }
-
-    public function perPage(): int
-    {
-        return min(max((int) $this->input('per_page', 20), 1), 100);
-    }
 }

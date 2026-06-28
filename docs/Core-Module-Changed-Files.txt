@@ -1,3 +1,6 @@
+HISTORICAL SNAPSHOT — SUPERSEDED 2026-06-28
+This manifest describes an earlier Core-focused change set. Current ownership moves idempotency persistence to Idempotency, private storage to PrivateObject, and password hashing to Auth. Do not use this file as the current module inventory.
+
 # AutoERP Core Module Change Manifest — clone-89
 
 Added: 15

@@ -23,7 +23,7 @@ return new class extends Migration
             $table->decimal('invoice_balance_after', 20, 6);
             $table->date('allocation_date');
             $table->string('allocation_method', 50)->default('specific_invoice');
-            $table->enum('status', ['pending', 'active', 'reversed', 'void'])->default('pending');
+            $table->string('status', 40)->default('pending');
             $table->timestamp('realized_at')->nullable();
             $table->unsignedBigInteger('realized_by')->nullable();
             $table->json('metadata')->nullable();

@@ -1,6 +1,6 @@
 # AutoERP Table Catalog
 
-This catalog documents the schema produced by the module migrations. The enclosing section is the owning module for every listed table. Laravel infrastructure tables are included for completeness. Foreign-key and unique-constraint summaries were verified against the migrated MySQL schema on 2026-06-12.
+This catalog documents the schema produced by the module migrations. The enclosing section is the owning module for every listed table. Laravel infrastructure tables are included for completeness. The ownership catalogue was aligned with the canonical create migrations by static verification on 2026-06-28. Runtime database verification remains a release gate.
 
 Conventions:
 
@@ -8,7 +8,7 @@ Conventions:
 - `tenant_id` identifies tenant ownership; nullable `organization_unit_id` adds operational scope where the domain requires it.
 - Polymorphic `source_type`/`source_id` pairs preserve source traceability without cross-module database coupling.
 - Database comments are supplementary only; this catalog is the portable source of table documentation.
-- Sections describe table ownership, not exact migration execution order. FK-dependent extension tables may run after the module they extend.
+- Sections describe table ownership, not exact migration execution order. Cross-module foreign keys do not transfer business ownership.
 
 ## Infrastructure
 
@@ -23,7 +23,17 @@ Conventions:
 
 ## Core
 
-No business tables. Core contains shared application infrastructure only.
+No business tables. Core contains technical primitives, concurrency abstractions, exact decimal/time support, and domain-safe exceptions only.
+
+## Idempotency
+
+| Table | Business purpose | Key relationships | Important constraints |
+| --- | --- | --- | --- |
+| `idempotency_records` | Owns replay-safe command/request result records for cross-module idempotent operations. | tenant and optional organization-unit scope; opaque source identity | unique idempotency identity per governed scope; explicit lifecycle and expiry |
+
+## PrivateObject
+
+No database tables. PrivateObject owns the private-storage capability and canonical object-key operations. Feature modules own their document metadata and lifecycle records.
 
 ## Tenant
 
@@ -327,11 +337,3 @@ No persisted tables. Reporting reads domain-owned data and does not duplicate bu
 | Table | Business purpose | Key relationships | Important constraints |
 | --- | --- | --- | --- |
 | `audit_logs` | Immutable, append-only audit events with actor/scope snapshots and bounded sanitized payloads. | canonical subject/source references; no lifecycle foreign keys | tenant and organization scoped; permission-controlled reads; no updates or deletes |
-
-## Extension
-
-| Table | Business purpose | Key relationships | Important constraints |
-| --- | --- | --- | --- |
-| `attachments` | Stores tenant-scoped file attachment metadata for polymorphic business records. | `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants`; polymorphic `source_type`/`source_id` source | tenant scoped; organization-unit aware |
-| `comments` | Stores threaded comments for polymorphic business records. | `organization_unit_id` -> `organization_units`; `author_id` -> `users`; `tenant_id` -> `tenants`; polymorphic `source_type`/`source_id` source | tenant scoped; organization-unit aware |
-| `entity_attributes` | Stores extensible typed attributes for polymorphic business records. | `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants` | unique `tenant_id,entity_type,entity_id,attribute_key`; tenant scoped; organization-unit aware |

@@ -17,17 +17,8 @@ return new class extends Migration
             $table->string('scope_key', 160);
             $table->string('code', 100);
             $table->string('name');
-            $table->enum('method_type', [
-                'cash',
-                'cheque',
-                'bank_transfer',
-                'card',
-                'mobile_wallet',
-                'digital_wallet',
-                'direct_debit',
-                'other',
-            ]);
-            $table->enum('direction_allowed', ['inbound', 'outbound', 'both'])->default('both');
+            $table->string('method_type', 40);
+            $table->string('direction_allowed', 40)->default('both');
             $table->boolean('requires_reference')->default(false);
             $table->boolean('requires_bank_account')->default(false);
             $table->boolean('is_active')->default(true);

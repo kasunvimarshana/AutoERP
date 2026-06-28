@@ -9,9 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Core\Models\TenantOwnedModel;
-use Modules\Customer\Models\CustomerVehicle;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
-use Modules\Supplier\Models\SupplierVehicle;
 use Modules\Tenant\Models\TenantModel;
 use Modules\Vehicle\Enums\VehicleFuelType;
 use Modules\Vehicle\Enums\VehicleStatus;
@@ -96,26 +94,6 @@ final class Vehicle extends TenantOwnedModel
         return $this->hasMany(VehicleOwnership::class, 'vehicle_id')->current();
     }
 
-    public function customerVehicles(): HasMany
-    {
-        return $this->hasMany(CustomerVehicle::class, 'vehicle_id');
-    }
-
-    public function currentCustomerVehicles(): HasMany
-    {
-        return $this->hasMany(CustomerVehicle::class, 'vehicle_id')->current();
-    }
-
-    public function supplierVehicles(): HasMany
-    {
-        return $this->hasMany(SupplierVehicle::class, 'vehicle_id');
-    }
-
-    public function currentSupplierVehicles(): HasMany
-    {
-        return $this->hasMany(SupplierVehicle::class, 'vehicle_id')->current();
-    }
-
     public function attributes(): HasMany
     {
         return $this->hasMany(VehicleAttribute::class, 'vehicle_id');
@@ -137,17 +115,10 @@ final class Vehicle extends TenantOwnedModel
 
     public function scopeWhereCurrentOwner(Builder $query, string $ownerType, ?int $ownerId = null): Builder
     {
-        if ($ownerType === VehicleOwnership::OWNER_TYPE_COMPANY) {
-            return $query->whereHas('currentOwnerships', fn (Builder $ownership): Builder => $ownership->where('owner_type', $ownerType));
-        }
-
-        $isCustomer = $ownerType === VehicleOwnership::OWNER_TYPE_CUSTOMER;
-        $relation = $isCustomer ? 'currentCustomerVehicles' : 'currentSupplierVehicles';
-        $partyColumn = $isCustomer ? 'customer_id' : 'supplier_id';
-
-        return $query->whereHas($relation, function (Builder $ownership) use ($ownerId, $partyColumn): void {
+        return $query->whereHas('currentOwnerships', function (Builder $ownership) use ($ownerType, $ownerId): void {
+            $ownership->where('owner_type', $ownerType);
             if ($ownerId !== null) {
-                $ownership->where($partyColumn, $ownerId);
+                $ownership->where('owner_id', $ownerId);
             }
         });
     }

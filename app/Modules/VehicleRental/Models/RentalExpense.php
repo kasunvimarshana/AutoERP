@@ -6,10 +6,8 @@ namespace Modules\VehicleRental\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Modules\ReferenceData\Models\CurrencyModel;
 use Modules\Core\Models\TenantOwnedModel;
-use Modules\Extension\Models\AttachmentModel;
 use Modules\Hr\Models\HrEmployee;
 use Modules\Supplier\Models\Supplier;
 use Modules\Tax\Models\TaxGroup;
@@ -33,5 +31,4 @@ final class RentalExpense extends TenantOwnedModel
     public function currency(): BelongsTo { return $this->belongsTo(CurrencyModel::class, 'currency_id'); }
     public function taxGroup(): BelongsTo { return $this->belongsTo(TaxGroup::class, 'tax_group_id'); }
     public function allocations(): HasMany { return $this->hasMany(RentalExpenseAllocation::class, 'expense_id')->orderBy('sequence'); }
-    public function attachments(): MorphMany { return $this->morphMany(AttachmentModel::class, 'attachable'); }
 }
