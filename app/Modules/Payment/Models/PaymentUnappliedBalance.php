@@ -20,6 +20,7 @@ final class PaymentUnappliedBalance extends TenantOwnedModel
     protected function casts(): array
     {
         return array_merge(parent::casts(), [
+            'row_version' => 'integer',
             'tenant_id' => 'integer',
             'organization_unit_id' => 'integer',
             'payment_id' => 'integer',
