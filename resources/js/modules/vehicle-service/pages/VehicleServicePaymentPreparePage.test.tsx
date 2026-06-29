@@ -85,7 +85,7 @@ describe('VehicleServicePaymentPreparePage', () => {
         await user.selectOptions(selects[1], '4');
         expect(screen.queryByLabelText('Internal bank account')).not.toBeInTheDocument();
         await user.type(screen.getByLabelText('Transfer reference'), 'TRX-100');
-        await user.type(screen.getByLabelText('Bank account'), 'Customer Bank');
+        await user.type(screen.getByLabelText('External bank'), 'Customer Bank');
         await user.click(screen.getByRole('button', { name: 'Review payment' }));
 
         await waitFor(() => expect(apiMocks.prepareVehicleServicePayment).toHaveBeenCalledWith(9, expect.objectContaining({
