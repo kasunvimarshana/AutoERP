@@ -1,3 +1,6 @@
-import type { PaymentLifecycleFilterParams } from './paymentLifecycleTypes';
-
-export interface TechnicianWorkReportParams extends PaymentLifecycleFilterParams {}
+export type { TechnicianWorkReportParams } from './technicianWorkParams';
+export type {
+    TechnicianWorkReportResult,
+    TechnicianWorkReportRow,
+    TechnicianWorkReportSummary,
+} from './technicianWorkResultTypes';
