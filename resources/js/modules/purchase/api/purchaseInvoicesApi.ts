@@ -42,7 +42,7 @@ export async function createPurchasePayment(payload: PurchasePaymentCreatePayloa
 
 export async function getPurchasePaymentContext(signal?: AbortSignal) {
     const response = await apiClient.get<ApiResource<{
-        payment_methods: PurchasePaymentMethodOption[];
+        payment_methods: Array<FastPurchaseOptionResource & PurchasePaymentMethodOption>;
     }>>(`${endpoints.purchase}/payments/context`, { signal });
     return response.data.data;
 }
