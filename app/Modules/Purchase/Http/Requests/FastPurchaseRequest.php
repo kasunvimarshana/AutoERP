@@ -81,7 +81,6 @@ final class FastPurchaseRequest extends PurchaseRequest
             'payment' => ['nullable', 'array'],
             'payment.amount' => ['nullable', 'decimal:0,6', 'gt:0'],
             'payment.payment_method_id' => ['nullable', 'integer', 'min:1'],
-            'payment.source_account_id' => ['nullable', 'integer', 'min:1'],
             'payment.reference' => ['nullable', 'string', 'max:150'],
             'payment.cheque_number' => ['nullable', 'string', 'max:100'],
             'payment.cheque_date' => ['nullable', 'date'],
@@ -93,7 +92,6 @@ final class FastPurchaseRequest extends PurchaseRequest
             'payment.lines' => ['nullable', 'array'],
             'payment.lines.*.amount' => ['required_with:payment.lines', 'decimal:0,6', 'gt:0'],
             'payment.lines.*.payment_method_id' => ['nullable', 'integer', 'min:1'],
-            'payment.lines.*.source_account_id' => ['nullable', 'integer', 'min:1'],
             'payment.lines.*.reference' => ['nullable', 'string', 'max:150'],
             'payment.lines.*.instrument_number' => ['nullable', 'string', 'max:100'],
             'payment.lines.*.instrument_date' => ['nullable', 'date'],
@@ -155,8 +153,10 @@ final class FastPurchaseRequest extends PurchaseRequest
             'payment.posting_status',
             'payment.payable_balance',
             'payment.finance_account_id',
+            'payment.source_account_id',
             'payment.lines.*.status',
             'payment.lines.*.finance_account_id',
+            'payment.lines.*.source_account_id',
         ];
     }
 }
