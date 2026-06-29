@@ -62,15 +62,27 @@ final class PaymentReversalService
                 $data->reason,
             );
 
-            foreach ($payment->allocations()->where('status', AllocationStatus::Active->value)->orderBy('invoice_id')->orderBy('id')->get() as $allocation) {
+            foreach ($payment->allocations()
+                ->where('status', AllocationStatus::Active->value)
+                ->orderBy('invoice_id')
+                ->orderBy('id')
+                ->get() as $allocation) {
                 $this->invoiceSettlements->reversePaymentAllocation(
                     (int) $allocation->invoice_id,
                     (string) $allocation->allocated_amount,
                 );
-                $allocation->forceFill(['status' => AllocationStatus::Reversed->value])->save();
+                $allocation->forceFill([
+                    'status' => AllocationStatus::Reversed->value,
+                    'row_version' => (int) $allocation->row_version + 1,
+                ])->save();
             }
-            foreach ($payment->allocations()->where('status', AllocationStatus::Pending->value)->get() as $allocation) {
-                $allocation->forceFill(['status' => AllocationStatus::Void->value])->save();
+            foreach ($payment->allocations()
+                ->where('status', AllocationStatus::Pending->value)
+                ->get() as $allocation) {
+                $allocation->forceFill([
+                    'status' => AllocationStatus::Void->value,
+                    'row_version' => (int) $allocation->row_version + 1,
+                ])->save();
             }
 
             $reversal = PaymentReversal::query()->create([
@@ -99,12 +111,39 @@ final class PaymentReversalService
                 'row_version' => (int) $payment->row_version + 1,
             ])->save();
             $payment = $payment->refresh();
-            $this->events->record($payment, PaymentLifecycleDimension::Document, $documentBefore, PaymentDocumentStatus::Reversed, $data->reversedBy, $data->reason);
-            $this->events->record($payment, PaymentLifecycleDimension::Posting, $postingBefore, PaymentPostingStatus::Reversed, $data->reversedBy, $data->reason, [
-                'finance_reversal_reference' => $financeReversal->journalNumber,
-            ]);
-            $this->events->record($payment, PaymentLifecycleDimension::Allocation, $allocationBefore, PaymentAllocationState::Unallocated, $data->reversedBy, $data->reason);
-            $this->events->record($payment, PaymentLifecycleDimension::Instrument, $instrumentBefore, PaymentInstrumentStatus::Reversed, $data->reversedBy, $data->reason);
+            $this->events->record(
+                $payment,
+                PaymentLifecycleDimension::Document,
+                $documentBefore,
+                PaymentDocumentStatus::Reversed,
+                $data->reversedBy,
+                $data->reason,
+            );
+            $this->events->record(
+                $payment,
+                PaymentLifecycleDimension::Posting,
+                $postingBefore,
+                PaymentPostingStatus::Reversed,
+                $data->reversedBy,
+                $data->reason,
+                ['finance_reversal_reference' => $financeReversal->journalNumber],
+            );
+            $this->events->record(
+                $payment,
+                PaymentLifecycleDimension::Allocation,
+                $allocationBefore,
+                PaymentAllocationState::Unallocated,
+                $data->reversedBy,
+                $data->reason,
+            );
+            $this->events->record(
+                $payment,
+                PaymentLifecycleDimension::Instrument,
+                $instrumentBefore,
+                PaymentInstrumentStatus::Reversed,
+                $data->reversedBy,
+                $data->reason,
+            );
 
             if ($payment->unappliedBalance !== null) {
                 $payment->unappliedBalance->forceFill([
@@ -112,6 +151,7 @@ final class PaymentReversalService
                     'allocated_amount' => '0.000000',
                     'remaining_amount' => '0.000000',
                     'status' => UnappliedBalanceStatus::Cancelled->value,
+                    'row_version' => (int) $payment->unappliedBalance->row_version + 1,
                 ])->save();
             }
 
@@ -153,6 +193,7 @@ final class PaymentReversalService
             return $payment->instrument_status;
         }
 
-        return PaymentInstrumentStatus::tryFrom((string) $payment->instrument_status) ?? PaymentInstrumentStatus::Pending;
+        return PaymentInstrumentStatus::tryFrom((string) $payment->instrument_status)
+            ?? PaymentInstrumentStatus::Pending;
     }
 }
