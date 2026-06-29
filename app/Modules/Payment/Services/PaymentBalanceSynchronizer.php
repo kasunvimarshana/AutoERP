@@ -10,27 +10,25 @@ final class PaymentBalanceSynchronizer
 {
     public function __construct(
         private readonly PaymentCalculationService $calculations,
-        private readonly PaymentStatusService $statuses,
+        private readonly PaymentAllocationStateService $allocationStates,
         private readonly PaymentUnappliedBalanceService $unappliedBalances,
     ) {}
 
-    public function sync(Payment $payment, ?string $reason = null): Payment
+    public function sync(Payment $payment, ?string $reason = null, ?int $actorId = null): Payment
     {
         $calculation = $this->calculations->recalculate($payment);
-
         $payment->forceFill([
             'total_amount' => $calculation->totalAmount,
             'allocated_amount' => $calculation->allocatedAmount,
             'unapplied_amount' => $calculation->unappliedAmount,
             'refunded_amount' => $calculation->refundedAmount,
         ])->save();
-
-        $payment = $this->statuses->applyCalculatedStatus(
+        $payment = $this->allocationStates->sync(
             $payment->refresh(),
             $calculation->totalAmount,
             $calculation->allocatedAmount,
-            $calculation->refundedAmount,
-            reason: $reason,
+            $actorId,
+            $reason,
         );
         $this->unappliedBalances->sync($payment);
 
