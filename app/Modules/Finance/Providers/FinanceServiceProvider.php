@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Modules\Finance\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use Modules\Core\Contracts\PermissionDefinitionRegistryInterface;
+use Modules\Finance\Constants\FinancePermission;
 use Modules\Finance\Contracts\FinancePostingInterface;
 use Modules\Finance\Services\FinancePostingService;
 
@@ -17,6 +19,9 @@ final class FinanceServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        $this->app->make(PermissionDefinitionRegistryInterface::class)
+            ->register('finance', FinancePermission::descriptions());
+
         $this->loadRoutesFrom(__DIR__.'/../Routes/api.php');
         $this->loadMigrationsFrom(__DIR__.'/../Database/Migrations');
     }
