@@ -28,6 +28,7 @@ final class PaymentCreationService
         private readonly PaymentUnappliedBalanceService $unappliedBalances,
         private readonly PaymentAllocationService $allocations,
         private readonly PaymentLifecycleEventRecorder $events,
+        private readonly PaymentReferenceSnapshotService $snapshots,
     ) {}
 
     public function create(CreatePaymentData $data): Payment
@@ -45,6 +46,7 @@ final class PaymentCreationService
                 'direction' => $data->direction->value,
                 'party_type' => $data->partyType,
                 'party_id' => $data->partyId,
+                ...$this->snapshots->header($data),
                 'source_type' => $data->sourceType,
                 'source_id' => $data->sourceId,
                 'document_status' => PaymentDocumentStatus::Draft->value,
