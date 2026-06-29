@@ -7,40 +7,58 @@ namespace Modules\Payment\Services;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
+use Modules\Payment\Enums\PaymentDocumentStatus;
 use Modules\Payment\Enums\PaymentInstrumentStatus;
+use Modules\Payment\Enums\PaymentLifecycleDimension;
 use Modules\Payment\Enums\PaymentMethodType;
-use Modules\Payment\Enums\PaymentStatus;
+use Modules\Payment\Enums\PaymentPostingStatus;
 use Modules\Payment\Models\Payment;
 use Modules\Payment\Models\PaymentLine;
 
 final class PaymentSettlementService
 {
-    public function __construct(private readonly DecimalMath $math) {}
+    public function __construct(
+        private readonly DecimalMath $math,
+        private readonly PaymentLifecycleEventRecorder $events,
+    ) {}
 
-    /**
-     * @param  array<string, mixed>|null  $metadata
-     */
-    public function transitionLine(Payment $payment, int $lineId, string $toStatus, ?array $metadata = null): PaymentLine
-    {
-        return DB::transaction(function () use ($payment, $lineId, $toStatus, $metadata): PaymentLine {
-            $payment = Payment::query()->lockForUpdate()->findOrFail($payment->getKey());
-            $this->assertPaymentAllowsSettlement($payment);
+    public function transitionLine(
+        Payment $payment,
+        int $lineId,
+        string $toStatus,
+        int $expectedPaymentVersion,
+        int $expectedLineVersion,
+        ?int $actorId = null,
+        ?string $reason = null,
+    ): PaymentLine {
+        return DB::transaction(function () use (
+            $payment,
+            $lineId,
+            $toStatus,
+            $expectedPaymentVersion,
+            $expectedLineVersion,
+            $actorId,
+            $reason,
+        ): PaymentLine {
+            $lockedPayment = Payment::query()->lockForUpdate()->findOrFail($payment->getKey());
+            $this->assertPaymentVersion($lockedPayment, $expectedPaymentVersion);
+            $this->assertPaymentAllowsSettlement($lockedPayment);
 
             $line = PaymentLine::query()
-                ->where('payment_id', $payment->getKey())
-                ->with('paymentMethod')
+                ->where('payment_id', $lockedPayment->getKey())
                 ->lockForUpdate()
                 ->findOrFail($lineId);
+            if ((int) $line->row_version !== $expectedLineVersion) {
+                throw new InvalidArgumentException('Payment line was changed by another request. Reload it before settling.');
+            }
 
             $fromStatus = strtolower(trim((string) $line->status));
             $toStatus = strtolower(trim($toStatus));
             if ($fromStatus === $toStatus) {
                 return $line;
             }
-
             $type = $this->methodType($line);
-            $transitions = $this->allowedTransitions()[$type] ?? [];
-            $allowed = $transitions[$fromStatus] ?? [];
+            $allowed = ($this->allowedTransitions()[$type] ?? [])[$fromStatus] ?? [];
             if (! in_array($toStatus, $allowed, true)) {
                 throw new InvalidArgumentException(sprintf(
                     'Payment line status cannot transition from %s to %s for %s payments.',
@@ -50,16 +68,31 @@ final class PaymentSettlementService
                 ));
             }
 
+            $instrumentBefore = $this->instrumentStatus($lockedPayment);
             $line->forceFill([
                 'status' => $toStatus,
                 'cleared_amount' => $this->clearedAmountForStatus($line, $toStatus),
                 ...$this->instrumentDatesForStatus($toStatus),
-                'metadata' => array_replace($line->metadata ?? [], $metadata ?? []),
+                'row_version' => (int) $line->row_version + 1,
             ])->save();
 
-            $payment->forceFill([
-                'instrument_status' => $this->aggregateInstrumentStatus($payment),
+            $instrumentAfter = PaymentInstrumentStatus::from($this->aggregateInstrumentStatus($lockedPayment));
+            $lockedPayment->forceFill([
+                'instrument_status' => $instrumentAfter->value,
+                'row_version' => (int) $lockedPayment->row_version + 1,
             ])->save();
+            $lockedPayment = $lockedPayment->refresh();
+            if ($instrumentBefore !== $instrumentAfter) {
+                $this->events->record(
+                    $lockedPayment,
+                    PaymentLifecycleDimension::Instrument,
+                    $instrumentBefore,
+                    $instrumentAfter,
+                    $actorId,
+                    $reason,
+                    ['payment_line_id' => (int) $line->getKey(), 'line_state' => $toStatus],
+                );
+            }
 
             return $line->refresh();
         });
@@ -67,21 +100,20 @@ final class PaymentSettlementService
 
     private function assertPaymentAllowsSettlement(Payment $payment): void
     {
-        $status = $payment->status instanceof PaymentStatus
-            ? $payment->status
-            : PaymentStatus::from((string) $payment->status);
-
-        if (in_array($status, [PaymentStatus::Cancelled, PaymentStatus::Void, PaymentStatus::Reversed, PaymentStatus::Refunded], true)) {
-            throw new InvalidArgumentException('Cancelled, void, refunded, or reversed payments cannot be settled.');
+        $document = $payment->document_status instanceof PaymentDocumentStatus
+            ? $payment->document_status
+            : PaymentDocumentStatus::from((string) $payment->document_status);
+        $posting = $payment->posting_status instanceof PaymentPostingStatus
+            ? $payment->posting_status
+            : PaymentPostingStatus::from((string) $payment->posting_status);
+        if ($document !== PaymentDocumentStatus::Approved || $posting !== PaymentPostingStatus::Posted) {
+            throw new InvalidArgumentException('Only approved and posted payments can be settled.');
         }
     }
 
     private function methodType(PaymentLine $line): string
     {
-        $type = $line->paymentMethod?->method_type;
-        $value = $type instanceof PaymentMethodType ? $type->value : (string) $type;
-
-        return match ($value) {
+        return match ((string) $line->payment_method_type_snapshot) {
             PaymentMethodType::Cheque->value => 'cheque',
             PaymentMethodType::BankTransfer->value,
             PaymentMethodType::DirectDebit->value => 'bank_transfer',
@@ -89,14 +121,10 @@ final class PaymentSettlementService
             PaymentMethodType::Cash->value => 'cash',
             PaymentMethodType::DigitalWallet->value,
             PaymentMethodType::MobileWallet->value => 'wallet',
-            PaymentMethodType::Other->value => 'other',
             default => 'other',
         };
     }
 
-    /**
-     * @return array<string, array<string, list<string>>>
-     */
     private function allowedTransitions(): array
     {
         $cashLike = [
@@ -154,7 +182,6 @@ final class PaymentSettlementService
         if (in_array($status, ['cleared', 'settled', 'captured'], true)) {
             return $this->math->normalize((string) $line->amount);
         }
-
         if (in_array($status, ['bounced', 'failed', 'cancelled', 'reversed'], true)) {
             return '0.000000';
         }
@@ -162,9 +189,6 @@ final class PaymentSettlementService
         return $this->math->normalize((string) $line->cleared_amount);
     }
 
-    /**
-     * @return array<string, mixed>
-     */
     private function instrumentDatesForStatus(string $status): array
     {
         $now = now()->toDateString();
@@ -180,8 +204,7 @@ final class PaymentSettlementService
 
     private function aggregateInstrumentStatus(Payment $payment): string
     {
-        $statuses = $payment->lines()
-            ->pluck('status')
+        $statuses = $payment->lines()->pluck('status')
             ->map(fn (mixed $status): string => strtolower((string) $status))
             ->filter()
             ->values()
@@ -203,7 +226,6 @@ final class PaymentSettlementService
                 return $priority;
             }
         }
-
         if ($statuses !== [] && count(array_diff($statuses, [
             PaymentInstrumentStatus::Cleared->value,
             PaymentInstrumentStatus::Settled->value,
@@ -212,5 +234,21 @@ final class PaymentSettlementService
         }
 
         return PaymentInstrumentStatus::Pending->value;
+    }
+
+    private function assertPaymentVersion(Payment $payment, int $expectedVersion): void
+    {
+        if ($expectedVersion < 1 || (int) $payment->row_version !== $expectedVersion) {
+            throw new InvalidArgumentException('Payment was changed by another request. Reload it before settling.');
+        }
+    }
+
+    private function instrumentStatus(Payment $payment): PaymentInstrumentStatus
+    {
+        if ($payment->instrument_status instanceof PaymentInstrumentStatus) {
+            return $payment->instrument_status;
+        }
+
+        return PaymentInstrumentStatus::tryFrom((string) $payment->instrument_status) ?? PaymentInstrumentStatus::Pending;
     }
 }
