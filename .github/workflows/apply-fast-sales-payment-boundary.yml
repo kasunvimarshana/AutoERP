@@ -96,6 +96,8 @@ jobs:
             resources/js/modules/sales/salesTypes.ts \
             > /tmp/fast-sales-payment-boundary.patch
 
+          git reset --hard HEAD
+          git clean -fd
           git fetch origin backup/payment-financial-trust-boundary-437b513
           git checkout -B payment-financial-trust-boundary-integrated \
             origin/backup/payment-financial-trust-boundary-437b513
