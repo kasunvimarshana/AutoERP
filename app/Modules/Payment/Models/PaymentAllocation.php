@@ -14,16 +14,17 @@ use Modules\Tenant\Models\TenantModel;
 final class PaymentAllocation extends TenantOwnedModel
 {
     protected $table = 'payment_allocations';
-
     protected $guarded = ['id'];
 
     protected function casts(): array
     {
         return array_merge(parent::casts(), [
+            'row_version' => 'integer',
             'tenant_id' => 'integer',
             'organization_unit_id' => 'integer',
             'payment_id' => 'integer',
             'invoice_id' => 'integer',
+            'invoice_date_snapshot' => 'date',
             'invoice_total' => 'decimal:6',
             'invoice_balance_before' => 'decimal:6',
             'previously_allocated_amount' => 'decimal:6',
@@ -31,6 +32,8 @@ final class PaymentAllocation extends TenantOwnedModel
             'invoice_balance_after' => 'decimal:6',
             'allocation_date' => 'date',
             'status' => AllocationStatus::class,
+            'realized_at' => 'datetime',
+            'realized_by' => 'integer',
             'metadata' => 'array',
         ]);
     }

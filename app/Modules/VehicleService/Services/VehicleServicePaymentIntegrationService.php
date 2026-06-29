@@ -9,20 +9,17 @@ use InvalidArgumentException;
 use LogicException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Invoice\Contracts\InvoiceBalanceProviderInterface;
-use Modules\Invoice\Enums\InvoiceDirection;
 use Modules\Invoice\Enums\InvoiceStatus;
-use Modules\Invoice\Models\Invoice;
 use Modules\Payment\DTOs\CreatePaymentData;
 use Modules\Payment\DTOs\PaymentAllocationData;
 use Modules\Payment\DTOs\PaymentLineData;
 use Modules\Payment\Enums\AllocationStatus;
 use Modules\Payment\Enums\PaymentDirection;
-use Modules\Payment\Enums\PaymentStatus;
 use Modules\Payment\Enums\PaymentType;
 use Modules\Payment\Models\Payment;
 use Modules\Payment\Services\PaymentCreationService;
+use Modules\Payment\Services\PaymentDocumentLifecycleService;
 use Modules\Payment\Services\PaymentPostingService;
-use Modules\Payment\Services\PaymentStatusService;
 use Modules\VehicleService\DTOs\VehicleServicePaymentData;
 use Modules\VehicleService\Enums\VehicleServiceJobStatus;
 use Modules\VehicleService\Models\VehicleServiceJob;
@@ -34,13 +31,14 @@ final class VehicleServicePaymentIntegrationService
         private readonly DecimalMath $math,
         private readonly InvoiceBalanceProviderInterface $invoiceBalances,
         private readonly PaymentCreationService $payments,
-        private readonly PaymentStatusService $paymentStatuses,
+        private readonly PaymentDocumentLifecycleService $paymentLifecycle,
         private readonly PaymentPostingService $paymentPosting,
         private readonly VehicleServiceStatusService $statuses,
     ) {}
 
     public function prepare(VehicleServiceJob $job, VehicleServicePaymentData $data): CreatePaymentData
     {
+        $this->assertJobVersion($job, $data->expectedJobVersion);
         if ($this->math->compare($data->amount, '0.000000') <= 0) {
             throw new InvalidArgumentException('Payment amount must be greater than zero.');
         }
@@ -54,22 +52,16 @@ final class VehicleServicePaymentIntegrationService
             throw new InvalidArgumentException('Payment invoice is not linked to this service job.');
         }
 
-        $invoice = Invoice::query()
-            ->with('balance')
-            ->where('tenant_id', $job->tenant_id)
-            ->where('id', $data->invoiceId)
-            ->firstOrFail();
-        if ($invoice->organization_unit_id !== $job->organization_unit_id
-            || $invoice->direction !== InvoiceDirection::Outbound
-            || $invoice->party_type !== 'customer'
-            || (int) $invoice->party_id !== (int) $job->customer_id) {
+        $balance = $this->invoiceBalances->validatePayableState($data->invoiceId);
+        if ($balance->tenantId !== (int) $job->tenant_id
+            || $balance->organizationUnitId !== $job->organization_unit_id
+            || $balance->partyType !== 'customer'
+            || $balance->partyId !== (int) $job->customer_id) {
             throw new InvalidArgumentException('Payment invoice does not match the service job customer and scope.');
         }
-        if ($data->currencyId !== null && $data->currencyId !== $invoice->currency_id) {
+        if ($data->currencyId !== null && $balance->currencyId !== null && $data->currencyId !== $balance->currencyId) {
             throw new InvalidArgumentException('Payment currency must match the invoice currency.');
         }
-
-        $balance = $this->invoiceBalances->validatePayableState($data->invoiceId);
         if ($this->math->compare($balance->remainingAmount, '0.000000') <= 0) {
             throw new InvalidArgumentException('Payment invoice has no outstanding balance.');
         }
@@ -87,7 +79,7 @@ final class VehicleServicePaymentIntegrationService
             partyId: (int) $job->customer_id,
             sourceType: 'vehicle_service_job',
             sourceId: (int) $job->getKey(),
-            currencyId: $data->currencyId ?? $invoice->currency_id,
+            currencyId: $data->currencyId ?? $balance->currencyId,
             exchangeRate: $data->exchangeRate,
             referenceNumber: $data->referenceNumber,
             notes: 'Received from vehicle service job '.$job->job_number,
@@ -96,18 +88,15 @@ final class VehicleServicePaymentIntegrationService
                 amount: $data->amount,
                 paymentMethodId: $data->paymentMethodId,
                 referenceNumber: $data->referenceNumber,
-                metadata: array_merge($data->metadata ?? [], [
-                    'vehicle_service_job_id' => (int) $job->getKey(),
-                    'invoice_id' => $data->invoiceId,
-                ]),
-                internalBankAccountId: $data->internalBankAccountId,
                 instrumentDirection: 'received',
                 externalBankName: $data->externalBankName,
                 externalBankBranch: $data->externalBankBranch,
                 instrumentNumber: $data->instrumentNumber,
                 instrumentDate: $data->instrumentDate,
-                depositDate: $data->depositDate,
-                realizedDate: $data->realizedDate,
+                metadata: [
+                    'vehicle_service_job_id' => (int) $job->getKey(),
+                    'invoice_id' => $data->invoiceId,
+                ],
             )],
             allocations: [new PaymentAllocationData(
                 invoiceId: $data->invoiceId,
@@ -130,15 +119,12 @@ final class VehicleServicePaymentIntegrationService
     {
         return DB::transaction(function () use ($job, $data): Payment {
             $job = VehicleServiceJob::query()->lockForUpdate()->findOrFail($job->getKey());
+            $this->assertJobVersion($job, $data->expectedJobVersion);
 
             $payment = $this->payments->create($this->prepare($job, $data));
-            $payment = $this->paymentStatuses->transition(
-                $payment,
-                PaymentStatus::Approved,
-                $data->createdBy,
-                'Vehicle service receipt approved for immediate posting.',
-            );
-            $payment = $this->paymentPosting->post($payment, $data->createdBy);
+            $payment = $this->paymentLifecycle->submit($payment, (int) $payment->row_version, $data->createdBy);
+            $payment = $this->paymentLifecycle->approve($payment, (int) $payment->row_version, $data->createdBy);
+            $payment = $this->paymentPosting->post($payment, (int) $payment->row_version, $data->createdBy);
 
             $allocation = $payment->allocations
                 ->first(fn ($row): bool => (int) $row->invoice_id === $data->invoiceId
@@ -156,14 +142,14 @@ final class VehicleServicePaymentIntegrationService
                 'allocated_amount' => $this->math->normalize((string) $allocation->allocated_amount),
                 'status' => 'active',
             ]);
+            $job->forceFill(['row_version' => (int) $job->row_version + 1])->save();
             $this->syncJobStatus($job->refresh(), $data->createdBy);
 
             return $payment->refresh()->load([
-                'lines.paymentMethod',
-                'lines.internalBankAccount',
+                'lines',
                 'allocations',
                 'unappliedBalance',
-                'financeJournalEntry',
+                'lifecycleEvents',
             ]);
         });
     }
@@ -210,5 +196,12 @@ final class VehicleServicePaymentIntegrationService
         }
 
         return $job;
+    }
+
+    private function assertJobVersion(VehicleServiceJob $job, int $expectedVersion): void
+    {
+        if ($expectedVersion < 1 || (int) $job->row_version !== $expectedVersion) {
+            throw new InvalidArgumentException('Vehicle service job was changed by another request. Reload it before receiving payment.');
+        }
     }
 }

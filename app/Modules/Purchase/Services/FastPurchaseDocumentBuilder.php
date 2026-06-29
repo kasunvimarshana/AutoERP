@@ -12,9 +12,7 @@ use Modules\Invoice\Enums\AllocationMethod;
 use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Models\Invoice;
 use Modules\Payment\DTOs\PaymentAllocationData;
-use Modules\Payment\Enums\PaymentStatus;
 use Modules\Payment\Models\Payment;
-use Modules\Payment\Services\PaymentCreationService;
 use Modules\Purchase\DTOs\CreateGoodsReceiptNoteData;
 use Modules\Purchase\DTOs\CreatePurchaseInvoiceData;
 use Modules\Purchase\DTOs\CreatePurchaseOrderData;
@@ -36,12 +34,8 @@ final class FastPurchaseDocumentBuilder
         private readonly GoodsReceiptNoteService $goodsReceipts,
         private readonly PurchaseInvoiceIntegrationService $purchaseInvoices,
         private readonly PurchasePaymentIntegrationService $purchasePayments,
-        private readonly PaymentCreationService $payments,
     ) {}
 
-    /**
-     * @param  array<string, mixed>  $resolved
-     */
     public function createPurchaseOrder(array $resolved): PurchaseOrder
     {
         $lines = array_map(
@@ -94,9 +88,6 @@ final class FastPurchaseDocumentBuilder
             ->load(['lines', 'adjustments', 'supplier', 'warehouse', 'warehouseLocation']);
     }
 
-    /**
-     * @param  array<string, mixed>  $resolved
-     */
     public function createGoodsReceipt(array $resolved, PurchaseOrder $purchaseOrder): GoodsReceiptNote
     {
         $orderLines = $this->orderLinesByFastLine($purchaseOrder);
@@ -150,9 +141,6 @@ final class FastPurchaseDocumentBuilder
             ->load(['lines.inventoryMovement', 'supplier', 'warehouse', 'warehouseLocation']);
     }
 
-    /**
-     * @param  array<string, mixed>  $resolved
-     */
     public function createSupplierInvoice(array $resolved, PurchaseOrder $purchaseOrder, ?GoodsReceiptNote $goodsReceipt): Invoice
     {
         $sources = [];
@@ -207,15 +195,12 @@ final class FastPurchaseDocumentBuilder
         ))->load(['lines', 'sources', 'sourceLines', 'adjustments', 'balance', 'supplier']);
     }
 
-    /**
-     * @param  array<string, mixed>  $resolved
-     */
     public function createSupplierPayment(array $resolved, Invoice $invoice): Payment
     {
         $payment = $resolved['payment'];
         $amount = (string) $payment['amount'];
 
-        $data = $this->purchasePayments->prepareSupplierPayment(
+        return $this->purchasePayments->createSupplierPayment(
             tenantId: (int) $resolved['tenant_id'],
             paymentDate: (string) $resolved['purchase_date'],
             amount: $amount,
@@ -226,28 +211,17 @@ final class FastPurchaseDocumentBuilder
             exchangeRate: (string) $resolved['exchange_rate'],
             referenceNumber: $payment['reference'] ?? $resolved['supplier_reference'],
             lines: $payment['lines'],
-            allocations: [
-                new PaymentAllocationData(
-                    invoiceId: (int) $invoice->getKey(),
-                    allocatedAmount: $amount,
-                    allocationDate: (string) $resolved['purchase_date'],
-                    allowOverpayment: false,
-                    metadata: ['fast_purchase' => true, 'supplier_reference' => $resolved['supplier_reference']],
-                ),
-            ],
-            status: PaymentStatus::Posted,
+            allocations: [new PaymentAllocationData(
+                invoiceId: (int) $invoice->getKey(),
+                allocatedAmount: $amount,
+                allocationDate: (string) $resolved['purchase_date'],
+                metadata: ['fast_purchase' => true, 'supplier_reference' => $resolved['supplier_reference']],
+            )],
             createdBy: $resolved['current_user_id'],
             notes: $resolved['notes'],
-            bankAccountId: $payment['header_bank_account_id'],
-            metadata: ['fast_purchase' => true, 'supplier_reference' => $resolved['supplier_reference']],
-        );
-
-        return $this->payments->create($data)->load(['lines', 'allocations']);
+        )->load(['lines', 'allocations', 'lifecycleEvents']);
     }
 
-    /**
-     * @return array<int, PurchaseOrderLine>
-     */
     private function orderLinesByFastLine(PurchaseOrder $purchaseOrder): array
     {
         $purchaseOrder->loadMissing('lines');
@@ -257,9 +231,6 @@ final class FastPurchaseDocumentBuilder
             ->all();
     }
 
-    /**
-     * @return array<int, string>
-     */
     private function goodsReceiptSourceQuantities(GoodsReceiptNote $goodsReceipt): array
     {
         $goodsReceipt->loadMissing('lines');
@@ -269,10 +240,6 @@ final class FastPurchaseDocumentBuilder
             ->all();
     }
 
-    /**
-     * @param  array<string, mixed>  $resolved
-     * @return array<int, string>
-     */
     private function purchaseOrderSourceQuantitiesForNonStock(PurchaseOrder $purchaseOrder, array $resolved): array
     {
         $orderLines = $this->orderLinesByFastLine($purchaseOrder);

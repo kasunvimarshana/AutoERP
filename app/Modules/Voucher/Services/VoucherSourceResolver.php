@@ -7,17 +7,13 @@ namespace Modules\Voucher\Services;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Modules\Core\Services\DecimalMath;
-use Modules\Customer\Models\Customer;
 use Modules\Finance\Enums\JournalStatus;
 use Modules\Finance\Enums\JournalType;
 use Modules\Finance\Models\FinanceJournalEntry;
-use Modules\Hr\Models\HrEmployee;
 use Modules\Payment\Enums\PaymentDirection;
-use Modules\Payment\Enums\PaymentStatus;
 use Modules\Payment\Enums\PaymentType;
 use Modules\Payment\Models\Payment;
 use Modules\Payment\Models\PaymentReversal;
-use Modules\Supplier\Models\Supplier;
 use Modules\Voucher\DTOs\VoucherPresentationData;
 use Modules\Voucher\Enums\VoucherType;
 
@@ -55,24 +51,13 @@ final class VoucherSourceResolver
         PaymentDirection $direction,
     ): VoucherPresentationData {
         $payment = $this->paymentScope($tenantId, $organizationUnitId)
-            ->with([
-                'currency',
-                'lines.paymentMethod',
-                'lines.internalBankAccount',
-                'allocations.invoice.currency',
-                'unappliedBalance',
-                'refunds',
-                'reversals',
-            ])
+            ->with(['lines', 'allocations', 'unappliedBalance', 'refunds', 'reversals'])
             ->where('direction', $direction->value)
             ->findOrFail($sourceId);
 
         return new VoucherPresentationData($this->paymentPayload($type, $payment));
     }
 
-    /**
-     * @param  list<JournalType>  $journalTypes
-     */
     private function journalVoucher(
         VoucherType $type,
         int $sourceId,
@@ -91,7 +76,10 @@ final class VoucherSourceResolver
                 'reversalOf',
                 'reversals',
             ])
-            ->whereIn('journal_type', array_map(static fn (JournalType $journalType): string => $journalType->value, $journalTypes))
+            ->whereIn('journal_type', array_map(
+                static fn (JournalType $journalType): string => $journalType->value,
+                $journalTypes,
+            ))
             ->findOrFail($sourceId);
 
         return new VoucherPresentationData($this->journalPayload($type, $journal));
@@ -106,13 +94,12 @@ final class VoucherSourceResolver
         if ($sourceKind === 'payment_reversal') {
             return $this->paymentReversalVoucher($sourceId, $tenantId, $organizationUnitId);
         }
-
         if ($sourceKind === 'finance_journal') {
             return $this->journalVoucher(VoucherType::Reversal, $sourceId, $tenantId, $organizationUnitId, [JournalType::Reversal]);
         }
 
         $paymentReversal = $this->paymentReversalScope($tenantId, $organizationUnitId)
-            ->with(['payment.currency', 'payment.lines.paymentMethod', 'payment.allocations.invoice'])
+            ->with(['payment.lines', 'payment.allocations', 'payment.reversals'])
             ->find($sourceId);
 
         if ($paymentReversal instanceof PaymentReversal) {
@@ -122,10 +109,13 @@ final class VoucherSourceResolver
         return $this->journalVoucher(VoucherType::Reversal, $sourceId, $tenantId, $organizationUnitId, [JournalType::Reversal]);
     }
 
-    private function paymentReversalVoucher(int $sourceId, int $tenantId, ?int $organizationUnitId): VoucherPresentationData
-    {
+    private function paymentReversalVoucher(
+        int $sourceId,
+        int $tenantId,
+        ?int $organizationUnitId,
+    ): VoucherPresentationData {
         $reversal = $this->paymentReversalScope($tenantId, $organizationUnitId)
-            ->with(['payment.currency', 'payment.lines.paymentMethod', 'payment.allocations.invoice', 'payment.reversals'])
+            ->with(['payment.lines', 'payment.allocations', 'payment.reversals'])
             ->findOrFail($sourceId);
 
         return new VoucherPresentationData($this->paymentReversalPayload($reversal));
@@ -133,16 +123,15 @@ final class VoucherSourceResolver
 
     private function paymentPayload(VoucherType $type, Payment $payment): array
     {
-        $status = $this->enum($payment->status);
-        $hasReversal = $payment->reversals->isNotEmpty();
-        $partyName = $this->partyName((string) $payment->party_type, $payment->party_id, (int) $payment->tenant_id, $payment->organization_unit_id);
-        $label = $this->paymentLabel($type, $payment, $partyName);
+        $documentStatus = (string) $this->enum($payment->document_status);
+        $postingStatus = (string) $this->enum($payment->posting_status);
+        $partyName = $payment->party_name_snapshot ?? $payment->payee_name;
         $total = $this->math->normalize((string) $payment->total_amount);
         $exchangeRate = $this->math->normalize((string) $payment->exchange_rate);
 
         return [
             'voucher_type' => $type->value,
-            'voucher_label' => $label,
+            'voucher_label' => $this->paymentLabel($type, $payment),
             'voucher_number' => (string) $payment->payment_number,
             'voucher_date' => $payment->payment_date?->toDateString(),
             'source_module' => 'Payment',
@@ -154,20 +143,20 @@ final class VoucherSourceResolver
             'organization_unit_id' => $payment->organization_unit_id,
             'financial_year_id' => null,
             'financial_period_id' => null,
-            'payer_or_payee' => $partyName ?? $payment->payee_name ?? $payment->party_type,
+            'payer_or_payee' => $partyName ?? $payment->party_type,
             'party_type' => $payment->party_type,
-            'party_name' => $partyName ?? $payment->payee_name,
+            'party_name' => $partyName,
             'currency_id' => $payment->currency_id,
-            'currency' => $payment->currency?->code,
+            'currency' => $payment->currency_code_snapshot,
             'exchange_rate' => $exchangeRate,
             'transaction_amount' => $total,
             'base_currency_amount' => $this->math->mul($total, $exchangeRate),
             'allocated_amount' => $this->math->normalize((string) $payment->allocated_amount),
             'unallocated_amount' => $this->math->normalize((string) $payment->unapplied_amount),
-            'document_status' => $this->enum($payment->document_status),
-            'approval_status' => $status,
+            'document_status' => $documentStatus,
+            'approval_status' => $documentStatus,
             'allocation_status' => $this->enum($payment->allocation_status),
-            'posting_status' => $this->enum($payment->posting_status),
+            'posting_status' => $postingStatus,
             'instrument_status' => $this->enum($payment->instrument_status),
             'narration' => $payment->notes,
             'external_references' => [
@@ -182,10 +171,14 @@ final class VoucherSourceResolver
             'reversal_information' => $this->paymentReversalInfo($payment),
             'prepared_by' => $payment->created_by,
             'approved_by' => $payment->approved_by,
-            'posted_by' => null,
+            'posted_by' => $payment->posted_by,
             'created_at' => $payment->created_at?->toIso8601String(),
             'updated_at' => $payment->updated_at?->toIso8601String(),
-            'available_actions' => $this->permissions->forPayment($status, $hasReversal),
+            'available_actions' => $this->permissions->forPayment(
+                $documentStatus,
+                $postingStatus,
+                $payment->reversals->isNotEmpty(),
+            ),
             'source_document_url' => '/payments/'.(string) $payment->getKey(),
             'print_available' => true,
             'print_url' => '/api/v1/vouchers/'.$type->value.'/'.(string) $payment->getKey().'/print?source_kind=payment',
@@ -207,8 +200,13 @@ final class VoucherSourceResolver
         $payload['source_id'] = (int) $reversal->getKey();
         $payload['source_document_number'] = (string) $payment->payment_number;
         $payload['transaction_amount'] = $this->math->normalize((string) $reversal->reversed_amount);
-        $payload['base_currency_amount'] = $this->math->mul((string) $reversal->reversed_amount, (string) $payment->exchange_rate);
+        $payload['base_currency_amount'] = $this->math->mul(
+            (string) $reversal->reversed_amount,
+            (string) $payment->exchange_rate,
+        );
         $payload['document_status'] = 'reversed';
+        $payload['approval_status'] = 'reversed';
+        $payload['allocation_status'] = 'unallocated';
         $payload['posting_status'] = 'reversed';
         $payload['instrument_status'] = 'reversed';
         $payload['narration'] = $reversal->reason;
@@ -230,7 +228,7 @@ final class VoucherSourceResolver
 
     private function journalPayload(VoucherType $type, FinanceJournalEntry $journal): array
     {
-        $status = $this->enum($journal->status);
+        $status = (string) $this->enum($journal->status);
         $total = $this->math->normalize((string) $journal->total_debit);
         $exchangeRate = $this->math->normalize((string) $journal->exchange_rate);
 
@@ -313,43 +311,7 @@ final class VoucherSourceResolver
             ->when($organizationUnitId !== null, fn (Builder $query) => $query->where('organization_unit_id', $organizationUnitId));
     }
 
-    private function partyName(?string $partyType, mixed $partyId, int $tenantId, ?int $organizationUnitId): ?string
-    {
-        if (! is_numeric($partyId) || trim((string) $partyType) === '') {
-            return null;
-        }
-
-        $partyType = strtolower((string) $partyType);
-        $query = null;
-        $field = 'display_name';
-
-        if (str_contains($partyType, 'customer')) {
-            $query = Customer::query();
-        } elseif (str_contains($partyType, 'supplier') || str_contains($partyType, 'owner')) {
-            $query = Supplier::query();
-        } elseif (str_contains($partyType, 'employee')) {
-            $query = HrEmployee::query();
-        }
-
-        if ($query === null) {
-            return null;
-        }
-
-        $party = $query
-            ->where('tenant_id', $tenantId)
-            ->when($organizationUnitId !== null, fn (Builder $scope) => $scope->where(function (Builder $inner) use ($organizationUnitId): void {
-                $inner->whereNull('organization_unit_id')->orWhere('organization_unit_id', $organizationUnitId);
-            }))
-            ->find($partyId);
-
-        if ($party === null) {
-            return null;
-        }
-
-        return (string) ($party->{$field} ?: $party->name ?? $party->code ?? null);
-    }
-
-    private function paymentLabel(VoucherType $type, Payment $payment, ?string $partyName): string
+    private function paymentLabel(VoucherType $type, Payment $payment): string
     {
         $paymentType = $payment->payment_type instanceof PaymentType
             ? $payment->payment_type
@@ -363,15 +325,12 @@ final class VoucherSourceResolver
         if ($type === VoucherType::Payment && str_contains($sourceHint, 'rental')) {
             return 'Rental Owner Payment Voucher';
         }
-
-        if ($partyName !== null && str_contains(strtolower((string) $payment->party_type), 'customer')) {
+        if (str_contains(strtolower((string) $payment->party_type), 'customer')) {
             return $type === VoucherType::Receipt ? 'Customer Receipt Voucher' : 'Customer Refund Voucher';
         }
-
         if (str_contains(strtolower((string) $payment->party_type), 'supplier')) {
             return 'Supplier Payment Voucher';
         }
-
         if (str_contains(strtolower((string) $payment->party_type), 'employee')) {
             return $paymentType === PaymentType::Advance ? 'Employee Advance Voucher' : 'Expense Reimbursement Voucher';
         }
@@ -379,19 +338,16 @@ final class VoucherSourceResolver
         return $type->label();
     }
 
-    /**
-     * @return list<array<string, mixed>>
-     */
     private function paymentLines(Payment $payment): array
     {
         return $payment->lines->map(fn ($line): array => [
-            'method' => $line->paymentMethod?->name,
-            'method_type' => $this->enum($line->paymentMethod?->method_type),
+            'method' => $line->payment_method_name_snapshot,
+            'method_code' => $line->payment_method_code_snapshot,
+            'method_type' => $line->payment_method_type_snapshot,
             'reference_number' => $line->reference_number,
             'amount' => $this->math->normalize((string) $line->amount),
             'cleared_amount' => $this->math->normalize((string) $line->cleared_amount),
-            'status' => $line->status,
-            'internal_bank_account' => $line->internalBankAccount?->name,
+            'status' => (string) $line->status,
             'instrument_direction' => $line->instrument_direction,
             'external_bank' => $line->external_bank_name,
             'external_branch' => $line->external_bank_branch,
@@ -407,14 +363,12 @@ final class VoucherSourceResolver
         ])->values()->all();
     }
 
-    /**
-     * @return list<array<string, mixed>>
-     */
     private function paymentAllocations(Payment $payment): array
     {
         return $payment->allocations->map(fn ($allocation): array => [
-            'invoice_number' => $allocation->invoice?->invoice_number,
-            'invoice_date' => $allocation->invoice?->invoice_date?->toDateString(),
+            'invoice_number' => $allocation->invoice_number_snapshot,
+            'invoice_date' => $allocation->invoice_date_snapshot?->toDateString(),
+            'invoice_currency_code' => $allocation->invoice_currency_code_snapshot,
             'invoice_total' => $this->math->normalize((string) $allocation->invoice_total),
             'invoice_balance_before' => $this->math->normalize((string) $allocation->invoice_balance_before),
             'allocated_amount' => $this->math->normalize((string) $allocation->allocated_amount),
@@ -424,9 +378,6 @@ final class VoucherSourceResolver
         ])->values()->all();
     }
 
-    /**
-     * @return list<array<string, mixed>>
-     */
     private function journalLines(FinanceJournalEntry $journal): array
     {
         return $journal->lines->map(fn ($line): array => [

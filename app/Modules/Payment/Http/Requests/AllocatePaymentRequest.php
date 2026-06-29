@@ -16,6 +16,7 @@ final class AllocatePaymentRequest extends TenantScopedRequest
         return [
             'tenant_id' => ['required', 'integer', 'min:1'],
             'organization_unit_id' => ['nullable', 'integer', 'min:1'],
+            'expected_version' => ['required', 'integer', 'min:1'],
             ...$this->paymentAllocationRules(['required', 'array', 'min:1']),
         ];
     }
@@ -23,5 +24,10 @@ final class AllocatePaymentRequest extends TenantScopedRequest
     public function toData(): array
     {
         return $this->paymentAllocationData();
+    }
+
+    public function expectedVersion(): int
+    {
+        return (int) $this->input('expected_version');
     }
 }

@@ -10,8 +10,9 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('payment_methods', function (Blueprint $table) {
+        Schema::create('payment_methods', function (Blueprint $table): void {
             $table->id();
+            $table->unsignedBigInteger('row_version')->default(1);
             $table->foreignId('tenant_id')->constrained('tenants', 'id', indexName: 'payment_methods_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->string('scope_key', 160);
@@ -20,7 +21,7 @@ return new class extends Migration
             $table->string('method_type', 40);
             $table->string('direction_allowed', 40)->default('both');
             $table->boolean('requires_reference')->default(false);
-            $table->boolean('requires_bank_account')->default(false);
+            $table->boolean('requires_instrument_details')->default(false);
             $table->boolean('is_active')->default(true);
             $table->unsignedInteger('sort_order')->default(0);
             $table->json('metadata')->nullable();

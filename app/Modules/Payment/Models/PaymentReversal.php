@@ -5,15 +5,14 @@ declare(strict_types=1);
 namespace Modules\Payment\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use LogicException;
 use Modules\Core\Models\TenantOwnedModel;
-use Modules\Finance\Models\FinanceJournalEntry;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Tenant\Models\TenantModel;
 
 final class PaymentReversal extends TenantOwnedModel
 {
     protected $table = 'payment_reversals';
-
     protected $guarded = ['id'];
 
     protected function casts(): array
@@ -26,19 +25,22 @@ final class PaymentReversal extends TenantOwnedModel
             'reversed_by' => 'integer',
             'original_amount' => 'decimal:6',
             'reversed_amount' => 'decimal:6',
-            'finance_reversal_journal_entry_id' => 'integer',
-            'metadata' => 'array',
         ]);
+    }
+
+    protected static function booted(): void
+    {
+        self::updating(static function (): never {
+            throw new LogicException('Payment reversals are immutable.');
+        });
+        self::deleting(static function (): never {
+            throw new LogicException('Payment reversals cannot be deleted.');
+        });
     }
 
     public function payment(): BelongsTo
     {
         return $this->belongsTo(Payment::class, 'payment_id');
-    }
-
-    public function financeReversalJournalEntry(): BelongsTo
-    {
-        return $this->belongsTo(FinanceJournalEntry::class, 'finance_reversal_journal_entry_id');
     }
 
     public function tenant(): BelongsTo

@@ -42,7 +42,9 @@ final class TechnicianWorkReportService
             ->paginate($perPage, ['vehicle_service_line_employees.*'], 'page', $page);
 
         return [
-            'data' => $paginator->getCollection()->map(fn (VehicleServiceLineEmployee $assignment): array => $this->row($assignment))->values(),
+            'data' => $paginator->getCollection()
+                ->map(fn (VehicleServiceLineEmployee $assignment): array => $this->row($assignment))
+                ->values(),
             'summary' => $totals,
             'meta' => [
                 'current_page' => $paginator->currentPage(),
@@ -85,7 +87,7 @@ final class TechnicianWorkReportService
             title: 'Technician Work / Labour Assignment Commission',
             group: 'Vehicle Service',
             model: VehicleServiceLineEmployee::class,
-            description: 'Technician labour work, assigned hours, commission and linked invoice/payment status.',
+            description: 'Technician labour work, assigned hours, commission and linked invoice/payment lifecycle.',
             columns: [
                 new ReportColumn('job_number', 'Job number', 'job_number', 'job_number'),
                 new ReportColumn('job_date', 'Job date', 'job_date', 'job_date', 'date'),
@@ -106,7 +108,10 @@ final class TechnicianWorkReportService
                 new ReportColumn('supervisor_name', 'Supervisor'),
                 new ReportColumn('supervisor_commission_amount', 'Supervisor commission', 'supervisor_commission_amount', 'supervisor_commission_amount', 'currency', true),
                 new ReportColumn('invoice_status', 'Invoice status'),
-                new ReportColumn('payment_status', 'Payment status'),
+                new ReportColumn('payment_document_status', 'Payment document status'),
+                new ReportColumn('payment_posting_status', 'Payment posting status'),
+                new ReportColumn('payment_allocation_status', 'Payment allocation status'),
+                new ReportColumn('payment_instrument_status', 'Payment instrument status'),
             ],
             dateColumn: 'job_date',
             defaultSort: 'job_date',
@@ -145,7 +150,6 @@ final class TechnicianWorkReportService
         if (! empty($params['date_from'])) {
             $query->whereDate('jobs.job_date', '>=', (string) $params['date_from']);
         }
-
         if (! empty($params['date_to'])) {
             $query->whereDate('jobs.job_date', '<=', (string) $params['date_to']);
         }
@@ -159,11 +163,19 @@ final class TechnicianWorkReportService
         $this->whereString($query, 'vehicle_service_line_employees.commission_type', $params['commission_type'] ?? null);
 
         if (! empty($params['invoice_status'])) {
-            $query->whereHas('job.invoiceLinks.invoice', fn (Builder $invoice): Builder => $invoice->where('status', (string) $params['invoice_status']));
+            $query->whereHas(
+                'job.invoiceLinks.invoice',
+                fn (Builder $invoice): Builder => $invoice->where('status', (string) $params['invoice_status']),
+            );
         }
 
-        if (! empty($params['payment_status'])) {
-            $query->whereHas('job.paymentLinks.payment', fn (Builder $payment): Builder => $payment->where('status', (string) $params['payment_status']));
+        if ($this->hasPaymentFilters($params)) {
+            $query->whereHas('job.paymentLinks.payment', function (Builder $payment) use ($params): void {
+                $this->whereString($payment, 'document_status', $params['payment_document_status'] ?? null);
+                $this->whereString($payment, 'posting_status', $params['payment_posting_status'] ?? null);
+                $this->whereString($payment, 'allocation_status', $params['payment_allocation_status'] ?? null);
+                $this->whereString($payment, 'instrument_status', $params['payment_instrument_status'] ?? null);
+            });
         }
 
         if (! empty($params['search'])) {
@@ -213,12 +225,18 @@ final class TechnicianWorkReportService
             $rate = $this->decimal($assignment->rate);
             $totalAssignedHours = $this->math->add($totalAssignedHours, $assignedHours);
             $totalLabourAmount = $this->math->add($totalLabourAmount, $this->math->mul($assignedHours, $rate));
-            $totalTechnicianCommission = $this->math->add($totalTechnicianCommission, $this->decimal($assignment->commission_amount));
+            $totalTechnicianCommission = $this->math->add(
+                $totalTechnicianCommission,
+                $this->decimal($assignment->commission_amount),
+            );
 
             $job = $assignment->job;
             if ($job instanceof VehicleServiceJob && ! isset($seenJobs[$job->getKey()])) {
                 $seenJobs[$job->getKey()] = true;
-                $totalSupervisorCommission = $this->math->add($totalSupervisorCommission, $this->decimal($job->supervisor_commission_amount));
+                $totalSupervisorCommission = $this->math->add(
+                    $totalSupervisorCommission,
+                    $this->decimal($job->supervisor_commission_amount),
+                );
             }
         });
 
@@ -227,7 +245,10 @@ final class TechnicianWorkReportService
             'total_labour_amount' => $totalLabourAmount,
             'total_technician_commission' => $totalTechnicianCommission,
             'total_supervisor_commission' => $totalSupervisorCommission,
-            'total_payable_commission' => $this->math->add($totalTechnicianCommission, $totalSupervisorCommission),
+            'total_payable_commission' => $this->math->add(
+                $totalTechnicianCommission,
+                $totalSupervisorCommission,
+            ),
         ];
     }
 
@@ -252,7 +273,6 @@ final class TechnicianWorkReportService
             'line_total' => 'lines.line_total',
             'supervisor_commission_amount' => 'jobs.supervisor_commission_amount',
         ];
-
         $sort = (string) ($params['sort'] ?? 'job_date');
         $direction = (string) ($params['direction'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
 
@@ -286,8 +306,12 @@ final class TechnicianWorkReportService
         $job = $assignment->job;
         /** @var VehicleServiceJobLine|null $line */
         $line = $assignment->line;
-        $invoice = $job instanceof VehicleServiceJob ? $job->invoiceLinks->pluck('invoice')->filter()->first() : null;
-        $payment = $job instanceof VehicleServiceJob ? $job->paymentLinks->pluck('payment')->filter()->first() : null;
+        $invoice = $job instanceof VehicleServiceJob
+            ? $job->invoiceLinks->pluck('invoice')->filter()->first()
+            : null;
+        $payment = $job instanceof VehicleServiceJob
+            ? $job->paymentLinks->pluck('payment')->filter()->first()
+            : null;
         $assignedHours = $this->decimal($assignment->assigned_hours);
         $rate = $this->decimal($assignment->rate);
 
@@ -317,9 +341,28 @@ final class TechnicianWorkReportService
             'supervisor_commission_amount' => $this->decimal($job?->supervisor_commission_amount),
             'invoice_status' => $this->enumValue($invoice?->status),
             'invoice' => $this->invoiceResource($invoice),
-            'payment_status' => $this->enumValue($payment?->status),
+            'payment_document_status' => $this->enumValue($payment?->document_status),
+            'payment_posting_status' => $this->enumValue($payment?->posting_status),
+            'payment_allocation_status' => $this->enumValue($payment?->allocation_status),
+            'payment_instrument_status' => $this->enumValue($payment?->instrument_status),
             'payment' => $this->paymentResource($payment),
         ];
+    }
+
+    private function hasPaymentFilters(array $params): bool
+    {
+        foreach ([
+            'payment_document_status',
+            'payment_posting_status',
+            'payment_allocation_status',
+            'payment_instrument_status',
+        ] as $filter) {
+            if (($params[$filter] ?? null) !== null && $params[$filter] !== '') {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function whereInteger(Builder $query, string $column, mixed $value): void
@@ -350,9 +393,6 @@ final class TechnicianWorkReportService
         return $this->math->normalize((string) ($value ?? '0'));
     }
 
-    /**
-     * @return array<string, mixed>|null
-     */
     private function customerResource(?Customer $customer): ?array
     {
         if (! $customer instanceof Customer) {
@@ -366,9 +406,6 @@ final class TechnicianWorkReportService
         ];
     }
 
-    /**
-     * @return array<string, mixed>|null
-     */
     private function vehicleResource(?Vehicle $vehicle): ?array
     {
         if (! $vehicle instanceof Vehicle) {
@@ -385,9 +422,6 @@ final class TechnicianWorkReportService
         ];
     }
 
-    /**
-     * @return array<string, mixed>|null
-     */
     private function employeeResource(?HrEmployee $employee): ?array
     {
         if (! $employee instanceof HrEmployee) {
@@ -401,9 +435,6 @@ final class TechnicianWorkReportService
         ];
     }
 
-    /**
-     * @return array<string, mixed>|null
-     */
     private function invoiceResource(?Invoice $invoice): ?array
     {
         if (! $invoice instanceof Invoice) {
@@ -417,9 +448,6 @@ final class TechnicianWorkReportService
         ];
     }
 
-    /**
-     * @return array<string, mixed>|null
-     */
     private function paymentResource(?Payment $payment): ?array
     {
         if (! $payment instanceof Payment) {

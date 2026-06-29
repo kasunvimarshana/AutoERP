@@ -4,18 +4,20 @@ declare(strict_types=1);
 
 namespace Modules\Payment\Services;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
-use Modules\Finance\Services\ReversalService as FinanceReversalService;
+use Modules\Finance\Contracts\FinancePaymentReversalInterface;
 use Modules\Invoice\Contracts\InvoiceSettlementServiceInterface;
 use Modules\Payment\DTOs\PaymentReversalData;
 use Modules\Payment\Enums\AllocationStatus;
 use Modules\Payment\Enums\PaymentAllocationState;
 use Modules\Payment\Enums\PaymentDocumentStatus;
 use Modules\Payment\Enums\PaymentInstrumentStatus;
+use Modules\Payment\Enums\PaymentLifecycleDimension;
 use Modules\Payment\Enums\PaymentPostingStatus;
-use Modules\Payment\Enums\PaymentStatus;
+use Modules\Payment\Enums\PaymentType;
 use Modules\Payment\Enums\UnappliedBalanceStatus;
 use Modules\Payment\Models\Payment;
 use Modules\Payment\Models\PaymentReversal;
@@ -25,9 +27,10 @@ final class PaymentReversalService
     public function __construct(
         private readonly DecimalMath $math,
         private readonly InvoiceSettlementServiceInterface $invoiceSettlements,
-        private readonly PaymentStatusService $statuses,
         private readonly PaymentReversalNumberService $numbers,
-        private readonly FinanceReversalService $financeReversals,
+        private readonly FinancePaymentReversalInterface $financeReversals,
+        private readonly PaymentLifecycleEventRecorder $events,
+        private readonly PaymentBalanceSynchronizer $balances,
     ) {}
 
     public function reverse(PaymentReversalData $data): PaymentReversal
@@ -37,20 +40,22 @@ final class PaymentReversalService
                 ->with(['allocations', 'unappliedBalance'])
                 ->lockForUpdate()
                 ->findOrFail($data->paymentId);
+            $this->assertVersion($payment, $data->expectedVersion);
 
-            $status = $payment->status instanceof PaymentStatus
-                ? $payment->status
-                : PaymentStatus::from((string) $payment->status);
-
+            $documentBefore = $this->documentStatus($payment);
+            $postingBefore = $this->postingStatus($payment);
+            $allocationBefore = $this->allocationStatus($payment);
+            $instrumentBefore = $this->instrumentStatus($payment);
             if ($payment->reversals()->exists()) {
                 throw new InvalidArgumentException('Payment reversal already exists for this payment.');
             }
-            if ($status !== PaymentStatus::Posted || $payment->posting_status !== PaymentPostingStatus::Posted) {
-                throw new InvalidArgumentException('Only posted payments can be reversed.');
+            if ($documentBefore !== PaymentDocumentStatus::Approved || $postingBefore !== PaymentPostingStatus::Posted) {
+                throw new InvalidArgumentException('Only approved and posted payments can be reversed.');
             }
-            if ($payment->finance_journal_entry_id === null) {
-                throw new InvalidArgumentException('Payment cannot be reversed without a posted Finance journal.');
+            if (trim((string) $payment->finance_posting_reference) === '') {
+                throw new InvalidArgumentException('Payment cannot be reversed without a Finance posting reference.');
             }
+            $this->assertNoActiveRefunds($payment);
 
             $financeReversal = $this->financeReversals->reversePayment(
                 (int) $payment->tenant_id,
@@ -61,36 +66,43 @@ final class PaymentReversalService
                 $data->reason,
             );
 
-            foreach ($payment->allocations()->where('status', AllocationStatus::Active->value)->orderBy('invoice_id')->orderBy('id')->get() as $allocation) {
+            foreach ($payment->allocations()
+                ->where('status', AllocationStatus::Active->value)
+                ->orderBy('invoice_id')
+                ->orderBy('id')
+                ->get() as $allocation) {
                 $this->invoiceSettlements->reversePaymentAllocation(
                     (int) $allocation->invoice_id,
                     (string) $allocation->allocated_amount,
                 );
-
-                $allocation->forceFill(['status' => AllocationStatus::Reversed->value])->save();
+                $allocation->forceFill([
+                    'status' => AllocationStatus::Reversed->value,
+                    'row_version' => (int) $allocation->row_version + 1,
+                ])->save();
             }
-
-            foreach ($payment->allocations()->where('status', AllocationStatus::Pending->value)->get() as $allocation) {
-                $allocation->forceFill(['status' => AllocationStatus::Void->value])->save();
+            foreach ($payment->allocations()
+                ->where('status', AllocationStatus::Pending->value)
+                ->get() as $allocation) {
+                $allocation->forceFill([
+                    'status' => AllocationStatus::Void->value,
+                    'row_version' => (int) $allocation->row_version + 1,
+                ])->save();
             }
 
             $reversal = PaymentReversal::query()->create([
                 'tenant_id' => $payment->tenant_id,
                 'organization_unit_id' => $payment->organization_unit_id,
                 'payment_id' => $payment->getKey(),
-                'finance_reversal_journal_entry_id' => $financeReversal->journalId,
+                'finance_reversal_reference' => $financeReversal->journalNumber,
                 'reversal_number' => $this->numbers->resolve($data, $payment),
                 'reversal_date' => $data->reversalDate,
                 'reason' => $data->reason,
                 'reversed_by' => $data->reversedBy,
                 'original_amount' => $payment->total_amount,
                 'reversed_amount' => $this->math->normalize((string) $payment->total_amount),
-                'status' => $data->status,
-                'metadata' => $data->metadata,
             ]);
 
             $payment->forceFill([
-                'status' => PaymentStatus::Reversed->value,
                 'document_status' => PaymentDocumentStatus::Reversed->value,
                 'allocation_status' => PaymentAllocationState::Unallocated->value,
                 'posting_status' => PaymentPostingStatus::Reversed->value,
@@ -100,8 +112,18 @@ final class PaymentReversalService
                 'reversed_by' => $data->reversedBy,
                 'reversed_at' => now(),
                 'reversal_reason' => $data->reason,
+                'row_version' => (int) $payment->row_version + 1,
             ])->save();
-            $this->statuses->record($payment->refresh(), $status, PaymentStatus::Reversed, $data->reversedBy, $data->reason);
+            $payment = $payment->refresh();
+            $this->recordLifecycleEvents(
+                $payment,
+                $documentBefore,
+                $postingBefore,
+                $allocationBefore,
+                $instrumentBefore,
+                $financeReversal->journalNumber,
+                $data,
+            );
 
             if ($payment->unappliedBalance !== null) {
                 $payment->unappliedBalance->forceFill([
@@ -109,10 +131,137 @@ final class PaymentReversalService
                     'allocated_amount' => '0.000000',
                     'remaining_amount' => '0.000000',
                     'status' => UnappliedBalanceStatus::Cancelled->value,
+                    'row_version' => (int) $payment->unappliedBalance->row_version + 1,
                 ])->save();
             }
 
+            $this->synchronizeOriginalAfterRefundReversal($payment, $data->reversedBy);
+
             return $reversal->refresh();
         });
+    }
+
+    private function assertNoActiveRefunds(Payment $payment): void
+    {
+        $hasActiveRefunds = $payment->refunds()
+            ->whereHas('refundPayment', fn (Builder $query): Builder => $query
+                ->where('document_status', PaymentDocumentStatus::Approved->value)
+                ->where('posting_status', PaymentPostingStatus::Posted->value))
+            ->exists();
+
+        if ($hasActiveRefunds) {
+            throw new InvalidArgumentException('Reverse active refund payments before reversing the original payment.');
+        }
+    }
+
+    private function synchronizeOriginalAfterRefundReversal(Payment $payment, ?int $actorId): void
+    {
+        $paymentType = $payment->payment_type instanceof PaymentType
+            ? $payment->payment_type
+            : PaymentType::from((string) $payment->payment_type);
+        if ($paymentType !== PaymentType::Refund || $payment->original_payment_id === null) {
+            return;
+        }
+
+        $query = Payment::query()
+            ->where('tenant_id', $payment->tenant_id)
+            ->whereKey((int) $payment->original_payment_id)
+            ->lockForUpdate();
+        $payment->organization_unit_id === null
+            ? $query->whereNull('organization_unit_id')
+            : $query->where('organization_unit_id', $payment->organization_unit_id);
+        $original = $query->firstOrFail();
+
+        if ($this->documentStatus($original) !== PaymentDocumentStatus::Approved
+            || $this->postingStatus($original) !== PaymentPostingStatus::Posted) {
+            throw new InvalidArgumentException('The original payment must remain approved and posted while reversing its refund.');
+        }
+
+        $original->forceFill([
+            'row_version' => (int) $original->row_version + 1,
+        ])->save();
+        $this->balances->sync($original->refresh(), 'Refund payment reversed.', $actorId);
+    }
+
+    private function recordLifecycleEvents(
+        Payment $payment,
+        PaymentDocumentStatus $documentBefore,
+        PaymentPostingStatus $postingBefore,
+        PaymentAllocationState $allocationBefore,
+        PaymentInstrumentStatus $instrumentBefore,
+        string $financeReversalReference,
+        PaymentReversalData $data,
+    ): void {
+        $this->events->record(
+            $payment,
+            PaymentLifecycleDimension::Document,
+            $documentBefore,
+            PaymentDocumentStatus::Reversed,
+            $data->reversedBy,
+            $data->reason,
+        );
+        $this->events->record(
+            $payment,
+            PaymentLifecycleDimension::Posting,
+            $postingBefore,
+            PaymentPostingStatus::Reversed,
+            $data->reversedBy,
+            $data->reason,
+            ['finance_reversal_reference' => $financeReversalReference],
+        );
+        $this->events->record(
+            $payment,
+            PaymentLifecycleDimension::Allocation,
+            $allocationBefore,
+            PaymentAllocationState::Unallocated,
+            $data->reversedBy,
+            $data->reason,
+        );
+        $this->events->record(
+            $payment,
+            PaymentLifecycleDimension::Instrument,
+            $instrumentBefore,
+            PaymentInstrumentStatus::Reversed,
+            $data->reversedBy,
+            $data->reason,
+        );
+    }
+
+    private function assertVersion(Payment $payment, int $expectedVersion): void
+    {
+        if ($expectedVersion < 1 || (int) $payment->row_version !== $expectedVersion) {
+            throw new InvalidArgumentException('Payment was changed by another request. Reload it before reversing.');
+        }
+    }
+
+    private function documentStatus(Payment $payment): PaymentDocumentStatus
+    {
+        return $payment->document_status instanceof PaymentDocumentStatus
+            ? $payment->document_status
+            : PaymentDocumentStatus::from((string) $payment->document_status);
+    }
+
+    private function postingStatus(Payment $payment): PaymentPostingStatus
+    {
+        return $payment->posting_status instanceof PaymentPostingStatus
+            ? $payment->posting_status
+            : PaymentPostingStatus::from((string) $payment->posting_status);
+    }
+
+    private function allocationStatus(Payment $payment): PaymentAllocationState
+    {
+        return $payment->allocation_status instanceof PaymentAllocationState
+            ? $payment->allocation_status
+            : PaymentAllocationState::from((string) $payment->allocation_status);
+    }
+
+    private function instrumentStatus(Payment $payment): PaymentInstrumentStatus
+    {
+        if ($payment->instrument_status instanceof PaymentInstrumentStatus) {
+            return $payment->instrument_status;
+        }
+
+        return PaymentInstrumentStatus::tryFrom((string) $payment->instrument_status)
+            ?? PaymentInstrumentStatus::Pending;
     }
 }

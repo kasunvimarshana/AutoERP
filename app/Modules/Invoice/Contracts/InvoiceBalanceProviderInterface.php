@@ -11,7 +11,13 @@ interface InvoiceBalanceProviderInterface
 {
     /**
      * @param  list<int>  $invoiceIds
-     * @return array<int, array{id: int, invoice_number: string|null, name: string}>
+     * @return array<int, array{
+     *     id: int,
+     *     invoice_number: string|null,
+     *     invoice_date: string|null,
+     *     currency_code: string|null,
+     *     name: string
+     * }>
      */
     public function getInvoiceReferences(array $invoiceIds): array;
 

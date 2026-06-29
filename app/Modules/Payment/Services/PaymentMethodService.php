@@ -6,6 +6,7 @@ namespace Modules\Payment\Services;
 
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Pagination\LengthAwarePaginator as Paginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -51,7 +52,7 @@ final class PaymentMethodService
                 ->unique(fn (PaymentMethod $method): string => strtoupper((string) $method->code))
                 ->values();
 
-            return new \Illuminate\Pagination\LengthAwarePaginator(
+            return new Paginator(
                 $rows->forPage((int) request('page', 1), $perPage)->values(),
                 $rows->count(),
                 $perPage,
@@ -63,7 +64,6 @@ final class PaymentMethodService
         return $query->orderBy('sort_order')->orderBy('name')->paginate($perPage);
     }
 
-    /** @return Collection<int, PaymentMethod> */
     public function effectiveActiveForDirection(
         int $tenantId,
         ?int $organizationUnitId,
@@ -106,19 +106,28 @@ final class PaymentMethodService
     public function update(PaymentMethod $method, array $payload): PaymentMethod
     {
         return DB::transaction(function () use ($method, $payload): PaymentMethod {
-            $attributes = $this->attributes($payload, $method->tenant_id, $method->organization_unit_id);
-            $this->assertUniqueCode($attributes['code'], $attributes['tenant_id'], $attributes['organization_unit_id'], (int) $method->getKey());
-            $method->fill($attributes)->save();
+            $locked = PaymentMethod::query()->lockForUpdate()->findOrFail($method->getKey());
+            $attributes = $this->attributes($payload, (int) $locked->tenant_id, $locked->organization_unit_id);
+            $this->assertUniqueCode($attributes['code'], $attributes['tenant_id'], $attributes['organization_unit_id'], (int) $locked->getKey());
+            $locked->fill($attributes);
+            $locked->row_version = (int) $locked->row_version + 1;
+            $locked->save();
 
-            return $method->refresh();
+            return $locked->refresh();
         });
     }
 
     public function setActive(PaymentMethod $method, bool $isActive): PaymentMethod
     {
-        $method->forceFill(['is_active' => $isActive])->save();
+        return DB::transaction(function () use ($method, $isActive): PaymentMethod {
+            $locked = PaymentMethod::query()->lockForUpdate()->findOrFail($method->getKey());
+            $locked->forceFill([
+                'is_active' => $isActive,
+                'row_version' => (int) $locked->row_version + 1,
+            ])->save();
 
-        return $method->refresh();
+            return $locked->refresh();
+        });
     }
 
     public function delete(PaymentMethod $method): void
@@ -136,7 +145,7 @@ final class PaymentMethodService
         ?string $referenceNumber,
         ?int $tenantId = null,
         ?int $organizationUnitId = null,
-        ?int $bankAccountId = null,
+        bool $hasInstrumentDetails = false,
     ): void {
         if (! $method instanceof PaymentMethod) {
             throw new InvalidArgumentException('Payment method is required.');
@@ -159,8 +168,8 @@ final class PaymentMethodService
         if ((bool) $method->requires_reference && trim((string) $referenceNumber) === '') {
             throw new InvalidArgumentException('Payment method requires a reference number.');
         }
-        if ((bool) $method->requires_bank_account && ($bankAccountId === null || $bankAccountId < 1)) {
-            throw new InvalidArgumentException('Payment method requires a bank account.');
+        if ((bool) $method->requires_instrument_details && ! $hasInstrumentDetails) {
+            throw new InvalidArgumentException('Payment method requires transaction instrument details.');
         }
     }
 
@@ -196,7 +205,6 @@ final class PaymentMethodService
         return true;
     }
 
-    /** @return array<string, mixed> */
     private function attributes(array $payload, int $tenantId, ?int $organizationUnitId): array
     {
         $code = strtoupper(trim((string) ($payload['code'] ?? '')));
@@ -204,19 +212,16 @@ final class PaymentMethodService
             throw ValidationException::withMessages(['code' => ['Payment method code is required.']]);
         }
 
-        $resolvedTenantId = $tenantId;
-        $resolvedOrganizationUnitId = $organizationUnitId;
-
         return [
-            'tenant_id' => $resolvedTenantId,
-            'organization_unit_id' => $resolvedOrganizationUnitId,
-            'scope_key' => $this->scopeKey($resolvedTenantId, $resolvedOrganizationUnitId === null ? null : (int) $resolvedOrganizationUnitId),
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => $organizationUnitId,
+            'scope_key' => $this->scopeKey($tenantId, $organizationUnitId),
             'code' => $code,
             'name' => trim((string) ($payload['name'] ?? '')),
             'method_type' => (string) $payload['method_type'],
             'direction_allowed' => (string) ($payload['direction_allowed'] ?? PaymentMethodDirection::Both->value),
             'requires_reference' => (bool) ($payload['requires_reference'] ?? false),
-            'requires_bank_account' => (bool) ($payload['requires_bank_account'] ?? false),
+            'requires_instrument_details' => (bool) ($payload['requires_instrument_details'] ?? false),
             'is_active' => (bool) ($payload['is_active'] ?? true),
             'sort_order' => (int) ($payload['sort_order'] ?? 0),
             'metadata' => isset($payload['metadata']) && is_array($payload['metadata']) ? $payload['metadata'] : null,

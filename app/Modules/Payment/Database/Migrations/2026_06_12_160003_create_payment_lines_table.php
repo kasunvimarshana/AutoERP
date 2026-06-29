@@ -10,13 +10,19 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('payment_lines', function (Blueprint $table) {
+        Schema::create('payment_lines', function (Blueprint $table): void {
             $table->id();
+            $table->unsignedBigInteger('row_version')->default(1);
             $table->foreignId('tenant_id')->constrained('tenants', 'id', indexName: 'payment_lines_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('payment_id');
+            $table->unsignedInteger('line_number');
             $table->foreignId('payment_method_id');
-            $table->foreignId('internal_bank_account_id')->nullable();
+            $table->string('payment_method_code_snapshot', 100);
+            $table->string('payment_method_name_snapshot');
+            $table->string('payment_method_type_snapshot', 40);
+            $table->boolean('requires_reference_snapshot')->default(false);
+            $table->boolean('requires_instrument_details_snapshot')->default(false);
             $table->string('reference_number')->nullable();
             $table->decimal('amount', 20, 6);
             $table->decimal('cleared_amount', 20, 6)->default('0');
@@ -36,7 +42,7 @@ return new class extends Migration
             $table->json('metadata')->nullable();
             $table->timestamps();
 
-            $table->index('payment_id', 'payment_lines_payment_ix');
+            $table->unique(['payment_id', 'line_number'], 'payment_lines_payment_number_uk');
             $table->index(['payment_method_id', 'status'], 'payment_lines_method_status_ix');
             $table->index(['instrument_number', 'external_bank_name'], 'payment_lines_instrument_ix');
 
@@ -52,10 +58,6 @@ return new class extends Migration
             $table->foreign(['payment_method_id', 'tenant_id'], 'payment_lines_payment_method_id_tenant_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('payment_methods')
-                ->restrictOnDelete();
-            $table->foreign(['internal_bank_account_id', 'tenant_id'], 'payment_lines_internal_bank_account_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('finance_accounts')
                 ->restrictOnDelete();
         });
     }

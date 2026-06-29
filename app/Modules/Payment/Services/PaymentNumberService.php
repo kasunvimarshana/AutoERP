@@ -14,10 +14,6 @@ final class PaymentNumberService
 
     public function resolve(CreatePaymentData $data): string
     {
-        if ($data->paymentNumber !== null && trim($data->paymentNumber) !== '') {
-            return trim($data->paymentNumber);
-        }
-
         $result = $this->sequences->execute([
             'tenant_id' => $data->tenantId,
             'organization_unit_id' => $data->organizationUnitId,
@@ -36,8 +32,6 @@ final class PaymentNumberService
             throw new RuntimeException($result->errorOrFail()->message);
         }
 
-        $payload = $result->valueOrFail();
-
-        return (string) $payload['generated_number'];
+        return (string) $result->valueOrFail()['generated_number'];
     }
 }

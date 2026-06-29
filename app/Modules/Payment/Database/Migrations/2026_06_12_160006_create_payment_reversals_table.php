@@ -10,7 +10,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('payment_reversals', function (Blueprint $table) {
+        Schema::create('payment_reversals', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants', 'id', indexName: 'payment_reversals_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
@@ -21,13 +21,12 @@ return new class extends Migration
             $table->unsignedBigInteger('reversed_by')->nullable();
             $table->decimal('original_amount', 20, 6);
             $table->decimal('reversed_amount', 20, 6);
-            $table->foreignId('finance_reversal_journal_entry_id')->nullable();
-            $table->string('status')->default('posted');
-            $table->json('metadata')->nullable();
+            $table->string('finance_reversal_reference', 160);
             $table->timestamps();
 
             $table->unique(['tenant_id', 'reversal_number'], 'payment_reversals_tenant_number_uk');
             $table->unique('payment_id', 'payment_reversals_payment_uk');
+            $table->index('finance_reversal_reference', 'payment_reversals_finance_reference_ix');
 
             $table->unique(['id', 'tenant_id'], 'payment_reversals_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'payment_reversals_organization_unit_id_tenant_fk')
@@ -37,12 +36,7 @@ return new class extends Migration
             $table->foreign(['payment_id', 'tenant_id'], 'payment_reversals_payment_id_tenant_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('payments')
-                ->cascadeOnDelete();
-            $table->foreign(['finance_reversal_journal_entry_id', 'tenant_id'], 'payment_reversals_fin_reversal_journal_entry_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('finance_journal_entries')
                 ->restrictOnDelete();
-
             $table->foreign(['reversed_by', 'tenant_id'], 'payment_reversals_reversed_by_tenant_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('users')

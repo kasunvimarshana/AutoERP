@@ -13,9 +13,9 @@ use Modules\Finance\DTOs\PostingLine;
 use Modules\Finance\DTOs\PostingSourceData;
 use Modules\Payment\Enums\PaymentDirection;
 use Modules\Payment\Enums\PaymentDocumentStatus;
+use Modules\Payment\Enums\PaymentLifecycleDimension;
 use Modules\Payment\Enums\PaymentMethodType;
 use Modules\Payment\Enums\PaymentPostingStatus;
-use Modules\Payment\Enums\PaymentStatus;
 use Modules\Payment\Models\Payment;
 use Modules\Payment\Models\PaymentLine;
 use Modules\Payment\Validators\PaymentValidationService;
@@ -26,58 +26,76 @@ final class PaymentPostingService
         private readonly DecimalMath $math,
         private readonly FinancePostingInterface $postings,
         private readonly PaymentValidationService $validator,
-        private readonly PaymentStatusService $statuses,
+        private readonly PaymentLifecycleEventRecorder $events,
         private readonly PaymentAllocationService $allocations,
     ) {}
 
-    public function post(Payment $payment, ?int $postedBy = null): Payment
+    public function post(Payment $payment, int $expectedVersion, ?int $postedBy = null): Payment
     {
-        return DB::transaction(function () use ($payment, $postedBy): Payment {
+        return DB::transaction(function () use ($payment, $expectedVersion, $postedBy): Payment {
             $locked = Payment::query()
-                ->with(['lines.paymentMethod', 'lines.internalBankAccount', 'bankAccount', 'allocations'])
+                ->with(['lines', 'allocations'])
                 ->lockForUpdate()
                 ->findOrFail($payment->getKey());
+            $this->assertVersion($locked, $expectedVersion);
 
-            if ($locked->finance_journal_entry_id !== null || $locked->posting_status === PaymentPostingStatus::Posted) {
-                return $locked->refresh()->load(['lines.paymentMethod', 'allocations', 'unappliedBalance', 'financeJournalEntry']);
+            $postingStatus = $this->postingStatus($locked);
+            if ($postingStatus === PaymentPostingStatus::Posted && $locked->finance_posting_reference !== null) {
+                return $locked->refresh()->load(['lines', 'allocations', 'unappliedBalance', 'lifecycleEvents']);
             }
-
-            $status = $locked->status instanceof PaymentStatus
-                ? $locked->status
-                : PaymentStatus::from((string) $locked->status);
-            if ($status !== PaymentStatus::Approved) {
-                throw new InvalidArgumentException('Only approved payments can be posted.');
+            if ($this->documentStatus($locked) !== PaymentDocumentStatus::Approved) {
+                throw new InvalidArgumentException('Only approved payment documents can be posted.');
+            }
+            if ($postingStatus !== PaymentPostingStatus::NotPosted && $postingStatus !== PaymentPostingStatus::Failed) {
+                throw new InvalidArgumentException('Payment posting is already in progress or complete.');
             }
             if ($locked->lines->isEmpty()) {
                 throw new InvalidArgumentException('Payment posting requires at least one payment line.');
             }
             $this->validator->assertPositive((string) $locked->total_amount, 'Payment total');
-
             foreach ($locked->lines as $line) {
-                if (! $line instanceof PaymentLine || $line->paymentMethod === null) {
-                    throw new InvalidArgumentException('Every posted payment line requires a payment method.');
+                if (! $line instanceof PaymentLine) {
+                    throw new InvalidArgumentException('Payment line data is invalid.');
                 }
                 $this->validator->assertPositive((string) $line->amount, 'Payment line amount');
             }
 
-            $locked->forceFill(['posting_status' => PaymentPostingStatus::Posting->value])->save();
+            $locked->forceFill([
+                'posting_status' => PaymentPostingStatus::Posting->value,
+                'row_version' => (int) $locked->row_version + 1,
+            ])->save();
+            $locked = $locked->refresh()->load('lines');
+            $this->events->record(
+                $locked,
+                PaymentLifecycleDimension::Posting,
+                $postingStatus,
+                PaymentPostingStatus::Posting,
+                $postedBy,
+                'Payment posting started.',
+            );
 
             $result = $this->postings->post($this->postingContext($locked), $postedBy);
-
-            $previous = $status;
             $locked->forceFill([
-                'finance_journal_entry_id' => $result->journalId,
+                'finance_posting_reference' => $result->journalNumber,
                 'posting_correlation_key' => 'payment:'.$locked->getKey().':post',
                 'posting_status' => PaymentPostingStatus::Posted->value,
-                'document_status' => PaymentDocumentStatus::Approved->value,
-                'status' => PaymentStatus::Posted->value,
+                'posted_by' => $postedBy,
                 'posted_at' => now(),
+                'row_version' => (int) $locked->row_version + 1,
             ])->save();
-            $this->statuses->record($locked->refresh(), $previous, PaymentStatus::Posted, $postedBy, 'Payment posted to Finance journal '.$result->journalNumber.'.');
+            $locked = $locked->refresh();
+            $this->events->record(
+                $locked,
+                PaymentLifecycleDimension::Posting,
+                PaymentPostingStatus::Posting,
+                PaymentPostingStatus::Posted,
+                $postedBy,
+                'Payment posted to Finance as '.$result->journalNumber.'.',
+            );
 
-            $locked = $this->allocations->realizePending($locked->refresh(), $postedBy);
+            $locked = $this->allocations->realizePending($locked, $postedBy);
 
-            return $locked->refresh()->load(['lines.paymentMethod', 'allocations', 'unappliedBalance', 'financeJournalEntry']);
+            return $locked->refresh()->load(['lines', 'allocations', 'unappliedBalance', 'lifecycleEvents']);
         });
     }
 
@@ -108,19 +126,11 @@ final class PaymentPostingService
         $direction = $payment->direction instanceof PaymentDirection
             ? $payment->direction
             : PaymentDirection::from((string) $payment->direction);
-
         $lines = [];
+
         if ($direction === PaymentDirection::Inbound) {
             foreach ($payment->lines as $line) {
-                $lines[] = new PostingLine(
-                    accountCode: $this->cashAccountCode($payment, $line),
-                    debit: (string) $line->amount,
-                    credit: '0.000000',
-                    description: 'Payment receipt '.$payment->payment_number,
-                    profileKey: $this->cashProfileKey($line),
-                    sourceLineType: 'payment_line',
-                    sourceLineId: (int) $line->getKey(),
-                );
+                $lines[] = $this->cashPostingLine($payment, $line, (string) $line->amount, '0.000000');
             }
             $lines[] = new PostingLine(
                 debit: '0.000000',
@@ -143,18 +153,26 @@ final class PaymentPostingService
             sourceLineId: (int) $payment->getKey(),
         );
         foreach ($payment->lines as $line) {
-            $lines[] = new PostingLine(
-                accountCode: $this->cashAccountCode($payment, $line),
-                debit: '0.000000',
-                credit: (string) $line->amount,
-                description: 'Payment disbursement '.$payment->payment_number,
-                profileKey: $this->cashProfileKey($line),
-                sourceLineType: 'payment_line',
-                sourceLineId: (int) $line->getKey(),
-            );
+            $lines[] = $this->cashPostingLine($payment, $line, '0.000000', (string) $line->amount);
         }
 
         return $lines;
+    }
+
+    private function cashPostingLine(Payment $payment, PaymentLine $line, string $debit, string $credit): PostingLine
+    {
+        return new PostingLine(
+            debit: $debit,
+            credit: $credit,
+            description: 'Payment '.$payment->payment_number,
+            profileKey: $this->cashProfileKey($line),
+            sourceLineType: 'payment_line',
+            sourceLineId: (int) $line->getKey(),
+            dimensions: [
+                'payment_method_id' => (string) $line->payment_method_id,
+                'payment_method_code' => (string) $line->payment_method_code_snapshot,
+            ],
+        );
     }
 
     private function profileCode(Payment $payment): string
@@ -166,18 +184,29 @@ final class PaymentPostingService
         return $direction === PaymentDirection::Inbound ? 'payment_received' : 'payment_made';
     }
 
-    private function cashAccountCode(Payment $payment, PaymentLine $line): ?string
-    {
-        $account = $line->internalBankAccount ?? $payment->bankAccount;
-
-        return $account?->code === null ? null : (string) $account->code;
-    }
-
     private function cashProfileKey(PaymentLine $line): string
     {
-        $methodType = $line->paymentMethod?->method_type;
-        $value = $methodType instanceof PaymentMethodType ? $methodType->value : (string) $methodType;
+        return (string) $line->payment_method_type_snapshot === PaymentMethodType::Cash->value ? 'cash' : 'bank';
+    }
 
-        return $value === PaymentMethodType::Cash->value ? 'cash' : 'bank';
+    private function assertVersion(Payment $payment, int $expectedVersion): void
+    {
+        if ($expectedVersion < 1 || (int) $payment->row_version !== $expectedVersion) {
+            throw new InvalidArgumentException('Payment was changed by another request. Reload it before posting.');
+        }
+    }
+
+    private function documentStatus(Payment $payment): PaymentDocumentStatus
+    {
+        return $payment->document_status instanceof PaymentDocumentStatus
+            ? $payment->document_status
+            : PaymentDocumentStatus::from((string) $payment->document_status);
+    }
+
+    private function postingStatus(Payment $payment): PaymentPostingStatus
+    {
+        return $payment->posting_status instanceof PaymentPostingStatus
+            ? $payment->posting_status
+            : PaymentPostingStatus::from((string) $payment->posting_status);
     }
 }

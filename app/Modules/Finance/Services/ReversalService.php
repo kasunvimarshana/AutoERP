@@ -5,11 +5,12 @@ declare(strict_types=1);
 namespace Modules\Finance\Services;
 
 use InvalidArgumentException;
+use Modules\Finance\Contracts\FinancePaymentReversalInterface;
 use Modules\Finance\Contracts\FinancePostingInterface;
 use Modules\Finance\DTOs\PostingResultData;
 use Modules\Finance\Models\FinanceJournalEntry;
 
-final class ReversalService
+final class ReversalService implements FinancePaymentReversalInterface
 {
     public function __construct(private readonly FinancePostingInterface $postings) {}
 

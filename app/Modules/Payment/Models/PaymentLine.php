@@ -6,7 +6,6 @@ namespace Modules\Payment\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Core\Models\TenantOwnedModel;
-use Modules\Finance\Models\FinanceAccount;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Tenant\Models\TenantModel;
 
@@ -19,11 +18,14 @@ final class PaymentLine extends TenantOwnedModel
     protected function casts(): array
     {
         return array_merge(parent::casts(), [
+            'row_version' => 'integer',
             'tenant_id' => 'integer',
             'organization_unit_id' => 'integer',
             'payment_id' => 'integer',
+            'line_number' => 'integer',
             'payment_method_id' => 'integer',
-            'internal_bank_account_id' => 'integer',
+            'requires_reference_snapshot' => 'boolean',
+            'requires_instrument_details_snapshot' => 'boolean',
             'amount' => 'decimal:6',
             'cleared_amount' => 'decimal:6',
             'instrument_date' => 'date',
@@ -44,11 +46,6 @@ final class PaymentLine extends TenantOwnedModel
     public function paymentMethod(): BelongsTo
     {
         return $this->belongsTo(PaymentMethod::class, 'payment_method_id');
-    }
-
-    public function internalBankAccount(): BelongsTo
-    {
-        return $this->belongsTo(FinanceAccount::class, 'internal_bank_account_id');
     }
 
     public function tenant(): BelongsTo

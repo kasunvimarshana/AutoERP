@@ -43,9 +43,25 @@ final class PaymentUnappliedBalanceService
             'allocated_amount' => $allocatedAmount,
             'refunded_amount' => $refundedAmount,
             'remaining_amount' => $remainingAmount,
-            'status' => $this->statusForAmounts($originalAmount, $allocatedAmount, $refundedAmount, $remainingAmount)->value,
+            'status' => $this->statusForAmounts(
+                $originalAmount,
+                $allocatedAmount,
+                $refundedAmount,
+                $remainingAmount,
+            )->value,
             'metadata' => $payment->metadata,
-        ])->save();
+        ]);
+
+        if (! $balance->exists) {
+            $balance->save();
+
+            return $balance->refresh();
+        }
+
+        if ($balance->isDirty()) {
+            $balance->row_version = (int) $balance->row_version + 1;
+            $balance->save();
+        }
 
         return $balance->refresh();
     }
