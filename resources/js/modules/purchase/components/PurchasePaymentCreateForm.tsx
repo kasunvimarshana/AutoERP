@@ -30,6 +30,7 @@ import { useInitialSourceParam, type InitialSourceCommand, type InitialSourcePar
 import { CurrencyLookupSelect, SupplierLookupSelect } from './PurchaseLookups';
 import {
     blankPaymentMethodRow,
+    paymentRowSatisfiesMethod,
     paymentRowsTotal,
     PurchasePaymentMethodsEditor,
     type PurchasePaymentMethodRow,
@@ -91,7 +92,12 @@ export function PurchasePaymentCreateForm({ mode = 'create' }: { mode?: 'create'
     const methodsMatch = compareDecimalStrings(methodTotal, amount || '0.000000') === 0;
     const hasAllocatedInvoices = Object.values(allocations).some(isPositiveDecimal);
     const currencyLocked = Object.values(allocatedInvoices).some((invoice) => isPositiveDecimal(allocations[invoice.id] ?? '0.000000') && invoice.currency?.id);
-    const dirty = Boolean(supplier || referenceNumber || hasAllocatedInvoices || paymentRows.some((row) => row.amount || row.payment_method_id || row.source_account_id || row.reference));
+    const paymentMethods = paymentContext.data?.payment_methods ?? [];
+    const paymentMethodsValid = paymentRows.every((row) => {
+        const method = paymentMethods.find((candidate) => String(candidate.id) === row.payment_method_id);
+        return isPositiveDecimal(row.amount) && paymentRowSatisfiesMethod(row, method);
+    });
+    const dirty = Boolean(supplier || referenceNumber || hasAllocatedInvoices || paymentRows.some((row) => row.amount || row.payment_method_id || row.reference));
     useUnsavedChanges(dirty && !busy);
 
     const cancelSourceRequest = useCallback((resetBusy = true) => {
@@ -103,7 +109,6 @@ export function PurchasePaymentCreateForm({ mode = 'create' }: { mode?: 'create'
 
     const loadInitialSource = useCallback(async (command: InitialSourceCommand<PaymentInitialSourceType>) => {
         cancelSourceRequest(false);
-
         const controller = new AbortController();
         const generation = sourceGenerationRef.current;
         sourceRequestRef.current = { key: command.key, controller, generation };
@@ -114,13 +119,11 @@ export function PurchasePaymentCreateForm({ mode = 'create' }: { mode?: 'create'
             if (command.sourceType === 'supplier_invoice') {
                 const invoice = await getInvoice(command.sourceId, controller.signal);
                 if (!mountedRef.current || isStaleSourceRequest(sourceRequestRef.current, command.key, controller, generation, sourceGenerationRef.current)) return;
-
                 const balance = balanceOf(invoice);
                 if (!isPositiveDecimal(balance)) {
                     setError(new ApiError('The selected supplier invoice has no payable balance.', 422));
                     return;
                 }
-
                 setAllocations({ [invoice.id]: balance });
                 setAllocatedInvoices({ [invoice.id]: invoice });
                 setAmount(balance);
@@ -133,7 +136,6 @@ export function PurchasePaymentCreateForm({ mode = 'create' }: { mode?: 'create'
 
             const order = await getPurchaseOrder(command.sourceId, controller.signal);
             if (!mountedRef.current || isStaleSourceRequest(sourceRequestRef.current, command.key, controller, generation, sourceGenerationRef.current)) return;
-
             setSupplierState(order.supplier ?? null);
             setCurrencyState(order.currency ?? null);
             setSourceNotice(`${order.purchase_order_number ?? 'Selected purchase order'} is selected. Create payment from an eligible supplier invoice generated from this purchase flow.`);
@@ -166,7 +168,6 @@ export function PurchasePaymentCreateForm({ mode = 'create' }: { mode?: 'create'
             window.clearTimeout(unmountCancelTimerRef.current);
             unmountCancelTimerRef.current = null;
         }
-
         return () => {
             mountedRef.current = false;
             unmountCancelTimerRef.current = window.setTimeout(() => cancelSourceRequest(false), 0);
@@ -214,6 +215,16 @@ export function PurchasePaymentCreateForm({ mode = 'create' }: { mode?: 'create'
         setCurrencyState(next);
     };
 
+    const syncAmountWithAllocations = (nextAllocations: Record<number, string>) => {
+        const nextAllocated = sumDecimals(Object.values(nextAllocations).filter(isPositiveDecimal));
+        if (!isPositiveDecimal(amount) || compareDecimalStrings(amount, allocated) === 0) {
+            setAmount(nextAllocated);
+            if (paymentRows.length === 1 && (!isPositiveDecimal(paymentRows[0].amount) || compareDecimalStrings(paymentRows[0].amount, amount || '0.000000') === 0)) {
+                setPaymentRows([{ ...paymentRows[0], amount: nextAllocated }]);
+            }
+        }
+    };
+
     const updateAllocation = async (invoice: Invoice, nextAmount: string) => {
         const invoiceCurrencyId = invoice.currency?.id;
         const allocatedCurrencyIds = Object.values(allocatedInvoices)
@@ -237,9 +248,7 @@ export function PurchasePaymentCreateForm({ mode = 'create' }: { mode?: 'create'
         const nextAllocatedInvoices = { ...allocatedInvoices };
         if (isPositiveDecimal(nextAmount)) {
             nextAllocatedInvoices[invoice.id] = invoice;
-            if (invoice.currency && (!currency || currency.id !== invoice.currency.id)) {
-                setCurrencyState(invoice.currency);
-            }
+            if (invoice.currency && (!currency || currency.id !== invoice.currency.id)) setCurrencyState(invoice.currency);
         } else {
             delete nextAllocatedInvoices[invoice.id];
         }
@@ -248,25 +257,15 @@ export function PurchasePaymentCreateForm({ mode = 'create' }: { mode?: 'create'
         syncAmountWithAllocations(nextAllocations);
     };
 
-    const syncAmountWithAllocations = (nextAllocations: Record<number, string>) => {
-        const nextAllocated = sumDecimals(Object.values(nextAllocations).filter(isPositiveDecimal));
-        if (!isPositiveDecimal(amount) || compareDecimalStrings(amount, allocated) === 0) {
-            setAmount(nextAllocated);
-            if (paymentRows.length === 1 && (!isPositiveDecimal(paymentRows[0].amount) || compareDecimalStrings(paymentRows[0].amount, amount || '0.000000') === 0)) {
-                setPaymentRows([{ ...paymentRows[0], amount: nextAllocated }]);
-            }
-        }
-    };
-
     const canCreate = Boolean(
         supplier?.id
         && isPositiveDecimal(amount)
         && currency?.id
-        && paymentRows.every((row) => isPositiveDecimal(row.amount) && row.payment_method_id && row.source_account_id)
+        && paymentMethodsValid
         && methodsMatch
         && compareDecimalStrings(overAllocated, '0.000000') === 0
         && hasAllocatedInvoices
-        && !busy
+        && !busy,
     );
 
     const paymentPayload = (): PurchasePaymentCreatePayload => ({
@@ -275,16 +274,15 @@ export function PurchasePaymentCreateForm({ mode = 'create' }: { mode?: 'create'
         supplier_type: 'supplier',
         supplier_id: supplier?.id,
         currency_id: currency?.id,
-        reference_number: referenceNumber || undefined,
+        reference_number: referenceNumber.trim() || undefined,
         lines: paymentRows.map((row) => ({
             amount: row.amount,
-            payment_method_id: row.payment_method_id ? Number(row.payment_method_id) : undefined,
-            source_account_id: row.source_account_id ? Number(row.source_account_id) : undefined,
-            reference: row.reference || undefined,
+            payment_method_id: Number(row.payment_method_id),
+            reference: row.reference.trim() || undefined,
             instrument_direction: 'issued',
-            external_bank_name: row.external_bank_name || undefined,
-            external_bank_branch: row.external_bank_branch || undefined,
-            instrument_number: row.instrument_number || undefined,
+            external_bank_name: row.external_bank_name.trim() || undefined,
+            external_bank_branch: row.external_bank_branch.trim() || undefined,
+            instrument_number: row.instrument_number.trim() || undefined,
             instrument_date: row.instrument_date || undefined,
         })),
         allocations: Object.entries(allocations)
@@ -306,7 +304,6 @@ export function PurchasePaymentCreateForm({ mode = 'create' }: { mode?: 'create'
                 setPreview(await preparePurchasePayment(paymentPayload()));
                 return;
             }
-
             const payment = await createPurchasePayment(paymentPayload());
             navigate(`/payments/${payment.id}?from=purchase`);
         } catch (requestError) {
@@ -351,9 +348,7 @@ export function PurchasePaymentCreateForm({ mode = 'create' }: { mode?: 'create'
                             <h2 className="text-base font-semibold text-slate-950">Invoice Allocations</h2>
                             <p className="text-sm text-slate-500">Select eligible posted supplier invoices and enter allocation amounts.</p>
                         </div>
-                        <div className="w-full sm:max-w-sm">
-                            <Input label="Search invoices" type="search" value={invoiceSearch} onChange={(event) => { setInvoiceSearch(event.target.value); setInvoicePage(1); }} />
-                        </div>
+                        <div className="w-full sm:max-w-sm"><Input label="Search invoices" type="search" value={invoiceSearch} onChange={(event) => { setInvoiceSearch(event.target.value); setInvoicePage(1); }} /></div>
                     </div>
                     {!supplier ? (
                         <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-10 text-center text-sm font-medium text-slate-600">Select a supplier to load outstanding invoices.</div>
@@ -362,9 +357,7 @@ export function PurchasePaymentCreateForm({ mode = 'create' }: { mode?: 'create'
                             <div className="overflow-hidden rounded-lg border border-slate-200">
                                 <div className="hidden overflow-x-auto md:block">
                                     <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
-                                        <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-                                            <tr>{['Invoice', 'Date', 'Status', 'Balance', 'Allocation'].map((header) => <th key={header} className="px-4 py-3 font-semibold">{header}</th>)}</tr>
-                                        </thead>
+                                        <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr>{['Invoice', 'Date', 'Status', 'Balance', 'Allocation'].map((header) => <th key={header} className="px-4 py-3 font-semibold">{header}</th>)}</tr></thead>
                                         <tbody className="divide-y divide-slate-100">
                                             {(invoiceResult.data?.data ?? []).map((invoice) => (
                                                 <AllocationRow key={invoice.id} invoice={invoice} value={allocations[invoice.id] ?? ''} error={errorFor(`allocations.${invoice.id}.allocated_amount`)} onChange={(value) => void updateAllocation(invoice, value)} />
@@ -381,9 +374,7 @@ export function PurchasePaymentCreateForm({ mode = 'create' }: { mode?: 'create'
                                                 <Summary label="Status" value={invoice.status ?? '-'} />
                                                 <Summary label="Balance" value={<MoneyDisplay value={balanceOf(invoice)} />} />
                                             </dl>
-                                            <div className="mt-3">
-                                                <DecimalInput label="Allocation" value={allocations[invoice.id] ?? ''} error={errorFor(`allocations.${invoice.id}.allocated_amount`)} onChange={(event) => void updateAllocation(invoice, event.target.value)} />
-                                            </div>
+                                            <div className="mt-3"><DecimalInput label="Allocation" value={allocations[invoice.id] ?? ''} error={errorFor(`allocations.${invoice.id}.allocated_amount`)} onChange={(event) => void updateAllocation(invoice, event.target.value)} /></div>
                                         </article>
                                     ))}
                                 </div>
@@ -399,13 +390,7 @@ export function PurchasePaymentCreateForm({ mode = 'create' }: { mode?: 'create'
             {activeTab === 'methods' && (
                 <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
                     <h2 className="mb-4 text-base font-semibold text-slate-950">Payment Methods</h2>
-                    <PurchasePaymentMethodsEditor
-                        rows={paymentRows}
-                        methods={paymentContext.data?.payment_methods ?? []}
-                        accounts={paymentContext.data?.payment_accounts ?? []}
-                        errorFor={errorFor}
-                        onChange={setPaymentRows}
-                    />
+                    <PurchasePaymentMethodsEditor rows={paymentRows} methods={paymentMethods} errorFor={errorFor} onChange={setPaymentRows} />
                     {!methodsMatch && <div className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800">Payment method rows must equal the payment total.</div>}
                 </section>
             )}
@@ -431,9 +416,7 @@ function PaymentPreviewPanel({ preview }: { preview: PurchasePaymentPreview }) {
             {preview.allocations.length > 0 && (
                 <div className="mt-4 overflow-hidden rounded-lg border border-emerald-200 bg-white">
                     <table className="min-w-full divide-y divide-emerald-100 text-left text-sm">
-                        <thead className="bg-emerald-50 text-xs uppercase tracking-wide text-emerald-700">
-                            <tr>{['Invoice', 'Before', 'Allocated', 'After'].map((header) => <th key={header} className="px-4 py-3 font-semibold">{header}</th>)}</tr>
-                        </thead>
+                        <thead className="bg-emerald-50 text-xs uppercase tracking-wide text-emerald-700"><tr>{['Invoice', 'Before', 'Allocated', 'After'].map((header) => <th key={header} className="px-4 py-3 font-semibold">{header}</th>)}</tr></thead>
                         <tbody className="divide-y divide-emerald-100">
                             {preview.allocations.map((allocation) => (
                                 <tr key={allocation.invoice_id}>
@@ -451,12 +434,7 @@ function PaymentPreviewPanel({ preview }: { preview: PurchasePaymentPreview }) {
     );
 }
 
-function AllocationRow({ invoice, value, error, onChange }: {
-    invoice: Invoice;
-    value: string;
-    error?: string;
-    onChange: (value: string) => void;
-}) {
+function AllocationRow({ invoice, value, error, onChange }: { invoice: Invoice; value: string; error?: string; onChange: (value: string) => void }) {
     return (
         <tr>
             <td className="px-4 py-3"><Link className="font-semibold text-sky-700 hover:underline" to={`/invoices/${invoice.id}?from=purchase`}>{invoice.invoice_number ?? 'Invoice'}</Link></td>
@@ -468,14 +446,7 @@ function AllocationRow({ invoice, value, error, onChange }: {
     );
 }
 
-function PaymentSummary({ amount, allocated, unallocated, methodTotal, methodDifference, overAllocated }: {
-    amount: string;
-    allocated: string;
-    unallocated: string;
-    methodTotal: string;
-    methodDifference: string;
-    overAllocated: string;
-}) {
+function PaymentSummary({ amount, allocated, unallocated, methodTotal, methodDifference, overAllocated }: { amount: string; allocated: string; unallocated: string; methodTotal: string; methodDifference: string; overAllocated: string }) {
     const rows = [
         ['Payment Total', amount, false],
         ['Invoice Allocated', allocated, false],
@@ -485,16 +456,12 @@ function PaymentSummary({ amount, allocated, unallocated, methodTotal, methodDif
         ['Over-allocated', overAllocated, compareDecimalStrings(overAllocated, '0.000000') > 0],
     ] as const;
 
-    return (
-        <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
-            {rows.map(([label, value, problem]) => (
-                <div key={label} className={`rounded-lg border p-3 text-sm ${problem ? 'border-rose-200 bg-rose-50 text-rose-800' : 'border-slate-200 bg-white text-slate-700'}`}>
-                    <span className="block text-xs font-semibold uppercase text-slate-500">{label}</span>
-                    <strong className="mt-1 block tabular-nums text-slate-950"><MoneyDisplay value={value} /></strong>
-                </div>
-            ))}
+    return <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">{rows.map(([label, value, problem]) => (
+        <div key={label} className={`rounded-lg border p-3 text-sm ${problem ? 'border-rose-200 bg-rose-50 text-rose-800' : 'border-slate-200 bg-white text-slate-700'}`}>
+            <span className="block text-xs font-semibold uppercase text-slate-500">{label}</span>
+            <strong className="mt-1 block tabular-nums text-slate-950"><MoneyDisplay value={value} /></strong>
         </div>
-    );
+    ))}</div>;
 }
 
 function Summary({ label, value }: { label: string; value: ReactNode }) {
