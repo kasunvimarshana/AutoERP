@@ -28,7 +28,7 @@ const emptyPaymentMethod: Partial<PaymentMethod> = {
     method_type: 'cash',
     direction_allowed: 'both',
     requires_reference: false,
-    requires_bank_account: false,
+    requires_instrument_details: false,
     is_active: true,
     sort_order: 0,
 };
@@ -77,7 +77,7 @@ function PaymentMethodEditor({ id, initialValue, loadError }: {
                 method_type: form.method_type,
                 direction_allowed: form.direction_allowed,
                 requires_reference: Boolean(form.requires_reference),
-                requires_bank_account: Boolean(form.requires_bank_account),
+                requires_instrument_details: Boolean(form.requires_instrument_details),
                 is_active: form.is_active !== false,
                 sort_order: Number(form.sort_order ?? 0),
             };
@@ -110,7 +110,7 @@ function PaymentMethodEditor({ id, initialValue, loadError }: {
                     </div>
                     <div className="grid gap-3 text-sm text-slate-700 sm:grid-cols-3">
                         <label className="flex items-center gap-2"><input type="checkbox" checked={Boolean(form.requires_reference)} onChange={(event) => update({ requires_reference: event.target.checked })} /> Requires reference</label>
-                        <label className="flex items-center gap-2"><input type="checkbox" checked={Boolean(form.requires_bank_account)} onChange={(event) => update({ requires_bank_account: event.target.checked })} /> Requires bank account</label>
+                        <label className="flex items-center gap-2"><input type="checkbox" checked={Boolean(form.requires_instrument_details)} onChange={(event) => update({ requires_instrument_details: event.target.checked })} /> Requires instrument details</label>
                         <label className="flex items-center gap-2"><input type="checkbox" checked={form.is_active !== false} onChange={(event) => update({ is_active: event.target.checked })} /> Active</label>
                     </div>
                     <div className="flex justify-end gap-2">

@@ -6,7 +6,6 @@ namespace Modules\Payment\Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 final class PaymentSeeder extends Seeder
 {
@@ -19,10 +18,6 @@ final class PaymentSeeder extends Seeder
 
     private function seedDefaultMethods(): void
     {
-        if (! Schema::hasTable('payment_methods')) {
-            return;
-        }
-
         $methods = [
             ['CASH', 'Cash', 'cash', 'both', false, false, 10],
             ['CHEQUE', 'Cheque', 'cheque', 'both', true, true, 20],
@@ -34,7 +29,7 @@ final class PaymentSeeder extends Seeder
         ];
 
         foreach (DB::table('tenants')->pluck('id') as $tenantId) {
-            foreach ($methods as [$code, $name, $type, $direction, $requiresReference, $requiresBank, $sortOrder]) {
+            foreach ($methods as [$code, $name, $type, $direction, $requiresReference, $requiresInstrumentDetails, $sortOrder]) {
                 DB::table('payment_methods')->updateOrInsert(
                     ['tenant_id' => $tenantId, 'organization_unit_id' => null, 'code' => $code],
                     [
@@ -43,7 +38,7 @@ final class PaymentSeeder extends Seeder
                         'method_type' => $type,
                         'direction_allowed' => $direction,
                         'requires_reference' => $requiresReference,
-                        'requires_bank_account' => $requiresBank,
+                        'requires_instrument_details' => $requiresInstrumentDetails,
                         'is_active' => true,
                         'sort_order' => $sortOrder,
                         'metadata' => json_encode(['seed_source' => 'payment_module'], JSON_THROW_ON_ERROR),
@@ -55,4 +50,3 @@ final class PaymentSeeder extends Seeder
         }
     }
 }
-

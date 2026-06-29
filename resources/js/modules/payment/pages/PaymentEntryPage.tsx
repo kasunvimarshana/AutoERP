@@ -9,7 +9,7 @@ import { Panel } from '@/shared/components/Panel';
 import { Select } from '@/shared/components/Select';
 import { useApi } from '@/shared/hooks/useApi';
 import type { NamedResource } from '@/shared/types/common';
-import { sumDecimals } from '@/shared/utils/decimal';
+import { isPositiveDecimal, sumDecimals } from '@/shared/utils/decimal';
 import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { CustomerLookupSelect } from '@/modules/customer/components/CustomerLookupSelect';
 import { SupplierLookupSelect } from '@/modules/supplier/components/SupplierLookupSelect';
@@ -44,40 +44,51 @@ function methodKind(method?: PaymentMethod): string {
     return type || 'other';
 }
 
-function linePayload(line: PaymentLineDraft, method?: PaymentMethod, direction?: string): PaymentLinePayload {
-    const metadata = Object.fromEntries(Object.entries(line.metadata).filter(([, value]) => value !== ''));
+function linePayload(line: PaymentLineDraft, method: PaymentMethod, direction: string): PaymentLinePayload {
     const kind = methodKind(method);
     const payload: PaymentLinePayload = {
-        payment_method_id: line.paymentMethodId ? Number(line.paymentMethodId) : undefined,
+        payment_method_id: method.id,
         amount: line.amount,
-        reference_number: line.reference || undefined,
+        reference_number: line.reference.trim() || undefined,
         instrument_direction: direction === 'outbound' ? 'issued' : 'received',
-        metadata,
     };
 
     if (kind === 'cheque') {
-        payload.instrument_number = line.metadata.cheque_number || undefined;
+        payload.instrument_number = line.metadata.cheque_number?.trim() || undefined;
         payload.instrument_date = line.metadata.cheque_date || undefined;
-        payload.deposit_date = line.metadata.value_date || undefined;
-        payload.external_bank_name = line.metadata.bank_account || undefined;
+        payload.external_bank_name = line.metadata.bank_account?.trim() || undefined;
     }
     if (kind === 'bank_transfer') {
-        payload.instrument_number = line.metadata.transfer_reference || undefined;
+        payload.instrument_number = line.metadata.transfer_reference?.trim() || undefined;
         payload.instrument_date = line.metadata.transfer_date || undefined;
-        payload.realized_date = line.metadata.settlement_date || undefined;
-        payload.external_bank_name = line.metadata.bank_account || undefined;
+        payload.external_bank_name = line.metadata.bank_account?.trim() || undefined;
     }
     if (kind === 'card') {
-        payload.instrument_number = line.metadata.card_reference || line.metadata.authorization_code || undefined;
-        payload.external_bank_name = line.metadata.terminal || undefined;
+        payload.instrument_number = line.metadata.card_reference?.trim() || line.metadata.authorization_code?.trim() || undefined;
+        payload.external_bank_name = line.metadata.terminal?.trim() || undefined;
     }
     if (kind === 'wallet') {
-        payload.instrument_number = line.metadata.wallet_reference || undefined;
-        payload.realized_date = line.metadata.settlement_date || undefined;
-        payload.external_bank_name = line.metadata.provider || undefined;
+        payload.instrument_number = line.metadata.wallet_reference?.trim() || undefined;
+        payload.external_bank_name = line.metadata.provider?.trim() || undefined;
     }
 
     return payload;
+}
+
+function lineIsValid(line: PaymentLineDraft, method: PaymentMethod | undefined, headerReference: string, direction: string): boolean {
+    if (!method || !isPositiveDecimal(line.amount)) return false;
+
+    const payload = linePayload(line, method, direction);
+    const hasReference = Boolean(payload.reference_number || headerReference.trim());
+    const hasInstrumentDetails = Boolean(
+        payload.instrument_number
+        || payload.instrument_date
+        || payload.external_bank_name
+        || payload.external_bank_branch,
+    );
+
+    return (!method.requires_reference || hasReference)
+        && (!method.requires_instrument_details || hasInstrumentDetails);
 }
 
 export default function PaymentEntryPage() {
@@ -95,6 +106,13 @@ export default function PaymentEntryPage() {
     const methodRows = methods.data?.data ?? [];
     const total = useMemo(() => sumDecimals(lines.map((line) => line.amount || '0.000000')), [lines]);
     const partyType = paymentType === 'supplier_payment' ? 'supplier' : 'customer';
+    const canSubmit = !busy
+        && lines.every((line) => lineIsValid(
+            line,
+            methodRows.find((method) => String(method.id) === line.paymentMethodId),
+            reference,
+            direction,
+        ));
 
     const updateLine = (key: number, patch: Partial<PaymentLineDraft>) => {
         setLines((current) => current.map((line) => line.key === key ? { ...line, ...patch } : line));
@@ -106,22 +124,22 @@ export default function PaymentEntryPage() {
     };
 
     async function submit() {
-        if (busy) return;
+        if (!canSubmit) return;
         setBusy(true);
         setError(null);
         try {
-            const payloadLines: PaymentLinePayload[] = lines.map((line) => linePayload(
-                line,
-                methodRows.find((method) => String(method.id) === line.paymentMethodId),
-                direction,
-            ));
+            const payloadLines = lines.map((line) => {
+                const method = methodRows.find((candidate) => String(candidate.id) === line.paymentMethodId);
+                if (!method) throw new Error('A valid payment method is required for every line.');
+                return linePayload(line, method, direction);
+            });
             const payment = await createPayment({
                 payment_type: paymentType,
                 direction,
                 payment_date: paymentDate,
                 party_type: party ? partyType : undefined,
                 party_id: party?.id,
-                reference_number: reference || undefined,
+                reference_number: reference.trim() || undefined,
                 lines: payloadLines,
             });
             navigate(`/payments/${payment.id}`);
@@ -172,7 +190,7 @@ export default function PaymentEntryPage() {
                 </Panel>
 
                 <div className="flex justify-end">
-                    <Button type="submit" loading={busy}>Create payment</Button>
+                    <Button type="submit" loading={busy} disabled={!canSubmit}>Create payment</Button>
                 </div>
             </form>
         </>

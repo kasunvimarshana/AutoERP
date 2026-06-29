@@ -61,13 +61,15 @@ export default function PaymentListPage() {
         { key: 'party', header: 'Party', render: (row) => readableRelation(row.party) },
         { key: 'type', header: 'Type', render: (row) => `${humanize(row.payment_type)} / ${humanize(row.direction)}` },
         { key: 'total', header: 'Amount', render: (row) => <MoneyDisplay value={row.total_amount} /> },
-        { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.status} /> },
+        { key: 'document', header: 'Document', render: (row) => <StatusBadge status={row.document_status} /> },
+        { key: 'posting', header: 'Posting', render: (row) => <StatusBadge status={row.posting_status} /> },
+        { key: 'allocation', header: 'Allocation', render: (row) => <StatusBadge status={row.allocation_status} /> },
     ];
     return (
         <>
             <ContentHeader
                 title={view?.title ?? 'Payments'}
-                description={view?.description ?? 'Payment activity with on-demand allocation data.'}
+                description={view?.description ?? 'Payment activity with independent document, posting, and allocation states.'}
                 actions={view?.action
                     ? <LinkButton to={view.action.to}>{view.action.label}</LinkButton>
                     : <LinkButton to="/payments/create">New payment</LinkButton>}
