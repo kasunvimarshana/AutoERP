@@ -10,8 +10,9 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('invoices', function (Blueprint $table) {
+        Schema::create('invoices', function (Blueprint $table): void {
             $table->id();
+            $table->unsignedBigInteger('row_version')->default(1);
             $table->foreignId('tenant_id')->constrained('tenants', 'id', indexName: 'invoices_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->string('invoice_number', 100);
@@ -19,9 +20,19 @@ return new class extends Migration
             $table->string('direction', 40);
             $table->string('party_type')->nullable();
             $table->unsignedBigInteger('party_id')->nullable();
+            $table->string('party_number_snapshot', 150)->nullable();
+            $table->string('party_code_snapshot', 150)->nullable();
+            $table->string('party_name_snapshot')->nullable();
+            $table->string('party_legal_name_snapshot')->nullable();
+            $table->string('party_email_snapshot')->nullable();
+            $table->string('party_phone_snapshot', 100)->nullable();
+            $table->string('party_tax_registration_snapshot', 150)->nullable();
             $table->date('invoice_date');
             $table->date('due_date')->nullable();
             $table->foreignId('currency_id')->nullable()->constrained('currencies', 'id', indexName: 'invoices_currency_fk')->nullOnDelete();
+            $table->char('currency_code_snapshot', 3)->nullable();
+            $table->string('currency_name_snapshot', 150)->nullable();
+            $table->string('currency_symbol_snapshot', 16)->nullable();
             $table->decimal('exchange_rate', 20, 6)->default('1.000000');
             $table->string('status', 40)->default('draft');
             $table->decimal('subtotal', 20, 6)->default('0');
@@ -37,7 +48,11 @@ return new class extends Migration
             $table->unsignedBigInteger('created_by')->nullable();
             $table->unsignedBigInteger('approved_by')->nullable();
             $table->timestamp('approved_at')->nullable();
+            $table->unsignedBigInteger('posted_by')->nullable();
             $table->timestamp('posted_at')->nullable();
+            $table->unsignedBigInteger('cancelled_by')->nullable();
+            $table->timestamp('cancelled_at')->nullable();
+            $table->text('cancellation_reason')->nullable();
             $table->timestamps();
             $table->softDeletes();
 
@@ -57,6 +72,14 @@ return new class extends Migration
                 ->on('users')
                 ->restrictOnDelete();
             $table->foreign(['approved_by', 'tenant_id'], 'invoices_approved_by_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('users')
+                ->restrictOnDelete();
+            $table->foreign(['posted_by', 'tenant_id'], 'invoices_posted_by_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('users')
+                ->restrictOnDelete();
+            $table->foreign(['cancelled_by', 'tenant_id'], 'invoices_cancelled_by_tenant_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('users')
                 ->restrictOnDelete();

@@ -16,17 +16,15 @@ final class InvoiceResource extends JsonResource
     {
         return [
             'id' => (int) $this->getKey(),
+            'row_version' => (int) $this->row_version,
             'invoice_number' => $this->invoice_number,
             'invoice_type' => $this->enumValue($this->invoice_type),
             'direction' => $this->enumValue($this->direction),
             'party_type' => $this->party_type,
-            'party' => $this->partySummary(),
+            'party' => $this->partySnapshot(),
             'invoice_date' => $this->invoice_date?->toDateString(),
             'due_date' => $this->due_date?->toDateString(),
-            'currency' => $this->whenLoaded(
-                'currency',
-                fn () => $this->summary($this->currency, ['code', 'name', 'symbol']),
-            ),
+            'currency' => $this->currencySnapshot(),
             'exchange_rate' => (string) $this->exchange_rate,
             'status' => $this->enumValue($this->status),
             'subtotal' => (string) $this->subtotal,
@@ -41,6 +39,8 @@ final class InvoiceResource extends JsonResource
             'notes' => $this->notes,
             'approved_at' => $this->approved_at?->toISOString(),
             'posted_at' => $this->posted_at?->toISOString(),
+            'cancelled_at' => $this->cancelled_at?->toISOString(),
+            'cancellation_reason' => $this->cancellation_reason,
             'lines' => $this->whenLoaded(
                 'lines',
                 fn () => InvoiceLineResource::collection($this->lines)->resolve($request),
@@ -53,14 +53,12 @@ final class InvoiceResource extends JsonResource
             ),
             'source_lines' => $this->whenLoaded(
                 'sourceLines',
-                fn () => InvoiceSourceLineResource::collection($this->sourceLines)
-                    ->resolve($request),
+                fn () => InvoiceSourceLineResource::collection($this->sourceLines)->resolve($request),
                 [],
             ),
             'adjustments' => $this->whenLoaded(
                 'adjustments',
-                fn () => InvoiceAdjustmentResource::collection($this->adjustments)
-                    ->resolve($request),
+                fn () => InvoiceAdjustmentResource::collection($this->adjustments)->resolve($request),
                 [],
             ),
             'adjustment_allocations' => $this->whenLoaded(
@@ -78,8 +76,7 @@ final class InvoiceResource extends JsonResource
             ),
             'credit_allocations' => $this->whenLoaded(
                 'creditAllocations',
-                fn () => InvoiceCreditAllocationResource::collection($this->creditAllocations)
-                    ->resolve($request),
+                fn () => InvoiceCreditAllocationResource::collection($this->creditAllocations)->resolve($request),
                 [],
             ),
             'created_at' => $this->created_at?->toISOString(),
@@ -87,24 +84,37 @@ final class InvoiceResource extends JsonResource
         ];
     }
 
-    private function partySummary(): mixed
+    private function partySnapshot(): ?array
     {
-        return match ($this->party_type) {
-            'customer' => $this->whenLoaded(
-                'customer',
-                fn () => $this->summary(
-                    $this->customer,
-                    ['customer_number', 'code', 'name', 'display_name'],
-                ),
-            ),
-            'supplier' => $this->whenLoaded(
-                'supplier',
-                fn () => $this->summary(
-                    $this->supplier,
-                    ['supplier_number', 'code', 'name', 'display_name'],
-                ),
-            ),
-            default => null,
-        };
+        if ($this->party_number_snapshot === null
+            && $this->party_code_snapshot === null
+            && $this->party_name_snapshot === null) {
+            return null;
+        }
+
+        return [
+            'number' => $this->party_number_snapshot,
+            'code' => $this->party_code_snapshot,
+            'name' => $this->party_name_snapshot,
+            'legal_name' => $this->party_legal_name_snapshot,
+            'tax_registration_number' => $this->party_tax_registration_snapshot,
+            'email' => $this->party_email_snapshot,
+            'phone' => $this->party_phone_snapshot,
+        ];
+    }
+
+    private function currencySnapshot(): ?array
+    {
+        if ($this->currency_code_snapshot === null
+            && $this->currency_name_snapshot === null
+            && $this->currency_symbol_snapshot === null) {
+            return null;
+        }
+
+        return [
+            'code' => $this->currency_code_snapshot,
+            'name' => $this->currency_name_snapshot,
+            'symbol' => $this->currency_symbol_snapshot,
+        ];
     }
 }

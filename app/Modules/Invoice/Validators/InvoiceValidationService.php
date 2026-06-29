@@ -6,11 +6,14 @@ namespace Modules\Invoice\Validators;
 
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
+use Modules\Invoice\Constants\InvoiceTaxMetadata;
 use Modules\Invoice\DTOs\CreateInvoiceData;
 use Modules\Invoice\DTOs\InvoiceAdjustmentData;
 use Modules\Invoice\DTOs\InvoiceLineData;
 use Modules\Invoice\DTOs\InvoiceSourceData;
 use Modules\Invoice\DTOs\InvoiceSourceLineData;
+use Modules\Invoice\Enums\AdjustmentEffect;
+use Modules\Invoice\Enums\AdjustmentType;
 
 final class InvoiceValidationService
 {
@@ -198,6 +201,46 @@ final class InvoiceValidationService
         }
     }
 
+    private function expectedLineTotal(InvoiceLineData $line): string
+    {
+        $total = $this->math->mul($line->quantity, $line->unitPrice);
+        $total = $this->math->sub($total, $line->discountAmount);
+        $total = $this->math->add($total, $line->chargeAmount);
+
+        $taxSnapshots = is_array($line->metadata)
+            ? ($line->metadata[InvoiceTaxMetadata::TAXES] ?? null)
+            : null;
+        if (! is_array($taxSnapshots)) {
+            return $this->math->add($total, $line->taxAmount);
+        }
+
+        $snapshotTaxTotal = '0.000000';
+        foreach ($taxSnapshots as $snapshot) {
+            if (! is_array($snapshot)) {
+                throw new InvalidArgumentException('Invoice line tax snapshots must be arrays.');
+            }
+
+            $amount = $snapshot[InvoiceTaxMetadata::TAX_AMOUNT] ?? null;
+            $method = $snapshot[InvoiceTaxMetadata::CALCULATION_METHOD] ?? null;
+            $isWithholding = $snapshot[InvoiceTaxMetadata::IS_WITHHOLDING] ?? null;
+            if (! is_string($amount) || ! is_string($method) || ! is_bool($isWithholding)) {
+                throw new InvalidArgumentException('Invoice line tax snapshot is incomplete.');
+            }
+
+            $this->assertNonNegative($amount, 'Invoice line tax snapshot amount');
+            $snapshotTaxTotal = $this->math->add($snapshotTaxTotal, $amount);
+            if (! $isWithholding && $method !== InvoiceTaxMetadata::CALCULATION_METHOD_INCLUSIVE) {
+                $total = $this->math->add($total, $amount);
+            }
+        }
+
+        if ($this->math->compare($snapshotTaxTotal, $line->taxAmount) !== 0) {
+            throw new InvalidArgumentException('Invoice line tax snapshots must match the line tax amount.');
+        }
+
+        return $total;
+    }
+
     private function validateAdjustment(InvoiceAdjustmentData $adjustment): void
     {
         if (trim($adjustment->name) === '') {
@@ -208,6 +251,7 @@ final class InvoiceValidationService
             throw new InvalidArgumentException('Invoice adjustment calculation type must be fixed or percentage.');
         }
 
+        $this->assertAdjustmentEffect($adjustment);
         $this->assertNonNegative($adjustment->rate, 'Invoice adjustment rate');
         $this->assertNonNegative($adjustment->amount, 'Invoice adjustment amount');
         if ($adjustment->sourceAmount !== null) {
@@ -232,6 +276,29 @@ final class InvoiceValidationService
 
         if ($adjustment->sourceType !== null && $adjustment->sourceId !== null) {
             $this->assertReference($adjustment->sourceType, $adjustment->sourceId, 'Adjustment source');
+        }
+    }
+
+    private function assertAdjustmentEffect(InvoiceAdjustmentData $adjustment): void
+    {
+        $requiredEffect = match ($adjustment->adjustmentType) {
+            AdjustmentType::Discount,
+            AdjustmentType::CreditNote,
+            AdjustmentType::Withholding => AdjustmentEffect::Decrease,
+            AdjustmentType::Tax,
+            AdjustmentType::Freight,
+            AdjustmentType::Charge,
+            AdjustmentType::DebitNote => AdjustmentEffect::Increase,
+            AdjustmentType::Rounding,
+            AdjustmentType::Other => null,
+        };
+
+        if ($requiredEffect !== null && $adjustment->effect !== $requiredEffect) {
+            throw new InvalidArgumentException(sprintf(
+                'Invoice adjustment type [%s] requires effect [%s].',
+                $adjustment->adjustmentType->value,
+                $requiredEffect->value,
+            ));
         }
     }
 
@@ -269,15 +336,6 @@ final class InvoiceValidationService
         if (trim($type) === '' || $id < 1) {
             throw new InvalidArgumentException($label.' type and id are required.');
         }
-    }
-
-    private function expectedLineTotal(InvoiceLineData $line): string
-    {
-        $total = $this->math->mul($line->quantity, $line->unitPrice);
-        $total = $this->math->sub($total, $line->discountAmount);
-        $total = $this->math->add($total, $line->taxAmount);
-
-        return $this->math->add($total, $line->chargeAmount);
     }
 
     private function key(string $type, int $id): string

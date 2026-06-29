@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Invoice\Services;
 
+use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Invoice\DTOs\CreateInvoiceData;
 use Modules\Invoice\DTOs\InvoiceAdjustmentData;
@@ -26,6 +27,8 @@ final class InvoiceCalculationService
         $taxTotal = '0.000000';
         $chargeTotal = '0.000000';
         $adjustmentTotal = '0.000000';
+        $lineGrandTotal = '0.000000';
+        $headerImpact = '0.000000';
         $lineTotals = [];
 
         foreach ($data->lines as $line) {
@@ -36,11 +39,15 @@ final class InvoiceCalculationService
             $discountTotal = $this->math->add($discountTotal, $line->discountAmount);
             $taxTotal = $this->math->add($taxTotal, $line->taxAmount);
             $chargeTotal = $this->math->add($chargeTotal, $line->chargeAmount);
+            $lineGrandTotal = $this->math->add($lineGrandTotal, $lineTotal);
             $lineTotals[] = $lineTotal;
         }
 
         foreach ($adjustments ?? $data->adjustments as $adjustment) {
             $amount = $this->math->normalize($adjustment->amount);
+            $headerImpact = $adjustment->effect === AdjustmentEffect::Increase
+                ? $this->math->add($headerImpact, $amount)
+                : $this->math->sub($headerImpact, $amount);
 
             if ($adjustment->adjustmentType === AdjustmentType::Discount
                 || $adjustment->adjustmentType === AdjustmentType::CreditNote
@@ -71,10 +78,10 @@ final class InvoiceCalculationService
                 : $this->math->sub($adjustmentTotal, $amount);
         }
 
-        $grandTotal = $this->math->add($subtotal, $taxTotal);
-        $grandTotal = $this->math->add($grandTotal, $chargeTotal);
-        $grandTotal = $this->math->add($grandTotal, $adjustmentTotal);
-        $grandTotal = $this->math->sub($grandTotal, $discountTotal);
+        $grandTotal = $this->math->add($lineGrandTotal, $headerImpact);
+        if ($this->math->isNegative($grandTotal)) {
+            throw new InvalidArgumentException('Invoice grand total cannot be negative.');
+        }
 
         return new InvoiceCalculationResult(
             subtotal: $subtotal,

@@ -7,6 +7,7 @@ namespace Modules\Invoice\DTOs;
 use Modules\Invoice\Enums\InvoiceDirection;
 use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Enums\InvoiceType;
+use Modules\Tax\DTOs\TaxCalculationResult;
 
 final readonly class CreateInvoiceData
 {
@@ -35,5 +36,6 @@ final readonly class CreateInvoiceData
         public array $sources = [],
         public array $sourceLines = [],
         public array $adjustments = [],
+        public ?TaxCalculationResult $taxCalculation = null,
     ) {}
 }

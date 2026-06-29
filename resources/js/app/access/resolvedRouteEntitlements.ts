@@ -2,6 +2,7 @@ import { matchPath } from 'react-router-dom';
 import { administrationRouteEntitlements } from './administrationRouteEntitlements';
 import { commerceRouteEntitlements } from './commerceRouteEntitlements';
 import { financeRouteEntitlements } from './financeRouteEntitlements';
+import { invoiceRouteEntitlements } from './invoiceRouteEntitlements';
 import {
     resolveTenantRouteEntitlement as resolveLegacyRouteEntitlement,
 } from './routeEntitlements';
@@ -13,6 +14,7 @@ const featureOwnedRules: readonly EntitlementRule[] = [
     ...administrationRouteEntitlements,
     ...commerceRouteEntitlements,
     ...financeRouteEntitlements,
+    ...invoiceRouteEntitlements,
 ];
 
 export function resolveTenantRouteEntitlement(pathname: string): TenantRouteEntitlement | null {

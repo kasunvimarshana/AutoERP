@@ -14,6 +14,7 @@ use Modules\Invoice\Models\Invoice;
 use Modules\Invoice\Services\Tax\InvoiceTaxDocumentMapper;
 use Modules\Invoice\Validators\InvoiceValidationService;
 use Modules\Tax\Services\TaxDocumentIntegrationService;
+use Modules\Tax\Services\TaxSnapshotService;
 
 final class InvoiceCreationService
 {
@@ -30,6 +31,9 @@ final class InvoiceCreationService
         private readonly InvoiceBalanceService $balances,
         private readonly TaxDocumentIntegrationService $taxDocuments,
         private readonly InvoiceTaxDocumentMapper $taxDocumentMapper,
+        private readonly InvoiceIssuanceService $issuance,
+        private readonly InvoiceReferenceSnapshotService $snapshots,
+        private readonly TaxSnapshotService $taxSnapshots,
     ) {}
 
     public function create(CreateInvoiceData $data): Invoice
@@ -37,13 +41,17 @@ final class InvoiceCreationService
         $this->validator->validateForCreation($data);
 
         return DB::transaction(function () use ($data): Invoice {
-            $sourceLineRows = $this->sourceAllocations->prepareSourceLineAllocations($data);
+            $sourceLineRows = $this->sourceAllocations->prepareSourceLineAllocations($data, lockRows: true);
             $preparedAdjustments = $this->adjustmentAllocations->prepareAdjustmentAllocations($data, $sourceLineRows);
             $calculation = $this->calculations->calculate(
                 $data,
                 $this->allocatedAdjustments($preparedAdjustments),
             );
 
+            $headerSnapshot = $this->snapshots->header($data);
+
+            // Creation has exactly one persisted initial state. Requested approved
+            // or posted targets are applied below through legal lifecycle commands.
             $invoice = Invoice::query()->create([
                 'tenant_id' => $data->tenantId,
                 'organization_unit_id' => $data->organizationUnitId,
@@ -52,11 +60,12 @@ final class InvoiceCreationService
                 'direction' => $data->direction->value,
                 'party_type' => $data->partyType,
                 'party_id' => $data->partyId,
+                ...$headerSnapshot,
                 'invoice_date' => $data->invoiceDate,
                 'due_date' => $data->dueDate,
                 'currency_id' => $data->currencyId,
                 'exchange_rate' => $this->math->normalize($data->exchangeRate),
-                'status' => $data->status->value,
+                'status' => InvoiceStatus::Draft->value,
                 'subtotal' => $calculation->subtotal,
                 'discount_total' => $calculation->discountTotal,
                 'tax_total' => $calculation->taxTotal,
@@ -71,7 +80,6 @@ final class InvoiceCreationService
             ]);
 
             $this->lines->create($invoice, $data, $calculation, $sourceLineRows);
-
             $this->sources->createSources(
                 $invoice,
                 $data,
@@ -80,11 +88,26 @@ final class InvoiceCreationService
             );
             $this->adjustments->createAdjustments($invoice, $preparedAdjustments);
             $this->balances->createBalance($invoice, $calculation->grandTotal);
-            $taxDocument = $this->taxDocumentMapper->map($invoice->refresh()->load('lines'));
-            $this->taxDocuments->snapshot($taxDocument);
-            if ($data->status === InvoiceStatus::Posted) {
-                $this->taxDocuments->post($taxDocument);
+
+            $invoice = $invoice->refresh()->load('lines');
+            $taxDocument = $this->taxDocumentMapper->map($invoice);
+            if ($data->taxCalculation === null) {
+                $this->taxDocuments->snapshot($taxDocument);
+            } else {
+                $this->taxSnapshots->snapshotCalculation($data->taxCalculation, [
+                    'tenant_id' => $taxDocument->tenantId,
+                    'organization_unit_id' => $taxDocument->organizationUnitId,
+                    'source_module' => $taxDocument->sourceModule,
+                    'source_type' => $taxDocument->sourceType,
+                    'source_id' => $taxDocument->sourceId,
+                    'source_number' => $taxDocument->sourceNumber,
+                    'source_date' => $taxDocument->sourceDate,
+                    'line_ids' => $invoice->lines->mapWithKeys(
+                        static fn ($line): array => [(int) $line->line_number => (int) $line->getKey()],
+                    )->all(),
+                ]);
             }
+            $invoice = $this->issuance->advance($invoice, $data->status, $data->createdBy);
 
             return $invoice->load([
                 'lines',

@@ -1,16 +1,54 @@
-import type { NamedResource } from '@/shared/types/common';
+export interface InvoicePartySnapshot extends Record<string, unknown> {
+    number?: string | null;
+    code?: string | null;
+    name?: string | null;
+    legal_name?: string | null;
+    tax_registration_number?: string | null;
+    email?: string | null;
+    phone?: string | null;
+}
+
+export interface InvoiceCurrencySnapshot extends Record<string, unknown> {
+    code?: string | null;
+    name?: string | null;
+    symbol?: string | null;
+}
+
+export interface InvoiceItemSnapshot extends Record<string, unknown> {
+    code?: string | null;
+    name?: string | null;
+}
+
+export interface InvoiceUomSnapshot extends Record<string, unknown> {
+    code?: string | null;
+    name?: string | null;
+}
+
+export interface InvoiceTaxSnapshot extends Record<string, unknown> {
+    tax_id?: number;
+    tax_code?: string;
+    tax_name?: string;
+    tax_type?: string;
+    calculation_method?: string;
+    rate?: string;
+    sequence?: number;
+    taxable_amount?: string;
+    tax_amount?: string;
+    is_withholding?: boolean;
+}
 
 export interface InvoiceLine extends Record<string, unknown> {
     id: number;
     line_number: number;
-    item?: NamedResource | null;
+    item?: InvoiceItemSnapshot | null;
     description: string;
     line_type: string;
     quantity: string;
-    uom?: NamedResource | null;
+    uom?: InvoiceUomSnapshot | null;
     unit_price: string;
     discount_amount: string;
     tax_amount: string;
+    taxes?: InvoiceTaxSnapshot[];
     charge_amount: string;
     line_total: string;
     source_line_type?: string | null;
@@ -90,6 +128,7 @@ export interface InvoiceAdjustment extends Record<string, unknown> {
 
 export interface Invoice extends Record<string, unknown> {
     id: number;
+    row_version: number;
     invoice_number?: string;
     invoice_date?: string;
     due_date?: string | null;
@@ -97,12 +136,16 @@ export interface Invoice extends Record<string, unknown> {
     direction?: string;
     status?: string;
     party_type?: string | null;
-    party?: NamedResource | null;
-    currency?: NamedResource | null;
+    party?: InvoicePartySnapshot | null;
+    currency?: InvoiceCurrencySnapshot | null;
     grand_total?: string;
     paid_total?: string;
     credit_total?: string;
     balance_due?: string;
+    approved_at?: string | null;
+    posted_at?: string | null;
+    cancelled_at?: string | null;
+    cancellation_reason?: string | null;
     balance?: InvoiceBalance | null;
     lines?: InvoiceLine[];
 }

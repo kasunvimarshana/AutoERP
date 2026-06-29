@@ -8,13 +8,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Modules\ReferenceData\Models\CurrencyModel;
+use LogicException;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\Customer\Models\Customer;
 use Modules\Invoice\Enums\InvoiceDirection;
 use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Enums\InvoiceType;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
+use Modules\ReferenceData\Models\CurrencyModel;
 use Modules\Supplier\Models\Supplier;
 use Modules\Tenant\Models\TenantModel;
 
@@ -26,22 +27,44 @@ final class Invoice extends TenantOwnedModel
 
     protected $guarded = ['id'];
 
+    protected static function booted(): void
+    {
+        static::updating(static function (Invoice $invoice): void {
+            if (! $invoice->isDirty('row_version')) {
+                $invoice->row_version = ((int) $invoice->getOriginal('row_version')) + 1;
+            }
+        });
+
+        static::deleting(static function (Invoice $invoice): void {
+            $status = $invoice->status instanceof InvoiceStatus
+                ? $invoice->status
+                : InvoiceStatus::from((string) $invoice->status);
+            if ($status !== InvoiceStatus::Draft) {
+                throw new LogicException('Only draft invoices can be deleted. Use governed cancellation or reversal for financial documents.');
+            }
+        });
+    }
+
     protected function casts(): array
     {
         return array_merge(parent::casts(), [
+            'row_version' => 'integer',
             'tenant_id' => 'integer',
             'organization_unit_id' => 'integer',
             'party_id' => 'integer',
             'currency_id' => 'integer',
             'created_by' => 'integer',
             'approved_by' => 'integer',
+            'posted_by' => 'integer',
+            'cancelled_by' => 'integer',
             'invoice_type' => InvoiceType::class,
             'direction' => InvoiceDirection::class,
             'status' => InvoiceStatus::class,
             'invoice_date' => 'date',
             'due_date' => 'date',
-            'approved_at' => 'datetime',
-            'posted_at' => 'datetime',
+            'approved_at' => 'immutable_datetime',
+            'posted_at' => 'immutable_datetime',
+            'cancelled_at' => 'immutable_datetime',
             'exchange_rate' => 'decimal:6',
             'subtotal' => 'decimal:6',
             'discount_total' => 'decimal:6',

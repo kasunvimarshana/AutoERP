@@ -33,6 +33,7 @@ final class InvoiceLine extends TenantOwnedModel
             'unit_price' => 'decimal:6',
             'discount_amount' => 'decimal:6',
             'tax_amount' => 'decimal:6',
+            'tax_snapshot' => 'array',
             'charge_amount' => 'decimal:6',
             'line_total' => 'decimal:6',
             'source_line_id' => 'integer',

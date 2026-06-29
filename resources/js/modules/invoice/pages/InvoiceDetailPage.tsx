@@ -1,9 +1,10 @@
 import { useParams, useSearchParams } from 'react-router-dom';
 import { getInvoice, getInvoiceAdjustments, getInvoiceBalance, getInvoiceSources } from '../invoiceApi';
+import { hasInvoicePermission, invoicePermissions } from '../invoicePermissions';
 import { useApi } from '@/shared/hooks/useApi';
 import { useOnDemandTab } from '@/shared/hooks/useOnDemandTab';
 import { ContentHeader } from '@/shared/components/ContentHeader';
-import { Tabs } from '@/shared/components/Tabs';
+import { Tabs, type TabItem } from '@/shared/components/Tabs';
 import { Panel } from '@/shared/components/Panel';
 import { DetailGrid } from '@/shared/components/DetailGrid';
 import { RecordTable } from '@/shared/components/RecordTable';
@@ -14,18 +15,45 @@ import { LoadingState } from '@/shared/components/LoadingState';
 import { formatDate } from '@/shared/utils/formatDate';
 import { humanize, readableRelation } from '@/shared/utils/object';
 import { LinkButton } from '@/shared/components/Button';
+import { useAuth } from '@/modules/auth/AuthProvider';
 
 type Tab = 'summary' | 'balance' | 'sources' | 'lines' | 'adjustments';
-const tabs = [['summary', 'Summary'], ['balance', 'Balance'], ['sources', 'Sources'], ['lines', 'Lines'], ['adjustments', 'Adjustments']].map(([id, label]) => ({ id: id as Tab, label }));
+
+const summaryTab: TabItem<Tab> = { id: 'summary', label: 'Summary' };
+const linesTab: TabItem<Tab> = { id: 'lines', label: 'Lines' };
 
 export default function InvoiceDetailPage() {
     const id = Number(useParams().id);
+    const auth = useAuth();
+    const canViewBalance = hasInvoicePermission(auth, invoicePermissions.balanceView);
+    const canViewSources = hasInvoicePermission(auth, invoicePermissions.sourcesView);
     const [searchParams] = useSearchParams();
     const tabState = useOnDemandTab<Tab>('summary');
+    const tabs: TabItem<Tab>[] = [
+        summaryTab,
+        ...(canViewBalance ? [{ id: 'balance' as const, label: 'Balance' }] : []),
+        ...(canViewSources ? [
+            { id: 'sources' as const, label: 'Sources' },
+            { id: 'adjustments' as const, label: 'Adjustments' },
+        ] : []),
+        linesTab,
+    ];
     const invoice = useApi((signal) => getInvoice(id, signal), [id]);
-    const balance = useApi((signal) => getInvoiceBalance(id, signal), [id], tabState.openedTabs.has('balance'));
-    const sources = useApi((signal) => getInvoiceSources(id, signal), [id], tabState.openedTabs.has('sources'));
-    const adjustments = useApi((signal) => getInvoiceAdjustments(id, signal), [id], tabState.openedTabs.has('adjustments'));
+    const balance = useApi(
+        (signal) => getInvoiceBalance(id, signal),
+        [id],
+        canViewBalance && tabState.openedTabs.has('balance'),
+    );
+    const sources = useApi(
+        (signal) => getInvoiceSources(id, signal),
+        [id],
+        canViewSources && tabState.openedTabs.has('sources'),
+    );
+    const adjustments = useApi(
+        (signal) => getInvoiceAdjustments(id, signal),
+        [id],
+        canViewSources && tabState.openedTabs.has('adjustments'),
+    );
     if (invoice.loading) return <LoadingState />;
     if (!invoice.data) return <ErrorAlert error={invoice.error} />;
     const value = invoice.data;
@@ -58,9 +86,9 @@ export default function InvoiceDetailPage() {
                         { label: 'Balance due', value: <MoneyDisplay value={value.balance_due} /> },
                     ]} />}
                     {tabState.activeTab === 'lines' && <RecordTable rows={value.lines ?? []} fields={['line_number', 'item', 'description', 'quantity', 'unit_price', 'discount_amount', 'tax_amount', 'charge_amount', 'line_total']} rowKey={(row, index) => String(row.id ?? row.line_number ?? `invoice-line-${index}`)} />}
-                    {tabState.activeTab === 'balance' && <BalanceSummary loading={balance.loading} error={balance.error} balance={balance.data} />}
-                    {tabState.activeTab === 'adjustments' && <AdjustmentRecords loading={adjustments.loading} error={adjustments.error} rows={adjustments.data ?? []} />}
-                    {tabState.activeTab === 'sources' && <SourceRecords loading={sources.loading} error={sources.error} data={sources.data} />}
+                    {canViewBalance && tabState.activeTab === 'balance' && <BalanceSummary loading={balance.loading} error={balance.error} balance={balance.data} />}
+                    {canViewSources && tabState.activeTab === 'adjustments' && <AdjustmentRecords loading={adjustments.loading} error={adjustments.error} rows={adjustments.data ?? []} />}
+                    {canViewSources && tabState.activeTab === 'sources' && <SourceRecords loading={sources.loading} error={sources.error} data={sources.data} />}
                 </div>
             </Panel>
         </>

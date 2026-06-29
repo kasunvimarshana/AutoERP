@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
+use Modules\Invoice\Constants\InvoicePermission;
 use Modules\Invoice\Http\Controllers\InvoiceController;
 
 $middleware = [
@@ -14,15 +15,45 @@ $middleware = [
     'tenant.feature:invoice',
 ];
 
-Route::prefix('api/v1/invoices')->middleware($middleware)->name('api.v1.invoices.')->group(function (): void {
-    Route::get('/', [InvoiceController::class, 'index'])->name('index');
-    Route::post('preview', [InvoiceController::class, 'preview'])->name('preview');
-    Route::post('/', [InvoiceController::class, 'store'])->name('store');
-    Route::get('{invoice}', [InvoiceController::class, 'show'])->whereNumber('invoice')->name('show');
-    Route::post('{invoice}/approve', [InvoiceController::class, 'approve'])->whereNumber('invoice')->name('approve');
-    Route::post('{invoice}/post', [InvoiceController::class, 'post'])->whereNumber('invoice')->name('post');
-    Route::post('{invoice}/cancel', [InvoiceController::class, 'cancel'])->whereNumber('invoice')->name('cancel');
-    Route::get('{invoice}/balance', [InvoiceController::class, 'balance'])->whereNumber('invoice')->name('balance');
-    Route::get('{invoice}/sources', [InvoiceController::class, 'sources'])->whereNumber('invoice')->name('sources');
-    Route::get('{invoice}/adjustments', [InvoiceController::class, 'adjustments'])->whereNumber('invoice')->name('adjustments');
+$permissionMiddleware = (string) config('user.tenant.permission_middleware_alias', 'tenant.permission');
+$requires = static fn (string $permission): string => $permissionMiddleware.':'.$permission;
+
+Route::prefix('api/v1/invoices')->middleware($middleware)->name('api.v1.invoices.')->group(function () use ($requires): void {
+    Route::get('/', [InvoiceController::class, 'index'])
+        ->middleware($requires(InvoicePermission::VIEW))
+        ->name('index');
+    Route::post('preview', [InvoiceController::class, 'preview'])
+        ->middleware($requires(InvoicePermission::PREVIEW))
+        ->name('preview');
+    Route::post('/', [InvoiceController::class, 'store'])
+        ->middleware($requires(InvoicePermission::CREATE))
+        ->name('store');
+    Route::get('{invoice}', [InvoiceController::class, 'show'])
+        ->whereNumber('invoice')
+        ->middleware($requires(InvoicePermission::VIEW))
+        ->name('show');
+    Route::post('{invoice}/approve', [InvoiceController::class, 'approve'])
+        ->whereNumber('invoice')
+        ->middleware($requires(InvoicePermission::APPROVE))
+        ->name('approve');
+    Route::post('{invoice}/post', [InvoiceController::class, 'post'])
+        ->whereNumber('invoice')
+        ->middleware($requires(InvoicePermission::POST))
+        ->name('post');
+    Route::post('{invoice}/cancel', [InvoiceController::class, 'cancel'])
+        ->whereNumber('invoice')
+        ->middleware($requires(InvoicePermission::CANCEL))
+        ->name('cancel');
+    Route::get('{invoice}/balance', [InvoiceController::class, 'balance'])
+        ->whereNumber('invoice')
+        ->middleware($requires(InvoicePermission::VIEW_BALANCE))
+        ->name('balance');
+    Route::get('{invoice}/sources', [InvoiceController::class, 'sources'])
+        ->whereNumber('invoice')
+        ->middleware($requires(InvoicePermission::VIEW_SOURCES))
+        ->name('sources');
+    Route::get('{invoice}/adjustments', [InvoiceController::class, 'adjustments'])
+        ->whereNumber('invoice')
+        ->middleware($requires(InvoicePermission::VIEW_SOURCES))
+        ->name('adjustments');
 });

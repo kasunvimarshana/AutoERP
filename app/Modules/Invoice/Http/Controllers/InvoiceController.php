@@ -18,19 +18,14 @@ use Modules\Invoice\Http\Resources\InvoiceSourceLineResource;
 use Modules\Invoice\Http\Resources\InvoiceSourceResource;
 use Modules\Invoice\Models\Invoice;
 use Modules\Invoice\Services\InvoiceBalanceService;
-use Modules\Invoice\Services\InvoiceCreationService;
 use Modules\Invoice\Services\InvoiceStatusService;
+use Modules\Invoice\Services\ManualInvoiceService;
 
 final class InvoiceController
 {
     public function index(ListInvoiceRequest $request): AnonymousResourceCollection
     {
-        $query = $this->scope(Invoice::query(), $request)->with([
-            'balance',
-            'currency',
-            'customer',
-            'supplier',
-        ]);
+        $query = $this->scope(Invoice::query(), $request);
         if ($request->filled('search')) {
             $query->where('invoice_number', 'like', '%'.trim((string) $request->input('search')).'%');
         }
@@ -54,33 +49,41 @@ final class InvoiceController
 
     public function show(ListInvoiceRequest $request, int $invoice): InvoiceResource
     {
-        return new InvoiceResource($this->scope(Invoice::query(), $request)->with([
-            'currency', 'customer', 'supplier', 'lines.item', 'lines.uom', 'sources',
-            'sourceLines', 'adjustments.allocations',
-            'adjustmentAllocations', 'balance', 'creditAllocations',
-        ])->findOrFail($invoice));
+        return new InvoiceResource($this->scope(Invoice::query(), $request)
+            ->with('lines')
+            ->findOrFail($invoice));
     }
 
-    public function preview(StoreInvoiceRequest $request, InvoiceCreationService $service): JsonResponse
+    public function preview(StoreInvoiceRequest $request, ManualInvoiceService $service): JsonResponse
     {
         return response()->json(['data' => get_object_vars($service->preview($request->toData()))]);
     }
 
-    public function store(StoreInvoiceRequest $request, InvoiceCreationService $service): InvoiceResource
+    public function store(StoreInvoiceRequest $request, ManualInvoiceService $service): InvoiceResource
     {
         return new InvoiceResource(
-            $service->create($request->toData())->loadMissing(['currency', 'customer', 'supplier']),
+            $service->create($request->toData(), $request->idempotencyKey()),
         );
     }
 
     public function approve(InvoiceActionRequest $request, int $invoice, InvoiceStatusService $service): InvoiceResource
     {
-        return new InvoiceResource($service->transition($this->find($request, $invoice), InvoiceStatus::Approved));
+        return new InvoiceResource($service->transitionIfVersion(
+            $this->find($request, $invoice),
+            InvoiceStatus::Approved,
+            $request->expectedVersion(),
+            $request->currentUserId(),
+        ));
     }
 
     public function post(InvoiceActionRequest $request, int $invoice, InvoiceStatusService $service): InvoiceResource
     {
-        return new InvoiceResource($service->transition($this->find($request, $invoice), InvoiceStatus::Posted));
+        return new InvoiceResource($service->transitionIfVersion(
+            $this->find($request, $invoice),
+            InvoiceStatus::Posted,
+            $request->expectedVersion(),
+            $request->currentUserId(),
+        ));
     }
 
     public function cancel(
@@ -95,9 +98,12 @@ final class InvoiceController
             $statuses,
             $balances,
         ): Invoice {
-            $model = $statuses->transition(
+            $model = $statuses->transitionIfVersion(
                 $this->find($request, $invoice),
                 InvoiceStatus::Cancelled,
+                $request->expectedVersion(),
+                $request->currentUserId(),
+                $request->reason(),
             );
             $balances->cancel($model);
 

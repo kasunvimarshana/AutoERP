@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Invoice\Services\Tax;
 
 use BackedEnum;
+use Modules\Invoice\Constants\InvoiceTaxMetadata;
 use Modules\Invoice\Models\Invoice;
 use Modules\Tax\Data\TaxableDocumentData;
 use Modules\Tax\Data\TaxableDocumentLineData;
@@ -23,8 +24,8 @@ final class InvoiceTaxDocumentMapper
                 quantity: (string) $line->quantity,
                 unitPrice: (string) $line->unit_price,
                 itemId: $line->item_id === null ? null : (int) $line->item_id,
-                taxGroupId: is_array($line->metadata) && is_numeric($line->metadata['tax_group_id'] ?? null)
-                    ? (int) $line->metadata['tax_group_id']
+                taxGroupId: is_array($line->metadata) && is_numeric($line->metadata[InvoiceTaxMetadata::TAX_GROUP_ID] ?? null)
+                    ? (int) $line->metadata[InvoiceTaxMetadata::TAX_GROUP_ID]
                     : null,
                 discountBeforeTax: (string) $line->discount_amount,
                 chargeAfterTax: (string) $line->charge_amount,

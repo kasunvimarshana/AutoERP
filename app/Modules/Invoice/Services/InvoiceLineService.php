@@ -18,6 +18,7 @@ final class InvoiceLineService
         private readonly DecimalMath $math,
         private readonly InvoiceCalculationService $calculations,
         private readonly InvoiceSourceAllocationService $sourceAllocations,
+        private readonly InvoiceReferenceSnapshotService $snapshots,
     ) {}
 
     /**
@@ -51,22 +52,29 @@ final class InvoiceLineService
         InvoiceCalculationResult $calculation,
     ): array {
         $lineIdsBySourceLine = [];
+        $snapshots = $this->snapshots->lines($data);
 
         foreach ($data->lines as $index => $line) {
             /** @var InvoiceLineData $line */
+            $snapshot = $snapshots[$line->lineNumber];
             $model = InvoiceLine::query()->create([
                 'tenant_id' => $data->tenantId,
                 'organization_unit_id' => $data->organizationUnitId,
                 'invoice_id' => $invoice->getKey(),
                 'line_number' => $line->lineNumber,
                 'item_id' => $line->itemId,
+                'item_code_snapshot' => $snapshot['item_code_snapshot'],
+                'item_name_snapshot' => $snapshot['item_name_snapshot'],
                 'description' => $line->description,
                 'line_type' => $line->lineType->value,
                 'quantity' => $this->math->normalize($line->quantity),
                 'uom_id' => $line->uomId,
+                'uom_code_snapshot' => $snapshot['uom_code_snapshot'],
+                'uom_name_snapshot' => $snapshot['uom_name_snapshot'],
                 'unit_price' => $this->math->normalize($line->unitPrice),
                 'discount_amount' => $this->math->normalize($line->discountAmount),
                 'tax_amount' => $this->math->normalize($line->taxAmount),
+                'tax_snapshot' => $snapshot['tax_snapshot'],
                 'charge_amount' => $this->math->normalize($line->chargeAmount),
                 'line_total' => $calculation->lineTotals[$index]
                     ?? $this->calculations->lineTotal($line),

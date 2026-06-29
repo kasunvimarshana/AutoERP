@@ -10,20 +10,25 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('invoice_lines', function (Blueprint $table) {
+        Schema::create('invoice_lines', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants', 'id', indexName: 'invoice_lines_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('invoice_id');
             $table->unsignedInteger('line_number');
             $table->unsignedBigInteger('item_id')->nullable();
+            $table->string('item_code_snapshot', 150)->nullable();
+            $table->string('item_name_snapshot')->nullable();
             $table->text('description');
             $table->string('line_type', 40)->default('item');
             $table->decimal('quantity', 20, 6)->default('0');
             $table->foreignId('uom_id')->nullable();
+            $table->string('uom_code_snapshot', 100)->nullable();
+            $table->string('uom_name_snapshot', 150)->nullable();
             $table->decimal('unit_price', 20, 6)->default('0');
             $table->decimal('discount_amount', 20, 6)->default('0');
             $table->decimal('tax_amount', 20, 6)->default('0');
+            $table->json('tax_snapshot')->nullable();
             $table->decimal('charge_amount', 20, 6)->default('0');
             $table->decimal('line_total', 20, 6)->default('0');
             $table->string('source_line_type')->nullable();
@@ -31,7 +36,7 @@ return new class extends Migration
             $table->json('metadata')->nullable();
             $table->timestamps();
 
-            $table->index('invoice_id', 'invoice_lines_invoice_ix');
+            $table->unique(['invoice_id', 'line_number'], 'invoice_lines_invoice_number_uk');
             $table->index('item_id', 'invoice_lines_item_ix');
             $table->index(['source_line_type', 'source_line_id'], 'invoice_lines_source_line_ix');
 
@@ -44,6 +49,10 @@ return new class extends Migration
                 ->references(['id', 'tenant_id'])
                 ->on('invoices')
                 ->cascadeOnDelete();
+            $table->foreign(['item_id', 'tenant_id'], 'invoice_lines_item_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('items')
+                ->restrictOnDelete();
             $table->foreign(['uom_id', 'tenant_id'], 'invoice_lines_uom_id_tenant_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('unit_of_measures')

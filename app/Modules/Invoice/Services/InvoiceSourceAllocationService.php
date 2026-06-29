@@ -16,14 +16,17 @@ final class InvoiceSourceAllocationService
     public function __construct(private readonly DecimalMath $math) {}
 
     /**
+     * Source-owning modules must lock their source aggregate before calling the
+     * creation command. Invoice owns only its persisted allocation history.
+     *
      * @return list<array<string, mixed>>
      */
-    public function prepareSourceLineAllocations(CreateInvoiceData $data): array
+    public function prepareSourceLineAllocations(CreateInvoiceData $data, bool $lockRows = false): array
     {
         $rows = [];
 
         foreach ($data->sourceLines as $sourceLine) {
-            $previouslyInvoiced = $this->previouslyInvoicedQuantity($data, $sourceLine);
+            $previouslyInvoiced = $this->previouslyInvoicedQuantity($data, $sourceLine, $lockRows);
             $remainingBeforeCurrent = $this->math->sub($sourceLine->sourceQuantity, $previouslyInvoiced);
 
             if ($this->math->compare($sourceLine->invoicedQuantity, $remainingBeforeCurrent) > 0) {
@@ -84,9 +87,13 @@ final class InvoiceSourceAllocationService
         return $sourceLineType.':'.$sourceLineId;
     }
 
-    private function previouslyInvoicedQuantity(CreateInvoiceData $data, InvoiceSourceLineData $sourceLine): string
+    private function previouslyInvoicedQuantity(
+        CreateInvoiceData $data,
+        InvoiceSourceLineData $sourceLine,
+        bool $lockRows,
+    ): string
     {
-        $databaseQuantity = (string) InvoiceSourceLine::query()
+        $rows = InvoiceSourceLine::query()
             ->where('tenant_id', $data->tenantId)
             ->when(
                 $data->organizationUnitId === null,
@@ -101,11 +108,12 @@ final class InvoiceSourceAllocationService
                 InvoiceStatus::Cancelled->value,
                 InvoiceStatus::Void->value,
             ]))
-            ->sum('invoiced_quantity');
+            ->when($lockRows, fn ($query) => $query->lockForUpdate())
+            ->get(['invoiced_quantity']);
 
-        return $this->math->compare($databaseQuantity, $sourceLine->previouslyInvoicedQuantity) > 0
-            ? $this->math->normalize($databaseQuantity)
-            : $this->math->normalize($sourceLine->previouslyInvoicedQuantity);
+        return $this->math->sum(
+            $rows->map(static fn (InvoiceSourceLine $row): string => (string) $row->invoiced_quantity)->all(),
+        );
     }
 
     private function proportionalAmount(string $sourceAmount, string $selectedQuantity, string $sourceQuantity): string

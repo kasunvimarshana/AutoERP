@@ -54,5 +54,4 @@ export const financeRouteEntitlements: readonly EntitlementRule[] = [
     // These modules still require module-owned granular permission catalogues.
     operational('/vehicle-service/*', ['vehicle-service']),
     operational('/tax/*', ['finance']),
-    operational('/invoices/*', ['invoice']),
 ];
