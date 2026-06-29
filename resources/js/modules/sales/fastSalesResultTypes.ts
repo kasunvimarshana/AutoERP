@@ -6,7 +6,10 @@ export interface FastSalesDocumentReference {
     number: string;
     status?: string;
     posting_status?: string;
+    finance_posting_reference?: string | null;
     url: string;
+    total_debit?: string;
+    total_credit?: string;
 }
 
 export interface FastSalesLinePreview {
@@ -39,6 +42,9 @@ export interface FastSalesResult {
         grand_total: string;
         received_total: string;
         balance_due: string;
+        revenue_total?: string;
+        stock_revenue_total?: string;
+        non_stock_revenue_total?: string;
     };
     lines: FastSalesLinePreview[];
     documents: {
@@ -48,5 +54,7 @@ export interface FastSalesResult {
         inventory_transactions?: FastSalesDocumentReference[];
         customer_invoice?: FastSalesDocumentReference | null;
         customer_receipt?: FastSalesDocumentReference | null;
+        finance_posting?: FastSalesDocumentReference | null;
+        finance_postings?: FastSalesDocumentReference[];
     };
 }
