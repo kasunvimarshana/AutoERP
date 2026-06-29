@@ -21,7 +21,7 @@ final class UpsertPaymentMethodRequest extends TenantScopedRequest
             'method_type' => ['required', Rule::enum(PaymentMethodType::class)],
             'direction_allowed' => ['nullable', Rule::enum(PaymentMethodDirection::class)],
             'requires_reference' => ['nullable', 'boolean'],
-            'requires_bank_account' => ['nullable', 'boolean'],
+            'requires_instrument_details' => ['nullable', 'boolean'],
             'is_active' => ['nullable', 'boolean'],
             'sort_order' => ['nullable', 'integer', 'min:0', 'max:1000000'],
             'metadata' => ['nullable', 'array'],
