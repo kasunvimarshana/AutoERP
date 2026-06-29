@@ -5,17 +5,14 @@ declare(strict_types=1);
 namespace Modules\Payment\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\SoftDeletes;
+use LogicException;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Tenant\Models\TenantModel;
 
 final class PaymentRefund extends TenantOwnedModel
 {
-    use SoftDeletes;
-
     protected $table = 'payment_refunds';
-
     protected $guarded = ['id'];
 
     protected function casts(): array
@@ -26,11 +23,19 @@ final class PaymentRefund extends TenantOwnedModel
             'payment_id' => 'integer',
             'refund_payment_id' => 'integer',
             'refund_date' => 'date',
-            'party_id' => 'integer',
-            'payment_method_id' => 'integer',
             'amount' => 'decimal:6',
-            'metadata' => 'array',
+            'refunded_by' => 'integer',
         ]);
+    }
+
+    protected static function booted(): void
+    {
+        self::updating(static function (): never {
+            throw new LogicException('Payment refunds are immutable.');
+        });
+        self::deleting(static function (): never {
+            throw new LogicException('Payment refunds cannot be deleted.');
+        });
     }
 
     public function payment(): BelongsTo
@@ -41,11 +46,6 @@ final class PaymentRefund extends TenantOwnedModel
     public function refundPayment(): BelongsTo
     {
         return $this->belongsTo(Payment::class, 'refund_payment_id');
-    }
-
-    public function paymentMethod(): BelongsTo
-    {
-        return $this->belongsTo(PaymentMethod::class, 'payment_method_id');
     }
 
     public function tenant(): BelongsTo
