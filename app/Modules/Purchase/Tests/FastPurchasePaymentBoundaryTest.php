@@ -22,9 +22,9 @@ final class FastPurchasePaymentBoundaryTest extends TestCase
         self::assertIsString($integration);
         self::assertIsString($request);
         self::assertStringContainsString('$this->purchasePayments->createSupplierPayment', $documents);
-        self::assertStringContainsString('$this->paymentDocuments->submit', $integration);
-        self::assertStringContainsString('$this->paymentDocuments->approve', $integration);
-        self::assertStringContainsString('$this->paymentPostings->post', $integration);
+        self::assertStringContainsString('$this->lifecycle->submit', $integration);
+        self::assertStringContainsString('$this->lifecycle->approve', $integration);
+        self::assertStringContainsString('$this->posting->post', $integration);
         self::assertStringNotContainsString('postPaymentFinance', $coordinator);
         self::assertStringNotContainsString('internalBankAccountId', $service);
         self::assertStringNotContainsString('requires_bank_account', $service);
