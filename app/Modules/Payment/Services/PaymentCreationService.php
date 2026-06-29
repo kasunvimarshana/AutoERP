@@ -49,6 +49,7 @@ final class PaymentCreationService
                 ...$this->snapshots->header($data),
                 'source_type' => $data->sourceType,
                 'source_id' => $data->sourceId,
+                'original_payment_id' => $data->originalPaymentId,
                 'document_status' => PaymentDocumentStatus::Draft->value,
                 'allocation_status' => PaymentAllocationState::Unallocated->value,
                 'posting_status' => PaymentPostingStatus::NotPosted->value,
