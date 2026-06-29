@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Payment\Services;
 
+use Illuminate\Database\Eloquent\Builder;
 use Modules\Core\Services\DecimalMath;
 use Modules\Payment\Enums\AllocationStatus;
 use Modules\Payment\Enums\PaymentAllocationState;
@@ -34,6 +35,11 @@ final class PaymentCapabilityService
         $hasActiveAllocations = $payment->relationLoaded('allocations')
             ? $payment->allocations->contains(fn ($row): bool => $this->stateValue($row->status) === AllocationStatus::Active->value)
             : $payment->allocations()->where('status', AllocationStatus::Active->value)->exists();
+        $hasActiveRefunds = $payment->refunds()
+            ->whereHas('refundPayment', fn (Builder $query): Builder => $query
+                ->where('document_status', PaymentDocumentStatus::Approved->value)
+                ->where('posting_status', PaymentPostingStatus::Posted->value))
+            ->exists();
         $hasChequeLine = $payment->relationLoaded('lines')
             ? $payment->lines->contains(fn ($line): bool => (string) $line->payment_method_type_snapshot === PaymentMethodType::Cheque->value)
             : $payment->lines()->where('payment_method_type_snapshot', PaymentMethodType::Cheque->value)->exists();
@@ -65,15 +71,16 @@ final class PaymentCapabilityService
                 ! $posted ? 'Only posted payments can be reversed.' : null,
                 $terminal ? 'Terminal payment documents cannot be reversed.' : null,
                 $payment->reversals()->exists() ? 'Payment already has a reversal.' : null,
+                $hasActiveRefunds ? 'Reverse active refund payments before reversing the original payment.' : null,
             ])),
             'can_settle' => $this->reasons($terminal, 'Terminal payment documents cannot be settled.'),
             'can_preview_cheque' => array_values(array_filter([
                 ! $hasChequeLine ? 'Payment has no cheque-capable line.' : null,
-                ! in_array($document, [PaymentDocumentStatus::Approved], true) ? 'Only approved payments can be previewed.' : null,
+                $document !== PaymentDocumentStatus::Approved ? 'Only approved payments can be previewed.' : null,
             ])),
             'can_print_cheque' => array_values(array_filter([
                 ! $hasChequeLine ? 'Payment has no cheque-capable line.' : null,
-                ! in_array($document, [PaymentDocumentStatus::Approved], true) ? 'Only approved payments can be printed.' : null,
+                $document !== PaymentDocumentStatus::Approved ? 'Only approved payments can be printed.' : null,
             ])),
             'allocation_complete' => $allocation === PaymentAllocationState::FullyAllocated ? [] : ['Payment is not fully allocated.'],
         ];
