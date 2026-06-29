@@ -12,24 +12,36 @@ export interface VehicleServicePaymentOptions {
     methods: VehicleServicePaymentMethodOption[];
 }
 
-export interface VehicleServicePaymentLinePayload {
+export interface VehicleServicePaymentPayload {
+    expected_job_version: number;
+    invoice_id: number;
+    payment_date: string;
     amount: string;
     payment_method_id: number;
+    currency_id?: number;
+    exchange_rate?: string;
     reference_number?: string;
-    instrument_direction?: 'inbound';
     external_bank_name?: string;
     external_bank_branch?: string;
     instrument_number?: string;
     instrument_date?: string;
 }
 
-export interface VehicleServicePaymentPayload {
-    expected_job_version: number;
-    payment_date: string;
-    amount: string;
-    currency_id?: number;
-    exchange_rate?: string;
-    reference_number?: string;
-    notes?: string;
-    lines: VehicleServicePaymentLinePayload[];
+export interface PreparedVehicleServicePayment {
+    paymentType: string;
+    direction: string;
+    paymentDate: string;
+    referenceNumber?: string | null;
+    lines: Array<{
+        amount: string;
+        paymentMethodId?: number | null;
+        externalBankName?: string | null;
+        externalBankBranch?: string | null;
+        instrumentNumber?: string | null;
+        instrumentDate?: string | null;
+    }>;
+    allocations: Array<{
+        invoiceId: number;
+        allocatedAmount: string;
+    }>;
 }
