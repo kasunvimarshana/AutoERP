@@ -38,19 +38,19 @@ function paymentMethodKind(method?: VehicleServicePaymentMethod): string {
 function methodReference(
     reference: string,
     kind: string,
-    metadata: Record<string, string>,
+    details: Record<string, string>,
 ): string | undefined {
     const explicit = reference.trim();
     if (explicit) return explicit;
 
     const derived = kind === 'cheque'
-        ? metadata.cheque_number
+        ? details.cheque_number
         : kind === 'bank_transfer'
-            ? metadata.transfer_reference
+            ? details.transfer_reference
             : kind === 'card'
-                ? metadata.card_reference || metadata.authorization_code
+                ? details.card_reference || details.authorization_code
                 : kind === 'wallet'
-                    ? metadata.wallet_reference
+                    ? details.wallet_reference
                     : undefined;
 
     return derived?.trim() || undefined;
@@ -58,55 +58,50 @@ function methodReference(
 
 function methodPayload(
     kind: string,
-    metadata: Record<string, string>,
+    details: Record<string, string>,
 ): Pick<VehicleServicePaymentPayload,
     | 'external_bank_name'
     | 'external_bank_branch'
     | 'instrument_number'
     | 'instrument_date'
-    | 'deposit_date'
-    | 'realized_date'
-    | 'metadata'
 > {
-    const cleanMetadata = Object.fromEntries(
-        Object.entries(metadata).filter(([, value]) => value.trim() !== ''),
-    );
-
     if (kind === 'cheque') {
         return {
-            instrument_number: metadata.cheque_number || undefined,
-            instrument_date: metadata.cheque_date || undefined,
-            deposit_date: metadata.value_date || undefined,
-            external_bank_name: metadata.bank_account || undefined,
-            metadata: cleanMetadata,
+            instrument_number: details.cheque_number?.trim() || undefined,
+            instrument_date: details.cheque_date || undefined,
+            external_bank_name: details.bank_account?.trim() || undefined,
         };
     }
     if (kind === 'bank_transfer') {
         return {
-            instrument_number: metadata.transfer_reference || undefined,
-            instrument_date: metadata.transfer_date || undefined,
-            realized_date: metadata.settlement_date || undefined,
-            external_bank_name: metadata.bank_account || undefined,
-            metadata: cleanMetadata,
+            instrument_number: details.transfer_reference?.trim() || undefined,
+            instrument_date: details.transfer_date || undefined,
+            external_bank_name: details.bank_account?.trim() || undefined,
         };
     }
     if (kind === 'card') {
         return {
-            instrument_number: metadata.card_reference || metadata.authorization_code || undefined,
-            external_bank_name: metadata.terminal || undefined,
-            metadata: cleanMetadata,
+            instrument_number: details.card_reference?.trim() || details.authorization_code?.trim() || undefined,
+            external_bank_name: details.terminal?.trim() || undefined,
         };
     }
     if (kind === 'wallet') {
         return {
-            instrument_number: metadata.wallet_reference || undefined,
-            realized_date: metadata.settlement_date || undefined,
-            external_bank_name: metadata.provider || undefined,
-            metadata: cleanMetadata,
+            instrument_number: details.wallet_reference?.trim() || undefined,
+            external_bank_name: details.provider?.trim() || undefined,
         };
     }
 
-    return { metadata: cleanMetadata };
+    return {};
+}
+
+function hasInstrumentDetails(payload: ReturnType<typeof methodPayload>): boolean {
+    return Boolean(
+        payload.instrument_number
+        || payload.instrument_date
+        || payload.external_bank_name
+        || payload.external_bank_branch,
+    );
 }
 
 export default function VehicleServicePaymentPreparePage() {
@@ -116,20 +111,19 @@ export default function VehicleServicePaymentPreparePage() {
     const options = useApi((signal) => getVehicleServicePaymentOptions(jobId, signal), [jobId]);
     const [invoiceId, setInvoiceId] = useState('');
     const [paymentMethodId, setPaymentMethodId] = useState('');
-    const [bankAccountId, setBankAccountId] = useState('');
     const [date, setDate] = useState(today());
     const [amount, setAmount] = useState('0.000000');
     const [reference, setReference] = useState('');
-    const [methodMetadata, setMethodMetadata] = useState<Record<string, string>>({});
+    const [methodDetails, setMethodDetails] = useState<Record<string, string>>({});
     const [prepared, setPrepared] = useState<PreparedVehicleServicePayment | null>(null);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
 
     const paymentMethods = options.data?.methods ?? [];
-    const bankAccounts = options.data?.bank_accounts ?? [];
     const selectedMethod = paymentMethods.find((method) => String(method.id) === paymentMethodId);
     const kind = paymentMethodKind(selectedMethod);
-    const resolvedReference = methodReference(reference, kind, methodMetadata);
+    const instrumentPayload = methodPayload(kind, methodDetails);
+    const resolvedReference = methodReference(reference, kind, methodDetails);
     const eligibleInvoices = useMemo(
         () => (job.data?.invoice_links ?? []).filter((link) =>
             link.status === 'active'
@@ -143,18 +137,24 @@ export default function VehicleServicePaymentPreparePage() {
         && (!invoice?.balance_due || compareDecimalStrings(amount, invoice.balance_due) <= 0);
     const methodRequirementsSatisfied = Boolean(selectedMethod)
         && (!selectedMethod?.requires_reference || Boolean(resolvedReference))
-        && (!selectedMethod?.requires_bank_account || Boolean(bankAccountId));
-    const canSubmit = Boolean(invoiceId) && amountValid && methodRequirementsSatisfied && !busy;
+        && (!selectedMethod?.requires_instrument_details || hasInstrumentDetails(instrumentPayload));
+    const canSubmit = Boolean(
+        options.data?.job_version
+        && invoiceId
+        && amountValid
+        && methodRequirementsSatisfied
+        && !busy,
+    );
 
     const clearPrepared = () => setPrepared(null);
     const payload = (): VehicleServicePaymentPayload => ({
+        expected_job_version: options.data?.job_version ?? 0,
         invoice_id: Number(invoiceId),
         payment_date: date,
         amount,
         payment_method_id: Number(paymentMethodId),
         reference_number: resolvedReference,
-        internal_bank_account_id: bankAccountId ? Number(bankAccountId) : undefined,
-        ...methodPayload(kind, methodMetadata),
+        ...instrumentPayload,
     });
 
     if (job.loading || options.loading) return <LoadingState />;
@@ -164,7 +164,7 @@ export default function VehicleServicePaymentPreparePage() {
         <>
             <ContentHeader
                 title={`Payment for ${job.data.job_number}`}
-                description="Receive, post, and allocate a customer payment through the existing Payment module."
+                description="Receive, post, and allocate a customer payment through the Payment module."
                 actions={<LinkButton to="/payments/methods" variant="secondary">Manage payment methods</LinkButton>}
             />
             <ErrorAlert error={error ?? options.error} />
@@ -204,15 +204,14 @@ export default function VehicleServicePaymentPreparePage() {
                         value={paymentMethodId}
                         error={fieldError(error, 'payment_method_id')}
                         options={paymentMethods.map((method) => ({
-                            value: method.id,
+                            value: method.id ?? '',
                             label: `${method.name}${method.method_type ? ` / ${method.method_type.replaceAll('_', ' ')}` : ''}`,
                         }))}
                         placeholder={paymentMethods.length > 0 ? 'Select payment method' : 'No active inbound methods'}
                         onChange={(event) => {
                             setPaymentMethodId(event.target.value);
-                            setBankAccountId('');
                             setReference('');
-                            setMethodMetadata({});
+                            setMethodDetails({});
                             clearPrepared();
                         }}
                     />
@@ -235,30 +234,20 @@ export default function VehicleServicePaymentPreparePage() {
                         error={fieldError(error, 'reference_number')}
                         onChange={(event) => { setReference(event.target.value); clearPrepared(); }}
                     />
-                    {selectedMethod?.requires_bank_account && (
-                        <Select
-                            label="Internal bank account"
-                            value={bankAccountId}
-                            error={fieldError(error, 'internal_bank_account_id')}
-                            options={bankAccounts.map((account) => ({
-                                value: account.id,
-                                label: `${account.code} / ${account.name}`,
-                            }))}
-                            placeholder={bankAccounts.length > 0 ? 'Select bank account' : 'No active bank accounts'}
-                            onChange={(event) => { setBankAccountId(event.target.value); clearPrepared(); }}
-                        />
-                    )}
 
                     {selectedMethod && (
                         <div className="md:col-span-2">
                             <PaymentMethodFields
                                 kind={kind}
-                                metadata={methodMetadata}
+                                metadata={methodDetails}
                                 onChange={(field, value) => {
-                                    setMethodMetadata((current) => ({ ...current, [field]: value }));
+                                    setMethodDetails((current) => ({ ...current, [field]: value }));
                                     clearPrepared();
                                 }}
                             />
+                            {selectedMethod.requires_instrument_details && !hasInstrumentDetails(instrumentPayload) && (
+                                <p className="mt-2 text-sm text-amber-700">This method requires transaction instrument details.</p>
+                            )}
                         </div>
                     )}
 
