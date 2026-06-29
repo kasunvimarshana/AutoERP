@@ -26,10 +26,10 @@ final class EmployeeCommissionReportService
     public function run(array $params): array
     {
         $query = $this->query($params);
-        $metrics = $this->metrics(clone $query, (string) ($params['group_by'] ?? 'employee'));
+        $groupBy = (string) ($params['group_by'] ?? 'employee');
+        $metrics = $this->metrics(clone $query, $groupBy);
         $this->sort($query, $params);
 
-        $groupBy = (string) ($params['group_by'] ?? 'employee');
         $response = $this->responses->paginate(
             $query,
             fn (object $row): array => $this->row($row, $groupBy),
@@ -38,7 +38,6 @@ final class EmployeeCommissionReportService
             max(1, (int) ($params['page'] ?? 1)),
             min(100, max(1, (int) ($params['per_page'] ?? 25))),
         );
-
         $response['rankings'] = $metrics['rankings'];
         $response['groups'] = $metrics['groups'];
 
@@ -53,10 +52,12 @@ final class EmployeeCommissionReportService
     {
         $query = $this->query($params);
         $this->sort($query, $params);
-
         $groupBy = (string) ($params['group_by'] ?? 'employee');
 
-        return $this->responses->exportRows($query, fn (object $row): array => $this->row($row, $groupBy));
+        return $this->responses->exportRows(
+            $query,
+            fn (object $row): array => $this->row($row, $groupBy),
+        );
     }
 
     public function definition(): ReportDefinition
@@ -66,7 +67,7 @@ final class EmployeeCommissionReportService
             title: 'Employee Commission Report',
             group: 'Vehicle Service',
             model: VehicleServiceLineEmployee::class,
-            description: 'Technician and supervisor commissions from Vehicle Service jobs using the stored domain-calculated bases and amounts.',
+            description: 'Technician and supervisor commissions from Vehicle Service jobs using stored domain-calculated bases and amounts.',
             columns: [
                 new ReportColumn('employee_code', 'Employee code', sortBy: 'employee_code'),
                 new ReportColumn('employee_name', 'Employee', sortBy: 'employee_name'),
@@ -107,7 +108,41 @@ final class EmployeeCommissionReportService
         $organizationUnitId = $params['organization_unit_id'] ?? null;
         $includeCancelled = filter_var($params['include_cancelled'] ?? false, FILTER_VALIDATE_BOOL);
 
-        $technicians = DB::table('vehicle_service_line_employees as assignments')
+        $commissionRows = $this->technicianRows($tenantId, $organizationUnitId, $includeCancelled)
+            ->unionAll($this->supervisorRows($tenantId, $organizationUnitId, $includeCancelled));
+        $query = DB::query()
+            ->fromSub($commissionRows, 'commission_rows')
+            ->leftJoinSub(
+                $this->invoiceTotals($tenantId, $organizationUnitId),
+                'invoice_totals',
+                'invoice_totals.vehicle_service_job_id',
+                '=',
+                'commission_rows.job_id',
+            )
+            ->leftJoinSub(
+                $this->paymentTotals($tenantId, $organizationUnitId),
+                'payment_totals',
+                'payment_totals.vehicle_service_job_id',
+                '=',
+                'commission_rows.job_id',
+            )
+            ->select([
+                'commission_rows.*',
+                DB::raw('COALESCE(invoice_totals.invoice_count, 0) as invoice_count'),
+                DB::raw('COALESCE(invoice_totals.draft_invoice_count, 0) as draft_invoice_count'),
+                DB::raw('COALESCE(invoice_totals.posted_invoice_count, 0) as posted_invoice_count'),
+                DB::raw('COALESCE(invoice_totals.invoice_total, 0) as invoice_total'),
+                DB::raw('COALESCE(payment_totals.paid_total, 0) as paid_total'),
+            ]);
+
+        $this->applyFilters($query, $params, $tenantId, $organizationUnitId);
+
+        return $query;
+    }
+
+    private function technicianRows(int $tenantId, mixed $organizationUnitId, bool $includeCancelled): Builder
+    {
+        $query = DB::table('vehicle_service_line_employees as assignments')
             ->join('vehicle_service_jobs as jobs', 'jobs.id', '=', 'assignments.vehicle_service_job_id')
             ->join('vehicle_service_job_lines as lines', 'lines.id', '=', 'assignments.vehicle_service_job_line_id')
             ->join('hr_employees as employees', 'employees.id', '=', 'assignments.employee_id')
@@ -125,15 +160,17 @@ final class EmployeeCommissionReportService
                 $commission->where('assignments.commission_type', '<>', 'none')
                     ->orWhere('assignments.commission_amount', '>', 0);
             });
-        $this->organizationScope($technicians, 'assignments.organization_unit_id', $organizationUnitId);
-        $this->organizationScope($technicians, 'jobs.organization_unit_id', $organizationUnitId);
-        $this->organizationScope($technicians, 'lines.organization_unit_id', $organizationUnitId);
+
+        $this->organizationScope($query, 'assignments.organization_unit_id', $organizationUnitId);
+        $this->organizationScope($query, 'jobs.organization_unit_id', $organizationUnitId);
+        $this->organizationScope($query, 'lines.organization_unit_id', $organizationUnitId);
         if (! $includeCancelled) {
-            $technicians
+            $query
                 ->where('jobs.status', '<>', 'cancelled')
                 ->where('lines.status', '<>', 'cancelled');
         }
-        $technicians->selectRaw(
+
+        return $query->selectRaw(
             "'technician' as commission_source, assignments.id as source_id, assignments.employee_id, jobs.id as job_id, lines.id as line_id, "
             .'employees.employee_number as employee_code, employees.display_name as employee_name, '
             .'departments.id as department_id, departments.code as department_code, departments.name as department_name, '
@@ -148,10 +185,13 @@ final class EmployeeCommissionReportService
             ."CASE WHEN jobs.status = 'cancelled' OR lines.status = 'cancelled' THEN 'cancelled' "
             ."WHEN assignments.completed_at IS NOT NULL OR assignments.status = 'completed' OR jobs.completed_at IS NOT NULL "
             ."OR jobs.status IN ('completed', 'invoiced', 'partially_paid', 'paid') THEN 'earned' ELSE 'pending' END as commission_status, "
-            .'COALESCE(assignments.completed_at, jobs.completed_at) as completed_at'
+            .'COALESCE(assignments.completed_at, jobs.completed_at) as completed_at',
         );
+    }
 
-        $supervisors = DB::table('vehicle_service_jobs as jobs')
+    private function supervisorRows(int $tenantId, mixed $organizationUnitId, bool $includeCancelled): Builder
+    {
+        $query = DB::table('vehicle_service_jobs as jobs')
             ->join('hr_employees as employees', 'employees.id', '=', 'jobs.supervisor_employee_id')
             ->leftJoin('hr_departments as departments', 'departments.id', '=', 'employees.department_id')
             ->leftJoin('hr_designations as designations', 'designations.id', '=', 'employees.designation_id')
@@ -165,11 +205,13 @@ final class EmployeeCommissionReportService
                 $commission->where('jobs.supervisor_commission_type', '<>', 'none')
                     ->orWhere('jobs.supervisor_commission_amount', '>', 0);
             });
-        $this->organizationScope($supervisors, 'jobs.organization_unit_id', $organizationUnitId);
+
+        $this->organizationScope($query, 'jobs.organization_unit_id', $organizationUnitId);
         if (! $includeCancelled) {
-            $supervisors->where('jobs.status', '<>', 'cancelled');
+            $query->where('jobs.status', '<>', 'cancelled');
         }
-        $supervisors->selectRaw(
+
+        return $query->selectRaw(
             "'supervisor' as commission_source, jobs.id as source_id, jobs.supervisor_employee_id as employee_id, jobs.id as job_id, 0 as line_id, "
             .'employees.employee_number as employee_code, employees.display_name as employee_name, '
             .'departments.id as department_id, departments.code as department_code, departments.name as department_name, '
@@ -183,29 +225,8 @@ final class EmployeeCommissionReportService
             .'jobs.supervisor_commission_value as commission_value, jobs.supervisor_commission_amount as commission_amount, '
             ."CASE WHEN jobs.status = 'cancelled' THEN 'cancelled' WHEN jobs.completed_at IS NOT NULL "
             ."OR jobs.status IN ('completed', 'invoiced', 'partially_paid', 'paid') THEN 'earned' ELSE 'pending' END as commission_status, "
-            .'jobs.completed_at as completed_at'
+            .'jobs.completed_at as completed_at',
         );
-
-        $commissionRows = $technicians->unionAll($supervisors);
-        $invoiceTotals = $this->invoiceTotals($tenantId, $organizationUnitId);
-        $paymentTotals = $this->paymentTotals($tenantId, $organizationUnitId);
-
-        $query = DB::query()
-            ->fromSub($commissionRows, 'commission_rows')
-            ->leftJoinSub($invoiceTotals, 'invoice_totals', 'invoice_totals.vehicle_service_job_id', '=', 'commission_rows.job_id')
-            ->leftJoinSub($paymentTotals, 'payment_totals', 'payment_totals.vehicle_service_job_id', '=', 'commission_rows.job_id')
-            ->select([
-                'commission_rows.*',
-                DB::raw('COALESCE(invoice_totals.invoice_count, 0) as invoice_count'),
-                DB::raw('COALESCE(invoice_totals.draft_invoice_count, 0) as draft_invoice_count'),
-                DB::raw('COALESCE(invoice_totals.posted_invoice_count, 0) as posted_invoice_count'),
-                DB::raw('COALESCE(invoice_totals.invoice_total, 0) as invoice_total'),
-                DB::raw('COALESCE(payment_totals.paid_total, 0) as paid_total'),
-            ]);
-
-        $this->applyFilters($query, $params, $tenantId, $organizationUnitId);
-
-        return $query;
     }
 
     private function invoiceTotals(int $tenantId, mixed $organizationUnitId): Builder
@@ -220,14 +241,13 @@ final class EmployeeCommissionReportService
                 'links.vehicle_service_job_id, COUNT(DISTINCT invoices.id) as invoice_count, '
                 ."SUM(CASE WHEN invoices.status IN ('draft', 'approved') THEN 1 ELSE 0 END) as draft_invoice_count, "
                 ."SUM(CASE WHEN invoices.status IN ('posted', 'partially_paid', 'paid') THEN 1 ELSE 0 END) as posted_invoice_count, "
-                .'COALESCE(SUM(links.invoice_total), 0) as invoice_total'
+                .'COALESCE(SUM(links.invoice_total), 0) as invoice_total',
             )
             ->groupBy('links.vehicle_service_job_id');
         $this->organizationScope($query, 'links.organization_unit_id', $organizationUnitId);
 
         return $query;
     }
-
 
     private function paymentTotals(int $tenantId, mixed $organizationUnitId): Builder
     {
@@ -236,10 +256,9 @@ final class EmployeeCommissionReportService
             ->where('links.tenant_id', $tenantId)
             ->where('links.status', 'active')
             ->whereNull('payments.deleted_at')
-            ->whereIn('payments.status', ['posted', 'partially_allocated', 'fully_allocated', 'allocated'])
-            ->selectRaw(
-                'links.vehicle_service_job_id, COALESCE(SUM(links.allocated_amount), 0) as paid_total'
-            )
+            ->where('payments.document_status', 'approved')
+            ->where('payments.posting_status', 'posted')
+            ->selectRaw('links.vehicle_service_job_id, COALESCE(SUM(links.allocated_amount), 0) as paid_total')
             ->groupBy('links.vehicle_service_job_id');
         $this->organizationScope($query, 'links.organization_unit_id', $organizationUnitId);
 
@@ -285,17 +304,19 @@ final class EmployeeCommissionReportService
             });
         }
 
-        if (! empty($params['payment_status'])) {
-            $status = (string) $params['payment_status'];
-            $query->whereExists(function (Builder $payment) use ($tenantId, $organizationUnitId, $status): void {
+        if ($this->hasPaymentFilters($params)) {
+            $query->whereExists(function (Builder $payment) use ($tenantId, $organizationUnitId, $params): void {
                 $payment->selectRaw('1')
                     ->from('vehicle_service_payment_links as filter_links')
                     ->join('payments as filter_payments', 'filter_payments.id', '=', 'filter_links.payment_id')
                     ->whereColumn('filter_links.vehicle_service_job_id', 'commission_rows.job_id')
                     ->where('filter_links.tenant_id', $tenantId)
                     ->where('filter_links.status', 'active')
-                    ->whereNull('filter_payments.deleted_at')
-                    ->where('filter_payments.status', $status);
+                    ->whereNull('filter_payments.deleted_at');
+                $this->whereString($payment, 'filter_payments.document_status', $params['payment_document_status'] ?? null);
+                $this->whereString($payment, 'filter_payments.posting_status', $params['payment_posting_status'] ?? null);
+                $this->whereString($payment, 'filter_payments.allocation_status', $params['payment_allocation_status'] ?? null);
+                $this->whereString($payment, 'filter_payments.instrument_status', $params['payment_instrument_status'] ?? null);
                 $this->organizationScope($payment, 'filter_links.organization_unit_id', $organizationUnitId);
             });
         }
@@ -357,17 +378,15 @@ final class EmployeeCommissionReportService
         $sort = (string) ($params['sort'] ?? 'job_date');
         $direction = (string) ($params['direction'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
         $groupBy = (string) ($params['group_by'] ?? 'employee');
-
         $hasExplicitSort = array_key_exists('sort', $params) && trim((string) $params['sort']) !== '';
+
         if (! $hasExplicitSort && isset($groupColumns[$groupBy])) {
             $query->orderBy($groupColumns[$groupBy]);
         }
-
         $query->orderBy($columns[$sort] ?? $columns['job_date'], $direction);
         if ($hasExplicitSort && isset($groupColumns[$groupBy])) {
             $query->orderBy($groupColumns[$groupBy]);
         }
-
         $query
             ->orderBy('commission_rows.job_id', 'desc')
             ->orderBy('commission_rows.commission_source')
@@ -390,7 +409,7 @@ final class EmployeeCommissionReportService
             ."COALESCE(SUM(CASE WHEN commission_rows.commission_status = 'earned' THEN commission_rows.commission_amount ELSE 0 END), 0) as earned_commission, "
             ."COALESCE(SUM(CASE WHEN commission_rows.commission_status = 'pending' THEN commission_rows.commission_amount ELSE 0 END), 0) as pending_commission, "
             ."COALESCE(SUM(CASE WHEN commission_rows.commission_status = 'cancelled' THEN commission_rows.commission_amount ELSE 0 END), 0) as cancelled_commission, "
-            ."COALESCE(SUM(CASE WHEN commission_rows.commission_status <> 'cancelled' THEN commission_rows.commission_amount ELSE 0 END), 0) as total_commission"
+            ."COALESCE(SUM(CASE WHEN commission_rows.commission_status <> 'cancelled' THEN commission_rows.commission_amount ELSE 0 END), 0) as total_commission",
         )->first();
 
         $totalCommission = $this->decimal($totals->total_commission ?? 0);
@@ -430,9 +449,6 @@ final class EmployeeCommissionReportService
         ];
     }
 
-    /**
-     * @return array<string, mixed>|null
-     */
     private function topEmployee(Builder $query, string $metric): ?array
     {
         $row = $query
@@ -446,7 +462,7 @@ final class EmployeeCommissionReportService
                 .'MAX(commission_rows.designation_id) as designation_id, MAX(commission_rows.designation_code) as designation_code, '
                 .'MAX(commission_rows.designation_name) as designation_name, '
                 .'COALESCE(SUM(commission_rows.labour_amount), 0) as labour_value, '
-                .'COALESCE(SUM(commission_rows.commission_amount), 0) as commission_amount'
+                .'COALESCE(SUM(commission_rows.commission_amount), 0) as commission_amount',
             )
             ->groupBy('commission_rows.employee_id')
             ->orderByDesc($metric === 'labour_amount' ? 'labour_value' : 'commission_amount')
@@ -484,13 +500,15 @@ final class EmployeeCommissionReportService
                 .'COUNT(DISTINCT commission_rows.job_id) as total_jobs, '
                 ."COALESCE(SUM(CASE WHEN commission_rows.commission_status <> 'cancelled' THEN commission_rows.assigned_hours ELSE 0 END), 0) as total_hours, "
                 ."COALESCE(SUM(CASE WHEN commission_rows.commission_status <> 'cancelled' THEN commission_rows.labour_amount ELSE 0 END), 0) as total_labour_value, "
-                ."COALESCE(SUM(CASE WHEN commission_rows.commission_status <> 'cancelled' THEN commission_rows.commission_amount ELSE 0 END), 0) as total_commission"
+                ."COALESCE(SUM(CASE WHEN commission_rows.commission_status <> 'cancelled' THEN commission_rows.commission_amount ELSE 0 END), 0) as total_commission",
             )
             ->groupBy($key)
             ->orderBy('group_label')
             ->get()
             ->map(function (object $row) use ($resourceType): array {
-                $key = $row->group_key === null || $row->group_key === '' ? 'unassigned' : (string) $row->group_key;
+                $key = $row->group_key === null || $row->group_key === ''
+                    ? 'unassigned'
+                    : (string) $row->group_key;
                 $label = trim((string) ($row->group_label ?? '')) ?: 'Unassigned';
 
                 return [
@@ -607,7 +625,6 @@ final class EmployeeCommissionReportService
         return 'unpaid';
     }
 
-
     private function balanceDue(object $row): string
     {
         $balance = $this->math->sub(
@@ -618,9 +635,6 @@ final class EmployeeCommissionReportService
         return $this->math->isNegative($balance) ? $this->decimal(0) : $balance;
     }
 
-    /**
-     * @return array<string, mixed>
-     */
     private function employeeResource(object $row): array
     {
         return [
@@ -632,9 +646,6 @@ final class EmployeeCommissionReportService
         ];
     }
 
-    /**
-     * @return array<string, mixed>|null
-     */
     private function namedResource(mixed $id, mixed $code, mixed $name): ?array
     {
         if ($id === null || $id === '') {
@@ -646,6 +657,22 @@ final class EmployeeCommissionReportService
             'code' => (string) ($code ?? ''),
             'name' => (string) ($name ?? ''),
         ];
+    }
+
+    private function hasPaymentFilters(array $params): bool
+    {
+        foreach ([
+            'payment_document_status',
+            'payment_posting_status',
+            'payment_allocation_status',
+            'payment_instrument_status',
+        ] as $filter) {
+            if (($params[$filter] ?? null) !== null && $params[$filter] !== '') {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function whereInteger(Builder $query, string $column, mixed $value): void
@@ -666,6 +693,7 @@ final class EmployeeCommissionReportService
     {
         if ($organizationUnitId === null || $organizationUnitId === '') {
             $query->whereNull($column);
+
             return;
         }
 
