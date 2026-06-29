@@ -14,7 +14,6 @@ final readonly class PaymentLineData
         public string $status = 'pending',
         public ?string $notes = null,
         public ?array $metadata = null,
-        public ?int $internalBankAccountId = null,
         public ?string $instrumentDirection = null,
         public ?string $externalBankName = null,
         public ?string $externalBankBranch = null,
