@@ -14,14 +14,15 @@ final class RefundPaymentRequest extends TenantScopedRequest
         return [
             'tenant_id' => ['required', 'integer', 'min:1'],
             'organization_unit_id' => ['nullable', 'integer', 'min:1'],
-            'refund_number' => ['required', 'string', 'max:100'],
+            'expected_version' => ['required', 'integer', 'min:1'],
             'refund_date' => ['required', 'date'],
             'amount' => ['required', 'decimal:0,6', 'gt:0'],
-            'party_type' => ['nullable', 'string', 'max:150'],
-            'party_id' => ['nullable', 'integer', 'min:1'],
             'payment_method_id' => ['nullable', 'integer', 'min:1'],
-            'reason' => ['nullable', 'string'],
-            'metadata' => ['nullable', 'array'],
+            'reason' => ['required', 'string', 'max:1000'],
+            'refund_number' => ['prohibited'],
+            'party_type' => ['prohibited'],
+            'party_id' => ['prohibited'],
+            'metadata' => ['prohibited'],
         ];
     }
 
@@ -29,14 +30,12 @@ final class RefundPaymentRequest extends TenantScopedRequest
     {
         return new PaymentRefundData(
             paymentId: $paymentId,
-            refundNumber: (string) $this->input('refund_number'),
+            expectedVersion: (int) $this->input('expected_version'),
             refundDate: (string) $this->input('refund_date'),
             amount: (string) $this->input('amount'),
-            partyType: $this->filled('party_type') ? (string) $this->input('party_type') : null,
-            partyId: $this->filled('party_id') ? (int) $this->input('party_id') : null,
             paymentMethodId: $this->filled('payment_method_id') ? (int) $this->input('payment_method_id') : null,
-            reason: $this->filled('reason') ? (string) $this->input('reason') : null,
-            metadata: $this->input('metadata'),
+            reason: trim((string) $this->input('reason')),
+            refundedBy: $this->currentUserId(),
         );
     }
 }
