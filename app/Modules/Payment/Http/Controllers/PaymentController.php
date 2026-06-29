@@ -18,23 +18,18 @@ use Modules\Payment\Http\Requests\SettlePaymentLineRequest;
 use Modules\Payment\Http\Requests\StorePaymentRequest;
 use Modules\Payment\Http\Resources\PaymentResource;
 use Modules\Payment\Models\Payment;
-use Modules\Payment\Models\PaymentAllocation;
 use Modules\Payment\Services\PaymentAllocationService;
-use Modules\Payment\Services\PaymentAuthorizationService;
 use Modules\Payment\Services\PaymentCreationService;
 use Modules\Payment\Services\PaymentDocumentLifecycleService;
 use Modules\Payment\Services\PaymentPostingService;
-use Modules\Payment\Services\PaymentRefundService;
+use Modules\Payment\Services\PaymentRefundWorkflowService;
 use Modules\Payment\Services\PaymentReversalService;
 use Modules\Payment\Services\PaymentSettlementService;
 
 final class PaymentController
 {
-    public function __construct(private readonly PaymentAuthorizationService $authorization) {}
-
     public function index(ListPaymentRequest $request): AnonymousResourceCollection
     {
-        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PaymentAuthorizationService::PAYMENTS_VIEW);
         $query = $this->scope(Payment::query(), $request)->with('currency');
         if ($request->filled('search')) {
             $search = trim((string) $request->input('search'));
@@ -59,8 +54,6 @@ final class PaymentController
 
     public function store(StorePaymentRequest $request, PaymentCreationService $service): PaymentResource
     {
-        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PaymentAuthorizationService::PAYMENTS_CREATE);
-
         return new PaymentResource($service->create($request->toData()));
     }
 
@@ -69,7 +62,6 @@ final class PaymentController
         int $payment,
         InvoiceBalanceProviderInterface $invoices,
     ): PaymentResource {
-        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PaymentAuthorizationService::PAYMENTS_VIEW);
         $row = $this->scope(Payment::query(), $request)
             ->with([
                 'currency', 'lines', 'allocations', 'unappliedBalance', 'refunds.refundPayment',
@@ -86,8 +78,6 @@ final class PaymentController
         int $payment,
         PaymentDocumentLifecycleService $service,
     ): PaymentResource {
-        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PaymentAuthorizationService::PAYMENTS_APPROVE);
-
         return new PaymentResource($service->approve(
             $this->find($request, $payment),
             $request->expectedVersion(),
@@ -100,8 +90,6 @@ final class PaymentController
         int $payment,
         PaymentDocumentLifecycleService $service,
     ): PaymentResource {
-        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PaymentAuthorizationService::PAYMENTS_SUBMIT);
-
         return new PaymentResource($service->submit(
             $this->find($request, $payment),
             $request->expectedVersion(),
@@ -111,8 +99,6 @@ final class PaymentController
 
     public function post(PaymentActionRequest $request, int $payment, PaymentPostingService $service): PaymentResource
     {
-        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PaymentAuthorizationService::PAYMENTS_POST);
-
         return new PaymentResource($service->post(
             $this->find($request, $payment),
             $request->expectedVersion(),
@@ -125,8 +111,6 @@ final class PaymentController
         int $payment,
         PaymentDocumentLifecycleService $service,
     ): PaymentResource {
-        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PaymentAuthorizationService::PAYMENTS_VOID);
-
         return new PaymentResource($service->void(
             $this->find($request, $payment),
             $request->expectedVersion(),
@@ -137,7 +121,6 @@ final class PaymentController
 
     public function reverse(ReversePaymentRequest $request, int $payment, PaymentReversalService $service): JsonResponse
     {
-        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PaymentAuthorizationService::PAYMENTS_REVERSE);
         $this->find($request, $payment);
 
         return response()->json(['data' => $service->reverse($request->toData($payment))]);
@@ -145,8 +128,6 @@ final class PaymentController
 
     public function allocate(AllocatePaymentRequest $request, int $payment, PaymentAllocationService $service): PaymentResource
     {
-        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PaymentAuthorizationService::PAYMENTS_ALLOCATE);
-
         return new PaymentResource($service->allocate(
             $this->find($request, $payment),
             $request->toData(),
@@ -156,21 +137,18 @@ final class PaymentController
     }
 
     public function allocations(
-        PaymentActionRequest $request,
+        ListPaymentRequest $request,
         int $payment,
         InvoiceBalanceProviderInterface $invoices,
     ): JsonResponse {
-        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PaymentAuthorizationService::PAYMENTS_VIEW);
         $allocations = $this->find($request, $payment)->allocations()->get();
         $this->attachInvoiceReferences($allocations, $invoices);
 
         return response()->json(['data' => $allocations]);
     }
 
-    public function unappliedBalance(PaymentActionRequest $request, int $payment): JsonResponse
+    public function unappliedBalance(ListPaymentRequest $request, int $payment): JsonResponse
     {
-        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PaymentAuthorizationService::PAYMENTS_VIEW);
-
         return response()->json(['data' => $this->find($request, $payment)->unappliedBalance()->first()]);
     }
 
@@ -180,28 +158,28 @@ final class PaymentController
         int $line,
         PaymentSettlementService $service,
     ): JsonResponse {
-        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PaymentAuthorizationService::PAYMENTS_SETTLE);
-
         return response()->json([
             'data' => $service->transitionLine(
                 $this->find($request, $payment),
                 $line,
                 $request->settlementStatus(),
-                $request->metadata(),
+                $request->expectedPaymentVersion(),
+                $request->expectedLineVersion(),
+                $request->currentUserId(),
+                $request->reason(),
             ),
         ]);
     }
 
-    public function refund(RefundPaymentRequest $request, int $payment, PaymentRefundService $service): JsonResponse
+    public function refund(RefundPaymentRequest $request, int $payment, PaymentRefundWorkflowService $service): JsonResponse
     {
-        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PaymentAuthorizationService::PAYMENTS_REFUND);
         $this->find($request, $payment);
 
         return response()->json(['data' => $service->refund($request->toData($payment))], 201);
     }
 
     private function find(
-        PaymentActionRequest|AllocatePaymentRequest|RefundPaymentRequest|ReversePaymentRequest|SettlePaymentLineRequest $request,
+        ListPaymentRequest|PaymentActionRequest|AllocatePaymentRequest|RefundPaymentRequest|ReversePaymentRequest|SettlePaymentLineRequest $request,
         int $payment,
     ): Payment {
         return $this->scope(Payment::query(), $request)->findOrFail($payment);
