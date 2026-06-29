@@ -18,8 +18,13 @@ final class VehicleServicePaymentController extends VehicleServiceController
         int $job,
         VehicleServicePaymentOptionService $service,
     ): JsonResponse {
+        $serviceJob = $this->job($request, $job);
+
         return response()->json([
-            'data' => $service->options($this->job($request, $job)),
+            'data' => [
+                'job_version' => (int) $serviceJob->row_version,
+                ...$service->options($serviceJob),
+            ],
         ]);
     }
 
