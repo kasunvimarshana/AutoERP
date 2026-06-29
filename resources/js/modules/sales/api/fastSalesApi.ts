@@ -1,7 +1,9 @@
 import { apiClient } from '@/shared/api/apiClient';
 import { endpoints } from '@/shared/api/endpoints';
 import type { ApiResource } from '@/shared/types/api';
-import type { FastSalesContext, FastSalesPayload, FastSalesResult } from '../salesTypes';
+import type { FastSalesContext } from '../fastSalesContextTypes';
+import type { FastSalesPayload } from '../fastSalesPayloadTypes';
+import type { FastSalesResult } from '../fastSalesResultTypes';
 
 export async function getFastSalesContext(signal?: AbortSignal) {
     const response = await apiClient.get<ApiResource<FastSalesContext>>(`${endpoints.sales}/fast-sales/context`, { signal });
