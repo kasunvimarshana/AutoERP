@@ -5,15 +5,10 @@ declare(strict_types=1);
 namespace Modules\Payment\DTOs;
 
 use Modules\Payment\Enums\PaymentDirection;
-use Modules\Payment\Enums\PaymentStatus;
 use Modules\Payment\Enums\PaymentType;
 
 final readonly class CreatePaymentData
 {
-    /**
-     * @param  list<PaymentLineData>  $lines
-     * @param  list<PaymentAllocationData>  $allocations
-     */
     public function __construct(
         public int $tenantId,
         public PaymentType $paymentType,
@@ -25,11 +20,10 @@ final readonly class CreatePaymentData
         public ?int $partyId = null,
         public ?string $sourceType = null,
         public ?int $sourceId = null,
-        public string $allocationStatus = 'unallocated',
+        public ?int $originalPaymentId = null,
         public ?int $currencyId = null,
         public string $exchangeRate = '1.000000',
         public ?string $referenceNumber = null,
-        public PaymentStatus $status = PaymentStatus::Draft,
         public ?string $notes = null,
         public ?int $createdBy = null,
         public array $lines = [],
