@@ -7,6 +7,7 @@ import { LoadingState } from '@/shared/components/LoadingState';
 import { Pagination } from '@/shared/components/Pagination';
 import { Panel } from '@/shared/components/Panel';
 import { EmployeeCommissionFilters } from '../components/EmployeeCommissionFilters';
+import { EmployeeCommissionSummary } from '../components/EmployeeCommissionSummary';
 import { EmployeeCommissionTable } from '../components/EmployeeCommissionTable';
 import { ExportActions } from '../components/ExportActions';
 import { runEmployeeCommissionReport } from '../reportingApi';
@@ -92,6 +93,7 @@ export default function EmployeeCommissionReportScreen() {
                         onReset={reset}
                     />
                 </Panel>
+                {result && <EmployeeCommissionSummary result={result} />}
                 <div className="flex items-center justify-between gap-3">
                     <span className="text-sm text-slate-500">
                         {loading ? 'Refreshing...' : `${result?.meta?.total ?? 0} commission entries`}
@@ -107,7 +109,6 @@ export default function EmployeeCommissionReportScreen() {
                         sortKey={filters.sort}
                         direction={filters.direction}
                         onSort={sort}
-                        onSelect={() => undefined}
                     />
                 )}
                 <Pagination
