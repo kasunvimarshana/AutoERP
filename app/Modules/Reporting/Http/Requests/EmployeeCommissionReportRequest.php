@@ -7,7 +7,10 @@ namespace Modules\Reporting\Http\Requests;
 use Illuminate\Validation\Rule;
 use Modules\Core\Http\Requests\TenantScopedRequest;
 use Modules\Invoice\Enums\InvoiceStatus;
-use Modules\Payment\Enums\PaymentStatus;
+use Modules\Payment\Enums\PaymentAllocationState;
+use Modules\Payment\Enums\PaymentDocumentStatus;
+use Modules\Payment\Enums\PaymentInstrumentStatus;
+use Modules\Payment\Enums\PaymentPostingStatus;
 use Modules\VehicleService\Enums\VehicleServiceCommissionType;
 use Modules\VehicleService\Enums\VehicleServiceJobStatus;
 
@@ -37,7 +40,10 @@ final class EmployeeCommissionReportRequest extends TenantScopedRequest
             'vehicle_id' => ['nullable', 'integer', 'min:1'],
             'job_status' => ['nullable', Rule::enum(VehicleServiceJobStatus::class)],
             'invoice_status' => ['nullable', Rule::enum(InvoiceStatus::class)],
-            'payment_status' => ['nullable', Rule::enum(PaymentStatus::class)],
+            'payment_document_status' => ['nullable', Rule::enum(PaymentDocumentStatus::class)],
+            'payment_posting_status' => ['nullable', Rule::enum(PaymentPostingStatus::class)],
+            'payment_allocation_status' => ['nullable', Rule::enum(PaymentAllocationState::class)],
+            'payment_instrument_status' => ['nullable', Rule::enum(PaymentInstrumentStatus::class)],
             'commission_type' => ['nullable', Rule::enum(VehicleServiceCommissionType::class)],
             'commission_source' => ['nullable', Rule::in(['technician', 'supervisor'])],
             'role_type' => ['nullable', Rule::in(['technician', 'helper', 'inspector', 'custom', 'supervisor'])],
