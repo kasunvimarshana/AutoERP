@@ -61,7 +61,6 @@ final class PaymentCreationService
                 'cheque_number' => $data->chequeNumber,
                 'cheque_date' => $data->chequeDate,
                 'payee_name' => $data->payeeName,
-                'amount_in_words' => $data->amountInWords,
                 'total_amount' => $calculation->totalAmount,
                 'allocated_amount' => $calculation->allocatedAmount,
                 'unapplied_amount' => $calculation->unappliedAmount,
