@@ -26,6 +26,7 @@ final class SalesPaymentPreparationService
         array $allocations = [],
         ?int $createdBy = null,
         ?string $notes = null,
+        ?array $metadata = null,
     ): CreatePaymentData {
         if ($customerId === null) {
             throw new InvalidArgumentException('Customer receipt requires a customer.');
@@ -60,6 +61,7 @@ final class SalesPaymentPreparationService
             createdBy: $createdBy,
             lines: $lines,
             allocations: $allocations,
+            metadata: $metadata,
         );
     }
 }

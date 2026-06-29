@@ -373,7 +373,7 @@ export interface FastSalesOptionResource {
     is_bank_account?: boolean;
     method_type?: string;
     requires_reference?: boolean;
-    requires_bank_account?: boolean;
+    requires_instrument_details?: boolean;
 }
 
 export interface FastSalesContext {
@@ -385,7 +385,6 @@ export interface FastSalesContext {
     warehouses: FastSalesOptionResource[];
     currencies: FastSalesOptionResource[];
     payment_methods: FastSalesOptionResource[];
-    payment_accounts: FastSalesOptionResource[];
     tax_groups: FastSalesOptionResource[];
 }
 
@@ -420,7 +419,6 @@ export interface FastSalesPayload {
     payment?: {
         amount?: string;
         payment_method_id?: number;
-        destination_account_id?: number;
         reference?: string;
         cheque_number?: string;
         cheque_date?: string;
@@ -432,7 +430,6 @@ export interface FastSalesPayload {
         lines?: Array<{
             amount: string;
             payment_method_id?: number;
-            destination_account_id?: number;
             reference?: string;
             instrument_number?: string;
             instrument_date?: string;

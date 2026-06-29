@@ -9,6 +9,12 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Modules\Audit\Models\AuditLog;
+use Modules\Core\Contracts\CurrentTenantContextAccessorInterface;
+use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
+use Modules\Core\Contracts\TenantExecutionContextInterface;
+use Modules\Core\DTOs\CurrentTenantContext;
+use Modules\Core\DTOs\CurrentUserContext;
+use Modules\Core\DTOs\DataRecord;
 use Modules\Finance\Contracts\FinancePostingInterface;
 use Modules\Finance\DTOs\CreateAccountData;
 use Modules\Finance\DTOs\PostingContext;
@@ -23,6 +29,8 @@ use Modules\Finance\Models\FinanceJournalEntry;
 use Modules\Finance\Models\FinancePostingProfile;
 use Modules\Finance\Models\FinancePostingProfileRule;
 use Modules\Finance\Services\ChartOfAccountsService;
+use Modules\Item\Enums\ItemPriceType;
+use Modules\Item\Services\ItemPriceScopeKey;
 use Modules\Inventory\DTOs\StockAdjustmentData;
 use Modules\Inventory\DTOs\StockAdjustmentLineData;
 use Modules\Inventory\Enums\AdjustmentType;
@@ -31,6 +39,9 @@ use Modules\Inventory\Models\InventoryStockBalance;
 use Modules\Inventory\Services\StockAdjustmentService;
 use Modules\Invoice\Models\Invoice;
 use Modules\Invoice\Models\InvoiceBalance;
+use Modules\Payment\Enums\PaymentAllocationState;
+use Modules\Payment\Enums\PaymentDocumentStatus;
+use Modules\Payment\Enums\PaymentPostingStatus;
 use Modules\Payment\Models\Payment;
 use Modules\Payment\Models\PaymentAllocation;
 use Modules\Payment\Models\PaymentLine;
@@ -48,7 +59,7 @@ final class FastSalesTest extends TestCase
     {
         $context = $this->context();
 
-        $result = app(FastSalesService::class)->create($this->payload($context, [
+        $result = $this->createFastSale($this->payload($context, [
             'customer_reference' => 'FS-ORDER',
             'options' => [
                 'create_sales_order_only' => true,
@@ -76,7 +87,7 @@ final class FastSalesTest extends TestCase
         $context = $this->context();
         $this->seedStock($context, '10.000000');
 
-        $result = app(FastSalesService::class)->create($this->payload($context, [
+        $result = $this->createFastSale($this->payload($context, [
             'customer_reference' => 'FS-DELIVERY',
             'options' => [
                 'create_sales_order_only' => false,
@@ -101,7 +112,7 @@ final class FastSalesTest extends TestCase
         $context = $this->context();
         $this->seedStock($context, '10.000000');
 
-        $result = app(FastSalesService::class)->create($this->payload($context, [
+        $result = $this->createFastSale($this->payload($context, [
             'customer_reference' => 'FS-CREDIT',
         ]));
 
@@ -122,7 +133,7 @@ final class FastSalesTest extends TestCase
         $context = $this->context();
         $this->seedStock($context, '10.000000');
 
-        $result = app(FastSalesService::class)->create($this->payload($context, [
+        $result = $this->createFastSale($this->payload($context, [
             'customer_reference' => 'FS-CASH',
             'options' => [
                 'create_sales_order_only' => false,
@@ -133,7 +144,6 @@ final class FastSalesTest extends TestCase
             'payment' => [
                 'amount' => '500.000000',
                 'payment_method_id' => $context['cash_method_id'],
-                'destination_account_id' => $context['cash_account_id'],
                 'reference' => 'FS-CASH-REC',
             ],
         ]));
@@ -143,7 +153,11 @@ final class FastSalesTest extends TestCase
         $this->assertSame('0.000000', $result['summary']['balance_due']);
         $this->assertSame('0.000000', (string) Invoice::query()->firstOrFail()->balance_due);
         $this->assertSame(1, PaymentAllocation::query()->count());
-        $this->assertSame('500.000000', (string) Payment::query()->firstOrFail()->allocated_amount);
+        $payment = Payment::query()->firstOrFail();
+        $this->assertSame('500.000000', (string) $payment->allocated_amount);
+        $this->assertSame(PaymentDocumentStatus::Approved, $payment->document_status);
+        $this->assertSame(PaymentPostingStatus::Posted, $payment->posting_status);
+        $this->assertSame(PaymentAllocationState::FullyAllocated, $payment->allocation_status);
         $this->assertSame(3, FinanceJournalEntry::query()->count());
     }
 
@@ -151,7 +165,7 @@ final class FastSalesTest extends TestCase
     {
         $context = $this->context();
 
-        $result = app(FastSalesService::class)->create($this->payload($context, [
+        $result = $this->createFastSale($this->payload($context, [
             'customer_reference' => 'FS-DIRECT',
             'warehouse_id' => null,
             'options' => [
@@ -169,7 +183,6 @@ final class FastSalesTest extends TestCase
             'payment' => [
                 'amount' => '150.000000',
                 'payment_method_id' => $context['cash_method_id'],
-                'destination_account_id' => $context['cash_account_id'],
             ],
         ]));
 
@@ -187,7 +200,7 @@ final class FastSalesTest extends TestCase
         $context = $this->context();
         $this->seedStock($context, '10.000000');
 
-        app(FastSalesService::class)->create($this->payload($context, [
+        $this->createFastSale($this->payload($context, [
             'customer_reference' => 'FS-MIXED',
             'lines' => [
                 ['item_id' => $context['stock_item_id'], 'uom_id' => $context['uom_id'], 'quantity' => '3.000000', 'discount_amount' => '0.000000'],
@@ -215,11 +228,11 @@ final class FastSalesTest extends TestCase
             'created_at' => now(),
             'updated_at' => now(),
         ]);
-        $this->price($context['tenant_id'], $context['stock_item_id'], '120.000000', 'sales', $boxUomId);
+        $this->price($context['tenant_id'], $context['stock_item_id'], '120.000000', 'sales', $boxUomId, $context['currency_id']);
         $this->seedStock($context, '24.000000');
         $taxGroupId = $this->taxGroup($context['tenant_id'], $context['withholding_receivable_account_id']);
 
-        $result = app(FastSalesService::class)->create($this->payload($context, [
+        $result = $this->createFastSale($this->payload($context, [
             'customer_reference' => 'FS-UOM-TAX',
             'lines' => [[
                 'item_id' => $context['stock_item_id'],
@@ -236,8 +249,8 @@ final class FastSalesTest extends TestCase
             ],
             'payment' => [
                 'lines' => [
-                    ['amount' => '100.000000', 'payment_method_id' => $context['cash_method_id'], 'destination_account_id' => $context['cash_account_id']],
-                    ['amount' => '50.000000', 'payment_method_id' => $context['bank_method_id'], 'destination_account_id' => $context['bank_account_id']],
+                    ['amount' => '100.000000', 'payment_method_id' => $context['cash_method_id']],
+                    ['amount' => '50.000000', 'payment_method_id' => $context['bank_method_id']],
                 ],
             ],
         ]));
@@ -258,7 +271,7 @@ final class FastSalesTest extends TestCase
         $context = $this->context();
 
         try {
-            app(FastSalesService::class)->preview($this->payload($context, [
+            $this->previewFastSale($this->payload($context, [
                 'customer_reference' => 'FS-NOSTOCK',
             ]));
             $this->fail('Expected insufficient stock validation to fail.');
@@ -267,7 +280,7 @@ final class FastSalesTest extends TestCase
         }
 
         $this->expectException(InvalidArgumentException::class);
-        app(FastSalesService::class)->create($this->payload($context, [
+        $this->createFastSale($this->payload($context, [
             'customer_reference' => 'FS-NOSTOCK-CREATE',
             'options' => [
                 'create_sales_order_only' => false,
@@ -287,7 +300,7 @@ final class FastSalesTest extends TestCase
         $this->seedStock($context, '10.000000');
 
         $this->expectException(InvalidArgumentException::class);
-        app(FastSalesService::class)->create($this->payload($context, [
+        $this->createFastSale($this->payload($context, [
             'customer_reference' => 'FS-CREDIT-LIMIT',
             'lines' => [[
                 'item_id' => $context['stock_item_id'],
@@ -307,15 +320,15 @@ final class FastSalesTest extends TestCase
             'customer_reference' => 'FS-IDEMPOTENT',
             'idempotency_key' => 'idem-fast-sales-test',
         ]);
-        $first = app(FastSalesService::class)->create($payload);
-        $second = app(FastSalesService::class)->create($payload);
+        $first = $this->createFastSale($payload);
+        $second = $this->createFastSale($payload);
 
         $this->assertSame($first['documents']['goods_delivery']['id'], $second['documents']['goods_delivery']['id']);
         $this->assertSame(1, SalesDelivery::query()->count());
         $this->assertSame(1, Invoice::query()->count());
 
         $this->expectException(InvalidArgumentException::class);
-        app(FastSalesService::class)->create($this->payload($context, [
+        $this->createFastSale($this->payload($context, [
             'customer_reference' => 'FS-IDEMPOTENT',
             'idempotency_key' => 'idem-fast-sales-test',
             'lines' => [[
@@ -357,7 +370,7 @@ final class FastSalesTest extends TestCase
         });
 
         try {
-            app(FastSalesService::class)->create($this->payload($context, ['customer_reference' => 'FS-ROLLBACK']));
+            $this->createFastSale($this->payload($context, ['customer_reference' => 'FS-ROLLBACK']));
             $this->fail('Expected posting failure.');
         } catch (InvalidArgumentException $exception) {
             $this->assertSame('Posting failed.', $exception->getMessage());
@@ -378,15 +391,39 @@ final class FastSalesTest extends TestCase
         $otherCustomerId = $this->customer($otherTenantId, 'CUS-OTHER');
 
         $this->expectException(InvalidArgumentException::class);
-        app(FastSalesService::class)->preview($this->payload($context, [
+        $this->previewFastSale($this->payload($context, [
             'customer_id' => $otherCustomerId,
             'grand_total' => '1.000000',
+        ]));
+    }
+
+    public function test_internal_payment_finance_fields_are_rejected(): void
+    {
+        $context = $this->context();
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->previewFastSale($this->payload($context, [
+            'options' => [
+                'create_sales_order_only' => false,
+                'deliver_items_now' => true,
+                'create_customer_invoice_now' => true,
+                'record_customer_receipt_now' => true,
+            ],
+            'payment' => [
+                'amount' => '500.000000',
+                'payment_method_id' => $context['cash_method_id'],
+                'destination_account_id' => $context['cash_account_id'],
+            ],
         ]));
     }
 
     public function test_organization_scope_is_enforced_for_customer_references(): void
     {
         $tenantId = $this->tenant('ORG');
+        $this->useTenantContext($tenantId);
+        $this->timezone();
+        $currencyId = $this->currency('LKR');
+        DB::table('tenants')->where('id', $tenantId)->update(['base_currency_id' => $currencyId]);
         $organizationUnitId = $this->organizationUnit($tenantId, 'ORG-A');
         $otherOrganizationUnitId = $this->organizationUnit($tenantId, 'ORG-B');
         $uomId = $this->uom($tenantId, 'PCS-ORG');
@@ -395,7 +432,7 @@ final class FastSalesTest extends TestCase
         $otherCustomerId = $this->customer($tenantId, 'CUS-ORG-B', $otherOrganizationUnitId);
         $stockItemId = $this->item($tenantId, 'ITEM-ORG', 'stock', true, $uomId, $organizationUnitId);
         $accounts = $this->finance($tenantId, $organizationUnitId);
-        $this->price($tenantId, $stockItemId, '100.000000', 'sales', $uomId, $organizationUnitId);
+        $this->price($tenantId, $stockItemId, '100.000000', 'sales', $uomId, $currencyId, $organizationUnitId);
         $this->seedStock([
             'tenant_id' => $tenantId,
             'warehouse_id' => $warehouseId,
@@ -404,14 +441,14 @@ final class FastSalesTest extends TestCase
         ], '10.000000');
 
         $this->expectException(InvalidArgumentException::class);
-        app(FastSalesService::class)->preview([
+        $this->previewFastSale([
             'tenant_id' => $tenantId,
             'organization_unit_id' => $organizationUnitId,
             'customer_id' => $otherCustomerId,
             'customer_reference' => 'FS-ORG',
             'transaction_date' => '2026-06-16',
             'warehouse_id' => $warehouseId,
-            'currency_id' => null,
+            'currency_id' => $currencyId,
             'exchange_rate' => '1.000000',
             'payment_terms' => 'net_30',
             'options' => [
@@ -430,6 +467,24 @@ final class FastSalesTest extends TestCase
     }
 
     /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    private function createFastSale(array $payload): array
+    {
+        return app(FastSalesService::class)->create($payload);
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    private function previewFastSale(array $payload): array
+    {
+        return app(FastSalesService::class)->preview($payload);
+    }
+
+    /**
      * @param  array<string, mixed>  $overrides
      * @return array<string, mixed>
      */
@@ -444,7 +499,7 @@ final class FastSalesTest extends TestCase
             'customer_reference' => 'FS-'.Str::upper(Str::random(8)),
             'transaction_date' => '2026-06-16',
             'warehouse_id' => $context['warehouse_id'],
-            'currency_id' => null,
+            'currency_id' => $context['currency_id'],
             'exchange_rate' => '1.000000',
             'payment_terms' => 'net_30',
             'options' => [
@@ -469,6 +524,10 @@ final class FastSalesTest extends TestCase
     private function context(array $overrides = []): array
     {
         $tenantId = $this->tenant();
+        $this->useTenantContext($tenantId);
+        $this->timezone();
+        $currencyId = $this->currency('LKR');
+        DB::table('tenants')->where('id', $tenantId)->update(['base_currency_id' => $currencyId]);
         $organizationUnitId = $this->nullableInt($overrides['organization_unit_id'] ?? null);
         $uomId = $this->uom($tenantId, 'PCS');
         $customerId = $this->customer($tenantId, 'CUS-FS', $organizationUnitId);
@@ -478,8 +537,8 @@ final class FastSalesTest extends TestCase
         $accounts = $this->finance($tenantId, $organizationUnitId);
         $cashMethodId = $this->paymentMethod($tenantId, 'CASH', 'cash', 'inbound');
         $bankMethodId = $this->paymentMethod($tenantId, 'BANK', 'bank_transfer', 'inbound');
-        $this->price($tenantId, $stockItemId, '100.000000', 'sales', $uomId, $organizationUnitId);
-        $this->price($tenantId, $serviceItemId, '75.000000', 'service', $uomId, $organizationUnitId);
+        $this->price($tenantId, $stockItemId, '100.000000', 'sales', $uomId, $currencyId, $organizationUnitId);
+        $this->price($tenantId, $serviceItemId, '75.000000', 'service', $uomId, $currencyId, $organizationUnitId);
 
         if (array_key_exists('credit_limit', $overrides)) {
             DB::table('customers')->where('id', $customerId)->update(['credit_limit' => $overrides['credit_limit']]);
@@ -501,6 +560,7 @@ final class FastSalesTest extends TestCase
         return [
             'tenant_id' => $tenantId,
             'organization_unit_id' => $organizationUnitId,
+            'currency_id' => $currencyId,
             'uom_id' => $uomId,
             'customer_id' => $customerId,
             'warehouse_id' => $warehouseId,
@@ -547,8 +607,154 @@ final class FastSalesTest extends TestCase
             'name' => 'Fast Sales '.$suffix,
             'slug' => 'fast-sales-'.Str::lower($suffix),
             'status' => 'active',
+            'status_changed_at' => now(),
             'created_at' => now(),
             'updated_at' => now()]);
+    }
+
+    private function useTenantContext(int $tenantId): void
+    {
+        $tenant = DB::table('tenants')->where('id', $tenantId)->first();
+        if ($tenant === null) {
+            throw new InvalidArgumentException('Fast Sales test tenant was not found.');
+        }
+        $tenantRecord = new DataRecord([
+            'id' => (int) $tenant->id,
+            'uuid' => (string) $tenant->uuid,
+            'code' => (string) $tenant->code,
+            'name' => (string) $tenant->name,
+            'slug' => (string) $tenant->slug,
+            'status' => (string) $tenant->status,
+        ]);
+        $currentTenant = new CurrentTenantContext(
+            tenant: $tenantRecord,
+            tenantId: (int) $tenant->id,
+            tenantCode: (string) $tenant->code,
+            tenantUuid: (string) $tenant->uuid,
+            domain: null,
+            status: (string) $tenant->status,
+            applicationId: null,
+            source: 'fast_sales_test',
+        );
+
+        $this->app->instance(TenantExecutionContextInterface::class, new class($tenantId) implements TenantExecutionContextInterface
+        {
+            public function __construct(private readonly int $tenantId) {}
+
+            public function tenantId(): ?int
+            {
+                return $this->tenantId;
+            }
+
+            public function isActive(): bool
+            {
+                return true;
+            }
+
+            public function isControlPlane(): bool
+            {
+                return false;
+            }
+
+            public function runForTenant(int $tenantId, callable $callback): mixed
+            {
+                if ($tenantId !== $this->tenantId) {
+                    throw new InvalidArgumentException('Nested tenant execution cannot switch tenant ownership.');
+                }
+
+                return $callback();
+            }
+
+            public function runAsControlPlane(callable $callback): mixed
+            {
+                throw new InvalidArgumentException('Tenant-scoped Fast Sales tests cannot enter control-plane execution.');
+            }
+        });
+        $this->app->instance(CurrentTenantContextAccessorInterface::class, new class($currentTenant) implements CurrentTenantContextAccessorInterface
+        {
+            public function __construct(private readonly CurrentTenantContext $currentTenant) {}
+
+            public function current(): ?CurrentTenantContext
+            {
+                return $this->currentTenant;
+            }
+
+            public function requireCurrent(): CurrentTenantContext
+            {
+                return $this->currentTenant;
+            }
+
+            public function currentTenant(): ?DataRecord
+            {
+                return $this->currentTenant->tenant();
+            }
+
+            public function currentTenantId(): ?int
+            {
+                return $this->currentTenant->tenantId();
+            }
+
+            public function currentTenantCode(): ?string
+            {
+                return $this->currentTenant->tenantCode();
+            }
+
+            public function currentTenantUuid(): ?string
+            {
+                return $this->currentTenant->tenantUuid();
+            }
+
+            public function currentTenantDomain(): ?string
+            {
+                return $this->currentTenant->domain();
+            }
+
+            public function currentApplicationId(): ?string
+            {
+                return $this->currentTenant->applicationId();
+            }
+        });
+        $user = new class implements \Illuminate\Contracts\Auth\Authenticatable
+        {
+            public function getAuthIdentifierName(): string { return 'id'; }
+            public function getAuthIdentifier(): int { return 1; }
+            public function getAuthPasswordName(): string { return 'password'; }
+            public function getAuthPassword(): string { return ''; }
+            public function getRememberToken(): ?string { return null; }
+            public function setRememberToken($value): void {}
+            public function getRememberTokenName(): string { return 'remember_token'; }
+        };
+        $currentUser = new CurrentUserContext(
+            user: $user,
+            userId: 1,
+            guard: 'test',
+            provider: null,
+            applicationId: null,
+        );
+        $this->app->instance(CurrentUserContextAccessorInterface::class, new class($currentUser) implements CurrentUserContextAccessorInterface
+        {
+            public function __construct(private readonly CurrentUserContext $currentUser) {}
+
+            public function current(): ?CurrentUserContext
+            {
+                return $this->currentUser;
+            }
+
+            public function requireCurrent(): CurrentUserContext
+            {
+                return $this->currentUser;
+            }
+
+            public function currentUserId(): ?int
+            {
+                return $this->currentUser->userId();
+            }
+
+            public function currentApplicationId(): ?string
+            {
+                return $this->currentUser->applicationId();
+            }
+        });
     }
 
     private function organizationUnit(int $tenantId, string $code): int
@@ -582,6 +788,34 @@ final class FastSalesTest extends TestCase
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+    }
+
+    private function currency(string $code): int
+    {
+        return (int) DB::table('currencies')->insertGetId([
+            'code' => $code,
+            'name' => $code.' Currency',
+            'symbol' => $code,
+            'decimal_places' => 2,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    private function timezone(): void
+    {
+        foreach (['UTC', 'Asia/Colombo'] as $timezone) {
+            DB::table('timezones')->updateOrInsert(
+                ['name' => $timezone],
+                [
+                    'display_name' => $timezone,
+                    'is_active' => true,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ],
+            );
+        }
     }
 
     private function customer(int $tenantId, string $code, ?int $organizationUnitId = null): int
@@ -637,19 +871,31 @@ final class FastSalesTest extends TestCase
         ]);
     }
 
-    private function price(int $tenantId, int $itemId, string $amount, string $type, int $uomId, ?int $organizationUnitId = null): void
-    {
+    private function price(
+        int $tenantId,
+        int $itemId,
+        string $amount,
+        string $type,
+        int $uomId,
+        int $currencyId,
+        ?int $organizationUnitId = null,
+    ): void {
         DB::table('item_prices')->insert([
             'tenant_id' => $tenantId,
             'organization_unit_id' => $organizationUnitId,
             'item_id' => $itemId,
             'price_type' => $type,
-            'currency_id' => null,
+            'currency_id' => $currencyId,
             'uom_id' => $uomId,
             'amount' => $amount,
             'effective_from' => '2026-01-01',
             'effective_to' => null,
-            'is_active' => true,
+            'scope_key' => ItemPriceScopeKey::for($organizationUnitId, null, ItemPriceType::from($type), $currencyId, $uomId),
+            'lineage_key' => (string) Str::uuid(),
+            'revision_no' => 1,
+            'recorded_from' => now(),
+            'recorded_to' => null,
+            'correction_reason' => 'Fast Sales test price fixture',
             'created_at' => now(),
             'updated_at' => now(),
         ]);
@@ -674,7 +920,7 @@ final class FastSalesTest extends TestCase
         $cogs = $this->account($tenantId, $organizationUnitId, $expense, '5200', 'Cost of Goods Sold', NormalBalance::Debit);
 
         $this->profile($tenantId, $organizationUnitId, 'sales_invoice', ['receivable' => $receivable, 'revenue' => $revenue, 'tax_payable' => $taxPayable]);
-        $this->profile($tenantId, $organizationUnitId, 'payment_received', ['receivable' => $receivable]);
+        $this->profile($tenantId, $organizationUnitId, 'payment_received', ['cash' => $cash, 'bank' => $bank, 'receivable' => $receivable]);
         $this->profile($tenantId, $organizationUnitId, 'inventory_issue', ['cost_of_goods_sold' => $cogs, 'inventory' => $inventory]);
 
         $year = FinanceFiscalYear::query()->create([
@@ -744,6 +990,7 @@ final class FastSalesTest extends TestCase
         ]);
         foreach ($rules as $key => $account) {
             FinancePostingProfileRule::query()->create([
+                'tenant_id' => $tenantId,
                 'posting_profile_id' => $profile->getKey(),
                 'line_key' => $key,
                 'account_id' => $account->getKey(),
@@ -761,7 +1008,7 @@ final class FastSalesTest extends TestCase
             'method_type' => $type,
             'direction_allowed' => $direction,
             'requires_reference' => false,
-            'requires_bank_account' => $type === 'bank_transfer',
+            'requires_instrument_details' => false,
             'is_active' => true,
             'created_at' => now(),
             'updated_at' => now(),
@@ -799,8 +1046,8 @@ final class FastSalesTest extends TestCase
             'updated_at' => now(),
         ]);
         DB::table('tax_rates')->insert([
-            ['tax_id' => $vat, 'rate' => '10.000000', 'effective_from' => '2026-01-01', 'active' => true, 'created_at' => now(), 'updated_at' => now()],
-            ['tax_id' => $wht, 'rate' => '5.000000', 'effective_from' => '2026-01-01', 'active' => true, 'created_at' => now(), 'updated_at' => now()],
+            ['tenant_id' => $tenantId, 'tax_id' => $vat, 'rate' => '10.000000', 'effective_from' => '2026-01-01', 'active' => true, 'created_at' => now(), 'updated_at' => now()],
+            ['tenant_id' => $tenantId, 'tax_id' => $wht, 'rate' => '5.000000', 'effective_from' => '2026-01-01', 'active' => true, 'created_at' => now(), 'updated_at' => now()],
         ]);
         $group = DB::table('tax_groups')->insertGetId([
             'tenant_id' => $tenantId,
@@ -812,8 +1059,8 @@ final class FastSalesTest extends TestCase
             'updated_at' => now(),
         ]);
         DB::table('tax_group_lines')->insert([
-            ['tax_group_id' => $group, 'tax_id' => $vat, 'sequence' => 1, 'active' => true, 'created_at' => now(), 'updated_at' => now()],
-            ['tax_group_id' => $group, 'tax_id' => $wht, 'sequence' => 2, 'active' => true, 'created_at' => now(), 'updated_at' => now()],
+            ['tenant_id' => $tenantId, 'tax_group_id' => $group, 'tax_id' => $vat, 'sequence' => 1, 'active' => true, 'created_at' => now(), 'updated_at' => now()],
+            ['tenant_id' => $tenantId, 'tax_group_id' => $group, 'tax_id' => $wht, 'sequence' => 2, 'active' => true, 'created_at' => now(), 'updated_at' => now()],
         ]);
         DB::table('tax_posting_profiles')->insert([
             'tenant_id' => $tenantId,
