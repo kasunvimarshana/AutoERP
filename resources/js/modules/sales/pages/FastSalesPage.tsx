@@ -15,13 +15,7 @@ import { CustomerLookupSelect, SalesCurrencyLookupSelect, SalesWarehouseLocation
 import { blankFastSalesLine, FastSalesLines, type FastSalesLineRow } from '../components/FastSalesLines';
 import { FastSalesSummary } from '../components/FastSalesSummary';
 
-type FastSalesWorkflowMode =
-    | 'order_only'
-    | 'delivery_only'
-    | 'credit_sale'
-    | 'cash_sale'
-    | 'direct_sale'
-    | 'direct_sale_paid';
+type FastSalesWorkflowMode = 'order_only' | 'delivery_only' | 'credit_sale' | 'cash_sale' | 'direct_sale' | 'direct_sale_paid';
 
 const paymentTerms = [
     { value: 'due_on_receipt', label: 'Due on receipt' },
@@ -39,7 +33,6 @@ const workflowOptions: Array<{ value: FastSalesWorkflowMode; label: string; hint
     { value: 'direct_sale_paid', label: 'Direct service + receipt', hint: 'Invoice and receipt for non-stock lines' },
 ];
 
-
 function workflowNeedsWarehouse(mode: FastSalesWorkflowMode): boolean {
     return ['order_only', 'delivery_only', 'credit_sale', 'cash_sale'].includes(mode);
 }
@@ -49,10 +42,7 @@ function workflowRecordsReceipt(mode: FastSalesWorkflowMode): boolean {
 }
 
 function newIdempotencyKey() {
-    if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
-        return crypto.randomUUID();
-    }
-
+    if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID();
     return `fast-sales-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
@@ -72,7 +62,6 @@ export default function FastSalesPage() {
     const [lines, setLines] = useState<FastSalesLineRow[]>([blankFastSalesLine()]);
     const [paymentAmount, setPaymentAmount] = useState('');
     const [paymentMethodId, setPaymentMethodId] = useState('');
-    const [paymentAccountId, setPaymentAccountId] = useState('');
     const [paymentReference, setPaymentReference] = useState('');
     const [instrumentNumber, setInstrumentNumber] = useState('');
     const [instrumentDate, setInstrumentDate] = useState('');
@@ -84,9 +73,9 @@ export default function FastSalesPage() {
     const [submitting, setSubmitting] = useState(false);
 
     const createOrderOnly = workflowMode === 'order_only';
-    const deliverItemsNow = workflowMode === 'delivery_only' || workflowMode === 'credit_sale' || workflowMode === 'cash_sale';
-    const createInvoice = workflowMode === 'credit_sale' || workflowMode === 'cash_sale' || workflowMode === 'direct_sale' || workflowMode === 'direct_sale_paid';
-    const recordReceipt = workflowMode === 'cash_sale' || workflowMode === 'direct_sale_paid';
+    const deliverItemsNow = ['delivery_only', 'credit_sale', 'cash_sale'].includes(workflowMode);
+    const createInvoice = ['credit_sale', 'cash_sale', 'direct_sale', 'direct_sale_paid'].includes(workflowMode);
+    const recordReceipt = workflowRecordsReceipt(workflowMode);
     const needsWarehouse = createOrderOnly || deliverItemsNow;
 
     const changeWorkflowMode = (nextMode: FastSalesWorkflowMode) => {
@@ -97,7 +86,6 @@ export default function FastSalesPage() {
         if (!workflowRecordsReceipt(nextMode)) {
             setPaymentAmount('');
             setPaymentMethodId('');
-            setPaymentAccountId('');
             setPaymentReference('');
             setInstrumentNumber('');
             setInstrumentDate('');
@@ -107,22 +95,16 @@ export default function FastSalesPage() {
         setWorkflowMode(nextMode);
     };
 
-    const dirty = Boolean(
-        customer
-        || customerReference
-        || notes
-        || lines.some((line) => line.item || line.unit_price || line.discount_amount !== '0.000000'),
-    );
+    const dirty = Boolean(customer || customerReference || notes || lines.some((line) => line.item || line.unit_price || line.discount_amount !== '0.000000'));
     useUnsavedChanges(dirty && !result && !submitting);
     const errorFor = (field: string) => fieldError(error, field);
-
     const canSubmit = useMemo(() => Boolean(
         customer?.id
         && customerReference.trim()
         && lines.some((line) => line.item?.id)
         && (!needsWarehouse || warehouse?.id)
-        && (!recordReceipt || (paymentAmount.trim() && paymentAccountId)),
-    ), [customer, customerReference, lines, needsWarehouse, paymentAccountId, paymentAmount, recordReceipt, warehouse]);
+        && (!recordReceipt || (paymentAmount.trim() && paymentMethodId)),
+    ), [customer, customerReference, lines, needsWarehouse, paymentAmount, paymentMethodId, recordReceipt, warehouse]);
 
     const payload = (): FastSalesPayload => ({
         idempotency_key: idempotencyKey,
@@ -153,7 +135,6 @@ export default function FastSalesPage() {
         payment: recordReceipt ? {
             amount: paymentAmount || undefined,
             payment_method_id: paymentMethodId ? Number(paymentMethodId) : undefined,
-            destination_account_id: paymentAccountId ? Number(paymentAccountId) : undefined,
             reference: paymentReference || undefined,
             instrument_number: instrumentNumber || undefined,
             instrument_date: instrumentDate || undefined,
@@ -163,12 +144,7 @@ export default function FastSalesPage() {
     const applyPreviewToLines = (next: FastSalesResult) => {
         setLines((current) => current.map((row, index) => {
             const previewLine = next.lines[index];
-            if (!previewLine) return row;
-
-            return {
-                ...row,
-                unit_price: row.unit_price || previewLine.unit_price,
-            };
+            return previewLine ? { ...row, unit_price: row.unit_price || previewLine.unit_price } : row;
         }));
     };
 
@@ -179,9 +155,7 @@ export default function FastSalesPage() {
             const next = await previewFastSales(payload());
             setPreview(next);
             applyPreviewToLines(next);
-            if (recordReceipt && !paymentAmount) {
-                setPaymentAmount(next.summary.grand_total);
-            }
+            if (recordReceipt && !paymentAmount) setPaymentAmount(next.summary.grand_total);
         } catch (requestError) {
             setError(toApiError(requestError));
         } finally {
@@ -190,26 +164,23 @@ export default function FastSalesPage() {
     };
 
     return (
-        <form
-            className="space-y-5"
-            onSubmit={async (event) => {
-                event.preventDefault();
-                if (submitting || !canSubmit) return;
-                setSubmitting(true);
-                setError(null);
-                try {
-                    const created = await createFastSales(payload());
-                    setResult(created);
-                    setPreview(created);
-                    setIdempotencyKey(newIdempotencyKey());
-                    applyPreviewToLines(created);
-                } catch (requestError) {
-                    setError(toApiError(requestError));
-                } finally {
-                    setSubmitting(false);
-                }
-            }}
-        >
+        <form className="space-y-5" onSubmit={async (event) => {
+            event.preventDefault();
+            if (submitting || !canSubmit) return;
+            setSubmitting(true);
+            setError(null);
+            try {
+                const created = await createFastSales(payload());
+                setResult(created);
+                setPreview(created);
+                setIdempotencyKey(newIdempotencyKey());
+                applyPreviewToLines(created);
+            } catch (requestError) {
+                setError(toApiError(requestError));
+            } finally {
+                setSubmitting(false);
+            }
+        }}>
             <ContentHeader title="Fast Sales" description="Quick customer sales entry" />
             <ErrorAlert error={context.error ?? error} />
             <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
@@ -217,12 +188,7 @@ export default function FastSalesPage() {
                     <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
                         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                             {workflowOptions.map((option) => (
-                                <button
-                                    key={option.value}
-                                    type="button"
-                                    className={`rounded-lg border px-4 py-3 text-left transition ${workflowMode === option.value ? 'border-sky-500 bg-sky-50 text-sky-900' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'}`}
-                                    onClick={() => changeWorkflowMode(option.value)}
-                                >
+                                <button key={option.value} type="button" className={`rounded-lg border px-4 py-3 text-left transition ${workflowMode === option.value ? 'border-sky-500 bg-sky-50 text-sky-900' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'}`} onClick={() => changeWorkflowMode(option.value)}>
                                     <div className="text-sm font-semibold">{option.label}</div>
                                     <div className="mt-1 text-xs text-slate-500">{option.hint}</div>
                                 </button>
@@ -246,22 +212,9 @@ export default function FastSalesPage() {
 
                     {recordReceipt && (
                         <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-                            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                                <Select
-                                    label="Payment method"
-                                    value={paymentMethodId}
-                                    onChange={(event) => setPaymentMethodId(event.target.value)}
-                                    options={(context.data?.payment_methods ?? []).map((method) => ({ value: method.id, label: `${method.code ?? ''} ${method.name ?? ''}`.trim() }))}
-                                    error={errorFor('payment.payment_method_id')}
-                                />
+                            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                                <Select label="Payment method" value={paymentMethodId} onChange={(event) => setPaymentMethodId(event.target.value)} options={(context.data?.payment_methods ?? []).map((method) => ({ value: method.id, label: `${method.code ?? ''} ${method.name ?? ''}`.trim() }))} error={errorFor('payment.payment_method_id')} />
                                 <DecimalInput label="Received amount" value={paymentAmount} onChange={(event) => setPaymentAmount(event.target.value)} error={errorFor('payment.amount')} />
-                                <Select
-                                    label="Deposit account"
-                                    value={paymentAccountId}
-                                    onChange={(event) => setPaymentAccountId(event.target.value)}
-                                    options={(context.data?.payment_accounts ?? []).map((account) => ({ value: account.id, label: `${account.code ?? ''} ${account.name ?? ''}`.trim() }))}
-                                    error={errorFor('payment.destination_account_id')}
-                                />
                                 <Input label="Reference" value={paymentReference} onChange={(event) => setPaymentReference(event.target.value)} error={errorFor('payment.reference')} />
                                 <Input label="Cheque / card no." value={instrumentNumber} onChange={(event) => setInstrumentNumber(event.target.value)} error={errorFor('payment.instrument_number')} />
                                 <Input label="Instrument date" type="date" value={instrumentDate} onChange={(event) => setInstrumentDate(event.target.value)} error={errorFor('payment.instrument_date')} />
@@ -271,19 +224,10 @@ export default function FastSalesPage() {
 
                     <details className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
                         <summary className="cursor-pointer text-sm font-semibold text-slate-800">Advanced</summary>
-                        <div className="mt-4">
-                            <Textarea label="Notes" value={notes} onChange={(event) => setNotes(event.target.value)} error={errorFor('notes')} />
-                        </div>
+                        <div className="mt-4"><Textarea label="Notes" value={notes} onChange={(event) => setNotes(event.target.value)} error={errorFor('notes')} /></div>
                     </details>
                 </main>
-                <FastSalesSummary
-                    preview={preview}
-                    result={result}
-                    submitting={submitting}
-                    previewing={previewing}
-                    canSubmit={canSubmit}
-                    onPreview={() => void runPreview()}
-                />
+                <FastSalesSummary preview={preview} result={result} submitting={submitting} previewing={previewing} canSubmit={canSubmit} onPreview={() => void runPreview()} />
             </div>
         </form>
     );
