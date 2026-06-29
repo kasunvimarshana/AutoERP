@@ -13,23 +13,31 @@ final class SettlePaymentLineRequest extends TenantScopedRequest
         return [
             'tenant_id' => ['required', 'integer', 'min:1'],
             'organization_unit_id' => ['nullable', 'integer', 'min:1'],
+            'expected_payment_version' => ['required', 'integer', 'min:1'],
+            'expected_line_version' => ['required', 'integer', 'min:1'],
             'status' => ['required', 'string', 'max:50'],
-            'metadata' => ['nullable', 'array'],
+            'reason' => ['nullable', 'string', 'max:1000'],
+            'metadata' => ['prohibited'],
         ];
     }
 
     public function settlementStatus(): string
     {
-        return (string) $this->input('status');
+        return strtolower(trim((string) $this->input('status')));
     }
 
-    /**
-     * @return array<string, mixed>|null
-     */
-    public function metadata(): ?array
+    public function expectedPaymentVersion(): int
     {
-        $metadata = $this->input('metadata');
+        return (int) $this->input('expected_payment_version');
+    }
 
-        return is_array($metadata) ? $metadata : null;
+    public function expectedLineVersion(): int
+    {
+        return (int) $this->input('expected_line_version');
+    }
+
+    public function reason(): ?string
+    {
+        return $this->filled('reason') ? trim((string) $this->input('reason')) : null;
     }
 }
