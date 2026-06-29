@@ -20,60 +20,64 @@ final class PaymentAllocationService
     public function __construct(
         private readonly DecimalMath $math,
         private readonly PaymentValidationService $validator,
-        private readonly PaymentStatusService $statuses,
+        private readonly PaymentAllocationStateService $allocationStates,
         private readonly PaymentBalanceSynchronizer $balances,
         private readonly InvoiceBalanceProviderInterface $invoiceBalances,
         private readonly InvoiceSettlementServiceInterface $invoiceSettlements,
     ) {}
 
-    /** @param list<PaymentAllocationData> $allocations */
     public function createPending(Payment $payment, array $allocations): Payment
     {
         return DB::transaction(function () use ($payment, $allocations): Payment {
-            $payment = Payment::query()->lockForUpdate()->with(['lines', 'allocations'])->findOrFail($payment->getKey());
+            $locked = Payment::query()->lockForUpdate()->with(['lines', 'allocations'])->findOrFail($payment->getKey());
             $pendingTotal = '0.000000';
             foreach ($allocations as $allocation) {
                 if (! $allocation instanceof PaymentAllocationData) {
                     throw new InvalidArgumentException('Payment allocations must be PaymentAllocationData instances.');
                 }
                 $pendingTotal = $this->math->add($pendingTotal, $allocation->allocatedAmount);
-                if ($this->math->compare($pendingTotal, (string) $payment->total_amount) > 0) {
+                if ($this->math->compare($pendingTotal, (string) $locked->total_amount) > 0) {
                     throw new InvalidArgumentException('Payment allocation total cannot exceed payment total.');
                 }
-                $this->createPendingOne($payment, $allocation);
+                $this->createPendingOne($locked, $allocation);
             }
 
-            $this->balances->sync($payment->refresh(), 'Pending payment allocations recorded.');
+            $this->bumpVersion($locked);
+            $this->balances->sync($locked->refresh(), 'Pending payment allocations recorded.');
 
-            return $payment->refresh()->load(['lines', 'allocations', 'unappliedBalance']);
+            return $locked->refresh()->load(['lines', 'allocations', 'unappliedBalance']);
         });
     }
 
-    /** @param list<PaymentAllocationData> $allocations */
-    public function allocate(Payment $payment, array $allocations): Payment
-    {
-        return DB::transaction(function () use ($payment, $allocations): Payment {
-            $payment = Payment::query()->lockForUpdate()->with(['lines', 'allocations'])->findOrFail($payment->getKey());
-            $this->statuses->assertAllocatable($payment);
+    public function allocate(
+        Payment $payment,
+        array $allocations,
+        int $expectedVersion,
+        ?int $actorId = null,
+    ): Payment {
+        return DB::transaction(function () use ($payment, $allocations, $expectedVersion, $actorId): Payment {
+            $locked = Payment::query()->lockForUpdate()->with(['lines', 'allocations'])->findOrFail($payment->getKey());
+            $this->assertVersion($locked, $expectedVersion);
+            $this->allocationStates->assertAllocatable($locked);
 
             foreach ($allocations as $allocation) {
                 if (! $allocation instanceof PaymentAllocationData) {
                     throw new InvalidArgumentException('Payment allocations must be PaymentAllocationData instances.');
                 }
-
-                $this->allocateOne($payment, $allocation);
-                $payment = $this->syncPaymentAmounts($payment->refresh());
+                $this->allocateOne($locked, $allocation);
+                $locked = $this->balances->sync($locked->refresh(), 'Payment allocation recalculated.', $actorId);
             }
+            $this->bumpVersion($locked);
 
-            return $payment->load(['lines', 'allocations', 'unappliedBalance']);
+            return $locked->refresh()->load(['lines', 'allocations', 'unappliedBalance', 'lifecycleEvents']);
         });
     }
 
     public function realizePending(Payment $payment, ?int $actorId = null): Payment
     {
         return DB::transaction(function () use ($payment, $actorId): Payment {
-            $payment = Payment::query()->lockForUpdate()->with(['allocations'])->findOrFail($payment->getKey());
-            foreach ($payment->allocations()->where('status', AllocationStatus::Pending->value)->orderBy('invoice_id')->orderBy('id')->get() as $allocation) {
+            $locked = Payment::query()->lockForUpdate()->with(['allocations'])->findOrFail($payment->getKey());
+            foreach ($locked->allocations()->where('status', AllocationStatus::Pending->value)->orderBy('invoice_id')->orderBy('id')->get() as $allocation) {
                 $data = new PaymentAllocationData(
                     invoiceId: (int) $allocation->invoice_id,
                     allocatedAmount: (string) $allocation->allocated_amount,
@@ -82,7 +86,7 @@ final class PaymentAllocationService
                     metadata: is_array($allocation->metadata) ? $allocation->metadata : null,
                 );
                 $invoiceBalance = $this->invoiceBalances->validatePayableState((int) $allocation->invoice_id);
-                $this->validator->validateInvoiceAllocation($payment, $invoiceBalance, $data);
+                $this->validator->validateInvoiceAllocation($locked, $invoiceBalance, $data);
                 if ($this->math->compare((string) $allocation->allocated_amount, $invoiceBalance->remainingAmount) > 0) {
                     throw new InvalidArgumentException('Payment allocation cannot exceed invoice remaining balance.');
                 }
@@ -99,16 +103,23 @@ final class PaymentAllocationService
                     'realized_at' => now(),
                     'realized_by' => $actorId,
                 ])->save();
-                $payment = $this->syncPaymentAmounts($payment->refresh());
+                $locked = $this->balances->sync($locked->refresh(), 'Pending payment allocation realized.', $actorId);
             }
+            $this->bumpVersion($locked);
 
-            return $payment->refresh()->load(['lines', 'allocations', 'unappliedBalance']);
+            return $locked->refresh()->load(['lines', 'allocations', 'unappliedBalance', 'lifecycleEvents']);
         });
     }
 
-    /** @param list<PaymentAllocationData> $allocations */
-    public function allocateByMethod(Payment $payment, string $method, string $allocationDate, array $allocations = [], ?string $amount = null): Payment
-    {
+    public function allocateByMethod(
+        Payment $payment,
+        string $method,
+        string $allocationDate,
+        int $expectedVersion,
+        array $allocations = [],
+        ?string $amount = null,
+        ?int $actorId = null,
+    ): Payment {
         $method = strtolower(trim($method));
         if (in_array($method, ['manual', 'specific_invoice'], true)) {
             return $this->allocate($payment, array_map(
@@ -120,14 +131,23 @@ final class PaymentAllocationService
                     metadata: $allocation->metadata,
                 ),
                 $allocations,
-            ));
+            ), $expectedVersion, $actorId);
         }
-
         if ($method !== 'fifo') {
             throw new InvalidArgumentException('Unsupported payment allocation method.');
         }
 
-        return $this->allocate($payment, $this->fifoAllocations($payment, $allocationDate, $amount));
+        return $this->allocate(
+            $payment,
+            $this->fifoAllocations($payment, $allocationDate, $amount),
+            $expectedVersion,
+            $actorId,
+        );
+    }
+
+    public function syncPaymentAmounts(Payment $payment, ?int $actorId = null): Payment
+    {
+        return $this->balances->sync($payment, 'Payment allocation recalculated.', $actorId);
     }
 
     private function createPendingOne(Payment $payment, PaymentAllocationData $allocation): PaymentAllocation
@@ -162,16 +182,13 @@ final class PaymentAllocationService
     {
         $invoiceBalance = $this->invoiceBalances->validatePayableState($allocation->invoiceId);
         $this->validator->validateInvoiceAllocation($payment, $invoiceBalance, $allocation);
-
-        $availableAmount = $this->availableAmount($payment);
-        if ($this->math->compare($allocation->allocatedAmount, $availableAmount) > 0) {
+        if ($this->math->compare($allocation->allocatedAmount, $this->availableAmount($payment)) > 0) {
             throw new InvalidArgumentException('Payment allocation cannot exceed available payment amount.');
         }
         if ($this->math->compare($allocation->allocatedAmount, $invoiceBalance->remainingAmount) > 0) {
             throw new InvalidArgumentException('Payment allocation cannot exceed invoice remaining balance.');
         }
         $this->assertNoExistingPaymentInvoiceAllocation($payment, $allocation->invoiceId);
-
         $settlement = $this->invoiceSettlements->applyPaymentAllocation($allocation->invoiceId, $allocation->allocatedAmount, false);
 
         return PaymentAllocation::query()->create([
@@ -188,13 +205,9 @@ final class PaymentAllocationService
             'allocation_method' => $allocation->allocationMethod,
             'status' => AllocationStatus::Active->value,
             'realized_at' => now(),
+            'realized_by' => null,
             'metadata' => $allocation->metadata,
         ]);
-    }
-
-    public function syncPaymentAmounts(Payment $payment): Payment
-    {
-        return $this->balances->sync($payment, 'Payment allocation recalculated.');
     }
 
     private function availableAmount(Payment $payment): string
@@ -213,7 +226,6 @@ final class PaymentAllocationService
         }
     }
 
-    /** @return list<PaymentAllocationData> */
     private function fifoAllocations(Payment $payment, string $allocationDate, ?string $amount = null): array
     {
         if ($payment->party_type === null || $payment->party_id === null) {
@@ -223,19 +235,18 @@ final class PaymentAllocationService
         $remaining = $amount === null ? $this->availableAmount($payment) : $this->math->normalize($amount);
         $this->validator->assertPositive($remaining, 'FIFO allocation amount');
         $allocations = [];
-        $invoiceBalances = $this->invoiceBalances->getPayableBalancesForParty(
+        foreach ($this->invoiceBalances->getPayableBalancesForParty(
             tenantId: (int) $payment->tenant_id,
             organizationUnitId: $payment->organization_unit_id,
             partyType: $payment->party_type,
             partyId: (int) $payment->party_id,
-        );
-
-        foreach ($invoiceBalances as $invoiceBalance) {
+        ) as $invoiceBalance) {
             if ($this->math->isZero($remaining)) {
                 break;
             }
-            $invoiceRemaining = $invoiceBalance->remainingAmount;
-            $allocatedAmount = $this->math->compare($remaining, $invoiceRemaining) > 0 ? $invoiceRemaining : $remaining;
+            $allocatedAmount = $this->math->compare($remaining, $invoiceBalance->remainingAmount) > 0
+                ? $invoiceBalance->remainingAmount
+                : $remaining;
             $allocations[] = new PaymentAllocationData(
                 invoiceId: $invoiceBalance->sourceId,
                 allocatedAmount: $allocatedAmount,
@@ -250,5 +261,17 @@ final class PaymentAllocationService
         }
 
         return $allocations;
+    }
+
+    private function assertVersion(Payment $payment, int $expectedVersion): void
+    {
+        if ($expectedVersion < 1 || (int) $payment->row_version !== $expectedVersion) {
+            throw new InvalidArgumentException('Payment was changed by another request. Reload it before allocating.');
+        }
+    }
+
+    private function bumpVersion(Payment $payment): void
+    {
+        $payment->forceFill(['row_version' => (int) $payment->row_version + 1])->save();
     }
 }
