@@ -14,10 +14,11 @@ final class ReversePaymentRequest extends TenantScopedRequest
         return [
             'tenant_id' => ['required', 'integer', 'min:1'],
             'organization_unit_id' => ['nullable', 'integer', 'min:1'],
-            'reversal_number' => ['nullable', 'string', 'max:100'],
+            'expected_version' => ['required', 'integer', 'min:1'],
             'reversal_date' => ['required', 'date'],
             'reason' => ['required', 'string', 'max:1000'],
-            'metadata' => ['nullable', 'array'],
+            'reversal_number' => ['prohibited'],
+            'metadata' => ['prohibited'],
         ];
     }
 
@@ -25,11 +26,10 @@ final class ReversePaymentRequest extends TenantScopedRequest
     {
         return new PaymentReversalData(
             paymentId: $paymentId,
-            reversalNumber: (string) $this->input('reversal_number', ''),
+            expectedVersion: (int) $this->input('expected_version'),
             reversalDate: (string) $this->input('reversal_date'),
-            reason: (string) $this->input('reason'),
+            reason: trim((string) $this->input('reason')),
             reversedBy: $this->currentUserId(),
-            metadata: $this->input('metadata'),
         );
     }
 }
