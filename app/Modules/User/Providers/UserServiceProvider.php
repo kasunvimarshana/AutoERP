@@ -14,6 +14,7 @@ use Modules\User\Contracts\PlatformOperatorAuthenticationDirectoryInterface;
 use Modules\User\Contracts\TenantUserAuthenticationDirectoryInterface;
 use Modules\Core\Contracts\PermissionDefinitionRegistryInterface;
 use Modules\User\Http\Middleware\RequirePlatformPermissionMiddleware;
+use Modules\User\Http\Middleware\RequireTenantPermissionMiddleware;
 use Modules\User\Http\Middleware\UserContextResolutionMiddleware;
 use Modules\User\Models\UserModel;
 use Modules\User\Policies\UserPolicy;
@@ -85,6 +86,10 @@ final class UserServiceProvider extends ServiceProvider
             ->register('user', UserPermission::descriptions());
 
         $router = $this->app->make(Router::class);
+        $router->aliasMiddleware(
+            (string) config('user.tenant.permission_middleware_alias', 'tenant.permission'),
+            RequireTenantPermissionMiddleware::class,
+        );
         $router->aliasMiddleware(
             (string) config('user.platform.permission_middleware_alias', 'platform.permission'),
             RequirePlatformPermissionMiddleware::class,
