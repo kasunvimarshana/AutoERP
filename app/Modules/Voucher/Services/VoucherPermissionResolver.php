@@ -5,35 +5,34 @@ declare(strict_types=1);
 namespace Modules\Voucher\Services;
 
 use Modules\Finance\Enums\JournalStatus;
-use Modules\Payment\Enums\PaymentStatus;
+use Modules\Payment\Enums\PaymentDocumentStatus;
+use Modules\Payment\Enums\PaymentPostingStatus;
 
 final class VoucherPermissionResolver
 {
     /**
      * @return list<string>
      */
-    public function forPayment(string $status, bool $hasReversal): array
+    public function forPayment(string $documentStatus, string $postingStatus, bool $hasReversal): array
     {
+        $document = PaymentDocumentStatus::from($documentStatus);
+        $posting = PaymentPostingStatus::from($postingStatus);
         $actions = ['view_source', 'print'];
 
-        if (in_array($status, [PaymentStatus::Draft->value, PaymentStatus::PendingApproval->value], true)) {
+        if (in_array($document, [PaymentDocumentStatus::Draft, PaymentDocumentStatus::Rejected], true)) {
             $actions[] = 'edit_source';
             $actions[] = 'submit';
         }
-
-        if (in_array($status, [PaymentStatus::Draft->value, PaymentStatus::PendingApproval->value], true)) {
+        if ($document === PaymentDocumentStatus::Submitted) {
             $actions[] = 'approve';
         }
-
-        if (in_array($status, [PaymentStatus::Approved->value, PaymentStatus::Draft->value], true)) {
+        if ($document === PaymentDocumentStatus::Approved && $posting === PaymentPostingStatus::NotPosted) {
             $actions[] = 'post';
+            $actions[] = 'void';
         }
-
-        if (! $hasReversal && ! in_array($status, [
-            PaymentStatus::Cancelled->value,
-            PaymentStatus::Void->value,
-            PaymentStatus::Reversed->value,
-        ], true)) {
+        if (! $hasReversal
+            && $document === PaymentDocumentStatus::Approved
+            && $posting === PaymentPostingStatus::Posted) {
             $actions[] = 'reverse';
         }
 
@@ -52,7 +51,6 @@ final class VoucherPermissionResolver
             $actions[] = 'post';
             $actions[] = 'void';
         }
-
         if ($status === JournalStatus::Posted->value && ! $hasReversal) {
             $actions[] = 'reverse';
         }
