@@ -6,9 +6,6 @@ namespace Modules\Sales\Http\Requests;
 
 final class FastSalesRequest extends SalesRequest
 {
-    /**
-     * @return array<string, mixed>
-     */
     public function rules(): array
     {
         if ($this->isMethod('get')) {
@@ -47,7 +44,6 @@ final class FastSalesRequest extends SalesRequest
             'payment' => ['nullable', 'array'],
             'payment.amount' => ['nullable', 'decimal:0,6', 'gt:0'],
             'payment.payment_method_id' => ['nullable', 'integer', 'min:1'],
-            'payment.destination_account_id' => ['nullable', 'integer', 'min:1'],
             'payment.reference' => ['nullable', 'string', 'max:150'],
             'payment.cheque_number' => ['nullable', 'string', 'max:100'],
             'payment.cheque_date' => ['nullable', 'date'],
@@ -59,7 +55,6 @@ final class FastSalesRequest extends SalesRequest
             'payment.lines' => ['nullable', 'array'],
             'payment.lines.*.amount' => ['required_with:payment.lines', 'decimal:0,6', 'gt:0'],
             'payment.lines.*.payment_method_id' => ['nullable', 'integer', 'min:1'],
-            'payment.lines.*.destination_account_id' => ['nullable', 'integer', 'min:1'],
             'payment.lines.*.reference' => ['nullable', 'string', 'max:150'],
             'payment.lines.*.instrument_number' => ['nullable', 'string', 'max:100'],
             'payment.lines.*.instrument_date' => ['nullable', 'date'],
@@ -74,9 +69,6 @@ final class FastSalesRequest extends SalesRequest
         return $rules;
     }
 
-    /**
-     * @return array<string, mixed>
-     */
     public function payload(): array
     {
         return array_merge($this->validated(), [
@@ -87,49 +79,20 @@ final class FastSalesRequest extends SalesRequest
         ]);
     }
 
-    /**
-     * @return list<string>
-     */
+    /** @return list<string> */
     private function clientAuthorityFields(): array
     {
         return [
-            'subtotal',
-            'discount_total',
-            'tax_total',
-            'withholding_total',
-            'grand_total',
-            'received_total',
-            'balance_due',
-            'status',
-            'posting_status',
-            'approval_status',
-            'finance_account_id',
-            'receivable_account_id',
-            'revenue_account_id',
-            'inventory_account_id',
-            'cost_of_goods_sold_account_id',
-            'base_quantity',
-            'base_uom_quantity',
-            'available_stock',
-            'available_quantity',
-            'lines.*.line_total',
-            'lines.*.tax_amount',
-            'lines.*.withholding_amount',
-            'lines.*.base_quantity',
-            'lines.*.base_uom_quantity',
-            'lines.*.available_stock',
-            'lines.*.available_quantity',
-            'lines.*.finance_account_id',
-            'lines.*.status',
-            'lines.*.source_line_type',
-            'lines.*.source_line_id',
-            'payment.status',
-            'payment.posting_status',
-            'payment.outstanding_balance',
-            'payment.finance_account_id',
-            'payment.direction',
-            'payment.lines.*.status',
-            'payment.lines.*.finance_account_id',
+            'subtotal', 'discount_total', 'tax_total', 'withholding_total', 'grand_total', 'received_total', 'balance_due',
+            'status', 'posting_status', 'approval_status',
+            'finance_account_id', 'receivable_account_id', 'revenue_account_id', 'inventory_account_id', 'cost_of_goods_sold_account_id',
+            'base_quantity', 'base_uom_quantity', 'available_stock', 'available_quantity',
+            'lines.*.line_total', 'lines.*.tax_amount', 'lines.*.withholding_amount', 'lines.*.base_quantity',
+            'lines.*.base_uom_quantity', 'lines.*.available_stock', 'lines.*.available_quantity', 'lines.*.finance_account_id',
+            'lines.*.status', 'lines.*.source_line_type', 'lines.*.source_line_id',
+            'payment.status', 'payment.posting_status', 'payment.outstanding_balance', 'payment.finance_account_id',
+            'payment.destination_account_id', 'payment.direction', 'payment.lines.*.status',
+            'payment.lines.*.finance_account_id', 'payment.lines.*.destination_account_id',
         ];
     }
 }
