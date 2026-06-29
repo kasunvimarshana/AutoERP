@@ -24,12 +24,13 @@ final class PaymentMethod extends TenantOwnedModel
     protected function casts(): array
     {
         return array_merge(parent::casts(), [
+            'row_version' => 'integer',
             'tenant_id' => 'integer',
             'organization_unit_id' => 'integer',
             'method_type' => PaymentMethodType::class,
             'direction_allowed' => PaymentMethodDirection::class,
             'requires_reference' => 'boolean',
-            'requires_bank_account' => 'boolean',
+            'requires_instrument_details' => 'boolean',
             'is_active' => 'boolean',
             'sort_order' => 'integer',
             'metadata' => 'array',
