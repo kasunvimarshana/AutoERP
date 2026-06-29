@@ -9,10 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use InvalidArgumentException;
-use Modules\ReferenceData\Models\CurrencyModel;
 use Modules\Core\Models\TenantOwnedModel;
-use Modules\Finance\Models\FinanceAccount;
-use Modules\Finance\Models\FinanceJournalEntry;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Payment\Enums\PaymentAllocationState;
 use Modules\Payment\Enums\PaymentDirection;
@@ -21,6 +18,7 @@ use Modules\Payment\Enums\PaymentInstrumentStatus;
 use Modules\Payment\Enums\PaymentPostingStatus;
 use Modules\Payment\Enums\PaymentStatus;
 use Modules\Payment\Enums\PaymentType;
+use Modules\ReferenceData\Models\CurrencyModel;
 use Modules\Tenant\Models\TenantModel;
 
 final class Payment extends TenantOwnedModel
@@ -34,13 +32,12 @@ final class Payment extends TenantOwnedModel
     protected function casts(): array
     {
         return array_merge(parent::casts(), [
+            'row_version' => 'integer',
             'tenant_id' => 'integer',
             'organization_unit_id' => 'integer',
             'party_id' => 'integer',
             'source_id' => 'integer',
             'currency_id' => 'integer',
-            'bank_account_id' => 'integer',
-            'finance_journal_entry_id' => 'integer',
             'reversal_payment_id' => 'integer',
             'original_payment_id' => 'integer',
             'payment_type' => PaymentType::class,
@@ -61,6 +58,7 @@ final class Payment extends TenantOwnedModel
             'created_by' => 'integer',
             'approved_by' => 'integer',
             'approved_at' => 'datetime',
+            'posted_by' => 'integer',
             'posted_at' => 'datetime',
             'voided_by' => 'integer',
             'voided_at' => 'datetime',
@@ -95,16 +93,6 @@ final class Payment extends TenantOwnedModel
     public function currency(): BelongsTo
     {
         return $this->belongsTo(CurrencyModel::class, 'currency_id');
-    }
-
-    public function bankAccount(): BelongsTo
-    {
-        return $this->belongsTo(FinanceAccount::class, 'bank_account_id');
-    }
-
-    public function financeJournalEntry(): BelongsTo
-    {
-        return $this->belongsTo(FinanceJournalEntry::class, 'finance_journal_entry_id');
     }
 
     public function originalPayment(): BelongsTo
