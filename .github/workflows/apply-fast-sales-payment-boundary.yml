@@ -1,0 +1,127 @@
+name: Apply Fast Sales Payment Boundary
+
+on:
+  push:
+    branches:
+      - payment-financial-trust-boundary
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: "${{ github.event.head_commit.message == 'chore: apply fast sales payment boundary' }}"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: payment-financial-trust-boundary
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Apply source patch
+        run: |
+          base64 --decode tools/apply_fast_sales_payment_boundary.py.b64 > /tmp/apply_fast_sales_payment_boundary.py
+          python3 /tmp/apply_fast_sales_payment_boundary.py
+
+      - name: Add regression coverage and change record
+        run: |
+          cat > app/Modules/Sales/Tests/FastSalesPaymentBoundaryTest.php <<'PHP'
+          <?php
+
+          declare(strict_types=1);
+
+          namespace Modules\Sales\Tests;
+
+          use Tests\TestCase;
+
+          final class FastSalesPaymentBoundaryTest extends TestCase
+          {
+              public function test_fast_sales_receipts_use_the_payment_owned_lifecycle(): void
+              {
+                  $service = file_get_contents(__DIR__.'/../Services/FastSalesService.php');
+
+                  self::assertIsString($service);
+                  self::assertStringContainsString('PaymentDocumentLifecycleService', $service);
+                  self::assertStringContainsString('PaymentPostingService', $service);
+                  self::assertStringContainsString('$this->paymentDocuments->submit', $service);
+                  self::assertStringContainsString('$this->paymentDocuments->approve', $service);
+                  self::assertStringContainsString('$this->paymentPostings', $service);
+                  self::assertStringNotContainsString('PaymentStatus', $service);
+                  self::assertStringNotContainsString('postPaymentFinance', $service);
+                  self::assertStringNotContainsString('destination_account_id', $service);
+                  self::assertStringNotContainsString('payment_accounts', $service);
+                  self::assertStringNotContainsString('requires_bank_account', $service);
+              }
+
+              public function test_fast_sales_ui_does_not_request_a_finance_deposit_account(): void
+              {
+                  $root = dirname(__DIR__, 4);
+                  $page = file_get_contents($root.'/resources/js/modules/sales/pages/FastSalesPage.tsx');
+                  $types = file_get_contents($root.'/resources/js/modules/sales/salesTypes.ts');
+
+                  self::assertIsString($page);
+                  self::assertIsString($types);
+                  self::assertStringNotContainsString('Deposit account', $page);
+                  self::assertStringNotContainsString('destination_account_id', $page);
+                  self::assertStringNotContainsString('payment_accounts', $types);
+                  self::assertStringNotContainsString('requires_bank_account', $types);
+                  self::assertStringContainsString('requires_instrument_details', $types);
+              }
+          }
+          PHP
+
+          mkdir -p docs/changes
+          cat > docs/changes/2026-06-29-fast-sales-payment-lifecycle.md <<'MD'
+          # Fast Sales Payment Lifecycle
+
+          Fast Sales customer receipts now use the Payment module as the authoritative owner of receipt creation, document approval, Finance posting, and invoice-allocation realization.
+
+          ## Changed
+
+          - Removed client-selected Finance deposit accounts from Fast Sales context, request contracts, and UI.
+          - Rejected legacy `destination_account_id` fields instead of silently accepting them.
+          - Created receipt documents as Payment drafts, then submitted, approved, and posted them through Payment-owned lifecycle services.
+          - Removed direct receipt journal construction from Sales.
+          - Updated payment-method lookups to expose `requires_instrument_details`.
+          - Added regression coverage preventing Fast Sales from reintroducing direct Finance-account selection or obsolete Payment status usage.
+
+          ## Verification
+
+          - PHP syntax checks for the changed Sales request, service, and regression test.
+          - TypeScript semantic check and focused ESLint verification.
+          - Static boundary assertions and `git diff --check`.
+          MD
+
+      - name: Verify PHP and boundary rules
+        run: |
+          php -l app/Modules/Sales/Services/FastSalesService.php
+          php -l app/Modules/Sales/Http/Requests/FastSalesRequest.php
+          php -l app/Modules/Sales/Tests/FastSalesPaymentBoundaryTest.php
+          git diff --check
+          grep -q "paymentDocuments->submit" app/Modules/Sales/Services/FastSalesService.php
+          grep -q "paymentPostings" app/Modules/Sales/Services/FastSalesService.php
+          ! grep -R "destination_account_id\|payment_accounts\|requires_bank_account\|postPaymentFinance\|PaymentStatus" \
+            app/Modules/Sales/Services/FastSalesService.php \
+            resources/js/modules/sales/pages/FastSalesPage.tsx \
+            resources/js/modules/sales/salesTypes.ts
+
+      - name: Verify frontend contract
+        run: |
+          npm ci --ignore-scripts
+          npm run typecheck
+          npx eslint resources/js/modules/sales/pages/FastSalesPage.tsx resources/js/modules/sales/salesTypes.ts
+
+      - name: Commit corrected boundary
+        run: |
+          rm tools/apply_fast_sales_payment_boundary.py.b64
+          rm .github/workflows/apply-fast-sales-payment-boundary.yml
+          git config user.name "AutoERP Architecture Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git commit -m "fix(sales): route fast sales receipts through payment lifecycle"
+          git push origin HEAD:payment-financial-trust-boundary
