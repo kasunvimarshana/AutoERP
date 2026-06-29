@@ -1,5 +1,5 @@
 import { Outlet, useLocation } from 'react-router-dom';
-import { resolveTenantRouteEntitlement } from '@/app/access/routeEntitlements';
+import { resolveTenantRouteEntitlement } from '@/app/access/resolvedRouteEntitlements';
 import { parseEnabledTenantModules } from '@/app/access/tenantModules';
 import { AccessDeniedPage } from '@/app/errors/AccessDeniedPage';
 import { ModuleUnavailablePage } from '@/app/errors/ModuleUnavailablePage';
