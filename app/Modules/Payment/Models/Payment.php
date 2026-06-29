@@ -16,7 +16,6 @@ use Modules\Payment\Enums\PaymentDirection;
 use Modules\Payment\Enums\PaymentDocumentStatus;
 use Modules\Payment\Enums\PaymentInstrumentStatus;
 use Modules\Payment\Enums\PaymentPostingStatus;
-use Modules\Payment\Enums\PaymentStatus;
 use Modules\Payment\Enums\PaymentType;
 use Modules\ReferenceData\Models\CurrencyModel;
 use Modules\Tenant\Models\TenantModel;
@@ -46,7 +45,6 @@ final class Payment extends TenantOwnedModel
             'allocation_status' => PaymentAllocationState::class,
             'posting_status' => PaymentPostingStatus::class,
             'instrument_status' => PaymentInstrumentStatus::class,
-            'status' => PaymentStatus::class,
             'payment_date' => 'date',
             'cheque_date' => 'date',
             'exchange_rate' => 'decimal:6',
@@ -70,12 +68,12 @@ final class Payment extends TenantOwnedModel
     protected static function booted(): void
     {
         self::deleting(function (Payment $payment): void {
-            $status = $payment->status instanceof PaymentStatus
-                ? $payment->status
-                : PaymentStatus::from((string) $payment->status);
+            $status = $payment->document_status instanceof PaymentDocumentStatus
+                ? $payment->document_status
+                : PaymentDocumentStatus::from((string) $payment->document_status);
 
-            if (! in_array($status, [PaymentStatus::Draft, PaymentStatus::Cancelled], true)) {
-                throw new InvalidArgumentException('Posted, allocated, refunded, or reversed payments cannot be deleted.');
+            if ($status !== PaymentDocumentStatus::Draft) {
+                throw new InvalidArgumentException('Only draft payments can be archived.');
             }
         });
     }
@@ -140,8 +138,8 @@ final class Payment extends TenantOwnedModel
         return $this->hasMany(ChequePrintLog::class, 'payment_id');
     }
 
-    public function statusHistory(): HasMany
+    public function lifecycleEvents(): HasMany
     {
-        return $this->hasMany(PaymentStatusHistory::class, 'payment_id');
+        return $this->hasMany(PaymentLifecycleEvent::class, 'payment_id');
     }
 }
