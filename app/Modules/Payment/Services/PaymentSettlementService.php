@@ -210,27 +210,43 @@ final class PaymentSettlementService
             ->values()
             ->all();
 
+        if ($statuses === []) {
+            return PaymentInstrumentStatus::Pending->value;
+        }
+
+        foreach ([
+            PaymentInstrumentStatus::Refunded->value => [PaymentInstrumentStatus::Refunded->value],
+            PaymentInstrumentStatus::Reversed->value => [PaymentInstrumentStatus::Reversed->value],
+            PaymentInstrumentStatus::Settled->value => [PaymentInstrumentStatus::Settled->value],
+            PaymentInstrumentStatus::Cleared->value => [
+                PaymentInstrumentStatus::Cleared->value,
+                PaymentInstrumentStatus::Settled->value,
+            ],
+        ] as $aggregate => $finalStates) {
+            if (array_diff($statuses, $finalStates) === []) {
+                return $aggregate;
+            }
+        }
+
         foreach ([
             PaymentInstrumentStatus::Bounced->value,
             PaymentInstrumentStatus::Returned->value,
             PaymentInstrumentStatus::Failed->value,
             PaymentInstrumentStatus::Cancelled->value,
+            PaymentInstrumentStatus::Refunded->value,
+            PaymentInstrumentStatus::Reversed->value,
             PaymentInstrumentStatus::Deposited->value,
             PaymentInstrumentStatus::Issued->value,
             PaymentInstrumentStatus::Received->value,
             PaymentInstrumentStatus::Initiated->value,
             PaymentInstrumentStatus::Authorized->value,
             PaymentInstrumentStatus::Captured->value,
+            PaymentInstrumentStatus::Settled->value,
+            PaymentInstrumentStatus::Cleared->value,
         ] as $priority) {
             if (in_array($priority, $statuses, true)) {
                 return $priority;
             }
-        }
-        if ($statuses !== [] && count(array_diff($statuses, [
-            PaymentInstrumentStatus::Cleared->value,
-            PaymentInstrumentStatus::Settled->value,
-        ])) === 0) {
-            return PaymentInstrumentStatus::Cleared->value;
         }
 
         return PaymentInstrumentStatus::Pending->value;
