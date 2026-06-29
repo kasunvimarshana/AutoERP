@@ -5,6 +5,10 @@ import { Select } from '@/shared/components/Select';
 import { sumDecimals } from '@/shared/utils/decimal';
 import type { FastPurchaseOptionResource } from '../purchaseTypes';
 
+export type PurchasePaymentMethodOption = FastPurchaseOptionResource & {
+    requires_instrument_details?: boolean;
+};
+
 export interface PurchasePaymentMethodRow {
     key: string;
     payment_method_id: string;
@@ -33,7 +37,7 @@ export function paymentRowsTotal(rows: PurchasePaymentMethodRow[]): string {
     return sumDecimals(rows.map((row) => row.amount || '0.000000'));
 }
 
-export function paymentRowSatisfiesMethod(row: PurchasePaymentMethodRow, method?: FastPurchaseOptionResource): boolean {
+export function paymentRowSatisfiesMethod(row: PurchasePaymentMethodRow, method?: PurchasePaymentMethodOption): boolean {
     if (!method) return false;
     const hasReference = row.reference.trim() !== '';
     const hasInstrumentDetails = Boolean(
@@ -49,7 +53,7 @@ export function paymentRowSatisfiesMethod(row: PurchasePaymentMethodRow, method?
 
 export function PurchasePaymentMethodsEditor({ rows, methods, errorFor, errorIndexForRow, onChange }: {
     rows: PurchasePaymentMethodRow[];
-    methods: FastPurchaseOptionResource[];
+    methods: PurchasePaymentMethodOption[];
     errorFor: (field: string) => string | undefined;
     errorIndexForRow?: (row: PurchasePaymentMethodRow, index: number) => number;
     onChange: (rows: PurchasePaymentMethodRow[]) => void;
