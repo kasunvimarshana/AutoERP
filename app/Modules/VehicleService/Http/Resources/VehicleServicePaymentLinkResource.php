@@ -23,14 +23,17 @@ final class VehicleServicePaymentLinkResource extends JsonResource
             'invoice_number' => $this->invoice?->invoice_number,
             'allocated_amount' => (string) $this->allocated_amount,
             'status' => $this->status,
-            'payment_status' => $this->enum($this->payment?->status),
+            'document_status' => $this->enum($this->payment?->document_status),
             'posting_status' => $this->enum($this->payment?->posting_status),
             'allocation_status' => $this->enum($this->payment?->allocation_status),
-            'payment_method' => $paymentLine?->paymentMethod === null ? null : [
-                'id' => (int) $paymentLine->paymentMethod->getKey(),
-                'code' => $paymentLine->paymentMethod->code,
-                'name' => $paymentLine->paymentMethod->name,
-                'method_type' => $this->enum($paymentLine->paymentMethod->method_type),
+            'instrument_status' => $this->enum($this->payment?->instrument_status),
+            'payment_method' => $paymentLine === null ? null : [
+                'id' => $paymentLine->payment_method_id === null ? null : (int) $paymentLine->payment_method_id,
+                'code' => $paymentLine->payment_method_code_snapshot,
+                'name' => $paymentLine->payment_method_name_snapshot,
+                'method_type' => $paymentLine->payment_method_type_snapshot,
+                'requires_reference' => (bool) $paymentLine->requires_reference_snapshot,
+                'requires_instrument_details' => (bool) $paymentLine->requires_instrument_details_snapshot,
             ],
             'reference_number' => $paymentLine?->reference_number ?? $this->payment?->reference_number,
         ];
