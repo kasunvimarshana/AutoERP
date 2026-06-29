@@ -14,7 +14,7 @@ interface EmployeeCommissionDrawerProps {
     row: EmployeeCommissionReportRow | null;
     group?: EmployeeCommissionGroup;
     onClose: () => void;
-    onFocus: (row: EmployeeCommissionReportRow) => void;
+    onFocus?: (row: EmployeeCommissionReportRow) => void;
 }
 
 export function EmployeeCommissionDrawer({
@@ -36,7 +36,7 @@ export function EmployeeCommissionDrawer({
                         </dl>
                         <div className="mt-4 flex gap-2">
                             <LinkButton to={`/hr/employees/${row.employee.id}`} variant="secondary">Employee record</LinkButton>
-                            <Button type="button" onClick={() => onFocus(row)}>Focus report</Button>
+                            {onFocus && <Button type="button" onClick={() => onFocus(row)}>Focus report</Button>}
                         </div>
                     </Panel>
                     {group && (
