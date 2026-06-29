@@ -15,11 +15,6 @@ final class PaymentReversalNumberService
 
     public function resolve(PaymentReversalData $data, Payment $payment): string
     {
-        $manual = trim($data->reversalNumber);
-        if ($manual !== '') {
-            return $manual;
-        }
-
         $result = $this->sequences->execute([
             'tenant_id' => (int) $payment->tenant_id,
             'organization_unit_id' => $payment->organization_unit_id,
