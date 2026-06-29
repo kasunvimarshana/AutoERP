@@ -36,7 +36,6 @@ final readonly class CreatePaymentData
         public array $allocations = [],
         public ?string $chequeNumber = null,
         public ?string $chequeDate = null,
-        public ?int $bankAccountId = null,
         public ?string $payeeName = null,
         public ?string $amountInWords = null,
         public ?array $metadata = null,
