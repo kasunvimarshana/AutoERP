@@ -3,7 +3,8 @@ import { Select } from '@/shared/components/Select';
 import { Button } from '@/shared/components/Button';
 import { subtractDecimal, multiplyDecimal } from '@/shared/utils/decimal';
 import type { NamedResource } from '@/shared/types/common';
-import type { FastSalesContext, FastSalesLinePreview } from '../salesTypes';
+import type { FastSalesContext } from '../fastSalesContextTypes';
+import type { FastSalesLinePreview } from '../fastSalesResultTypes';
 import { SalesItemLookupSelect, SalesUomLookupSelect } from './SalesLookups';
 
 export interface FastSalesLineRow {

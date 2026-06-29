@@ -10,7 +10,9 @@ import { useApi } from '@/shared/hooks/useApi';
 import { useUnsavedChanges } from '@/shared/hooks/useUnsavedChanges';
 import type { NamedResource } from '@/shared/types/common';
 import { businessDateInputValue } from '@/shared/utils/businessDate';
-import { createFastSales, getFastSalesContext, previewFastSales, type FastSalesPayload, type FastSalesResult } from '../salesApi';
+import { createFastSales, getFastSalesContext, previewFastSales } from '../salesApi';
+import type { FastSalesPayload } from '../fastSalesPayloadTypes';
+import type { FastSalesResult } from '../fastSalesResultTypes';
 import { CustomerLookupSelect, SalesCurrencyLookupSelect, SalesWarehouseLocationLookupSelect, SalesWarehouseLookupSelect } from '../components/SalesLookups';
 import { blankFastSalesLine, FastSalesLines, type FastSalesLineRow } from '../components/FastSalesLines';
 import { FastSalesSummary } from '../components/FastSalesSummary';
@@ -65,6 +67,8 @@ export default function FastSalesPage() {
     const [paymentReference, setPaymentReference] = useState('');
     const [instrumentNumber, setInstrumentNumber] = useState('');
     const [instrumentDate, setInstrumentDate] = useState('');
+    const [externalBankName, setExternalBankName] = useState('');
+    const [externalBankBranch, setExternalBankBranch] = useState('');
     const [preview, setPreview] = useState<FastSalesResult | null>(null);
     const [result, setResult] = useState<FastSalesResult | null>(null);
     const [idempotencyKey, setIdempotencyKey] = useState(newIdempotencyKey);
@@ -77,6 +81,10 @@ export default function FastSalesPage() {
     const createInvoice = ['credit_sale', 'cash_sale', 'direct_sale', 'direct_sale_paid'].includes(workflowMode);
     const recordReceipt = workflowRecordsReceipt(workflowMode);
     const needsWarehouse = createOrderOnly || deliverItemsNow;
+    const selectedPaymentMethod = useMemo(
+        () => context.data?.payment_methods.find((method) => String(method.id) === paymentMethodId),
+        [context.data?.payment_methods, paymentMethodId],
+    );
 
     const changeWorkflowMode = (nextMode: FastSalesWorkflowMode) => {
         if (!workflowNeedsWarehouse(nextMode)) {
@@ -89,6 +97,8 @@ export default function FastSalesPage() {
             setPaymentReference('');
             setInstrumentNumber('');
             setInstrumentDate('');
+            setExternalBankName('');
+            setExternalBankBranch('');
         }
         setPreview(null);
         setResult(null);
@@ -98,13 +108,18 @@ export default function FastSalesPage() {
     const dirty = Boolean(customer || customerReference || notes || lines.some((line) => line.item || line.unit_price || line.discount_amount !== '0.000000'));
     useUnsavedChanges(dirty && !result && !submitting);
     const errorFor = (field: string) => fieldError(error, field);
+    const referenceReady = !selectedPaymentMethod?.requires_reference || Boolean(paymentReference.trim() || instrumentNumber.trim());
+    const instrumentReady = !selectedPaymentMethod?.requires_instrument_details || Boolean(
+        instrumentNumber.trim() && instrumentDate && externalBankName.trim(),
+    );
+    const receiptReady = !recordReceipt || Boolean(paymentAmount.trim() && paymentMethodId && referenceReady && instrumentReady);
     const canSubmit = useMemo(() => Boolean(
         customer?.id
         && customerReference.trim()
         && lines.some((line) => line.item?.id)
         && (!needsWarehouse || warehouse?.id)
-        && (!recordReceipt || (paymentAmount.trim() && paymentMethodId)),
-    ), [customer, customerReference, lines, needsWarehouse, paymentAmount, paymentMethodId, recordReceipt, warehouse]);
+        && receiptReady,
+    ), [customer, customerReference, lines, needsWarehouse, receiptReady, warehouse]);
 
     const payload = (): FastSalesPayload => ({
         idempotency_key: idempotencyKey,
@@ -138,6 +153,8 @@ export default function FastSalesPage() {
             reference: paymentReference || undefined,
             instrument_number: instrumentNumber || undefined,
             instrument_date: instrumentDate || undefined,
+            external_bank_name: externalBankName || undefined,
+            external_bank_branch: externalBankBranch || undefined,
         } : undefined,
     });
 
@@ -218,6 +235,12 @@ export default function FastSalesPage() {
                                 <Input label="Reference" value={paymentReference} onChange={(event) => setPaymentReference(event.target.value)} error={errorFor('payment.reference')} />
                                 <Input label="Cheque / card no." value={instrumentNumber} onChange={(event) => setInstrumentNumber(event.target.value)} error={errorFor('payment.instrument_number')} />
                                 <Input label="Instrument date" type="date" value={instrumentDate} onChange={(event) => setInstrumentDate(event.target.value)} error={errorFor('payment.instrument_date')} />
+                                {selectedPaymentMethod?.requires_instrument_details && (
+                                    <>
+                                        <Input label="External bank" value={externalBankName} onChange={(event) => setExternalBankName(event.target.value)} error={errorFor('payment.external_bank_name')} />
+                                        <Input label="External branch" value={externalBankBranch} onChange={(event) => setExternalBankBranch(event.target.value)} error={errorFor('payment.external_bank_branch')} />
+                                    </>
+                                )}
                             </div>
                         </section>
                     )}

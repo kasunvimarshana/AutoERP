@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { Button } from '@/shared/components/Button';
-import type { FastSalesResult } from '../salesTypes';
+import type { FastSalesResult } from '../fastSalesResultTypes';
 
 const emptySummary = {
     subtotal: '0.000000',
