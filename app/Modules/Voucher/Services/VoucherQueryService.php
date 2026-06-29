@@ -9,15 +9,11 @@ use Illuminate\Support\Facades\DB;
 
 final class VoucherQueryService
 {
-    /**
-     * @param  array<string, mixed>  $filters
-     */
     public function paginate(array $filters, int $tenantId, ?int $organizationUnitId, int $perPage): LengthAwarePaginator
     {
         $union = $this->paymentRows($tenantId, $organizationUnitId, $filters)
             ->unionAll($this->financeJournalRows($tenantId, $organizationUnitId))
             ->unionAll($this->paymentReversalRows($tenantId, $organizationUnitId));
-
         $query = DB::query()->fromSub($union, 'voucher_rows');
 
         foreach (['voucher_type', 'source_module', 'source_kind', 'document_status', 'allocation_status', 'posting_status', 'instrument_status'] as $filter) {
@@ -35,11 +31,9 @@ final class VoucherQueryService
                     ->orWhere('narration', 'like', $search);
             });
         }
-
         if (($filters['party'] ?? null) !== null && trim((string) $filters['party']) !== '') {
             $query->where('party_or_narration', 'like', '%'.trim((string) $filters['party']).'%');
         }
-
         if (($filters['date_from'] ?? null) !== null) {
             $query->whereDate('voucher_date', '>=', $filters['date_from']);
         }
@@ -70,13 +64,9 @@ final class VoucherQueryService
             ->paginate($perPage);
     }
 
-    /**
-     * @param  array<string, mixed>  $filters
-     */
     private function paymentRows(int $tenantId, ?int $organizationUnitId, array $filters)
     {
         $query = DB::table('payments')
-            ->leftJoin('currencies', 'currencies.id', '=', 'payments.currency_id')
             ->where('payments.tenant_id', $tenantId)
             ->when($organizationUnitId === null, fn ($scope) => $scope->whereNull('payments.organization_unit_id'))
             ->when($organizationUnitId !== null, fn ($scope) => $scope->where('payments.organization_unit_id', $organizationUnitId));
@@ -86,11 +76,10 @@ final class VoucherQueryService
             $query->whereExists(function ($exists) use ($method): void {
                 $exists->selectRaw('1')
                     ->from('payment_lines')
-                    ->leftJoin('payment_methods', 'payment_methods.id', '=', 'payment_lines.payment_method_id')
                     ->whereColumn('payment_lines.payment_id', 'payments.id')
                     ->where(function ($scope) use ($method): void {
-                        $scope->where('payment_methods.method_type', $method)
-                            ->orWhere('payment_methods.code', $method);
+                        $scope->where('payment_lines.payment_method_type_snapshot', $method)
+                            ->orWhere('payment_lines.payment_method_code_snapshot', $method);
                     });
             });
         }
@@ -108,18 +97,18 @@ final class VoucherQueryService
             'payments.organization_unit_id',
             DB::raw('NULL as financial_year_id'),
             DB::raw('NULL as financial_period_id'),
-            DB::raw('COALESCE(payments.payee_name, payments.notes, payments.party_type, payments.source_type) as party_or_narration'),
+            DB::raw('COALESCE(payments.party_name_snapshot, payments.payee_name, payments.notes, payments.party_type, payments.source_type) as party_or_narration'),
             'payments.party_type',
             'payments.party_id',
             'payments.currency_id',
-            'currencies.code as currency_code',
+            'payments.currency_code_snapshot as currency_code',
             'payments.exchange_rate',
             'payments.total_amount as transaction_amount',
             DB::raw('NULL as base_currency_amount'),
             'payments.allocated_amount',
             'payments.unapplied_amount as unallocated_amount',
             'payments.document_status',
-            'payments.status as approval_status',
+            'payments.document_status as approval_status',
             'payments.allocation_status',
             'payments.posting_status',
             'payments.instrument_status',
@@ -128,7 +117,7 @@ final class VoucherQueryService
             DB::raw('NULL as source_document_url'),
             'payments.created_by',
             'payments.approved_by',
-            DB::raw('NULL as posted_by'),
+            'payments.posted_by',
             'payments.created_at',
             'payments.updated_at',
         ]);
@@ -185,7 +174,6 @@ final class VoucherQueryService
     {
         return DB::table('payment_reversals')
             ->join('payments', 'payments.id', '=', 'payment_reversals.payment_id')
-            ->leftJoin('currencies', 'currencies.id', '=', 'payments.currency_id')
             ->where('payment_reversals.tenant_id', $tenantId)
             ->when($organizationUnitId === null, fn ($scope) => $scope->whereNull('payment_reversals.organization_unit_id'))
             ->when($organizationUnitId !== null, fn ($scope) => $scope->where('payment_reversals.organization_unit_id', $organizationUnitId))
@@ -202,18 +190,18 @@ final class VoucherQueryService
                 'payment_reversals.organization_unit_id',
                 DB::raw('NULL as financial_year_id'),
                 DB::raw('NULL as financial_period_id'),
-                DB::raw('COALESCE(payments.payee_name, payment_reversals.reason, payments.party_type) as party_or_narration'),
+                DB::raw('COALESCE(payments.party_name_snapshot, payments.payee_name, payment_reversals.reason, payments.party_type) as party_or_narration'),
                 'payments.party_type',
                 'payments.party_id',
                 'payments.currency_id',
-                'currencies.code as currency_code',
+                'payments.currency_code_snapshot as currency_code',
                 'payments.exchange_rate',
                 'payment_reversals.reversed_amount as transaction_amount',
                 DB::raw('NULL as base_currency_amount'),
                 DB::raw("'0.000000' as allocated_amount"),
                 DB::raw("'0.000000' as unallocated_amount"),
                 DB::raw("'reversed' as document_status"),
-                'payment_reversals.status as approval_status',
+                DB::raw("'reversed' as approval_status"),
                 DB::raw("'unallocated' as allocation_status"),
                 DB::raw("'reversed' as posting_status"),
                 DB::raw("'reversed' as instrument_status"),
