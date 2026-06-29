@@ -17,10 +17,10 @@ use Modules\Finance\Models\FinanceFiscalYear;
 use Modules\Finance\Services\ChartOfAccountsService;
 use Modules\Payment\DTOs\CreatePaymentData;
 use Modules\Payment\DTOs\PaymentLineData;
+use Modules\Payment\DTOs\PaymentPostingContext;
 use Modules\Payment\Enums\PaymentDirection;
 use Modules\Payment\Enums\PaymentMethodType;
 use Modules\Payment\Enums\PaymentType;
-use Modules\Payment\DTOs\PaymentPostingContext;
 use Modules\Payment\Models\PaymentMethod;
 use Modules\Payment\Services\PaymentCreationService;
 use Modules\Payment\Services\PaymentFinanceIntegrationService;
@@ -38,9 +38,11 @@ final class PaymentFinanceIntegrationTest extends TestCase
             paymentType: PaymentType::Advance,
             direction: PaymentDirection::Inbound,
             paymentDate: '2026-06-06',
-            paymentNumber: 'PAY-FIN-PREP',
             lines: [
-                new PaymentLineData(amount: '1000.000000', paymentMethodId: (int) $this->paymentMethod($tenantId)->getKey()),
+                new PaymentLineData(
+                    amount: '1000.000000',
+                    paymentMethodId: (int) $this->paymentMethod($tenantId)->getKey(),
+                ),
             ],
         ));
 
@@ -58,16 +60,15 @@ final class PaymentFinanceIntegrationTest extends TestCase
         $this->assertSame('payment', $financeRequest->source->sourceType);
         $this->assertSame($tenantId, $financeRequest->source->tenantId);
         $this->assertSame('payment', $financeRequest->source->sourceModule);
-        $this->assertSame('PAY-FIN-PREP', $financeRequest->source->sourceNumber);
+        $this->assertNotSame('', trim((string) $payment->payment_number));
+        $this->assertSame((string) $payment->payment_number, $financeRequest->source->sourceNumber);
         $this->assertCount(2, $financeRequest->lines);
 
         $service->validatePostingRequest($financeRequest);
         $this->assertDatabaseCount('finance_journal_entries', 0);
     }
 
-    /**
-     * @return array{0: int}
-     */
+    /** @return array{0: int} */
     private function createChart(): array
     {
         $tenantId = $this->createTenant();
@@ -132,7 +133,8 @@ final class PaymentFinanceIntegrationTest extends TestCase
             'slug' => 'payment-finance-integration-'.Str::lower($suffix),
             'status' => 'active',
             'created_at' => now(),
-            'updated_at' => now()]);
+            'updated_at' => now(),
+        ]);
     }
 
     private function paymentMethod(int $tenantId): PaymentMethod
@@ -143,6 +145,8 @@ final class PaymentFinanceIntegrationTest extends TestCase
             'name' => 'Cash',
             'method_type' => PaymentMethodType::Cash,
             'direction_allowed' => 'both',
+            'requires_reference' => false,
+            'requires_instrument_details' => false,
             'is_active' => true,
         ]);
     }
