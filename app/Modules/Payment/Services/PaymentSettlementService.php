@@ -20,6 +20,7 @@ final class PaymentSettlementService
     public function __construct(
         private readonly DecimalMath $math,
         private readonly PaymentLifecycleEventRecorder $events,
+        private readonly PaymentInstrumentStateResolver $instrumentStates,
     ) {}
 
     public function transitionLine(
@@ -76,7 +77,9 @@ final class PaymentSettlementService
                 'row_version' => (int) $line->row_version + 1,
             ])->save();
 
-            $instrumentAfter = PaymentInstrumentStatus::from($this->aggregateInstrumentStatus($lockedPayment));
+            $instrumentAfter = $this->instrumentStates->resolve(
+                $lockedPayment->lines()->pluck('status')->all(),
+            );
             $lockedPayment->forceFill([
                 'instrument_status' => $instrumentAfter->value,
                 'row_version' => (int) $lockedPayment->row_version + 1,
@@ -125,6 +128,7 @@ final class PaymentSettlementService
         };
     }
 
+    /** @return array<string, array<string, list<string>>> */
     private function allowedTransitions(): array
     {
         $cashLike = [
@@ -189,6 +193,7 @@ final class PaymentSettlementService
         return $this->math->normalize((string) $line->cleared_amount);
     }
 
+    /** @return array<string, string> */
     private function instrumentDatesForStatus(string $status): array
     {
         $now = now()->toDateString();
@@ -200,56 +205,6 @@ final class PaymentSettlementService
             'returned' => ['returned_date' => $now],
             default => [],
         };
-    }
-
-    private function aggregateInstrumentStatus(Payment $payment): string
-    {
-        $statuses = $payment->lines()->pluck('status')
-            ->map(fn (mixed $status): string => strtolower((string) $status))
-            ->filter()
-            ->values()
-            ->all();
-
-        if ($statuses === []) {
-            return PaymentInstrumentStatus::Pending->value;
-        }
-
-        foreach ([
-            PaymentInstrumentStatus::Refunded->value => [PaymentInstrumentStatus::Refunded->value],
-            PaymentInstrumentStatus::Reversed->value => [PaymentInstrumentStatus::Reversed->value],
-            PaymentInstrumentStatus::Settled->value => [PaymentInstrumentStatus::Settled->value],
-            PaymentInstrumentStatus::Cleared->value => [
-                PaymentInstrumentStatus::Cleared->value,
-                PaymentInstrumentStatus::Settled->value,
-            ],
-        ] as $aggregate => $finalStates) {
-            if (array_diff($statuses, $finalStates) === []) {
-                return $aggregate;
-            }
-        }
-
-        foreach ([
-            PaymentInstrumentStatus::Bounced->value,
-            PaymentInstrumentStatus::Returned->value,
-            PaymentInstrumentStatus::Failed->value,
-            PaymentInstrumentStatus::Cancelled->value,
-            PaymentInstrumentStatus::Refunded->value,
-            PaymentInstrumentStatus::Reversed->value,
-            PaymentInstrumentStatus::Deposited->value,
-            PaymentInstrumentStatus::Issued->value,
-            PaymentInstrumentStatus::Received->value,
-            PaymentInstrumentStatus::Initiated->value,
-            PaymentInstrumentStatus::Authorized->value,
-            PaymentInstrumentStatus::Captured->value,
-            PaymentInstrumentStatus::Settled->value,
-            PaymentInstrumentStatus::Cleared->value,
-        ] as $priority) {
-            if (in_array($priority, $statuses, true)) {
-                return $priority;
-            }
-        }
-
-        return PaymentInstrumentStatus::Pending->value;
     }
 
     private function assertPaymentVersion(Payment $payment, int $expectedVersion): void
@@ -265,6 +220,7 @@ final class PaymentSettlementService
             return $payment->instrument_status;
         }
 
-        return PaymentInstrumentStatus::tryFrom((string) $payment->instrument_status) ?? PaymentInstrumentStatus::Pending;
+        return PaymentInstrumentStatus::tryFrom((string) $payment->instrument_status)
+            ?? PaymentInstrumentStatus::Pending;
     }
 }
