@@ -15,7 +15,6 @@ final readonly class CreatePaymentData
         public PaymentDirection $direction,
         public string $paymentDate,
         public ?int $organizationUnitId = null,
-        public ?string $paymentNumber = null,
         public ?string $partyType = null,
         public ?int $partyId = null,
         public ?string $sourceType = null,
@@ -31,7 +30,6 @@ final readonly class CreatePaymentData
         public ?string $chequeNumber = null,
         public ?string $chequeDate = null,
         public ?string $payeeName = null,
-        public ?string $amountInWords = null,
         public ?array $metadata = null,
     ) {}
 }
