@@ -10,8 +10,9 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('payment_unapplied_balances', function (Blueprint $table) {
+        Schema::create('payment_unapplied_balances', function (Blueprint $table): void {
             $table->id();
+            $table->unsignedBigInteger('row_version')->default(1);
             $table->foreignId('tenant_id')->constrained('tenants', 'id', indexName: 'payment_unapplied_balances_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('payment_id')->unique('payment_unapplied_balances_payment_uk');
@@ -31,7 +32,6 @@ return new class extends Migration
 
             $table->index(['party_type', 'party_id', 'status'], 'payment_unapplied_party_status_ix');
             $table->index(['source_type', 'source_id'], 'payment_unapplied_source_ix');
-
             $table->unique(['id', 'tenant_id'], 'payment_unapplied_balances_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'payment_unapplied_balances_organization_unit_id_tenant_fk')
                 ->references(['id', 'tenant_id'])
@@ -40,7 +40,7 @@ return new class extends Migration
             $table->foreign(['payment_id', 'tenant_id'], 'payment_unapplied_balances_payment_id_tenant_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('payments')
-                ->cascadeOnDelete();
+                ->restrictOnDelete();
         });
     }
 
