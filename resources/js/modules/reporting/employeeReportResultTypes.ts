@@ -1,6 +1,6 @@
 import type { ApiCollection } from '@/shared/types/api';
 import type { NamedResource } from '@/shared/types/common';
-import type { ReportDefinition } from './reportingTypes';
+import type { ReportDefinition } from './genericReportTypes';
 
 export interface EmployeeCommissionEmployee extends NamedResource {
     department?: NamedResource | null;
