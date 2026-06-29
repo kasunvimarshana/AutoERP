@@ -20,6 +20,11 @@ return new class extends Migration
             $table->string('direction', 40);
             $table->string('party_type')->nullable();
             $table->unsignedBigInteger('party_id')->nullable();
+            $table->string('party_number_snapshot')->nullable();
+            $table->string('party_code_snapshot')->nullable();
+            $table->string('party_name_snapshot')->nullable();
+            $table->string('party_email_snapshot')->nullable();
+            $table->string('party_phone_snapshot')->nullable();
             $table->string('source_type', 150)->nullable();
             $table->unsignedBigInteger('source_id')->nullable();
             $table->string('document_status', 50)->default('draft');
@@ -28,13 +33,15 @@ return new class extends Migration
             $table->string('instrument_status', 50)->nullable();
             $table->date('payment_date');
             $table->foreignId('currency_id')->nullable()->constrained('currencies', 'id', indexName: 'payments_currency_fk')->nullOnDelete();
+            $table->string('currency_code_snapshot', 20)->nullable();
+            $table->string('currency_name_snapshot')->nullable();
+            $table->string('currency_symbol_snapshot', 20)->nullable();
             $table->decimal('exchange_rate', 20, 6)->default('1.000000');
             $table->string('reference_number')->nullable();
             $table->string('cheque_number', 100)->nullable();
             $table->date('cheque_date')->nullable();
             $table->string('payee_name')->nullable();
             $table->text('amount_in_words')->nullable();
-            $table->string('status', 40)->default('draft');
             $table->decimal('total_amount', 20, 6)->default('0');
             $table->decimal('allocated_amount', 20, 6)->default('0');
             $table->decimal('unapplied_amount', 20, 6)->default('0');
@@ -61,8 +68,8 @@ return new class extends Migration
 
             $table->unique(['tenant_id', 'payment_number'], 'payments_tenant_number_uk');
             $table->index(['tenant_id', 'organization_unit_id'], 'payments_tenant_org_ix');
-            $table->index(['payment_type', 'direction', 'status'], 'payments_type_direction_status_ix');
-            $table->index(['document_status', 'allocation_status', 'posting_status'], 'payments_status_dimensions_ix');
+            $table->index(['payment_type', 'direction', 'document_status'], 'payments_type_direction_document_ix');
+            $table->index(['document_status', 'allocation_status', 'posting_status'], 'payments_state_dimensions_ix');
             $table->index(['party_type', 'party_id'], 'payments_party_ix');
             $table->index(['source_type', 'source_id'], 'payments_source_ix');
             $table->index('cheque_number', 'payments_cheque_number_ix');
@@ -72,38 +79,14 @@ return new class extends Migration
             $table->index('original_payment_id', 'payments_original_payment_ix');
 
             $table->unique(['id', 'tenant_id'], 'payments_id_tenant_uk');
-            $table->foreign(['organization_unit_id', 'tenant_id'], 'payments_organization_unit_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('organization_units')
-                ->restrictOnDelete();
-            $table->foreign(['reversal_payment_id', 'tenant_id'], 'payments_reversal_payment_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('payments')
-                ->restrictOnDelete();
-            $table->foreign(['original_payment_id', 'tenant_id'], 'payments_original_payment_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('payments')
-                ->restrictOnDelete();
-            $table->foreign(['reversed_by', 'tenant_id'], 'payments_reversed_by_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('users')
-                ->restrictOnDelete();
-            $table->foreign(['created_by', 'tenant_id'], 'payments_created_by_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('users')
-                ->restrictOnDelete();
-            $table->foreign(['approved_by', 'tenant_id'], 'payments_approved_by_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('users')
-                ->restrictOnDelete();
-            $table->foreign(['posted_by', 'tenant_id'], 'payments_posted_by_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('users')
-                ->restrictOnDelete();
-            $table->foreign(['voided_by', 'tenant_id'], 'payments_voided_by_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('users')
-                ->restrictOnDelete();
+            $table->foreign(['organization_unit_id', 'tenant_id'], 'payments_organization_unit_id_tenant_fk')->references(['id', 'tenant_id'])->on('organization_units')->restrictOnDelete();
+            $table->foreign(['reversal_payment_id', 'tenant_id'], 'payments_reversal_payment_id_tenant_fk')->references(['id', 'tenant_id'])->on('payments')->restrictOnDelete();
+            $table->foreign(['original_payment_id', 'tenant_id'], 'payments_original_payment_id_tenant_fk')->references(['id', 'tenant_id'])->on('payments')->restrictOnDelete();
+            $table->foreign(['reversed_by', 'tenant_id'], 'payments_reversed_by_tenant_fk')->references(['id', 'tenant_id'])->on('users')->restrictOnDelete();
+            $table->foreign(['created_by', 'tenant_id'], 'payments_created_by_tenant_fk')->references(['id', 'tenant_id'])->on('users')->restrictOnDelete();
+            $table->foreign(['approved_by', 'tenant_id'], 'payments_approved_by_tenant_fk')->references(['id', 'tenant_id'])->on('users')->restrictOnDelete();
+            $table->foreign(['posted_by', 'tenant_id'], 'payments_posted_by_tenant_fk')->references(['id', 'tenant_id'])->on('users')->restrictOnDelete();
+            $table->foreign(['voided_by', 'tenant_id'], 'payments_voided_by_tenant_fk')->references(['id', 'tenant_id'])->on('users')->restrictOnDelete();
         });
     }
 
