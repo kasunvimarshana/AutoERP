@@ -1,7 +1,9 @@
 import { apiClient } from '@/shared/api/apiClient';
 import { endpoints } from '@/shared/api/endpoints';
 import type { ApiResource } from '@/shared/types/api';
-import type { FastPurchaseContext, FastPurchasePayload, FastPurchaseResult } from '../purchaseTypes';
+import type { FastPurchaseContext, FastPurchasePayload, FastPurchaseResult } from '../types/fastPurchaseTypes';
+
+export type { FastPurchaseContext, FastPurchasePayload, FastPurchaseResult } from '../types/fastPurchaseTypes';
 
 export async function getFastPurchaseContext(signal?: AbortSignal) {
     const response = await apiClient.get<ApiResource<FastPurchaseContext>>(`${endpoints.purchase}/fast-purchases/context`, { signal });
