@@ -19,6 +19,7 @@ return new class extends Migration
             $table->foreignId('usage_log_id');
             $table->unsignedInteger('sequence');
             $table->string('event_type', 40);
+            $table->string('applicability', 20);
             $table->dateTime('occurred_at')->nullable();
             $table->decimal('quantity', 20, 6);
             $table->string('unit', 30)->nullable();
@@ -29,9 +30,9 @@ return new class extends Migration
             $table->timestamps();
 
             $table->unique(['usage_log_id', 'sequence'], 'rental_usage_events_sequence_uk');
-            $table->index(['usage_log_id', 'event_type'], 'rental_usage_events_type_ix');
-
+            $table->index(['usage_log_id', 'event_type', 'applicability'], 'rental_usage_events_type_side_ix');
             $table->unique(['id', 'tenant_id'], 'rental_usage_events_id_tenant_uk');
+
             $table->foreign(['organization_unit_id', 'tenant_id'], 'rental_usage_events_organization_unit_id_tenant_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('organization_units')
@@ -39,8 +40,7 @@ return new class extends Migration
             $table->foreign(['usage_log_id', 'tenant_id'], 'rental_usage_events_usage_log_id_tenant_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('rental_usage_logs')
-                ->cascadeOnDelete();
-
+                ->restrictOnDelete();
             $table->foreign(['created_by', 'tenant_id'], 'rental_usage_events_created_by_tenant_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('users')
