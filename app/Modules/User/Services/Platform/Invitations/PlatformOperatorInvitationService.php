@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\User\Services\Platform\Invitations;
 
+use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Database\DatabaseManager;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Str;
@@ -16,6 +17,7 @@ use Modules\Audit\Data\PlatformAuditActorData;
 use Modules\Core\Contracts\ClockInterface;
 use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
+use Modules\Core\Http\Middleware\RequestCorrelationIdMiddleware;
 use Modules\User\Constants\PlatformOperatorInvitationDeliveryStatus;
 use Modules\User\Constants\PlatformOperatorInvitationStatus;
 use Modules\User\Constants\PlatformOperatorStatus;
@@ -31,7 +33,7 @@ final class PlatformOperatorInvitationService
 {
     private const REPLACED_INVITATION_REASON = 'Replaced by a new invitation.';
     private const REPLACED_DELIVERY_REASON = 'Superseded by a newer delivery attempt for the same invitation.';
-    private const TOKEN_UNAVAILABLE_REASON = 'The invitation delivery token was unavailable and had to be replaced.';
+    private const TOKEN_REPLACEMENT_REASON = 'The invitation token could not be safely redelivered and was replaced.';
 
     public function __construct(
         private readonly PlatformOperatorInvitationModel $invitations,
@@ -200,13 +202,16 @@ final class PlatformOperatorInvitationService
         if ($plainToken === '') {
             throw ValidationException::withMessages(['token' => ['A valid invitation token is required.']]);
         }
-        $query = $this->invitations->newQuery()->with('operator')
-            ->where('token_hash', $this->tokens->digest($plainToken));
+
+        $query = $this->invitations->newQuery()
+            ->with('operator')
+            ->whereIn('token_hash', $this->tokens->lookupDigests($plainToken));
         if ($lock) {
             $query->lockForUpdate();
         }
         $invitation = $query->first();
         if (! $invitation instanceof PlatformOperatorInvitationModel) {
+            $this->logTokenLookupMiss($plainToken);
             throw ValidationException::withMessages(['token' => ['This invitation is invalid or no longer available.']]);
         }
 
@@ -281,8 +286,21 @@ final class PlatformOperatorInvitationService
 
     private function canRedeliver(PlatformOperatorInvitationModel $invitation): bool
     {
-        return $invitation->getAttribute('expires_at')->toImmutable() > $this->clock->now()
-            && trim((string) $invitation->getAttribute('delivery_token')) !== '';
+        if ($invitation->getAttribute('expires_at')->toImmutable() <= $this->clock->now()) {
+            return false;
+        }
+
+        try {
+            $token = trim((string) $invitation->getAttribute('delivery_token'));
+        } catch (DecryptException) {
+            return false;
+        }
+
+        return $token !== ''
+            && $this->tokens->matchesCurrentDigest(
+                $token,
+                (string) $invitation->getAttribute('token_hash'),
+            );
     }
 
     private function queueRedelivery(PlatformOperatorInvitationModel $invitation): void
@@ -310,7 +328,7 @@ final class PlatformOperatorInvitationService
     private function retireUnavailableInvitation(PlatformOperatorInvitationModel $invitation): void
     {
         $expired = $invitation->getAttribute('expires_at')->toImmutable() <= $this->clock->now();
-        $reason = $expired ? 'Invitation expired.' : self::TOKEN_UNAVAILABLE_REASON;
+        $reason = $expired ? 'Invitation expired.' : self::TOKEN_REPLACEMENT_REASON;
         $invitation->forceFill([
             'status' => $expired
                 ? PlatformOperatorInvitationStatus::EXPIRED
@@ -413,6 +431,27 @@ final class PlatformOperatorInvitationService
                 'error_message' => $reason,
                 'updated_at' => $this->clock->now(),
             ]);
+    }
+
+    private function logTokenLookupMiss(string $plainToken): void
+    {
+        $correlationId = null;
+        $host = null;
+        if (app()->bound('request')) {
+            $request = request();
+            $attribute = $request->attributes->get(RequestCorrelationIdMiddleware::ATTRIBUTE);
+            $correlationId = is_string($attribute) ? $attribute : null;
+            $host = $request->getHost();
+        }
+
+        logger()->warning('Platform operator invitation token lookup failed.', [
+            'correlation_id' => $correlationId,
+            'request_host' => $host,
+            'current_digest_prefix' => substr($this->tokens->digest($plainToken), 0, 12),
+            'legacy_digest_prefix' => substr($this->tokens->legacyDigest($plainToken), 0, 12),
+            'database_connection' => (string) config('database.default'),
+            'application_environment' => app()->environment(),
+        ]);
     }
 
     private function recordAcceptanceAudit(PlatformOperatorModel $operator): void
