@@ -130,7 +130,7 @@ final class FastPurchaseResponseBuilder
     }
 
     /**
-     * @param  list<array{data: PurchaseHeaderAdjustmentData, amount: string}>  $adjustments
+     * @param  list<array{data: PurchaseHeaderAdjustmentData, amount: string, accounting?: array<string, mixed>}>  $adjustments
      * @return list<array<string, mixed>>
      */
     private function adjustmentPreview(array $adjustments): array
@@ -138,8 +138,7 @@ final class FastPurchaseResponseBuilder
         return array_map(static function (array $adjustment): array {
             /** @var PurchaseHeaderAdjustmentData $data */
             $data = $adjustment['data'];
-
-            $accounting = $adjustment['accounting'] ?? [];
+            $recognition = $adjustment['accounting'] ?? [];
 
             return [
                 'name' => $data->name,
@@ -151,14 +150,10 @@ final class FastPurchaseResponseBuilder
                 'amount' => $adjustment['amount'],
                 'allocation_method' => $data->allocationMethod->value,
                 'manual_allocations' => $data->manualAllocations,
-                'finance_mapping' => [
-                    'cost_treatment' => $accounting['cost_treatment'] ?? $data->costTreatment,
-                    'tax_treatment' => $accounting['tax_treatment'] ?? $data->taxTreatment,
-                    'mapping_source' => $accounting['mapping_source'] ?? $data->mappingSource,
-                    'final_treatment' => $accounting['final_treatment'] ?? null,
-                    'profile_key' => $accounting['profile_key'] ?? null,
-                    'finance_posting_profile_id' => $accounting['finance_posting_profile_id'] ?? null,
-                    'finance_account_id' => $accounting['finance_account_id'] ?? null,
+                'recognition' => [
+                    'cost_treatment' => $recognition['cost_treatment'] ?? null,
+                    'tax_treatment' => $recognition['tax_treatment'] ?? null,
+                    'final_treatment' => $recognition['final_treatment'] ?? null,
                 ],
             ];
         }, $adjustments);
