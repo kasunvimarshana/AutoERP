@@ -12,6 +12,7 @@ use Modules\User\Constants\PlatformOperatorInvitationDeliveryStatus;
 use Modules\User\Constants\PlatformOperatorInvitationStatus;
 use Modules\User\Constants\PlatformOperatorStatus;
 use Modules\User\Services\Platform\Invitations\PlatformOperatorInvitationDeliveryService;
+use Modules\User\Services\Platform\Invitations\PlatformOperatorInvitationService;
 use Modules\User\Services\Platform\Invitations\PlatformOperatorInvitationTokenCodec;
 use Tests\TestCase;
 
@@ -19,7 +20,7 @@ final class PlatformOperatorInvitationDeliveryRecoveryTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_unreadable_delivery_token_is_retired_without_mail_or_retry_exception(): void
+    public function test_unreadable_delivery_copy_is_cancelled_without_invalidating_an_existing_link(): void
     {
         Notification::fake();
         $now = now();
@@ -77,13 +78,17 @@ final class PlatformOperatorInvitationDeliveryRecoveryTest extends TestCase
 
         $this->assertDatabaseHas('platform_operator_invitations', [
             'id' => $invitationId,
-            'status' => PlatformOperatorInvitationStatus::REVOKED,
+            'status' => PlatformOperatorInvitationStatus::PENDING,
         ]);
         $this->assertDatabaseHas('platform_operator_invitation_deliveries', [
             'id' => $deliveryId,
             'status' => PlatformOperatorInvitationDeliveryStatus::CANCELLED,
             'error_code' => 'PLATFORM_OPERATOR_INVITATION_TOKEN_REISSUE_REQUIRED',
         ]);
+        self::assertSame(
+            'unreadable@example.test',
+            $this->app->make(PlatformOperatorInvitationService::class)->inspect($token)['email'],
+        );
         Notification::assertNothingSent();
     }
 }
