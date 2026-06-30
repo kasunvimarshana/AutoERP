@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Auth\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Modules\Auth\Services\Registration\RegistrationInvitationTokenFormat;
 
 final class InspectInitialAdministratorInvitationRequest extends FormRequest
 {
@@ -17,7 +18,12 @@ final class InspectInitialAdministratorInvitationRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'token' => ['required', 'string', 'size:64'],
+            'token' => [
+                'required',
+                'string',
+                'size:'.RegistrationInvitationTokenFormat::ENCODED_LENGTH,
+                'regex:'.RegistrationInvitationTokenFormat::VALIDATION_PATTERN,
+            ],
         ];
     }
 }

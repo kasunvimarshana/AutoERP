@@ -7,6 +7,7 @@ namespace Modules\User\Http\Requests\Platform;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rules\Password;
 use Modules\User\Contracts\PlatformOperatorCredentialProvisionerInterface;
+use Modules\User\Services\Platform\Invitations\PlatformOperatorInvitationTokenCodec;
 
 final class AcceptPlatformOperatorInvitationRequest extends FormRequest
 {
@@ -28,7 +29,12 @@ final class AcceptPlatformOperatorInvitationRequest extends FormRequest
         }
 
         return [
-            'token' => ['required', 'string', 'size:72'],
+            'token' => [
+                'required',
+                'string',
+                'size:'.PlatformOperatorInvitationTokenCodec::ENCODED_LENGTH,
+                'regex:'.PlatformOperatorInvitationTokenCodec::VALIDATION_PATTERN,
+            ],
             'password' => ['required', 'string', 'max:255', 'confirmed', $password],
         ];
     }

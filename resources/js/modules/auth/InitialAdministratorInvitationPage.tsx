@@ -7,9 +7,10 @@ import { SuccessAlert } from '@/shared/components/SuccessAlert';
 import { ApiError, fieldError, toApiError } from '@/shared/api/apiError';
 import { authApi } from './authApi';
 import type { InitialAdministratorInvitationInspection } from './authTypes';
+import { useInitialAdministratorInvitationToken } from './invitationToken';
 
 export default function InitialAdministratorInvitationPage() {
-    const [token] = useState(() => readInvitationToken());
+    const token = useInitialAdministratorInvitationToken();
     const [invitation, setInvitation] = useState<InitialAdministratorInvitationInspection | null>(null);
     const [firstName, setFirstName] = useState('');
     const [lastName, setLastName] = useState('');
@@ -47,7 +48,6 @@ export default function InitialAdministratorInvitationPage() {
                 password,
                 password_confirmation: passwordConfirmation,
             });
-            window.history.replaceState(null, '', '/register/invitation');
             setCompleted(true);
         } catch (nextError) {
             setError(toApiError(nextError));
@@ -130,14 +130,6 @@ export default function InitialAdministratorInvitationPage() {
             </section>
         </main>
     );
-}
-
-function readInvitationToken(): string | null {
-    const hash = new URLSearchParams(window.location.hash.replace(/^#/, '')).get('token');
-    const query = new URLSearchParams(window.location.search).get('token');
-    const value = (hash ?? query ?? '').trim();
-
-    return /^[a-f0-9]{64}$/i.test(value) ? value : null;
 }
 
 function formatDateTime(value: string): string {

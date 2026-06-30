@@ -46,7 +46,7 @@ describe('InitialAdministratorInvitationPage', () => {
         });
     });
 
-    it('validates the secure link and completes recipient-owned account setup', async () => {
+    it('validates the secure link, removes the token from browser chrome, and completes account setup', async () => {
         const user = userEvent.setup();
         render(
             <TestRouter initialEntries={['/register/invitation']}>
@@ -54,6 +54,7 @@ describe('InitialAdministratorInvitationPage', () => {
             </TestRouter>,
         );
 
+        expect(window.location.hash).toBe('');
         expect(await screen.findByText('Acme Workshop')).toBeInTheDocument();
         expect(mocks.inspectInitialAdministratorInvitation).toHaveBeenCalledWith(
             initialAdministratorToken,
@@ -74,7 +75,6 @@ describe('InitialAdministratorInvitationPage', () => {
             password_confirmation: 'StrongPassword!123',
         }));
         expect(await screen.findByText('Administrator account created')).toBeInTheDocument();
-        expect(window.location.hash).toBe('');
     });
 
     it('does not call the API for a malformed link token', async () => {
@@ -85,7 +85,21 @@ describe('InitialAdministratorInvitationPage', () => {
             </TestRouter>,
         );
 
+        expect(window.location.hash).toBe('');
         expect(await screen.findByText(/invitation link is incomplete/i)).toBeInTheDocument();
+        expect(mocks.inspectInitialAdministratorInvitation).not.toHaveBeenCalled();
+    });
+
+    it('rejects and removes query-string invitation tokens', async () => {
+        window.history.replaceState(null, '', `/register/invitation?token=${initialAdministratorToken}&source=email`);
+        render(
+            <TestRouter initialEntries={['/register/invitation']}>
+                <InitialAdministratorInvitationPage />
+            </TestRouter>,
+        );
+
+        expect(await screen.findByText(/invitation link is incomplete/i)).toBeInTheDocument();
+        expect(window.location.search).toBe('?source=email');
         expect(mocks.inspectInitialAdministratorInvitation).not.toHaveBeenCalled();
     });
 });
@@ -121,7 +135,7 @@ describe('PlatformOperatorInvitationPage', () => {
         });
     });
 
-    it('requires recipient-owned password and MFA setup before sign-in', async () => {
+    it('removes the token from browser chrome and requires password plus MFA before sign-in', async () => {
         const user = userEvent.setup();
         render(
             <TestRouter initialEntries={['/register/platform-operator']}>
@@ -129,6 +143,7 @@ describe('PlatformOperatorInvitationPage', () => {
             </TestRouter>,
         );
 
+        expect(window.location.hash).toBe('');
         expect(await screen.findByText('Platform Operator')).toBeInTheDocument();
         expect(mocks.inspectPlatformOperatorInvitation).toHaveBeenCalledWith(
             platformOperatorToken,
@@ -156,6 +171,5 @@ describe('PlatformOperatorInvitationPage', () => {
         ));
         expect(await screen.findByText('Save these one-time backup codes now')).toBeInTheDocument();
         expect(screen.getByText('BACKUP-ONE')).toBeInTheDocument();
-        expect(window.location.hash).toBe('');
     });
 });
