@@ -72,9 +72,14 @@ final class RentalUsageFactService
                 throw new InvalidArgumentException('Only draft or rejected commercial usage facts can be edited.');
             }
 
-            $usage = RentalUsageLog::query()->lockForUpdate()->findOrFail($fact->usage_log_id);
+            $usage = RentalUsageLog::query()
+                ->lockForUpdate()
+                ->findOrFail($fact->usage_log_id);
             $startedAt = CarbonImmutable::parse((string) $data['started_at']);
             $endedAt = CarbonImmutable::parse((string) $data['ended_at']);
+            if (! $endedAt->greaterThan($startedAt)) {
+                throw new InvalidArgumentException('Commercial finish time must be after its start time.');
+            }
             if ($startedAt->lessThan(CarbonImmutable::parse($usage->started_at))
                 || $endedAt->greaterThan(CarbonImmutable::parse($usage->ended_at))) {
                 throw new InvalidArgumentException('Commercial time must stay inside the physical usage period.');
@@ -195,8 +200,11 @@ final class RentalUsageFactService
         });
     }
 
-    public function reverseForUsage(RentalUsageLog $usage, ?int $userId, string $reason): void
-    {
+    public function reverseForUsage(
+        RentalUsageLog $usage,
+        ?int $userId,
+        string $reason,
+    ): void {
         $facts = RentalUsageFact::query()
             ->where('usage_log_id', $usage->getKey())
             ->whereNot('status', RentalUsageFactStatus::Reversed->value)
