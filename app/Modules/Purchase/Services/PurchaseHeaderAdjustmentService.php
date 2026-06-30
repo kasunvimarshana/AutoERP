@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Purchase\Services;
 
+use Illuminate\Validation\ValidationException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Purchase\DTOs\PurchaseHeaderAdjustmentData;
 use Modules\Purchase\Models\PurchaseHeaderAdjustment;
@@ -27,6 +28,11 @@ final class PurchaseHeaderAdjustmentService
     ): PurchaseHeaderAdjustment {
         $value = $this->math->normalize($amount ?? $data->amount);
         $policy = $this->policies->resolveForData($data);
+        if ($policy['final_treatment'] === 'unsupported') {
+            throw ValidationException::withMessages([
+                "{$fieldPrefix}.adjustment_type" => ['The selected purchase adjustment cannot be recognized by the current Purchase policy.'],
+            ]);
+        }
 
         $model = PurchaseHeaderAdjustment::query()->create([
             'tenant_id' => $tenantId,
