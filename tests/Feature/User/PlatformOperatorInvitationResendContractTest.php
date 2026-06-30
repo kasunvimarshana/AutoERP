@@ -30,7 +30,7 @@ final class PlatformOperatorInvitationResendContractTest extends TestCase
         self::assertStringContainsString('$this->queueRedelivery($invitation)', $resend);
         self::assertStringContainsString('$this->issueForOperator($operator)', $resend);
         self::assertStringContainsString('$this->createDelivery($invitation, $nextAttempt)', $redelivery);
-        self::assertStringContainsString("'expires_at' => $this->invitationExpiry()", $redelivery);
+        self::assertStringContainsString("'expires_at' => \$this->invitationExpiry()", $redelivery);
         self::assertStringNotContainsString("'token_hash' =>", $redelivery);
         self::assertStringNotContainsString("'delivery_token' =>", $redelivery);
     }
@@ -52,7 +52,7 @@ final class PlatformOperatorInvitationResendContractTest extends TestCase
         self::assertStringContainsString('private function claim(int $deliveryId): ?array', $delivery);
         self::assertStringContainsString('->whereKey($deliveryId)', $delivery);
         self::assertStringNotContainsString("->latest('attempt_number')", $delivery);
-        self::assertStringNotContainsString("'attempt_number' => (int) $delivery->getAttribute('attempt_number') + 1", $delivery);
+        self::assertStringNotContainsString("'attempt_number' => (int) \$delivery->getAttribute('attempt_number') + 1", $delivery);
     }
 
     public function test_known_stale_invitation_states_return_actionable_messages(): void
