@@ -35,13 +35,15 @@ final class EnsureApplicationKeyCommand extends Command
 
                 return self::FAILURE;
             }
-            if (
-                $runtimeValue !== ''
-                && ! hash_equals(
-                    ApplicationKeyConfiguration::decode($fileValue),
-                    ApplicationKeyConfiguration::decode($runtimeValue),
-                )
-            ) {
+            if ($runtimeValue === '') {
+                $this->error('APP_KEY is valid in the environment file but missing from effective configuration. Clear cached configuration and remove conflicting process-level APP_KEY values.');
+
+                return self::FAILURE;
+            }
+            if (! hash_equals(
+                ApplicationKeyConfiguration::decode($fileValue),
+                ApplicationKeyConfiguration::decode($runtimeValue),
+            )) {
                 $this->error('Effective APP_KEY does not match the environment file. Clear cached configuration and remove conflicting process-level APP_KEY values.');
 
                 return self::FAILURE;
