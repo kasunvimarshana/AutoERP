@@ -24,12 +24,6 @@ final readonly class PurchaseHeaderAdjustmentData
         public bool $isAllocatable = true,
         public int $sortOrder = 0,
         public ?string $description = null,
-        public ?int $financePostingProfileId = null,
-        public ?int $financeAccountId = null,
-        public ?string $costTreatment = null,
-        public ?string $taxTreatment = null,
-        public ?string $mappingSource = null,
-        public ?string $overrideReason = null,
         /** @var list<array{client_line_key?: string|null, purchase_order_line_id?: int|null, amount: string}> */
         public array $manualAllocations = [],
     ) {}
