@@ -73,18 +73,20 @@ final class RentalUsageLogResource extends RentalResource
                 'remarks' => $event->remarks,
             ]),
             'contexts' => $this->loadedCollection('contexts', function ($context) use ($request): array {
+                $agreement = $context->relationLoaded('agreement') ? $context->agreement : null;
+
                 return [
                     'id' => (int) $context->getKey(),
                     'financial_side' => $this->enumValue($context->financial_side),
-                    'agreement' => $context->relationLoaded('agreement')
-                        ? $this->summary($context->agreement, ['agreement_number', 'agreement_kind'])
-                        : null,
+                    'agreement' => $agreement === null
+                        ? null
+                        : $this->summary($agreement, ['agreement_number', 'agreement_kind']),
                     'rate_version_id' => (int) $context->rate_version_id,
-                    'customer' => $context->relationLoaded('customer')
-                        ? $this->summary($context->customer, ['customer_number', 'name', 'display_name'])
+                    'customer' => $agreement?->relationLoaded('customer')
+                        ? $this->summary($agreement->customer, ['customer_number', 'name', 'display_name'])
                         : null,
-                    'supplier' => $context->relationLoaded('supplier')
-                        ? $this->summary($context->supplier, ['supplier_number', 'name', 'display_name'])
+                    'supplier' => $agreement?->relationLoaded('supplier')
+                        ? $this->summary($agreement->supplier, ['supplier_number', 'name', 'display_name'])
                         : null,
                     'usage_fact' => $context->relationLoaded('usageFact') && $context->usageFact !== null
                         ? (new RentalUsageFactResource($context->usageFact->setRelation('context', $context)))->resolve($request)
