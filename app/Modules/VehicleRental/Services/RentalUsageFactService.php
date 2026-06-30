@@ -63,18 +63,13 @@ final class RentalUsageFactService
         ?int $userId,
     ): RentalUsageFact {
         return DB::transaction(function () use ($fact, $data, $expectedVersion, $userId): RentalUsageFact {
-            $fact = RentalUsageFact::query()
-                ->with(['usageLog', 'context'])
-                ->lockForUpdate()
-                ->findOrFail($fact->getKey());
+            $fact = $this->lockFact($fact);
             $this->assertVersion($fact, $expectedVersion);
             if (! in_array($fact->status, [RentalUsageFactStatus::Draft, RentalUsageFactStatus::Rejected], true)) {
                 throw new InvalidArgumentException('Only draft or rejected commercial usage facts can be edited.');
             }
 
-            $usage = RentalUsageLog::query()
-                ->lockForUpdate()
-                ->findOrFail($fact->usage_log_id);
+            $usage = $fact->usageLog;
             $startedAt = CarbonImmutable::parse((string) $data['started_at']);
             $endedAt = CarbonImmutable::parse((string) $data['ended_at']);
             if (! $endedAt->greaterThan($startedAt)) {
@@ -151,10 +146,7 @@ final class RentalUsageFactService
         ?string $reason = null,
     ): RentalUsageFact {
         return DB::transaction(function () use ($fact, $to, $expectedVersion, $userId, $reason): RentalUsageFact {
-            $fact = RentalUsageFact::query()
-                ->with(['usageLog', 'context'])
-                ->lockForUpdate()
-                ->findOrFail($fact->getKey());
+            $fact = $this->lockFact($fact);
             $this->assertVersion($fact, $expectedVersion);
             $from = $fact->status;
             if ($from === $to) {
@@ -171,14 +163,7 @@ final class RentalUsageFactService
                 if (empty(trim((string) $reason))) {
                     throw new InvalidArgumentException('A reversal reason is required.');
                 }
-                $consumed = $fact->context->calculationLines()
-                    ->where('status', RentalCalculationLineStatus::Approved->value)
-                    ->whereHas('run', fn (Builder $query) => $query
-                        ->where('calculation_status', RentalCalculationStatus::Approved->value))
-                    ->exists();
-                if ($consumed) {
-                    throw new InvalidArgumentException('Reverse the approved calculation before reversing commercial usage facts.');
-                }
+                $this->assertNoActiveCalculation($fact->context);
             }
 
             $fact->forceFill([
@@ -205,9 +190,19 @@ final class RentalUsageFactService
         ?int $userId,
         string $reason,
     ): void {
+        $contexts = RentalUsageContext::query()
+            ->where('usage_log_id', $usage->getKey())
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get();
+        foreach ($contexts as $context) {
+            $this->assertNoActiveCalculation($context);
+        }
+
         $facts = RentalUsageFact::query()
             ->where('usage_log_id', $usage->getKey())
             ->whereNot('status', RentalUsageFactStatus::Reversed->value)
+            ->orderBy('id')
             ->lockForUpdate()
             ->get();
         foreach ($facts as $fact) {
@@ -219,6 +214,33 @@ final class RentalUsageFactService
                 'row_version' => $fact->row_version + 1,
                 'updated_by' => $userId,
             ])->save();
+        }
+    }
+
+    private function lockFact(RentalUsageFact $fact): RentalUsageFact
+    {
+        RentalUsageLog::query()
+            ->lockForUpdate()
+            ->findOrFail($fact->usage_log_id);
+        RentalUsageContext::query()
+            ->lockForUpdate()
+            ->findOrFail($fact->usage_context_id);
+
+        return RentalUsageFact::query()
+            ->with(['usageLog', 'context'])
+            ->lockForUpdate()
+            ->findOrFail($fact->getKey());
+    }
+
+    private function assertNoActiveCalculation(RentalUsageContext $context): void
+    {
+        $active = $context->calculationLines()
+            ->whereNot('status', RentalCalculationLineStatus::Reversed->value)
+            ->whereHas('run', fn (Builder $query) => $query
+                ->whereNot('calculation_status', RentalCalculationStatus::Reversed->value))
+            ->exists();
+        if ($active) {
+            throw new InvalidArgumentException('Reverse the active calculation before reversing commercial usage facts.');
         }
     }
 
