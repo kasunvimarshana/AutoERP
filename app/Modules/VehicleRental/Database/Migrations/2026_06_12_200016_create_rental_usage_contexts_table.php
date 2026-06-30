@@ -32,8 +32,8 @@ return new class extends Migration
             $table->unique(['usage_log_id', 'financial_side', 'agreement_id'], 'rental_usage_contexts_log_side_agreement_uk');
             $table->unique(['tenant_id', 'context_fingerprint'], 'rental_usage_contexts_fingerprint_uk');
             $table->index(['agreement_id', 'financial_side', 'usage_log_id'], 'rental_usage_contexts_agreement_side_ix');
-
             $table->unique(['id', 'tenant_id'], 'rental_usage_contexts_id_tenant_uk');
+
             $table->foreign(['organization_unit_id', 'tenant_id'], 'rental_usage_contexts_organization_unit_id_tenant_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('organization_units')
@@ -41,7 +41,7 @@ return new class extends Migration
             $table->foreign(['usage_log_id', 'tenant_id'], 'rental_usage_contexts_usage_log_id_tenant_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('rental_usage_logs')
-                ->cascadeOnDelete();
+                ->restrictOnDelete();
             $table->foreign(['agreement_id', 'tenant_id'], 'rental_usage_contexts_agreement_id_tenant_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('rental_agreements')
@@ -62,7 +62,6 @@ return new class extends Migration
                 ->references(['id', 'tenant_id'])
                 ->on('suppliers')
                 ->restrictOnDelete();
-
             $table->foreign(['created_by', 'tenant_id'], 'rental_usage_contexts_created_by_tenant_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('users')
