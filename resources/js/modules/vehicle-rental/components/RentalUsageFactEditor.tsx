@@ -74,7 +74,7 @@ export function RentalUsageFactEditor({
     const [error, setError] = useState<ApiError | null>(null);
     const editable = canRecord && ["draft", "rejected"].includes(fact.status);
 
-    const change = <K extends keyof FactForm>(field: K, value: FactForm[K]) => {
+    const change = (field: keyof FactForm, value: string) => {
         setForm((current) => ({ ...current, [field]: value }));
         setDirty(true);
     };
