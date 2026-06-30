@@ -7,9 +7,10 @@ import { LoadingState } from '@/shared/components/LoadingState';
 import { SuccessAlert } from '@/shared/components/SuccessAlert';
 import { authApi } from './authApi';
 import type { PasswordPolicyRequirements, PlatformMfaEnrollment, PlatformOperatorInvitationInspection } from './authTypes';
+import { usePlatformOperatorInvitationToken } from './invitationToken';
 
 export default function PlatformOperatorInvitationPage() {
-    const [token] = useState(() => readInvitationToken());
+    const token = usePlatformOperatorInvitationToken();
     const [invitation, setInvitation] = useState<PlatformOperatorInvitationInspection | null>(null);
     const [password, setPassword] = useState('');
     const [passwordConfirmation, setPasswordConfirmation] = useState('');
@@ -45,7 +46,6 @@ export default function PlatformOperatorInvitationPage() {
                 password,
                 password_confirmation: passwordConfirmation,
             });
-            window.history.replaceState(null, '', '/register/platform-operator');
             if (!acceptance.mfa_enrollment) {
                 throw new ApiError(
                     'The platform account was activated, but MFA enrollment could not be started. Contact a platform manager.',
@@ -174,14 +174,6 @@ export default function PlatformOperatorInvitationPage() {
             </section>
         </main>
     );
-}
-
-function readInvitationToken(): string | null {
-    const hash = new URLSearchParams(window.location.hash.replace(/^#/, '')).get('token');
-    const query = new URLSearchParams(window.location.search).get('token');
-    const value = (hash ?? query ?? '').trim();
-
-    return /^[A-Za-z0-9_-]{72}$/.test(value) ? value : null;
 }
 
 function formatDateTime(value: string): string {

@@ -3,6 +3,7 @@
 // Prevent secrets passed to service methods from appearing in exception stack traces.
 ini_set('zend.exception_ignore_args', '1');
 
+use App\Console\Commands\EnsureApplicationKeyCommand;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
@@ -41,6 +42,9 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
+    ->withCommands([
+        EnsureApplicationKeyCommand::class,
+    ])
     ->withMiddleware(function (Middleware $middleware): void {
         $trustedProxies = array_values(array_filter(array_map(
             static fn (string $proxy): string => trim($proxy),

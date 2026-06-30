@@ -2,6 +2,7 @@ import axios, { type InternalAxiosRequestConfig } from 'axios';
 import { refreshAccessToken, shouldAttemptAuthRefresh } from './authRefreshCoordinator';
 import { getStoredApiContext } from './authSessionStorage';
 import { toApiError } from './apiError';
+import { isPublicApiRequest, requestPath } from './requestClassification';
 import { serializeQueryParams } from './queryParams';
 
 interface AuthRetryConfig extends InternalAxiosRequestConfig {
@@ -27,7 +28,9 @@ apiClient.interceptors.request.use((config) => {
     }
 
     const context = getStoredApiContext();
-    if (context.accessToken) {
+    if (isPublicApiRequest(config.url)) {
+        config.headers.delete('Authorization');
+    } else if (shouldAttachAuthorizationHeader(config.url, context.accessToken)) {
         config.headers.Authorization = `Bearer ${context.accessToken}`;
     }
     if (shouldAttachTenantHeader(config.url, context.authMode, context.tenantId)) {
@@ -62,6 +65,15 @@ apiClient.interceptors.response.use(
     },
 );
 
+export function shouldAttachAuthorizationHeader(
+    url: string | undefined,
+    accessToken: string | null,
+): boolean {
+    return typeof accessToken === 'string'
+        && accessToken.trim() !== ''
+        && !isPublicApiRequest(url);
+}
+
 export function shouldAttachTenantHeader(
     url: string | undefined,
     authMode: 'tenant' | 'platform',
@@ -71,23 +83,10 @@ export function shouldAttachTenantHeader(
         return false;
     }
 
-    const path = normalizedPath(url);
+    const path = requestPath(url);
     if (!path.startsWith('/api/v1/')) return false;
     if (path.startsWith('/api/v1/platform/')) return false;
+    if (isPublicApiRequest(path)) return false;
 
-    return ![
-        '/api/v1/auth/login',
-        '/api/v1/auth/refresh',
-        '/api/v1/auth/initial-administrator/',
-    ].some((prefix) => path === prefix || path.startsWith(prefix));
-}
-
-function normalizedPath(url: string | undefined): string {
-    if (!url) return '';
-
-    try {
-        return new URL(url, window.location.origin).pathname;
-    } catch {
-        return url.split('?')[0] ?? '';
-    }
+    return true;
 }

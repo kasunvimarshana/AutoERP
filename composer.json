@@ -45,15 +45,20 @@
         "setup": [
             "composer install",
             "@php -r \"file_exists('.env') || copy('.env.example', '.env');\"",
-            "@php artisan key:generate",
+            "@php artisan app:key:ensure --no-interaction",
             "@php artisan migrate --force",
             "@php artisan platform:permissions:sync --no-interaction",
             "@php artisan auth:readiness --no-interaction",
             "npm install",
             "npm run build"
         ],
+        "runtime:check": [
+            "@php artisan config:clear --ansi",
+            "@php artisan auth:readiness --no-interaction"
+        ],
         "dev": [
             "Composer\\Config::disableProcessTimeout",
+            "@runtime:check",
             "npx concurrently -c \"#93c5fd,#c4b5fd,#fb7185,#fdba74\" \"php artisan serve\" \"php artisan queue:listen --tries=1 --timeout=0\" \"php artisan pail --timeout=0\" \"npm run dev\" --names=server,queue,logs,vite --kill-others"
         ],
         "test": [

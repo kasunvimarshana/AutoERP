@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Auth\Services\Readiness;
 
+use App\Support\ApplicationKeyConfiguration;
 use Illuminate\Contracts\Cache\Repository as CacheRepository;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Database\DatabaseManager;
@@ -23,6 +24,7 @@ use Throwable;
 final readonly class AuthReadinessService
 {
     private const CACHE_PROBE_PREFIX = 'autoerp:auth-readiness:';
+    private const KEY_FINGERPRINT_LENGTH = 12;
 
     public function __construct(
         private Container $container,
@@ -56,9 +58,69 @@ final readonly class AuthReadinessService
 
     private function applicationKeyReady(): string
     {
+        $key = trim((string) config('app.key'));
+        $cipher = (string) config('app.cipher');
+        $application = app();
+        $environmentFile = method_exists($application, 'environmentFile')
+            ? (string) $application->environmentFile()
+            : 'unknown';
+        $environmentKey = $this->environmentFileKey($application);
+        if ($key === '' || ! ApplicationKeyConfiguration::isValid($key, $cipher)) {
+            throw new \RuntimeException('The effective APP_KEY is missing or invalid for the configured cipher.');
+        }
+        if ($environmentKey !== null && $environmentKey !== '') {
+            if (! ApplicationKeyConfiguration::isValid($environmentKey, $cipher)) {
+                throw new \RuntimeException('The selected environment file contains an invalid APP_KEY value.');
+            }
+            if (! hash_equals(
+                ApplicationKeyConfiguration::decode($environmentKey),
+                ApplicationKeyConfiguration::decode($key),
+            )) {
+                throw new \RuntimeException(
+                    'Effective APP_KEY does not match the selected environment file. Clear cached configuration and remove conflicting process-level APP_KEY values.',
+                );
+            }
+        }
+
         $this->container->make(OpaqueTokenCodec::class);
 
-        return 'Auth cryptographic key is valid.';
+        $configurationState = method_exists($application, 'configurationIsCached')
+            && $application->configurationIsCached()
+            ? 'cached'
+            : 'uncached';
+        $keySource = $environmentKey === null || $environmentKey === '' ? 'external' : 'environment-file';
+
+        return sprintf(
+            'Auth cryptographic key is valid (environment_file=%s, key_source=%s, configuration=%s, fingerprint=%s).',
+            $environmentFile,
+            $keySource,
+            $configurationState,
+            ApplicationKeyConfiguration::fingerprint($key, self::KEY_FINGERPRINT_LENGTH),
+        );
+    }
+
+    private function environmentFileKey(object $application): ?string
+    {
+        if (! method_exists($application, 'environmentFilePath')) {
+            return null;
+        }
+
+        $path = (string) $application->environmentFilePath();
+        if (! is_file($path) || ! is_readable($path)) {
+            return null;
+        }
+
+        $contents = file_get_contents($path);
+        if (! is_string($contents)) {
+            return null;
+        }
+
+        $values = ApplicationKeyConfiguration::values($contents);
+        if (count($values) > 1) {
+            throw new \RuntimeException('The selected environment file contains multiple APP_KEY entries.');
+        }
+
+        return $values[0] ?? null;
     }
 
     private function databaseReady(): string

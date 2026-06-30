@@ -6,6 +6,7 @@ namespace Modules\Auth\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Modules\Auth\Security\PasswordPolicy;
+use Modules\Auth\Services\Registration\RegistrationInvitationTokenFormat;
 
 final class AcceptInitialAdministratorInvitationRequest extends FormRequest
 {
@@ -18,7 +19,12 @@ final class AcceptInitialAdministratorInvitationRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'token' => ['required', 'string', 'size:64'],
+            'token' => [
+                'required',
+                'string',
+                'size:'.RegistrationInvitationTokenFormat::ENCODED_LENGTH,
+                'regex:'.RegistrationInvitationTokenFormat::VALIDATION_PATTERN,
+            ],
             'first_name' => ['required', 'string', 'max:255'],
             'last_name' => ['nullable', 'string', 'max:255'],
             'password' => ['required', 'string', 'max:255', 'confirmed', PasswordPolicy::rule()],

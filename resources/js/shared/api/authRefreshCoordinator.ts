@@ -5,6 +5,7 @@ import {
     invalidateStoredAuthSession,
     updateRefreshedSession,
 } from './authSessionStorage';
+import { isPublicApiRequest } from './requestClassification';
 
 interface RefreshResponse {
     access_token?: string;
@@ -49,6 +50,7 @@ export function refreshAccessToken(): Promise<string> {
 }
 
 export function shouldAttemptAuthRefresh(url: string | undefined): boolean {
+    if (isPublicApiRequest(url)) return false;
     if (!getStoredApiContext().hasSession) return false;
     if (!url) return true;
 
@@ -209,4 +211,3 @@ function createCoordinatorId(): string {
 function isTerminalRefreshFailure(error: ApiError): boolean {
     return error.status === 401 || error.status === 403 || error.code === 'AUTH_TOKEN_INVALID' || error.code === 'AUTH_TOKEN_REVOKED';
 }
-

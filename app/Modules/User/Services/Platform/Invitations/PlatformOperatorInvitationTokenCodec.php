@@ -8,8 +8,12 @@ use Modules\Core\Exceptions\ConfigurationException;
 
 final readonly class PlatformOperatorInvitationTokenCodec
 {
+    public const ENCODED_LENGTH = 72;
+    public const VALIDATION_PATTERN = '/\A[A-Za-z0-9_-]{72}\z/';
+
     private const CURRENT_DIGEST_CONTEXT = 'autoerp-platform-operator-invitation-v2';
     private const LEGACY_DIGEST_CONTEXT = 'autoerp-platform-operator-invitation-v1';
+    private const TOKEN_BYTES = 54;
 
     private string $legacyDigestKey;
 
@@ -34,7 +38,7 @@ final readonly class PlatformOperatorInvitationTokenCodec
 
     public function issue(): string
     {
-        return rtrim(strtr(base64_encode(random_bytes(54)), '+/', '-_'), '=');
+        return rtrim(strtr(base64_encode(random_bytes(self::TOKEN_BYTES)), '+/', '-_'), '=');
     }
 
     /**
