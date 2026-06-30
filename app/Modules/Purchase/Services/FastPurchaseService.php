@@ -12,8 +12,6 @@ use Modules\Audit\Constants\AuditEventCategory;
 use Modules\Audit\Contracts\AuditRecorderInterface;
 use Modules\Audit\Data\AuditEventData;
 use Modules\Core\Services\DecimalMath;
-use Modules\Finance\Models\FinanceAccount;
-use Modules\Finance\Models\FinancePostingProfile;
 use Modules\Idempotency\Enums\IdempotencyStatus;
 use Modules\Idempotency\Services\IdempotencyService;
 use Modules\Item\Enums\ItemType;
@@ -172,7 +170,7 @@ final class FastPurchaseService
         }
         $supplier = $this->supplier($tenantId, $organizationUnitId, (int) $payload['supplier_id'], $lockRecords);
         $supplierReference = trim((string) ($payload['supplier_reference'] ?? ''));
-        $currencyId = $this->currencyId($payload, $supplier, $tenantId, $organizationUnitId, $lockRecords);
+        $currencyId = $this->currencyId($payload, $supplier, $tenantId, $organizationUnitId);
         $exchangeRate = $this->math->normalize((string) ($payload['exchange_rate'] ?? '1.000000'));
         $warehouseId = $this->nullableInt($payload['warehouse_id'] ?? null);
         $warehouseLocationId = $this->nullableInt($payload['warehouse_location_id'] ?? null);
@@ -203,11 +201,7 @@ final class FastPurchaseService
         $adjustments = $this->resolveAdjustments(
             is_array($payload['adjustments'] ?? null) ? $payload['adjustments'] : [],
             $lines,
-            $tenantId,
-            $organizationUnitId,
             $createInvoice,
-            $currentUserId,
-            $lockRecords,
         );
         $summary = $this->summaryWithAdjustments($this->summary($lines), $adjustments);
         $payment = $this->resolvePayment($payload, $recordPayment, $summary, $tenantId, $organizationUnitId, $lockRecords);
@@ -600,10 +594,8 @@ final class FastPurchaseService
     private function validateMode(array $lines, bool $receiveStock, bool $createInvoice, bool $recordPayment): void
     {
         $hasStock = false;
-        $hasNonStock = false;
         foreach ($lines as $line) {
             $hasStock = $hasStock || (bool) $line['is_stock'];
-            $hasNonStock = $hasNonStock || ! (bool) $line['is_stock'];
         }
 
         if ($recordPayment && ! $createInvoice) {
@@ -625,7 +617,7 @@ final class FastPurchaseService
      * @param  list<array<string, mixed>>  $lines
      * @return list<array{data: PurchaseHeaderAdjustmentData, amount: string, accounting: array<string, mixed>}>
      */
-    private function resolveAdjustments(array $payloads, array $lines, int $tenantId, ?int $organizationUnitId, bool $createInvoice, ?int $userId, bool $lockRecords): array
+    private function resolveAdjustments(array $payloads, array $lines, bool $createInvoice): array
     {
         $adjustments = [];
         foreach (array_values($payloads) as $index => $row) {
@@ -634,7 +626,6 @@ final class FastPurchaseService
             }
 
             $adjustmentType = PurchaseAdjustmentType::from((string) $row['adjustment_type']);
-            $defaults = $this->adjustmentCatalogue->defaultsFor($adjustmentType);
             $data = new PurchaseHeaderAdjustmentData(
                 name: trim((string) $row['name']),
                 adjustmentType: $adjustmentType,
@@ -647,22 +638,16 @@ final class FastPurchaseService
                 isAllocatable: (bool) ($row['is_allocatable'] ?? true),
                 sortOrder: $index,
                 description: $this->nullableString($row['description'] ?? null),
-                financePostingProfileId: $this->nullableInt($row['finance_posting_profile_id'] ?? null),
-                financeAccountId: $this->nullableInt($row['finance_account_id'] ?? null),
-                costTreatment: $this->nullableString($row['cost_treatment'] ?? null) ?? (string) $defaults['cost_treatment'],
-                taxTreatment: $this->nullableString($row['tax_treatment'] ?? null) ?? (string) $defaults['tax_treatment'],
-                mappingSource: $this->nullableString($row['mapping_source'] ?? null) ?? 'catalogue',
-                overrideReason: $this->nullableString($row['override_reason'] ?? null),
                 manualAllocations: $this->manualAllocationsFromPayload($row['allocations'] ?? [], "adjustments.{$index}"),
             );
 
             $this->validator->assertNonNegative($data->amount, 'Fast purchase adjustment amount cannot be negative.');
             $this->validator->assertNonNegative($data->rate, 'Fast purchase adjustment rate cannot be negative.');
-            $this->adjustmentCatalogue->validate($data, $tenantId, $organizationUnitId, "adjustments.{$index}");
-            $accounting = $this->adjustmentPolicies->resolveForData($data, $tenantId, $organizationUnitId, "adjustments.{$index}", $userId, $lockRecords);
-            if ($accounting['final_treatment'] === 'unsupported') {
+            $this->adjustmentCatalogue->validate($data, "adjustments.{$index}");
+            $recognition = $this->adjustmentPolicies->resolveForData($data);
+            if ($recognition['final_treatment'] === 'unsupported') {
                 throw ValidationException::withMessages([
-                    "adjustments.{$index}.cost_treatment" => ['This adjustment accounting treatment is not supported for Fast Purchase.'],
+                    "adjustments.{$index}.adjustment_type" => ['This adjustment recognition is not supported for Fast Purchase.'],
                 ]);
             }
             if (! $createInvoice) {
@@ -673,7 +658,7 @@ final class FastPurchaseService
                 }
                 $this->assertReceiveOnlyAdjustmentSupported($data, "adjustments.{$index}.adjustment_type");
             }
-            $adjustments[] = ['data' => $data, 'accounting' => $accounting];
+            $adjustments[] = ['data' => $data, 'accounting' => $recognition];
         }
 
         $amounts = $this->purchaseCalculator->headerAdjustmentAmounts(
@@ -856,7 +841,6 @@ final class FastPurchaseService
     private function lockPayloadReferences(array $payload): void
     {
         $lines = is_array($payload['lines'] ?? null) ? $payload['lines'] : [];
-        $adjustments = is_array($payload['adjustments'] ?? null) ? $payload['adjustments'] : [];
         $payment = is_array($payload['payment'] ?? null) ? $payload['payment'] : [];
         $paymentLines = is_array($payment['lines'] ?? null) && $payment['lines'] !== []
             ? $payment['lines']
@@ -871,11 +855,6 @@ final class FastPurchaseService
         $this->lockModelIds(UnitOfMeasureModel::class, array_map(static fn (mixed $line): mixed => is_array($line) ? ($line['uom_id'] ?? null) : null, $lines));
         $this->lockModelIds(TaxGroup::class, array_map(static fn (mixed $line): mixed => is_array($line) ? ($line['tax_group_id'] ?? null) : null, $lines));
         $this->lockModelIds(PaymentMethod::class, array_map(static fn (mixed $line): mixed => is_array($line) ? ($line['payment_method_id'] ?? null) : null, $paymentLines));
-        $this->lockModelIds(FinancePostingProfile::class, array_map(static fn (mixed $adjustment): mixed => is_array($adjustment) ? ($adjustment['finance_posting_profile_id'] ?? null) : null, $adjustments));
-        $this->lockModelIds(FinanceAccount::class, array_map(
-            static fn (mixed $adjustment): mixed => is_array($adjustment) ? ($adjustment['finance_account_id'] ?? null) : null,
-            $adjustments,
-        ));
     }
 
     /**
@@ -941,7 +920,7 @@ final class FastPurchaseService
         return $this->validator->warehouseLocation($tenantId, $organizationUnitId, $warehouseId, (int) $location->getKey(), $field);
     }
 
-    private function currencyId(array $payload, Supplier $supplier, int $tenantId, ?int $organizationUnitId, bool $lockRecords): ?int
+    private function currencyId(array $payload, Supplier $supplier, int $tenantId, ?int $organizationUnitId): ?int
     {
         $currencyId = $this->nullableInt($payload['currency_id'] ?? null) ?? $supplier->default_currency_id;
         if ($currencyId === null) {
@@ -1108,6 +1087,17 @@ final class FastPurchaseService
             foreach (['line_total', 'line_subtotal', 'tax_calculation_type', 'tax_rate', 'tax_amount', 'withholding_amount', 'base_quantity', 'base_uom_quantity', 'finance_account_id', 'status'] as $key) {
                 if (array_key_exists($key, $line)) {
                     throw new InvalidArgumentException('Fast purchase line totals, statuses, base quantities, and finance accounts are server controlled.');
+                }
+            }
+        }
+
+        foreach (($payload['adjustments'] ?? []) as $adjustment) {
+            if (! is_array($adjustment)) {
+                continue;
+            }
+            foreach (['finance_posting_profile_id', 'finance_account_id', 'cost_treatment', 'tax_treatment', 'mapping_source', 'override_reason'] as $key) {
+                if (array_key_exists($key, $adjustment)) {
+                    throw new InvalidArgumentException('Fast purchase adjustment recognition and finance mapping are server controlled.');
                 }
             }
         }
