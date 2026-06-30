@@ -1,11 +1,11 @@
 import { useState, type FormEvent } from "react";
+import { toApiError, type ApiError } from "@/shared/api/apiError";
 import { Button } from "@/shared/components/Button";
+import { ErrorAlert } from "@/shared/components/ErrorAlert";
 import { Input } from "@/shared/components/Input";
 import { Panel } from "@/shared/components/Panel";
 import { StatusBadge } from "@/shared/components/StatusBadge";
 import { Textarea } from "@/shared/components/Textarea";
-import { toApiError, type ApiError } from "@/shared/api/apiError";
-import { ErrorAlert } from "@/shared/components/ErrorAlert";
 import {
     transitionRentalUsageFact,
     updateRentalUsageFact,
@@ -34,7 +34,12 @@ interface RentalUsageFactEditorProps {
     onSaved: () => void;
 }
 
-const toDateTimeInput = (value: string) => value.slice(0, 16);
+const toDateTimeInput = (value: string) => {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value.slice(0, 16);
+    const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+    return local.toISOString().slice(0, 16);
+};
 
 const formFromFact = (fact: RentalUsageFact): FactForm => ({
     started_at: toDateTimeInput(fact.started_at),
@@ -63,14 +68,20 @@ export function RentalUsageFactEditor({
     onSaved,
 }: RentalUsageFactEditorProps) {
     const [form, setForm] = useState<FactForm>(() => formFromFact(fact));
+    const [dirty, setDirty] = useState(false);
     const [transitionReason, setTransitionReason] = useState("");
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
     const editable = canRecord && ["draft", "rejected"].includes(fact.status);
 
+    const change = <K extends keyof FactForm>(field: K, value: FactForm[K]) => {
+        setForm((current) => ({ ...current, [field]: value }));
+        setDirty(true);
+    };
+
     const save = async (event: FormEvent) => {
         event.preventDefault();
-        if (!editable) return;
+        if (!editable || !dirty) return;
         setBusy(true);
         setError(null);
         try {
@@ -81,6 +92,7 @@ export function RentalUsageFactEditor({
                 double_overtime_minutes: Number(form.double_overtime_minutes),
                 triple_overtime_minutes: Number(form.triple_overtime_minutes),
             });
+            setDirty(false);
             onSaved();
         } catch (requestError) {
             setError(toApiError(requestError));
@@ -90,6 +102,7 @@ export function RentalUsageFactEditor({
     };
 
     const transition = async (status: string) => {
+        if (dirty) return;
         setBusy(true);
         setError(null);
         try {
@@ -125,9 +138,7 @@ export function RentalUsageFactEditor({
                         required
                         disabled={!editable}
                         value={form.started_at}
-                        onChange={(event) =>
-                            setForm({ ...form, started_at: event.target.value })
-                        }
+                        onChange={(event) => change("started_at", event.target.value)}
                     />
                     <Input
                         label="Commercial finish"
@@ -135,9 +146,7 @@ export function RentalUsageFactEditor({
                         required
                         disabled={!editable}
                         value={form.ended_at}
-                        onChange={(event) =>
-                            setForm({ ...form, ended_at: event.target.value })
-                        }
+                        onChange={(event) => change("ended_at", event.target.value)}
                     />
                     <Input
                         label="Commercial start odometer"
@@ -148,7 +157,7 @@ export function RentalUsageFactEditor({
                         disabled={!editable}
                         value={form.start_odometer}
                         onChange={(event) =>
-                            setForm({ ...form, start_odometer: event.target.value })
+                            change("start_odometer", event.target.value)
                         }
                     />
                     <Input
@@ -160,7 +169,7 @@ export function RentalUsageFactEditor({
                         disabled={!editable}
                         value={form.end_odometer}
                         onChange={(event) =>
-                            setForm({ ...form, end_odometer: event.target.value })
+                            change("end_odometer", event.target.value)
                         }
                     />
                     <Input
@@ -176,10 +185,7 @@ export function RentalUsageFactEditor({
                         disabled={!editable}
                         value={form.commercial_distance_km}
                         onChange={(event) =>
-                            setForm({
-                                ...form,
-                                commercial_distance_km: event.target.value,
-                            })
+                            change("commercial_distance_km", event.target.value)
                         }
                     />
                     <Input
@@ -189,10 +195,7 @@ export function RentalUsageFactEditor({
                         disabled={!editable}
                         value={form.normal_overtime_minutes}
                         onChange={(event) =>
-                            setForm({
-                                ...form,
-                                normal_overtime_minutes: event.target.value,
-                            })
+                            change("normal_overtime_minutes", event.target.value)
                         }
                     />
                     <Input
@@ -202,10 +205,7 @@ export function RentalUsageFactEditor({
                         disabled={!editable}
                         value={form.double_overtime_minutes}
                         onChange={(event) =>
-                            setForm({
-                                ...form,
-                                double_overtime_minutes: event.target.value,
-                            })
+                            change("double_overtime_minutes", event.target.value)
                         }
                     />
                     <Input
@@ -215,10 +215,7 @@ export function RentalUsageFactEditor({
                         disabled={!editable}
                         value={form.triple_overtime_minutes}
                         onChange={(event) =>
-                            setForm({
-                                ...form,
-                                triple_overtime_minutes: event.target.value,
-                            })
+                            change("triple_overtime_minutes", event.target.value)
                         }
                     />
                     <Input
@@ -229,7 +226,7 @@ export function RentalUsageFactEditor({
                         disabled={!editable}
                         value={form.night_out_count}
                         onChange={(event) =>
-                            setForm({ ...form, night_out_count: event.target.value })
+                            change("night_out_count", event.target.value)
                         }
                     />
                     <Input
@@ -237,7 +234,7 @@ export function RentalUsageFactEditor({
                         disabled={!editable}
                         value={form.reference_number}
                         onChange={(event) =>
-                            setForm({ ...form, reference_number: event.target.value })
+                            change("reference_number", event.target.value)
                         }
                     />
                 </div>
@@ -247,18 +244,21 @@ export function RentalUsageFactEditor({
                         disabled={!editable}
                         value={form.variance_reason}
                         onChange={(event) =>
-                            setForm({ ...form, variance_reason: event.target.value })
+                            change("variance_reason", event.target.value)
                         }
                     />
                     <Textarea
                         label="Remarks"
                         disabled={!editable}
                         value={form.remarks}
-                        onChange={(event) =>
-                            setForm({ ...form, remarks: event.target.value })
-                        }
+                        onChange={(event) => change("remarks", event.target.value)}
                     />
                 </div>
+                {dirty && (
+                    <p className="mt-3 text-sm font-medium text-amber-700">
+                        Save these changes before submitting or approving this side.
+                    </p>
+                )}
                 <div className="mt-4 grid gap-4 md:grid-cols-[1fr_auto] md:items-end">
                     <Input
                         label="Approval, rejection or reversal note"
@@ -267,7 +267,7 @@ export function RentalUsageFactEditor({
                     />
                     <div className="flex flex-wrap justify-end gap-2">
                         {editable && (
-                            <Button type="submit" loading={busy}>
+                            <Button type="submit" loading={busy} disabled={!dirty}>
                                 Save facts
                             </Button>
                         )}
@@ -276,6 +276,7 @@ export function RentalUsageFactEditor({
                                 type="button"
                                 variant="secondary"
                                 loading={busy}
+                                disabled={dirty}
                                 onClick={() => void transition("submitted")}
                             >
                                 Submit
