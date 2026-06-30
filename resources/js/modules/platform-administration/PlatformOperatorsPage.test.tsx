@@ -90,7 +90,7 @@ describe('PlatformOperatorsPage', () => {
         }));
     });
 
-    it('requeues the active invitation without claiming that earlier copies are invalid', async () => {
+    it('explains safe resend transition and directs the operator to the newest email', async () => {
         mocks.canManage = true;
         mocks.listOperators.mockResolvedValue(operatorPage([invitedOperator()]));
         const user = userEvent.setup();
@@ -102,12 +102,13 @@ describe('PlatformOperatorsPage', () => {
 
         await user.click(screen.getAllByRole('button', { name: 'Resend invitation' })[0]);
         const dialog = screen.getByRole('dialog', { name: 'Resend invitation to Pending Operator' });
-        expect(within(dialog).getByText(/existing copies remain valid/i)).toBeInTheDocument();
-        expect(within(dialog).queryByText(/previous invitation link becomes invalid/i)).not.toBeInTheDocument();
+        expect(within(dialog).getByText(/use the newest email/i)).toBeInTheDocument();
+        expect(within(dialog).getByText(/legacy or unreadable tokens are safely replaced/i)).toBeInTheDocument();
         await user.click(within(dialog).getByRole('button', { name: 'Resend invitation' }));
 
         await waitFor(() => expect(mocks.resendOperatorInvitation).toHaveBeenCalledWith(invitedOperator()));
-        expect(await screen.findByText(/active invitation was queued again/i)).toBeInTheDocument();
+        expect(await screen.findByText(/invitation was queued/i)).toBeInTheDocument();
+        expect(screen.getByText(/current-format links remain valid/i)).toBeInTheDocument();
     });
 });
 
