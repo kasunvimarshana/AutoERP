@@ -10,6 +10,5 @@ enum RentalUsageStatus: string
     case Submitted = 'submitted';
     case Approved = 'approved';
     case Rejected = 'rejected';
-    case Consumed = 'consumed';
     case Reversed = 'reversed';
 }
