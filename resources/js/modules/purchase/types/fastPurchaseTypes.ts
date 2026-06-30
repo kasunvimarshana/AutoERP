@@ -77,10 +77,6 @@ export interface FastPurchasePayload {
         amount?: string;
         allocation_method?: string;
         is_allocatable?: boolean;
-        cost_treatment?: string;
-        tax_treatment?: string;
-        mapping_source?: 'catalogue' | 'override';
-        override_reason?: string;
         allocations?: Array<{
             client_line_key: string;
             amount: string;
