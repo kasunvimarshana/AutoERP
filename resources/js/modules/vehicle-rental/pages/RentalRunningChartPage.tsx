@@ -1,8 +1,8 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { useSearchParams } from "react-router-dom";
-import type { EmployeeSummary } from "@/modules/hr/hrTypes";
 import { useAuth } from "@/modules/auth/AuthProvider";
 import { hasPermission } from "@/modules/auth/accessControl";
+import { toApiError, type ApiError } from "@/shared/api/apiError";
 import { Button } from "@/shared/components/Button";
 import { ContentHeader } from "@/shared/components/ContentHeader";
 import { DataTable, type DataColumn } from "@/shared/components/DataTable";
@@ -13,32 +13,36 @@ import { Panel } from "@/shared/components/Panel";
 import { Select } from "@/shared/components/Select";
 import { StatusBadge } from "@/shared/components/StatusBadge";
 import { Textarea } from "@/shared/components/Textarea";
-import { toApiError, type ApiError } from "@/shared/api/apiError";
 import { useApi } from "@/shared/hooks/useApi";
 import { businessDateInputValue } from "@/shared/utils/businessDate";
 import { formatDate } from "@/shared/utils/formatDate";
 import { readableRelation } from "@/shared/utils/object";
 import { parsePositiveInteger } from "@/shared/utils/routeParams";
-import { RentalDriverLookupSelect } from "../components/RentalDriverLookupSelect";
 import { RentalPage } from "../components/RentalPage";
+import { RentalUsageFactEditor } from "../components/RentalUsageFactEditor";
 import {
     createRentalUsageLog,
+    getRentalMetadata,
     listRentalAllocations,
     listRentalUsageLogs,
     transitionRentalUsageLog,
 } from "../vehicleRentalApi";
 import { vehicleRentalPermissions } from "../vehicleRentalPermissions";
-import type { RentalUsageLog } from "../vehicleRentalTypes";
+import type {
+    RentalAllocation,
+    RentalUsageEventApplicability,
+    RentalUsageLog,
+} from "../vehicleRentalTypes";
 
 interface UsageForm {
     usage_date: string;
     started_at: string;
     ended_at: string;
+    driver_assignment_id: string;
     start_odometer: string;
     end_odometer: string;
     garage_distance_km: string;
     internal_distance_km: string;
-    working_minutes: string;
     normal_overtime_minutes: string;
     double_overtime_minutes: string;
     triple_overtime_minutes: string;
@@ -46,6 +50,18 @@ interface UsageForm {
     trip_from: string;
     trip_to: string;
     trip_purpose: string;
+    odometer_variance_reason: string;
+    remarks: string;
+}
+
+interface EventDraft {
+    key: number;
+    event_type: string;
+    applicability: RentalUsageEventApplicability;
+    occurred_at: string;
+    quantity: string;
+    unit: string;
+    reference_number: string;
     remarks: string;
 }
 
@@ -53,11 +69,11 @@ const emptyForm = (): UsageForm => ({
     usage_date: businessDateInputValue(),
     started_at: "",
     ended_at: "",
+    driver_assignment_id: "",
     start_odometer: "",
     end_odometer: "",
     garage_distance_km: "0",
     internal_distance_km: "0",
-    working_minutes: "0",
     normal_overtime_minutes: "0",
     double_overtime_minutes: "0",
     triple_overtime_minutes: "0",
@@ -65,18 +81,51 @@ const emptyForm = (): UsageForm => ({
     trip_from: "",
     trip_to: "",
     trip_purpose: "",
+    odometer_variance_reason: "",
     remarks: "",
 });
+
+const newEvent = (key: number): EventDraft => ({
+    key,
+    event_type: "",
+    applicability: "customer",
+    occurred_at: "",
+    quantity: "",
+    unit: "",
+    reference_number: "",
+    remarks: "",
+});
+
+const optionLabel = (value: string) =>
+    value
+        .split("_")
+        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+        .join(" ");
+
+const assignmentLabel = (
+    assignment: NonNullable<RentalAllocation["drivers"]>[number],
+) => {
+    const employee = readableRelation(assignment.employee);
+    const period = `${formatDate(assignment.assigned_from)} – ${
+        assignment.assigned_to ? formatDate(assignment.assigned_to) : "Open"
+    }`;
+
+    return `${employee} · ${optionLabel(assignment.assignment_role)} · ${period}`;
+};
 
 export default function RentalRunningChartPage() {
     const auth = useAuth();
     const [searchParams, setSearchParams] = useSearchParams();
     const allocationId = parsePositiveInteger(searchParams.get("allocation_id"));
     const [form, setForm] = useState<UsageForm>(emptyForm);
-    const [driver, setDriver] = useState<EmployeeSummary | null>(null);
+    const [events, setEvents] = useState<EventDraft[]>([]);
+    const [nextEventKey, setNextEventKey] = useState(1);
+    const [selectedUsageId, setSelectedUsageId] = useState<number | null>(null);
+    const [physicalTransitionReason, setPhysicalTransitionReason] = useState("");
     const [saving, setSaving] = useState(false);
     const [actionError, setActionError] = useState<ApiError | null>(null);
 
+    const metadata = useApi((signal) => getRentalMetadata(signal), []);
     const allocations = useApi(
         (signal) =>
             listRentalAllocations({ status: "active", per_page: 100 }, signal),
@@ -95,16 +144,76 @@ export default function RentalRunningChartPage() {
         allocationId !== null,
     );
 
+    const allocationRows = allocations.data?.data ?? [];
+    const selectedAllocation = useMemo(
+        () => allocationRows.find((row) => row.id === allocationId) ?? null,
+        [allocationId, allocationRows],
+    );
+    const selectedUsage = useMemo(
+        () =>
+            (logs.data?.data ?? []).find((row) => row.id === selectedUsageId) ??
+            null,
+        [logs.data, selectedUsageId],
+    );
     const allocationOptions = useMemo(
         () =>
-            (allocations.data?.data ?? []).map((row) => ({
+            allocationRows.map((row) => ({
                 value: String(row.id),
                 label: `${row.allocation_number} · ${readableRelation(row.vehicle)}`,
             })),
-        [allocations.data],
+        [allocationRows],
     );
+    const driverAssignmentOptions = useMemo(
+        () => [
+            { value: "", label: "No company driver" },
+            ...(selectedAllocation?.drivers ?? [])
+                .filter((assignment) => assignment.status === "active")
+                .map((assignment) => ({
+                    value: String(assignment.id),
+                    label: assignmentLabel(assignment),
+                })),
+        ],
+        [selectedAllocation],
+    );
+    const eventTypeOptions = useMemo(
+        () => [
+            { value: "", label: "Select event type" },
+            ...(metadata.data?.usage_event_types ?? []).map((value) => ({
+                value,
+                label: optionLabel(value),
+            })),
+        ],
+        [metadata.data],
+    );
+    const eventApplicabilityOptions = useMemo(
+        () =>
+            (metadata.data?.usage_event_applicabilities ?? []).map((value) => ({
+                value,
+                label:
+                    value === "customer"
+                        ? "Customer / lessee only"
+                        : value === "owner"
+                          ? "Vehicle owner / lessor only"
+                          : value === "both"
+                            ? "Both commercial sides"
+                            : "Internal only",
+            })),
+        [metadata.data],
+    );
+
     const canRecord = hasPermission(auth, vehicleRentalPermissions.usageRecord);
     const canApprove = hasPermission(auth, vehicleRentalPermissions.usageApprove);
+
+    const addEvent = () => {
+        setEvents((current) => [...current, newEvent(nextEventKey)]);
+        setNextEventKey((current) => current + 1);
+    };
+
+    const updateEvent = (key: number, patch: Partial<EventDraft>) => {
+        setEvents((current) =>
+            current.map((row) => (row.key === key ? { ...row, ...patch } : row)),
+        );
+    };
 
     const save = async (event: FormEvent) => {
         event.preventDefault();
@@ -113,22 +222,37 @@ export default function RentalRunningChartPage() {
         setActionError(null);
         try {
             await createRentalUsageLog(allocationId, {
-                ...form,
-                driver_id: driver?.id ?? null,
-                started_at: form.started_at || null,
-                ended_at: form.ended_at || null,
+                usage_date: form.usage_date,
+                started_at: form.started_at,
+                ended_at: form.ended_at,
+                driver_assignment_id: form.driver_assignment_id
+                    ? Number(form.driver_assignment_id)
+                    : null,
                 start_odometer: form.start_odometer,
                 end_odometer: form.end_odometer,
                 garage_distance_km: form.garage_distance_km,
                 internal_distance_km: form.internal_distance_km,
-                working_minutes: Number(form.working_minutes),
                 normal_overtime_minutes: Number(form.normal_overtime_minutes),
                 double_overtime_minutes: Number(form.double_overtime_minutes),
                 triple_overtime_minutes: Number(form.triple_overtime_minutes),
                 night_out_count: form.night_out_count,
+                trip_from: form.trip_from || null,
+                trip_to: form.trip_to || null,
+                trip_purpose: form.trip_purpose || null,
+                odometer_variance_reason:
+                    form.odometer_variance_reason || null,
+                remarks: form.remarks || null,
+                events: events.map(({ key: _key, ...row }) => ({
+                    ...row,
+                    occurred_at: row.occurred_at || null,
+                    unit: row.unit || null,
+                    reference_number: row.reference_number || null,
+                    remarks: row.remarks || null,
+                })),
             });
             setForm(emptyForm());
-            setDriver(null);
+            setEvents([]);
+            setSelectedUsageId(null);
             logs.reload();
         } catch (error) {
             setActionError(toApiError(error));
@@ -140,12 +264,22 @@ export default function RentalRunningChartPage() {
     const transition = async (row: RentalUsageLog, status: string) => {
         setActionError(null);
         try {
-            await transitionRentalUsageLog(row.id, status);
+            await transitionRentalUsageLog(
+                row.id,
+                row.row_version,
+                status,
+                physicalTransitionReason || undefined,
+            );
+            setPhysicalTransitionReason("");
             logs.reload();
         } catch (error) {
             setActionError(toApiError(error));
         }
     };
+
+    const contextStatus = (row: RentalUsageLog, side: "revenue" | "cost") =>
+        row.contexts.find((context) => context.financial_side === side)?.usage_fact
+            ?.status ?? "not_applicable";
 
     const columns: DataColumn<RentalUsageLog>[] = [
         {
@@ -160,55 +294,72 @@ export default function RentalRunningChartPage() {
         },
         {
             key: "driver",
-            header: "Driver",
-            render: (row) => readableRelation(row.driver),
+            header: "Driver assignment",
+            render: (row) =>
+                row.driver_assignment
+                    ? readableRelation(row.driver_assignment.employee)
+                    : "Without company driver",
         },
         {
             key: "distance",
-            header: "KM",
+            header: "Physical KM",
             render: (row) =>
-                `${row.distance_km} (${row.chargeable_distance_km} chargeable)`,
+                `${row.distance_km} total / ${row.net_operational_distance_km} net`,
         },
         {
-            key: "overtime",
-            header: "Overtime",
-            render: (row) =>
-                `${row.normal_overtime_minutes}/${row.double_overtime_minutes}/${row.triple_overtime_minutes} min`,
-        },
-        {
-            key: "status",
-            header: "Status",
+            key: "physical_status",
+            header: "Physical",
             render: (row) => <StatusBadge status={row.status} />,
+        },
+        {
+            key: "customer_status",
+            header: "Customer facts",
+            render: (row) => <StatusBadge status={contextStatus(row, "revenue")} />,
+        },
+        {
+            key: "owner_status",
+            header: "Owner facts",
+            render: (row) => <StatusBadge status={contextStatus(row, "cost")} />,
         },
         {
             key: "actions",
             header: "",
             className: "text-right",
             render: (row) => (
-                <div className="flex justify-end gap-2">
+                <div className="flex flex-wrap justify-end gap-2">
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => setSelectedUsageId(row.id)}
+                    >
+                        Manage facts
+                    </Button>
                     {canRecord && row.status === "draft" && (
                         <Button
+                            type="button"
                             variant="ghost"
                             onClick={() => void transition(row, "submitted")}
                         >
-                            Submit
+                            Submit physical usage
                         </Button>
                     )}
                     {canApprove && row.status === "submitted" && (
-                        <Button
-                            variant="ghost"
-                            onClick={() => void transition(row, "approved")}
-                        >
-                            Approve
-                        </Button>
-                    )}
-                    {canApprove && row.status === "submitted" && (
-                        <Button
-                            variant="ghost"
-                            onClick={() => void transition(row, "rejected")}
-                        >
-                            Reject
-                        </Button>
+                        <>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                onClick={() => void transition(row, "approved")}
+                            >
+                                Approve physical usage
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                onClick={() => void transition(row, "rejected")}
+                            >
+                                Reject
+                            </Button>
+                        </>
                     )}
                 </div>
             ),
@@ -219,28 +370,45 @@ export default function RentalRunningChartPage() {
         <RentalPage>
             <ContentHeader
                 title="Daily running chart"
-                description="Record one operational usage stream that feeds independent customer revenue and owner cost calculations."
+                description="Record physical vehicle usage once, then approve customer billable and vehicle-owner payable facts independently."
             />
             <ErrorAlert
-                error={actionError ?? allocations.error ?? logs.error}
+                error={
+                    actionError ??
+                    metadata.error ??
+                    allocations.error ??
+                    logs.error
+                }
             />
-            <Panel title="Context">
+            <Panel title="Rental allocation">
                 <Select
-                    label="Active allocation"
+                    label="Active vehicle allocation"
                     value={allocationId !== null ? String(allocationId) : ""}
-                    onChange={(event) =>
+                    onChange={(event) => {
                         setSearchParams(
                             event.target.value
                                 ? { allocation_id: event.target.value }
                                 : {},
-                        )
-                    }
+                        );
+                        setForm(emptyForm());
+                        setEvents([]);
+                        setSelectedUsageId(null);
+                    }}
                     options={allocationOptions}
                 />
+                <p className="mt-2 text-sm text-slate-500">
+                    The selected allocation controls the vehicle, customer agreement,
+                    owner agreement and valid driver assignments.
+                </p>
             </Panel>
+
             {canRecord && allocationId !== null && (
                 <form onSubmit={save} className="mt-5 space-y-5">
-                    <Panel title="New usage entry">
+                    <Panel title="Physical usage">
+                        <p className="mb-4 text-sm text-slate-600">
+                            Enter actual time and odometer facts. Customer billable and
+                            owner payable values are reviewed separately after saving.
+                        </p>
                         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                             <Input
                                 label="Usage date"
@@ -255,8 +423,9 @@ export default function RentalRunningChartPage() {
                                 }
                             />
                             <Input
-                                label="Started at"
+                                label="Actual start"
                                 type="datetime-local"
+                                required
                                 value={form.started_at}
                                 onChange={(event) =>
                                     setForm({
@@ -266,8 +435,9 @@ export default function RentalRunningChartPage() {
                                 }
                             />
                             <Input
-                                label="Ended at"
+                                label="Actual finish"
                                 type="datetime-local"
+                                required
                                 value={form.ended_at}
                                 onChange={(event) =>
                                     setForm({
@@ -276,9 +446,16 @@ export default function RentalRunningChartPage() {
                                     })
                                 }
                             />
-                            <RentalDriverLookupSelect
-                                value={driver}
-                                onChange={setDriver}
+                            <Select
+                                label="Valid driver assignment"
+                                value={form.driver_assignment_id}
+                                onChange={(event) =>
+                                    setForm({
+                                        ...form,
+                                        driver_assignment_id: event.target.value,
+                                    })
+                                }
+                                options={driverAssignmentOptions}
                             />
                             <Input
                                 label="Start odometer"
@@ -322,7 +499,7 @@ export default function RentalRunningChartPage() {
                                 }
                             />
                             <Input
-                                label="Internal KM"
+                                label="Internal / non-commercial KM"
                                 type="number"
                                 min="0"
                                 step="0.000001"
@@ -330,20 +507,7 @@ export default function RentalRunningChartPage() {
                                 onChange={(event) =>
                                     setForm({
                                         ...form,
-                                        internal_distance_km:
-                                            event.target.value,
-                                    })
-                                }
-                            />
-                            <Input
-                                label="Working minutes"
-                                type="number"
-                                min="0"
-                                value={form.working_minutes}
-                                onChange={(event) =>
-                                    setForm({
-                                        ...form,
-                                        working_minutes: event.target.value,
+                                        internal_distance_km: event.target.value,
                                     })
                                 }
                             />
@@ -355,8 +519,7 @@ export default function RentalRunningChartPage() {
                                 onChange={(event) =>
                                     setForm({
                                         ...form,
-                                        normal_overtime_minutes:
-                                            event.target.value,
+                                        normal_overtime_minutes: event.target.value,
                                     })
                                 }
                             />
@@ -368,8 +531,7 @@ export default function RentalRunningChartPage() {
                                 onChange={(event) =>
                                     setForm({
                                         ...form,
-                                        double_overtime_minutes:
-                                            event.target.value,
+                                        double_overtime_minutes: event.target.value,
                                     })
                                 }
                             />
@@ -381,8 +543,7 @@ export default function RentalRunningChartPage() {
                                 onChange={(event) =>
                                     setForm({
                                         ...form,
-                                        triple_overtime_minutes:
-                                            event.target.value,
+                                        triple_overtime_minutes: event.target.value,
                                     })
                                 }
                             />
@@ -403,20 +564,14 @@ export default function RentalRunningChartPage() {
                                 label="From"
                                 value={form.trip_from}
                                 onChange={(event) =>
-                                    setForm({
-                                        ...form,
-                                        trip_from: event.target.value,
-                                    })
+                                    setForm({ ...form, trip_from: event.target.value })
                                 }
                             />
                             <Input
                                 label="To"
                                 value={form.trip_to}
                                 onChange={(event) =>
-                                    setForm({
-                                        ...form,
-                                        trip_to: event.target.value,
-                                    })
+                                    setForm({ ...form, trip_to: event.target.value })
                                 }
                             />
                             <Input
@@ -430,32 +585,159 @@ export default function RentalRunningChartPage() {
                                 }
                             />
                         </div>
-                        <div className="mt-4">
+                        <div className="mt-4 grid gap-4 md:grid-cols-2">
+                            <Textarea
+                                label="Odometer variance reason"
+                                value={form.odometer_variance_reason}
+                                onChange={(event) =>
+                                    setForm({
+                                        ...form,
+                                        odometer_variance_reason: event.target.value,
+                                    })
+                                }
+                            />
                             <Textarea
                                 label="Remarks"
                                 value={form.remarks}
                                 onChange={(event) =>
-                                    setForm({
-                                        ...form,
-                                        remarks: event.target.value,
-                                    })
+                                    setForm({ ...form, remarks: event.target.value })
                                 }
                             />
                         </div>
+                    </Panel>
+
+                    <Panel title="Usage events and other charges">
+                        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                            <p className="text-sm text-slate-600">
+                                Classify every event by the commercial side it affects.
+                                Internal-only events remain operational and are not billed.
+                            </p>
+                            <Button type="button" variant="secondary" onClick={addEvent}>
+                                Add event
+                            </Button>
+                        </div>
+                        {events.length === 0 ? (
+                            <p className="text-sm text-slate-500">
+                                No parking, toll, waiting, fuel, damage, repair or other
+                                events recorded.
+                            </p>
+                        ) : (
+                            <div className="space-y-4">
+                                {events.map((row, index) => (
+                                    <div
+                                        key={row.key}
+                                        className="rounded-lg border border-slate-200 p-4"
+                                    >
+                                        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                                            <Select
+                                                label={`Event ${index + 1}`}
+                                                required
+                                                value={row.event_type}
+                                                onChange={(event) =>
+                                                    updateEvent(row.key, {
+                                                        event_type: event.target.value,
+                                                    })
+                                                }
+                                                options={eventTypeOptions}
+                                            />
+                                            <Select
+                                                label="Applies to"
+                                                required
+                                                value={row.applicability}
+                                                onChange={(event) =>
+                                                    updateEvent(row.key, {
+                                                        applicability: event.target
+                                                            .value as RentalUsageEventApplicability,
+                                                    })
+                                                }
+                                                options={eventApplicabilityOptions}
+                                            />
+                                            <Input
+                                                label="Occurred at"
+                                                type="datetime-local"
+                                                value={row.occurred_at}
+                                                onChange={(event) =>
+                                                    updateEvent(row.key, {
+                                                        occurred_at: event.target.value,
+                                                    })
+                                                }
+                                            />
+                                            <Input
+                                                label="Quantity / amount basis"
+                                                type="number"
+                                                min="0"
+                                                step="0.000001"
+                                                required
+                                                value={row.quantity}
+                                                onChange={(event) =>
+                                                    updateEvent(row.key, {
+                                                        quantity: event.target.value,
+                                                    })
+                                                }
+                                            />
+                                            <Input
+                                                label="Unit"
+                                                value={row.unit}
+                                                onChange={(event) =>
+                                                    updateEvent(row.key, {
+                                                        unit: event.target.value,
+                                                    })
+                                                }
+                                            />
+                                            <Input
+                                                label="Reference"
+                                                value={row.reference_number}
+                                                onChange={(event) =>
+                                                    updateEvent(row.key, {
+                                                        reference_number:
+                                                            event.target.value,
+                                                    })
+                                                }
+                                            />
+                                            <Input
+                                                label="Remarks"
+                                                value={row.remarks}
+                                                onChange={(event) =>
+                                                    updateEvent(row.key, {
+                                                        remarks: event.target.value,
+                                                    })
+                                                }
+                                            />
+                                        </div>
+                                        <div className="mt-3 flex justify-end">
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                onClick={() =>
+                                                    setEvents((current) =>
+                                                        current.filter(
+                                                            (eventRow) =>
+                                                                eventRow.key !== row.key,
+                                                        ),
+                                                    )
+                                                }
+                                            >
+                                                Remove event
+                                            </Button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                         <div className="mt-4 flex justify-end">
                             <Button type="submit" loading={saving}>
-                                Save usage
+                                Save physical usage
                             </Button>
                         </div>
                     </Panel>
                 </form>
             )}
+
             <div className="mt-5">
                 {!allocationId ? (
                     <Panel>
                         <p className="text-sm text-slate-500">
-                            Select an active allocation to view its running
-                            chart.
+                            Select an active allocation to view its running chart.
                         </p>
                     </Panel>
                 ) : logs.loading ? (
@@ -469,6 +751,75 @@ export default function RentalRunningChartPage() {
                     />
                 )}
             </div>
+
+            {selectedUsage && (
+                <div className="mt-5 space-y-5">
+                    <Panel title={`Physical usage · ${selectedUsage.usage_number}`}>
+                        <div className="grid gap-3 md:grid-cols-3">
+                            <div>
+                                <p className="text-xs font-semibold uppercase text-slate-500">
+                                    Actual period
+                                </p>
+                                <p className="mt-1 text-sm">
+                                    {selectedUsage.started_at} – {selectedUsage.ended_at}
+                                </p>
+                            </div>
+                            <div>
+                                <p className="text-xs font-semibold uppercase text-slate-500">
+                                    Actual distance
+                                </p>
+                                <p className="mt-1 text-sm">
+                                    {selectedUsage.distance_km} km total / {" "}
+                                    {selectedUsage.net_operational_distance_km} km net
+                                </p>
+                            </div>
+                            <div>
+                                <p className="text-xs font-semibold uppercase text-slate-500">
+                                    Status
+                                </p>
+                                <div className="mt-1">
+                                    <StatusBadge status={selectedUsage.status} />
+                                </div>
+                            </div>
+                        </div>
+                        {canApprove && selectedUsage.status === "approved" && (
+                            <div className="mt-4 grid gap-4 md:grid-cols-[1fr_auto] md:items-end">
+                                <Input
+                                    label="Physical usage reversal reason"
+                                    value={physicalTransitionReason}
+                                    onChange={(event) =>
+                                        setPhysicalTransitionReason(
+                                            event.target.value,
+                                        )
+                                    }
+                                />
+                                <Button
+                                    type="button"
+                                    variant="secondary"
+                                    disabled={!physicalTransitionReason.trim()}
+                                    onClick={() =>
+                                        void transition(selectedUsage, "reversed")
+                                    }
+                                >
+                                    Reverse physical usage
+                                </Button>
+                            </div>
+                        )}
+                    </Panel>
+
+                    {selectedUsage.contexts.map((context) =>
+                        context.usage_fact ? (
+                            <RentalUsageFactEditor
+                                key={`${context.usage_fact.id}:${context.usage_fact.row_version}`}
+                                fact={context.usage_fact}
+                                canRecord={canRecord}
+                                canApprove={canApprove}
+                                onSaved={logs.reload}
+                            />
+                        ) : null,
+                    )}
+                </div>
+            )}
         </RentalPage>
     );
 }
