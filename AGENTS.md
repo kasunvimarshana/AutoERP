@@ -114,6 +114,8 @@ No dead code: Do not introduce unused code, unnecessary abstractions, speculativ
 
 Verify before completion: Before considering a task complete, verify that the solution satisfies all requirements and does not introduce regressions.
 
+Fix only the requested issue using the smallest possible change. Do not introduce new errors, regressions, or side effects, and do not modify unrelated code or refactor unless explicitly requested. If you cannot confidently make a safe fix, explain the risk and ask for clarification instead of guessing. Before finishing, verify that your changes do not break existing functionality and that no new errors have been introduced.
+
 Before making changes, review the latest records in /docs/changes for context. Modify only the files necessary for the task and avoid unrelated changes. After completing the work, create a new record in /docs/changes describing what changed and why. Never edit or delete existing change records.
 
 This project uses `/docs/changes` as its shared memory. Before starting any task, read the latest records to understand context and avoid repeating or conflicting work. Make only the minimal necessary changes to complete the task and do not modify unrelated or shared parts of the system. After finishing, add a new change record explaining what was changed and why. Never edit or delete existing records, as they form an append-only history for future reference.
