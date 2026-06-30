@@ -9,6 +9,8 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
+use Modules\VehicleRental\Enums\RentalCalculationLineStatus;
+use Modules\VehicleRental\Enums\RentalCalculationStatus;
 use Modules\VehicleRental\Enums\RentalUsageFactStatus;
 use Modules\VehicleRental\Enums\RentalUsageStatus;
 use Modules\VehicleRental\Models\RentalUsageContext;
@@ -87,8 +89,9 @@ final class RentalUsageFactService
             }
 
             $commercialDistance = $this->math->normalize((string) $data['commercial_distance_km']);
-            if ($this->math->compare($commercialDistance, (string) $usage->distance_km) > 0) {
-                throw new InvalidArgumentException('Commercial distance cannot exceed the physical distance.');
+            $commercialOdometerDistance = $this->math->sub($endOdometer, $startOdometer);
+            if ($this->math->compare($commercialDistance, $commercialOdometerDistance) > 0) {
+                throw new InvalidArgumentException('Commercial distance cannot exceed the selected commercial odometer range.');
             }
             $workingMinutes = $startedAt->diffInMinutes($endedAt);
             $normalOvertime = (int) ($data['normal_overtime_minutes'] ?? 0);
@@ -97,14 +100,17 @@ final class RentalUsageFactService
             if ($normalOvertime + $doubleOvertime + $tripleOvertime > $workingMinutes) {
                 throw new InvalidArgumentException('Combined commercial overtime cannot exceed commercial working minutes.');
             }
+            $nightOutCount = $this->math->normalize((string) ($data['night_out_count'] ?? '0'));
 
-            $varianceExists = $this->math->compare($commercialDistance, (string) $usage->net_operational_distance_km) !== 0
+            $varianceExists = $this->math->compare($startOdometer, (string) $usage->start_odometer) !== 0
+                || $this->math->compare($endOdometer, (string) $usage->end_odometer) !== 0
+                || $this->math->compare($commercialDistance, (string) $usage->net_operational_distance_km) !== 0
                 || ! $startedAt->equalTo(CarbonImmutable::parse($usage->started_at))
                 || ! $endedAt->equalTo(CarbonImmutable::parse($usage->ended_at))
                 || $normalOvertime !== (int) $usage->normal_overtime_minutes
                 || $doubleOvertime !== (int) $usage->double_overtime_minutes
                 || $tripleOvertime !== (int) $usage->triple_overtime_minutes
-                || $this->math->compare((string) ($data['night_out_count'] ?? '0'), (string) $usage->night_out_count) !== 0;
+                || $this->math->compare($nightOutCount, (string) $usage->night_out_count) !== 0;
             if ($varianceExists && empty(trim((string) ($data['variance_reason'] ?? '')))) {
                 throw new InvalidArgumentException('A variance reason is required when commercial facts differ from physical usage.');
             }
@@ -119,7 +125,7 @@ final class RentalUsageFactService
                 'normal_overtime_minutes' => $normalOvertime,
                 'double_overtime_minutes' => $doubleOvertime,
                 'triple_overtime_minutes' => $tripleOvertime,
-                'night_out_count' => $data['night_out_count'] ?? '0.000000',
+                'night_out_count' => $nightOutCount,
                 'reference_number' => $data['reference_number'] ?? null,
                 'variance_reason' => $data['variance_reason'] ?? null,
                 'remarks' => $data['remarks'] ?? null,
@@ -161,8 +167,9 @@ final class RentalUsageFactService
                     throw new InvalidArgumentException('A reversal reason is required.');
                 }
                 $consumed = $fact->context->calculationLines()
-                    ->where('status', 'approved')
-                    ->whereHas('run', fn (Builder $query) => $query->where('calculation_status', 'approved'))
+                    ->where('status', RentalCalculationLineStatus::Approved->value)
+                    ->whereHas('run', fn (Builder $query) => $query
+                        ->where('calculation_status', RentalCalculationStatus::Approved->value))
                     ->exists();
                 if ($consumed) {
                     throw new InvalidArgumentException('Reverse the approved calculation before reversing commercial usage facts.');
