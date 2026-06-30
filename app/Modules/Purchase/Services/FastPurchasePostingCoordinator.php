@@ -11,7 +11,6 @@ use Modules\Finance\DTOs\FinancePostingLine;
 use Modules\Finance\DTOs\FinancePostingRequest;
 use Modules\Finance\DTOs\PostingResultData;
 use Modules\Finance\DTOs\PostingSourceData;
-use Modules\Finance\Models\FinanceAccount;
 use Modules\Invoice\Models\Invoice;
 use Modules\Invoice\Models\InvoiceAdjustment;
 use Modules\Purchase\Enums\PurchaseAdjustmentType;
@@ -188,27 +187,20 @@ final class FastPurchasePostingCoordinator
                 continue;
             }
 
-            $account = $this->configuredAccount($sourceAdjustment, $invoice);
-            $accountCode = $account instanceof FinanceAccount ? (string) $account->code : null;
-            $accountName = $account instanceof FinanceAccount ? (string) $account->name : (string) $adjustment->name;
-            $profileKey = $account instanceof FinanceAccount
-                ? null
-                : 'expense';
+            $profileKey = $this->adjustmentPolicies->invoiceProfileKeyFor($sourceAdjustment);
+            if ($profileKey === null) {
+                throw new InvalidArgumentException('Purchase adjustment recognition cannot be mapped to a Finance posting role.');
+            }
 
             if ($adjustment->effect->value === 'increase') {
-                $lines[] = new FinancePostingLine($accountCode, $accountName, debit: $amount, profileKey: $profileKey);
+                $lines[] = new FinancePostingLine(null, (string) $adjustment->name, debit: $amount, profileKey: $profileKey);
                 $lines[] = new FinancePostingLine(null, 'Supplier payable', credit: $amount, profileKey: 'payable');
             } else {
                 $lines[] = new FinancePostingLine(null, 'Supplier payable', debit: $amount, profileKey: 'payable');
-                $lines[] = new FinancePostingLine($accountCode, $accountName, credit: $amount, profileKey: $profileKey);
+                $lines[] = new FinancePostingLine(null, (string) $adjustment->name, credit: $amount, profileKey: $profileKey);
             }
         }
 
         return $lines;
-    }
-
-    private function configuredAccount(PurchaseHeaderAdjustment $adjustment, Invoice $invoice): ?FinanceAccount
-    {
-        return $this->adjustmentPolicies->accountForAdjustment($adjustment, lock: true);
     }
 }
