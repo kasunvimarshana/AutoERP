@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Support\ApplicationKeyConfiguration;
 use Illuminate\Console\Command;
 use Illuminate\Encryption\Encrypter;
 use RuntimeException;
@@ -12,33 +13,58 @@ final class EnsureApplicationKeyCommand extends Command
 {
     protected $signature = 'app:key:ensure';
 
-    protected $description = 'Generate APP_KEY only when the application environment file does not already contain a valid key.';
+    protected $description = 'Generate APP_KEY only when neither the environment file nor the runtime environment provides a valid key.';
 
     public function handle(): int
     {
         $path = $this->laravel->environmentFilePath();
         $contents = $this->readEnvironmentFile($path);
-        $entries = $this->applicationKeyValues($contents);
+        $entries = ApplicationKeyConfiguration::values($contents);
         if (count($entries) > 1) {
             $this->error('The environment file contains multiple APP_KEY entries. Keep one explicit source of truth.');
 
             return self::FAILURE;
         }
-        $currentValue = $entries[0] ?? null;
 
-        if ($currentValue !== null && $currentValue !== '') {
-            if (! $this->isValidKey($currentValue)) {
-                $this->error('APP_KEY exists but is invalid. Correct it explicitly; the existing value was not overwritten.');
+        $cipher = (string) config('app.cipher');
+        $fileValue = $entries[0] ?? null;
+        $runtimeValue = trim((string) config('app.key'));
+        if ($fileValue !== null && $fileValue !== '') {
+            if (! ApplicationKeyConfiguration::isValid($fileValue, $cipher)) {
+                $this->error('APP_KEY exists in the environment file but is invalid. Correct it explicitly; the existing value was not overwritten.');
+
+                return self::FAILURE;
+            }
+            if (
+                $runtimeValue !== ''
+                && ! hash_equals(
+                    ApplicationKeyConfiguration::decode($fileValue),
+                    ApplicationKeyConfiguration::decode($runtimeValue),
+                )
+            ) {
+                $this->error('Effective APP_KEY does not match the environment file. Clear cached configuration and remove conflicting process-level APP_KEY values.');
 
                 return self::FAILURE;
             }
 
-            $this->info('APP_KEY already exists and is valid. No change was made.');
+            $this->info('APP_KEY already exists in the environment file and is valid. No change was made.');
 
             return self::SUCCESS;
         }
 
-        $key = 'base64:'.base64_encode(Encrypter::generateKey((string) config('app.cipher')));
+        if ($runtimeValue !== '') {
+            if (! ApplicationKeyConfiguration::isValid($runtimeValue, $cipher)) {
+                $this->error('The runtime environment provides an invalid APP_KEY. Correct it explicitly; no key was generated.');
+
+                return self::FAILURE;
+            }
+
+            $this->info('APP_KEY is supplied by the runtime environment. The environment file was not changed.');
+
+            return self::SUCCESS;
+        }
+
+        $key = ApplicationKeyConfiguration::BASE64_PREFIX.base64_encode(Encrypter::generateKey($cipher));
         $updated = $this->writeApplicationKey($contents, $key);
         $written = file_put_contents($path, $updated, LOCK_EX);
 
@@ -46,7 +72,7 @@ final class EnsureApplicationKeyCommand extends Command
             throw new RuntimeException(sprintf('Unable to write the application environment file [%s].', $path));
         }
 
-        $this->info('APP_KEY was generated because the environment file did not contain one.');
+        $this->info('APP_KEY was generated because no key source was configured.');
 
         return self::SUCCESS;
     }
@@ -63,34 +89,6 @@ final class EnsureApplicationKeyCommand extends Command
         }
 
         return $contents;
-    }
-
-    /** @return list<string> */
-    private function applicationKeyValues(string $contents): array
-    {
-        preg_match_all('/^APP_KEY=(.*)$/m', $contents, $matches);
-
-        return array_map(function (string $raw): string {
-            $value = trim($raw);
-            if (strlen($value) >= 2) {
-                $first = $value[0];
-                $last = $value[strlen($value) - 1];
-                if (($first === '"' && $last === '"') || ($first === "'" && $last === "'")) {
-                    $value = substr($value, 1, -1);
-                }
-            }
-
-            return trim($value);
-        }, $matches[1] ?? []);
-    }
-
-    private function isValidKey(string $value): bool
-    {
-        $key = str_starts_with($value, 'base64:')
-            ? base64_decode(substr($value, 7), true)
-            : $value;
-
-        return is_string($key) && Encrypter::supported($key, (string) config('app.cipher'));
     }
 
     private function writeApplicationKey(string $contents, string $key): string
