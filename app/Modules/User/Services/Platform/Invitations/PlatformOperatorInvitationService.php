@@ -29,6 +29,10 @@ use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 final class PlatformOperatorInvitationService
 {
+    private const REPLACED_INVITATION_REASON = 'Replaced by a new invitation.';
+    private const REPLACED_DELIVERY_REASON = 'Superseded by a newer delivery attempt for the same invitation.';
+    private const TOKEN_UNAVAILABLE_REASON = 'The invitation delivery token was unavailable and had to be replaced.';
+
     public function __construct(
         private readonly PlatformOperatorInvitationModel $invitations,
         private readonly PlatformOperatorInvitationDeliveryModel $deliveries,
@@ -46,7 +50,7 @@ final class PlatformOperatorInvitationService
     public function issueForOperator(PlatformOperatorModel $operator): PlatformOperatorInvitationModel
     {
         $this->assertInvitable($operator);
-        $this->revokePendingInvitations((int) $operator->getKey(), 'Replaced by a new invitation.');
+        $this->revokePendingInvitations((int) $operator->getKey(), self::REPLACED_INVITATION_REASON);
 
         $token = $this->tokens->issue();
         $invitation = $this->invitations->newQuery()->create([
@@ -56,19 +60,11 @@ final class PlatformOperatorInvitationService
             'token_hash' => $this->tokens->digest($token),
             'delivery_token' => $token,
             'status' => PlatformOperatorInvitationStatus::PENDING,
-            'expires_at' => $this->clock->now()->modify(sprintf(
-                '+%d minutes',
-                max(15, (int) config('user.platform.operator_invitation_ttl_minutes', 1440)),
-            )),
+            'expires_at' => $this->invitationExpiry(),
             'row_version' => 1,
         ]);
-        $this->deliveries->newQuery()->create([
-            'invitation_id' => $invitation->getKey(),
-            'attempt_number' => 1,
-            'status' => PlatformOperatorInvitationDeliveryStatus::QUEUED,
-            'row_version' => 1,
-        ]);
-        DeliverPlatformOperatorInvitation::dispatch((int) $invitation->getKey())->afterCommit();
+        $delivery = $this->createDelivery($invitation, 1);
+        $this->dispatchDelivery($invitation, $delivery);
 
         return $invitation;
     }
@@ -80,12 +76,23 @@ final class PlatformOperatorInvitationService
                 $operator = $this->operator($operatorId, true);
                 $this->assertVersion($operator, $expectedVersion);
                 $this->assertInvitable($operator);
-                $this->issueForOperator($operator);
+
+                $invitation = $this->latestPendingInvitation($operatorId);
+                if ($invitation instanceof PlatformOperatorInvitationModel && $this->canRedeliver($invitation)) {
+                    $this->queueRedelivery($invitation);
+                } else {
+                    if ($invitation instanceof PlatformOperatorInvitationModel) {
+                        $this->retireUnavailableInvitation($invitation);
+                    }
+                    $this->issueForOperator($operator);
+                }
+
+                $now = $this->clock->now();
                 $operator->forceFill([
-                    'invited_at' => $this->clock->now(),
+                    'invited_at' => $now,
                     'row_version' => $expectedVersion + 1,
                     'updated_by_operator_id' => $this->currentUser->currentUserId(),
-                    'updated_at' => $this->clock->now(),
+                    'updated_at' => $now,
                 ])->save();
                 $this->recordAudit('invitation_resent', $operator);
 
@@ -193,14 +200,31 @@ final class PlatformOperatorInvitationService
             throw ValidationException::withMessages(['token' => ['A valid invitation token is required.']]);
         }
         $query = $this->invitations->newQuery()->with('operator')
-            ->where('token_hash', $this->tokens->digest($plainToken))
-            ->where('status', PlatformOperatorInvitationStatus::PENDING);
+            ->where('token_hash', $this->tokens->digest($plainToken));
         if ($lock) {
             $query->lockForUpdate();
         }
         $invitation = $query->first();
         if (! $invitation instanceof PlatformOperatorInvitationModel) {
             throw ValidationException::withMessages(['token' => ['This invitation is invalid or no longer available.']]);
+        }
+
+        $status = (string) $invitation->getAttribute('status');
+        if ($status === PlatformOperatorInvitationStatus::ACCEPTED) {
+            throw ValidationException::withMessages(['token' => ['This invitation has already been used. Return to sign in.']]);
+        }
+        if ($status === PlatformOperatorInvitationStatus::REVOKED) {
+            $reason = (string) $invitation->getAttribute('revocation_reason');
+            $message = str_contains(strtolower($reason), 'replaced')
+                ? 'This invitation was replaced. Use the most recent invitation email.'
+                : 'This invitation was revoked. Ask a platform manager to send a new one.';
+            throw ValidationException::withMessages(['token' => [$message]]);
+        }
+        if ($status === PlatformOperatorInvitationStatus::EXPIRED) {
+            throw ValidationException::withMessages(['token' => ['This invitation has expired. Ask a platform manager to send a new one.']]);
+        }
+        if ($status !== PlatformOperatorInvitationStatus::PENDING) {
+            throw ValidationException::withMessages(['token' => ['This invitation is no longer available.']]);
         }
         if ($invitation->getAttribute('expires_at')->toImmutable() <= $this->clock->now()) {
             if ($lock) {
@@ -226,6 +250,91 @@ final class PlatformOperatorInvitationService
 
         return $query->first()
             ?? throw (new ModelNotFoundException())->setModel(PlatformOperatorModel::class, [$operatorId]);
+    }
+
+    private function latestPendingInvitation(int $operatorId): ?PlatformOperatorInvitationModel
+    {
+        return $this->invitations->newQuery()
+            ->where('platform_operator_id', $operatorId)
+            ->where('status', PlatformOperatorInvitationStatus::PENDING)
+            ->orderByDesc('id')
+            ->lockForUpdate()
+            ->first();
+    }
+
+    private function canRedeliver(PlatformOperatorInvitationModel $invitation): bool
+    {
+        return $invitation->getAttribute('expires_at')->toImmutable() > $this->clock->now()
+            && trim((string) $invitation->getAttribute('delivery_token')) !== '';
+    }
+
+    private function queueRedelivery(PlatformOperatorInvitationModel $invitation): void
+    {
+        $latestDelivery = $this->deliveries->newQuery()
+            ->where('invitation_id', $invitation->getKey())
+            ->orderByDesc('attempt_number')
+            ->lockForUpdate()
+            ->first();
+        $nextAttempt = $latestDelivery instanceof PlatformOperatorInvitationDeliveryModel
+            ? (int) $latestDelivery->getAttribute('attempt_number') + 1
+            : 1;
+
+        $this->cancelDeliveries((int) $invitation->getKey(), self::REPLACED_DELIVERY_REASON);
+        $invitation->forceFill([
+            'expires_at' => $this->invitationExpiry(),
+            'row_version' => (int) $invitation->getAttribute('row_version') + 1,
+            'updated_at' => $this->clock->now(),
+        ])->save();
+
+        $delivery = $this->createDelivery($invitation, $nextAttempt);
+        $this->dispatchDelivery($invitation, $delivery);
+    }
+
+    private function retireUnavailableInvitation(PlatformOperatorInvitationModel $invitation): void
+    {
+        $expired = $invitation->getAttribute('expires_at')->toImmutable() <= $this->clock->now();
+        $reason = $expired ? 'Invitation expired.' : self::TOKEN_UNAVAILABLE_REASON;
+        $invitation->forceFill([
+            'status' => $expired
+                ? PlatformOperatorInvitationStatus::EXPIRED
+                : PlatformOperatorInvitationStatus::REVOKED,
+            'revoked_at' => $expired ? null : $this->clock->now(),
+            'revocation_reason' => $expired ? null : $reason,
+            'delivery_token' => null,
+            'row_version' => (int) $invitation->getAttribute('row_version') + 1,
+            'updated_at' => $this->clock->now(),
+        ])->save();
+        $this->cancelDeliveries((int) $invitation->getKey(), $reason);
+    }
+
+    private function createDelivery(
+        PlatformOperatorInvitationModel $invitation,
+        int $attemptNumber,
+    ): PlatformOperatorInvitationDeliveryModel {
+        return $this->deliveries->newQuery()->create([
+            'invitation_id' => $invitation->getKey(),
+            'attempt_number' => $attemptNumber,
+            'status' => PlatformOperatorInvitationDeliveryStatus::QUEUED,
+            'row_version' => 1,
+        ]);
+    }
+
+    private function dispatchDelivery(
+        PlatformOperatorInvitationModel $invitation,
+        PlatformOperatorInvitationDeliveryModel $delivery,
+    ): void {
+        DeliverPlatformOperatorInvitation::dispatch(
+            (int) $invitation->getKey(),
+            (int) $delivery->getKey(),
+        )->afterCommit();
+    }
+
+    private function invitationExpiry(): \DateTimeImmutable
+    {
+        return $this->clock->now()->modify(sprintf(
+            '+%d minutes',
+            max(15, (int) config('user.platform.operator_invitation_ttl_minutes', 1440)),
+        ));
     }
 
     private function reload(PlatformOperatorModel $operator): PlatformOperatorModel
