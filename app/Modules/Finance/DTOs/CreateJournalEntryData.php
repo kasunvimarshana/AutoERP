@@ -30,5 +30,7 @@ final readonly class CreateJournalEntryData
         public ?int $postingProfileId = null,
         public ?int $reversalOfId = null,
         public ?string $reversalReason = null,
+        public ?string $sourceKey = null,
+        public ?string $postingFingerprint = null,
     ) {}
 }
