@@ -53,7 +53,7 @@ final class PurchaseHeaderAdjustmentService
             'is_allocatable' => $data->isAllocatable,
             'cost_treatment' => $policy['cost_treatment'],
             'tax_treatment' => $policy['tax_treatment'],
-            'mapping_source' => $policy['recognition_source'],
+            'recognition_source' => $policy['recognition_source'],
             'sort_order' => $data->sortOrder,
             'description' => $data->description,
             'created_by' => $userId,
@@ -106,7 +106,7 @@ final class PurchaseHeaderAdjustmentService
             'is_allocatable' => $adjustment->is_allocatable,
             'cost_treatment' => $adjustment->cost_treatment,
             'tax_treatment' => $adjustment->tax_treatment,
-            'mapping_source' => $adjustment->mapping_source,
+            'recognition_source' => $adjustment->recognition_source,
             'sort_order' => $adjustment->sort_order,
             'description' => $adjustment->description,
         ]);
