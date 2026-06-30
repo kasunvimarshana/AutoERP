@@ -44,3 +44,5 @@ The physical row owns actual vehicle, driver assignment, timestamps, odometers, 
 ## Open release gates
 
 This batch must remain unmerged until all changed PHP and TypeScript files, Reporting rental definitions, migrations, Laravel routes, MySQL migration/seeding, PHPUnit, TypeScript, ESLint, Vitest, and the production frontend build pass in a runnable checkout. The current execution environment cannot clone or download the repository archive, so those runtime gates are not claimed as passed.
+
+A Reporting definition still references the previous shared distance field and the removed operational `consumed` status. That Reporting-owned definition must be corrected before this schema change can merge. Vehicle Rental does not add a legacy alias or duplicate column.
