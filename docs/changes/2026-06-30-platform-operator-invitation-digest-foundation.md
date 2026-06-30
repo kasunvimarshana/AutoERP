@@ -23,7 +23,7 @@ Platform invitation tokens contain 54 random bytes and are URL-safe encoded. Loo
 - A current, decryptable invitation is preserved when resent.
 - A legacy, unreadable, missing, or digest-mismatched invitation is revoked and replaced with a new stable invitation during resend.
 - An already delivered current-format link remains inspectable after an application-key rotation because inspection and acceptance do not require the encrypted delivery copy.
-- A worker that cannot decrypt or validate its delivery token retires the invitation and cancels open delivery attempts instead of retrying indefinitely.
+- A worker that cannot decrypt or validate the delivery copy clears that copy and cancels open delivery attempts without revoking the pending invitation. An already delivered stable link therefore remains valid; the next resend replaces the unavailable delivery copy.
 - Token lookup misses write a sanitized correlation-aware operational log. Plaintext tokens and application keys are never logged.
 
 ## Recovery after deployment
@@ -43,4 +43,4 @@ A token that was already deleted or belongs to another database cannot be recons
 
 ## Verification coverage
 
-Regression coverage verifies stable digest behavior across application keys, legacy fallback, key-rotation inspection, current-token preservation, legacy-token replacement, unreadable-token retirement, safe UI guidance, and sanitized lookup logging.
+Regression coverage verifies stable digest behavior across application keys, legacy fallback, key-rotation inspection, current-token preservation, legacy-token replacement, unreadable-delivery cancellation without link invalidation, safe UI guidance, and sanitized lookup logging.
