@@ -83,10 +83,7 @@ export function PurchaseHeaderAdjustmentForm({ adjustment, mode, catalogue, allo
             effect: entry.default_effect,
             calculation_type: entry.default_calculation_type,
             calculation_base: entry.default_calculation_base as EditableHeaderAdjustment['calculation_base'],
-            finance_mapping_label: entry.finance_mapping_label,
-            cost_treatment: entry.cost_treatment,
-            tax_treatment: entry.tax_treatment,
-            mapping_source: 'catalogue',
+            recognition_label: entry.recognition_label,
         }));
     };
 
@@ -141,7 +138,7 @@ export function PurchaseHeaderAdjustmentForm({ adjustment, mode, catalogue, allo
             <div className="rounded-lg border border-slate-200 p-4 text-sm">
                 <h3 className="font-semibold text-slate-900">Adjustment Preview</h3>
                 <div className="mt-2 text-slate-700">{formatAdjustmentSummary(draft)}</div>
-                {draft.finance_mapping_label && <div className="mt-2 text-slate-600">Finance mapping: {draft.finance_mapping_label}</div>}
+                {draft.recognition_label && <div className="mt-2 text-slate-600">Recognition: {draft.recognition_label}</div>}
             </div>
 
             <div className="flex justify-end gap-2">
