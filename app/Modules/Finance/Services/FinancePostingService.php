@@ -275,7 +275,7 @@ final class FinancePostingService implements FinancePostingInterface
         $sqlState = (string) ($exception->errorInfo[0] ?? $exception->getCode());
         $driverCode = (int) ($exception->errorInfo[1] ?? 0);
 
-        return $sqlState === '23000' || $driverCode === 1062;
+        return $driverCode === 1062 || $sqlState === '23505';
     }
 
     private function statusOf(FinanceJournalEntry $journal): JournalStatus
