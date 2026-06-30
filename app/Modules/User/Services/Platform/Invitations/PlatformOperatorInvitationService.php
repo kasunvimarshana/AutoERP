@@ -73,11 +73,11 @@ final class PlatformOperatorInvitationService
     {
         return $this->executionContext->runAsControlPlane(function () use ($operatorId, $expectedVersion): PlatformOperatorModel {
             return $this->database->transaction(function () use ($operatorId, $expectedVersion): PlatformOperatorModel {
+                $invitation = $this->latestPendingInvitation($operatorId);
                 $operator = $this->operator($operatorId, true);
                 $this->assertVersion($operator, $expectedVersion);
                 $this->assertInvitable($operator);
 
-                $invitation = $this->latestPendingInvitation($operatorId);
                 if ($invitation instanceof PlatformOperatorInvitationModel && $this->canRedeliver($invitation)) {
                     $this->queueRedelivery($invitation);
                 } else {
@@ -110,10 +110,11 @@ final class PlatformOperatorInvitationService
             }
 
             return $this->database->transaction(function () use ($operatorId, $expectedVersion, $reason): PlatformOperatorModel {
+                $pendingInvitations = $this->pendingInvitations($operatorId);
                 $operator = $this->operator($operatorId, true);
                 $this->assertVersion($operator, $expectedVersion);
                 $this->assertInvitable($operator);
-                $this->revokePendingInvitations($operatorId, $reason);
+                $this->revokeLockedInvitations($pendingInvitations, $reason);
                 $operator->forceFill([
                     'status' => PlatformOperatorStatus::INACTIVE,
                     'deactivated_at' => $this->clock->now(),
@@ -257,9 +258,25 @@ final class PlatformOperatorInvitationService
         return $this->invitations->newQuery()
             ->where('platform_operator_id', $operatorId)
             ->where('status', PlatformOperatorInvitationStatus::PENDING)
-            ->orderByDesc('id')
+            ->orderBy('id')
             ->lockForUpdate()
-            ->first();
+            ->get()
+            ->last();
+    }
+
+    /** @return list<PlatformOperatorInvitationModel> */
+    private function pendingInvitations(int $operatorId, ?int $exceptInvitationId = null): array
+    {
+        $query = $this->invitations->newQuery()
+            ->where('platform_operator_id', $operatorId)
+            ->where('status', PlatformOperatorInvitationStatus::PENDING)
+            ->orderBy('id')
+            ->lockForUpdate();
+        if ($exceptInvitationId !== null) {
+            $query->where('id', '!=', $exceptInvitationId);
+        }
+
+        return $query->get()->all();
     }
 
     private function canRedeliver(PlatformOperatorInvitationModel $invitation): bool
@@ -359,14 +376,16 @@ final class PlatformOperatorInvitationService
 
     private function revokePendingInvitations(int $operatorId, string $reason, ?int $exceptInvitationId = null): void
     {
-        $query = $this->invitations->newQuery()->where('platform_operator_id', $operatorId)
-            ->where('status', PlatformOperatorInvitationStatus::PENDING)->lockForUpdate();
-        if ($exceptInvitationId !== null) {
-            $query->where('id', '!=', $exceptInvitationId);
-        }
-        /** @var list<PlatformOperatorInvitationModel> $pending */
-        $pending = $query->get()->all();
-        foreach ($pending as $invitation) {
+        $this->revokeLockedInvitations(
+            $this->pendingInvitations($operatorId, $exceptInvitationId),
+            $reason,
+        );
+    }
+
+    /** @param list<PlatformOperatorInvitationModel> $pendingInvitations */
+    private function revokeLockedInvitations(array $pendingInvitations, string $reason): void
+    {
+        foreach ($pendingInvitations as $invitation) {
             $invitation->forceFill([
                 'status' => PlatformOperatorInvitationStatus::REVOKED,
                 'revoked_at' => $this->clock->now(),
