@@ -141,28 +141,72 @@ export interface RentalAllocation {
     drivers?: RentalDriverAssignment[];
     custody_events?: RentalCustodyEvent[];
 }
+export type RentalUsageEventApplicability =
+    | "customer"
+    | "owner"
+    | "both"
+    | "internal";
 export interface RentalUsageEvent {
     id?: number;
     event_type: string;
+    applicability: RentalUsageEventApplicability;
     occurred_at?: string | null;
     quantity: string;
     unit?: string | null;
     reference_number?: string | null;
     remarks?: string | null;
 }
+export interface RentalUsageFact {
+    id: number;
+    row_version: number;
+    financial_side: "revenue" | "cost";
+    context_id: number;
+    usage_log_id: number;
+    agreement?: NamedResource | null;
+    started_at: string;
+    ended_at: string;
+    start_odometer: string;
+    end_odometer: string;
+    commercial_distance_km: string;
+    working_minutes: number;
+    normal_overtime_minutes: number;
+    double_overtime_minutes: number;
+    triple_overtime_minutes: number;
+    night_out_count: string;
+    reference_number?: string | null;
+    variance_reason?: string | null;
+    status: string;
+    submitted_at?: string | null;
+    approved_at?: string | null;
+    rejected_at?: string | null;
+    reversed_at?: string | null;
+    reversal_reason?: string | null;
+    remarks?: string | null;
+}
+export interface RentalUsageContext {
+    id: number;
+    financial_side: "revenue" | "cost";
+    agreement?: NamedResource | null;
+    rate_version_id: number;
+    customer?: RentalParty | null;
+    supplier?: RentalParty | null;
+    usage_fact?: RentalUsageFact | null;
+}
 export interface RentalUsageLog {
     id: number;
+    row_version: number;
     usage_number: string;
     allocation?: NamedResource | null;
     vehicle?: RentalVehicle | null;
+    driver_assignment?: RentalDriverAssignment | null;
     driver?: NamedResource | null;
     usage_date: string;
-    started_at?: string | null;
-    ended_at?: string | null;
+    started_at: string;
+    ended_at: string;
     start_odometer: string;
     end_odometer: string;
     distance_km: string;
-    chargeable_distance_km: string;
+    net_operational_distance_km: string;
     garage_distance_km: string;
     internal_distance_km: string;
     working_minutes: number;
@@ -170,8 +214,14 @@ export interface RentalUsageLog {
     double_overtime_minutes: number;
     triple_overtime_minutes: number;
     night_out_count: string;
+    trip_from?: string | null;
+    trip_to?: string | null;
+    trip_purpose?: string | null;
+    odometer_variance_reason?: string | null;
     status: string;
     events: RentalUsageEvent[];
+    contexts: RentalUsageContext[];
+    reversal_reason?: string | null;
     remarks?: string | null;
 }
 export interface RentalExpense {
@@ -286,6 +336,7 @@ export interface RentalMetadata {
     vehicle_source_types: string[];
     custody_event_types: string[];
     usage_event_types: string[];
+    usage_event_applicabilities: RentalUsageEventApplicability[];
     expense_types: string[];
     expense_allocation_types: string[];
     financial_sides: string[];
