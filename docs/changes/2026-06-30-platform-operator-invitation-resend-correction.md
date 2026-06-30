@@ -49,3 +49,16 @@ Regression coverage verifies:
 - resend messaging no longer claims that previous copies are invalid.
 
 No compatibility token format, validation bypass, or duplicate invitation state was introduced.
+
+## Deployment
+
+The queued job payload now contains both the invitation ID and the exact delivery-attempt ID. Serialized jobs created by the previous class shape must not be executed after this deployment.
+
+Use the following deployment sequence:
+
+```bash
+php artisan queue:restart
+php artisan optimize:clear
+```
+
+After the new source is active, use the platform-operator **Resend invitation** action for any invited operator whose prior delivery failed or whose old link was already revoked. Do not manually retry pre-deployment platform-invitation jobs. An already revoked token remains revoked; the correction prevents future resends from invalidating the active token.
