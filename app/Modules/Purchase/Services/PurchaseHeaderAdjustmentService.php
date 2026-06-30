@@ -26,7 +26,7 @@ final class PurchaseHeaderAdjustmentService
         string $fieldPrefix = 'adjustments',
     ): PurchaseHeaderAdjustment {
         $value = $this->math->normalize($amount ?? $data->amount);
-        $policy = $this->policies->resolveForData($data, $tenantId, $organizationUnitId, $fieldPrefix, $userId);
+        $policy = $this->policies->resolveForData($data);
 
         $model = PurchaseHeaderAdjustment::query()->create([
             'tenant_id' => $tenantId,
@@ -45,14 +45,13 @@ final class PurchaseHeaderAdjustmentService
             'remaining_amount' => $value,
             'allocation_method' => $data->allocationMethod,
             'is_allocatable' => $data->isAllocatable,
-            'finance_posting_profile_id' => $policy['finance_posting_profile_id'],
-            'finance_account_id' => $policy['finance_account_id'],
             'cost_treatment' => $policy['cost_treatment'],
             'tax_treatment' => $policy['tax_treatment'],
-            'mapping_source' => $policy['mapping_source'],
-            'override_reason' => $data->overrideReason,
+            'mapping_source' => $policy['recognition_source'],
             'sort_order' => $data->sortOrder,
             'description' => $data->description,
+            'created_by' => $userId,
+            'updated_by' => $userId,
         ]);
 
         if ($data->manualAllocations !== []) {
@@ -99,12 +98,9 @@ final class PurchaseHeaderAdjustmentService
             'remaining_amount' => $amount,
             'allocation_method' => $adjustment->allocation_method,
             'is_allocatable' => $adjustment->is_allocatable,
-            'finance_posting_profile_id' => $adjustment->finance_posting_profile_id,
-            'finance_account_id' => $adjustment->finance_account_id,
             'cost_treatment' => $adjustment->cost_treatment,
             'tax_treatment' => $adjustment->tax_treatment,
             'mapping_source' => $adjustment->mapping_source,
-            'override_reason' => $adjustment->override_reason,
             'sort_order' => $adjustment->sort_order,
             'description' => $adjustment->description,
         ]);
