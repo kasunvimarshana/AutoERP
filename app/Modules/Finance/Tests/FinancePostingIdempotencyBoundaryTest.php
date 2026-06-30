@@ -17,18 +17,18 @@ final class FinancePostingIdempotencyBoundaryTest extends TestCase
 
         self::assertStringContainsString('sourceKey:', $posting);
         self::assertStringContainsString('postingFingerprint:', $posting);
-        self::assertStringContainsString("->where('source_key', $sourceKey)", $posting);
+        self::assertStringContainsString('->where(\'source_key\', $sourceKey)', $posting);
         self::assertStringContainsString('assertReplayMatches', $posting);
         self::assertStringContainsString('posting_fingerprint', $creation);
         self::assertStringContainsString('public ?string $sourceKey', $data);
         self::assertStringContainsString('public ?string $postingFingerprint', $data);
-        self::assertStringContainsString("$table->unique('source_key'", $migration);
+        self::assertStringContainsString('$table->unique(\'source_key\'', $migration);
     }
 
     public function test_posted_or_reversed_journal_replay_does_not_repost_ledger(): void
     {
         $posting = $this->source('../Services/JournalPostingService.php');
-        $statusGuard = "in_array($status, [JournalStatus::Posted, JournalStatus::Reversed], true)";
+        $statusGuard = 'in_array($status, [JournalStatus::Posted, JournalStatus::Reversed], true)';
 
         self::assertStringContainsString($statusGuard, $posting);
         self::assertStringContainsString('return $this->resultFromJournal($journal, $status);', $posting);
