@@ -16,7 +16,7 @@ final class PlatformOperatorInvitationResendContractTest extends TestCase
         $this->root = dirname(__DIR__, 3);
     }
 
-    public function test_resend_reuses_a_live_invitation_token_and_creates_a_new_delivery_attempt(): void
+    public function test_resend_reuses_only_a_current_live_token_and_creates_a_new_delivery_attempt(): void
     {
         $source = $this->source(
             'app/Modules/User/Services/Platform/Invitations/PlatformOperatorInvitationService.php',
@@ -24,6 +24,7 @@ final class PlatformOperatorInvitationResendContractTest extends TestCase
 
         $resend = $this->method($source, 'resend', 'revoke');
         $redelivery = $this->method($source, 'queueRedelivery', 'retireUnavailableInvitation');
+        $eligibility = $this->method($source, 'canRedeliver', 'queueRedelivery');
 
         self::assertStringContainsString('$this->latestPendingInvitation($operatorId)', $resend);
         self::assertStringContainsString('$this->canRedeliver($invitation)', $resend);
@@ -33,6 +34,21 @@ final class PlatformOperatorInvitationResendContractTest extends TestCase
         self::assertStringContainsString("'expires_at' => \$this->invitationExpiry()", $redelivery);
         self::assertStringNotContainsString("'token_hash' =>", $redelivery);
         self::assertStringNotContainsString("'delivery_token' =>", $redelivery);
+        self::assertStringContainsString('$this->tokens->matchesCurrentDigest(', $eligibility);
+        self::assertStringContainsString('catch (DecryptException)', $eligibility);
+    }
+
+    public function test_lookup_supports_current_and_legacy_digests_without_exposing_plain_tokens(): void
+    {
+        $source = $this->source(
+            'app/Modules/User/Services/Platform/Invitations/PlatformOperatorInvitationService.php',
+        );
+
+        self::assertStringContainsString("->whereIn('token_hash', \$this->tokens->lookupDigests(\$plainToken))", $source);
+        self::assertStringContainsString('$this->logTokenLookupMiss($plainToken);', $source);
+        self::assertStringContainsString("'current_digest_prefix'", $source);
+        self::assertStringContainsString("'legacy_digest_prefix'", $source);
+        self::assertStringNotContainsString("'plain_token'", $source);
     }
 
     public function test_delivery_jobs_are_bound_to_one_exact_attempt(): void
