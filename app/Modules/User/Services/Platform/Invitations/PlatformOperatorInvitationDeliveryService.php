@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\User\Services\Platform\Invitations;
 
+use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Database\DatabaseManager;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
@@ -27,10 +28,13 @@ final class PlatformOperatorInvitationDeliveryService
     private const DEFAULT_LEASE_SECONDS = 300;
     private const INVITATION_EXPIRED_CODE = 'PLATFORM_OPERATOR_INVITATION_EXPIRED';
     private const INVITATION_UNAVAILABLE_CODE = 'PLATFORM_OPERATOR_INVITATION_UNAVAILABLE';
+    private const TOKEN_REISSUE_REQUIRED_CODE = 'PLATFORM_OPERATOR_INVITATION_TOKEN_REISSUE_REQUIRED';
+    private const TOKEN_REISSUE_REQUIRED_MESSAGE = 'The invitation token could not be safely delivered and must be replaced.';
 
     public function __construct(
         private readonly PlatformOperatorInvitationModel $invitations,
         private readonly PlatformOperatorInvitationDeliveryModel $deliveries,
+        private readonly PlatformOperatorInvitationTokenCodec $tokens,
         private readonly ClockInterface $clock,
         private readonly TenantExecutionContextInterface $executionContext,
         private readonly DatabaseManager $database,
@@ -145,16 +149,32 @@ final class PlatformOperatorInvitationDeliveryService
             }
 
             $operator = $invitation->operator;
-            $token = trim((string) $invitation->getAttribute('delivery_token'));
             if (! $operator instanceof PlatformOperatorModel
                 || $operator->getAttribute('status') !== PlatformOperatorStatus::INVITED
-                || $token === ''
             ) {
                 $this->cancelOpenDeliveries(
                     $invitationId,
                     self::INVITATION_UNAVAILABLE_CODE,
-                    'The invitation recipient or delivery token is no longer available.',
+                    'The invitation recipient is no longer available.',
                 );
+
+                return null;
+            }
+
+            try {
+                $token = trim((string) $invitation->getAttribute('delivery_token'));
+            } catch (DecryptException) {
+                $this->retireUnreadableInvitation($invitation);
+
+                return null;
+            }
+
+            if ($token === '' || ! in_array(
+                (string) $invitation->getAttribute('token_hash'),
+                $this->tokens->lookupDigests($token),
+                true,
+            )) {
+                $this->retireUnreadableInvitation($invitation);
 
                 return null;
             }
@@ -191,6 +211,27 @@ final class PlatformOperatorInvitationDeliveryService
                 'expires_at' => $invitation->getAttribute('expires_at')->toAtomString(),
             ];
         }, 3);
+    }
+
+    private function retireUnreadableInvitation(PlatformOperatorInvitationModel $invitation): void
+    {
+        $invitationId = (int) $invitation->getKey();
+        $invitation->forceFill([
+            'status' => PlatformOperatorInvitationStatus::REVOKED,
+            'revoked_at' => $this->clock->now(),
+            'revocation_reason' => self::TOKEN_REISSUE_REQUIRED_MESSAGE,
+            'delivery_token' => null,
+            'row_version' => (int) $invitation->getAttribute('row_version') + 1,
+            'updated_at' => $this->clock->now(),
+        ])->save();
+        $this->cancelOpenDeliveries(
+            $invitationId,
+            self::TOKEN_REISSUE_REQUIRED_CODE,
+            self::TOKEN_REISSUE_REQUIRED_MESSAGE,
+        );
+        $this->logger->warning('Platform operator invitation token must be reissued before delivery.', [
+            'invitation_id' => $invitationId,
+        ]);
     }
 
     private function cancelOpenDeliveries(int $invitationId, string $errorCode, string $message): void
