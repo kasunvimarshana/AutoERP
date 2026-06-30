@@ -14,9 +14,14 @@ final class PostingProfileRuleResource extends JsonResource
         return [
             'id' => (int) $this->getKey(),
             'line_key' => (string) $this->line_key,
+            'account_role_id' => (int) $this->account_role_id,
             'description' => $this->description,
-            'account_id' => $this->account_id,
-            'account' => FinanceAccountSummaryResource::make($this->whenLoaded('account')),
+            'role' => $this->whenLoaded('role', fn (): array => [
+                'id' => (int) $this->role->getKey(),
+                'code' => (string) $this->role->code,
+                'name' => (string) $this->role->name,
+                'is_active' => (bool) $this->role->is_active,
+            ]),
         ];
     }
 }
