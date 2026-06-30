@@ -15,6 +15,7 @@ import type {
     RentalMetadata,
     RentalPayload,
     RentalReservation,
+    RentalUsageFact,
     RentalUsageLog,
     RentalVehicle,
     VehicleFinanceAgreement,
@@ -136,15 +137,36 @@ export const replaceRentalVehicle = (
 
 export const listRentalUsageLogs = (params: ListParams, signal?: AbortSignal) =>
     collection<RentalUsageLog>("usage-logs", params, signal);
+export const getRentalUsageLog = (id: number, signal?: AbortSignal) =>
+    resource<RentalUsageLog>(`usage-logs/${id}`, signal);
 export const createRentalUsageLog = (
     allocationId: number,
     payload: RentalPayload,
 ) => post<RentalUsageLog>(`allocations/${allocationId}/usage-logs`, payload);
 export const transitionRentalUsageLog = (
     id: number,
+    expectedVersion: number,
     status: string,
     reason?: string,
-) => patch<RentalUsageLog>(`usage-logs/${id}/transition`, { status, reason });
+) =>
+    patch<RentalUsageLog>(`usage-logs/${id}/transition`, {
+        expected_version: expectedVersion,
+        status,
+        reason,
+    });
+export const updateRentalUsageFact = (id: number, payload: RentalPayload) =>
+    patch<RentalUsageFact>(`usage-facts/${id}`, payload);
+export const transitionRentalUsageFact = (
+    id: number,
+    expectedVersion: number,
+    status: string,
+    reason?: string,
+) =>
+    patch<RentalUsageFact>(`usage-facts/${id}/transition`, {
+        expected_version: expectedVersion,
+        status,
+        reason,
+    });
 
 export const listRentalExpenses = (params: ListParams, signal?: AbortSignal) =>
     collection<RentalExpense>("expenses", params, signal);
