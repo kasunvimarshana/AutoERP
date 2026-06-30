@@ -15,6 +15,7 @@ use Modules\VehicleRental\Http\Controllers\RentalRateVersionController;
 use Modules\VehicleRental\Http\Controllers\RentalReplacementController;
 use Modules\VehicleRental\Http\Controllers\RentalReservationController;
 use Modules\VehicleRental\Http\Controllers\RentalUsageController;
+use Modules\VehicleRental\Http\Controllers\RentalUsageFactController;
 use Modules\VehicleRental\Http\Controllers\VehicleFinanceController;
 
 $middleware = [
@@ -63,6 +64,9 @@ Route::prefix('api/v1/vehicle-rental')->middleware($middleware)->name('api.v1.ve
     Route::post('allocations/{allocation}/usage-logs', [RentalUsageController::class, 'store'])->whereNumber('allocation')->name('usage.store');
     Route::get('usage-logs/{usage}', [RentalUsageController::class, 'show'])->whereNumber('usage')->name('usage.show');
     Route::patch('usage-logs/{usage}/transition', [RentalUsageController::class, 'transition'])->whereNumber('usage')->name('usage.transition');
+    Route::get('usage-facts/{fact}', [RentalUsageFactController::class, 'show'])->whereNumber('fact')->name('usage-facts.show');
+    Route::patch('usage-facts/{fact}', [RentalUsageFactController::class, 'update'])->whereNumber('fact')->name('usage-facts.update');
+    Route::patch('usage-facts/{fact}/transition', [RentalUsageFactController::class, 'transition'])->whereNumber('fact')->name('usage-facts.transition');
 
     Route::get('expenses', [RentalExpenseController::class, 'index'])->name('expenses.index');
     Route::post('expenses', [RentalExpenseController::class, 'store'])->name('expenses.store');
