@@ -31,6 +31,23 @@ export interface FinanceLookup extends Record<string, unknown> {
     is_active?: boolean;
 }
 
+export interface FinanceAccountRole extends FinanceLookup {
+    description?: string | null;
+    is_active: boolean;
+}
+
+export interface FinanceAccountAssignment extends Record<string, unknown> {
+    id: number;
+    organization_unit_id?: number | null;
+    account_role_id: number;
+    account_id: number;
+    effective_from: string;
+    effective_to?: string | null;
+    is_active: boolean;
+    role?: FinanceAccountRole;
+    account?: FinanceLookup;
+}
+
 export interface FiscalPeriod extends Record<string, unknown> {
     id: number;
     name: string;
@@ -42,7 +59,13 @@ export interface FiscalPeriod extends Record<string, unknown> {
 }
 
 export interface PostingProfile extends FinanceLookup {
-    rules?: Array<{ id: number; line_key: string; account_id?: number; account?: FinanceLookup; description?: string | null }>;
+    rules?: Array<{
+        id: number;
+        line_key: string;
+        account_role_id: number;
+        role?: FinanceAccountRole;
+        description?: string | null;
+    }>;
 }
 
 export interface FinanceLookups {
@@ -51,8 +74,10 @@ export interface FinanceLookups {
     accounts: FinanceLookup[];
     periods: FiscalPeriod[];
     profiles: PostingProfile[];
+    account_roles: FinanceAccountRole[];
+    account_assignments: FinanceAccountAssignment[];
     dimensions?: FinanceLookup[];
-    bankAccounts?: FinanceLookup[];
+    bank_accounts?: FinanceLookup[];
 }
 
 export interface AccountPayload {
@@ -182,7 +207,21 @@ export interface PostingProfilePayload {
     name: string;
     description?: string | null;
     is_active: boolean;
-    rules: Array<{ line_key: string; account_id: number | null; description?: string | null }>;
+    rules: Array<{ line_key: string; account_role_id: number; description?: string | null }>;
+}
+
+export interface AccountRolePayload {
+    code: string;
+    name: string;
+    description?: string | null;
+    is_active: boolean;
+}
+
+export interface AccountAssignmentPayload {
+    account_role_id: number;
+    account_id: number;
+    effective_from: string;
+    effective_to?: string | null;
 }
 
 export interface AgingReport {
