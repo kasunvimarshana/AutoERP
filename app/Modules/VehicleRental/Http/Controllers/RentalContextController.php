@@ -10,6 +10,7 @@ use Modules\VehicleRental\Enums\RentalAgreementStatus;
 use Modules\VehicleRental\Enums\RentalAllocationStatus;
 use Modules\VehicleRental\Enums\RentalBillingBasis;
 use Modules\VehicleRental\Enums\RentalBillingCycle;
+use Modules\VehicleRental\Enums\RentalCalculationStatus;
 use Modules\VehicleRental\Enums\RentalCustodyEventType;
 use Modules\VehicleRental\Enums\RentalExcessKmMethod;
 use Modules\VehicleRental\Enums\RentalExpenseAllocationType;
@@ -19,7 +20,9 @@ use Modules\VehicleRental\Enums\RentalMode;
 use Modules\VehicleRental\Enums\RentalProrationRule;
 use Modules\VehicleRental\Enums\RentalRateComponentCode;
 use Modules\VehicleRental\Enums\RentalRateUnit;
+use Modules\VehicleRental\Enums\RentalUsageEventApplicability;
 use Modules\VehicleRental\Enums\RentalUsageEventType;
+use Modules\VehicleRental\Enums\RentalUsageStatus;
 use Modules\VehicleRental\Enums\RentalVehicleSourceType;
 use Modules\VehicleRental\Http\Requests\ListRentalRequest;
 use Modules\VehicleRental\Models\RentalAgreement;
@@ -34,9 +37,16 @@ final class RentalContextController
 
     public function metadata(ListRentalRequest $request): JsonResponse
     {
-        $this->authorization->assert($request->currentUserId(), $request->tenantId(), VehicleRentalAuthorizationService::VIEW);
+        $this->authorization->assert(
+            $request->currentUserId(),
+            $request->tenantId(),
+            VehicleRentalAuthorizationService::VIEW,
+        );
 
-        $values = static fn (array $cases): array => array_map(static fn ($case): string => $case->value, $cases);
+        $values = static fn (array $cases): array => array_map(
+            static fn ($case): string => $case->value,
+            $cases,
+        );
 
         return response()->json(['data' => [
             'agreement_kinds' => $values(RentalAgreementKind::cases()),
@@ -50,6 +60,7 @@ final class RentalContextController
             'vehicle_source_types' => $values(RentalVehicleSourceType::cases()),
             'custody_event_types' => $values(RentalCustodyEventType::cases()),
             'usage_event_types' => $values(RentalUsageEventType::cases()),
+            'usage_event_applicabilities' => $values(RentalUsageEventApplicability::cases()),
             'expense_types' => $values(RentalExpenseType::cases()),
             'expense_allocation_types' => $values(RentalExpenseAllocationType::cases()),
             'financial_sides' => $values(RentalFinancialSide::cases()),
@@ -60,14 +71,29 @@ final class RentalContextController
 
     public function dashboard(ListRentalRequest $request): JsonResponse
     {
-        $this->authorization->assert($request->currentUserId(), $request->tenantId(), VehicleRentalAuthorizationService::VIEW);
-        $scope = static fn ($query) => $query->forContext($request->tenantId(), $request->organizationUnitId());
+        $this->authorization->assert(
+            $request->currentUserId(),
+            $request->tenantId(),
+            VehicleRentalAuthorizationService::VIEW,
+        );
+        $scope = static fn ($query) => $query->forContext(
+            $request->tenantId(),
+            $request->organizationUnitId(),
+        );
 
         return response()->json(['data' => [
-            'active_agreements' => $scope(RentalAgreement::query())->where('status', RentalAgreementStatus::Active->value)->count(),
-            'active_allocations' => $scope(RentalVehicleAllocation::query())->where('status', RentalAllocationStatus::Active->value)->count(),
-            'usage_pending_approval' => $scope(RentalUsageLog::query())->where('status', 'submitted')->count(),
-            'calculations_pending_approval' => $scope(RentalCalculationRun::query())->where('calculation_status', 'submitted')->count(),
+            'active_agreements' => $scope(RentalAgreement::query())
+                ->where('status', RentalAgreementStatus::Active->value)
+                ->count(),
+            'active_allocations' => $scope(RentalVehicleAllocation::query())
+                ->where('status', RentalAllocationStatus::Active->value)
+                ->count(),
+            'usage_pending_approval' => $scope(RentalUsageLog::query())
+                ->where('status', RentalUsageStatus::Submitted->value)
+                ->count(),
+            'calculations_pending_approval' => $scope(RentalCalculationRun::query())
+                ->where('calculation_status', RentalCalculationStatus::Submitted->value)
+                ->count(),
         ]]);
     }
 }
