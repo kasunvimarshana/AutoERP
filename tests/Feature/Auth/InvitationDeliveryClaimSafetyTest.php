@@ -80,6 +80,20 @@ final class InvitationDeliveryClaimSafetyTest extends TestCase
         self::assertStringContainsString("'lease_expires_at' => null", $source);
     }
 
+    public function test_platform_worker_retires_unreadable_or_mismatched_tokens_without_retrying_forever(): void
+    {
+        $source = $this->source(
+            'app/Modules/User/Services/Platform/Invitations/PlatformOperatorInvitationDeliveryService.php',
+        );
+
+        self::assertStringContainsString('catch (DecryptException)', $source);
+        self::assertStringContainsString('$this->retireUnreadableInvitation($invitation);', $source);
+        self::assertStringContainsString('$this->tokens->lookupDigests($token)', $source);
+        self::assertStringContainsString('self::TOKEN_REISSUE_REQUIRED_CODE', $source);
+        self::assertStringContainsString('PlatformOperatorInvitationStatus::REVOKED', $source);
+        self::assertStringContainsString('must be reissued before delivery', $source);
+    }
+
     private function source(string $relativePath): string
     {
         $path = $this->root.'/'.$relativePath;
