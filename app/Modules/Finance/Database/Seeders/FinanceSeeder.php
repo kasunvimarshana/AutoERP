@@ -5,12 +5,15 @@ declare(strict_types=1);
 namespace Modules\Finance\Database\Seeders;
 
 use Carbon\CarbonImmutable;
+use Database\Seeders\Concerns\ResolvesSeedContext;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Database\Seeders\Concerns\ResolvesSeedContext;
+use Illuminate\Support\Str;
 use Modules\Finance\Models\FinanceAccount;
+use Modules\Finance\Models\FinanceAccountAssignment;
 use Modules\Finance\Models\FinanceAccountCategory;
+use Modules\Finance\Models\FinanceAccountRole;
 use Modules\Finance\Models\FinanceAccountType;
 use Modules\Finance\Models\FinanceFiscalPeriod;
 use Modules\Finance\Models\FinanceFiscalYear;
@@ -20,6 +23,8 @@ use Modules\Finance\Models\FinancePostingProfileRule;
 final class FinanceSeeder extends Seeder
 {
     use ResolvesSeedContext;
+
+    private const OPENING_EFFECTIVE_DATE = '1900-01-01';
 
     public function run(): void
     {
@@ -233,7 +238,9 @@ final class FinanceSeeder extends Seeder
 
     private function seedPostingProfiles(int $tenantId, ?int $organizationUnitId): void
     {
-        if (! Schema::hasTable('finance_posting_profiles')) {
+        if (! Schema::hasTable('finance_posting_profiles')
+            || ! Schema::hasTable('finance_account_roles')
+            || ! Schema::hasTable('finance_account_assignments')) {
             return;
         }
 
@@ -301,6 +308,29 @@ final class FinanceSeeder extends Seeder
                     continue;
                 }
 
+                $role = FinanceAccountRole::query()->updateOrCreate(
+                    ['tenant_id' => $tenantId, 'code' => $lineKey],
+                    [
+                        'name' => Str::headline($lineKey),
+                        'description' => 'Default AutoERP semantic Finance account role.',
+                        'is_active' => true,
+                    ],
+                );
+
+                FinanceAccountAssignment::query()->updateOrCreate(
+                    [
+                        'tenant_id' => $tenantId,
+                        'organization_unit_id' => $organizationUnitId,
+                        'account_role_id' => $role->getKey(),
+                        'effective_from' => self::OPENING_EFFECTIVE_DATE,
+                    ],
+                    [
+                        'account_id' => $account->getKey(),
+                        'effective_to' => null,
+                        'is_active' => true,
+                    ],
+                );
+
                 FinancePostingProfileRule::query()->updateOrCreate(
                     [
                         'tenant_id' => $tenantId,
@@ -308,7 +338,7 @@ final class FinanceSeeder extends Seeder
                         'line_key' => $lineKey,
                     ],
                     [
-                        'account_id' => $account->getKey(),
+                        'account_role_id' => $role->getKey(),
                         'description' => $definition['name'].' '.$lineKey,
                     ],
                 );
