@@ -5,7 +5,7 @@ import {
     type PurchaseLineEditorConfig,
     type PurchaseLineField,
 } from './purchaseLineModel';
-import type { FastPurchaseContext, FastPurchaseLinePreview } from '../purchaseTypes';
+import type { FastPurchaseContext, FastPurchaseLinePreview } from '../types/fastPurchaseTypes';
 
 export type FastPurchaseLineRow = EditablePurchaseLine;
 
@@ -78,6 +78,6 @@ function previewForLine(previewLines: FastPurchaseLinePreview[], line: FastPurch
 }
 
 function indexOfError(previewLines: FastPurchaseLinePreview[], line: FastPurchaseLineRow, fallback: number): number {
-    const previewIndex = previewLines.findIndex((preview) => preview.client_line_key === line.client_key);
-    return previewIndex >= 0 ? previewIndex : fallback;
+    const index = previewLines.findIndex((preview) => preview.client_line_key === line.client_key);
+    return index >= 0 ? index : fallback;
 }

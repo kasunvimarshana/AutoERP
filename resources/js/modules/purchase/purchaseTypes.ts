@@ -70,18 +70,10 @@ export interface PurchaseHeaderAdjustment {
     remaining_amount?: string;
     allocation_method: string;
     is_allocatable?: boolean;
-    finance_posting_profile_id?: number | null;
-    finance_account_id?: number | null;
-    cost_treatment?: string | null;
-    tax_treatment?: string | null;
-    mapping_source?: string | null;
-    override_reason?: string | null;
-    finance_mapping?: {
-        posting_profile_id?: number | null;
-        account_id?: number | null;
+    recognition?: {
         cost_treatment?: string | null;
         tax_treatment?: string | null;
-        source?: string | null;
+        final_treatment?: string | null;
     } | null;
     sort_order?: number;
     description?: string | null;
@@ -189,12 +181,6 @@ export interface PurchaseOrderPayload {
         amount: string;
         allocation_method?: string;
         is_allocatable?: boolean;
-        finance_posting_profile_id?: number;
-        finance_account_id?: number;
-        cost_treatment?: string;
-        tax_treatment?: string;
-        mapping_source?: 'catalogue' | 'override';
-        override_reason?: string;
         sort_order?: number;
         description?: string;
     }>;
@@ -285,8 +271,7 @@ export interface PurchaseAdjustmentCatalogueEntry {
     default_calculation_base: string;
     cost_treatment?: string;
     tax_treatment?: string;
-    finance_mapping_label?: string;
-    override_allowed: boolean;
+    recognition_label?: string;
 }
 
 export type GoodsReceiptStatus = 'draft' | 'posted' | 'reversed';
@@ -454,7 +439,6 @@ export interface PurchasePaymentCreatePayload {
     lines?: Array<{
         amount: string;
         payment_method_id?: number;
-        source_account_id?: number;
         reference?: string;
         instrument_direction?: 'received' | 'issued' | 'outbound';
         external_bank_name?: string;
@@ -488,7 +472,6 @@ export interface PurchasePaymentPreview {
     lines: Array<{
         amount: string;
         payment_method_id?: number | null;
-        source_account_id?: number | null;
         reference_number?: string | null;
     }>;
     allocations: Array<{
@@ -519,192 +502,4 @@ export interface InventoryAdjustmentRequestPayload {
         unit_cost?: string;
         reason?: string;
     }>;
-}
-
-export interface FastPurchaseOptionResource {
-    id: number;
-    code?: string | null;
-    name?: string | null;
-    symbol?: string | null;
-    is_default?: boolean;
-    is_cash_account?: boolean;
-    is_bank_account?: boolean;
-    method_type?: string;
-    requires_reference?: boolean;
-    requires_bank_account?: boolean;
-}
-
-export interface FastPurchaseContext {
-    defaults: {
-        purchase_date: string;
-        exchange_rate: string;
-        currency_id?: number | null;
-        currency?: NamedResource | null;
-        currency_source?: string;
-        exchange_rate_source?: string;
-        warehouse_id?: number | null;
-        warehouse?: NamedResource | null;
-        warehouse_location_id?: number | null;
-        warehouse_location?: NamedResource | null;
-        warehouse_location_source?: string;
-    };
-    endpoints: Record<string, string>;
-    warehouses: FastPurchaseOptionResource[];
-    currencies: FastPurchaseOptionResource[];
-    payment_methods: FastPurchaseOptionResource[];
-    payment_accounts: FastPurchaseOptionResource[];
-    tax_groups: FastPurchaseOptionResource[];
-}
-
-export interface FastPurchasePayload {
-    supplier_id: number;
-    supplier_reference?: string;
-    purchase_date: string;
-    warehouse_id?: number;
-    warehouse_location_id?: number;
-    currency_id?: number;
-    exchange_rate?: string;
-    payment_terms?: string;
-    due_date?: string;
-    notes?: string;
-    options: {
-        receive_stock_now: boolean;
-        create_supplier_invoice_now: boolean;
-        record_payment_now: boolean;
-    };
-    lines: Array<{
-        client_line_key: string;
-        item_id: number;
-        item_variant_id?: number;
-        description?: string;
-        uom_id?: number;
-        quantity: string;
-        unit_cost?: string;
-        pricing_mode: 'auto' | 'manual';
-        manual_price_confirmed?: boolean;
-        pricing_context_hash?: string;
-        discount_calculation_type?: 'fixed' | 'percentage';
-        discount_rate?: string;
-        discount_amount?: string;
-        tax_group_id?: number;
-        charge_calculation_type?: 'fixed' | 'percentage';
-        charge_rate?: string;
-        charge_amount?: string;
-    }>;
-    adjustments?: Array<{
-        name: string;
-        adjustment_type: string;
-        effect: 'increase' | 'decrease';
-        calculation_type?: 'fixed' | 'percentage';
-        calculation_base?: string;
-        rate?: string;
-        amount?: string;
-        allocation_method?: string;
-        is_allocatable?: boolean;
-        cost_treatment?: string;
-        tax_treatment?: string;
-        mapping_source?: 'catalogue' | 'override';
-        override_reason?: string;
-        allocations?: Array<{
-            client_line_key: string;
-            amount: string;
-        }>;
-        description?: string;
-    }>;
-    payment?: {
-        amount?: string;
-        payment_method_id?: number;
-        source_account_id?: number;
-        reference?: string;
-        cheque_number?: string;
-        cheque_date?: string;
-        card_reference?: string;
-        instrument_number?: string;
-        instrument_date?: string;
-        external_bank_name?: string;
-        external_bank_branch?: string;
-        lines?: Array<{
-            amount: string;
-            payment_method_id?: number;
-            source_account_id?: number;
-            reference?: string;
-            instrument_number?: string;
-            instrument_date?: string;
-            external_bank_name?: string;
-            external_bank_branch?: string;
-        }>;
-    };
-}
-
-export interface FastPurchaseDocumentReference {
-    id: number;
-    number: string;
-    status?: string;
-    url: string;
-    total_debit?: string;
-    total_credit?: string;
-}
-
-export interface FastPurchaseLinePreview {
-    client_line_key?: string | null;
-    line_number: number;
-    item?: NamedResource | null;
-    uom?: NamedResource | null;
-    description?: string;
-    is_stock: boolean;
-    quantity: string;
-    base_quantity?: string;
-    unit_cost: string;
-    pricing_mode?: 'auto' | 'manual';
-    price_source?: string | null;
-    price_source_id?: number | null;
-    pricing_context_hash?: string | null;
-    line_subtotal?: string;
-    discount_calculation_type?: 'fixed' | 'percentage';
-    discount_rate?: string;
-    discount_amount: string;
-    tax_group_id?: number | null;
-    tax_amount: string;
-    withholding_amount: string;
-    charge_calculation_type?: 'fixed' | 'percentage';
-    charge_rate?: string;
-    charge_amount?: string;
-    line_total: string;
-    taxes?: Array<Record<string, unknown>>;
-}
-
-export interface FastPurchaseResult {
-    supplier_reference?: string;
-    mode: string;
-    options: FastPurchasePayload['options'];
-    supplier?: NamedResource | null;
-    summary: {
-        subtotal: string;
-        discount_total: string;
-        tax_total: string;
-        withholding_total: string;
-        line_withholding_total?: string;
-        charge_total?: string;
-        adjustment_total?: string;
-        header_increase_total?: string;
-        header_decrease_total?: string;
-        grand_total: string;
-        paid_total: string;
-        balance_due: string;
-        stock_taxable_total?: string;
-        non_stock_taxable_total?: string;
-    };
-    adjustments?: Array<Record<string, unknown>>;
-    lines: FastPurchaseLinePreview[];
-    document_plan?: Record<string, unknown>;
-    documents: {
-        purchase_order?: FastPurchaseDocumentReference | null;
-        goods_receipt?: FastPurchaseDocumentReference | null;
-        inventory_transaction?: FastPurchaseDocumentReference | null;
-        inventory_transactions?: FastPurchaseDocumentReference[];
-        supplier_invoice?: FastPurchaseDocumentReference | null;
-        supplier_payment?: FastPurchaseDocumentReference | null;
-        finance_posting?: FastPurchaseDocumentReference | null;
-        finance_postings?: FastPurchaseDocumentReference[];
-    };
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Finance\Services;
 
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
@@ -33,29 +34,54 @@ final class FinancePostingService implements FinancePostingInterface
     {
         $this->validatePosting($request);
         $profile = $this->profiles->resolveProfile($request);
+        $lines = $this->journalLines($request, $profile);
+        $sourceKey = $this->sourceKey($request);
+        $fingerprint = $this->postingFingerprint($request, $profile, $lines);
 
-        $journal = $this->journals->create(new CreateJournalEntryData(
-            tenantId: $request->source->tenantId,
-            journalDate: $request->postingDate,
-            journalType: $this->journalTypeForSource($request->source->sourceType),
-            organizationUnitId: $request->source->organizationUnitId,
-            source: new PostingSourceData(
-                sourceType: $request->source->sourceType,
-                sourceId: $request->source->sourceId,
-                tenantId: $request->source->tenantId,
-                organizationUnitId: $request->source->organizationUnitId,
-                sourceModule: $request->source->sourceModule ?: $request->source->sourceType,
-                sourceNumber: $request->source->sourceNumber,
-                sourceDate: $request->source->sourceDate ?: $request->postingDate,
-            ),
-            description: $request->description,
-            currencyId: $request->currencyId,
-            exchangeRate: $request->exchangeRate,
-            lines: $this->journalLines($request, $profile),
-            postingProfileId: $profile?->getKey(),
-        ));
+        return DB::transaction(function () use ($request, $profile, $lines, $sourceKey, $fingerprint): PostingResultData {
+            $existing = $this->sourceJournal($sourceKey);
+            if ($existing instanceof FinanceJournalEntry) {
+                return $this->assertReplayMatches($existing, $fingerprint);
+            }
 
-        return $this->resultFromJournal($journal);
+            try {
+                $journal = $this->journals->create(new CreateJournalEntryData(
+                    tenantId: $request->source->tenantId,
+                    journalDate: $request->postingDate,
+                    journalType: $this->journalTypeForSource($request->source->sourceType),
+                    organizationUnitId: $request->source->organizationUnitId,
+                    source: new PostingSourceData(
+                        sourceType: $request->source->sourceType,
+                        sourceId: $request->source->sourceId,
+                        tenantId: $request->source->tenantId,
+                        organizationUnitId: $request->source->organizationUnitId,
+                        sourceModule: $request->source->sourceModule ?: $request->source->sourceType,
+                        sourceNumber: $request->source->sourceNumber,
+                        sourceDate: $request->source->sourceDate ?: $request->postingDate,
+                    ),
+                    description: $request->description,
+                    currencyId: $request->currencyId,
+                    exchangeRate: $request->exchangeRate,
+                    lines: $lines,
+                    postingProfileId: $profile?->getKey(),
+                    sourceKey: $sourceKey,
+                    postingFingerprint: $fingerprint,
+                ));
+            } catch (QueryException $exception) {
+                if (! $this->isUniqueViolation($exception)) {
+                    throw $exception;
+                }
+
+                $journal = $this->sourceJournal($sourceKey);
+                if (! $journal instanceof FinanceJournalEntry) {
+                    throw $exception;
+                }
+
+                return $this->assertReplayMatches($journal, $fingerprint);
+            }
+
+            return $this->resultFromJournal($journal);
+        });
     }
 
     public function validatePosting(PostingContext $request): void
@@ -122,7 +148,17 @@ final class FinancePostingService implements FinancePostingInterface
 
     public function postJournal(int $journalId, ?int $postedBy = null): PostingResultData
     {
-        $result = $this->posting->post(FinanceJournalEntry::query()->findOrFail($journalId), $postedBy);
+        $journal = FinanceJournalEntry::query()->lockForUpdate()->findOrFail($journalId);
+        $status = $this->statusOf($journal);
+
+        if (in_array($status, [JournalStatus::Posted, JournalStatus::Reversed], true)) {
+            return $this->resultFromJournal($journal);
+        }
+        if ($status !== JournalStatus::Draft) {
+            throw new InvalidArgumentException('Only draft journals can be posted.');
+        }
+
+        $result = $this->posting->post($journal, $postedBy);
 
         return new PostingResultData(
             journalId: $result->journalEntryId,
@@ -164,8 +200,8 @@ final class FinancePostingService implements FinancePostingInterface
             $lines[] = new JournalLineData(
                 accountId: (int) $account->getKey(),
                 lineNumber: $index + 1,
-                debit: $line->debit,
-                credit: $line->credit,
+                debit: $this->math->normalize($line->debit),
+                credit: $this->math->normalize($line->credit),
                 description: $line->description,
                 dimensionId: $dimension?->getKey(),
                 sourceLineType: $line->sourceLineType,
@@ -174,6 +210,79 @@ final class FinancePostingService implements FinancePostingInterface
         }
 
         return $lines;
+    }
+
+    private function sourceKey(PostingContext $request): string
+    {
+        return hash('sha256', json_encode([
+            'tenant_id' => $request->source->tenantId,
+            'organization_unit_id' => $request->source->organizationUnitId,
+            'source_module' => $request->source->sourceModule ?: $request->source->sourceType,
+            'source_type' => $request->source->sourceType,
+            'source_id' => $request->source->sourceId,
+        ], JSON_THROW_ON_ERROR));
+    }
+
+    /**
+     * @param  list<JournalLineData>  $lines
+     */
+    private function postingFingerprint(
+        PostingContext $request,
+        ?FinancePostingProfile $profile,
+        array $lines,
+    ): string {
+        return hash('sha256', json_encode([
+            'posting_date' => $request->postingDate,
+            'source_number' => $request->source->sourceNumber,
+            'source_date' => $request->source->sourceDate ?: $request->postingDate,
+            'description' => $request->description,
+            'currency_id' => $request->currencyId,
+            'exchange_rate' => $this->math->normalize($request->exchangeRate),
+            'posting_profile_id' => $profile?->getKey(),
+            'lines' => array_map(fn (JournalLineData $line): array => [
+                'line_number' => $line->lineNumber,
+                'account_id' => $line->accountId,
+                'debit' => $this->math->normalize($line->debit),
+                'credit' => $this->math->normalize($line->credit),
+                'description' => $line->description,
+                'dimension_id' => $line->dimensionId,
+                'source_line_type' => $line->sourceLineType,
+                'source_line_id' => $line->sourceLineId,
+            ], $lines),
+        ], JSON_THROW_ON_ERROR));
+    }
+
+    private function sourceJournal(string $sourceKey): ?FinanceJournalEntry
+    {
+        return FinanceJournalEntry::query()
+            ->where('source_key', $sourceKey)
+            ->lockForUpdate()
+            ->first();
+    }
+
+    private function assertReplayMatches(FinanceJournalEntry $journal, string $fingerprint): PostingResultData
+    {
+        $stored = trim((string) $journal->posting_fingerprint);
+        if ($stored === '' || ! hash_equals($stored, $fingerprint)) {
+            throw new InvalidArgumentException('Finance posting source was already used with different posting facts.');
+        }
+
+        return $this->resultFromJournal($journal);
+    }
+
+    private function isUniqueViolation(QueryException $exception): bool
+    {
+        $sqlState = (string) ($exception->errorInfo[0] ?? $exception->getCode());
+        $driverCode = (int) ($exception->errorInfo[1] ?? 0);
+
+        return $driverCode === 1062 || $sqlState === '23505';
+    }
+
+    private function statusOf(FinanceJournalEntry $journal): JournalStatus
+    {
+        return $journal->status instanceof JournalStatus
+            ? $journal->status
+            : JournalStatus::from((string) $journal->status);
     }
 
     private function journalTypeForSource(string $sourceType): JournalType
@@ -191,14 +300,10 @@ final class FinancePostingService implements FinancePostingInterface
 
     private function resultFromJournal(FinanceJournalEntry $journal): PostingResultData
     {
-        $status = $journal->status instanceof JournalStatus
-            ? $journal->status->value
-            : (string) $journal->status;
-
         return new PostingResultData(
             journalId: (int) $journal->getKey(),
             journalNumber: (string) $journal->journal_number,
-            status: $status,
+            status: $this->statusOf($journal)->value,
             totalDebit: (string) $journal->total_debit,
             totalCredit: (string) $journal->total_credit,
             ledgerEntryCount: $journal->ledgerEntries()->count(),

@@ -2,14 +2,18 @@ import { apiClient } from '@/shared/api/apiClient';
 import { endpoints } from '@/shared/api/endpoints';
 import type { ApiCollection, ApiResource, ListParams } from '@/shared/types/api';
 import type {
+    AccountAssignmentPayload,
     AccountBalanceRow,
     AccountPayload,
+    AccountRolePayload,
     AgingReport,
     BankReconciliation,
     BankReconciliationPayload,
     Budget,
     BudgetPayload,
     FinanceAccount,
+    FinanceAccountAssignment,
+    FinanceAccountRole,
     FinanceLookups,
     FiscalPeriod,
     JournalEntry,
@@ -21,14 +25,18 @@ import type {
 } from './financeTypes';
 
 export type {
+    AccountAssignmentPayload,
     AccountBalanceRow,
     AccountPayload,
+    AccountRolePayload,
     AgingReport,
     BankReconciliation,
     BankReconciliationPayload,
     Budget,
     BudgetPayload,
     FinanceAccount,
+    FinanceAccountAssignment,
+    FinanceAccountRole,
     FinanceLookup,
     FinanceLookups,
     FiscalPeriod,
@@ -170,6 +178,38 @@ export async function createPostingProfile(payload: PostingProfilePayload) {
 
 export async function updatePostingProfile(id: number, payload: PostingProfilePayload) {
     const response = await apiClient.patch<ApiResource<PostingProfile>>(`${endpoints.finance}/posting-profiles/${id}`, payload);
+    return response.data.data;
+}
+
+export async function listAccountRoles(params: ListParams, signal?: AbortSignal) {
+    const response = await apiClient.get<ApiCollection<FinanceAccountRole>>(`${endpoints.finance}/account-roles`, { params, signal });
+    return response.data;
+}
+
+export async function createAccountRole(payload: AccountRolePayload) {
+    const response = await apiClient.post<ApiResource<FinanceAccountRole>>(`${endpoints.finance}/account-roles`, payload);
+    return response.data.data;
+}
+
+export async function updateAccountRole(id: number, payload: AccountRolePayload) {
+    const response = await apiClient.patch<ApiResource<FinanceAccountRole>>(`${endpoints.finance}/account-roles/${id}`, payload);
+    return response.data.data;
+}
+
+export async function listAccountAssignments(params: ListParams, signal?: AbortSignal) {
+    const response = await apiClient.get<ApiCollection<FinanceAccountAssignment>>(`${endpoints.finance}/account-assignments`, { params, signal });
+    return response.data;
+}
+
+export async function createAccountAssignment(payload: AccountAssignmentPayload) {
+    const response = await apiClient.post<ApiResource<FinanceAccountAssignment>>(`${endpoints.finance}/account-assignments`, payload);
+    return response.data.data;
+}
+
+export async function endAccountAssignment(id: number, effectiveTo: string) {
+    const response = await apiClient.post<ApiResource<FinanceAccountAssignment>>(`${endpoints.finance}/account-assignments/${id}/end`, {
+        effective_to: effectiveTo,
+    });
     return response.data.data;
 }
 

@@ -8,11 +8,7 @@ export interface EditableHeaderAdjustment {
     amount: string;
     allocation_method: string;
     allocations?: Array<{ client_line_key: string; amount: string }>;
-    finance_mapping_label?: string;
-    cost_treatment?: string;
-    tax_treatment?: string;
-    mapping_source?: 'catalogue' | 'override';
-    override_reason?: string;
+    recognition_label?: string;
     description: string;
 }
 
@@ -27,11 +23,7 @@ export function emptyHeaderAdjustment(): EditableHeaderAdjustment {
         amount: '0.000000',
         allocation_method: 'proportional',
         allocations: [],
-        finance_mapping_label: 'Freight-in / landed cost',
-        cost_treatment: 'landed_cost_or_expense',
-        tax_treatment: 'none',
-        mapping_source: 'catalogue',
-        override_reason: '',
+        recognition_label: 'Capitalize for stock; expense otherwise',
         description: '',
     };
 }

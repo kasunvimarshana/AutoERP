@@ -8,7 +8,7 @@ import type { NamedResource } from '@/shared/types/common';
 import { compareDecimalStrings } from '@/shared/utils/decimal';
 import { CurrencyLookupSelect, SupplierLookupSelect, WarehouseLocationLookupSelect, WarehouseLookupSelect } from './PurchaseLookups';
 import { PurchasePaymentMethodsEditor, type PurchasePaymentMethodRow } from './PurchasePaymentMethodsEditor';
-import type { FastPurchaseContext, FastPurchaseResult } from '../purchaseTypes';
+import type { FastPurchaseContext, FastPurchaseResult } from '../types/fastPurchaseTypes';
 
 export type FastPurchasePreset = 'expense_only' | 'purchase_receive' | 'purchase_receive_invoice' | 'purchase_receive_invoice_pay';
 
@@ -146,7 +146,6 @@ export function FastPurchasePaymentSection({
             <PurchasePaymentMethodsEditor
                 rows={rows}
                 methods={context?.payment_methods ?? []}
-                accounts={context?.payment_accounts ?? []}
                 errorFor={errorFor}
                 errorIndexForRow={errorIndexForRow}
                 onChange={onChange}

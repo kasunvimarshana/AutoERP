@@ -11,10 +11,8 @@ use Modules\Finance\DTOs\FinancePostingLine;
 use Modules\Finance\DTOs\FinancePostingRequest;
 use Modules\Finance\DTOs\PostingResultData;
 use Modules\Finance\DTOs\PostingSourceData;
-use Modules\Finance\Models\FinanceAccount;
 use Modules\Invoice\Models\Invoice;
 use Modules\Invoice\Models\InvoiceAdjustment;
-use Modules\Payment\Models\Payment;
 use Modules\Purchase\Enums\PurchaseAdjustmentType;
 use Modules\Purchase\Models\GoodsReceiptNote;
 use Modules\Purchase\Models\PurchaseHeaderAdjustment;
@@ -58,7 +56,6 @@ final class FastPurchasePostingCoordinator
             }
 
             $payment = $this->documents->createSupplierPayment($resolved, $invoice);
-            $financePostings = array_merge($financePostings, $this->postPaymentFinance($resolved, $payment));
         }
 
         return [
@@ -153,46 +150,6 @@ final class FastPurchasePostingCoordinator
     }
 
     /**
-     * @param  array<string, mixed>  $resolved
-     * @return list<PostingResultData>
-     */
-    private function postPaymentFinance(array $resolved, Payment $payment): array
-    {
-        $lines = [
-            new FinancePostingLine(null, 'Supplier payable', debit: (string) $payment->total_amount, profileKey: 'payable'),
-        ];
-
-        foreach ($resolved['payment']['source_accounts'] as $row) {
-            /** @var FinanceAccount $account */
-            $account = $row['account'];
-            $lines[] = new FinancePostingLine(
-                accountCode: (string) $account->code,
-                accountName: (string) $account->name,
-                credit: (string) $row['amount'],
-                description: 'Fast purchase payment source',
-            );
-        }
-
-        return [$this->financePostings->post(new FinancePostingRequest(
-            source: new PostingSourceData(
-                sourceType: 'payment_made',
-                sourceId: (int) $payment->getKey(),
-                tenantId: (int) $payment->tenant_id,
-                organizationUnitId: $payment->organization_unit_id,
-                sourceModule: 'payment',
-                sourceNumber: (string) $payment->payment_number,
-                sourceDate: $payment->payment_date?->toDateString() ?? (string) $resolved['purchase_date'],
-            ),
-            postingDate: (string) $resolved['purchase_date'],
-            currencyId: $payment->currency_id,
-            exchangeRate: (string) $payment->exchange_rate,
-            lines: $lines,
-            description: 'Fast purchase supplier payment '.$payment->payment_number,
-            postingProfileCode: 'payment_made',
-        ), $resolved['current_user_id'])];
-    }
-
-    /**
      * @return list<FinancePostingLine>
      */
     private function invoiceAdjustmentFinanceLines(Invoice $invoice): array
@@ -230,27 +187,20 @@ final class FastPurchasePostingCoordinator
                 continue;
             }
 
-            $account = $this->configuredAccount($sourceAdjustment, $invoice);
-            $accountCode = $account instanceof FinanceAccount ? (string) $account->code : null;
-            $accountName = $account instanceof FinanceAccount ? (string) $account->name : (string) $adjustment->name;
-            $profileKey = $account instanceof FinanceAccount
-                ? null
-                : 'expense';
+            $profileKey = $this->adjustmentPolicies->invoiceProfileKeyFor($sourceAdjustment);
+            if ($profileKey === null) {
+                throw new InvalidArgumentException('Purchase adjustment recognition cannot be mapped to a Finance posting role.');
+            }
 
             if ($adjustment->effect->value === 'increase') {
-                $lines[] = new FinancePostingLine($accountCode, $accountName, debit: $amount, profileKey: $profileKey);
+                $lines[] = new FinancePostingLine(null, (string) $adjustment->name, debit: $amount, profileKey: $profileKey);
                 $lines[] = new FinancePostingLine(null, 'Supplier payable', credit: $amount, profileKey: 'payable');
             } else {
                 $lines[] = new FinancePostingLine(null, 'Supplier payable', debit: $amount, profileKey: 'payable');
-                $lines[] = new FinancePostingLine($accountCode, $accountName, credit: $amount, profileKey: $profileKey);
+                $lines[] = new FinancePostingLine(null, (string) $adjustment->name, credit: $amount, profileKey: $profileKey);
             }
         }
 
         return $lines;
-    }
-
-    private function configuredAccount(PurchaseHeaderAdjustment $adjustment, Invoice $invoice): ?FinanceAccount
-    {
-        return $this->adjustmentPolicies->accountForAdjustment($adjustment, lock: true);
     }
 }

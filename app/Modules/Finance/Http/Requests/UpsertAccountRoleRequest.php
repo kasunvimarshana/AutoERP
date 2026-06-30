@@ -6,7 +6,7 @@ namespace Modules\Finance\Http\Requests;
 
 use Modules\Core\Http\Requests\TenantScopedRequest;
 
-final class UpsertPostingProfileRequest extends TenantScopedRequest
+final class UpsertAccountRoleRequest extends TenantScopedRequest
 {
     public function rules(): array
     {
@@ -17,12 +17,6 @@ final class UpsertPostingProfileRequest extends TenantScopedRequest
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'is_active' => ['required', 'boolean'],
-            'rules' => ['required', 'array', 'min:1'],
-            'rules.*.line_key' => ['required', 'string', 'max:100', 'distinct'],
-            'rules.*.account_role_id' => ['required', 'integer', 'min:1'],
-            'rules.*.description' => ['nullable', 'string', 'max:255'],
-            'rules.*.account_id' => ['prohibited'],
-            'lines' => ['prohibited'],
         ];
     }
 }

@@ -8,7 +8,6 @@ import type { FastPurchaseOptionResource } from '../purchaseTypes';
 export interface PurchasePaymentMethodRow {
     key: string;
     payment_method_id: string;
-    source_account_id: string;
     amount: string;
     reference: string;
     instrument_number: string;
@@ -21,7 +20,6 @@ export function blankPaymentMethodRow(amount = ''): PurchasePaymentMethodRow {
     return {
         key: typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
         payment_method_id: '',
-        source_account_id: '',
         amount,
         reference: '',
         instrument_number: '',
@@ -35,10 +33,9 @@ export function paymentRowsTotal(rows: PurchasePaymentMethodRow[]): string {
     return sumDecimals(rows.map((row) => row.amount || '0.000000'));
 }
 
-export function PurchasePaymentMethodsEditor({ rows, methods, accounts, errorFor, errorIndexForRow, onChange }: {
+export function PurchasePaymentMethodsEditor({ rows, methods, errorFor, errorIndexForRow, onChange }: {
     rows: PurchasePaymentMethodRow[];
     methods: FastPurchaseOptionResource[];
-    accounts: FastPurchaseOptionResource[];
     errorFor: (field: string) => string | undefined;
     errorIndexForRow?: (row: PurchasePaymentMethodRow, index: number) => number;
     onChange: (rows: PurchasePaymentMethodRow[]) => void;
@@ -66,13 +63,6 @@ export function PurchasePaymentMethodsEditor({ rows, methods, accounts, errorFor
                                     onChange={(event) => update(index, { payment_method_id: event.target.value })}
                                     error={errorFor(`lines.${errorIndex}.payment_method_id`) ?? errorFor(`payment.lines.${errorIndex}.payment_method_id`)}
                                 />
-                                <Select
-                                    label="Account"
-                                    value={row.source_account_id}
-                                    options={accounts.map((account) => ({ value: account.id, label: optionLabel(account) }))}
-                                    onChange={(event) => update(index, { source_account_id: event.target.value })}
-                                    error={errorFor(`lines.${errorIndex}.source_account_id`) ?? errorFor(`payment.lines.${errorIndex}.source_account_id`)}
-                                />
                                 <Input
                                     label="Reference"
                                     value={row.reference}
@@ -99,7 +89,6 @@ export function PurchasePaymentMethodsEditor({ rows, methods, accounts, errorFor
                     <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500">
                         <tr>
                             <th className="w-44 px-3 py-2">Method</th>
-                            <th className="w-52 px-3 py-2">Account</th>
                             <th className="px-3 py-2">Reference</th>
                             <th className="w-40 px-3 py-2">Amount</th>
                             <th className="w-24 px-3 py-2" />
@@ -112,29 +101,21 @@ export function PurchasePaymentMethodsEditor({ rows, methods, accounts, errorFor
 
                             return (
                                 <tr key={row.key} className="align-top">
-                                <td className="px-3 py-3">
-                                    <Select
-                                        value={row.payment_method_id}
-                                        options={methods.map((option) => ({ value: option.id, label: optionLabel(option) }))}
-                                        onChange={(event) => update(index, { payment_method_id: event.target.value })}
-                                        error={errorFor(`lines.${errorIndex}.payment_method_id`) ?? errorFor(`payment.lines.${errorIndex}.payment_method_id`)}
-                                    />
-                                </td>
-                                <td className="px-3 py-3">
-                                    <Select
-                                        value={row.source_account_id}
-                                        options={accounts.map((account) => ({ value: account.id, label: optionLabel(account) }))}
-                                        onChange={(event) => update(index, { source_account_id: event.target.value })}
-                                        error={errorFor(`lines.${errorIndex}.source_account_id`) ?? errorFor(`payment.lines.${errorIndex}.source_account_id`)}
-                                    />
-                                </td>
-                                <td className="px-3 py-3">
-                                    <Input value={row.reference} onChange={(event) => update(index, { reference: event.target.value })} error={errorFor(`lines.${errorIndex}.reference`) ?? errorFor(`payment.lines.${errorIndex}.reference`)} />
-                                    <MethodSpecificFields methodType={method?.method_type} row={row} index={index} errorIndex={errorIndex} errorFor={errorFor} update={update} />
-                                </td>
-                                <td className="px-3 py-3"><DecimalInput value={row.amount} onChange={(event) => update(index, { amount: event.target.value })} error={errorFor(`lines.${errorIndex}.amount`) ?? errorFor(`payment.lines.${errorIndex}.amount`)} /></td>
-                                <td className="px-3 py-3 text-right"><Button type="button" variant="ghost" className="min-h-9 px-3" onClick={() => removeRow(index)}>Remove</Button></td>
-                            </tr>
+                                    <td className="px-3 py-3">
+                                        <Select
+                                            value={row.payment_method_id}
+                                            options={methods.map((option) => ({ value: option.id, label: optionLabel(option) }))}
+                                            onChange={(event) => update(index, { payment_method_id: event.target.value })}
+                                            error={errorFor(`lines.${errorIndex}.payment_method_id`) ?? errorFor(`payment.lines.${errorIndex}.payment_method_id`)}
+                                        />
+                                    </td>
+                                    <td className="px-3 py-3">
+                                        <Input value={row.reference} onChange={(event) => update(index, { reference: event.target.value })} error={errorFor(`lines.${errorIndex}.reference`) ?? errorFor(`payment.lines.${errorIndex}.reference`)} />
+                                        <MethodSpecificFields methodType={method?.method_type} row={row} index={index} errorIndex={errorIndex} errorFor={errorFor} update={update} />
+                                    </td>
+                                    <td className="px-3 py-3"><DecimalInput value={row.amount} onChange={(event) => update(index, { amount: event.target.value })} error={errorFor(`lines.${errorIndex}.amount`) ?? errorFor(`payment.lines.${errorIndex}.amount`)} /></td>
+                                    <td className="px-3 py-3 text-right"><Button type="button" variant="ghost" className="min-h-9 px-3" onClick={() => removeRow(index)}>Remove</Button></td>
+                                </tr>
                             );
                         })}
                     </tbody>
@@ -164,7 +145,7 @@ function MethodSpecificFields({ methodType, row, index, errorIndex, errorFor, up
             <div className="mt-2 grid gap-2 sm:grid-cols-2">
                 <Input placeholder="Cheque number" value={row.instrument_number} onChange={(event) => update(index, { instrument_number: event.target.value })} error={errorFor(`lines.${errorIndex}.instrument_number`) ?? errorFor(`payment.lines.${errorIndex}.instrument_number`)} />
                 <Input type="date" value={row.instrument_date} onChange={(event) => update(index, { instrument_date: event.target.value })} error={errorFor(`lines.${errorIndex}.instrument_date`) ?? errorFor(`payment.lines.${errorIndex}.instrument_date`)} />
-                <Input placeholder="Bank" value={row.external_bank_name} onChange={(event) => update(index, { external_bank_name: event.target.value })} error={errorFor(`lines.${errorIndex}.external_bank_name`) ?? errorFor(`payment.lines.${errorIndex}.external_bank_name`)} />
+                <Input placeholder="External bank" value={row.external_bank_name} onChange={(event) => update(index, { external_bank_name: event.target.value })} error={errorFor(`lines.${errorIndex}.external_bank_name`) ?? errorFor(`payment.lines.${errorIndex}.external_bank_name`)} />
                 <Input placeholder="Branch" value={row.external_bank_branch} onChange={(event) => update(index, { external_bank_branch: event.target.value })} error={errorFor(`lines.${errorIndex}.external_bank_branch`) ?? errorFor(`payment.lines.${errorIndex}.external_bank_branch`)} />
             </div>
         );

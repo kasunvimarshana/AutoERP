@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
 use Modules\Finance\Constants\FinancePermission;
+use Modules\Finance\Http\Controllers\FinanceConfigurationController;
 use Modules\Finance\Http\Controllers\FinanceController;
 
 $middleware = [
@@ -23,7 +24,7 @@ Route::prefix('api/v1/finance')->middleware($middleware)->name('api.v1.finance.'
         Route::get('accounts', [FinanceController::class, 'accounts'])->name('accounts.index');
         Route::get('accounts/{account}', [FinanceController::class, 'showAccount'])->whereNumber('account')->name('accounts.show');
         Route::get('accounts/{account}/balance', [FinanceController::class, 'accountBalance'])->whereNumber('account')->name('accounts.balance');
-        Route::get('lookups', [FinanceController::class, 'lookups'])->name('lookups');
+        Route::get('lookups', [FinanceConfigurationController::class, 'lookups'])->name('lookups');
     });
 
     Route::middleware($requires(FinancePermission::ACCOUNTS_MANAGE))->group(function (): void {
@@ -31,16 +32,25 @@ Route::prefix('api/v1/finance')->middleware($middleware)->name('api.v1.finance.'
         Route::patch('accounts/{account}', [FinanceController::class, 'updateAccount'])->whereNumber('account')->name('accounts.update');
     });
 
-    Route::get('posting-profiles', [FinanceController::class, 'postingProfiles'])
-        ->middleware($requires(FinancePermission::POSTING_PROFILES_VIEW))
-        ->name('posting-profiles.index');
-    Route::post('posting-profiles', [FinanceController::class, 'createPostingProfile'])
-        ->middleware($requires(FinancePermission::POSTING_PROFILES_MANAGE))
-        ->name('posting-profiles.store');
-    Route::patch('posting-profiles/{profile}', [FinanceController::class, 'updatePostingProfile'])
-        ->whereNumber('profile')
-        ->middleware($requires(FinancePermission::POSTING_PROFILES_MANAGE))
-        ->name('posting-profiles.update');
+    Route::middleware($requires(FinancePermission::POSTING_PROFILES_VIEW))->group(function (): void {
+        Route::get('posting-profiles', [FinanceConfigurationController::class, 'postingProfiles'])->name('posting-profiles.index');
+        Route::get('account-roles', [FinanceConfigurationController::class, 'accountRoles'])->name('account-roles.index');
+        Route::get('account-assignments', [FinanceConfigurationController::class, 'accountAssignments'])->name('account-assignments.index');
+    });
+    Route::middleware($requires(FinancePermission::POSTING_PROFILES_MANAGE))->group(function (): void {
+        Route::post('posting-profiles', [FinanceConfigurationController::class, 'createPostingProfile'])->name('posting-profiles.store');
+        Route::patch('posting-profiles/{profile}', [FinanceConfigurationController::class, 'updatePostingProfile'])
+            ->whereNumber('profile')
+            ->name('posting-profiles.update');
+        Route::post('account-roles', [FinanceConfigurationController::class, 'createAccountRole'])->name('account-roles.store');
+        Route::patch('account-roles/{role}', [FinanceConfigurationController::class, 'updateAccountRole'])
+            ->whereNumber('role')
+            ->name('account-roles.update');
+        Route::post('account-assignments', [FinanceConfigurationController::class, 'createAccountAssignment'])->name('account-assignments.store');
+        Route::post('account-assignments/{assignment}/end', [FinanceConfigurationController::class, 'endAccountAssignment'])
+            ->whereNumber('assignment')
+            ->name('account-assignments.end');
+    });
 
     Route::middleware($requires(FinancePermission::JOURNALS_VIEW))->group(function (): void {
         Route::get('journals', [FinanceController::class, 'journals'])->name('journals.index');

@@ -11,12 +11,9 @@ use InvalidArgumentException;
 use Modules\Audit\Constants\AuditEventCategory;
 use Modules\Audit\Contracts\AuditRecorderInterface;
 use Modules\Audit\Data\AuditEventData;
-use Modules\ReferenceData\Models\CurrencyModel;
-use Modules\Idempotency\Enums\IdempotencyStatus;
 use Modules\Core\Services\DecimalMath;
+use Modules\Idempotency\Enums\IdempotencyStatus;
 use Modules\Idempotency\Services\IdempotencyService;
-use Modules\Finance\Models\FinanceAccount;
-use Modules\Finance\Models\FinancePostingProfile;
 use Modules\Item\Enums\ItemType;
 use Modules\Item\Models\Item;
 use Modules\Item\Models\ItemVariant;
@@ -30,6 +27,7 @@ use Modules\Purchase\Enums\PurchaseAdjustmentCalculationType;
 use Modules\Purchase\Enums\PurchaseAdjustmentEffect;
 use Modules\Purchase\Enums\PurchaseAdjustmentType;
 use Modules\Purchase\Validators\PurchaseValidationService;
+use Modules\ReferenceData\Models\CurrencyModel;
 use Modules\Supplier\Models\Supplier;
 use Modules\Tax\DTOs\TaxCalculationData;
 use Modules\Tax\DTOs\TaxCalculationLineData;
@@ -101,7 +99,6 @@ final class FastPurchaseService
             'warehouses' => $this->warehouseOptions($tenantId, $organizationUnitId, $search, $perPage),
             'currencies' => $this->currencyOptions($tenantId, $organizationUnitId, $search, $perPage),
             'payment_methods' => $this->paymentMethodOptions($tenantId, $organizationUnitId, $search, $perPage),
-            'payment_accounts' => $this->paymentAccountOptions($tenantId, $organizationUnitId, $search, $perPage),
             'tax_groups' => $this->taxGroupOptions($tenantId, $organizationUnitId, $search, $perPage),
         ];
     }
@@ -173,7 +170,7 @@ final class FastPurchaseService
         }
         $supplier = $this->supplier($tenantId, $organizationUnitId, (int) $payload['supplier_id'], $lockRecords);
         $supplierReference = trim((string) ($payload['supplier_reference'] ?? ''));
-        $currencyId = $this->currencyId($payload, $supplier, $tenantId, $organizationUnitId, $lockRecords);
+        $currencyId = $this->currencyId($payload, $supplier, $tenantId, $organizationUnitId);
         $exchangeRate = $this->math->normalize((string) ($payload['exchange_rate'] ?? '1.000000'));
         $warehouseId = $this->nullableInt($payload['warehouse_id'] ?? null);
         $warehouseLocationId = $this->nullableInt($payload['warehouse_location_id'] ?? null);
@@ -204,11 +201,7 @@ final class FastPurchaseService
         $adjustments = $this->resolveAdjustments(
             is_array($payload['adjustments'] ?? null) ? $payload['adjustments'] : [],
             $lines,
-            $tenantId,
-            $organizationUnitId,
             $createInvoice,
-            $currentUserId,
-            $lockRecords,
         );
         $summary = $this->summaryWithAdjustments($this->summary($lines), $adjustments);
         $payment = $this->resolvePayment($payload, $recordPayment, $summary, $tenantId, $organizationUnitId, $lockRecords);
@@ -514,7 +507,7 @@ final class FastPurchaseService
     private function resolvePayment(array $payload, bool $recordPayment, array &$summary, int $tenantId, ?int $organizationUnitId, bool $lockRecords): array
     {
         if (! $recordPayment) {
-            return ['amount' => '0.000000', 'reference' => null, 'lines' => [], 'source_accounts' => [], 'header_bank_account_id' => null];
+            return ['amount' => '0.000000', 'reference' => null, 'lines' => []];
         }
 
         $payment = is_array($payload['payment'] ?? null) ? $payload['payment'] : [];
@@ -524,7 +517,6 @@ final class FastPurchaseService
             : [[
                 'amount' => $payment['amount'] ?? null,
                 'payment_method_id' => $payment['payment_method_id'] ?? null,
-                'source_account_id' => $payment['source_account_id'] ?? null,
                 'reference' => $payment['reference'] ?? null,
                 'instrument_number' => $payment['instrument_number'] ?? $payment['cheque_number'] ?? $payment['card_reference'] ?? null,
                 'instrument_date' => $payment['instrument_date'] ?? $payment['cheque_date'] ?? null,
@@ -533,9 +525,7 @@ final class FastPurchaseService
             ]];
 
         $lines = [];
-        $sourceAccounts = [];
         $amount = '0.000000';
-        $headerBankAccountId = null;
 
         foreach (array_values($linePayloads) as $index => $line) {
             if (! is_array($line) || ($line['amount'] ?? null) === null) {
@@ -543,36 +533,44 @@ final class FastPurchaseService
             }
 
             $fieldPrefix = $usesPaymentLines ? "payment.lines.{$index}" : 'payment';
-
             $lineAmount = $this->math->normalize((string) $line['amount']);
-            $accountId = $this->nullableInt($line['source_account_id'] ?? null);
-            if ($accountId === null) {
-                throw new InvalidArgumentException('Payment source account is required.');
-            }
-
-            $account = $this->paymentAccount($tenantId, $organizationUnitId, $accountId, $lockRecords, "{$fieldPrefix}.source_account_id");
             $methodId = $this->nullableInt($line['payment_method_id'] ?? null);
-            if ($methodId !== null) {
-                $this->paymentMethod($tenantId, $organizationUnitId, $methodId, $lockRecords, "{$fieldPrefix}.payment_method_id");
+            if ($methodId === null) {
+                throw ValidationException::withMessages([
+                    "{$fieldPrefix}.payment_method_id" => ['Payment method is required when recording supplier payment.'],
+                ]);
             }
 
-            if ((bool) $account->is_bank_account && $headerBankAccountId === null) {
-                $headerBankAccountId = (int) $account->getKey();
+            $method = $this->paymentMethod($tenantId, $organizationUnitId, $methodId, $lockRecords, "{$fieldPrefix}.payment_method_id");
+            $reference = $this->nullableString($line['reference'] ?? null);
+            $instrumentNumber = $this->nullableString($line['instrument_number'] ?? null);
+            $instrumentDate = $this->nullableString($line['instrument_date'] ?? null);
+            $externalBankName = $this->nullableString($line['external_bank_name'] ?? null);
+            $externalBankBranch = $this->nullableString($line['external_bank_branch'] ?? null);
+
+            if ((bool) $method->requires_reference && $reference === null && $instrumentNumber === null) {
+                throw ValidationException::withMessages([
+                    "{$fieldPrefix}.reference" => ['The selected payment method requires a reference.'],
+                ]);
+            }
+            if ((bool) $method->requires_instrument_details
+                && ($instrumentNumber === null || $instrumentDate === null || $externalBankName === null)
+            ) {
+                throw ValidationException::withMessages([
+                    "{$fieldPrefix}.instrument_number" => ['The selected payment method requires instrument number, date, and external bank name.'],
+                ]);
             }
 
             $lines[] = new PaymentLineData(
                 amount: $lineAmount,
                 paymentMethodId: $methodId,
-                referenceNumber: $this->nullableString($line['reference'] ?? null),
-                internalBankAccountId: (bool) $account->is_bank_account ? (int) $account->getKey() : null,
+                referenceNumber: $reference,
                 instrumentDirection: 'outbound',
-                externalBankName: $this->nullableString($line['external_bank_name'] ?? null),
-                externalBankBranch: $this->nullableString($line['external_bank_branch'] ?? null),
-                instrumentNumber: $this->nullableString($line['instrument_number'] ?? null),
-                instrumentDate: $this->nullableString($line['instrument_date'] ?? null),
-                metadata: ['source_account_id' => (int) $account->getKey()],
+                externalBankName: $externalBankName,
+                externalBankBranch: $externalBankBranch,
+                instrumentNumber: $instrumentNumber,
+                instrumentDate: $instrumentDate,
             );
-            $sourceAccounts[] = ['account' => $account, 'amount' => $lineAmount];
             $amount = $this->math->add($amount, $lineAmount);
         }
 
@@ -587,8 +585,6 @@ final class FastPurchaseService
             'amount' => $amount,
             'reference' => $this->nullableString($payment['reference'] ?? null),
             'lines' => $lines,
-            'source_accounts' => $sourceAccounts,
-            'header_bank_account_id' => $headerBankAccountId,
         ];
     }
 
@@ -598,10 +594,8 @@ final class FastPurchaseService
     private function validateMode(array $lines, bool $receiveStock, bool $createInvoice, bool $recordPayment): void
     {
         $hasStock = false;
-        $hasNonStock = false;
         foreach ($lines as $line) {
             $hasStock = $hasStock || (bool) $line['is_stock'];
-            $hasNonStock = $hasNonStock || ! (bool) $line['is_stock'];
         }
 
         if ($recordPayment && ! $createInvoice) {
@@ -623,7 +617,7 @@ final class FastPurchaseService
      * @param  list<array<string, mixed>>  $lines
      * @return list<array{data: PurchaseHeaderAdjustmentData, amount: string, accounting: array<string, mixed>}>
      */
-    private function resolveAdjustments(array $payloads, array $lines, int $tenantId, ?int $organizationUnitId, bool $createInvoice, ?int $userId, bool $lockRecords): array
+    private function resolveAdjustments(array $payloads, array $lines, bool $createInvoice): array
     {
         $adjustments = [];
         foreach (array_values($payloads) as $index => $row) {
@@ -632,7 +626,6 @@ final class FastPurchaseService
             }
 
             $adjustmentType = PurchaseAdjustmentType::from((string) $row['adjustment_type']);
-            $defaults = $this->adjustmentCatalogue->defaultsFor($adjustmentType);
             $data = new PurchaseHeaderAdjustmentData(
                 name: trim((string) $row['name']),
                 adjustmentType: $adjustmentType,
@@ -645,22 +638,16 @@ final class FastPurchaseService
                 isAllocatable: (bool) ($row['is_allocatable'] ?? true),
                 sortOrder: $index,
                 description: $this->nullableString($row['description'] ?? null),
-                financePostingProfileId: $this->nullableInt($row['finance_posting_profile_id'] ?? null),
-                financeAccountId: $this->nullableInt($row['finance_account_id'] ?? null),
-                costTreatment: $this->nullableString($row['cost_treatment'] ?? null) ?? (string) $defaults['cost_treatment'],
-                taxTreatment: $this->nullableString($row['tax_treatment'] ?? null) ?? (string) $defaults['tax_treatment'],
-                mappingSource: $this->nullableString($row['mapping_source'] ?? null) ?? 'catalogue',
-                overrideReason: $this->nullableString($row['override_reason'] ?? null),
                 manualAllocations: $this->manualAllocationsFromPayload($row['allocations'] ?? [], "adjustments.{$index}"),
             );
 
             $this->validator->assertNonNegative($data->amount, 'Fast purchase adjustment amount cannot be negative.');
             $this->validator->assertNonNegative($data->rate, 'Fast purchase adjustment rate cannot be negative.');
-            $this->adjustmentCatalogue->validate($data, $tenantId, $organizationUnitId, "adjustments.{$index}");
-            $accounting = $this->adjustmentPolicies->resolveForData($data, $tenantId, $organizationUnitId, "adjustments.{$index}", $userId, $lockRecords);
-            if ($accounting['final_treatment'] === 'unsupported') {
+            $this->adjustmentCatalogue->validate($data, "adjustments.{$index}");
+            $recognition = $this->adjustmentPolicies->resolveForData($data);
+            if ($recognition['final_treatment'] === 'unsupported') {
                 throw ValidationException::withMessages([
-                    "adjustments.{$index}.cost_treatment" => ['This adjustment accounting treatment is not supported for Fast Purchase.'],
+                    "adjustments.{$index}.adjustment_type" => ['This adjustment recognition is not supported for Fast Purchase.'],
                 ]);
             }
             if (! $createInvoice) {
@@ -671,7 +658,7 @@ final class FastPurchaseService
                 }
                 $this->assertReceiveOnlyAdjustmentSupported($data, "adjustments.{$index}.adjustment_type");
             }
-            $adjustments[] = ['data' => $data, 'accounting' => $accounting];
+            $adjustments[] = ['data' => $data, 'accounting' => $recognition];
         }
 
         $amounts = $this->purchaseCalculator->headerAdjustmentAmounts(
@@ -854,7 +841,6 @@ final class FastPurchaseService
     private function lockPayloadReferences(array $payload): void
     {
         $lines = is_array($payload['lines'] ?? null) ? $payload['lines'] : [];
-        $adjustments = is_array($payload['adjustments'] ?? null) ? $payload['adjustments'] : [];
         $payment = is_array($payload['payment'] ?? null) ? $payload['payment'] : [];
         $paymentLines = is_array($payment['lines'] ?? null) && $payment['lines'] !== []
             ? $payment['lines']
@@ -869,11 +855,6 @@ final class FastPurchaseService
         $this->lockModelIds(UnitOfMeasureModel::class, array_map(static fn (mixed $line): mixed => is_array($line) ? ($line['uom_id'] ?? null) : null, $lines));
         $this->lockModelIds(TaxGroup::class, array_map(static fn (mixed $line): mixed => is_array($line) ? ($line['tax_group_id'] ?? null) : null, $lines));
         $this->lockModelIds(PaymentMethod::class, array_map(static fn (mixed $line): mixed => is_array($line) ? ($line['payment_method_id'] ?? null) : null, $paymentLines));
-        $this->lockModelIds(FinancePostingProfile::class, array_map(static fn (mixed $adjustment): mixed => is_array($adjustment) ? ($adjustment['finance_posting_profile_id'] ?? null) : null, $adjustments));
-        $this->lockModelIds(FinanceAccount::class, array_merge(
-            array_map(static fn (mixed $line): mixed => is_array($line) ? ($line['source_account_id'] ?? null) : null, $paymentLines),
-            array_map(static fn (mixed $adjustment): mixed => is_array($adjustment) ? ($adjustment['finance_account_id'] ?? null) : null, $adjustments),
-        ));
     }
 
     /**
@@ -939,7 +920,7 @@ final class FastPurchaseService
         return $this->validator->warehouseLocation($tenantId, $organizationUnitId, $warehouseId, (int) $location->getKey(), $field);
     }
 
-    private function currencyId(array $payload, Supplier $supplier, int $tenantId, ?int $organizationUnitId, bool $lockRecords): ?int
+    private function currencyId(array $payload, Supplier $supplier, int $tenantId, ?int $organizationUnitId): ?int
     {
         $currencyId = $this->nullableInt($payload['currency_id'] ?? null) ?? $supplier->default_currency_id;
         if ($currencyId === null) {
@@ -990,27 +971,12 @@ final class FastPurchaseService
             $this->validator->invalidReference($field, 'payment method', 'The selected payment method is not active.');
         }
 
+        $direction = $this->enumValue($method->direction_allowed);
+        if (! in_array($direction, ['outbound', 'both'], true)) {
+            $this->validator->invalidReference($field, 'payment method', 'The selected payment method does not allow outbound payments.');
+        }
+
         return $method;
-    }
-
-    private function paymentAccount(int $tenantId, ?int $organizationUnitId, int $accountId, bool $lockRecords, string $field): FinanceAccount
-    {
-        $account = FinanceAccount::query()->when($lockRecords, fn ($query) => $query->lockForUpdate())->find($accountId);
-        if (! $account instanceof FinanceAccount) {
-            $this->validator->invalidReference($field, 'payment source account');
-        }
-
-        if ((int) $account->tenant_id !== $tenantId || $account->organization_unit_id !== $organizationUnitId) {
-            $this->validator->invalidReference($field, 'payment source account');
-        }
-        if (! (bool) $account->is_active || ! (bool) $account->is_posting_account) {
-            $this->validator->invalidReference($field, 'payment source account', 'The selected payment source account must be active and postable.');
-        }
-        if (! (bool) $account->is_cash_account && ! (bool) $account->is_bank_account) {
-            $this->validator->invalidReference($field, 'payment source account', 'The selected payment source account must be a cash or bank account.');
-        }
-
-        return $account;
     }
 
     private function enumValue(mixed $value): mixed
@@ -1124,6 +1090,27 @@ final class FastPurchaseService
                 }
             }
         }
+
+        foreach (($payload['adjustments'] ?? []) as $adjustment) {
+            if (! is_array($adjustment)) {
+                continue;
+            }
+            foreach (['finance_posting_profile_id', 'finance_account_id', 'cost_treatment', 'tax_treatment', 'mapping_source', 'override_reason'] as $key) {
+                if (array_key_exists($key, $adjustment)) {
+                    throw new InvalidArgumentException('Fast purchase adjustment recognition and finance mapping are server controlled.');
+                }
+            }
+        }
+
+        $payment = is_array($payload['payment'] ?? null) ? $payload['payment'] : [];
+        if (array_key_exists('source_account_id', $payment) || array_key_exists('finance_account_id', $payment)) {
+            throw new InvalidArgumentException('Fast purchase payment account selection is server controlled by Payment and Finance.');
+        }
+        foreach (($payment['lines'] ?? []) as $line) {
+            if (is_array($line) && (array_key_exists('source_account_id', $line) || array_key_exists('finance_account_id', $line))) {
+                throw new InvalidArgumentException('Fast purchase payment account selection is server controlled by Payment and Finance.');
+            }
+        }
     }
 
     private function dueDate(string $purchaseDate, string $paymentTerms, mixed $explicitDueDate): string
@@ -1208,31 +1195,15 @@ final class FastPurchaseService
             ->orderBy('sort_order')
             ->orderBy('name')
             ->limit($limit)
-            ->get(['id', 'code', 'name', 'method_type', 'requires_reference', 'requires_bank_account'])
-            ->map(fn (PaymentMethod $method): array => ['id' => (int) $method->getKey(), 'code' => $method->code, 'name' => $method->name, 'method_type' => $this->enumValue($method->method_type), 'requires_reference' => (bool) $method->requires_reference, 'requires_bank_account' => (bool) $method->requires_bank_account])
-            ->all();
-    }
-
-    /**
-     * @return list<array<string, mixed>>
-     */
-    private function paymentAccountOptions(int $tenantId, ?int $organizationUnitId, string $search, int $limit): array
-    {
-        return FinanceAccount::query()
-            ->where('tenant_id', $tenantId)
-            ->when($organizationUnitId === null, fn ($query) => $query->whereNull('organization_unit_id'), fn ($query) => $query->where('organization_unit_id', $organizationUnitId))
-            ->where('is_active', true)
-            ->where('is_posting_account', true)
-            ->where(function ($query): void {
-                $query->where('is_cash_account', true)->orWhere('is_bank_account', true);
-            })
-            ->when($search !== '', fn ($query) => $query->where(function ($scope) use ($search): void {
-                $scope->where('code', 'like', '%'.$search.'%')->orWhere('name', 'like', '%'.$search.'%');
-            }))
-            ->orderBy('code')
-            ->limit($limit)
-            ->get(['id', 'code', 'name', 'is_cash_account', 'is_bank_account'])
-            ->map(fn (FinanceAccount $account): array => ['id' => (int) $account->getKey(), 'code' => $account->code, 'name' => $account->name, 'is_cash_account' => (bool) $account->is_cash_account, 'is_bank_account' => (bool) $account->is_bank_account])
+            ->get(['id', 'code', 'name', 'method_type', 'requires_reference', 'requires_instrument_details'])
+            ->map(fn (PaymentMethod $method): array => [
+                'id' => (int) $method->getKey(),
+                'code' => $method->code,
+                'name' => $method->name,
+                'method_type' => $this->enumValue($method->method_type),
+                'requires_reference' => (bool) $method->requires_reference,
+                'requires_instrument_details' => (bool) $method->requires_instrument_details,
+            ])
             ->all();
     }
 

@@ -45,7 +45,6 @@ final class PurchaseAuthorizationService
     public const FAST_PURCHASE_VIEW = 'purchase.fast_purchases.view';
     public const FAST_PURCHASE_EXECUTE = 'purchase.fast_purchases.execute';
     public const FAST_PURCHASE_LOOKUPS = 'purchase.fast_purchases.lookups';
-    public const ADJUSTMENT_ACCOUNTING_OVERRIDE = 'purchase.adjustments.override_accounting';
 
     public function __construct(private readonly UserAccessResolver $access) {}
 
@@ -85,7 +84,6 @@ final class PurchaseAuthorizationService
             self::FAST_PURCHASE_VIEW => 'View Fast Purchase context and previews.',
             self::FAST_PURCHASE_EXECUTE => 'Execute Fast Purchase workflows.',
             self::FAST_PURCHASE_LOOKUPS => 'Access focused Fast Purchase lookup and context data.',
-            self::ADJUSTMENT_ACCOUNTING_OVERRIDE => 'Override purchase adjustment accounting treatment and finance mapping.',
         ];
     }
 

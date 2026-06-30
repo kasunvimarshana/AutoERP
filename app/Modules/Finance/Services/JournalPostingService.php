@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Finance\Services;
 
 use Illuminate\Support\Facades\DB;
+use InvalidArgumentException;
 use Modules\Finance\DTOs\JournalPostingResult;
 use Modules\Finance\Enums\JournalStatus;
 use Modules\Finance\Models\FinanceJournalEntry;
@@ -25,6 +26,14 @@ final class JournalPostingService
                 ->with(['lines.account', 'fiscalPeriod'])
                 ->lockForUpdate()
                 ->findOrFail($journal->getKey());
+            $status = $this->statusOf($journal);
+
+            if (in_array($status, [JournalStatus::Posted, JournalStatus::Reversed], true)) {
+                return $this->resultFromJournal($journal, $status);
+            }
+            if ($status !== JournalStatus::Draft) {
+                throw new InvalidArgumentException('Only draft journals can be posted.');
+            }
 
             $this->periods->assertOpen($journal->fiscalPeriod);
             $this->validator->validateForPosting($journal);
@@ -46,5 +55,24 @@ final class JournalPostingService
                 ledgerEntryCount: $ledgerCount,
             );
         });
+    }
+
+    private function resultFromJournal(FinanceJournalEntry $journal, JournalStatus $status): JournalPostingResult
+    {
+        return new JournalPostingResult(
+            journalEntryId: (int) $journal->getKey(),
+            journalNumber: (string) $journal->journal_number,
+            status: $status,
+            totalDebit: (string) $journal->total_debit,
+            totalCredit: (string) $journal->total_credit,
+            ledgerEntryCount: $journal->ledgerEntries()->count(),
+        );
+    }
+
+    private function statusOf(FinanceJournalEntry $journal): JournalStatus
+    {
+        return $journal->status instanceof JournalStatus
+            ? $journal->status
+            : JournalStatus::from((string) $journal->status);
     }
 }

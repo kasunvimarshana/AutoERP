@@ -18,7 +18,7 @@ final class FinancePostingProfileRule extends TenantOwnedModel
         return array_merge(parent::casts(), [
             'tenant_id' => 'integer',
             'posting_profile_id' => 'integer',
-            'account_id' => 'integer',
+            'account_role_id' => 'integer',
         ]);
     }
 
@@ -27,8 +27,8 @@ final class FinancePostingProfileRule extends TenantOwnedModel
         return $this->belongsTo(FinancePostingProfile::class, 'posting_profile_id');
     }
 
-    public function account(): BelongsTo
+    public function role(): BelongsTo
     {
-        return $this->belongsTo(FinanceAccount::class, 'account_id');
+        return $this->belongsTo(FinanceAccountRole::class, 'account_role_id');
     }
 }
