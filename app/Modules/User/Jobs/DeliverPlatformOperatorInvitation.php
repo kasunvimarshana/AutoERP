@@ -20,17 +20,23 @@ final class DeliverPlatformOperatorInvitation implements ShouldQueue, ShouldBeUn
     use Queueable;
     use SerializesModels;
 
+    private const OVERLAP_RELEASE_SECONDS = 5;
+    private const OVERLAP_EXPIRY_SECONDS = 600;
+
     public int $tries = 5;
     public int $uniqueFor = 600;
 
     /** @var list<int> */
     public array $backoff = [60, 300, 900, 3600];
 
-    public function __construct(public readonly int $invitationId) {}
+    public function __construct(
+        public readonly int $invitationId,
+        public readonly int $deliveryId,
+    ) {}
 
     public function uniqueId(): string
     {
-        return (string) $this->invitationId;
+        return (string) $this->deliveryId;
     }
 
     /** @return list<object> */
@@ -38,13 +44,13 @@ final class DeliverPlatformOperatorInvitation implements ShouldQueue, ShouldBeUn
     {
         return [
             (new WithoutOverlapping('platform-operator-invitation:'.$this->invitationId))
-                ->expireAfter(600)
-                ->dontRelease(),
+                ->releaseAfter(self::OVERLAP_RELEASE_SECONDS)
+                ->expireAfter(self::OVERLAP_EXPIRY_SECONDS),
         ];
     }
 
     public function handle(PlatformOperatorInvitationDeliveryService $delivery): void
     {
-        $delivery->deliver($this->invitationId);
+        $delivery->deliver($this->deliveryId);
     }
 }
