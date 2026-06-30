@@ -9,14 +9,17 @@ use InvalidArgumentException;
 use Modules\Finance\DTOs\PostingContext;
 use Modules\Finance\DTOs\PostingLine;
 use Modules\Finance\Models\FinanceAccount;
+use Modules\Finance\Models\FinanceAccountRole;
 use Modules\Finance\Models\FinanceDimension;
 use Modules\Finance\Models\FinancePostingProfile;
 use Modules\Finance\Models\FinancePostingProfileRule;
 
 final class PostingProfileService
 {
+    public function __construct(private readonly AccountRoleAssignmentService $assignments) {}
+
     /**
-     * @param  list<array{line_key: string, account_id: int, description?: string|null}>  $rules
+     * @param  list<array{line_key: string, account_role_id: int, description?: string|null}>  $rules
      */
     public function save(
         int $tenantId,
@@ -70,22 +73,21 @@ final class PostingProfileService
 
             $profile->rules()->delete();
             foreach ($rules as $rule) {
-                $account = FinanceAccount::query()->findOrFail((int) $rule['account_id']);
-                if ((int) $account->tenant_id !== $tenantId
-                    || $account->organization_unit_id !== $organizationUnitId) {
-                    throw new InvalidArgumentException('Posting profile account mapping belongs to a different scope.');
+                $role = FinanceAccountRole::query()->findOrFail((int) $rule['account_role_id']);
+                if ((int) $role->tenant_id !== $tenantId || ! (bool) $role->is_active) {
+                    throw new InvalidArgumentException('Posting profile account role belongs to a different tenant or is inactive.');
                 }
 
                 FinancePostingProfileRule::query()->create([
                     'tenant_id' => $tenantId,
                     'posting_profile_id' => $profile->getKey(),
                     'line_key' => trim($rule['line_key']),
-                    'account_id' => $account->getKey(),
+                    'account_role_id' => $role->getKey(),
                     'description' => $rule['description'] ?? null,
                 ]);
             }
 
-            return $profile->refresh()->load('rules.account');
+            return $profile->refresh()->load('rules.role');
         });
     }
 
@@ -97,7 +99,7 @@ final class PostingProfileService
         }
 
         $query = FinancePostingProfile::query()
-            ->with('rules.account')
+            ->with('rules.role')
             ->where('tenant_id', $request->source->tenantId)
             ->where('code', $code)
             ->where('is_active', true);
@@ -117,41 +119,29 @@ final class PostingProfileService
         PostingLine $line,
         ?FinancePostingProfile $profile = null,
     ): FinanceAccount {
-        $accountCode = trim((string) $line->accountCode);
-        if ($accountCode !== '') {
-            $query = FinanceAccount::query()
-                ->where('tenant_id', $request->source->tenantId)
-                ->where('code', $accountCode);
-
-            $this->scopeOrganization($query, $request->source->organizationUnitId);
-            $account = $query->first();
-
-            if (! $account instanceof FinanceAccount) {
-                throw new InvalidArgumentException("Finance account [{$accountCode}] is missing for this scope.");
-            }
-
-            return $account;
+        if (trim((string) $line->accountCode) !== '') {
+            throw new InvalidArgumentException('Source postings cannot select Finance accounts by code; use a semantic posting profile key.');
         }
 
         $profileKey = trim((string) $line->profileKey);
         if (! $profile instanceof FinancePostingProfile || $profileKey === '') {
-            throw new InvalidArgumentException('Posting line requires an account code or posting profile mapping key.');
+            throw new InvalidArgumentException('Posting line requires a posting profile mapping key.');
         }
 
         $rule = $profile->rules->firstWhere('line_key', $profileKey);
-        $account = $rule?->account;
-        if (! $account instanceof FinanceAccount) {
+        $role = $rule?->role;
+        if (! $role instanceof FinanceAccountRole) {
             throw new InvalidArgumentException(
-                "Posting profile [{$profile->code}] is missing account mapping [{$profileKey}].",
+                "Posting profile [{$profile->code}] is missing account role mapping [{$profileKey}].",
             );
         }
 
-        if ((int) $account->tenant_id !== (int) $request->source->tenantId
-            || $account->organization_unit_id !== $request->source->organizationUnitId) {
-            throw new InvalidArgumentException('Posting profile account mapping belongs to a different scope.');
-        }
-
-        return $account;
+        return $this->assignments->resolve(
+            (int) $request->source->tenantId,
+            $request->source->organizationUnitId,
+            $role,
+            $request->postingDate,
+        );
     }
 
     public function resolveDimension(PostingContext $request, ?string $dimensionCode): ?FinanceDimension
