@@ -61,6 +61,20 @@ final class EnsureApplicationKeyCommandTest extends TestCase
         self::assertSame($contents, $this->readEnvironment());
     }
 
+    public function test_it_rejects_a_valid_file_key_that_is_missing_from_effective_configuration(): void
+    {
+        $fileKey = 'base64:'.base64_encode(str_repeat('f', 32));
+        config()->set('app.key', '');
+        $contents = "APP_KEY={$fileKey}\n";
+        $this->writeEnvironment($contents);
+
+        $this->artisan('app:key:ensure')
+            ->expectsOutput('APP_KEY is valid in the environment file but missing from effective configuration. Clear cached configuration and remove conflicting process-level APP_KEY values.')
+            ->assertExitCode(1);
+
+        self::assertSame($contents, $this->readEnvironment());
+    }
+
     public function test_it_preserves_a_valid_runtime_key_when_the_environment_file_is_blank(): void
     {
         config()->set('app.key', 'base64:'.base64_encode(str_repeat('r', 32)));
