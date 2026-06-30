@@ -90,7 +90,7 @@ describe('PlatformOperatorsPage', () => {
         }));
     });
 
-    it('offers invitation lifecycle actions instead of manual activation for invited operators', async () => {
+    it('requeues the active invitation without claiming that earlier copies are invalid', async () => {
         mocks.canManage = true;
         mocks.listOperators.mockResolvedValue(operatorPage([invitedOperator()]));
         const user = userEvent.setup();
@@ -102,9 +102,12 @@ describe('PlatformOperatorsPage', () => {
 
         await user.click(screen.getAllByRole('button', { name: 'Resend invitation' })[0]);
         const dialog = screen.getByRole('dialog', { name: 'Resend invitation to Pending Operator' });
+        expect(within(dialog).getByText(/existing copies remain valid/i)).toBeInTheDocument();
+        expect(within(dialog).queryByText(/previous invitation link becomes invalid/i)).not.toBeInTheDocument();
         await user.click(within(dialog).getByRole('button', { name: 'Resend invitation' }));
 
         await waitFor(() => expect(mocks.resendOperatorInvitation).toHaveBeenCalledWith(invitedOperator()));
+        expect(await screen.findByText(/active invitation was queued again/i)).toBeInTheDocument();
     });
 });
 
