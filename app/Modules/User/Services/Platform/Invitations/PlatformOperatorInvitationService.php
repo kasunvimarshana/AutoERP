@@ -444,7 +444,7 @@ final class PlatformOperatorInvitationService
             $host = $request->getHost();
         }
 
-        logger()->notice('Platform operator invitation token lookup failed.', [
+        logger()->warning('Platform operator invitation token lookup failed.', [
             'correlation_id' => $correlationId,
             'request_host' => $host,
             'current_digest_prefix' => substr($this->tokens->digest($plainToken), 0, 12),
