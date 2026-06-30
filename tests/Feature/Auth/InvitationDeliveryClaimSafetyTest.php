@@ -80,17 +80,19 @@ final class InvitationDeliveryClaimSafetyTest extends TestCase
         self::assertStringContainsString("'lease_expires_at' => null", $source);
     }
 
-    public function test_platform_worker_retires_unreadable_or_mismatched_tokens_without_retrying_forever(): void
+    public function test_platform_worker_marks_unreadable_or_mismatched_tokens_for_reissue_without_invalidating_existing_links(): void
     {
         $source = $this->source(
             'app/Modules/User/Services/Platform/Invitations/PlatformOperatorInvitationDeliveryService.php',
         );
+        $recovery = $this->method($source, 'markTokenReissueRequired', 'cancelOpenDeliveries');
 
         self::assertStringContainsString('catch (DecryptException)', $source);
-        self::assertStringContainsString('$this->retireUnreadableInvitation($invitation);', $source);
+        self::assertStringContainsString('$this->markTokenReissueRequired($invitation);', $source);
         self::assertStringContainsString('$this->tokens->lookupDigests($token)', $source);
         self::assertStringContainsString('self::TOKEN_REISSUE_REQUIRED_CODE', $source);
-        self::assertStringContainsString('PlatformOperatorInvitationStatus::REVOKED', $source);
+        self::assertStringContainsString("'delivery_token' => null", $recovery);
+        self::assertStringNotContainsString("'status' => PlatformOperatorInvitationStatus::REVOKED", $recovery);
         self::assertStringContainsString('must be reissued before delivery', $source);
     }
 
@@ -108,5 +110,15 @@ final class InvitationDeliveryClaimSafetyTest extends TestCase
         self::assertNotFalse($position, sprintf('Missing expected source fragment: %s', $needle));
 
         return $position;
+    }
+
+    private function method(string $source, string $method, string $nextMethod): string
+    {
+        $start = strpos($source, "private function {$method}(");
+        self::assertNotFalse($start, "Method {$method} was not found.");
+        $end = strpos($source, "private function {$nextMethod}(", $start + 1);
+        self::assertNotFalse($end, "Method {$nextMethod} was not found.");
+
+        return substr($source, $start, $end - $start);
     }
 }
