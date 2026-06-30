@@ -164,7 +164,7 @@ final class PlatformOperatorInvitationDeliveryService
             try {
                 $token = trim((string) $invitation->getAttribute('delivery_token'));
             } catch (DecryptException) {
-                $this->retireUnreadableInvitation($invitation);
+                $this->markTokenReissueRequired($invitation);
 
                 return null;
             }
@@ -174,7 +174,7 @@ final class PlatformOperatorInvitationDeliveryService
                 $this->tokens->lookupDigests($token),
                 true,
             )) {
-                $this->retireUnreadableInvitation($invitation);
+                $this->markTokenReissueRequired($invitation);
 
                 return null;
             }
@@ -213,13 +213,10 @@ final class PlatformOperatorInvitationDeliveryService
         }, 3);
     }
 
-    private function retireUnreadableInvitation(PlatformOperatorInvitationModel $invitation): void
+    private function markTokenReissueRequired(PlatformOperatorInvitationModel $invitation): void
     {
         $invitationId = (int) $invitation->getKey();
         $invitation->forceFill([
-            'status' => PlatformOperatorInvitationStatus::REVOKED,
-            'revoked_at' => $this->clock->now(),
-            'revocation_reason' => self::TOKEN_REISSUE_REQUIRED_MESSAGE,
             'delivery_token' => null,
             'row_version' => (int) $invitation->getAttribute('row_version') + 1,
             'updated_at' => $this->clock->now(),
