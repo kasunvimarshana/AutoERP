@@ -11,7 +11,6 @@ use Illuminate\Support\Str;
 use Modules\User\Constants\PlatformOperatorInvitationDeliveryStatus;
 use Modules\User\Constants\PlatformOperatorInvitationStatus;
 use Modules\User\Constants\PlatformOperatorStatus;
-use Modules\User\Notifications\PlatformOperatorInvitationNotification;
 use Modules\User\Services\Platform\Invitations\PlatformOperatorInvitationDeliveryService;
 use Modules\User\Services\Platform\Invitations\PlatformOperatorInvitationTokenCodec;
 use Tests\TestCase;
@@ -86,9 +85,5 @@ final class PlatformOperatorInvitationDeliveryRecoveryTest extends TestCase
             'error_code' => 'PLATFORM_OPERATOR_INVITATION_TOKEN_REISSUE_REQUIRED',
         ]);
         Notification::assertNothingSent();
-        Notification::assertNotSentTo(
-            new \Illuminate\Notifications\AnonymousNotifiable,
-            PlatformOperatorInvitationNotification::class,
-        );
     }
 }
