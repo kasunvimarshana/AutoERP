@@ -18,7 +18,6 @@ use Modules\Tax\DTOs\TaxCalculationData;
 use Modules\Tax\DTOs\TaxCalculationLineData;
 use Modules\Tax\Services\TaxCalculationService;
 use Modules\VehicleRental\Enums\RentalAgreementKind;
-use Modules\VehicleRental\Enums\RentalBillingBasis;
 use Modules\VehicleRental\Enums\RentalBillingPeriodStatus;
 use Modules\VehicleRental\Enums\RentalCalculationLineStatus;
 use Modules\VehicleRental\Enums\RentalCalculationStatus;
@@ -28,6 +27,7 @@ use Modules\VehicleRental\Enums\RentalExpenseAllocationType;
 use Modules\VehicleRental\Enums\RentalFinancialSide;
 use Modules\VehicleRental\Enums\RentalRateComponentCode;
 use Modules\VehicleRental\Enums\RentalRateUnit;
+use Modules\VehicleRental\Enums\RentalUsageFactStatus;
 use Modules\VehicleRental\Enums\RentalUsageStatus;
 use Modules\VehicleRental\Models\RentalAgreement;
 use Modules\VehicleRental\Models\RentalAgreementRateComponent;
@@ -72,16 +72,23 @@ final class RentalCalculationService
                 ->where('agreement_id', $agreement->getKey())
                 ->where('financial_side', $side->value)
                 ->whereHas('usageLog', fn (Builder $query) => $query
-                    ->whereIn('status', [RentalUsageStatus::Approved->value, RentalUsageStatus::Consumed->value])
+                    ->where('status', RentalUsageStatus::Approved->value)
                     ->whereDate('usage_date', '>=', $start->toDateString())
                     ->whereDate('usage_date', '<=', $end->toDateString()))
-                ->with(['usageLog.events', 'allocation.vehicle.category', 'rateVersion.components'])
+                ->whereHas('usageFact', fn (Builder $query) => $query
+                    ->where('status', RentalUsageFactStatus::Approved->value))
+                ->with([
+                    'usageLog.events',
+                    'usageFact',
+                    'allocation.vehicle.category',
+                    'rateVersion.components',
+                ])
                 ->orderBy('usage_log_id')
                 ->lockForUpdate()
                 ->get();
 
             if ($contexts->isEmpty()) {
-                throw new InvalidArgumentException('No approved running-chart usage is available for this period and financial side.');
+                throw new InvalidArgumentException('No approved commercial usage facts are available for this period and financial side.');
             }
             $rateVersionIds = $contexts->pluck('rate_version_id')->unique()->values();
             if ($rateVersionIds->count() !== 1) {
@@ -96,15 +103,21 @@ final class RentalCalculationService
             $alreadyConsumed = RentalCalculationLine::query()
                 ->whereIn('usage_context_id', $contexts->pluck('id'))
                 ->where('status', RentalCalculationLineStatus::Approved->value)
-                ->whereHas('run', fn (Builder $query) => $query->where('calculation_status', RentalCalculationStatus::Approved->value))
+                ->whereHas('run', fn (Builder $query) => $query
+                    ->where('calculation_status', RentalCalculationStatus::Approved->value))
                 ->exists();
             if ($alreadyConsumed) {
-                throw new InvalidArgumentException('One or more running-chart contexts are already consumed by an approved calculation.');
+                throw new InvalidArgumentException('One or more commercial usage facts are already consumed by an approved calculation.');
             }
 
             $version = ((int) $period->runs()->max('run_version')) + 1;
             $fingerprint = hash('sha256', implode('|', [
-                $agreement->tenant_id, $period->getKey(), $version, $rate->getKey(), $contexts->pluck('context_fingerprint')->implode(','),
+                $agreement->tenant_id,
+                $period->getKey(),
+                $version,
+                $rate->getKey(),
+                $contexts->pluck('context_fingerprint')->implode(','),
+                $contexts->pluck('usageFact.row_version')->implode(','),
             ]));
             $run = RentalCalculationRun::query()->create([
                 'tenant_id' => $agreement->tenant_id,
@@ -130,7 +143,12 @@ final class RentalCalculationService
                 $line['organization_unit_id'] = $agreement->organization_unit_id;
                 $line['calculation_run_id'] = $run->getKey();
                 $line['fingerprint'] = hash('sha256', implode('|', [
-                    $agreement->tenant_id, $run->getKey(), $index + 1, $line['source_type'], $line['source_id'], $line['component_code'],
+                    $agreement->tenant_id,
+                    $run->getKey(),
+                    $index + 1,
+                    $line['source_type'],
+                    $line['source_id'],
+                    $line['component_code'],
                 ]));
                 $line['status'] = RentalCalculationLineStatus::Draft->value;
                 $line['created_by'] = $userId;
@@ -143,16 +161,28 @@ final class RentalCalculationService
             $run->calculated_by = $userId;
             $run->calculated_at = now();
             $run->save();
-            $this->history->record($run, RentalCalculationStatus::Draft->value, RentalCalculationStatus::Calculated->value, $userId);
+            $this->history->record(
+                $run,
+                RentalCalculationStatus::Draft->value,
+                RentalCalculationStatus::Calculated->value,
+                $userId,
+            );
 
             return $run->refresh()->load($this->relations());
         });
     }
 
-    public function transition(RentalCalculationRun $run, RentalCalculationStatus $to, ?int $userId = null, ?string $reason = null): RentalCalculationRun
-    {
+    public function transition(
+        RentalCalculationRun $run,
+        RentalCalculationStatus $to,
+        ?int $userId = null,
+        ?string $reason = null,
+    ): RentalCalculationRun {
         return DB::transaction(function () use ($run, $to, $userId, $reason): RentalCalculationRun {
-            $run = RentalCalculationRun::query()->with(['billingPeriod', 'lines'])->lockForUpdate()->findOrFail($run->getKey());
+            $run = RentalCalculationRun::query()
+                ->with(['billingPeriod', 'lines'])
+                ->lockForUpdate()
+                ->findOrFail($run->getKey());
             $from = $run->calculation_status;
             $allowed = match ($from) {
                 RentalCalculationStatus::Calculated => [RentalCalculationStatus::Submitted, RentalCalculationStatus::Reversed],
@@ -183,20 +213,28 @@ final class RentalCalculationService
             $run->approved_at = $to === RentalCalculationStatus::Approved ? now() : $run->approved_at;
             $run->reversed_by = $to === RentalCalculationStatus::Reversed ? $userId : $run->reversed_by;
             $run->reversed_at = $to === RentalCalculationStatus::Reversed ? now() : $run->reversed_at;
-            $run->metadata = array_merge($run->metadata ?? [], $reason === null ? [] : ['transition_reason' => $reason]);
+            $run->metadata = array_merge(
+                $run->metadata ?? [],
+                $reason === null ? [] : ['transition_reason' => $reason],
+            );
             $run->updated_by = $userId;
             $run->save();
             $run->lines()->update([
                 'status' => $to === RentalCalculationStatus::Approved
                     ? RentalCalculationLineStatus::Approved->value
-                    : ($to === RentalCalculationStatus::Reversed ? RentalCalculationLineStatus::Reversed->value : RentalCalculationLineStatus::Draft->value),
+                    : ($to === RentalCalculationStatus::Reversed
+                        ? RentalCalculationLineStatus::Reversed->value
+                        : RentalCalculationLineStatus::Draft->value),
                 'updated_by' => $userId,
                 'updated_at' => now(),
             ]);
+
             if ($to === RentalCalculationStatus::Approved) {
-                $contextIds = $run->lines()->whereNotNull('usage_context_id')->pluck('usage_context_id')->unique();
-                $this->syncUsageStatuses((int) $run->tenant_id, $contextIds, $userId);
-                $this->syncExpenseAllocationStatuses((int) $run->tenant_id, $run->lines()->whereNotNull('expense_allocation_id')->pluck('expense_allocation_id')->unique(), $userId);
+                $this->syncExpenseAllocationStatuses(
+                    (int) $run->tenant_id,
+                    $run->lines()->whereNotNull('expense_allocation_id')->pluck('expense_allocation_id')->unique(),
+                    $userId,
+                );
                 $run->billingPeriod->forceFill([
                     'status' => RentalBillingPeriodStatus::Finalized->value,
                     'is_final' => true,
@@ -207,9 +245,11 @@ final class RentalCalculationService
             } elseif ($to === RentalCalculationStatus::Reversed) {
                 $run->document_status = RentalDocumentStatus::NotGenerated;
                 $run->save();
-                $contextIds = $run->lines()->whereNotNull('usage_context_id')->pluck('usage_context_id')->unique();
-                $this->syncUsageStatuses((int) $run->tenant_id, $contextIds, $userId);
-                $this->syncExpenseAllocationStatuses((int) $run->tenant_id, $run->lines()->whereNotNull('expense_allocation_id')->pluck('expense_allocation_id')->unique(), $userId);
+                $this->syncExpenseAllocationStatuses(
+                    (int) $run->tenant_id,
+                    $run->lines()->whereNotNull('expense_allocation_id')->pluck('expense_allocation_id')->unique(),
+                    $userId,
+                );
                 $run->billingPeriod->forceFill([
                     'status' => RentalBillingPeriodStatus::Reopened->value,
                     'is_final' => false,
@@ -224,19 +264,31 @@ final class RentalCalculationService
         });
     }
 
-    public function paginate(int $tenantId, ?int $organizationUnitId, array $filters, int $perPage): LengthAwarePaginator
-    {
-        $query = RentalCalculationRun::query()->forContext($tenantId, $organizationUnitId)->with($this->relations());
+    public function paginate(
+        int $tenantId,
+        ?int $organizationUnitId,
+        array $filters,
+        int $perPage,
+    ): LengthAwarePaginator {
+        $query = RentalCalculationRun::query()
+            ->forContext($tenantId, $organizationUnitId)
+            ->with($this->relations());
         foreach (['calculation_status', 'document_status'] as $key) {
             if (isset($filters[$key]) && $filters[$key] !== '') {
                 $query->where($key, $filters[$key]);
             }
         }
         if (! empty($filters['agreement_id'])) {
-            $query->whereHas('billingPeriod', fn (Builder $period) => $period->where('agreement_id', $filters['agreement_id']));
+            $query->whereHas(
+                'billingPeriod',
+                fn (Builder $period) => $period->where('agreement_id', $filters['agreement_id']),
+            );
         }
         if (! empty($filters['financial_side'])) {
-            $query->whereHas('billingPeriod', fn (Builder $period) => $period->where('financial_side', $filters['financial_side']));
+            $query->whereHas(
+                'billingPeriod',
+                fn (Builder $period) => $period->where('financial_side', $filters['financial_side']),
+            );
         }
 
         return $query->latest('id')->paginate($perPage);
@@ -245,8 +297,14 @@ final class RentalCalculationService
     public function relations(): array
     {
         return [
-            'billingPeriod.agreement.customer', 'billingPeriod.agreement.supplier', 'billingPeriod.rateVersion',
-            'currency', 'lines.usageContext.usageLog.vehicle', 'lines.expenseAllocation.expense', 'lines.taxGroup',
+            'billingPeriod.agreement.customer',
+            'billingPeriod.agreement.supplier',
+            'billingPeriod.rateVersion',
+            'currency',
+            'lines.usageContext.usageLog.vehicle',
+            'lines.usageContext.usageFact',
+            'lines.expenseAllocation.expense',
+            'lines.taxGroup',
         ];
     }
 
@@ -258,8 +316,17 @@ final class RentalCalculationService
         CarbonImmutable $end,
         ?int $userId,
     ): RentalBillingPeriod {
-        $fingerprint = hash('sha256', implode('|', [$agreement->tenant_id, $agreement->getKey(), $side->value, $rate->getKey(), $start->toIso8601String(), $end->toIso8601String()]));
-        $sequence = ((int) $agreement->billingPeriods()->where('financial_side', $side->value)->max('period_sequence')) + 1;
+        $fingerprint = hash('sha256', implode('|', [
+            $agreement->tenant_id,
+            $agreement->getKey(),
+            $side->value,
+            $rate->getKey(),
+            $start->toIso8601String(),
+            $end->toIso8601String(),
+        ]));
+        $sequence = ((int) $agreement->billingPeriods()
+            ->where('financial_side', $side->value)
+            ->max('period_sequence')) + 1;
 
         return RentalBillingPeriod::query()->firstOrCreate(
             ['tenant_id' => $agreement->tenant_id, 'fingerprint' => $fingerprint],
@@ -298,11 +365,19 @@ final class RentalCalculationService
             if ($component->component_code === RentalRateComponentCode::ExcessKm
                 && $rate->excess_km_method === RentalExcessKmMethod::PerUsageLog) {
                 foreach ($contexts as $context) {
-                    $measured = (string) $context->usageLog->chargeable_distance_km;
+                    $measured = (string) $context->usageFact->commercial_distance_km;
                     $allowed = (string) ($component->included_quantity ?: $rate->included_km);
                     $quantity = $this->positiveDifference($measured, $allowed);
                     if (! $this->math->isZero($quantity)) {
-                        $lines[] = $this->lineFromComponent($component, $context, $quantity, $measured, $allowed, 'usage_context', (int) $context->getKey());
+                        $lines[] = $this->lineFromComponent(
+                            $component,
+                            $context,
+                            $quantity,
+                            $measured,
+                            $allowed,
+                            'usage_context',
+                            (int) $context->getKey(),
+                        );
                     }
                 }
                 continue;
@@ -311,7 +386,10 @@ final class RentalCalculationService
                 && $rate->excess_km_method === RentalExcessKmMethod::PerHire) {
                 foreach ($contexts->groupBy('vehicle_allocation_id') as $allocationContexts) {
                     $measured = $allocationContexts->reduce(
-                        fn (string $sum, RentalUsageContext $context) => $this->math->add($sum, (string) $context->usageLog->chargeable_distance_km),
+                        fn (string $sum, RentalUsageContext $context) => $this->math->add(
+                            $sum,
+                            (string) $context->usageFact->commercial_distance_km,
+                        ),
                         '0.000000',
                     );
                     $allowed = (string) ($component->included_quantity ?: $rate->included_km);
@@ -333,7 +411,8 @@ final class RentalCalculationService
             }
 
             $quantity = $this->quantityFor($component, $contexts, $start, $end, $rate);
-            if ($this->math->isZero($quantity) && $component->component_code !== RentalRateComponentCode::BaseRental) {
+            if ($this->math->isZero($quantity)
+                && $component->component_code !== RentalRateComponentCode::BaseRental) {
                 continue;
             }
             $source = $contexts->first();
@@ -347,8 +426,12 @@ final class RentalCalculationService
                 $quantity,
                 $measured,
                 $allowed,
-                $component->component_code === RentalRateComponentCode::BaseRental ? 'billing_period' : 'usage_context',
-                $component->component_code === RentalRateComponentCode::BaseRental ? 0 : (int) $source->getKey(),
+                $component->component_code === RentalRateComponentCode::BaseRental
+                    ? 'billing_period'
+                    : 'usage_context',
+                $component->component_code === RentalRateComponentCode::BaseRental
+                    ? 0
+                    : (int) $source->getKey(),
             );
         }
 
@@ -366,20 +449,33 @@ final class RentalCalculationService
             ->with('expense')
             ->get();
         foreach ($expenseAllocations as $allocation) {
-            $baseAmount = $this->math->add((string) $allocation->net_amount, (string) $allocation->markup_amount);
+            $baseAmount = $this->math->add(
+                (string) $allocation->net_amount,
+                (string) $allocation->markup_amount,
+            );
             $negative = $side === RentalFinancialSide::Cost;
             $net = $negative ? $this->math->sub('0', $baseAmount) : $baseAmount;
-            $taxAmount = $negative ? $this->math->sub('0', (string) $allocation->tax_amount) : '0.000000';
-            $withholdingAmount = $negative ? (string) $allocation->withholding_amount : '0.000000';
-            $totalAmount = $this->math->sub($this->math->add($net, $taxAmount), $withholdingAmount);
+            $taxAmount = $negative
+                ? $this->math->sub('0', (string) $allocation->tax_amount)
+                : '0.000000';
+            $withholdingAmount = $negative
+                ? (string) $allocation->withholding_amount
+                : '0.000000';
+            $totalAmount = $this->math->sub(
+                $this->math->add($net, $taxAmount),
+                $withholdingAmount,
+            );
             $lines[] = [
                 'usage_context_id' => null,
                 'expense_allocation_id' => $allocation->getKey(),
                 'custody_event_item_id' => null,
                 'source_type' => 'rental_expense_allocation',
                 'source_id' => $allocation->getKey(),
-                'component_code' => $allocation->expense->expense_type === 'repair' ? RentalRateComponentCode::Repair->value : RentalRateComponentCode::OtherRecovery->value,
-                'description' => ($negative ? 'Owner deduction: ' : 'Customer recovery: ').($allocation->expense->description ?: $allocation->expense->expense_number),
+                'component_code' => $allocation->expense->expense_type === 'repair'
+                    ? RentalRateComponentCode::Repair->value
+                    : RentalRateComponentCode::OtherRecovery->value,
+                'description' => ($negative ? 'Owner deduction: ' : 'Customer recovery: ')
+                    .($allocation->expense->description ?: $allocation->expense->expense_number),
                 'measured_quantity' => '1.000000',
                 'allowed_quantity' => '0.000000',
                 'chargeable_quantity' => '1.000000',
@@ -393,7 +489,10 @@ final class RentalCalculationService
                 'withholding_amount' => $withholdingAmount,
                 'total_amount' => $totalAmount,
                 'applied_rule' => $allocationType->value,
-                'rule_snapshot' => ['expense_id' => $allocation->expense_id, 'allocation_type' => $allocationType->value],
+                'rule_snapshot' => [
+                    'expense_id' => $allocation->expense_id,
+                    'allocation_type' => $allocationType->value,
+                ],
             ];
         }
 
@@ -401,8 +500,10 @@ final class RentalCalculationService
     }
 
     /** @return Collection<int, RentalAgreementRateComponent> */
-    private function applicableComponents(RentalAgreementRateVersion $rate, Collection $contexts): Collection
-    {
+    private function applicableComponents(
+        RentalAgreementRateVersion $rate,
+        Collection $contexts,
+    ): Collection {
         $categoryIds = $contexts
             ->map(fn (RentalUsageContext $context) => $context->allocation?->vehicle?->vehicle_category_id
                 ?? $context->allocation?->vehicle?->category_id)
@@ -410,7 +511,8 @@ final class RentalCalculationService
             ->unique()
             ->values();
         $active = $rate->components->where('status', 'active');
-        if ($categoryIds->count() > 1 && $active->contains(fn (RentalAgreementRateComponent $component) => $component->vehicle_category_id !== null)) {
+        if ($categoryIds->count() > 1
+            && $active->contains(fn (RentalAgreementRateComponent $component) => $component->vehicle_category_id !== null)) {
             throw new InvalidArgumentException('Billing period contains multiple vehicle categories with category-specific rates. Split the period by allocation/category.');
         }
 
@@ -428,7 +530,9 @@ final class RentalCalculationService
                     }
                 }
 
-                return $group->first(fn (RentalAgreementRateComponent $component) => $component->vehicle_category_id === null);
+                return $group->first(
+                    fn (RentalAgreementRateComponent $component) => $component->vehicle_category_id === null,
+                );
             })
             ->filter()
             ->sortBy('calculation_order')
@@ -444,11 +548,16 @@ final class RentalCalculationService
         string $sourceType,
         int $sourceId,
     ): array {
-        $amount = $this->math->mul($this->math->mul($quantity, (string) $component->rate), (string) $component->multiplier);
-        if ($component->minimum_amount !== null && $this->math->compare($amount, (string) $component->minimum_amount) < 0) {
+        $amount = $this->math->mul(
+            $this->math->mul($quantity, (string) $component->rate),
+            (string) $component->multiplier,
+        );
+        if ($component->minimum_amount !== null
+            && $this->math->compare($amount, (string) $component->minimum_amount) < 0) {
             $amount = (string) $component->minimum_amount;
         }
-        if ($component->maximum_amount !== null && $this->math->compare($amount, (string) $component->maximum_amount) > 0) {
+        if ($component->maximum_amount !== null
+            && $this->math->compare($amount, (string) $component->maximum_amount) > 0) {
             $amount = (string) $component->maximum_amount;
         }
 
@@ -476,6 +585,8 @@ final class RentalCalculationService
             'rule_snapshot' => [
                 'rate_component_id' => $component->getKey(),
                 'rate_version_id' => $component->rate_version_id,
+                'usage_fact_id' => $context->usageFact->getKey(),
+                'usage_fact_version' => $context->usageFact->row_version,
                 'unit' => $component->unit->value,
                 'rate' => (string) $component->rate,
                 'multiplier' => (string) $component->multiplier,
@@ -493,14 +604,14 @@ final class RentalCalculationService
         return match ($component->component_code) {
             RentalRateComponentCode::BaseRental => $this->baseQuantity($component->unit, $contexts, $start, $end),
             RentalRateComponentCode::ExcessKm => $this->positiveDifference(
-                $contexts->reduce(fn (string $sum, RentalUsageContext $context) => $this->math->add($sum, (string) $context->usageLog->chargeable_distance_km), '0.000000'),
+                $this->sumFactField($contexts, 'commercial_distance_km'),
                 (string) ($component->included_quantity ?: $rate->included_km),
             ),
             RentalRateComponentCode::DriverSalary => $this->quantityByUnit($component->unit, $contexts, 'working_minutes'),
             RentalRateComponentCode::NormalOvertime => $this->quantityByUnit($component->unit, $contexts, 'normal_overtime_minutes'),
             RentalRateComponentCode::DoubleOvertime => $this->quantityByUnit($component->unit, $contexts, 'double_overtime_minutes'),
             RentalRateComponentCode::TripleOvertime => $this->quantityByUnit($component->unit, $contexts, 'triple_overtime_minutes'),
-            RentalRateComponentCode::NightOut => $contexts->reduce(fn (string $sum, RentalUsageContext $context) => $this->math->add($sum, (string) $context->usageLog->night_out_count), '0.000000'),
+            RentalRateComponentCode::NightOut => $this->sumFactField($contexts, 'night_out_count'),
             RentalRateComponentCode::Parking => $this->eventQuantity($contexts, 'parking'),
             RentalRateComponentCode::Toll => $this->eventQuantity($contexts, 'toll'),
             RentalRateComponentCode::Waiting => $this->eventQuantity($contexts, 'waiting'),
@@ -513,41 +624,75 @@ final class RentalCalculationService
         };
     }
 
-    private function measuredFor(RentalAgreementRateComponent $component, Collection $contexts, CarbonImmutable $start, CarbonImmutable $end): string
-    {
+    private function measuredFor(
+        RentalAgreementRateComponent $component,
+        Collection $contexts,
+        CarbonImmutable $start,
+        CarbonImmutable $end,
+    ): string {
         if ($component->component_code === RentalRateComponentCode::ExcessKm) {
-            return $contexts->reduce(fn (string $sum, RentalUsageContext $context) => $this->math->add($sum, (string) $context->usageLog->chargeable_distance_km), '0.000000');
+            return $this->sumFactField($contexts, 'commercial_distance_km');
         }
 
-        return $this->quantityFor($component, $contexts, $start, $end, $contexts->first()->rateVersion);
+        return $this->quantityFor(
+            $component,
+            $contexts,
+            $start,
+            $end,
+            $contexts->first()->rateVersion,
+        );
     }
 
-    private function baseQuantity(RentalRateUnit $unit, Collection $contexts, CarbonImmutable $start, CarbonImmutable $end): string
-    {
+    private function baseQuantity(
+        RentalRateUnit $unit,
+        Collection $contexts,
+        CarbonImmutable $start,
+        CarbonImmutable $end,
+    ): string {
         return match ($unit) {
             RentalRateUnit::Fixed, RentalRateUnit::Month => '1.000000',
             RentalRateUnit::Day => $this->math->normalize((string) ($start->startOfDay()->diffInDays($end->startOfDay()) + 1)),
-            RentalRateUnit::Week => $this->math->div($this->math->normalize((string) ($start->startOfDay()->diffInDays($end->startOfDay()) + 1)), '7'),
-            RentalRateUnit::Hour => $this->math->div($contexts->reduce(fn (string $sum, RentalUsageContext $context) => $this->math->add($sum, (string) $context->usageLog->working_minutes), '0.000000'), '60'),
-            RentalRateUnit::Minute => $contexts->reduce(fn (string $sum, RentalUsageContext $context) => $this->math->add($sum, (string) $context->usageLog->working_minutes), '0.000000'),
+            RentalRateUnit::Week => $this->math->div(
+                $this->math->normalize((string) ($start->startOfDay()->diffInDays($end->startOfDay()) + 1)),
+                '7',
+            ),
+            RentalRateUnit::Hour => $this->math->div($this->sumFactField($contexts, 'working_minutes'), '60'),
+            RentalRateUnit::Minute => $this->sumFactField($contexts, 'working_minutes'),
             RentalRateUnit::Trip, RentalRateUnit::Count => $this->math->normalize((string) $contexts->count()),
-            RentalRateUnit::Kilometre => $contexts->reduce(fn (string $sum, RentalUsageContext $context) => $this->math->add($sum, (string) $context->usageLog->chargeable_distance_km), '0.000000'),
+            RentalRateUnit::Kilometre => $this->sumFactField($contexts, 'commercial_distance_km'),
             RentalRateUnit::Litre => '0.000000',
         };
     }
 
-    private function quantityByUnit(RentalRateUnit $unit, Collection $contexts, string $minutesField): string
-    {
-        $minutes = $contexts->reduce(fn (string $sum, RentalUsageContext $context) => $this->math->add($sum, (string) $context->usageLog->{$minutesField}), '0.000000');
+    private function quantityByUnit(
+        RentalRateUnit $unit,
+        Collection $contexts,
+        string $minutesField,
+    ): string {
+        $minutes = $this->sumFactField($contexts, $minutesField);
 
         return $unit === RentalRateUnit::Hour ? $this->math->div($minutes, '60') : $minutes;
+    }
+
+    private function sumFactField(Collection $contexts, string $field): string
+    {
+        return $contexts->reduce(
+            fn (string $sum, RentalUsageContext $context) => $this->math->add(
+                $sum,
+                (string) $context->usageFact->{$field},
+            ),
+            '0.000000',
+        );
     }
 
     private function eventQuantity(Collection $contexts, string $eventType): string
     {
         $total = '0.000000';
         foreach ($contexts as $context) {
-            foreach ($context->usageLog->events->filter(static fn ($event): bool => $event->event_type->value === $eventType) as $event) {
+            foreach ($context->usageLog->events->filter(
+                fn ($event): bool => $event->event_type->value === $eventType
+                    && $event->applicability->appliesTo($context->financial_side),
+            ) as $event) {
                 $total = $this->math->add($total, (string) $event->quantity);
             }
         }
@@ -562,7 +707,7 @@ final class RentalCalculationService
         return $this->math->isNegative($difference) ? '0.000000' : $difference;
     }
 
-    /** @param list<array<string,mixed>> $lines @return list<array<string,mixed>> */
+    /** @param list<array<string, mixed>> $lines @return list<array<string, mixed>> */
     private function applyTax(
         RentalAgreement $agreement,
         RentalFinancialSide $side,
@@ -627,9 +772,15 @@ final class RentalCalculationService
             ));
             foreach ($withholdingResult->lineResults as $position => $taxResult) {
                 $index = $positiveIndexes[$position];
-                $lines[$index]['withholding_amount'] = $this->math->add((string) $lines[$index]['withholding_amount'], $taxResult->withholdingAmount);
+                $lines[$index]['withholding_amount'] = $this->math->add(
+                    (string) $lines[$index]['withholding_amount'],
+                    $taxResult->withholdingAmount,
+                );
                 $lines[$index]['total_amount'] = $this->math->sub(
-                    $this->math->add((string) $lines[$index]['net_amount'], (string) $lines[$index]['tax_amount']),
+                    $this->math->add(
+                        (string) $lines[$index]['net_amount'],
+                        (string) $lines[$index]['tax_amount'],
+                    ),
                     (string) $lines[$index]['withholding_amount'],
                 );
             }
@@ -640,14 +791,23 @@ final class RentalCalculationService
 
     private function syncTotals(RentalCalculationRun $run): void
     {
-        $run->net_total = $this->math->sum($run->lines()->pluck('net_amount')->map(fn ($value) => (string) $value)->all());
-        $run->discount_total = $this->math->sum($run->lines()->pluck('discount_amount')->map(fn ($value) => (string) $value)->all());
-        $run->tax_total = $this->math->sum($run->lines()->pluck('tax_amount')->map(fn ($value) => (string) $value)->all());
-        $run->withholding_total = $this->math->sum($run->lines()->pluck('withholding_amount')->map(fn ($value) => (string) $value)->all());
-        $run->grand_total = $this->math->sum($run->lines()->pluck('total_amount')->map(fn ($value) => (string) $value)->all());
+        $run->net_total = $this->math->sum(
+            $run->lines()->pluck('net_amount')->map(fn ($value) => (string) $value)->all(),
+        );
+        $run->discount_total = $this->math->sum(
+            $run->lines()->pluck('discount_amount')->map(fn ($value) => (string) $value)->all(),
+        );
+        $run->tax_total = $this->math->sum(
+            $run->lines()->pluck('tax_amount')->map(fn ($value) => (string) $value)->all(),
+        );
+        $run->withholding_total = $this->math->sum(
+            $run->lines()->pluck('withholding_amount')->map(fn ($value) => (string) $value)->all(),
+        );
+        $run->grand_total = $this->math->sum(
+            $run->lines()->pluck('total_amount')->map(fn ($value) => (string) $value)->all(),
+        );
         $run->save();
     }
-
 
     private function assertSourcesAvailableForApproval(RentalCalculationRun $run): void
     {
@@ -661,7 +821,7 @@ final class RentalCalculationService
                     ->where('calculation_status', RentalCalculationStatus::Approved->value))
                 ->exists();
             if ($contextConflict) {
-                throw new InvalidArgumentException('One or more running-chart contexts are already consumed by another approved calculation.');
+                throw new InvalidArgumentException('One or more commercial usage facts are already consumed by another approved calculation.');
             }
         }
 
@@ -680,8 +840,11 @@ final class RentalCalculationService
         }
     }
 
-    private function syncExpenseAllocationStatuses(int $tenantId, Collection $allocationIds, ?int $userId): void
-    {
+    private function syncExpenseAllocationStatuses(
+        int $tenantId,
+        Collection $allocationIds,
+        ?int $userId,
+    ): void {
         foreach ($allocationIds as $allocationId) {
             $consumed = RentalCalculationLine::query()
                 ->where('expense_allocation_id', $allocationId)
@@ -731,12 +894,12 @@ final class RentalCalculationService
 
     private function hasActiveFinancialDocument(RentalCalculationRun $run): bool
     {
-        $activeStatuses = [InvoiceStatus::Cancelled->value, InvoiceStatus::Void->value];
+        $inactiveStatuses = [InvoiceStatus::Cancelled->value, InvoiceStatus::Void->value];
         $hasSource = InvoiceSource::query()
             ->where('tenant_id', $run->tenant_id)
             ->where('source_type', 'rental_calculation_run')
             ->where('source_id', $run->getKey())
-            ->whereHas('invoice', fn (Builder $query) => $query->whereNotIn('status', $activeStatuses))
+            ->whereHas('invoice', fn (Builder $query) => $query->whereNotIn('status', $inactiveStatuses))
             ->exists();
         if ($hasSource) {
             return true;
@@ -746,41 +909,18 @@ final class RentalCalculationService
             ->where('tenant_id', $run->tenant_id)
             ->where('source_type', 'rental_calculation_line')
             ->whereIn('source_id', $run->lines()->select('id'))
-            ->whereHas('invoice', fn (Builder $query) => $query->whereNotIn('status', $activeStatuses))
+            ->whereHas('invoice', fn (Builder $query) => $query->whereNotIn('status', $inactiveStatuses))
             ->exists();
-    }
-
-    private function syncUsageStatuses(int $tenantId, Collection $contextIds, ?int $userId): void
-    {
-        $usageIds = DB::table('rental_usage_contexts')
-            ->where('tenant_id', $tenantId)
-            ->whereIn('id', $contextIds)
-            ->pluck('usage_log_id')
-            ->unique();
-        foreach ($usageIds as $usageId) {
-            $hasApprovedCalculation = RentalCalculationLine::query()
-                ->whereIn('usage_context_id', DB::table('rental_usage_contexts')->where('tenant_id', $tenantId)->where('usage_log_id', $usageId)->select('id'))
-                ->where('status', RentalCalculationLineStatus::Approved->value)
-                ->whereHas('run', fn (Builder $query) => $query->where('calculation_status', RentalCalculationStatus::Approved->value))
-                ->exists();
-            DB::table('rental_usage_logs')
-                ->where('tenant_id', $tenantId)
-                ->where('id', $usageId)
-                ->whereIn('status', [RentalUsageStatus::Approved->value, RentalUsageStatus::Consumed->value])
-                ->update([
-                    'status' => $hasApprovedCalculation ? RentalUsageStatus::Consumed->value : RentalUsageStatus::Approved->value,
-                    'updated_by' => $userId,
-                    'updated_at' => now(),
-                ]);
-        }
     }
 
     private function assertSide(RentalAgreement $agreement, RentalFinancialSide $side): void
     {
-        if ($side === RentalFinancialSide::Revenue && $agreement->agreement_kind !== RentalAgreementKind::CustomerRental) {
+        if ($side === RentalFinancialSide::Revenue
+            && $agreement->agreement_kind !== RentalAgreementKind::CustomerRental) {
             throw new InvalidArgumentException('Revenue calculations require a customer rental agreement.');
         }
-        if ($side === RentalFinancialSide::Cost && $agreement->agreement_kind !== RentalAgreementKind::OwnerSupply) {
+        if ($side === RentalFinancialSide::Cost
+            && $agreement->agreement_kind !== RentalAgreementKind::OwnerSupply) {
             throw new InvalidArgumentException('Cost calculations require an owner supply agreement.');
         }
     }
