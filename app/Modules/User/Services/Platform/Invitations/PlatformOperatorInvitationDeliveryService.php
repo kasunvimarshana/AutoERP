@@ -37,11 +37,11 @@ final class PlatformOperatorInvitationDeliveryService
         private readonly LoggerInterface $logger,
     ) {}
 
-    public function deliver(int $invitationId): void
+    public function deliver(int $deliveryId): void
     {
         $claim = null;
         try {
-            $claim = $this->executionContext->runAsControlPlane(fn (): ?array => $this->claim($invitationId));
+            $claim = $this->executionContext->runAsControlPlane(fn (): ?array => $this->claim($deliveryId));
             if (! is_array($claim)) {
                 return;
             }
@@ -60,13 +60,14 @@ final class PlatformOperatorInvitationDeliveryService
             );
             if ($updated !== 1) {
                 $this->logger->warning('Platform operator invitation email was handed to the mail transport after its delivery claim changed.', [
-                    'invitation_id' => $invitationId,
+                    'invitation_id' => $claim['invitation_id'],
                     'delivery_id' => $claim['delivery_id'],
                 ]);
             }
         } catch (Throwable $exception) {
             $this->logger->error('Platform operator invitation delivery failed.', [
-                'invitation_id' => $invitationId,
+                'delivery_id' => $deliveryId,
+                'invitation_id' => is_array($claim) ? $claim['invitation_id'] : null,
                 'exception' => $exception,
             ]);
             if (is_array($claim)) {
@@ -77,14 +78,48 @@ final class PlatformOperatorInvitationDeliveryService
     }
 
     /** @return array<string,mixed>|null */
-    private function claim(int $invitationId): ?array
+    private function claim(int $deliveryId): ?array
     {
-        return $this->database->transaction(function () use ($invitationId): ?array {
-            $invitation = $this->invitations->newQuery()->with('operator')->whereKey($invitationId)
-                ->lockForUpdate()->first();
-            if (! $invitation instanceof PlatformOperatorInvitationModel) {
+        return $this->database->transaction(function () use ($deliveryId): ?array {
+            $locator = $this->deliveries->newQuery()->whereKey($deliveryId)->first(['id', 'invitation_id']);
+            if (! $locator instanceof PlatformOperatorInvitationDeliveryModel) {
                 return null;
             }
+
+            $invitationId = (int) $locator->getAttribute('invitation_id');
+            $invitation = $this->invitations->newQuery()->with('operator')->whereKey($invitationId)
+                ->lockForUpdate()->first();
+            $delivery = $this->deliveries->newQuery()
+                ->whereKey($deliveryId)
+                ->where('invitation_id', $invitationId)
+                ->lockForUpdate()
+                ->first();
+            if (! $invitation instanceof PlatformOperatorInvitationModel
+                || ! $delivery instanceof PlatformOperatorInvitationDeliveryModel
+            ) {
+                return null;
+            }
+
+            $deliveryStatus = (string) $delivery->getAttribute('status');
+            if (in_array($deliveryStatus, [
+                PlatformOperatorInvitationDeliveryStatus::SENT,
+                PlatformOperatorInvitationDeliveryStatus::CANCELLED,
+            ], true)) {
+                return null;
+            }
+            if ($deliveryStatus === PlatformOperatorInvitationDeliveryStatus::SENDING
+                && $delivery->getAttribute('lease_expires_at')?->toImmutable() > $this->clock->now()
+            ) {
+                return null;
+            }
+            if (! in_array($deliveryStatus, [
+                PlatformOperatorInvitationDeliveryStatus::QUEUED,
+                PlatformOperatorInvitationDeliveryStatus::FAILED,
+                PlatformOperatorInvitationDeliveryStatus::SENDING,
+            ], true)) {
+                return null;
+            }
+
             if ($invitation->getAttribute('status') !== PlatformOperatorInvitationStatus::PENDING) {
                 $this->cancelOpenDeliveries(
                     $invitationId,
@@ -108,6 +143,7 @@ final class PlatformOperatorInvitationDeliveryService
 
                 return null;
             }
+
             $operator = $invitation->operator;
             $token = trim((string) $invitation->getAttribute('delivery_token'));
             if (! $operator instanceof PlatformOperatorModel
@@ -120,37 +156,6 @@ final class PlatformOperatorInvitationDeliveryService
                     'The invitation recipient or delivery token is no longer available.',
                 );
 
-                return null;
-            }
-
-            $delivery = $this->deliveries->newQuery()->where('invitation_id', $invitationId)
-                ->latest('attempt_number')->lockForUpdate()->first();
-            if ($delivery instanceof PlatformOperatorInvitationDeliveryModel) {
-                if ($delivery->getAttribute('status') === PlatformOperatorInvitationDeliveryStatus::SENT) {
-                    return null;
-                }
-                if ($delivery->getAttribute('status') === PlatformOperatorInvitationDeliveryStatus::SENDING
-                    && $delivery->getAttribute('lease_expires_at')?->toImmutable() > $this->clock->now()
-                ) {
-                    return null;
-                }
-                if ($delivery->getAttribute('status') === PlatformOperatorInvitationDeliveryStatus::FAILED) {
-                    $delivery = $this->deliveries->newQuery()->create([
-                        'invitation_id' => $invitationId,
-                        'attempt_number' => (int) $delivery->getAttribute('attempt_number') + 1,
-                        'status' => PlatformOperatorInvitationDeliveryStatus::QUEUED,
-                        'row_version' => 1,
-                    ]);
-                }
-            } else {
-                $delivery = $this->deliveries->newQuery()->create([
-                    'invitation_id' => $invitationId,
-                    'attempt_number' => 1,
-                    'status' => PlatformOperatorInvitationDeliveryStatus::QUEUED,
-                    'row_version' => 1,
-                ]);
-            }
-            if ($delivery->getAttribute('status') === PlatformOperatorInvitationDeliveryStatus::CANCELLED) {
                 return null;
             }
 
