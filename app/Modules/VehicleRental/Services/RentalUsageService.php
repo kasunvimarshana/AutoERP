@@ -18,6 +18,7 @@ use Modules\VehicleRental\Enums\RentalFinancialSide;
 use Modules\VehicleRental\Enums\RentalMode;
 use Modules\VehicleRental\Enums\RentalUsageStatus;
 use Modules\VehicleRental\Models\RentalDriverAssignment;
+use Modules\VehicleRental\Models\RentalUsageContext;
 use Modules\VehicleRental\Models\RentalUsageLog;
 use Modules\VehicleRental\Models\RentalVehicleAllocation;
 
@@ -29,7 +30,6 @@ final class RentalUsageService
         'submitted' => ['approved', 'rejected', 'reversed'],
         'approved' => ['reversed'],
         'rejected' => ['draft', 'reversed'],
-        'consumed' => ['reversed'],
         'reversed' => [],
     ];
 
@@ -38,6 +38,7 @@ final class RentalUsageService
         private readonly RentalNumberService $numbers,
         private readonly RentalRateVersionService $rates,
         private readonly RentalStatusHistoryService $history,
+        private readonly RentalUsageFactService $facts,
     ) {}
 
     public function create(RentalVehicleAllocation $allocation, array $data, ?int $userId): RentalUsageLog
@@ -49,7 +50,7 @@ final class RentalUsageService
                 ->findOrFail($allocation->getKey());
             $startedAt = CarbonImmutable::parse((string) $data['started_at']);
             $endedAt = CarbonImmutable::parse((string) $data['ended_at']);
-            $this->assertAllocation($allocation, $data, $startedAt, $endedAt);
+            $this->assertAllocation($allocation, $startedAt, $endedAt);
             $driverAssignment = $this->resolveDriverAssignment($allocation, $data, $startedAt, $endedAt);
 
             $startOdometer = $this->math->normalize((string) $data['start_odometer']);
@@ -60,8 +61,8 @@ final class RentalUsageService
             $distance = $this->math->sub($endOdometer, $startOdometer);
             $garage = $this->math->normalize((string) ($data['garage_distance_km'] ?? '0'));
             $internal = $this->math->normalize((string) ($data['internal_distance_km'] ?? '0'));
-            $chargeable = $this->math->sub($this->math->sub($distance, $garage), $internal);
-            if ($this->math->isNegative($chargeable)) {
+            $netOperationalDistance = $this->math->sub($this->math->sub($distance, $garage), $internal);
+            if ($this->math->isNegative($netOperationalDistance)) {
                 throw new InvalidArgumentException('Garage and internal distance cannot exceed total distance.');
             }
 
@@ -112,7 +113,8 @@ final class RentalUsageService
                 ->orderByDesc('id')
                 ->lockForUpdate()
                 ->first();
-            if ($previous !== null && $this->math->compare($startOdometer, (string) $previous->end_odometer) < 0
+            if ($previous !== null
+                && $this->math->compare($startOdometer, (string) $previous->end_odometer) < 0
                 && empty($data['odometer_variance_reason'])) {
                 throw new InvalidArgumentException('Start odometer is below the previous recorded finish. Provide a variance reason.');
             }
@@ -125,22 +127,24 @@ final class RentalUsageService
                 ->orderBy('id')
                 ->lockForUpdate()
                 ->first();
-            if ($next !== null && $this->math->compare($endOdometer, (string) $next->start_odometer) > 0
+            if ($next !== null
+                && $this->math->compare($endOdometer, (string) $next->start_odometer) > 0
                 && empty($data['odometer_variance_reason'])) {
                 throw new InvalidArgumentException('Finish odometer exceeds the next recorded start. Provide a variance reason.');
             }
 
-            $workingMinutes = $this->minutesBetween($startedAt->toIso8601String(), $endedAt->toIso8601String());
-            $overtimeMinutes = (int) ($data['normal_overtime_minutes'] ?? 0)
-                + (int) ($data['double_overtime_minutes'] ?? 0)
-                + (int) ($data['triple_overtime_minutes'] ?? 0);
-            if ($overtimeMinutes > $workingMinutes) {
+            $workingMinutes = $this->minutesBetween($startedAt, $endedAt);
+            $normalOvertime = (int) ($data['normal_overtime_minutes'] ?? 0);
+            $doubleOvertime = (int) ($data['double_overtime_minutes'] ?? 0);
+            $tripleOvertime = (int) ($data['triple_overtime_minutes'] ?? 0);
+            if ($normalOvertime + $doubleOvertime + $tripleOvertime > $workingMinutes) {
                 throw new InvalidArgumentException('Combined overtime cannot exceed total working minutes.');
             }
+
             $log = RentalUsageLog::query()->create([
                 'tenant_id' => $allocation->tenant_id,
                 'organization_unit_id' => $allocation->organization_unit_id,
-                'usage_number' => $data['usage_number'] ?? $this->numbers->next(
+                'usage_number' => $this->numbers->next(
                     (int) $allocation->tenant_id,
                     $allocation->organization_unit_id,
                     'vehicle_rental_usage',
@@ -156,13 +160,13 @@ final class RentalUsageService
                 'start_odometer' => $startOdometer,
                 'end_odometer' => $endOdometer,
                 'distance_km' => $distance,
-                'chargeable_distance_km' => $chargeable,
+                'net_operational_distance_km' => $netOperationalDistance,
                 'garage_distance_km' => $garage,
                 'internal_distance_km' => $internal,
                 'working_minutes' => $workingMinutes,
-                'normal_overtime_minutes' => $data['normal_overtime_minutes'] ?? 0,
-                'double_overtime_minutes' => $data['double_overtime_minutes'] ?? 0,
-                'triple_overtime_minutes' => $data['triple_overtime_minutes'] ?? 0,
+                'normal_overtime_minutes' => $normalOvertime,
+                'double_overtime_minutes' => $doubleOvertime,
+                'triple_overtime_minutes' => $tripleOvertime,
                 'night_out_count' => $data['night_out_count'] ?? '0.000000',
                 'trip_from' => $data['trip_from'] ?? null,
                 'trip_to' => $data['trip_to'] ?? null,
@@ -186,8 +190,9 @@ final class RentalUsageService
                 $log->events()->create([
                     'tenant_id' => $allocation->tenant_id,
                     'organization_unit_id' => $allocation->organization_unit_id,
-                    'sequence' => $event['sequence'] ?? ($index + 1),
+                    'sequence' => $index + 1,
                     'event_type' => $event['event_type'],
+                    'applicability' => $event['applicability'],
                     'occurred_at' => $event['occurred_at'] ?? null,
                     'quantity' => $event['quantity'],
                     'unit' => $event['unit'] ?? null,
@@ -198,9 +203,23 @@ final class RentalUsageService
                 ]);
             }
 
-            $this->createContext($log, $allocation, RentalFinancialSide::Revenue, $startedAt->toDateTimeString(), $userId);
+            $revenueContext = $this->createContext(
+                $log,
+                $allocation,
+                RentalFinancialSide::Revenue,
+                $startedAt->toDateTimeString(),
+                $userId,
+            );
+            $this->facts->createInitial($revenueContext, $log, $userId);
             if ($allocation->sourceAllocation !== null) {
-                $this->createContext($log, $allocation->sourceAllocation, RentalFinancialSide::Cost, $startedAt->toDateTimeString(), $userId);
+                $costContext = $this->createContext(
+                    $log,
+                    $allocation->sourceAllocation,
+                    RentalFinancialSide::Cost,
+                    $startedAt->toDateTimeString(),
+                    $userId,
+                );
+                $this->facts->createInitial($costContext, $log, $userId);
             }
             $this->history->record($log, null, RentalUsageStatus::Draft->value, $userId);
 
@@ -208,10 +227,18 @@ final class RentalUsageService
         });
     }
 
-    public function transition(RentalUsageLog $log, RentalUsageStatus $to, ?int $userId = null, ?string $reason = null): RentalUsageLog
-    {
-        return DB::transaction(function () use ($log, $to, $userId, $reason): RentalUsageLog {
+    public function transition(
+        RentalUsageLog $log,
+        RentalUsageStatus $to,
+        int $expectedVersion,
+        ?int $userId = null,
+        ?string $reason = null,
+    ): RentalUsageLog {
+        return DB::transaction(function () use ($log, $to, $expectedVersion, $userId, $reason): RentalUsageLog {
             $log = RentalUsageLog::query()->lockForUpdate()->findOrFail($log->getKey());
+            if ((int) $log->row_version !== $expectedVersion) {
+                throw new InvalidArgumentException('Running-chart usage changed since it was loaded. Reload and try again.');
+            }
             $from = $log->status;
             if ($from === $to) {
                 return $log->load($this->relations());
@@ -219,27 +246,36 @@ final class RentalUsageService
             if (! in_array($to->value, self::TRANSITIONS[$from->value] ?? [], true)) {
                 throw new InvalidArgumentException("Invalid usage transition from {$from->value} to {$to->value}.");
             }
-            if ($to === RentalUsageStatus::Approved && ! $log->contexts()->where('financial_side', RentalFinancialSide::Revenue->value)->exists()) {
+            if ($to === RentalUsageStatus::Approved
+                && ! $log->contexts()->where('financial_side', RentalFinancialSide::Revenue->value)->exists()) {
                 throw new InvalidArgumentException('Revenue context is required before usage approval.');
             }
-            if ($to === RentalUsageStatus::Reversed && $log->contexts()
-                ->whereHas('calculationLines.run', fn (Builder $query) => $query->where('calculation_status', 'approved'))
-                ->exists()) {
-                throw new InvalidArgumentException('Reverse the approved rental calculations before reversing this running-chart entry.');
+            if ($to === RentalUsageStatus::Reversed) {
+                if (empty(trim((string) $reason))) {
+                    throw new InvalidArgumentException('A reversal reason is required.');
+                }
+                if ($log->contexts()
+                    ->whereHas('calculationLines.run', fn (Builder $query) => $query->where('calculation_status', 'approved'))
+                    ->exists()) {
+                    throw new InvalidArgumentException('Reverse the approved rental calculations before reversing this running-chart entry.');
+                }
+                $this->facts->reverseForUsage($log, $userId, $reason);
             }
 
-            $log->status = $to;
-            $log->submitted_by = $to === RentalUsageStatus::Submitted ? $userId : $log->submitted_by;
-            $log->submitted_at = $to === RentalUsageStatus::Submitted ? now() : $log->submitted_at;
-            $log->approved_by = $to === RentalUsageStatus::Approved ? $userId : $log->approved_by;
-            $log->approved_at = $to === RentalUsageStatus::Approved ? now() : $log->approved_at;
-            $log->rejected_by = $to === RentalUsageStatus::Rejected ? $userId : $log->rejected_by;
-            $log->rejected_at = $to === RentalUsageStatus::Rejected ? now() : $log->rejected_at;
-            $log->reversed_by = $to === RentalUsageStatus::Reversed ? $userId : $log->reversed_by;
-            $log->reversed_at = $to === RentalUsageStatus::Reversed ? now() : $log->reversed_at;
-            $log->reversal_reason = $to === RentalUsageStatus::Reversed ? $reason : $log->reversal_reason;
-            $log->updated_by = $userId;
-            $log->save();
+            $log->forceFill([
+                'status' => $to,
+                'submitted_by' => $to === RentalUsageStatus::Submitted ? $userId : $log->submitted_by,
+                'submitted_at' => $to === RentalUsageStatus::Submitted ? now() : $log->submitted_at,
+                'approved_by' => $to === RentalUsageStatus::Approved ? $userId : $log->approved_by,
+                'approved_at' => $to === RentalUsageStatus::Approved ? now() : $log->approved_at,
+                'rejected_by' => $to === RentalUsageStatus::Rejected ? $userId : $log->rejected_by,
+                'rejected_at' => $to === RentalUsageStatus::Rejected ? now() : $log->rejected_at,
+                'reversed_by' => $to === RentalUsageStatus::Reversed ? $userId : $log->reversed_by,
+                'reversed_at' => $to === RentalUsageStatus::Reversed ? now() : $log->reversed_at,
+                'reversal_reason' => $to === RentalUsageStatus::Reversed ? $reason : $log->reversal_reason,
+                'row_version' => $log->row_version + 1,
+                'updated_by' => $userId,
+            ])->save();
             $this->history->record($log, $from->value, $to->value, $userId, $reason);
 
             return $log->refresh()->load($this->relations());
@@ -273,19 +309,25 @@ final class RentalUsageService
     public function relations(): array
     {
         return [
-            'allocation.agreement.customer', 'allocation.agreement.supplier', 'vehicle.make', 'vehicle.model',
-            'driverAssignment', 'driver', 'events', 'contexts.agreement.customer', 'contexts.agreement.supplier',
+            'allocation.agreement.customer',
+            'allocation.agreement.supplier',
+            'vehicle.make',
+            'vehicle.model',
+            'driverAssignment.employee',
+            'driver',
+            'events',
+            'contexts.agreement.customer',
+            'contexts.agreement.supplier',
             'contexts.rateVersion.components',
+            'contexts.usageFact',
         ];
     }
 
     private function assertAllocation(
         RentalVehicleAllocation $allocation,
-        array $data,
         CarbonImmutable $startedAt,
         CarbonImmutable $endedAt,
-    ): void
-    {
+    ): void {
         if ($allocation->agreement->agreement_kind !== RentalAgreementKind::CustomerRental) {
             throw new InvalidArgumentException('Daily running chart must be recorded against a customer rental allocation.');
         }
@@ -325,23 +367,18 @@ final class RentalUsageService
             throw new InvalidArgumentException('A valid driver assignment is required for a with-driver rental.');
         }
         if ($assignmentId === null) {
-            if (! empty($data['driver_id'])) {
-                throw new InvalidArgumentException('Select a driver assignment instead of submitting an unassigned driver.');
-            }
-
             return null;
         }
 
         $assignment = $allocation->driverAssignments()
             ->whereKey($assignmentId)
             ->where('assigned_from', '<=', $startedAt)
-            ->where(fn (Builder $query) => $query->whereNull('assigned_to')->orWhere('assigned_to', '>=', $endedAt))
+            ->where(fn (Builder $query) => $query
+                ->whereNull('assigned_to')
+                ->orWhere('assigned_to', '>=', $endedAt))
             ->first();
         if ($assignment === null) {
             throw new InvalidArgumentException('Driver assignment is not valid for the complete usage period.');
-        }
-        if (! empty($data['driver_id']) && (int) $data['driver_id'] !== (int) $assignment->employee_id) {
-            throw new InvalidArgumentException('Driver does not match the selected driver assignment.');
         }
 
         return $assignment;
@@ -353,11 +390,18 @@ final class RentalUsageService
         RentalFinancialSide $side,
         string $at,
         ?int $userId,
-    ): void {
+    ): RentalUsageContext {
         $agreement = $allocation->agreement;
         $rate = $this->rates->resolve($agreement, $at);
-        $fingerprint = hash('sha256', implode('|', [$log->tenant_id, $log->getKey(), $side->value, $agreement->getKey(), $rate->getKey()]));
-        $log->contexts()->create([
+        $fingerprint = hash('sha256', implode('|', [
+            $log->tenant_id,
+            $log->getKey(),
+            $side->value,
+            $agreement->getKey(),
+            $rate->getKey(),
+        ]));
+
+        return $log->contexts()->create([
             'tenant_id' => $log->tenant_id,
             'organization_unit_id' => $log->organization_unit_id,
             'financial_side' => $side->value,
@@ -373,17 +417,12 @@ final class RentalUsageService
         ]);
     }
 
-    private function minutesBetween(?string $start, ?string $end): int
+    private function minutesBetween(CarbonImmutable $start, CarbonImmutable $end): int
     {
-        if ($start === null || $end === null) {
-            return 0;
-        }
-        $from = CarbonImmutable::parse($start);
-        $to = CarbonImmutable::parse($end);
-        if (! $to->greaterThan($from)) {
+        if (! $end->greaterThan($start)) {
             throw new InvalidArgumentException('Usage finish time must be after start time.');
         }
 
-        return $from->diffInMinutes($to);
+        return $start->diffInMinutes($end);
     }
 }
