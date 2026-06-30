@@ -66,10 +66,10 @@ return new class extends Migration
             $table->string('description', 255)->nullable();
             $table->timestamps();
 
-            $table->unique(['posting_profile_id', 'line_key'], 'finance_posting_profile_rules_profile_line_uk');
-            $table->foreign('tenant_id', 'finance_posting_profile_rules_tenant_fk')->references('id')->on('tenants')->cascadeOnDelete();
-            $table->foreign('posting_profile_id', 'finance_posting_profile_rules_profile_fk')->references('id')->on('finance_posting_profiles')->cascadeOnDelete();
-            $table->foreign('account_role_id', 'finance_posting_profile_rules_role_fk')->references('id')->on(self::ROLES)->restrictOnDelete();
+            $table->unique(['posting_profile_id', 'line_key'], 'finance_profile_role_rules_profile_line_uk');
+            $table->foreign('tenant_id', 'finance_profile_role_rules_tenant_fk')->references('id')->on('tenants')->cascadeOnDelete();
+            $table->foreign('posting_profile_id', 'finance_profile_role_rules_profile_fk')->references('id')->on('finance_posting_profiles')->cascadeOnDelete();
+            $table->foreign('account_role_id', 'finance_profile_role_rules_role_fk')->references('id')->on(self::ROLES)->restrictOnDelete();
         });
 
         $rules = DB::table(self::RULES.' as rule')
@@ -124,10 +124,10 @@ return new class extends Migration
             $table->string('description', 255)->nullable();
             $table->timestamps();
 
-            $table->unique(['posting_profile_id', 'line_key'], 'finance_posting_profile_rules_profile_line_uk');
-            $table->foreign('tenant_id', 'finance_posting_profile_rules_tenant_fk')->references('id')->on('tenants')->cascadeOnDelete();
-            $table->foreign('posting_profile_id', 'finance_posting_profile_rules_profile_fk')->references('id')->on('finance_posting_profiles')->cascadeOnDelete();
-            $table->foreign('account_id', 'finance_posting_profile_rules_account_fk')->references('id')->on('finance_accounts')->restrictOnDelete();
+            $table->unique(['posting_profile_id', 'line_key'], 'finance_profile_account_rules_profile_line_uk');
+            $table->foreign('tenant_id', 'finance_profile_account_rules_tenant_fk')->references('id')->on('tenants')->cascadeOnDelete();
+            $table->foreign('posting_profile_id', 'finance_profile_account_rules_profile_fk')->references('id')->on('finance_posting_profiles')->cascadeOnDelete();
+            $table->foreign('account_id', 'finance_profile_account_rules_account_fk')->references('id')->on('finance_accounts')->restrictOnDelete();
         });
 
         $rules = DB::table(self::RULES.' as rule')
