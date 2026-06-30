@@ -22,12 +22,12 @@ return new class extends Migration
             $table->foreignId('driver_assignment_id')->nullable();
             $table->foreignId('driver_id')->nullable();
             $table->date('usage_date');
-            $table->dateTime('started_at')->nullable();
-            $table->dateTime('ended_at')->nullable();
+            $table->dateTime('started_at');
+            $table->dateTime('ended_at');
             $table->decimal('start_odometer', 20, 6);
             $table->decimal('end_odometer', 20, 6);
             $table->decimal('distance_km', 20, 6)->default('0.000000');
-            $table->decimal('chargeable_distance_km', 20, 6)->default('0.000000');
+            $table->decimal('net_operational_distance_km', 20, 6)->default('0.000000');
             $table->decimal('garage_distance_km', 20, 6)->default('0.000000');
             $table->decimal('internal_distance_km', 20, 6)->default('0.000000');
             $table->unsignedInteger('working_minutes')->default(0);
@@ -50,6 +50,7 @@ return new class extends Migration
             $table->dateTime('rejected_at')->nullable();
             $table->unsignedBigInteger('reversed_by')->nullable();
             $table->dateTime('reversed_at')->nullable();
+            $table->text('reversal_reason')->nullable();
             $table->text('remarks')->nullable();
             $table->unsignedBigInteger('created_by')->nullable();
             $table->unsignedBigInteger('updated_by')->nullable();
@@ -61,8 +62,8 @@ return new class extends Migration
             $table->index(['vehicle_id', 'usage_date', 'status'], 'rental_usage_logs_vehicle_date_ix');
             $table->index(['driver_id', 'usage_date', 'status'], 'rental_usage_logs_driver_date_ix');
             $table->index(['vehicle_id', 'status', 'started_at', 'id'], 'rental_usage_logs_odometer_chain_ix');
-
             $table->unique(['id', 'tenant_id'], 'rental_usage_logs_id_tenant_uk');
+
             $table->foreign(['organization_unit_id', 'tenant_id'], 'rental_usage_logs_organization_unit_id_tenant_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('organization_units')
@@ -70,7 +71,7 @@ return new class extends Migration
             $table->foreign(['vehicle_allocation_id', 'tenant_id'], 'rental_usage_logs_vehicle_allocation_id_tenant_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('rental_vehicle_allocations')
-                ->cascadeOnDelete();
+                ->restrictOnDelete();
             $table->foreign(['vehicle_id', 'tenant_id'], 'rental_usage_logs_vehicle_id_tenant_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('vehicles')
@@ -83,12 +84,15 @@ return new class extends Migration
                 ->references(['id', 'tenant_id'])
                 ->on('hr_employees')
                 ->restrictOnDelete();
-
             $table->foreign(['submitted_by', 'tenant_id'], 'rental_usage_logs_submitted_by_tenant_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('users')
                 ->restrictOnDelete();
             $table->foreign(['approved_by', 'tenant_id'], 'rental_usage_logs_approved_by_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('users')
+                ->restrictOnDelete();
+            $table->foreign(['rejected_by', 'tenant_id'], 'rental_usage_logs_rejected_by_tenant_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('users')
                 ->restrictOnDelete();
