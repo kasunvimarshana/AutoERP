@@ -192,7 +192,7 @@ export default function PlatformOperatorsPage() {
                 setSuccess(`${updated.display_name} is now ${updated.status}.`);
             } else if (action.type === 'resend-invitation') {
                 const updated = await platformAdministrationApi.resendOperatorInvitation(action.operator);
-                setSuccess(`A new secure invitation was queued for ${updated.email}. The previous link is no longer valid.`);
+                setSuccess(`The active invitation was queued again for ${updated.email}. Its expiry was refreshed, and existing copies of the active link remain valid.`);
             } else {
                 const updated = await platformAdministrationApi.revokeOperatorInvitation(action.operator, reason.trim());
                 setSuccess(`${updated.display_name}'s pending invitation was revoked.`);
@@ -340,7 +340,7 @@ export default function PlatformOperatorsPage() {
             >
                 <div className="space-y-5">
                     <p className="text-sm text-slate-700">
-                        A new secure link will be queued for delivery to {action?.type === 'resend-invitation' ? action.operator.email : 'the operator'}. Any previous invitation link becomes invalid immediately.
+                        The active secure invitation will be queued again for {action?.type === 'resend-invitation' ? action.operator.email : 'the operator'}. Its expiry is refreshed, and existing copies remain valid until the invitation is accepted, expires, or is explicitly revoked.
                     </p>
                     <div className="flex justify-end gap-2">
                         <Button variant="secondary" disabled={saving} onClick={() => setAction(null)}>Cancel</Button>
