@@ -94,11 +94,10 @@ final class AccountRoleAssignmentService
                     fn ($query) => $query->whereNull('organization_unit_id'),
                     fn ($query) => $query->where('organization_unit_id', $organizationUnitId),
                 )
-                ->where(function ($query) use ($to): void {
-                    if ($to !== null) {
-                        $query->whereDate('effective_from', '<=', $to->toDateString());
-                    }
-                })
+                ->when(
+                    $to !== null,
+                    fn ($query) => $query->whereDate('effective_from', '<=', $to->toDateString()),
+                )
                 ->where(function ($query) use ($from): void {
                     $query->whereNull('effective_to')
                         ->orWhereDate('effective_to', '>=', $from->toDateString());
@@ -127,7 +126,7 @@ final class AccountRoleAssignmentService
         ?int $endedBy = null,
     ): FinanceAccountAssignment {
         return DB::transaction(function () use ($assignment, $effectiveTo, $endedBy): FinanceAccountAssignment {
-            $role = FinanceAccountRole::query()->lockForUpdate()->findOrFail($assignment->account_role_id);
+            FinanceAccountRole::query()->lockForUpdate()->findOrFail($assignment->account_role_id);
             $assignment = FinanceAccountAssignment::query()->lockForUpdate()->findOrFail($assignment->getKey());
             $to = CarbonImmutable::parse($effectiveTo)->startOfDay();
             $from = CarbonImmutable::parse((string) $assignment->effective_from)->startOfDay();
