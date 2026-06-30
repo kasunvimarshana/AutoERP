@@ -180,7 +180,7 @@ final class PurchaseOrderWriteService
                 'Purchase header adjustment rate cannot be negative.',
             );
             $this->assertPercentageRate($adjustment->calculationType, $adjustment->rate);
-            $this->adjustmentCatalogue->validate($adjustment, $data->tenantId, $data->organizationUnitId, "adjustments.{$index}");
+            $this->adjustmentCatalogue->validate($adjustment, "adjustments.{$index}");
         }
     }
 
@@ -332,8 +332,11 @@ final class PurchaseOrderWriteService
     /**
      * @param  array<string, int>  $lineIdsByClientKey
      */
-    private function withPersistedManualAllocationLines(PurchaseHeaderAdjustmentData $adjustment, array $lineIdsByClientKey, string $fieldPrefix): PurchaseHeaderAdjustmentData
-    {
+    private function withPersistedManualAllocationLines(
+        PurchaseHeaderAdjustmentData $adjustment,
+        array $lineIdsByClientKey,
+        string $fieldPrefix,
+    ): PurchaseHeaderAdjustmentData {
         if ($adjustment->manualAllocations === []) {
             return $adjustment;
         }
@@ -368,12 +371,6 @@ final class PurchaseOrderWriteService
             isAllocatable: $adjustment->isAllocatable,
             sortOrder: $adjustment->sortOrder,
             description: $adjustment->description,
-            financePostingProfileId: $adjustment->financePostingProfileId,
-            financeAccountId: $adjustment->financeAccountId,
-            costTreatment: $adjustment->costTreatment,
-            taxTreatment: $adjustment->taxTreatment,
-            mappingSource: $adjustment->mappingSource,
-            overrideReason: $adjustment->overrideReason,
             manualAllocations: $allocations,
         );
     }
