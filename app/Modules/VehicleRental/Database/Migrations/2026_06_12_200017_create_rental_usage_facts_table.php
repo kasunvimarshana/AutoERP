@@ -46,7 +46,7 @@ return new class extends Migration
             $table->unsignedBigInteger('updated_by')->nullable();
             $table->timestamps();
 
-            $table->unique(['usage_context_id'], 'rental_usage_facts_context_uk');
+            $table->unique('usage_context_id', 'rental_usage_facts_context_uk');
             $table->unique(['usage_log_id', 'financial_side'], 'rental_usage_facts_log_side_uk');
             $table->index(['tenant_id', 'financial_side', 'status'], 'rental_usage_facts_side_status_ix');
             $table->unique(['id', 'tenant_id'], 'rental_usage_facts_id_tenant_uk');
@@ -63,21 +63,30 @@ return new class extends Migration
                 ->references(['id', 'tenant_id'])
                 ->on('rental_usage_logs')
                 ->restrictOnDelete();
-
-            foreach (['submitted_by', 'approved_by', 'rejected_by', 'reversed_by', 'created_by', 'updated_by'] as $actorColumn) {
-                $constraint = match ($actorColumn) {
-                    'submitted_by' => 'rental_usage_facts_submitted_by_tenant_fk',
-                    'approved_by' => 'rental_usage_facts_approved_by_tenant_fk',
-                    'rejected_by' => 'rental_usage_facts_rejected_by_tenant_fk',
-                    'reversed_by' => 'rental_usage_facts_reversed_by_tenant_fk',
-                    'created_by' => 'rental_usage_facts_created_by_tenant_fk',
-                    'updated_by' => 'rental_usage_facts_updated_by_tenant_fk',
-                };
-                $table->foreign([$actorColumn, 'tenant_id'], $constraint)
-                    ->references(['id', 'tenant_id'])
-                    ->on('users')
-                    ->restrictOnDelete();
-            }
+            $table->foreign(['submitted_by', 'tenant_id'], 'rental_usage_facts_submitted_by_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('users')
+                ->restrictOnDelete();
+            $table->foreign(['approved_by', 'tenant_id'], 'rental_usage_facts_approved_by_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('users')
+                ->restrictOnDelete();
+            $table->foreign(['rejected_by', 'tenant_id'], 'rental_usage_facts_rejected_by_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('users')
+                ->restrictOnDelete();
+            $table->foreign(['reversed_by', 'tenant_id'], 'rental_usage_facts_reversed_by_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('users')
+                ->restrictOnDelete();
+            $table->foreign(['created_by', 'tenant_id'], 'rental_usage_facts_created_by_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('users')
+                ->restrictOnDelete();
+            $table->foreign(['updated_by', 'tenant_id'], 'rental_usage_facts_updated_by_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('users')
+                ->restrictOnDelete();
         });
     }
 
