@@ -10,6 +10,7 @@ import { organizationUnitPermissions } from "@/modules/organization-unit/organiz
 import { auditPermissions } from "@/modules/audit/auditPermissions";
 import { referenceDataPermissions } from "@/modules/reference-data/referenceDataPermissions";
 import { tenantPermissions } from "@/modules/tenant/tenantPermissions";
+import { financePermissions } from "@/modules/finance/financePermissions";
 import { paymentPermissions } from "@/modules/payment/paymentPermissions";
 import { purchasePermissions } from "@/modules/purchase/purchasePermissions";
 import { reportingPermissions } from "@/modules/reporting/reportingPermissions";
@@ -905,6 +906,182 @@ export const tenantNavigationSections: NavigationSection[] = [
         id: "finance",
         label: "Finance",
         items: [
+            {
+                id: "finance-workspace",
+                type: "module",
+                label: "Finance",
+                icon: "list",
+                access: operationalAccess(["finance"]),
+                children: [
+                    {
+                        id: "chart-of-accounts",
+                        type: "link",
+                        label: "Chart of Accounts",
+                        to: "/finance/accounts",
+                        match: ["/finance/accounts"],
+                        access: {
+                            ...operationalAccess(["finance"]),
+                            permissions: [financePermissions.accountsView],
+                        },
+                    },
+                    {
+                        id: "finance-journals",
+                        type: "link",
+                        label: "Journals",
+                        to: "/finance/journals",
+                        match: ["/finance/journals"],
+                        access: {
+                            ...operationalAccess(["finance"]),
+                            permissions: [financePermissions.journalsView],
+                        },
+                    },
+                    {
+                        id: "general-ledger",
+                        type: "link",
+                        label: "General Ledger",
+                        to: "/finance/ledger",
+                        match: ["/finance/ledger"],
+                        access: {
+                            ...operationalAccess(["finance"]),
+                            permissions: [financePermissions.reportsView],
+                        },
+                    },
+                    {
+                        id: "trial-balance",
+                        type: "link",
+                        label: "Trial Balance",
+                        to: "/finance/trial-balance",
+                        match: ["/finance/trial-balance"],
+                        access: {
+                            ...operationalAccess(["finance"]),
+                            permissions: [financePermissions.reportsView],
+                        },
+                    },
+                    {
+                        id: "account-balances",
+                        type: "link",
+                        label: "Account Balances",
+                        to: "/finance/account-balances",
+                        match: ["/finance/account-balances"],
+                        access: {
+                            ...operationalAccess(["finance"]),
+                            permissions: [financePermissions.reportsView],
+                        },
+                    },
+                    {
+                        id: "posting-profiles",
+                        type: "link",
+                        label: "Posting Profiles",
+                        to: "/finance/posting-profiles",
+                        match: ["/finance/posting-profiles"],
+                        access: {
+                            ...operationalAccess(["finance"]),
+                            permissions: [financePermissions.postingProfilesView],
+                        },
+                    },
+                    {
+                        id: "finance-reversals",
+                        type: "link",
+                        label: "Reversals",
+                        to: "/finance/reversals",
+                        match: ["/finance/reversals"],
+                        access: {
+                            ...operationalAccess(["finance"]),
+                            permissions: [financePermissions.journalsView],
+                        },
+                    },
+                    {
+                        id: "finance-reports",
+                        type: "link",
+                        label: "Financial Reports",
+                        to: "/finance/reports",
+                        match: ["/finance/reports"],
+                        access: {
+                            ...operationalAccess(["finance"]),
+                            permissions: [financePermissions.reportsView],
+                        },
+                    },
+                    {
+                        id: "bank-reconciliations",
+                        type: "link",
+                        label: "Bank Reconciliation",
+                        to: "/finance/bank-reconciliations",
+                        match: ["/finance/bank-reconciliations"],
+                        access: {
+                            ...operationalAccess(["finance"]),
+                            permissions: [financePermissions.bankReconciliationsView],
+                        },
+                    },
+                    {
+                        id: "finance-budgets",
+                        type: "link",
+                        label: "Budgets",
+                        to: "/finance/budgets",
+                        match: ["/finance/budgets"],
+                        access: {
+                            ...operationalAccess(["finance"]),
+                            permissions: [financePermissions.budgetsView],
+                        },
+                    },
+                ],
+            },
+            {
+                id: "tax",
+                type: "module",
+                label: "Tax",
+                icon: "list",
+                access: operationalAccess(["finance"]),
+                children: [
+                    {
+                        id: "taxes",
+                        type: "link",
+                        label: "Taxes",
+                        to: "/tax/taxes",
+                        match: ["/tax/taxes"],
+                        access: operationalAccess(["finance"]),
+                    },
+                    {
+                        id: "tax-groups",
+                        type: "link",
+                        label: "Tax Groups",
+                        to: "/tax/groups",
+                        match: ["/tax/groups"],
+                        access: operationalAccess(["finance"]),
+                    },
+                    {
+                        id: "customer-tax-profiles",
+                        type: "link",
+                        label: "Customer Profiles",
+                        to: "/tax/customer-profiles",
+                        match: ["/tax/customer-profiles"],
+                        access: operationalAccess(["finance"]),
+                    },
+                    {
+                        id: "supplier-tax-profiles",
+                        type: "link",
+                        label: "Supplier Profiles",
+                        to: "/tax/supplier-profiles",
+                        match: ["/tax/supplier-profiles"],
+                        access: operationalAccess(["finance"]),
+                    },
+                    {
+                        id: "tax-posting-profiles",
+                        type: "link",
+                        label: "Posting Profiles",
+                        to: "/tax/posting-profiles",
+                        match: ["/tax/posting-profiles"],
+                        access: operationalAccess(["finance"]),
+                    },
+                    {
+                        id: "tax-reports",
+                        type: "link",
+                        label: "Tax Reports",
+                        to: "/tax/reports",
+                        match: ["/tax/reports"],
+                        access: operationalAccess(["finance"]),
+                    },
+                ],
+            },
             {
                 id: "invoices",
                 type: "link",

@@ -8,7 +8,7 @@ import type {
 } from './navigationTypes';
 import { meetsAccessRequirement } from '@/modules/auth/accessControl';
 import { parseEnabledTenantModules } from '@/app/access/tenantModules';
-import { resolveTenantRouteEntitlement } from '@/app/access/routeEntitlements';
+import { resolveTenantRouteEntitlement } from '@/app/access/resolvedRouteEntitlements';
 
 export { normalizeAccessValue } from '@/modules/auth/accessControl';
 
@@ -83,11 +83,21 @@ function resolveLinkAccess(item: NavigationLinkItem): NavigationAccessRule | nul
     return {
         requiresTenant: configured?.requiresTenant ?? true,
         requiresPlatformOperator: configured?.requiresPlatformOperator,
-        requiresOrganizationUnit: entitlement.requiresOrganizationUnit,
-        modules: entitlement.modules,
-        permissions: entitlement.permissions,
-        roles: entitlement.roles,
+        requiresOrganizationUnit: configured?.requiresOrganizationUnit || entitlement.requiresOrganizationUnit,
+        modules: mergeAccessValues(configured?.modules, entitlement.modules),
+        permissions: entitlement.permissions ?? configured?.permissions,
+        roles: entitlement.roles ?? configured?.roles,
     };
+}
+
+function mergeAccessValues<T extends string>(
+    configured: readonly T[] | undefined,
+    entitled: readonly T[] | undefined,
+): readonly T[] | undefined {
+    if (!configured?.length) return entitled;
+    if (!entitled?.length) return configured;
+
+    return [...new Set([...configured, ...entitled])];
 }
 
 function modeAccessOnly(rule: NavigationAccessRule | undefined): NavigationAccessRule | undefined {

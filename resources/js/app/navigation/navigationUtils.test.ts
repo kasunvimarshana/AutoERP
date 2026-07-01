@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { itemPermissions } from '@/modules/item/itemPermissions';
+import { financePermissions } from '@/modules/finance/financePermissions';
+import { invoicePermissions } from '@/modules/invoice/invoicePermissions';
 import { purchasePermissions } from '@/modules/purchase/purchasePermissions';
+import { vehicleRentalPermissions } from '@/modules/vehicle-rental/vehicleRentalPermissions';
 import { tenantNavigationSections } from './navigationConfig';
 import {
     filterNavigation,
@@ -29,7 +32,11 @@ describe('navigation access and matching', () => {
             isPlatformOperator: false,
             organizationUnitId: 20,
             roles: [],
-            permissions: ['vehicle-rental.reservations.manage'],
+            permissions: [
+                vehicleRentalPermissions.view,
+                vehicleRentalPermissions.reservationsManage,
+                invoicePermissions.view,
+            ],
             permissionsLoaded: true,
             enabledModules: ['vehicle-rental', 'invoice', 'payment'],
             enabledModulesLoaded: true,
@@ -141,6 +148,51 @@ describe('navigation access and matching', () => {
 
         expect(itemModule?.type).toBe('module');
         expect(itemModule?.type === 'module' ? itemModule.children.map((child) => child.label) : []).toEqual(['Items']);
+    });
+
+    it('shows finance navigation through feature-owned route entitlements', () => {
+        const sections = filterNavigation(tenantNavigationSections, {
+            tenantId: 10,
+            isPlatformOperator: false,
+            organizationUnitId: 20,
+            roles: [],
+            permissions: [
+                financePermissions.accountsView,
+                financePermissions.reportsView,
+            ],
+            permissionsLoaded: true,
+            enabledModules: ['finance'],
+            enabledModulesLoaded: true,
+        });
+        const financeModule = sections
+            .flatMap((section) => section.items)
+            .find((item) => item.id === 'finance-workspace');
+
+        expect(financeModule?.type).toBe('module');
+        expect(financeModule?.type === 'module' ? financeModule.children.map((child) => child.label) : []).toEqual([
+            'Chart of Accounts',
+            'General Ledger',
+            'Trial Balance',
+            'Account Balances',
+            'Financial Reports',
+        ]);
+    });
+
+    it('preserves navigation-specific module constraints for shared route paths', () => {
+        const sections = filterNavigation(tenantNavigationSections, {
+            tenantId: 10,
+            isPlatformOperator: false,
+            organizationUnitId: 20,
+            roles: [],
+            permissions: [invoicePermissions.view],
+            permissionsLoaded: true,
+            enabledModules: ['invoice'],
+            enabledModulesLoaded: true,
+        });
+        const itemIds = sections.flatMap((section) => section.items).map((item) => item.id);
+
+        expect(itemIds).toContain('invoices');
+        expect(itemIds).not.toContain('vehicle-rental');
     });
 
     it('selects the query-specific child for shared invoice routes', () => {
