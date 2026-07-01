@@ -4,13 +4,16 @@ declare(strict_types=1);
 
 namespace Modules\VehicleRental\Services;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\VehicleRental\Enums\RentalCalculationSourceKind;
 use Modules\VehicleRental\Enums\RentalCalculationSourceStatus;
 use Modules\VehicleRental\Enums\RentalCalculationStatus;
 use Modules\VehicleRental\Models\RentalCalculationRun;
 use Modules\VehicleRental\Models\RentalCalculationSource;
+use Modules\VehicleRental\Models\RentalExpenseAllocation;
 use Modules\VehicleRental\Models\RentalUsageContext;
 
 final class RentalCalculationSourceService
@@ -69,7 +72,7 @@ final class RentalCalculationSourceService
         $consumed = RentalCalculationSource::query()
             ->whereIn('usage_context_id', $usageContextIds)
             ->where('status', RentalCalculationSourceStatus::Approved->value)
-            ->whereHas('run', fn ($query) => $query
+            ->whereHas('run', fn (Builder $query): Builder => $query
                 ->where('calculation_status', RentalCalculationStatus::Approved->value))
             ->exists();
 
@@ -82,20 +85,25 @@ final class RentalCalculationSourceService
 
     public function assertAvailableForApproval(RentalCalculationRun $run): void
     {
-        $sources = $run->sources()->lockForUpdate()->get();
+        $sources = $run->sources()->orderBy('id')->lockForUpdate()->get();
         if ($sources->isEmpty()) {
             throw new InvalidArgumentException('Calculation run has no governed source allocations.');
         }
 
-        $usageContextIds = $sources->pluck('usage_context_id')->filter()->unique();
+        $usageContextIds = $sources->pluck('usage_context_id')->filter()->unique()->values();
         if ($usageContextIds->isNotEmpty()) {
+            RentalUsageContext::query()
+                ->whereIn('id', $usageContextIds)
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get(['id']);
+
             $usageConflict = RentalCalculationSource::query()
                 ->where('calculation_run_id', '!=', $run->getKey())
                 ->whereIn('usage_context_id', $usageContextIds)
                 ->where('status', RentalCalculationSourceStatus::Approved->value)
-                ->whereHas('run', fn ($query) => $query
+                ->whereHas('run', fn (Builder $query): Builder => $query
                     ->where('calculation_status', RentalCalculationStatus::Approved->value))
-                ->lockForUpdate()
                 ->exists();
             if ($usageConflict) {
                 throw new InvalidArgumentException(
@@ -104,15 +112,20 @@ final class RentalCalculationSourceService
             }
         }
 
-        $expenseAllocationIds = $sources->pluck('expense_allocation_id')->filter()->unique();
+        $expenseAllocationIds = $sources->pluck('expense_allocation_id')->filter()->unique()->values();
         if ($expenseAllocationIds->isNotEmpty()) {
+            RentalExpenseAllocation::query()
+                ->whereIn('id', $expenseAllocationIds)
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get(['id']);
+
             $expenseConflict = RentalCalculationSource::query()
                 ->where('calculation_run_id', '!=', $run->getKey())
                 ->whereIn('expense_allocation_id', $expenseAllocationIds)
                 ->where('status', RentalCalculationSourceStatus::Approved->value)
-                ->whereHas('run', fn ($query) => $query
+                ->whereHas('run', fn (Builder $query): Builder => $query
                     ->where('calculation_status', RentalCalculationStatus::Approved->value))
-                ->lockForUpdate()
                 ->exists();
             if ($expenseConflict) {
                 throw new InvalidArgumentException(
@@ -135,7 +148,7 @@ final class RentalCalculationSourceService
 
         $run->sources()->update([
             'status' => $sourceStatus->value,
-            'row_version' => \DB::raw('row_version + 1'),
+            'row_version' => DB::raw('row_version + 1'),
             'updated_by' => $userId,
             'updated_at' => now(),
         ]);
