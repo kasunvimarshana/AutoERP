@@ -15,7 +15,7 @@ use Modules\Auth\Models\AuthRegistrationInvitationDeliveryModel;
 use Modules\Auth\Models\AuthRegistrationInvitationModel;
 use Modules\Auth\Services\Security\OpaqueTokenCodec;
 use Modules\Core\Contracts\ClockInterface;
-use Modules\Core\Contracts\TenantAuthenticationDirectoryInterface;
+use Modules\Core\Contracts\TenantDirectoryInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\User\Contracts\TenantUserInvitationIssuerInterface;
 use RuntimeException;
@@ -32,7 +32,7 @@ final class RegistrationInvitationService implements TenantUserInvitationIssuerI
         private readonly TenantExecutionContextInterface $executionContext,
         private readonly ClockInterface $clock,
         private readonly OpaqueTokenCodec $tokens,
-        private readonly TenantAuthenticationDirectoryInterface $tenants,
+        private readonly TenantDirectoryInterface $tenants,
     ) {}
 
     /** @return array{invitation_id:int,expires_at:string,delivery_status:string} */
@@ -225,7 +225,7 @@ final class RegistrationInvitationService implements TenantUserInvitationIssuerI
             }
 
             $tenantId = (int) $invitation->getAttribute('tenant_id');
-            $tenant = $this->tenants->findActive($tenantId);
+            $tenant = $this->tenants->summary($tenantId);
             if ($tenant === null) {
                 return null;
             }
