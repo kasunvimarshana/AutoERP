@@ -1,0 +1,66 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Tests\Unit\VehicleRental;
+
+use PHPUnit\Framework\TestCase;
+
+final class RentalCalculationIntegrityContractTest extends TestCase
+{
+    private string $root;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->root = dirname(__DIR__, 3);
+    }
+
+    public function test_calculation_transitions_require_and_return_row_versions(): void
+    {
+        $request = $this->source('app/Modules/VehicleRental/Http/Requests/RentalTransitionRequest.php');
+        $controller = $this->source('app/Modules/VehicleRental/Http/Controllers/RentalCalculationController.php');
+        $service = $this->source('app/Modules/VehicleRental/Services/RentalCalculationTransitionService.php');
+        $resource = $this->source('app/Modules/VehicleRental/Http/Resources/RentalCalculationRunResource.php');
+        $api = $this->source('resources/js/modules/vehicle-rental/vehicleRentalApi.ts');
+        $page = $this->source('resources/js/modules/vehicle-rental/pages/RentalBillingPage.tsx');
+        $types = $this->source('resources/js/modules/vehicle-rental/vehicleRentalTypes.ts');
+
+        self::assertStringContainsString("'expected_version' => ['required', 'integer', 'min:1']", $request);
+        self::assertStringContainsString('RentalCalculationTransitionService $service', $controller);
+        self::assertStringContainsString("(int) \$request->input('expected_version')", $controller);
+        self::assertStringContainsString('->lockForUpdate()', $service);
+        self::assertStringContainsString("'row_version' => \$expectedVersion + 1", $service);
+        self::assertStringContainsString("'row_version' => (int) \$this->row_version", $resource);
+        self::assertStringContainsString('expected_version: expectedVersion', $api);
+        self::assertStringContainsString('run.id, run.row_version, status', $page);
+        self::assertStringContainsString('row_version: number;', $types);
+    }
+
+    public function test_schema_enforces_calculation_source_and_usage_fact_identity(): void
+    {
+        $sources = $this->source('app/Modules/VehicleRental/Database/Migrations/2026_06_12_200025_create_rental_calculation_sources_table.php');
+        $contexts = $this->source('app/Modules/VehicleRental/Database/Migrations/2026_06_12_200016_create_rental_usage_contexts_table.php');
+        $facts = $this->source('app/Modules/VehicleRental/Database/Migrations/2026_06_12_200017_create_rental_usage_facts_table.php');
+
+        self::assertStringContainsString('rental_calculation_sources_valid_source_ck', $sources);
+        self::assertStringContainsString("source_kind = 'usage_context'", $sources);
+        self::assertStringContainsString("source_kind = 'expense_allocation'", $sources);
+        self::assertStringContainsString(
+            "['id', 'tenant_id', 'financial_side', 'usage_log_id']",
+            $contexts,
+        );
+        self::assertStringContainsString(
+            "['usage_context_id', 'tenant_id', 'financial_side', 'usage_log_id']",
+            $facts,
+        );
+    }
+
+    private function source(string $path): string
+    {
+        $contents = file_get_contents($this->root.'/'.$path);
+        self::assertNotFalse($contents, "Unable to read {$path}");
+
+        return $contents;
+    }
+}
