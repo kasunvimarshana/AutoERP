@@ -35,6 +35,7 @@ final class RentalUsageLogResource extends RentalResource
                     'assignment_role' => $this->driverAssignment->assignment_role,
                     'assigned_from' => $this->driverAssignment->assigned_from?->toISOString(),
                     'assigned_to' => $this->driverAssignment->assigned_to?->toISOString(),
+                    'is_primary' => (bool) $this->driverAssignment->is_primary,
                     'status' => $this->enumValue($this->driverAssignment->status),
                 ];
             }),
