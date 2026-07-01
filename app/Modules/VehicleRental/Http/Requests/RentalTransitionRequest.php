@@ -13,6 +13,7 @@ final class RentalTransitionRequest extends TenantScopedRequest
         return [
             'tenant_id' => ['required', 'integer', 'min:1'],
             'organization_unit_id' => ['nullable', 'integer', 'min:1'],
+            'expected_version' => ['required', 'integer', 'min:1'],
             'status' => ['required', 'string', 'max:40'],
             'reason' => ['nullable', 'string'],
         ];
