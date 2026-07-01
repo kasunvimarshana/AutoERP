@@ -17,6 +17,11 @@ interface WorkspaceLayoutProps {
     mode: 'tenant' | 'platform';
 }
 
+interface PreferredExpandedModule {
+    locationKey: string;
+    moduleId: string;
+}
+
 export function WorkspaceLayout({ sections, homePath, workspaceLabel, mode }: WorkspaceLayoutProps) {
     const location = useLocation();
     const auth = useAuth();
@@ -24,7 +29,7 @@ export function WorkspaceLayout({ sections, homePath, workspaceLabel, mode }: Wo
     const [collapsed, setCollapsed] = useState(
         () => window.localStorage.getItem(`autoerp.${mode}.sidebar.collapsed`) === 'true',
     );
-    const [preferredExpandedModuleId, setPreferredExpandedModuleId] = useState<string | null>(null);
+    const [preferredExpandedModule, setPreferredExpandedModule] = useState<PreferredExpandedModule | null>(null);
 
     const visibleSections = useMemo(() => filterNavigation(sections, {
         tenantId: auth.tenant?.id ?? null,
@@ -59,10 +64,12 @@ export function WorkspaceLayout({ sections, homePath, workspaceLabel, mode }: Wo
             .map((item) => item.id),
         [visibleSections],
     );
-    const expandedModuleId = activeModuleId
-        ?? (preferredExpandedModuleId && moduleIds.includes(preferredExpandedModuleId)
-            ? preferredExpandedModuleId
-            : moduleIds[0] ?? null);
+    const preferredExpandedModuleId = preferredExpandedModule?.locationKey === location.key
+        ? preferredExpandedModule.moduleId
+        : null;
+    const expandedModuleId = preferredExpandedModuleId && moduleIds.includes(preferredExpandedModuleId)
+        ? preferredExpandedModuleId
+        : activeModuleId ?? moduleIds[0] ?? null;
     const mobileOpen = mobileOpenLocationKey === location.key;
 
     function updateCollapsed(next: boolean) {
@@ -86,8 +93,8 @@ export function WorkspaceLayout({ sections, homePath, workspaceLabel, mode }: Wo
                 workspaceLabel={workspaceLabel}
                 onCloseMobile={() => setMobileOpenLocationKey(null)}
                 onExpandDesktop={() => updateCollapsed(false)}
-                onToggleModule={(moduleId) => setPreferredExpandedModuleId(
-                    expandedModuleId === moduleId ? null : moduleId,
+                onToggleModule={(moduleId) => setPreferredExpandedModule(
+                    expandedModuleId === moduleId ? null : { locationKey: location.key, moduleId },
                 )}
             />
             <div className={`app-content min-h-screen ${collapsed ? 'lg:pl-20' : 'lg:pl-72'}`}>
