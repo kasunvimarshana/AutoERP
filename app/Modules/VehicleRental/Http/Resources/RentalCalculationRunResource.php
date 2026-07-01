@@ -12,6 +12,7 @@ final class RentalCalculationRunResource extends RentalResource
     {
         return [
             'id' => (int) $this->getKey(),
+            'row_version' => (int) $this->row_version,
             'billing_period' => $this->whenLoaded('billingPeriod', fn () => [
                 'id' => (int) $this->billingPeriod->getKey(),
                 'agreement' => $this->billingPeriod->relationLoaded('agreement')
