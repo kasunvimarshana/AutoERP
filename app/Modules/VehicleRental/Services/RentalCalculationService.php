@@ -20,6 +20,7 @@ use Modules\Tax\Services\TaxCalculationService;
 use Modules\VehicleRental\Enums\RentalAgreementKind;
 use Modules\VehicleRental\Enums\RentalBillingPeriodStatus;
 use Modules\VehicleRental\Enums\RentalCalculationLineStatus;
+use Modules\VehicleRental\Enums\RentalCalculationSourceStatus;
 use Modules\VehicleRental\Enums\RentalCalculationStatus;
 use Modules\VehicleRental\Enums\RentalDocumentStatus;
 use Modules\VehicleRental\Enums\RentalExcessKmMethod;
@@ -35,6 +36,7 @@ use Modules\VehicleRental\Models\RentalAgreementRateVersion;
 use Modules\VehicleRental\Models\RentalBillingPeriod;
 use Modules\VehicleRental\Models\RentalCalculationLine;
 use Modules\VehicleRental\Models\RentalCalculationRun;
+use Modules\VehicleRental\Models\RentalCalculationSource;
 use Modules\VehicleRental\Models\RentalExpenseAllocation;
 use Modules\VehicleRental\Models\RentalUsageContext;
 
@@ -45,6 +47,7 @@ final class RentalCalculationService
         private readonly TaxCalculationService $taxes,
         private readonly RentalRateVersionService $rates,
         private readonly RentalStatusHistoryService $history,
+        private readonly RentalCalculationSourceService $sources,
     ) {}
 
     public function calculate(
@@ -100,15 +103,9 @@ final class RentalCalculationService
             if ($period->runs()->where('calculation_status', RentalCalculationStatus::Approved->value)->exists()) {
                 throw new InvalidArgumentException('Approved calculation already exists for this billing period. Reverse it before recalculation.');
             }
-            $alreadyConsumed = RentalCalculationLine::query()
-                ->whereIn('usage_context_id', $contexts->pluck('id'))
-                ->where('status', RentalCalculationLineStatus::Approved->value)
-                ->whereHas('run', fn (Builder $query) => $query
-                    ->where('calculation_status', RentalCalculationStatus::Approved->value))
-                ->exists();
-            if ($alreadyConsumed) {
-                throw new InvalidArgumentException('One or more commercial usage facts are already consumed by an approved calculation.');
-            }
+            $this->sources->assertUsageContextsAvailable(
+                $contexts->pluck('id')->map(static fn ($id): int => (int) $id)->values(),
+            );
 
             $version = ((int) $period->runs()->max('run_version')) + 1;
             $fingerprint = hash('sha256', implode('|', [
@@ -132,11 +129,27 @@ final class RentalCalculationService
                 'updated_by' => $userId,
             ]);
 
-            $drafts = $this->buildLines($agreement, $side, $rate, $contexts, $start, $end);
+            $drafts = $this->buildLines(
+                $agreement,
+                $side,
+                $rate,
+                $period,
+                $contexts,
+                $start,
+                $end,
+            );
             if ($drafts === []) {
                 throw new InvalidArgumentException('Rate version does not produce any billable or payable calculation lines.');
             }
             $drafts = $this->applyTax($agreement, $side, $rate, $start, $drafts);
+            $expenseAllocationIds = collect($drafts)
+                ->pluck('expense_allocation_id')
+                ->filter()
+                ->map(static fn ($id): int => (int) $id)
+                ->unique()
+                ->values();
+            $this->sources->record($run, $contexts, $expenseAllocationIds, $userId);
+
             foreach ($drafts as $index => $line) {
                 $line['line_number'] = $index + 1;
                 $line['tenant_id'] = $agreement->tenant_id;
@@ -180,7 +193,7 @@ final class RentalCalculationService
     ): RentalCalculationRun {
         return DB::transaction(function () use ($run, $to, $userId, $reason): RentalCalculationRun {
             $run = RentalCalculationRun::query()
-                ->with(['billingPeriod', 'lines'])
+                ->with(['billingPeriod', 'lines', 'sources'])
                 ->lockForUpdate()
                 ->findOrFail($run->getKey());
             $from = $run->calculation_status;
@@ -200,7 +213,7 @@ final class RentalCalculationService
                 throw new InvalidArgumentException('Calculation run requires lines before approval.');
             }
             if ($to === RentalCalculationStatus::Approved) {
-                $this->assertSourcesAvailableForApproval($run);
+                $this->sources->assertAvailableForApproval($run);
             }
             if ($to === RentalCalculationStatus::Reversed && $this->hasActiveFinancialDocument($run)) {
                 throw new InvalidArgumentException('Reverse the generated invoice/payable through the Invoice module before reversing this calculation.');
@@ -228,11 +241,18 @@ final class RentalCalculationService
                 'updated_by' => $userId,
                 'updated_at' => now(),
             ]);
+            $this->sources->transition($run, $to, $userId);
 
+            $expenseAllocationIds = $run->sources()
+                ->whereNotNull('expense_allocation_id')
+                ->pluck('expense_allocation_id')
+                ->map(static fn ($id): int => (int) $id)
+                ->unique()
+                ->values();
             if ($to === RentalCalculationStatus::Approved) {
                 $this->syncExpenseAllocationStatuses(
                     (int) $run->tenant_id,
-                    $run->lines()->whereNotNull('expense_allocation_id')->pluck('expense_allocation_id')->unique(),
+                    $expenseAllocationIds,
                     $userId,
                 );
                 $run->billingPeriod->forceFill([
@@ -247,7 +267,7 @@ final class RentalCalculationService
                 $run->save();
                 $this->syncExpenseAllocationStatuses(
                     (int) $run->tenant_id,
-                    $run->lines()->whereNotNull('expense_allocation_id')->pluck('expense_allocation_id')->unique(),
+                    $expenseAllocationIds,
                     $userId,
                 );
                 $run->billingPeriod->forceFill([
@@ -301,6 +321,9 @@ final class RentalCalculationService
             'billingPeriod.agreement.supplier',
             'billingPeriod.rateVersion',
             'currency',
+            'sources.usageContext.usageLog.vehicle',
+            'sources.usageContext.usageFact',
+            'sources.expenseAllocation.expense',
             'lines.usageContext.usageLog.vehicle',
             'lines.usageContext.usageFact',
             'lines.expenseAllocation.expense',
@@ -352,6 +375,7 @@ final class RentalCalculationService
         RentalAgreement $agreement,
         RentalFinancialSide $side,
         RentalAgreementRateVersion $rate,
+        RentalBillingPeriod $period,
         Collection $contexts,
         CarbonImmutable $start,
         CarbonImmutable $end,
@@ -426,12 +450,8 @@ final class RentalCalculationService
                 $quantity,
                 $measured,
                 $allowed,
-                $component->component_code === RentalRateComponentCode::BaseRental
-                    ? 'billing_period'
-                    : 'usage_context',
-                $component->component_code === RentalRateComponentCode::BaseRental
-                    ? 0
-                    : (int) $source->getKey(),
+                'billing_period',
+                (int) $period->getKey(),
             );
         }
 
@@ -561,14 +581,27 @@ final class RentalCalculationService
             $amount = (string) $component->maximum_amount;
         }
 
+        $ruleSnapshot = [
+            'rate_component_id' => $component->getKey(),
+            'rate_version_id' => $component->rate_version_id,
+            'source_scope' => $sourceType,
+            'unit' => $component->unit->value,
+            'rate' => (string) $component->rate,
+            'multiplier' => (string) $component->multiplier,
+        ];
+        if ($sourceType === 'usage_context') {
+            $ruleSnapshot['usage_fact_id'] = $context->usageFact->getKey();
+            $ruleSnapshot['usage_fact_version'] = (int) $context->usageFact->row_version;
+        }
+
         return [
-            'usage_context_id' => $context->getKey(),
+            'usage_context_id' => $sourceType === 'usage_context' ? $context->getKey() : null,
             'expense_allocation_id' => null,
             'custody_event_item_id' => null,
             'source_type' => $sourceType,
-            'source_id' => $sourceId === 0 ? $context->agreement_id : $sourceId,
+            'source_id' => $sourceId,
             'component_code' => $component->component_code->value,
-            'description' => str($component->component_code->value)->replace('_', ' ')->title()->toString(),
+            'description' => ucwords(str_replace('_', ' ', $component->component_code->value)),
             'measured_quantity' => $measured,
             'allowed_quantity' => $allowed,
             'chargeable_quantity' => $quantity,
@@ -582,15 +615,7 @@ final class RentalCalculationService
             'withholding_amount' => '0.000000',
             'total_amount' => $amount,
             'applied_rule' => $component->component_code->value,
-            'rule_snapshot' => [
-                'rate_component_id' => $component->getKey(),
-                'rate_version_id' => $component->rate_version_id,
-                'usage_fact_id' => $context->usageFact->getKey(),
-                'usage_fact_version' => $context->usageFact->row_version,
-                'unit' => $component->unit->value,
-                'rate' => (string) $component->rate,
-                'multiplier' => (string) $component->multiplier,
-            ],
+            'rule_snapshot' => $ruleSnapshot,
         ];
     }
 
@@ -809,46 +834,15 @@ final class RentalCalculationService
         $run->save();
     }
 
-    private function assertSourcesAvailableForApproval(RentalCalculationRun $run): void
-    {
-        $contextIds = $run->lines->pluck('usage_context_id')->filter()->unique();
-        if ($contextIds->isNotEmpty()) {
-            $contextConflict = RentalCalculationLine::query()
-                ->where('calculation_run_id', '!=', $run->getKey())
-                ->whereIn('usage_context_id', $contextIds)
-                ->where('status', RentalCalculationLineStatus::Approved->value)
-                ->whereHas('run', fn (Builder $query) => $query
-                    ->where('calculation_status', RentalCalculationStatus::Approved->value))
-                ->exists();
-            if ($contextConflict) {
-                throw new InvalidArgumentException('One or more commercial usage facts are already consumed by another approved calculation.');
-            }
-        }
-
-        $expenseAllocationIds = $run->lines->pluck('expense_allocation_id')->filter()->unique();
-        if ($expenseAllocationIds->isNotEmpty()) {
-            $expenseConflict = RentalCalculationLine::query()
-                ->where('calculation_run_id', '!=', $run->getKey())
-                ->whereIn('expense_allocation_id', $expenseAllocationIds)
-                ->where('status', RentalCalculationLineStatus::Approved->value)
-                ->whereHas('run', fn (Builder $query) => $query
-                    ->where('calculation_status', RentalCalculationStatus::Approved->value))
-                ->exists();
-            if ($expenseConflict) {
-                throw new InvalidArgumentException('One or more expense allocations are already consumed by another approved calculation.');
-            }
-        }
-    }
-
     private function syncExpenseAllocationStatuses(
         int $tenantId,
         Collection $allocationIds,
         ?int $userId,
     ): void {
         foreach ($allocationIds as $allocationId) {
-            $consumed = RentalCalculationLine::query()
+            $consumed = RentalCalculationSource::query()
                 ->where('expense_allocation_id', $allocationId)
-                ->where('status', RentalCalculationLineStatus::Approved->value)
+                ->where('status', RentalCalculationSourceStatus::Approved->value)
                 ->whereHas('run', fn (Builder $query) => $query
                     ->where('calculation_status', RentalCalculationStatus::Approved->value))
                 ->exists();
