@@ -30,10 +30,6 @@ final class FinancePermission
 
     public const CURRENCY_REVALUATIONS_POST = 'finance.currency_revaluations.post';
 
-    public const FISCAL_CALENDAR_VIEW = 'finance.fiscal_calendar.view';
-
-    public const FISCAL_CALENDAR_MANAGE = 'finance.fiscal_calendar.manage';
-
     public const BANK_RECONCILIATIONS_VIEW = 'finance.bank_reconciliations.view';
 
     public const BANK_RECONCILIATIONS_MANAGE = 'finance.bank_reconciliations.manage';
@@ -60,8 +56,6 @@ final class FinancePermission
             self::JOURNALS_REVERSE => 'Reverse posted Finance journals through governed reversal entries.',
             self::REPORTS_VIEW => 'View ledgers, balances, statements, aging, and Finance tax reports.',
             self::CURRENCY_REVALUATIONS_POST => 'Post governed foreign-currency revaluation journals.',
-            self::FISCAL_CALENDAR_VIEW => 'View fiscal years and fiscal periods.',
-            self::FISCAL_CALENDAR_MANAGE => 'Change governed fiscal-year and fiscal-period states.',
             self::BANK_RECONCILIATIONS_VIEW => 'View bank reconciliations and statement lines.',
             self::BANK_RECONCILIATIONS_MANAGE => 'Create, complete, match, and unmatch bank reconciliations.',
             self::BUDGETS_VIEW => 'View Finance budgets, budget details, and actuals.',

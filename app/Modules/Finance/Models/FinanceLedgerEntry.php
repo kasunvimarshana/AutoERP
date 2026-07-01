@@ -24,8 +24,6 @@ final class FinanceLedgerEntry extends TenantOwnedModel
             'journal_entry_id' => 'integer',
             'journal_line_id' => 'integer',
             'account_id' => 'integer',
-            'fiscal_year_id' => 'integer',
-            'fiscal_period_id' => 'integer',
             'dimension_id' => 'integer',
             'entry_date' => 'date',
             'debit' => 'decimal:6',
@@ -60,16 +58,6 @@ final class FinanceLedgerEntry extends TenantOwnedModel
     public function account(): BelongsTo
     {
         return $this->belongsTo(FinanceAccount::class, 'account_id');
-    }
-
-    public function fiscalYear(): BelongsTo
-    {
-        return $this->belongsTo(FinanceFiscalYear::class, 'fiscal_year_id');
-    }
-
-    public function fiscalPeriod(): BelongsTo
-    {
-        return $this->belongsTo(FinanceFiscalPeriod::class, 'fiscal_period_id');
     }
 
     public function dimension(): BelongsTo

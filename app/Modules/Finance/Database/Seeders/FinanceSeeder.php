@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Finance\Database\Seeders;
 
-use Carbon\CarbonImmutable;
 use Database\Seeders\Concerns\ResolvesSeedContext;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
@@ -15,8 +14,6 @@ use Modules\Finance\Models\FinanceAccountAssignment;
 use Modules\Finance\Models\FinanceAccountCategory;
 use Modules\Finance\Models\FinanceAccountRole;
 use Modules\Finance\Models\FinanceAccountType;
-use Modules\Finance\Models\FinanceFiscalPeriod;
-use Modules\Finance\Models\FinanceFiscalYear;
 use Modules\Finance\Models\FinancePostingProfile;
 use Modules\Finance\Models\FinancePostingProfileRule;
 
@@ -47,7 +44,6 @@ final class FinanceSeeder extends Seeder
                 $types,
                 $categories,
             );
-            $this->seedFiscalCalendar((int) $tenant->getKey(), $organizationUnit?->getKey());
             $this->seedPostingProfiles((int) $tenant->getKey(), $organizationUnit?->getKey());
         }, 3);
     }
@@ -190,47 +186,6 @@ final class FinanceSeeder extends Seeder
                     'opening_balance' => '0.000000',
                     'current_balance' => '0.000000',
                     'metadata' => ['seed_source' => 'finance_module'],
-                ],
-            );
-        }
-    }
-
-    private function seedFiscalCalendar(int $tenantId, ?int $organizationUnitId): void
-    {
-        if (! Schema::hasTable('finance_fiscal_years')) {
-            return;
-        }
-
-        $yearNumber = (int) now()->year;
-        $start = CarbonImmutable::create($yearNumber, 1, 1);
-        $end = $start->endOfYear();
-        $year = FinanceFiscalYear::query()->updateOrCreate(
-            [
-                'tenant_id' => $tenantId,
-                'organization_unit_id' => $organizationUnitId,
-                'start_date' => $start,
-                'end_date' => $end,
-            ],
-            [
-                'name' => 'FY '.$yearNumber,
-                'status' => 'open',
-            ],
-        );
-
-        for ($month = 1; $month <= 12; $month++) {
-            $periodStart = CarbonImmutable::create($yearNumber, $month, 1);
-            FinanceFiscalPeriod::query()->updateOrCreate(
-                [
-                    'fiscal_year_id' => $year->getKey(),
-                    'period_number' => $month,
-                ],
-                [
-                    'tenant_id' => $tenantId,
-                    'organization_unit_id' => $organizationUnitId,
-                    'name' => $periodStart->format('F Y'),
-                    'start_date' => $periodStart->toDateString(),
-                    'end_date' => $periodStart->endOfMonth()->toDateString(),
-                    'status' => 'open',
                 ],
             );
         }

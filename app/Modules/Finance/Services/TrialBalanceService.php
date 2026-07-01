@@ -8,7 +8,6 @@ use Illuminate\Database\Eloquent\Builder;
 use Modules\Core\Services\DecimalMath;
 use Modules\Finance\DTOs\TrialBalanceResult;
 use Modules\Finance\Models\FinanceAccount;
-use Modules\Finance\Models\FinanceFiscalPeriod;
 
 final class TrialBalanceService
 {
@@ -20,20 +19,9 @@ final class TrialBalanceService
     public function calculate(
         int $tenantId,
         ?int $organizationUnitId = null,
-        ?int $fiscalPeriodId = null,
         ?string $dateFrom = null,
         ?string $dateTo = null,
     ): TrialBalanceResult {
-        if ($fiscalPeriodId !== null) {
-            $periodQuery = FinanceFiscalPeriod::query()
-                ->where('tenant_id', $tenantId);
-            $this->scopeOrganization($periodQuery, $organizationUnitId);
-
-            $period = $periodQuery->findOrFail($fiscalPeriodId);
-            $dateFrom = $period->start_date->toDateString();
-            $dateTo = $period->end_date->toDateString();
-        }
-
         $query = FinanceAccount::query()
             ->where('tenant_id', $tenantId);
 

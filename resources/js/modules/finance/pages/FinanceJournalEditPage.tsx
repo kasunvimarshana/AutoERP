@@ -29,7 +29,6 @@ export default function FinanceJournalEditPage() {
                 setForm({
                     journal_date: journal.journal_date,
                     journal_type: journal.journal_type,
-                    fiscal_period_id: journal.fiscal_period?.id ?? null,
                     posting_profile_id: journal.posting_profile?.id ?? null,
                     source_module: journal.source_module,
                     source_type: journal.source_type,

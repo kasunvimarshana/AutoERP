@@ -93,19 +93,6 @@ Route::prefix('api/v1/finance')->middleware($middleware)->name('api.v1.finance.'
         ->middleware($requires(FinancePermission::CURRENCY_REVALUATIONS_POST))
         ->name('currency-revaluations.store');
 
-    Route::middleware($requires(FinancePermission::FISCAL_CALENDAR_VIEW))->group(function (): void {
-        Route::get('fiscal-years', [FinanceController::class, 'fiscalYears'])->name('fiscal-years.index');
-        Route::get('fiscal-periods', [FinanceController::class, 'fiscalPeriods'])->name('fiscal-periods.index');
-    });
-    Route::patch('fiscal-years/{year}/status', [FinanceController::class, 'updateFiscalYearStatus'])
-        ->whereNumber('year')
-        ->middleware($requires(FinancePermission::FISCAL_CALENDAR_MANAGE))
-        ->name('fiscal-years.status');
-    Route::patch('fiscal-periods/{period}/status', [FinanceController::class, 'updateFiscalPeriodStatus'])
-        ->whereNumber('period')
-        ->middleware($requires(FinancePermission::FISCAL_CALENDAR_MANAGE))
-        ->name('fiscal-periods.status');
-
     Route::middleware($requires(FinancePermission::BANK_RECONCILIATIONS_VIEW))->group(function (): void {
         Route::get('bank-reconciliations', [FinanceController::class, 'bankReconciliations'])->name('bank-reconciliations.index');
         Route::get('bank-reconciliations/{reconciliation}', [FinanceController::class, 'showBankReconciliation'])

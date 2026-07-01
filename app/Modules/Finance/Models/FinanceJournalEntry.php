@@ -28,8 +28,6 @@ final class FinanceJournalEntry extends TenantOwnedModel
         return array_merge(parent::casts(), [
             'tenant_id' => 'integer',
             'organization_unit_id' => 'integer',
-            'fiscal_year_id' => 'integer',
-            'fiscal_period_id' => 'integer',
             'posting_profile_id' => 'integer',
             'source_id' => 'integer',
             'source_date' => 'date',
@@ -57,16 +55,6 @@ final class FinanceJournalEntry extends TenantOwnedModel
     public function organizationUnit(): BelongsTo
     {
         return $this->belongsTo(OrganizationUnitModel::class, 'organization_unit_id');
-    }
-
-    public function fiscalYear(): BelongsTo
-    {
-        return $this->belongsTo(FinanceFiscalYear::class, 'fiscal_year_id');
-    }
-
-    public function fiscalPeriod(): BelongsTo
-    {
-        return $this->belongsTo(FinanceFiscalPeriod::class, 'fiscal_period_id');
     }
 
     public function currency(): BelongsTo

@@ -68,8 +68,6 @@ final class VoucherSourceResolver
         $journal = $this->journalScope($tenantId, $organizationUnitId)
             ->with([
                 'currency',
-                'fiscalYear',
-                'fiscalPeriod',
                 'lines.account',
                 'lines.dimension',
                 'ledgerEntries',
@@ -244,10 +242,10 @@ final class VoucherSourceResolver
             'source_document_number' => $journal->source_number ?: $journal->journal_number,
             'tenant_id' => (int) $journal->tenant_id,
             'organization_unit_id' => $journal->organization_unit_id,
-            'financial_year_id' => $journal->fiscal_year_id,
-            'financial_period_id' => $journal->fiscal_period_id,
-            'financial_year' => $journal->fiscalYear?->name,
-            'financial_period' => $journal->fiscalPeriod?->name,
+            'financial_year_id' => null,
+            'financial_period_id' => null,
+            'financial_year' => null,
+            'financial_period' => null,
             'payer_or_payee' => null,
             'party_type' => null,
             'party_name' => null,

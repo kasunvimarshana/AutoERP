@@ -35,7 +35,6 @@ final class JournalEntryResource extends JsonResource
             'reversal_reason' => $this->reversal_reason,
             'posted_at' => $this->posted_at?->toIso8601String(),
             'reversed_at' => $this->reversed_at?->toIso8601String(),
-            'fiscal_period' => $this->whenLoaded('fiscalPeriod'),
             'posting_profile' => $this->whenLoaded('postingProfile'),
             'lines' => JournalLineResource::collection($this->whenLoaded('lines')),
             'ledger_entries' => LedgerEntryResource::collection($this->whenLoaded('ledgerEntries')),

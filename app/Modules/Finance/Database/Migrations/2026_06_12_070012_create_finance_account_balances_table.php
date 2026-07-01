@@ -15,8 +15,6 @@ return new class extends Migration
             $table->foreignId('tenant_id')->constrained('tenants', 'id', indexName: 'finance_account_balances_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('account_id');
-            $table->foreignId('fiscal_year_id')->nullable();
-            $table->foreignId('fiscal_period_id')->nullable();
             $table->decimal('opening_debit', 20, 6)->default('0');
             $table->decimal('opening_credit', 20, 6)->default('0');
             $table->decimal('period_debit', 20, 6)->default('0');
@@ -26,8 +24,8 @@ return new class extends Migration
             $table->timestamps();
 
             $table->unique(
-                ['tenant_id', 'organization_unit_id', 'account_id', 'fiscal_period_id'],
-                'finance_account_balances_period_uk'
+                ['tenant_id', 'account_id'],
+                'finance_account_balances_account_uk'
             );
 
             $table->unique(['id', 'tenant_id'], 'finance_account_balances_id_tenant_uk');
@@ -39,14 +37,6 @@ return new class extends Migration
                 ->references(['id', 'tenant_id'])
                 ->on('finance_accounts')
                 ->cascadeOnDelete();
-            $table->foreign(['fiscal_year_id', 'tenant_id'], 'finance_account_balances_fiscal_year_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('finance_fiscal_years')
-                ->restrictOnDelete();
-            $table->foreign(['fiscal_period_id', 'tenant_id'], 'finance_account_balances_fiscal_period_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('finance_fiscal_periods')
-                ->restrictOnDelete();
         });
     }
 

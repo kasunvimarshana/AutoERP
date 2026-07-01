@@ -18,8 +18,6 @@ use Modules\Finance\Enums\NormalBalance;
 use Modules\Finance\Enums\StatementType;
 use Modules\Finance\Models\FinanceAccount;
 use Modules\Finance\Models\FinanceAccountType;
-use Modules\Finance\Models\FinanceFiscalPeriod;
-use Modules\Finance\Models\FinanceFiscalYear;
 use Modules\Finance\Models\FinanceLedgerEntry;
 use Modules\Finance\Models\FinancePostingProfile;
 use Modules\Finance\Models\FinancePostingProfileRule;
@@ -131,9 +129,9 @@ final class FinanceHardeningTest extends TestCase
         });
     }
 
-    public function test_ledger_entries_are_immutable_and_reversal_uses_new_period_and_reason(): void
+    public function test_ledger_entries_are_immutable_and_reversal_uses_new_date_and_reason(): void
     {
-        [$tenantId] = $this->context(includeJuly: true);
+        [$tenantId] = $this->context();
         $this->withTenantExecutionContext($tenantId, function () use ($tenantId): void {
             $posting = app(FinancePostingInterface::class);
             $posted = $posting->post($this->directRequest($tenantId, '2026-06-30'));
@@ -144,9 +142,12 @@ final class FinanceHardeningTest extends TestCase
                 'reversal_of_id' => $posted->journalId,
                 'reversal_reason' => 'Correct source date',
             ]);
-            $this->assertSame(7, (int) DB::table('finance_fiscal_periods')
-                ->where('id', DB::table('finance_journal_entries')->where('id', $reversal->journalId)->value('fiscal_period_id'))
-                ->value('period_number'));
+            $this->assertStringStartsWith(
+                '2026-07-01',
+                (string) DB::table('finance_journal_entries')
+                    ->where('id', $reversal->journalId)
+                    ->value('journal_date'),
+            );
 
             $ledger = FinanceLedgerEntry::query()->where('journal_entry_id', $posted->journalId)->firstOrFail();
             $this->expectException(LogicException::class);
@@ -193,47 +194,14 @@ final class FinanceHardeningTest extends TestCase
         });
     }
 
-    public function test_trial_balance_fiscal_period_respects_organization_scope(): void
-    {
-        $tenantId = $this->createTenant();
-        $orgOne = $this->organizationUnit($tenantId, 'ORG-TB-A');
-        $orgTwo = $this->organizationUnit($tenantId, 'ORG-TB-B');
-        $yearTwo = (int) DB::table('finance_fiscal_years')->insertGetId([
-            'tenant_id' => $tenantId,
-            'organization_unit_id' => $orgTwo,
-            'name' => 'FY 2026 Org B',
-            'start_date' => '2026-01-01',
-            'end_date' => '2026-12-31',
-            'status' => 'open',
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-        $periodTwo = (int) DB::table('finance_fiscal_periods')->insertGetId([
-            'tenant_id' => $tenantId,
-            'organization_unit_id' => $orgTwo,
-            'fiscal_year_id' => $yearTwo,
-            'name' => 'June 2026 Org B',
-            'period_number' => 6,
-            'start_date' => '2026-06-01',
-            'end_date' => '2026-06-30',
-            'status' => 'open',
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-
-        $this->expectException(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
-
-        $this->withTenantExecutionContext($tenantId, fn () => app(TrialBalanceService::class)->calculate($tenantId, $orgOne, $periodTwo));
-    }
-
     /**
      * @return array{0: int, 1: FinanceAccount, 2: FinanceAccount}
      */
-    private function context(bool $includeJuly = false, bool $withIncomeAccounts = false): array
+    private function context(bool $withIncomeAccounts = false): array
     {
         $tenantId = $this->createTenant();
 
-        return $this->withTenantExecutionContext($tenantId, function () use ($tenantId, $includeJuly, $withIncomeAccounts): array {
+        return $this->withTenantExecutionContext($tenantId, function () use ($tenantId, $withIncomeAccounts): array {
             $asset = $this->accountType($tenantId, 'ASSET', NormalBalance::Debit, StatementType::BalanceSheet);
             $equity = $this->accountType($tenantId, 'EQUITY', NormalBalance::Credit, StatementType::BalanceSheet);
             if ($withIncomeAccounts) {
@@ -269,18 +237,6 @@ final class FinanceHardeningTest extends TestCase
                 name: 'Capital',
                 normalBalance: NormalBalance::Credit,
             ));
-
-            $year = FinanceFiscalYear::query()->create([
-                'tenant_id' => $tenantId,
-                'name' => 'FY 2026',
-                'start_date' => '2026-01-01',
-                'end_date' => '2026-12-31',
-                'status' => 'open',
-            ]);
-            $this->period($tenantId, (int) $year->getKey(), 6, '2026-06-01', '2026-06-30');
-            if ($includeJuly) {
-                $this->period($tenantId, (int) $year->getKey(), 7, '2026-07-01', '2026-07-31');
-            }
 
             $this->profile($tenantId, 'direct_test', [
                 'cash' => $cash,
@@ -369,19 +325,6 @@ final class FinanceHardeningTest extends TestCase
         ]);
     }
 
-    private function period(int $tenantId, int $yearId, int $number, string $start, string $end): void
-    {
-        FinanceFiscalPeriod::query()->create([
-            'tenant_id' => $tenantId,
-            'fiscal_year_id' => $yearId,
-            'name' => 'Period '.$number,
-            'period_number' => $number,
-            'start_date' => $start,
-            'end_date' => $end,
-            'status' => 'open',
-        ]);
-    }
-
     private function createTenant(): int
     {
         $suffix = Str::upper(Str::random(6));
@@ -397,15 +340,4 @@ final class FinanceHardeningTest extends TestCase
             'updated_at' => now()]);
     }
 
-    private function organizationUnit(int $tenantId, string $code): int
-    {
-        return (int) \Tests\Support\OrganizationUnitFixture::create([
-            'tenant_id' => $tenantId,
-            'name' => 'Organization '.$code,
-            'code' => $code,
-            'is_active' => true,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-    }
 }

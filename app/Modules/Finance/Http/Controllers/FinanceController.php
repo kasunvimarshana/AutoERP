@@ -14,7 +14,6 @@ use Modules\Finance\Http\Requests\FinanceActionRequest;
 use Modules\Finance\Http\Requests\ListFinanceRequest;
 use Modules\Finance\Http\Requests\StoreFinanceAccountRequest;
 use Modules\Finance\Http\Requests\StoreJournalEntryRequest;
-use Modules\Finance\Http\Requests\UpdateFiscalStatusRequest;
 use Modules\Finance\Http\Requests\UpsertPostingProfileRequest;
 use Modules\Finance\Http\Resources\AccountBalanceReportResource;
 use Modules\Finance\Http\Resources\FinanceAccountResource;
@@ -27,8 +26,6 @@ use Modules\Finance\Models\FinanceAccountType;
 use Modules\Finance\Models\FinanceBankReconciliation;
 use Modules\Finance\Models\FinanceBankStatementLine;
 use Modules\Finance\Models\FinanceBudget;
-use Modules\Finance\Models\FinanceFiscalPeriod;
-use Modules\Finance\Models\FinanceFiscalYear;
 use Modules\Finance\Models\FinanceJournalEntry;
 use Modules\Finance\Models\FinancePostingProfile;
 use Modules\Finance\Services\AccountBalanceService;
@@ -40,7 +37,6 @@ use Modules\Finance\Services\ChartOfAccountsService;
 use Modules\Finance\Services\CurrencyRevaluationService;
 use Modules\Finance\Services\FinanceStatementService;
 use Modules\Finance\Services\FinanceTaxReportService;
-use Modules\Finance\Services\FiscalPeriodService;
 use Modules\Finance\Services\GeneralLedgerReportService;
 use Modules\Finance\Services\JournalEntryCreationService;
 use Modules\Finance\Services\JournalPostingService;
@@ -102,7 +98,7 @@ final class FinanceController
     public function journals(ListFinanceRequest $request): AnonymousResourceCollection
     {
         $query = $this->scope(FinanceJournalEntry::query(), $request)
-            ->with(['fiscalPeriod', 'postingProfile', 'reversalOf', 'reversals'])
+            ->with(['postingProfile', 'reversalOf', 'reversals'])
             ->withCount(['lines', 'ledgerEntries']);
 
         if ($request->filled('search')) {
@@ -128,13 +124,11 @@ final class FinanceController
     {
         return new JournalEntryResource($this->scope(FinanceJournalEntry::query(), $request)
             ->with([
-                'fiscalPeriod.fiscalYear',
                 'postingProfile',
                 'lines.account',
                 'lines.dimension',
                 'ledgerEntries.account',
                 'ledgerEntries.journalLine',
-                'ledgerEntries.fiscalPeriod',
                 'ledgerEntries.dimension',
                 'reversalOf',
                 'reversals',
@@ -244,7 +238,6 @@ final class FinanceController
         $result = $service->calculate(
             $request->tenantId(),
             $request->organizationUnitId(),
-            $request->filled('fiscal_period_id') ? (int) $request->input('fiscal_period_id') : null,
             $request->filled('date_from') ? (string) $request->input('date_from') : null,
             $request->filled('date_to') ? (string) $request->input('date_to') : null,
         );
@@ -383,10 +376,6 @@ final class FinanceController
         $accounts = $this->scope(FinanceAccount::query(), $request)
             ->orderBy('code')
             ->get(['id', 'code', 'name', 'is_posting_account', 'is_active']);
-        $periods = $this->scope(FinanceFiscalPeriod::query(), $request)
-            ->with('fiscalYear:id,name,status')
-            ->orderByDesc('start_date')
-            ->get();
         $profiles = FinancePostingProfile::query()
             ->where('tenant_id', $tenantId)
             ->where('is_active', true)
@@ -410,7 +399,7 @@ final class FinanceController
             ->orderBy('code')
             ->get(['id', 'code', 'name', 'is_posting_account', 'is_active']);
 
-        return response()->json(['data' => compact('types', 'categories', 'accounts', 'periods', 'profiles', 'dimensions', 'bankAccounts')]);
+        return response()->json(['data' => compact('types', 'categories', 'accounts', 'profiles', 'dimensions', 'bankAccounts')]);
     }
 
     public function postingProfiles(ListFinanceRequest $request): AnonymousResourceCollection
@@ -455,49 +444,6 @@ final class FinanceController
             $request->input('rules'),
             $model,
         ));
-    }
-
-    public function fiscalYears(ListFinanceRequest $request): AnonymousResourceCollection
-    {
-        return JsonResource::collection(
-            $this->scope(FinanceFiscalYear::query(), $request)
-                ->with('periods')
-                ->orderByDesc('start_date')
-                ->paginate($request->perPage()),
-        );
-    }
-
-    public function fiscalPeriods(ListFinanceRequest $request): AnonymousResourceCollection
-    {
-        $query = $this->scope(FinanceFiscalPeriod::query(), $request)
-            ->with('fiscalYear');
-        if ($request->filled('status')) {
-            $query->where('status', (string) $request->input('status'));
-        }
-
-        return JsonResource::collection(
-            $query->orderByDesc('start_date')->paginate($request->perPage()),
-        );
-    }
-
-    public function updateFiscalYearStatus(
-        UpdateFiscalStatusRequest $request,
-        int $year,
-        FiscalPeriodService $service,
-    ): JsonResponse {
-        $model = $this->scope(FinanceFiscalYear::query(), $request)->findOrFail($year);
-
-        return response()->json(['data' => $service->changeYearStatus($model, $request->status())]);
-    }
-
-    public function updateFiscalPeriodStatus(
-        UpdateFiscalStatusRequest $request,
-        int $period,
-        FiscalPeriodService $service,
-    ): JsonResponse {
-        $model = $this->scope(FinanceFiscalPeriod::query(), $request)->with('fiscalYear')->findOrFail($period);
-
-        return response()->json(['data' => $service->changePeriodStatus($model, $request->status())]);
     }
 
     public function bankReconciliations(ListFinanceRequest $request): AnonymousResourceCollection
@@ -626,7 +572,7 @@ final class FinanceController
         int $budget,
     ): JsonResource {
         return new JsonResource($this->scope(FinanceBudget::query(), $request)
-            ->with(['lines.account', 'lines.fiscalPeriod', 'lines.dimension'])
+            ->with(['lines.account', 'lines.dimension'])
             ->findOrFail($budget));
     }
 
@@ -640,10 +586,9 @@ final class FinanceController
             (int) $data['budget_year'],
             (string) $data['name'],
             $data['lines'],
-            isset($data['fiscal_year_id']) ? (int) $data['fiscal_year_id'] : null,
             (string) ($data['status'] ?? 'draft'),
             $data['description'] ?? null,
-        )->load(['lines.account', 'lines.fiscalPeriod', 'lines.dimension'])]);
+        )->load(['lines.account', 'lines.dimension'])]);
     }
 
     public function updateBudget(
@@ -660,11 +605,10 @@ final class FinanceController
             (int) $data['budget_year'],
             (string) $data['name'],
             $data['lines'],
-            isset($data['fiscal_year_id']) ? (int) $data['fiscal_year_id'] : null,
             (string) ($data['status'] ?? 'draft'),
             $data['description'] ?? null,
             $model,
-        )->load(['lines.account', 'lines.fiscalPeriod', 'lines.dimension'])]);
+        )->load(['lines.account', 'lines.dimension'])]);
     }
 
     public function budgetActuals(
@@ -673,7 +617,7 @@ final class FinanceController
         BudgetService $service,
     ): JsonResponse {
         $model = $this->scope(FinanceBudget::query(), $request)
-            ->with(['lines.account', 'lines.fiscalPeriod'])
+            ->with(['lines.account'])
             ->findOrFail($budget);
 
         return response()->json(['data' => $service->actualVsBudget($model)]);
@@ -695,7 +639,7 @@ final class FinanceController
 
     private function scope(
         Builder $query,
-        ListFinanceRequest|FinanceActionRequest|StoreFinanceAccountRequest|StoreJournalEntryRequest|UpdateFiscalStatusRequest|UpsertPostingProfileRequest $request,
+        ListFinanceRequest|FinanceActionRequest|StoreFinanceAccountRequest|StoreJournalEntryRequest|UpsertPostingProfileRequest $request,
     ): Builder {
         $query->where('tenant_id', $request->tenantId());
 
@@ -736,13 +680,6 @@ final class FinanceController
      */
     private function reportDates(ListFinanceRequest $request): array
     {
-        if ($request->filled('fiscal_period_id')) {
-            $period = $this->scope(FinanceFiscalPeriod::query(), $request)
-                ->findOrFail((int) $request->input('fiscal_period_id'));
-
-            return [$period->start_date->toDateString(), $period->end_date->toDateString()];
-        }
-
         return [
             $request->filled('date_from') ? (string) $request->input('date_from') : null,
             $request->filled('date_to') ? (string) $request->input('date_to') : null,
@@ -757,14 +694,12 @@ final class FinanceController
         return [
             'tenant_id' => ['required', 'integer', 'min:1'],
             'organization_unit_id' => ['nullable', 'integer', 'min:1'],
-            'fiscal_year_id' => ['nullable', 'integer', 'min:1', 'exists:finance_fiscal_years,id'],
             'budget_year' => ['required', 'integer', 'between:1900,2200'],
             'name' => ['required', 'string', 'max:255'],
             'status' => ['nullable', 'string', 'max:30'],
             'description' => ['nullable', 'string'],
             'lines' => ['required', 'array', 'min:1'],
             'lines.*.account_id' => ['required', 'integer', 'min:1', 'exists:finance_accounts,id'],
-            'lines.*.fiscal_period_id' => ['nullable', 'integer', 'min:1', 'exists:finance_fiscal_periods,id'],
             'lines.*.dimension_id' => ['nullable', 'integer', 'min:1', 'exists:finance_dimensions,id'],
             'lines.*.budget_month' => ['nullable', 'integer', 'between:1,12'],
             'lines.*.amount' => ['required', 'decimal:0,6', 'gte:0'],

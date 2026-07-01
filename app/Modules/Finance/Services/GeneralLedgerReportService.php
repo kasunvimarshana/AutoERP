@@ -21,7 +21,7 @@ final class GeneralLedgerReportService
     ): LengthAwarePaginator {
         $query = FinanceLedgerEntry::query()
             ->where('tenant_id', $tenantId)
-            ->with(['account', 'journalEntry', 'journalLine.account', 'fiscalPeriod', 'dimension']);
+            ->with(['account', 'journalEntry', 'journalLine.account', 'dimension']);
 
         $this->scopeOrganization($query, $organizationUnitId);
 

@@ -11,15 +11,12 @@ use InvalidArgumentException;
 use Modules\Finance\DTOs\CreateAccountData;
 use Modules\Finance\DTOs\CreateJournalEntryData;
 use Modules\Finance\DTOs\JournalLineData;
-use Modules\Finance\Enums\FiscalPeriodStatus;
 use Modules\Finance\Enums\JournalStatus;
 use Modules\Finance\Enums\JournalType;
 use Modules\Finance\Enums\NormalBalance;
 use Modules\Finance\Enums\StatementType;
 use Modules\Finance\Models\FinanceAccount;
 use Modules\Finance\Models\FinanceAccountType;
-use Modules\Finance\Models\FinanceFiscalPeriod;
-use Modules\Finance\Models\FinanceFiscalYear;
 use Modules\Finance\Models\FinanceJournalEntry;
 use Modules\Finance\Services\ChartOfAccountsService;
 use Modules\Finance\Services\JournalEntryCreationService;
@@ -67,10 +64,10 @@ final class FinanceEngineTest extends TestCase
 
     public function test_it_posts_balanced_journal_creates_ledger_entries_and_updates_balances(): void
     {
-        [$tenantId, $cash, $capital, $period] = $this->chartWithOpenPeriod();
+        [$tenantId, $cash, $capital] = $this->chart();
 
-        $this->withTenantExecutionContext($tenantId, function () use ($tenantId, $cash, $capital, $period): void {
-            $journal = $this->createCashCapitalJournal($tenantId, $cash, $capital, $period);
+        $this->withTenantExecutionContext($tenantId, function () use ($tenantId, $cash, $capital): void {
+            $journal = $this->createCashCapitalJournal($tenantId, $cash, $capital);
             $result = app(JournalPostingService::class)->post($journal);
 
             $this->assertSame(JournalStatus::Posted, $result->status);
@@ -84,13 +81,17 @@ final class FinanceEngineTest extends TestCase
             $this->assertSame('100000.000000', (string) $cash->refresh()->current_balance);
             $this->assertSame('100000.000000', (string) $capital->refresh()->current_balance);
 
-            $cashBalance = $cash->balances()->where('fiscal_period_id', $period->getKey())->firstOrFail();
-            $capitalBalance = $capital->balances()->where('fiscal_period_id', $period->getKey())->firstOrFail();
+            $cashBalance = $cash->balances()->firstOrFail();
+            $capitalBalance = $capital->balances()->firstOrFail();
 
             $this->assertSame('100000.000000', (string) $cashBalance->closing_debit);
             $this->assertSame('100000.000000', (string) $capitalBalance->closing_credit);
 
-            $trialBalance = app(TrialBalanceService::class)->calculate($tenantId, null, (int) $period->getKey());
+            $trialBalance = app(TrialBalanceService::class)->calculate(
+                tenantId: $tenantId,
+                dateFrom: '2026-06-01',
+                dateTo: '2026-06-30',
+            );
 
             $this->assertTrue($trialBalance->isBalanced);
             $this->assertSame('100000.000000', $trialBalance->totalDebit);
@@ -100,7 +101,7 @@ final class FinanceEngineTest extends TestCase
 
     public function test_it_rejects_unbalanced_journals(): void
     {
-        [$tenantId, $cash, $capital, $period] = $this->chartWithOpenPeriod();
+        [$tenantId, $cash, $capital] = $this->chart();
 
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Journal must be balanced before it can be created.');
@@ -109,8 +110,6 @@ final class FinanceEngineTest extends TestCase
             tenantId: $tenantId,
             journalDate: '2026-06-06',
             journalNumber: 'JE-BAD',
-            fiscalYearId: $period->fiscal_year_id,
-            fiscalPeriodId: (int) $period->getKey(),
             lines: [
                 new JournalLineData(accountId: (int) $cash->getKey(), lineNumber: 1, debit: '100.000000'),
                 new JournalLineData(accountId: (int) $capital->getKey(), lineNumber: 2, credit: '90.000000'),
@@ -118,27 +117,12 @@ final class FinanceEngineTest extends TestCase
         )));
     }
 
-    public function test_it_rejects_posting_into_closed_period(): void
-    {
-        [$tenantId, $cash, $capital, $period] = $this->chartWithOpenPeriod();
-
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Cannot post into a closed or locked fiscal period.');
-
-        $this->withTenantExecutionContext($tenantId, function () use ($tenantId, $cash, $capital, $period): void {
-            $period->forceFill(['status' => FiscalPeriodStatus::Closed->value])->save();
-            $journal = $this->createCashCapitalJournal($tenantId, $cash, $capital, $period, 'JE-CLOSED');
-
-            app(JournalPostingService::class)->post($journal);
-        });
-    }
-
     public function test_it_reverses_posted_journal_with_immutable_opposite_entry(): void
     {
-        [$tenantId, $cash, $capital, $period] = $this->chartWithOpenPeriod();
+        [$tenantId, $cash, $capital] = $this->chart();
 
-        $this->withTenantExecutionContext($tenantId, function () use ($tenantId, $cash, $capital, $period): void {
-            $journal = $this->createCashCapitalJournal($tenantId, $cash, $capital, $period, 'JE-REV');
+        $this->withTenantExecutionContext($tenantId, function () use ($tenantId, $cash, $capital): void {
+            $journal = $this->createCashCapitalJournal($tenantId, $cash, $capital, 'JE-REV');
             app(JournalPostingService::class)->post($journal);
 
             $reversal = app(JournalReversalService::class)->reverse($journal->refresh(), '2026-06-07');
@@ -192,7 +176,7 @@ final class FinanceEngineTest extends TestCase
 
     public function test_it_prevents_cross_tenant_posting(): void
     {
-        [$tenantId, $cash] = $this->chartWithOpenPeriod();
+        [$tenantId, $cash] = $this->chart();
         $otherTenantId = $this->createTenant('OTHER-FIN');
 
         $this->expectException(InvalidArgumentException::class);
@@ -209,9 +193,9 @@ final class FinanceEngineTest extends TestCase
     }
 
     /**
-     * @return array{0: int, 1: FinanceAccount, 2: FinanceAccount, 3: FinanceFiscalPeriod}
+     * @return array{0: int, 1: FinanceAccount, 2: FinanceAccount}
      */
-    private function chartWithOpenPeriod(): array
+    private function chart(): array
     {
         $tenantId = $this->createTenant();
 
@@ -236,25 +220,7 @@ final class FinanceEngineTest extends TestCase
                 normalBalance: NormalBalance::Credit,
             ));
 
-            $year = FinanceFiscalYear::query()->create([
-                'tenant_id' => $tenantId,
-                'name' => 'FY 2026',
-                'start_date' => '2026-01-01',
-                'end_date' => '2026-12-31',
-                'status' => FiscalPeriodStatus::Open->value,
-            ]);
-
-            $period = FinanceFiscalPeriod::query()->create([
-                'tenant_id' => $tenantId,
-                'fiscal_year_id' => $year->getKey(),
-                'name' => 'June 2026',
-                'period_number' => 6,
-                'start_date' => '2026-06-01',
-                'end_date' => '2026-06-30',
-                'status' => FiscalPeriodStatus::Open->value,
-            ]);
-
-            return [$tenantId, $cash, $capital, $period];
+            return [$tenantId, $cash, $capital];
         });
     }
 
@@ -262,15 +228,12 @@ final class FinanceEngineTest extends TestCase
         int $tenantId,
         FinanceAccount $cash,
         FinanceAccount $capital,
-        FinanceFiscalPeriod $period,
         string $journalNumber = 'JE-001',
     ): FinanceJournalEntry {
         return app(JournalEntryCreationService::class)->create(new CreateJournalEntryData(
             tenantId: $tenantId,
             journalDate: '2026-06-06',
             journalNumber: $journalNumber,
-            fiscalYearId: $period->fiscal_year_id,
-            fiscalPeriodId: (int) $period->getKey(),
             journalType: JournalType::Opening,
             description: 'Opening capital contribution',
             lines: [

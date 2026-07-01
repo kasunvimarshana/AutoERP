@@ -18,8 +18,6 @@ final readonly class CreateJournalEntryData
         public JournalType $journalType = JournalType::General,
         public ?int $organizationUnitId = null,
         public ?string $journalNumber = null,
-        public ?int $fiscalYearId = null,
-        public ?int $fiscalPeriodId = null,
         public ?PostingSourceData $source = null,
         public JournalStatus $status = JournalStatus::Draft,
         public ?string $description = null,

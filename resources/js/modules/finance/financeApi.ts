@@ -15,7 +15,6 @@ import type {
     FinanceAccountAssignment,
     FinanceAccountRole,
     FinanceLookups,
-    FiscalPeriod,
     JournalEntry,
     JournalPayload,
     LedgerEntry,
@@ -39,7 +38,6 @@ export type {
     FinanceAccountRole,
     FinanceLookup,
     FinanceLookups,
-    FiscalPeriod,
     JournalEntry,
     JournalLine,
     JournalPayload,
@@ -210,16 +208,6 @@ export async function endAccountAssignment(id: number, effectiveTo: string) {
     const response = await apiClient.post<ApiResource<FinanceAccountAssignment>>(`${endpoints.finance}/account-assignments/${id}/end`, {
         effective_to: effectiveTo,
     });
-    return response.data.data;
-}
-
-export async function listFiscalPeriods(params: ListParams, signal?: AbortSignal) {
-    const response = await apiClient.get<ApiCollection<FiscalPeriod>>(`${endpoints.finance}/fiscal-periods`, { params, signal });
-    return response.data;
-}
-
-export async function updateFiscalPeriodStatus(id: number, status: string) {
-    const response = await apiClient.patch<ApiResource<FiscalPeriod>>(`${endpoints.finance}/fiscal-periods/${id}/status`, { status });
     return response.data.data;
 }
 

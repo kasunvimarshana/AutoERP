@@ -16,8 +16,6 @@ return new class extends Migration
             $table->foreignId('organization_unit_id')->nullable();
             $table->string('journal_number', 100);
             $table->date('journal_date');
-            $table->foreignId('fiscal_year_id')->nullable();
-            $table->foreignId('fiscal_period_id')->nullable();
             $table->foreignId('posting_profile_id')->nullable();
             $table->string('source_module', 100)->nullable();
             $table->string('source_type')->nullable();
@@ -55,14 +53,6 @@ return new class extends Migration
             $table->foreign(['organization_unit_id', 'tenant_id'], 'finance_journal_entries_organization_unit_id_tenant_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('organization_units')
-                ->restrictOnDelete();
-            $table->foreign(['fiscal_year_id', 'tenant_id'], 'finance_journal_entries_fiscal_year_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('finance_fiscal_years')
-                ->restrictOnDelete();
-            $table->foreign(['fiscal_period_id', 'tenant_id'], 'finance_journal_entries_fiscal_period_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('finance_fiscal_periods')
                 ->restrictOnDelete();
             $table->foreign(['posting_profile_id', 'tenant_id'], 'finance_journal_entries_posting_profile_id_tenant_fk')
                 ->references(['id', 'tenant_id'])

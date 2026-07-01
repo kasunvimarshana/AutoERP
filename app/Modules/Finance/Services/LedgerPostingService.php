@@ -33,8 +33,6 @@ final class LedgerPostingService
                 'journal_entry_id' => $journal->getKey(),
                 'journal_line_id' => $line->getKey(),
                 'account_id' => $account->getKey(),
-                'fiscal_year_id' => $journal->fiscal_year_id,
-                'fiscal_period_id' => $journal->fiscal_period_id,
                 'dimension_id' => $line->dimension_id,
                 'entry_date' => $journal->journal_date,
                 'debit' => $this->math->normalize((string) $line->debit),

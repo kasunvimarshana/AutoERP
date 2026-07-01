@@ -317,7 +317,7 @@ final class ReportCatalog
                 $this->col('account', 'Account', 'account.code'), $this->col('account_name', 'Account Name', 'account.name'), $this->money('opening_debit', 'Opening Dr'),
                 $this->money('opening_credit', 'Opening Cr'), $this->money('period_debit', 'Period Dr'), $this->money('period_credit', 'Period Cr'),
                 $this->money('closing_debit', 'Closing Dr'), $this->money('closing_credit', 'Closing Cr'),
-            ], ['account.code', 'account.name'], ['account', 'fiscalPeriod']),
+            ], ['account.code', 'account.name'], ['account']),
             $this->chartOfAccounts(),
             $this->definition('finance.journals', 'Journal Entries', 'Finance', FinanceJournalEntry::class, [
                 $this->col('journal_date', 'Date', format: 'date', sort: 'journal_date'), $this->col('journal_number', 'Journal', sort: 'journal_number'),

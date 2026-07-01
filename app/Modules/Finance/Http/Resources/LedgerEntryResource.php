@@ -25,7 +25,6 @@ final class LedgerEntryResource extends JsonResource
             'account' => FinanceAccountSummaryResource::make($this->whenLoaded('account')),
             'journal_entry' => $this->whenLoaded('journalEntry'),
             'journal_line' => JournalLineResource::make($this->whenLoaded('journalLine')),
-            'fiscal_period' => $this->whenLoaded('fiscalPeriod'),
             'dimension' => $this->whenLoaded('dimension'),
         ];
     }

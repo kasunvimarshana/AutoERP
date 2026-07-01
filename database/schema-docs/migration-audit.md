@@ -69,7 +69,7 @@ Tables (2): `warehouses`, `warehouse_locations`.
 
 ### Finance
 
-Tables (16): `finance_account_types`, `finance_account_categories`, `finance_accounts`, `finance_fiscal_years`, `finance_fiscal_periods`, `finance_dimensions`, `finance_posting_profiles`, `finance_posting_profile_rules`, `finance_journal_entries`, `finance_journal_lines`, `finance_ledger_entries`, `finance_account_balances`, `finance_bank_reconciliations`, `finance_bank_statement_lines`, `finance_budgets`, `finance_budget_lines`.
+Tables (14): `finance_account_types`, `finance_account_categories`, `finance_accounts`, `finance_dimensions`, `finance_posting_profiles`, `finance_posting_profile_rules`, `finance_journal_entries`, `finance_journal_lines`, `finance_ledger_entries`, `finance_account_balances`, `finance_bank_reconciliations`, `finance_bank_statement_lines`, `finance_budgets`, `finance_budget_lines`.
 
 ### Tax
 

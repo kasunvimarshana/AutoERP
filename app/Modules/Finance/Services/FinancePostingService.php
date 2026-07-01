@@ -27,7 +27,6 @@ final class FinancePostingService implements FinancePostingInterface
         private readonly JournalPostingService $posting,
         private readonly JournalReversalService $reversals,
         private readonly PostingProfileService $profiles,
-        private readonly FiscalPeriodService $periods,
     ) {}
 
     public function createDraftJournal(PostingContext $request): PostingResultData
@@ -101,13 +100,6 @@ final class FinancePostingService implements FinancePostingInterface
         if (trim($request->source->sourceType) === '' || $request->source->sourceId < 1) {
             throw new InvalidArgumentException('Posting source type and ID are required.');
         }
-
-        $this->periods->resolve(
-            $request->source->tenantId,
-            $request->source->organizationUnitId,
-            $request->postingDate,
-            requireOpen: true,
-        );
 
         $profile = $this->profiles->resolveProfile($request);
 

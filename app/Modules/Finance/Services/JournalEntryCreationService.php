@@ -18,28 +18,19 @@ final class JournalEntryCreationService
         private readonly DecimalMath $math,
         private readonly FinanceValidationService $validator,
         private readonly JournalNumberService $numbers,
-        private readonly FiscalPeriodService $periods,
     ) {}
 
     public function create(CreateJournalEntryData $data): FinanceJournalEntry
     {
         $this->validator->validateJournalCreation($data);
         [$totalDebit, $totalCredit] = $this->validator->journalTotals($data->lines);
-        $period = $this->periods->resolve(
-            $data->tenantId,
-            $data->organizationUnitId,
-            $data->journalDate,
-            $data->fiscalPeriodId,
-        );
 
-        return DB::transaction(function () use ($data, $totalDebit, $totalCredit, $period): FinanceJournalEntry {
+        return DB::transaction(function () use ($data, $totalDebit, $totalCredit): FinanceJournalEntry {
             $journal = FinanceJournalEntry::query()->create([
                 'tenant_id' => $data->tenantId,
                 'organization_unit_id' => $data->organizationUnitId,
                 'journal_number' => $this->numbers->resolve($data),
                 'journal_date' => $data->journalDate,
-                'fiscal_year_id' => $period->fiscal_year_id,
-                'fiscal_period_id' => $period->getKey(),
                 'posting_profile_id' => $data->postingProfileId,
                 'source_module' => $data->source?->sourceModule,
                 'source_type' => $data->source?->sourceType,
@@ -62,7 +53,7 @@ final class JournalEntryCreationService
 
             $this->saveLines($journal, $data);
 
-            return $journal->load(['lines.account', 'fiscalPeriod']);
+            return $journal->load(['lines.account']);
         });
     }
 
@@ -70,22 +61,14 @@ final class JournalEntryCreationService
     {
         $this->validator->validateJournalCreation($data);
         [$totalDebit, $totalCredit] = $this->validator->journalTotals($data->lines);
-        $period = $this->periods->resolve(
-            $data->tenantId,
-            $data->organizationUnitId,
-            $data->journalDate,
-            $data->fiscalPeriodId,
-        );
 
-        return DB::transaction(function () use ($journal, $data, $period, $totalDebit, $totalCredit): FinanceJournalEntry {
+        return DB::transaction(function () use ($journal, $data, $totalDebit, $totalCredit): FinanceJournalEntry {
             $journal = FinanceJournalEntry::query()->lockForUpdate()->findOrFail($journal->getKey());
             $this->assertDraft($journal, 'Only draft journals can be edited.');
 
             $journal->lines()->delete();
             $journal->forceFill([
                 'journal_date' => $data->journalDate,
-                'fiscal_year_id' => $period->fiscal_year_id,
-                'fiscal_period_id' => $period->getKey(),
                 'posting_profile_id' => $data->postingProfileId,
                 'source_module' => $data->source?->sourceModule,
                 'source_type' => $data->source?->sourceType,
@@ -104,7 +87,7 @@ final class JournalEntryCreationService
 
             $this->saveLines($journal, $data);
 
-            return $journal->refresh()->load(['lines.account', 'fiscalPeriod', 'postingProfile']);
+            return $journal->refresh()->load(['lines.account', 'postingProfile']);
         });
     }
 

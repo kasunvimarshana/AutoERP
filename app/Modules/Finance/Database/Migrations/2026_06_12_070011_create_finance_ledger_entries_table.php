@@ -17,8 +17,6 @@ return new class extends Migration
             $table->foreignId('journal_entry_id');
             $table->foreignId('journal_line_id');
             $table->foreignId('account_id');
-            $table->foreignId('fiscal_year_id')->nullable();
-            $table->foreignId('fiscal_period_id')->nullable();
             $table->foreignId('dimension_id')->nullable();
             $table->date('entry_date');
             $table->decimal('debit', 20, 6)->default('0');
@@ -37,7 +35,6 @@ return new class extends Migration
             $table->index('account_id', 'finance_ledger_account_ix');
             $table->index('entry_date', 'finance_ledger_date_ix');
             $table->index(['source_type', 'source_id'], 'finance_ledger_source_ix');
-            $table->index(['tenant_id', 'organization_unit_id', 'fiscal_period_id'], 'finance_ledger_scope_period_ix', );
             $table->index(['tenant_id', 'source_module', 'source_type', 'source_id'], 'finance_ledger_tenant_source_trace_ix', );
 
             $table->unique(['id', 'tenant_id'], 'finance_ledger_entries_id_tenant_uk');
@@ -56,14 +53,6 @@ return new class extends Migration
             $table->foreign(['account_id', 'tenant_id'], 'finance_ledger_entries_account_id_tenant_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('finance_accounts')
-                ->restrictOnDelete();
-            $table->foreign(['fiscal_year_id', 'tenant_id'], 'finance_ledger_entries_fiscal_year_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('finance_fiscal_years')
-                ->restrictOnDelete();
-            $table->foreign(['fiscal_period_id', 'tenant_id'], 'finance_ledger_entries_fiscal_period_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('finance_fiscal_periods')
                 ->restrictOnDelete();
             $table->foreign(['dimension_id', 'tenant_id'], 'finance_ledger_entries_dimension_id_tenant_fk')
                 ->references(['id', 'tenant_id'])

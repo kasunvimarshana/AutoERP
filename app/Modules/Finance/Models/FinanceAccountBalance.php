@@ -21,8 +21,6 @@ final class FinanceAccountBalance extends TenantOwnedModel
             'tenant_id' => 'integer',
             'organization_unit_id' => 'integer',
             'account_id' => 'integer',
-            'fiscal_year_id' => 'integer',
-            'fiscal_period_id' => 'integer',
             'opening_debit' => 'decimal:6',
             'opening_credit' => 'decimal:6',
             'period_debit' => 'decimal:6',
@@ -47,13 +45,4 @@ final class FinanceAccountBalance extends TenantOwnedModel
         return $this->belongsTo(FinanceAccount::class, 'account_id');
     }
 
-    public function fiscalYear(): BelongsTo
-    {
-        return $this->belongsTo(FinanceFiscalYear::class, 'fiscal_year_id');
-    }
-
-    public function fiscalPeriod(): BelongsTo
-    {
-        return $this->belongsTo(FinanceFiscalPeriod::class, 'fiscal_period_id');
-    }
 }

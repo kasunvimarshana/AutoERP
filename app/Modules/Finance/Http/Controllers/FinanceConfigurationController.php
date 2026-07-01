@@ -20,7 +20,6 @@ use Modules\Finance\Models\FinanceAccountCategory;
 use Modules\Finance\Models\FinanceAccountRole;
 use Modules\Finance\Models\FinanceAccountType;
 use Modules\Finance\Models\FinanceDimension;
-use Modules\Finance\Models\FinanceFiscalPeriod;
 use Modules\Finance\Models\FinancePostingProfile;
 use Modules\Finance\Services\AccountRoleAssignmentService;
 use Modules\Finance\Services\PostingProfileService;
@@ -45,10 +44,6 @@ final class FinanceConfigurationController
         $accounts = $this->scopeOrganization(FinanceAccount::query()->where('tenant_id', $tenantId), $organizationUnitId)
             ->orderBy('code')
             ->get(['id', 'code', 'name', 'is_posting_account', 'is_active']);
-        $periods = $this->scopeOrganization(FinanceFiscalPeriod::query()->where('tenant_id', $tenantId), $organizationUnitId)
-            ->with('fiscalYear:id,name,status')
-            ->orderByDesc('start_date')
-            ->get();
         $profiles = $this->scopeOrganization(FinancePostingProfile::query()->where('tenant_id', $tenantId), $organizationUnitId)
             ->where('is_active', true)
             ->with('rules.role:id,code,name,is_active')
@@ -87,7 +82,6 @@ final class FinanceConfigurationController
             'types' => $types,
             'categories' => $categories,
             'accounts' => $accounts,
-            'periods' => $periods,
             'profiles' => PostingProfileResource::collection($profiles)->resolve($request),
             'account_roles' => FinanceAccountRoleResource::collection($accountRoles)->resolve($request),
             'account_assignments' => FinanceAccountAssignmentResource::collection($assignments)->resolve($request),

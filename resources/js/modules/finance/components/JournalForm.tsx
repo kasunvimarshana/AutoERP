@@ -17,7 +17,6 @@ export function JournalForm({ value, onChange, lookups, error }: {
     const totalDebit = sumDecimals(value.lines.map((line) => line.debit || '0'));
     const totalCredit = sumDecimals(value.lines.map((line) => line.credit || '0'));
     const balanced = compareDecimalStrings(totalDebit, totalCredit) === 0 && compareDecimalStrings(totalDebit, '0') > 0;
-    const matchedPeriod = lookups.periods.find((period) => value.journal_date >= period.start_date.slice(0, 10) && value.journal_date <= period.end_date.slice(0, 10));
     const postableAccounts = lookups.accounts.filter((account) => account.is_posting_account && account.is_active);
     const set = <K extends keyof JournalPayload>(key: K, next: JournalPayload[K]) => onChange({ ...value, [key]: next });
 
@@ -44,11 +43,6 @@ export function JournalForm({ value, onChange, lookups, error }: {
                 <Input label="Source date" type="date" value={value.source_date ?? ''} onChange={(event) => set('source_date', event.target.value || null)} />
             </div>
             <div className="mt-4"><Textarea label="Description" value={value.description ?? ''} onChange={(event) => set('description', event.target.value || null)} error={fieldError(error, 'description')} /></div>
-            <div className={`mt-4 rounded-lg border px-4 py-3 text-sm ${matchedPeriod?.status === 'open' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-900'}`}>
-                {matchedPeriod
-                    ? `Fiscal period: ${matchedPeriod.name} (${matchedPeriod.status.replaceAll('_', ' ')})`
-                    : 'No fiscal period matches this journal date. The backend will reject posting.'}
-            </div>
         </Panel>
 
         <Panel title="Journal lines">

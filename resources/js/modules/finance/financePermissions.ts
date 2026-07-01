@@ -11,8 +11,6 @@ export const financePermissions = {
     journalsReverse: 'finance.journals.reverse',
     reportsView: 'finance.reports.view',
     currencyRevaluationsPost: 'finance.currency_revaluations.post',
-    fiscalCalendarView: 'finance.fiscal_calendar.view',
-    fiscalCalendarManage: 'finance.fiscal_calendar.manage',
     bankReconciliationsView: 'finance.bank_reconciliations.view',
     bankReconciliationsManage: 'finance.bank_reconciliations.manage',
     budgetsView: 'finance.budgets.view',

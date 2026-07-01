@@ -26,7 +26,6 @@ final class BudgetService
         int $budgetYear,
         string $name,
         array $lines,
-        ?int $fiscalYearId = null,
         string $status = 'draft',
         ?string $description = null,
         ?FinanceBudget $budget = null,
@@ -37,7 +36,6 @@ final class BudgetService
             $budgetYear,
             $name,
             $lines,
-            $fiscalYearId,
             $status,
             $description,
             $budget,
@@ -56,7 +54,6 @@ final class BudgetService
             $budget->forceFill([
                 'tenant_id' => $tenantId,
                 'organization_unit_id' => $organizationUnitId,
-                'fiscal_year_id' => $fiscalYearId,
                 'budget_year' => $budgetYear,
                 'name' => trim($name),
                 'status' => $status,
@@ -79,14 +76,13 @@ final class BudgetService
                     'tenant_id' => $tenantId,
                     'organization_unit_id' => $organizationUnitId,
                     'account_id' => $account->getKey(),
-                    'fiscal_period_id' => $line['fiscal_period_id'] ?? null,
                     'dimension_id' => $line['dimension_id'] ?? null,
                     'budget_month' => $line['budget_month'] ?? null,
                     'amount' => $amount,
                 ]);
             }
 
-            return $budget->refresh()->load(['lines.account', 'lines.fiscalPeriod', 'lines.dimension']);
+            return $budget->refresh()->load(['lines.account', 'lines.dimension']);
         });
     }
 
@@ -95,7 +91,7 @@ final class BudgetService
      */
     public function actualVsBudget(FinanceBudget $budget): array
     {
-        $budget->loadMissing(['lines.account', 'lines.fiscalPeriod']);
+        $budget->loadMissing(['lines.account']);
         $rows = [];
         $totalBudget = '0.000000';
         $totalActual = '0.000000';
@@ -112,7 +108,6 @@ final class BudgetService
                 'account_id' => (int) $account->getKey(),
                 'account_code' => (string) $account->code,
                 'account_name' => (string) $account->name,
-                'fiscal_period_id' => $line->fiscal_period_id,
                 'budget_month' => $line->budget_month,
                 'budget_amount' => $budgetAmount,
                 'actual_amount' => $actual,
@@ -144,9 +139,7 @@ final class BudgetService
             ? $query->whereNull('organization_unit_id')
             : $query->where('organization_unit_id', $line->organization_unit_id);
 
-        if ($line->fiscal_period_id !== null) {
-            $query->where('fiscal_period_id', $line->fiscal_period_id);
-        } elseif ($line->budget_month !== null) {
+        if ($line->budget_month !== null) {
             $query->whereMonth('entry_date', (int) $line->budget_month);
             $query->whereYear('entry_date', (int) $line->budget->budget_year);
         } else {

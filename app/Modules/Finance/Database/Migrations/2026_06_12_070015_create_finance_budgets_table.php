@@ -14,7 +14,6 @@ return new class extends Migration
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants', 'id', indexName: 'finance_budgets_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
-            $table->foreignId('fiscal_year_id')->nullable();
             $table->unsignedSmallInteger('budget_year');
             $table->string('name');
             $table->string('status', 30)->default('draft');
@@ -31,10 +30,6 @@ return new class extends Migration
             $table->foreign(['organization_unit_id', 'tenant_id'], 'finance_budgets_organization_unit_id_tenant_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('organization_units')
-                ->restrictOnDelete();
-            $table->foreign(['fiscal_year_id', 'tenant_id'], 'finance_budgets_fiscal_year_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('finance_fiscal_years')
                 ->restrictOnDelete();
         });
     }

@@ -9,13 +9,11 @@ use Modules\Core\Services\DecimalMath;
 use Modules\Finance\DTOs\CreateAccountData;
 use Modules\Finance\DTOs\CreateJournalEntryData;
 use Modules\Finance\DTOs\JournalLineData;
-use Modules\Finance\Enums\FiscalPeriodStatus;
 use Modules\Finance\Enums\JournalStatus;
 use Modules\Finance\Models\FinanceAccount;
 use Modules\Finance\Models\FinanceAccountCategory;
 use Modules\Finance\Models\FinanceAccountType;
 use Modules\Finance\Models\FinanceDimension;
-use Modules\Finance\Models\FinanceFiscalPeriod;
 use Modules\Finance\Models\FinanceJournalEntry;
 use Modules\Finance\Models\FinancePostingProfile;
 
@@ -145,16 +143,6 @@ final class FinanceValidationService
 
         if ($this->math->compare((string) $journal->total_debit, (string) $journal->total_credit) !== 0) {
             throw new InvalidArgumentException('Unbalanced journal cannot be posted.');
-        }
-
-        if ($journal->fiscalPeriod instanceof FinanceFiscalPeriod) {
-            $periodStatus = $journal->fiscalPeriod->status instanceof FiscalPeriodStatus
-                ? $journal->fiscalPeriod->status
-                : FiscalPeriodStatus::from((string) $journal->fiscalPeriod->status);
-
-            if ($periodStatus !== FiscalPeriodStatus::Open) {
-                throw new InvalidArgumentException('Cannot post into a closed or locked fiscal period.');
-            }
         }
 
         foreach ($journal->lines as $line) {

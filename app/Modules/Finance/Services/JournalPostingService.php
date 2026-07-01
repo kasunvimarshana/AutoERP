@@ -15,7 +15,6 @@ final class JournalPostingService
 {
     public function __construct(
         private readonly FinanceValidationService $validator,
-        private readonly FiscalPeriodService $periods,
         private readonly LedgerPostingService $ledger,
     ) {}
 
@@ -23,7 +22,7 @@ final class JournalPostingService
     {
         return DB::transaction(function () use ($journal, $postedBy): JournalPostingResult {
             $journal = FinanceJournalEntry::query()
-                ->with(['lines.account', 'fiscalPeriod'])
+                ->with(['lines.account'])
                 ->lockForUpdate()
                 ->findOrFail($journal->getKey());
             $status = $this->statusOf($journal);
@@ -35,7 +34,6 @@ final class JournalPostingService
                 throw new InvalidArgumentException('Only draft journals can be posted.');
             }
 
-            $this->periods->assertOpen($journal->fiscalPeriod);
             $this->validator->validateForPosting($journal);
 
             $ledgerCount = $this->ledger->post($journal);

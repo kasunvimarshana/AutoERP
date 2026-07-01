@@ -21,7 +21,6 @@ final class FinanceBudget extends TenantOwnedModel
         return array_merge(parent::casts(), [
             'tenant_id' => 'integer',
             'organization_unit_id' => 'integer',
-            'fiscal_year_id' => 'integer',
             'budget_year' => 'integer',
         ]);
     }
@@ -34,11 +33,6 @@ final class FinanceBudget extends TenantOwnedModel
     public function organizationUnit(): BelongsTo
     {
         return $this->belongsTo(OrganizationUnitModel::class, 'organization_unit_id');
-    }
-
-    public function fiscalYear(): BelongsTo
-    {
-        return $this->belongsTo(FinanceFiscalYear::class, 'fiscal_year_id');
     }
 
     public function lines(): HasMany

@@ -48,16 +48,6 @@ export interface FinanceAccountAssignment extends Record<string, unknown> {
     account?: FinanceLookup;
 }
 
-export interface FiscalPeriod extends Record<string, unknown> {
-    id: number;
-    name: string;
-    period_number: number;
-    start_date: string;
-    end_date: string;
-    status: string;
-    fiscal_year?: { id: number; name: string; status: string };
-}
-
 export interface PostingProfile extends FinanceLookup {
     rules?: Array<{
         id: number;
@@ -72,7 +62,6 @@ export interface FinanceLookups {
     types: FinanceLookup[];
     categories: FinanceLookup[];
     accounts: FinanceLookup[];
-    periods: FiscalPeriod[];
     profiles: PostingProfile[];
     account_roles: FinanceAccountRole[];
     account_assignments: FinanceAccountAssignment[];
@@ -124,7 +113,6 @@ export interface JournalEntry extends Record<string, unknown> {
     source_number?: string | null;
     source_date?: string | null;
     reversal_reason?: string | null;
-    fiscal_period?: FiscalPeriod;
     posting_profile?: PostingProfile | null;
     lines?: JournalLine[];
     ledger_entries?: LedgerEntry[];
@@ -139,7 +127,6 @@ export interface JournalEntry extends Record<string, unknown> {
 export interface JournalPayload {
     journal_date: string;
     journal_type: string;
-    fiscal_period_id?: number | null;
     posting_profile_id?: number | null;
     source_module?: string | null;
     source_type?: string | null;
@@ -172,7 +159,6 @@ export interface LedgerEntry extends Record<string, unknown> {
     account?: FinanceLookup;
     journal_entry?: { id: number; journal_number?: string; description?: string };
     journal_line?: JournalLine;
-    fiscal_period?: FiscalPeriod;
 }
 
 export interface AccountBalanceRow extends Record<string, unknown> {
@@ -274,6 +260,5 @@ export interface BudgetPayload {
     budget_year: number;
     status: string;
     description?: string | null;
-    fiscal_year_id?: number | null;
     lines: Array<{ account_id: number | null; budget_month?: number | null; amount: string }>;
 }

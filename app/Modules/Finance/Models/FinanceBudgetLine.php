@@ -22,7 +22,6 @@ final class FinanceBudgetLine extends TenantOwnedModel
             'tenant_id' => 'integer',
             'organization_unit_id' => 'integer',
             'account_id' => 'integer',
-            'fiscal_period_id' => 'integer',
             'dimension_id' => 'integer',
             'budget_month' => 'integer',
             'amount' => 'decimal:6',
@@ -47,11 +46,6 @@ final class FinanceBudgetLine extends TenantOwnedModel
     public function account(): BelongsTo
     {
         return $this->belongsTo(FinanceAccount::class, 'account_id');
-    }
-
-    public function fiscalPeriod(): BelongsTo
-    {
-        return $this->belongsTo(FinanceFiscalPeriod::class, 'fiscal_period_id');
     }
 
     public function dimension(): BelongsTo

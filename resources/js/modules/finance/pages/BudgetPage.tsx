@@ -75,9 +75,9 @@ export default function BudgetPage() {
                         <span>Actual <MoneyDisplay value={String(actuals.total_actual ?? '0.000000')} /></span>
                         <span>Variance <MoneyDisplay value={String(actuals.variance ?? '0.000000')} /></span>
                     </div>
-                    <DataTable rows={Array.isArray(actuals.rows) ? actuals.rows as Array<Record<string, unknown>> : []} rowKey={(row) => `${row.account_code}-${row.budget_month ?? row.fiscal_period_id ?? 'annual'}`} columns={[
+                    <DataTable rows={Array.isArray(actuals.rows) ? actuals.rows as Array<Record<string, unknown>> : []} rowKey={(row) => `${row.account_code}-${row.budget_month ?? 'annual'}`} columns={[
                         { key: 'account', header: 'Account', render: (row) => `${row.account_code} - ${row.account_name}` },
-                        { key: 'period', header: 'Period', render: (row) => row.budget_month ? `Month ${row.budget_month}` : row.fiscal_period_id ? 'Fiscal period' : 'Annual' },
+                        { key: 'period', header: 'Period', render: (row) => row.budget_month ? `Month ${row.budget_month}` : 'Annual' },
                         { key: 'budget', header: 'Budget', render: (row) => <MoneyDisplay value={String(row.budget_amount ?? '0.000000')} /> },
                         { key: 'actual', header: 'Actual', render: (row) => <MoneyDisplay value={String(row.actual_amount ?? '0.000000')} /> },
                         { key: 'variance', header: 'Variance', render: (row) => <MoneyDisplay value={String(row.variance ?? '0.000000')} /> },

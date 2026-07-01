@@ -17,8 +17,6 @@ use Modules\Finance\Enums\NormalBalance;
 use Modules\Finance\Enums\StatementType;
 use Modules\Finance\Models\FinanceAccount;
 use Modules\Finance\Models\FinanceAccountType;
-use Modules\Finance\Models\FinanceFiscalPeriod;
-use Modules\Finance\Models\FinanceFiscalYear;
 use Modules\Finance\Models\FinanceJournalEntry;
 use Modules\Finance\Models\FinancePostingProfile;
 use Modules\Finance\Models\FinancePostingProfileRule;
@@ -825,26 +823,6 @@ final class FastSalesTest extends TestCase
                 'cost_of_goods_sold' => $this->accountRole($tenantId, $organizationUnitId, 'cost_of_goods_sold', $cogs),
                 'inventory' => $this->accountRole($tenantId, $organizationUnitId, 'sales_inventory', $inventory),
             ]);
-
-            $year = FinanceFiscalYear::query()->create([
-                'tenant_id' => $tenantId,
-                'organization_unit_id' => $organizationUnitId,
-                'name' => 'FY 2026',
-                'start_date' => '2026-01-01',
-                'end_date' => '2026-12-31',
-                'status' => 'open',
-            ]);
-            FinanceFiscalPeriod::query()->create([
-                'tenant_id' => $tenantId,
-                'organization_unit_id' => $organizationUnitId,
-                'fiscal_year_id' => $year->getKey(),
-                'name' => 'June 2026',
-                'period_number' => 6,
-                'start_date' => '2026-06-01',
-                'end_date' => '2026-06-30',
-                'status' => 'open',
-            ]);
-
             return [
                 'cash' => (int) $cash->getKey(),
                 'bank' => (int) $bank->getKey(),

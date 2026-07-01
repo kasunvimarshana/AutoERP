@@ -17,7 +17,6 @@ final class ListFinanceRequest extends TenantScopedRequest
             'account_type_id' => ['nullable', 'integer', 'min:1'],
             'is_active' => ['nullable', 'boolean'],
             'account_id' => ['nullable', 'integer', 'min:1'],
-            'fiscal_period_id' => ['nullable', 'integer', 'min:1'],
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
             'status' => ['nullable', 'string', 'max:30'],

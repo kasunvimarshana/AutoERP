@@ -94,7 +94,6 @@ export default function FinanceJournalDetailPage() {
                 { label: 'Status', value: <StatusBadge status={journal.status} /> },
                 { label: 'Date', value: formatDate(journal.journal_date) },
                 { label: 'Type', value: journal.journal_type.replaceAll('_', ' ') },
-                { label: 'Fiscal period', value: journal.fiscal_period ? `${journal.fiscal_period.name} (${journal.fiscal_period.status})` : '-' },
                 { label: 'Source', value: journal.source_number ?? ([journal.source_module, journal.source_type].filter(Boolean).join(' / ') || '-') },
                 { label: 'Description', value: journal.description ?? '-' },
                 { label: 'Total debit', value: <MoneyDisplay value={journal.total_debit} /> },

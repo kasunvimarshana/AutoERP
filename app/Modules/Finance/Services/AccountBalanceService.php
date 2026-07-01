@@ -25,12 +25,10 @@ final class AccountBalanceService
             'tenant_id' => $journal->tenant_id,
             'organization_unit_id' => $journal->organization_unit_id,
             'account_id' => $line->account_id,
-            'fiscal_period_id' => $journal->fiscal_period_id,
         ]);
 
         if (! $balance->exists) {
             $balance->forceFill([
-                'fiscal_year_id' => $journal->fiscal_year_id,
                 'opening_debit' => '0.000000',
                 'opening_credit' => '0.000000',
                 'period_debit' => '0.000000',
