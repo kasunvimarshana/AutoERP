@@ -171,7 +171,11 @@ final class TenantAccessProvisioner implements TenantAccessProvisionerInterface
         if ($lockForUpdate) {
             $assignedQuery->lockForUpdate();
         }
-        $assignedNames = $assignedQuery->pluck('permissions.name')->map(static fn ($name): string => (string) $name)->all();
+        $assignedNames = $assignedQuery->pluck('permissions.name')
+            ->map(static fn ($name): string => (string) $name)
+            ->sort()
+            ->values()
+            ->all();
 
         return $assignedNames === $expectedNames;
     }

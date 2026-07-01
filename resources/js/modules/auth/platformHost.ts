@@ -1,11 +1,17 @@
-export function isCentralPlatformHost(): boolean {
+const LOOPBACK_HOSTNAMES = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
+
+export function isCentralPlatformHost(
+    currentHost = window.location.host,
+    currentHostname = window.location.hostname,
+): boolean {
     if (import.meta.env.DEV) return false;
+    if (localTenantFallbackEnabled() && LOOPBACK_HOSTNAMES.has(currentHostname.toLowerCase())) return false;
 
     const configured = String(import.meta.env.VITE_PLATFORM_PUBLIC_URL ?? '').trim();
     if (configured === '') return false;
 
     try {
-        return new URL(configured).host.toLowerCase() === window.location.host.toLowerCase();
+        return new URL(configured).host.toLowerCase() === currentHost.toLowerCase();
     } catch {
         return false;
     }
@@ -28,4 +34,8 @@ export function workspaceLoginUrl(value: string): string | null {
     } catch {
         return null;
     }
+}
+
+function localTenantFallbackEnabled(): boolean {
+    return String(import.meta.env.VITE_TENANT_LOCAL_FALLBACK_ENABLED ?? '').trim().toLowerCase() === 'true';
 }
