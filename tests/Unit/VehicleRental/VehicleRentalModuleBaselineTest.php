@@ -22,7 +22,7 @@ final class VehicleRentalModuleBaselineTest extends TestCase
         $migrations = glob($migrationDirectory.'/*.php') ?: [];
         sort($migrations);
 
-        self::assertCount(24, $migrations);
+        self::assertCount(26, $migrations);
 
         $source = implode("\n", array_map(
             static fn (string $path): string => (string) file_get_contents($path),
@@ -42,6 +42,8 @@ final class VehicleRentalModuleBaselineTest extends TestCase
         self::assertStringContainsString("'rental_vehicle_replacements'", $source);
         self::assertStringContainsString("'vehicle_finance_installments'", $source);
         self::assertStringContainsString("'rental_deposit_requirements'", $source);
+        self::assertStringContainsString("'rental_usage_facts'", $source);
+        self::assertStringContainsString("'rental_calculation_sources'", $source);
     }
 
     public function test_core_financial_modules_remain_authoritative(): void
@@ -53,6 +55,8 @@ final class VehicleRentalModuleBaselineTest extends TestCase
         self::assertStringContainsString('PaymentAllocationService', $moduleSource);
         self::assertStringContainsString('TaxCalculationService', $moduleSource);
         self::assertStringContainsString('VehicleStatusService', $moduleSource);
+        self::assertStringContainsString('RentalCalculationSourceService', $moduleSource);
+        self::assertStringNotContainsString('RentalUsageStatus::Consumed', $moduleSource);
 
         foreach (['rental_invoice_links', 'rental_payment_links', 'rental_charges'] as $legacyTable) {
             self::assertStringNotContainsString($legacyTable, $moduleSource);
@@ -89,11 +93,13 @@ final class VehicleRentalModuleBaselineTest extends TestCase
             'rental_usage_logs',
             'rental_usage_events',
             'rental_usage_contexts',
+            'rental_usage_facts',
             'rental_expenses',
             'rental_expense_allocations',
             'rental_billing_periods',
             'rental_calculation_runs',
             'rental_calculation_lines',
+            'rental_calculation_sources',
             'rental_deposit_requirements',
             'rental_deposit_links',
             'rental_status_histories',
