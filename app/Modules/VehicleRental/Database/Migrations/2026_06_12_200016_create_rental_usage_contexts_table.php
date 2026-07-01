@@ -29,10 +29,11 @@ return new class extends Migration
             $table->unsignedBigInteger('updated_by')->nullable();
             $table->timestamps();
 
-            $table->unique(['usage_log_id', 'financial_side', 'agreement_id'], 'rental_usage_contexts_log_side_agreement_uk');
+            $table->unique(['usage_log_id', 'financial_side'], 'rental_usage_contexts_log_side_uk');
             $table->unique(['tenant_id', 'context_fingerprint'], 'rental_usage_contexts_fingerprint_uk');
             $table->index(['agreement_id', 'financial_side', 'usage_log_id'], 'rental_usage_contexts_agreement_side_ix');
             $table->unique(['id', 'tenant_id'], 'rental_usage_contexts_id_tenant_uk');
+            $table->unique(['id', 'tenant_id', 'financial_side'], 'rental_usage_contexts_id_tenant_side_uk');
 
             $table->foreign(['organization_unit_id', 'tenant_id'], 'rental_usage_contexts_organization_unit_id_tenant_fk')
                 ->references(['id', 'tenant_id'])
