@@ -82,7 +82,7 @@ export default function RentalBillingPage() {
     const transition = async (run: RentalCalculationRun, status: string) => {
         setActionError(null);
         try {
-            await transitionRentalCalculationRun(run.id, status);
+            await transitionRentalCalculationRun(run.id, run.row_version, status);
             runs.reload();
         } catch (error: unknown) {
             setActionError(toApiError(error));
