@@ -55,13 +55,12 @@ return new class extends Migration
                 ->references(['id', 'tenant_id'])
                 ->on('organization_units')
                 ->restrictOnDelete();
-            $table->foreign(['usage_context_id', 'tenant_id', 'financial_side'], 'rental_usage_facts_usage_context_tenant_side_fk')
-                ->references(['id', 'tenant_id', 'financial_side'])
+            $table->foreign(
+                ['usage_context_id', 'tenant_id', 'financial_side', 'usage_log_id'],
+                'rental_usage_facts_context_tenant_side_log_fk',
+            )
+                ->references(['id', 'tenant_id', 'financial_side', 'usage_log_id'])
                 ->on('rental_usage_contexts')
-                ->restrictOnDelete();
-            $table->foreign(['usage_log_id', 'tenant_id'], 'rental_usage_facts_usage_log_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('rental_usage_logs')
                 ->restrictOnDelete();
             $table->foreign(['submitted_by', 'tenant_id'], 'rental_usage_facts_submitted_by_tenant_fk')
                 ->references(['id', 'tenant_id'])
