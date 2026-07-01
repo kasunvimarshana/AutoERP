@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -86,6 +87,24 @@ return new class extends Migration
                 ->on('users')
                 ->restrictOnDelete();
         });
+
+        DB::statement(<<<'SQL'
+            ALTER TABLE rental_calculation_sources
+            ADD CONSTRAINT rental_calculation_sources_valid_source_ck
+            CHECK (
+                (
+                    source_kind = 'usage_context'
+                    AND usage_context_id IS NOT NULL
+                    AND expense_allocation_id IS NULL
+                )
+                OR
+                (
+                    source_kind = 'expense_allocation'
+                    AND usage_context_id IS NULL
+                    AND expense_allocation_id IS NOT NULL
+                )
+            )
+        SQL);
     }
 
     public function down(): void
