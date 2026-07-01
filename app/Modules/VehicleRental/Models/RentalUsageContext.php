@@ -48,4 +48,5 @@ final class RentalUsageContext extends TenantOwnedModel
     public function supplier(): BelongsTo { return $this->belongsTo(Supplier::class, 'supplier_id'); }
     public function currency(): BelongsTo { return $this->belongsTo(CurrencyModel::class, 'currency_id'); }
     public function calculationLines(): HasMany { return $this->hasMany(RentalCalculationLine::class, 'usage_context_id'); }
+    public function calculationSources(): HasMany { return $this->hasMany(RentalCalculationSource::class, 'usage_context_id'); }
 }
