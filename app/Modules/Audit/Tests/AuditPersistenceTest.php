@@ -81,6 +81,7 @@ final class AuditPersistenceTest extends TestCase
     ): AuditLog {
         return AuditLog::query()->create([
             'event_uuid' => sprintf('00000000-0000-4000-8000-%012d', AuditLog::query()->count() + 1),
+            'scope_type' => 'tenant',
             'tenant_id' => $tenantId,
             'tenant_name' => 'Tenant '.$tenantId,
             'organization_unit_id' => $organizationUnitId,

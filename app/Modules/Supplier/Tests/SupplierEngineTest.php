@@ -8,6 +8,7 @@ use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use Modules\Item\DTOs\CreateItemData;
 use Modules\Item\Enums\ItemType;
@@ -52,65 +53,67 @@ final class SupplierEngineTest extends TestCase
         $item = $this->createItem($tenantId, $organizationUnitId, 'PART-1', $uomId);
         $category = $this->createCategory($tenantId, $organizationUnitId, 'PARTS');
 
-        $supplier = app(SupplierCreationService::class)->create(new CreateSupplierData(
-            tenantId: $tenantId,
-            organizationUnitId: $organizationUnitId,
-            code: 'SUP-ACME',
-            name: 'Acme Supplies',
-            supplierType: SupplierType::Company,
-            status: SupplierStatus::Active,
-            email: 'orders@acme.test',
-            defaultCurrencyId: $currencyId,
-            creditLimit: '50000.000000',
-            creditProfile: new SupplierCreditProfileData(
+        $this->runInTenant($tenantId, function () use ($tenantId, $organizationUnitId, $currencyId, $category, $item, $uomId): void {
+            $supplier = app(SupplierCreationService::class)->create(new CreateSupplierData(
+                tenantId: $tenantId,
+                organizationUnitId: $organizationUnitId,
+                code: 'SUP-ACME',
+                name: 'Acme Supplies',
+                supplierType: SupplierType::Company,
+                status: SupplierStatus::Active,
+                email: 'orders@acme.test',
+                defaultCurrencyId: $currencyId,
                 creditLimit: '50000.000000',
-                creditPeriodDays: 30,
-                warningThresholdPercent: '75.000000',
-                allowPartialPayment: true,
-            ),
-            contacts: [
-                new SupplierContactData('Jane Buyer', email: 'jane@acme.test', isPrimary: true),
-            ],
-            addresses: [
-                new SupplierAddressData(SupplierAddressType::Billing, '10 Main Street', city: 'Colombo', isPrimary: true),
-            ],
-            bankAccounts: [
-                new SupplierBankAccountData('Test Bank', 'Acme Supplies', '001234', currencyId: $currencyId, isPrimary: true),
-            ],
-            categoryIds: [(int) $category->getKey()],
-            documents: [
-                new SupplierDocumentData(SupplierDocumentType::BusinessRegistration, 'BR-001', status: SupplierDocumentStatus::Active),
-            ],
-            itemMappings: [
-                new SupplierItemMappingData(
-                    itemId: (int) $item->getKey(),
-                    supplierItemCode: 'ACME-PART-1',
-                    defaultPurchaseUomId: $uomId,
-                    minimumOrderQuantity: '5.000000',
-                    leadTimeDays: 7,
-                    isPreferred: true,
+                creditProfile: new SupplierCreditProfileData(
+                    creditLimit: '50000.000000',
+                    creditPeriodDays: 30,
+                    warningThresholdPercent: '75.000000',
+                    allowPartialPayment: true,
                 ),
-            ],
-        ));
+                contacts: [
+                    new SupplierContactData('Jane Buyer', email: 'jane@acme.test', isPrimary: true),
+                ],
+                addresses: [
+                    new SupplierAddressData(SupplierAddressType::Billing, '10 Main Street', city: 'Colombo', isPrimary: true),
+                ],
+                bankAccounts: [
+                    new SupplierBankAccountData('Test Bank', 'Acme Supplies', '001234', currencyId: $currencyId, isPrimary: true),
+                ],
+                categoryIds: [(int) $category->getKey()],
+                documents: [
+                    new SupplierDocumentData(SupplierDocumentType::BusinessRegistration, 'BR-001', status: SupplierDocumentStatus::Active),
+                ],
+                itemMappings: [
+                    new SupplierItemMappingData(
+                        itemId: (int) $item->getKey(),
+                        supplierItemCode: 'ACME-PART-1',
+                        defaultPurchaseUomId: $uomId,
+                        minimumOrderQuantity: '5.000000',
+                        leadTimeDays: 7,
+                        isPreferred: true,
+                    ),
+                ],
+            ));
 
-        $this->assertSame(SupplierStatus::Active, $supplier->status);
-        $this->assertSame('50000.000000', (string) $supplier->credit_limit);
-        $this->assertCount(1, $supplier->contacts);
-        $this->assertCount(1, $supplier->addresses);
-        $this->assertCount(1, $supplier->bankAccounts);
-        $this->assertCount(1, $supplier->categories);
-        $this->assertCount(1, $supplier->documents);
-        $this->assertCount(1, $supplier->itemMappings);
-        $this->assertCount(1, $supplier->statusHistories);
+            $this->assertSame(SupplierStatus::Active, $supplier->status);
+            $this->assertSame('50000.000000', (string) $supplier->credit_limit);
+            $this->assertCount(1, $supplier->contacts);
+            $this->assertCount(1, $supplier->addresses);
+            $this->assertCount(1, $supplier->bankAccounts);
+            $this->assertCount(1, $supplier->categories);
+            $this->assertCount(1, $supplier->documents);
+            $this->assertCount(1, $supplier->itemMappings);
+            $this->assertCount(1, $supplier->statusHistories);
 
-        $profile = app(SupplierCreditProfileService::class)->get($supplier);
-        $this->assertNotNull($profile);
-        $this->assertSame('50000.000000', (string) $profile->credit_limit);
-        $this->assertSame(30, $profile->credit_period_days);
-        $this->assertSame('75.000000', (string) $profile->warning_threshold_percent);
+            $profile = app(SupplierCreditProfileService::class)->get($supplier);
+            $this->assertNotNull($profile);
+            $this->assertSame('50000.000000', (string) $profile->credit_limit);
+            $this->assertSame(30, $profile->credit_period_days);
+            $this->assertSame('75.000000', (string) $profile->warning_threshold_percent);
 
-        $result = app(SupplierLookupService::class)->result($supplier);
-        $this->assertSame('50000.000000', $result->creditLimit);
+            $result = app(SupplierLookupService::class)->result($supplier);
+            $this->assertSame('50000.000000', $result->creditLimit);
+        });
     }
 
     public function test_duplicate_code_and_supplier_number_are_rejected_per_tenant(): void
@@ -133,56 +136,58 @@ final class SupplierEngineTest extends TestCase
     public function test_primary_contact_address_and_bank_account_constraints_are_enforced(): void
     {
         [$tenantId, $organizationUnitId, $currencyId] = $this->scopeContext();
-        $supplier = app(SupplierCreationService::class)->create(new CreateSupplierData(
-            tenantId: $tenantId,
-            organizationUnitId: $organizationUnitId,
-            code: 'PRIMARY',
-            name: 'Primary Test',
-            supplierType: SupplierType::Company,
-            bankAccounts: [
-                new SupplierBankAccountData('Bank A', 'Primary Test', '100', currencyId: $currencyId, isPrimary: true),
-            ],
-            contacts: [
-                new SupplierContactData('Contact A', isPrimary: true),
-            ],
-            addresses: [
-                new SupplierAddressData(SupplierAddressType::Billing, 'Address A', isPrimary: true),
-            ],
-        ));
+        $this->runInTenant($tenantId, function () use ($tenantId, $organizationUnitId, $currencyId): void {
+            $supplier = app(SupplierCreationService::class)->create(new CreateSupplierData(
+                tenantId: $tenantId,
+                organizationUnitId: $organizationUnitId,
+                code: 'PRIMARY',
+                name: 'Primary Test',
+                supplierType: SupplierType::Company,
+                bankAccounts: [
+                    new SupplierBankAccountData('Bank A', 'Primary Test', '100', currencyId: $currencyId, isPrimary: true),
+                ],
+                contacts: [
+                    new SupplierContactData('Contact A', isPrimary: true),
+                ],
+                addresses: [
+                    new SupplierAddressData(SupplierAddressType::Billing, 'Address A', isPrimary: true),
+                ],
+            ));
 
-        try {
-            app(SupplierContactService::class)->create($supplier, new SupplierContactData('Contact B', isPrimary: true));
-            $this->fail('Expected duplicate primary contact validation to fail.');
-        } catch (InvalidArgumentException $exception) {
-            $this->assertSame('Supplier can have only one primary contact.', $exception->getMessage());
-        }
+            try {
+                app(SupplierContactService::class)->create($supplier, new SupplierContactData('Contact B', isPrimary: true));
+                $this->fail('Expected duplicate primary contact validation to fail.');
+            } catch (ValidationException $exception) {
+                $this->assertSame('Supplier can have only one primary contact.', $exception->errors()['is_primary'][0] ?? null);
+            }
 
-        try {
-            app(SupplierAddressService::class)->create(
-                $supplier,
-                new SupplierAddressData(SupplierAddressType::Billing, 'Address B', isPrimary: true),
-            );
-            $this->fail('Expected duplicate primary address validation to fail.');
-        } catch (InvalidArgumentException $exception) {
-            $this->assertSame('Supplier can have only one primary address per address type.', $exception->getMessage());
-        }
+            try {
+                app(SupplierAddressService::class)->create(
+                    $supplier,
+                    new SupplierAddressData(SupplierAddressType::Billing, 'Address B', isPrimary: true),
+                );
+                $this->fail('Expected duplicate primary address validation to fail.');
+            } catch (InvalidArgumentException $exception) {
+                $this->assertSame('Supplier can have only one primary address per address type.', $exception->getMessage());
+            }
 
-        try {
+            try {
+                app(SupplierBankAccountService::class)->create(
+                    $supplier,
+                    new SupplierBankAccountData('Bank A', 'Primary Test', '100', currencyId: $currencyId),
+                );
+                $this->fail('Expected duplicate bank account validation to fail.');
+            } catch (InvalidArgumentException $exception) {
+                $this->assertSame('Supplier bank account number already exists.', $exception->getMessage());
+            }
+
+            $this->expectException(InvalidArgumentException::class);
+            $this->expectExceptionMessage('Supplier can have only one primary bank account.');
             app(SupplierBankAccountService::class)->create(
                 $supplier,
-                new SupplierBankAccountData('Bank A', 'Primary Test', '100', currencyId: $currencyId),
+                new SupplierBankAccountData('Bank B', 'Primary Test', '200', currencyId: $currencyId, isPrimary: true),
             );
-            $this->fail('Expected duplicate bank account validation to fail.');
-        } catch (InvalidArgumentException $exception) {
-            $this->assertSame('Supplier bank account number already exists.', $exception->getMessage());
-        }
-
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Supplier can have only one primary bank account.');
-        app(SupplierBankAccountService::class)->create(
-            $supplier,
-            new SupplierBankAccountData('Bank B', 'Primary Test', '200', currencyId: $currencyId, isPrimary: true),
-        );
+        });
     }
 
     public function test_category_assignment_and_item_mapping_drive_lookups(): void
@@ -192,24 +197,26 @@ final class SupplierEngineTest extends TestCase
         $item = $this->createItem($tenantId, $organizationUnitId, 'FILTER-ITEM', $uomId);
         $category = $this->createCategory($tenantId, $organizationUnitId, 'FILTER-CAT');
 
-        $supplier = app(SupplierCreationService::class)->create(new CreateSupplierData(
-            tenantId: $tenantId,
-            organizationUnitId: $organizationUnitId,
-            code: 'FILTER-SUP',
-            name: 'Filter Supplier',
-            supplierType: SupplierType::Company,
-            status: SupplierStatus::Active,
-            categoryIds: [(int) $category->getKey()],
-            itemMappings: [
-                new SupplierItemMappingData((int) $item->getKey(), isPreferred: true),
-            ],
-        ));
+        $this->runInTenant($tenantId, function () use ($tenantId, $organizationUnitId, $category, $item): void {
+            $supplier = app(SupplierCreationService::class)->create(new CreateSupplierData(
+                tenantId: $tenantId,
+                organizationUnitId: $organizationUnitId,
+                code: 'FILTER-SUP',
+                name: 'Filter Supplier',
+                supplierType: SupplierType::Company,
+                status: SupplierStatus::Active,
+                categoryIds: [(int) $category->getKey()],
+                itemMappings: [
+                    new SupplierItemMappingData((int) $item->getKey(), isPreferred: true),
+                ],
+            ));
 
-        $lookup = app(SupplierLookupService::class);
-        $this->assertTrue($lookup->suppliersByCategory($tenantId, (int) $category->getKey(), $organizationUnitId)->contains($supplier));
-        $this->assertTrue($lookup->suppliersByItem($tenantId, (int) $item->getKey(), $organizationUnitId)->contains($supplier));
-        $this->assertTrue($lookup->preferredSuppliersForItem($tenantId, (int) $item->getKey(), $organizationUnitId)->contains($supplier));
-        $this->assertTrue($lookup->suppliersAllowedForCredit($tenantId, $organizationUnitId)->contains($supplier));
+            $lookup = app(SupplierLookupService::class);
+            $this->assertTrue($lookup->suppliersByCategory($tenantId, (int) $category->getKey(), $organizationUnitId)->contains($supplier));
+            $this->assertTrue($lookup->suppliersByItem($tenantId, (int) $item->getKey(), $organizationUnitId)->contains($supplier));
+            $this->assertTrue($lookup->preferredSuppliersForItem($tenantId, (int) $item->getKey(), $organizationUnitId)->contains($supplier));
+            $this->assertTrue($lookup->suppliersAllowedForCredit($tenantId, $organizationUnitId)->contains($supplier));
+        });
     }
 
     public function test_status_transition_records_history_and_blacklist_excludes_active_lookup(): void
@@ -217,21 +224,23 @@ final class SupplierEngineTest extends TestCase
         [$tenantId] = $this->scopeContext();
         $supplier = $this->createSupplier($tenantId, 'STATUS', status: SupplierStatus::Active);
 
-        app(SupplierStatusService::class)->change($supplier, new SupplierStatusChangeData(
-            SupplierStatus::Blacklisted,
-            reason: 'Compliance failure',
-            changedBy: 42,
-        ));
+        $this->runInTenant($tenantId, function () use ($tenantId, $supplier): void {
+            app(SupplierStatusService::class)->change($supplier, new SupplierStatusChangeData(
+                SupplierStatus::Blacklisted,
+                reason: 'Compliance failure',
+                changedBy: 42,
+            ));
 
-        $this->assertSame(SupplierStatus::Blacklisted, $supplier->refresh()->status);
-        $this->assertCount(2, $supplier->statusHistories()->get());
-        $this->assertFalse(app(SupplierLookupService::class)->activeSuppliers($tenantId)->contains($supplier));
-        $this->assertTrue(app(SupplierLookupService::class)->restrictedSuppliers($tenantId)->contains($supplier));
-        $this->assertTrue(app(SupplierLookupService::class)->blacklistedSuppliers($tenantId)->contains($supplier));
+            $this->assertSame(SupplierStatus::Blacklisted, $supplier->refresh()->status);
+            $this->assertCount(2, $supplier->statusHistories()->get());
+            $this->assertFalse(app(SupplierLookupService::class)->activeSuppliers($tenantId)->contains($supplier));
+            $this->assertTrue(app(SupplierLookupService::class)->restrictedSuppliers($tenantId)->contains($supplier));
+            $this->assertTrue(app(SupplierLookupService::class)->blacklistedSuppliers($tenantId)->contains($supplier));
 
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Invalid supplier status transition.');
-        app(SupplierStatusService::class)->change($supplier, new SupplierStatusChangeData(SupplierStatus::Active));
+            $this->expectException(ValidationException::class);
+            $this->expectExceptionMessage('Invalid supplier status transition.');
+            app(SupplierStatusService::class)->change($supplier, new SupplierStatusChangeData(SupplierStatus::Active));
+        });
     }
 
     public function test_credit_profile_validation_and_on_hold_lookup(): void
@@ -239,21 +248,23 @@ final class SupplierEngineTest extends TestCase
         [$tenantId] = $this->scopeContext();
         $supplier = $this->createSupplier($tenantId, 'CREDIT', status: SupplierStatus::Active);
 
-        app(SupplierCreditProfileService::class)->set($supplier, new SupplierCreditProfileData(
-            creditLimit: '10000.000000',
-            creditPeriodDays: 45,
-            warningThresholdPercent: '90.000000',
-            allowOverCredit: false,
-        ));
-        app(SupplierStatusService::class)->change($supplier, new SupplierStatusChangeData(SupplierStatus::OnHold));
+        $this->runInTenant($tenantId, function () use ($tenantId, $supplier): void {
+            app(SupplierCreditProfileService::class)->set($supplier, new SupplierCreditProfileData(
+                creditLimit: '10000.000000',
+                creditPeriodDays: 45,
+                warningThresholdPercent: '90.000000',
+                allowOverCredit: false,
+            ));
+            app(SupplierStatusService::class)->change($supplier, new SupplierStatusChangeData(SupplierStatus::OnHold));
 
-        $this->assertTrue(app(SupplierLookupService::class)->suppliersOnHold($tenantId)->contains($supplier));
+            $this->assertTrue(app(SupplierLookupService::class)->suppliersOnHold($tenantId)->contains($supplier));
 
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Supplier credit warning threshold must be between 0 and 100.');
-        app(SupplierCreditProfileService::class)->set($supplier, new SupplierCreditProfileData(
-            warningThresholdPercent: '101.000000',
-        ));
+            $this->expectException(InvalidArgumentException::class);
+            $this->expectExceptionMessage('Supplier credit warning threshold must be between 0 and 100.');
+            app(SupplierCreditProfileService::class)->set($supplier, new SupplierCreditProfileData(
+                warningThresholdPercent: '101.000000',
+            ));
+        });
     }
 
     public function test_cross_tenant_and_organization_references_are_rejected(): void
@@ -265,7 +276,7 @@ final class SupplierEngineTest extends TestCase
 
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Supplier reference belongs to a different tenant.');
-        app(SupplierCategoryService::class)->assign($supplier, [(int) $otherCategory->getKey()]);
+        $this->runInTenant($tenantId, fn () => app(SupplierCategoryService::class)->assign($supplier, [(int) $otherCategory->getKey()]));
     }
 
     public function test_supplier_organization_unit_must_belong_to_tenant(): void
@@ -295,7 +306,7 @@ final class SupplierEngineTest extends TestCase
 
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Supplier reference belongs to a different organization unit.');
-        app(SupplierCategoryService::class)->assign($supplier, [(int) $category->getKey()]);
+        $this->runInTenant($tenantId, fn () => app(SupplierCategoryService::class)->assign($supplier, [(int) $category->getKey()]));
     }
 
     public function test_cross_tenant_item_variant_reference_is_rejected(): void
@@ -303,11 +314,12 @@ final class SupplierEngineTest extends TestCase
         [$tenantId, $organizationUnitId] = $this->scopeContext();
         [$otherTenantId, $otherOrganizationUnitId] = $this->scopeContext('VARIANT-OTHER');
         $item = $this->createItem($tenantId, $organizationUnitId, 'VARIANT-ITEM');
+        $otherItem = $this->createItem($otherTenantId, $otherOrganizationUnitId, 'VARIANT-OTHER-ITEM');
         $supplier = $this->createSupplier($tenantId, 'VARIANT-SUP', organizationUnitId: $organizationUnitId);
         $variantId = (int) DB::table('item_variants')->insertGetId([
             'tenant_id' => $otherTenantId,
             'organization_unit_id' => $otherOrganizationUnitId,
-            'item_id' => $item->getKey(),
+            'item_id' => $otherItem->getKey(),
             'code' => 'CROSS-TENANT-VARIANT',
             'name' => 'Cross tenant variant',
             'is_active' => true,
@@ -317,10 +329,10 @@ final class SupplierEngineTest extends TestCase
 
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Supplier reference belongs to a different tenant.');
-        app(SupplierItemMappingService::class)->create(
+        $this->runInTenant($tenantId, fn () => app(SupplierItemMappingService::class)->create(
             $supplier,
             new SupplierItemMappingData((int) $item->getKey(), itemVariantId: $variantId),
-        );
+        ));
     }
 
     public function test_database_seeder_adds_supplier_master_data(): void
@@ -330,7 +342,7 @@ final class SupplierEngineTest extends TestCase
 
         $this->assertDatabaseHas('supplier_categories', ['tenant_id' => $tenantId, 'code' => 'GENERAL']);
         $this->assertDatabaseHas('suppliers', ['tenant_id' => $tenantId, 'supplier_number' => 'SUP-000001']);
-        $this->assertSame(1, Supplier::query()->where('tenant_id', $tenantId)->count());
+        $this->assertSame(1, DB::table('suppliers')->where('tenant_id', $tenantId)->count());
     }
 
     private function createSupplier(
@@ -340,7 +352,7 @@ final class SupplierEngineTest extends TestCase
         SupplierStatus $status = SupplierStatus::PendingApproval,
         ?int $organizationUnitId = null,
     ): Supplier {
-        return app(SupplierCreationService::class)->create(new CreateSupplierData(
+        return $this->runInTenant($tenantId, fn (): Supplier => app(SupplierCreationService::class)->create(new CreateSupplierData(
             tenantId: $tenantId,
             organizationUnitId: $organizationUnitId,
             supplierNumber: $number,
@@ -348,22 +360,22 @@ final class SupplierEngineTest extends TestCase
             name: 'Supplier '.$code,
             supplierType: SupplierType::Company,
             status: $status,
-        ));
+        )));
     }
 
     private function createCategory(int $tenantId, ?int $organizationUnitId, string $code): SupplierCategory
     {
-        return app(SupplierCategoryService::class)->create(new SupplierCategoryData(
+        return $this->runInTenant($tenantId, fn (): SupplierCategory => app(SupplierCategoryService::class)->create(new SupplierCategoryData(
             tenantId: $tenantId,
             organizationUnitId: $organizationUnitId,
             code: $code,
             name: 'Category '.$code,
-        ));
+        )));
     }
 
     private function createItem(int $tenantId, ?int $organizationUnitId, string $code, ?int $uomId = null): Item
     {
-        return app(ItemCreationService::class)->create(new CreateItemData(
+        return $this->runInTenant($tenantId, fn (): Item => app(ItemCreationService::class)->create(new CreateItemData(
             tenantId: $tenantId,
             organizationUnitId: $organizationUnitId,
             code: $code,
@@ -371,7 +383,12 @@ final class SupplierEngineTest extends TestCase
             itemType: ItemType::Stock,
             baseUomId: $uomId,
             isStockable: true,
-        ));
+        )));
+    }
+
+    private function runInTenant(int $tenantId, callable $callback): mixed
+    {
+        return $this->withTenantExecutionContext($tenantId, $callback);
     }
 
     /**
@@ -387,6 +404,7 @@ final class SupplierEngineTest extends TestCase
             'name' => 'Supplier Tenant '.$suffix,
             'slug' => 'supplier-tenant-'.Str::lower($suffix).'-'.Str::lower(Str::random(3)),
             'status' => 'active',
+            'status_changed_at' => now(),
             'base_currency_id' => $currencyId,
             'created_at' => now(),
             'updated_at' => now()]);

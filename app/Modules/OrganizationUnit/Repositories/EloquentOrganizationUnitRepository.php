@@ -131,8 +131,12 @@ final class EloquentOrganizationUnitRepository extends EloquentRepository implem
     protected function toRecord(Model $model): DataRecord
     {
         $payload = $model->attributesToArray();
-        $payload['type'] = $model->getRelation('type')?->attributesToArray();
-        $payload['parent'] = $model->getRelation('parent')?->attributesToArray();
+        $payload['type'] = $model->relationLoaded('type')
+            ? $model->getRelation('type')?->attributesToArray()
+            : null;
+        $payload['parent'] = $model->relationLoaded('parent')
+            ? $model->getRelation('parent')?->attributesToArray()
+            : null;
         $payload['has_logo'] = is_string($model->getAttribute('logo_object_key'))
             && trim((string) $model->getAttribute('logo_object_key')) !== '';
         unset($payload['logo_object_key'], $payload['path_hash']);

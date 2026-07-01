@@ -19,19 +19,33 @@ final class RequirePlatformPermissionMiddleware
         private readonly ApiErrorResponseFactory $responses,
     ) {}
 
-    public function handle(Request $request, Closure $next, string $permission): Response
+    public function handle(Request $request, Closure $next, string ...$permissions): Response
     {
         $operatorId = $this->currentUser->currentUserId();
-        if ($operatorId === null || ! $this->permissions->allows($operatorId, $permission)) {
+        if ($operatorId === null || ! $this->allowsAny($operatorId, $permissions)) {
             return $this->responses->make(
                 'PLATFORM_PERMISSION_REQUIRED',
                 'You do not have permission to perform this platform action.',
                 403,
                 'authorization',
-                ['permission' => $permission],
+                ['permissions' => $permissions],
             );
         }
 
         return $next($request);
+    }
+
+    /**
+     * @param  list<string>  $permissions
+     */
+    private function allowsAny(int $operatorId, array $permissions): bool
+    {
+        foreach ($permissions as $permission) {
+            if ($this->permissions->allows($operatorId, $permission)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

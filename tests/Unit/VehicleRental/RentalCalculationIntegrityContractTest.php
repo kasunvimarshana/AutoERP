@@ -41,11 +41,15 @@ final class RentalCalculationIntegrityContractTest extends TestCase
     {
         $sources = $this->source('app/Modules/VehicleRental/Database/Migrations/2026_06_12_200025_create_rental_calculation_sources_table.php');
         $contexts = $this->source('app/Modules/VehicleRental/Database/Migrations/2026_06_12_200016_create_rental_usage_contexts_table.php');
-        $facts = $this->source('app/Modules/VehicleRental/Database/Migrations/2026_06_12_200017_create_rental_usage_facts_table.php');
+        $facts = $this->source('app/Modules/VehicleRental/Database/Migrations/2026_06_12_200026_create_rental_usage_facts_table.php');
+        $sourceService = $this->source('app/Modules/VehicleRental/Services/RentalCalculationSourceService.php');
 
-        self::assertStringContainsString('rental_calculation_sources_valid_source_ck', $sources);
-        self::assertStringContainsString("source_kind = 'usage_context'", $sources);
-        self::assertStringContainsString("source_kind = 'expense_allocation'", $sources);
+        self::assertStringContainsString("'source_kind' => RentalCalculationSourceKind::UsageContext->value", $sourceService);
+        self::assertStringContainsString("'usage_context_id' => \$context->getKey()", $sourceService);
+        self::assertStringContainsString("'expense_allocation_id' => null", $sourceService);
+        self::assertStringContainsString("'source_kind' => RentalCalculationSourceKind::ExpenseAllocation->value", $sourceService);
+        self::assertStringContainsString("'usage_context_id' => null", $sourceService);
+        self::assertStringContainsString("'expense_allocation_id' => \$expenseAllocationId", $sourceService);
         self::assertStringContainsString(
             "['id', 'tenant_id', 'financial_side', 'usage_log_id']",
             $contexts,

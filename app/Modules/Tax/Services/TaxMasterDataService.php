@@ -8,7 +8,6 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
-use Modules\Finance\Models\FinanceAccount;
 use Modules\Tax\Models\CustomerTaxProfile;
 use Modules\Tax\Models\SupplierTaxProfile;
 use Modules\Tax\Models\Tax;
@@ -270,15 +269,12 @@ final class TaxMasterDataService
         $tax = Tax::query()->findOrFail((int) $data['tax_id']);
         $this->assertTaxInScope($tax, $tenantId, $organizationUnitId);
 
-        $account = FinanceAccount::query()->findOrFail((int) $data['account_id']);
-        if ((int) $account->tenant_id !== $tenantId || $account->organization_unit_id !== $organizationUnitId) {
-            throw new InvalidArgumentException('Tax posting profile account belongs to a different scope.');
-        }
-        if (! (bool) $account->is_active || ! (bool) $account->is_posting_account) {
-            throw new InvalidArgumentException('Tax posting profile account must be active and postable.');
+        $direction = trim((string) ($data['direction'] ?? 'tax'));
+        $postingKey = trim((string) ($data['posting_key'] ?? ''));
+        if ($postingKey === '') {
+            throw new InvalidArgumentException('Tax posting profile requires a Finance posting key.');
         }
 
-        $direction = trim((string) ($data['direction'] ?? 'tax'));
         $duplicate = TaxPostingProfile::query()
             ->where('tenant_id', $tenantId)
             ->where('tax_id', $tax->getKey())
@@ -300,12 +296,11 @@ final class TaxMasterDataService
             'organization_unit_id' => $organizationUnitId,
             'tax_id' => $tax->getKey(),
             'direction' => $direction,
-            'account_id' => $account->getKey(),
-            'posting_key' => $data['posting_key'] ?? null,
+            'posting_key' => $postingKey,
             'active' => (bool) ($data['active'] ?? true),
         ])->save();
 
-        return $profile->refresh()->load(['tax', 'account']);
+        return $profile->refresh()->load('tax');
     }
 
     private function assertTaxInScope(Tax $tax, int $tenantId, ?int $organizationUnitId): void

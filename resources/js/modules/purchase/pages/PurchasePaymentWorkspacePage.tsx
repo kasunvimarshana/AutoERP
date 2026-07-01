@@ -38,7 +38,7 @@ export default function PurchasePaymentWorkspacePage() {
         { key: 'type', header: 'Type', render: (row) => `${humanize(row.payment_type)} / ${humanize(row.direction)}` },
         { key: 'total', header: 'Amount', render: (row) => <MoneyDisplay value={row.total_amount} /> },
         { key: 'allocated', header: 'Allocated', render: (row) => <MoneyDisplay value={row.allocated_amount} /> },
-        { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.status} /> },
+        { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.document_status} /> },
     ];
 
     return (

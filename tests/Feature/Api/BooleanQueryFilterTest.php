@@ -7,6 +7,7 @@ namespace Tests\Feature\Api;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\User\Models\UserModel;
 use Modules\Warehouse\Services\WarehouseAuthorizationService;
 use Tests\TestCase;
@@ -19,6 +20,7 @@ final class BooleanQueryFilterTest extends TestCase
     {
         parent::setUp();
         $this->withoutMiddleware();
+        $this->trustTenantScopedRequestContextFromPayload();
     }
 
     public function test_warehouse_boolean_filters_accept_supported_query_representations(): void
@@ -28,7 +30,8 @@ final class BooleanQueryFilterTest extends TestCase
         $this->warehouse($tenantId, $organizationUnitId, $userId, 'INACTIVE', false);
 
         foreach (['true', '1'] as $value) {
-            $this->asWarehouseUser($userId)->getJson($this->warehouseUrl($tenantId, $organizationUnitId, $value))
+            $this->asWarehouseUser($tenantId, $userId)
+                ->tenantGetJson($tenantId, $this->warehouseUrl($tenantId, $organizationUnitId, $value))
                 ->assertOk()
                 ->assertJsonCount(1, 'data')
                 ->assertJsonPath('data.0.code', 'ACTIVE')
@@ -37,13 +40,15 @@ final class BooleanQueryFilterTest extends TestCase
         }
 
         foreach (['false', '0'] as $value) {
-            $this->asWarehouseUser($userId)->getJson($this->warehouseUrl($tenantId, $organizationUnitId, $value))
+            $this->asWarehouseUser($tenantId, $userId)
+                ->tenantGetJson($tenantId, $this->warehouseUrl($tenantId, $organizationUnitId, $value))
                 ->assertOk()
                 ->assertJsonCount(1, 'data')
                 ->assertJsonPath('data.0.code', 'INACTIVE');
         }
 
-        $this->asWarehouseUser($userId)->getJson($this->warehouseUrl($tenantId, $organizationUnitId, 'yes'))
+        $this->asWarehouseUser($tenantId, $userId)
+            ->tenantGetJson($tenantId, $this->warehouseUrl($tenantId, $organizationUnitId, 'yes'))
             ->assertUnprocessable()
             ->assertJsonValidationErrors('is_active');
     }
@@ -57,25 +62,33 @@ final class BooleanQueryFilterTest extends TestCase
 
         $scope = '?tenant_id='.$otherTenantId.'&organization_unit_id='.$otherOrganizationUnitId;
 
-        $this->asWarehouseUser($otherUserId)->getJson('/api/v1/warehouses/'.$warehouseId.$scope)->assertNotFound();
-        $this->asWarehouseUser($otherUserId)->patchJson('/api/v1/warehouses/'.$warehouseId, [
+        $this->asWarehouseUser($otherTenantId, $otherUserId)
+            ->tenantGetJson($otherTenantId, '/api/v1/warehouses/'.$warehouseId.$scope)
+            ->assertForbidden();
+        $this->asWarehouseUser($otherTenantId, $otherUserId)->tenantPatchJson($otherTenantId, '/api/v1/warehouses/'.$warehouseId, [
             'tenant_id' => $otherTenantId,
             'organization_unit_id' => $otherOrganizationUnitId,
             'row_version' => 1,
             'name' => 'Cross tenant update',
-        ])->assertNotFound();
-        $this->asWarehouseUser($otherUserId)->deleteJson('/api/v1/warehouses/'.$warehouseId.$scope)->assertNotFound();
+        ])->assertForbidden();
+        $this->asWarehouseUser($otherTenantId, $otherUserId)
+            ->tenantDeleteJson($otherTenantId, '/api/v1/warehouses/'.$warehouseId.$scope)
+            ->assertForbidden();
 
         $organizationScope = '?tenant_id='.$tenantId.'&organization_unit_id='.$sameTenantOtherOrganizationId;
 
-        $this->asWarehouseUser($userId)->getJson('/api/v1/warehouses/'.$warehouseId.$organizationScope)->assertNotFound();
-        $this->asWarehouseUser($userId)->patchJson('/api/v1/warehouses/'.$warehouseId, [
+        $this->asWarehouseUser($tenantId, $userId)
+            ->tenantGetJson($tenantId, '/api/v1/warehouses/'.$warehouseId.$organizationScope)
+            ->assertNotFound();
+        $this->asWarehouseUser($tenantId, $userId)->tenantPatchJson($tenantId, '/api/v1/warehouses/'.$warehouseId, [
             'tenant_id' => $tenantId,
             'organization_unit_id' => $sameTenantOtherOrganizationId,
             'row_version' => 1,
             'name' => 'Cross organization update',
         ])->assertNotFound();
-        $this->asWarehouseUser($userId)->deleteJson('/api/v1/warehouses/'.$warehouseId.$organizationScope)->assertNotFound();
+        $this->asWarehouseUser($tenantId, $userId)
+            ->tenantDeleteJson($tenantId, '/api/v1/warehouses/'.$warehouseId.$organizationScope)
+            ->assertNotFound();
     }
 
     private function warehouseUrl(int $tenantId, int $organizationUnitId, string $isActive): string
@@ -87,7 +100,7 @@ final class BooleanQueryFilterTest extends TestCase
 
     private function warehouse(int $tenantId, int $organizationUnitId, int $userId, string $code, bool $isActive): int
     {
-        return (int) $this->asWarehouseUser($userId)->postJson('/api/v1/warehouses', [
+        return (int) $this->asWarehouseUser($tenantId, $userId)->tenantPostJson($tenantId, '/api/v1/warehouses', [
             'tenant_id' => $tenantId,
             'organization_unit_id' => $organizationUnitId,
             'code' => $code,
@@ -109,6 +122,7 @@ final class BooleanQueryFilterTest extends TestCase
             'name' => 'Tenant '.$suffix,
             'slug' => 'tenant-'.Str::lower($suffix),
             'status' => 'active',
+            'status_changed_at' => now(),
             'created_at' => now(),
             'updated_at' => now()]);
 
@@ -189,9 +203,14 @@ final class BooleanQueryFilterTest extends TestCase
         return $userId;
     }
 
-    private function asWarehouseUser(int $userId): self
+    private function asWarehouseUser(int $tenantId, int $userId): self
     {
-        $this->actingAs(UserModel::query()->findOrFail($userId));
+        $user = app(TenantExecutionContextInterface::class)->runForTenant(
+            $tenantId,
+            fn (): UserModel => UserModel::query()->findOrFail($userId),
+        );
+
+        $this->actingAs($user);
 
         return $this;
     }

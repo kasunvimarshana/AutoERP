@@ -119,7 +119,9 @@ Route::prefix('api/v1/platform/configuration')
     ])
     ->name('api.v1.platform.configuration.')
     ->group(function () use ($registerPlatformScope, $platformStepUp): void {
-        $readMiddleware = ['platform.permission:'.PlatformPermission::CONFIGURATION_VIEW];
+        $readMiddleware = [
+            'platform.permission:'.PlatformPermission::CONFIGURATION_VIEW.','.PlatformPermission::CONFIGURATION_MANAGE,
+        ];
         $writeMiddleware = [
             $platformStepUp,
             'platform.permission:'.PlatformPermission::CONFIGURATION_MANAGE,

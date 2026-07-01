@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Item\Services;
 
 use Carbon\CarbonImmutable;
+use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Item\Models\Item;
@@ -105,7 +106,11 @@ final class ItemBaseUomConversionValidator
     ): array {
         $validation = $this->validate($item, $newBaseUomId, $providedFactor, $effectiveAt);
         if (! $validation['is_valid']) {
-            throw new InvalidArgumentException((string) $validation['blockers'][0]['message']);
+            $blocker = $validation['blockers'][0];
+
+            throw ValidationException::withMessages([
+                $this->blockerField((string) $blocker['code']) => [(string) $blocker['message']],
+            ]);
         }
 
         return $validation;
@@ -153,5 +158,14 @@ final class ItemBaseUomConversionValidator
     private function blocker(string $code, string $message): array
     {
         return ['code' => $code, 'message' => $message, 'count' => 1];
+    }
+
+    private function blockerField(string $code): string
+    {
+        return match ($code) {
+            'missing_conversion_factor', 'invalid_conversion_factor' => 'conversion_factor',
+            'future_effective_at' => 'effective_at',
+            default => 'new_base_uom_id',
+        };
     }
 }

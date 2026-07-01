@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Modules\Item\Services;
 
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use InvalidArgumentException;
@@ -40,14 +42,28 @@ final class ItemQueryService
 
     public function find(int $id, int $tenantId, ?int $organizationUnitId): Item
     {
-        return $this->baseQuery($tenantId, $organizationUnitId)
+        $item = $this->baseQuery($tenantId, $organizationUnitId)
             ->with($this->summaryRelations())
-            ->findOrFail($id);
+            ->find($id);
+
+        if ($item instanceof Item) {
+            return $item;
+        }
+
+        $this->assertItemIsNotOwnedByAnotherScope($id, $tenantId, $organizationUnitId);
+        throw (new ModelNotFoundException())->setModel(Item::class, [$id]);
     }
 
     public function item(int $id, int $tenantId, ?int $organizationUnitId): Item
     {
-        return $this->baseQuery($tenantId, $organizationUnitId)->findOrFail($id);
+        $item = $this->baseQuery($tenantId, $organizationUnitId)->find($id);
+
+        if ($item instanceof Item) {
+            return $item;
+        }
+
+        $this->assertItemIsNotOwnedByAnotherScope($id, $tenantId, $organizationUnitId);
+        throw (new ModelNotFoundException())->setModel(Item::class, [$id]);
     }
 
     public function delete(Item $item): void
@@ -66,7 +82,7 @@ final class ItemQueryService
      */
     private function summaryRelations(): array
     {
-        return ['category', 'brand', 'tenant.currency', 'baseUom', 'defaultTaxGroup', 'purchaseTaxGroup', 'salesTaxGroup'];
+        return ['category', 'brand', 'tenant.baseCurrency', 'baseUom', 'defaultTaxGroup', 'purchaseTaxGroup', 'salesTaxGroup'];
     }
 
     private function applyCriteria(Builder $query, array $criteria): void
@@ -154,5 +170,31 @@ final class ItemQueryService
             'vehicle_service_job_lines' => ['item_id'],
             'supplier_item_mappings' => ['item_id'],
         ];
+    }
+
+    private function assertItemIsNotOwnedByAnotherScope(int $id, int $tenantId, ?int $organizationUnitId): void
+    {
+        $record = DB::table('items')
+            ->where('id', $id)
+            ->whereNull('deleted_at')
+            ->first(['tenant_id', 'organization_unit_id']);
+
+        if ($record === null) {
+            return;
+        }
+
+        if ((int) $record->tenant_id !== $tenantId) {
+            throw new AuthorizationException('Item belongs to a different tenant.');
+        }
+
+        $recordOrganizationUnitId = $record->organization_unit_id === null
+            ? null
+            : (int) $record->organization_unit_id;
+
+        if ($organizationUnitId !== null
+            && $recordOrganizationUnitId !== null
+            && $recordOrganizationUnitId !== $organizationUnitId) {
+            throw new AuthorizationException('Item belongs to a different organization unit.');
+        }
     }
 }

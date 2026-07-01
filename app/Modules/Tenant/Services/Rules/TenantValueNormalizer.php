@@ -9,6 +9,9 @@ use Modules\Tenant\Services\Contracts\TenantValueNormalizerInterface;
 
 final class TenantValueNormalizer implements TenantValueNormalizerInterface
 {
+    /** @param list<string> $centralHosts */
+    public function __construct(private readonly array $centralHosts = []) {}
+
     public function normalizeCode(string $value): string
     {
         $value = strtoupper(trim($value));
@@ -71,10 +74,10 @@ final class TenantValueNormalizer implements TenantValueNormalizerInterface
         $labels = explode('.', $value);
         $reservedTlds = ['example', 'invalid', 'localhost', 'local', 'test', 'internal'];
         $lastLabel = end($labels);
-        $centralHosts = config('tenant.resolution.central_hosts', []);
-        $centralHosts = is_array($centralHosts)
-            ? array_map(static fn (mixed $host): string => strtolower(rtrim(trim((string) $host), '.')), $centralHosts)
-            : [];
+        $centralHosts = array_map(
+            static fn (string $host): string => strtolower(rtrim(trim($host), '.')),
+            $this->centralHosts,
+        );
 
         if (
             strlen($value) > 253

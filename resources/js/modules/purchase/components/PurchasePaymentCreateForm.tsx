@@ -49,6 +49,24 @@ function balanceOf(invoice: Invoice): string {
     return String(invoice.balance_due ?? invoice.balance?.remaining_amount ?? invoice.grand_total ?? '0.000000');
 }
 
+function namedResourceFromInvoiceSnapshot(snapshot: {
+    id?: number | null;
+    number?: string | null;
+    code?: string | null;
+    name?: string | null;
+    legal_name?: string | null;
+    symbol?: string | null;
+} | null | undefined): NamedResource | null {
+    if (!snapshot?.id) return null;
+
+    return {
+        id: snapshot.id,
+        code: snapshot.code ?? snapshot.number ?? null,
+        name: snapshot.name ?? snapshot.legal_name ?? snapshot.code ?? snapshot.number ?? snapshot.symbol ?? `#${snapshot.id}`,
+        symbol: snapshot.symbol ?? null,
+    };
+}
+
 export function PurchasePaymentCreateForm({ mode = 'create' }: { mode?: 'create' | 'prepare' }) {
     const { confirm, confirmDialog } = useConfirmDialog();
     const navigate = useNavigate();
@@ -91,7 +109,7 @@ export function PurchasePaymentCreateForm({ mode = 'create' }: { mode?: 'create'
     const methodsMatch = compareDecimalStrings(methodTotal, amount || '0.000000') === 0;
     const hasAllocatedInvoices = Object.values(allocations).some(isPositiveDecimal);
     const currencyLocked = Object.values(allocatedInvoices).some((invoice) => isPositiveDecimal(allocations[invoice.id] ?? '0.000000') && invoice.currency?.id);
-    const dirty = Boolean(supplier || referenceNumber || hasAllocatedInvoices || paymentRows.some((row) => row.amount || row.payment_method_id || row.source_account_id || row.reference));
+    const dirty = Boolean(supplier || referenceNumber || hasAllocatedInvoices || paymentRows.some((row) => row.amount || row.payment_method_id || row.reference));
     useUnsavedChanges(dirty && !busy);
 
     const cancelSourceRequest = useCallback((resetBusy = true) => {
@@ -125,8 +143,8 @@ export function PurchasePaymentCreateForm({ mode = 'create' }: { mode?: 'create'
                 setAllocatedInvoices({ [invoice.id]: invoice });
                 setAmount(balance);
                 setPaymentRows([blankPaymentMethodRow(balance)]);
-                setSupplierState(invoice.party ?? null);
-                setCurrencyState(invoice.currency ?? null);
+                setSupplierState(namedResourceFromInvoiceSnapshot(invoice.party));
+                setCurrencyState(namedResourceFromInvoiceSnapshot(invoice.currency));
                 setSourceNotice(`Loaded supplier invoice ${invoice.invoice_number ?? 'Invoice number unavailable'}.`);
                 return;
             }
@@ -228,7 +246,7 @@ export function PurchasePaymentCreateForm({ mode = 'create' }: { mode?: 'create'
             const nextAllocations = { [invoice.id]: nextAmount };
             setAllocations(nextAllocations);
             setAllocatedInvoices({ [invoice.id]: invoice });
-            setCurrencyState(invoice.currency ?? null);
+            setCurrencyState(namedResourceFromInvoiceSnapshot(invoice.currency));
             syncAmountWithAllocations(nextAllocations);
             return;
         }
@@ -238,7 +256,7 @@ export function PurchasePaymentCreateForm({ mode = 'create' }: { mode?: 'create'
         if (isPositiveDecimal(nextAmount)) {
             nextAllocatedInvoices[invoice.id] = invoice;
             if (invoice.currency && (!currency || currency.id !== invoice.currency.id)) {
-                setCurrencyState(invoice.currency);
+                setCurrencyState(namedResourceFromInvoiceSnapshot(invoice.currency));
             }
         } else {
             delete nextAllocatedInvoices[invoice.id];
@@ -262,7 +280,7 @@ export function PurchasePaymentCreateForm({ mode = 'create' }: { mode?: 'create'
         supplier?.id
         && isPositiveDecimal(amount)
         && currency?.id
-        && paymentRows.every((row) => isPositiveDecimal(row.amount) && row.payment_method_id && row.source_account_id)
+        && paymentRows.every((row) => isPositiveDecimal(row.amount) && row.payment_method_id)
         && methodsMatch
         && compareDecimalStrings(overAllocated, '0.000000') === 0
         && hasAllocatedInvoices
@@ -279,7 +297,6 @@ export function PurchasePaymentCreateForm({ mode = 'create' }: { mode?: 'create'
         lines: paymentRows.map((row) => ({
             amount: row.amount,
             payment_method_id: row.payment_method_id ? Number(row.payment_method_id) : undefined,
-            source_account_id: row.source_account_id ? Number(row.source_account_id) : undefined,
             reference: row.reference || undefined,
             instrument_direction: 'issued',
             external_bank_name: row.external_bank_name || undefined,
@@ -402,7 +419,6 @@ export function PurchasePaymentCreateForm({ mode = 'create' }: { mode?: 'create'
                     <PurchasePaymentMethodsEditor
                         rows={paymentRows}
                         methods={paymentContext.data?.payment_methods ?? []}
-                        accounts={paymentContext.data?.payment_accounts ?? []}
                         errorFor={errorFor}
                         onChange={setPaymentRows}
                     />

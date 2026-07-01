@@ -1,4 +1,5 @@
 export interface InvoicePartySnapshot extends Record<string, unknown> {
+    id?: number | null;
     number?: string | null;
     code?: string | null;
     name?: string | null;
@@ -9,6 +10,7 @@ export interface InvoicePartySnapshot extends Record<string, unknown> {
 }
 
 export interface InvoiceCurrencySnapshot extends Record<string, unknown> {
+    id?: number | null;
     code?: string | null;
     name?: string | null;
     symbol?: string | null;

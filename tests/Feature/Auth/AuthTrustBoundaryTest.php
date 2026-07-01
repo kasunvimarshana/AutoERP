@@ -76,7 +76,7 @@ final class AuthTrustBoundaryTest extends TestCase
 
         self::assertStringContainsString("'core.current_tenant.resolver_middleware_alias'", $routes);
         self::assertStringContainsString("'core.current_tenant.access_middleware_alias'", $routes);
-        self::assertStringContainsString("->middleware(['api', $resolveCurrentTenant])", $routes);
+        self::assertStringContainsString('->middleware([\'api\', $resolveCurrentTenant])', $routes);
         self::assertStringContainsString('$requireCurrentTenantAccess,', $routes);
     }
 

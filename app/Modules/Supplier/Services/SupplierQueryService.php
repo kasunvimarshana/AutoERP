@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace Modules\Supplier\Services;
 
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Facades\DB;
 use Modules\Supplier\Enums\SupplierStatus;
 use Modules\Supplier\Models\Supplier;
 
@@ -45,14 +48,28 @@ final class SupplierQueryService
 
     public function find(int $id, int $tenantId, ?int $organizationUnitId): Supplier
     {
-        return $this->baseQuery($tenantId, $organizationUnitId)
+        $supplier = $this->baseQuery($tenantId, $organizationUnitId)
             ->with(['defaultCurrency', 'categories'])
-            ->findOrFail($id);
+            ->find($id);
+
+        if ($supplier instanceof Supplier) {
+            return $supplier;
+        }
+
+        $this->assertSupplierIsNotOwnedByAnotherScope($id, $tenantId, $organizationUnitId);
+        throw (new ModelNotFoundException())->setModel(Supplier::class, [$id]);
     }
 
     public function supplier(int $id, int $tenantId, ?int $organizationUnitId): Supplier
     {
-        return $this->baseQuery($tenantId, $organizationUnitId)->findOrFail($id);
+        $supplier = $this->baseQuery($tenantId, $organizationUnitId)->find($id);
+
+        if ($supplier instanceof Supplier) {
+            return $supplier;
+        }
+
+        $this->assertSupplierIsNotOwnedByAnotherScope($id, $tenantId, $organizationUnitId);
+        throw (new ModelNotFoundException())->setModel(Supplier::class, [$id]);
     }
 
     public function delete(Supplier $supplier): void
@@ -92,6 +109,30 @@ final class SupplierQueryService
             $query->whereHas('itemMappings', fn (Builder $mappings): Builder => $mappings
                 ->where('item_id', (int) $criteria['item_id'])
                 ->where('is_active', true));
+        }
+    }
+
+    private function assertSupplierIsNotOwnedByAnotherScope(int $id, int $tenantId, ?int $organizationUnitId): void
+    {
+        $record = DB::table('suppliers')
+            ->where('id', $id)
+            ->whereNull('deleted_at')
+            ->first(['tenant_id', 'organization_unit_id']);
+
+        if ($record === null) {
+            return;
+        }
+
+        if ((int) $record->tenant_id !== $tenantId) {
+            throw new AuthorizationException('Supplier belongs to a different tenant.');
+        }
+
+        $recordOrganizationUnitId = $record->organization_unit_id === null
+            ? null
+            : (int) $record->organization_unit_id;
+
+        if ($recordOrganizationUnitId !== $organizationUnitId) {
+            throw new AuthorizationException('Supplier belongs to a different organization unit.');
         }
     }
 }

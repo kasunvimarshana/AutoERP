@@ -30,7 +30,7 @@ final class InvoiceFinanceIntegrationTest extends TestCase
     public function test_invoice_prepares_finance_posting_request_without_posting(): void
     {
         [$tenantId] = $this->createChart();
-        $invoice = app(InvoiceCreationService::class)->create(new CreateInvoiceData(
+        $invoice = $this->withTenantExecutionContext($tenantId, fn () => app(InvoiceCreationService::class)->create(new CreateInvoiceData(
             tenantId: $tenantId,
             invoiceType: InvoiceType::Manual,
             direction: InvoiceDirection::Outbound,
@@ -44,16 +44,17 @@ final class InvoiceFinanceIntegrationTest extends TestCase
                     unitPrice: '1000.000000',
                 ),
             ],
-        ));
+        )));
 
-        $request = app(InvoiceFinanceIntegrationService::class)->preparePostingRequest(
+        $request = $this->withTenantExecutionContext($tenantId, fn () => app(InvoiceFinanceIntegrationService::class)->preparePostingRequest(
             (int) $invoice->getKey(),
             '2026-06-06',
             [
-                new FinancePostingLine('1010', 'Cash', debit: '1000.000000'),
-                new FinancePostingLine('3000', 'Capital', credit: '1000.000000'),
+                new FinancePostingLine(null, 'Cash', debit: '1000.000000', profileKey: 'cash'),
+                new FinancePostingLine(null, 'Capital', credit: '1000.000000', profileKey: 'capital'),
             ],
-        );
+            'invoice_posting',
+        ));
 
         $this->assertSame('invoice', $request->source->sourceType);
         $this->assertSame((int) $invoice->getKey(), $request->source->sourceId);
@@ -62,7 +63,7 @@ final class InvoiceFinanceIntegrationTest extends TestCase
         $this->assertSame('INV-FIN-PREP', $request->source->sourceNumber);
         $this->assertCount(2, $request->lines);
 
-        app(InvoiceFinanceIntegrationService::class)->validatePostingRequest($request);
+        $this->withTenantExecutionContext($tenantId, fn () => app(InvoiceFinanceIntegrationService::class)->validatePostingRequest($request));
         $this->assertDatabaseCount('finance_journal_entries', 0);
     }
 
@@ -72,40 +73,96 @@ final class InvoiceFinanceIntegrationTest extends TestCase
     private function createChart(): array
     {
         $tenantId = $this->createTenant();
-        $assetType = $this->createAccountType($tenantId, 'ASSET', NormalBalance::Debit);
-        $equityType = $this->createAccountType($tenantId, 'EQUITY', NormalBalance::Credit);
+        $this->withTenantExecutionContext($tenantId, function () use ($tenantId): void {
+            $assetType = $this->createAccountType($tenantId, 'ASSET', NormalBalance::Debit);
+            $equityType = $this->createAccountType($tenantId, 'EQUITY', NormalBalance::Credit);
 
-        app(ChartOfAccountsService::class)->createAccount(new CreateAccountData(
-            tenantId: $tenantId,
-            accountTypeId: (int) $assetType->getKey(),
-            code: '1010',
-            name: 'Cash',
-            normalBalance: NormalBalance::Debit,
-        ));
-        app(ChartOfAccountsService::class)->createAccount(new CreateAccountData(
-            tenantId: $tenantId,
-            accountTypeId: (int) $equityType->getKey(),
-            code: '3000',
-            name: 'Capital',
-            normalBalance: NormalBalance::Credit,
-        ));
+            app(ChartOfAccountsService::class)->createAccount(new CreateAccountData(
+                tenantId: $tenantId,
+                accountTypeId: (int) $assetType->getKey(),
+                code: '1010',
+                name: 'Cash',
+                normalBalance: NormalBalance::Debit,
+            ));
+            app(ChartOfAccountsService::class)->createAccount(new CreateAccountData(
+                tenantId: $tenantId,
+                accountTypeId: (int) $equityType->getKey(),
+                code: '3000',
+                name: 'Capital',
+                normalBalance: NormalBalance::Credit,
+            ));
 
-        $year = FinanceFiscalYear::query()->create([
-            'tenant_id' => $tenantId,
-            'name' => 'FY 2026',
-            'start_date' => '2026-01-01',
-            'end_date' => '2026-12-31',
-            'status' => 'open',
-        ]);
-        FinanceFiscalPeriod::query()->create([
-            'tenant_id' => $tenantId,
-            'fiscal_year_id' => $year->getKey(),
-            'name' => 'June 2026',
-            'period_number' => 6,
-            'start_date' => '2026-06-01',
-            'end_date' => '2026-06-30',
-            'status' => 'open',
-        ]);
+            $cashRoleId = $this->createAccountRole($tenantId, 'cash', 'Cash');
+            $capitalRoleId = $this->createAccountRole($tenantId, 'capital', 'Capital');
+            $now = now();
+            DB::table('finance_account_assignments')->insert([
+                [
+                    'tenant_id' => $tenantId,
+                    'organization_unit_id' => null,
+                    'account_role_id' => $cashRoleId,
+                    'account_id' => (int) DB::table('finance_accounts')->where('tenant_id', $tenantId)->where('code', '1010')->value('id'),
+                    'effective_from' => '2026-01-01',
+                    'is_active' => true,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ],
+                [
+                    'tenant_id' => $tenantId,
+                    'organization_unit_id' => null,
+                    'account_role_id' => $capitalRoleId,
+                    'account_id' => (int) DB::table('finance_accounts')->where('tenant_id', $tenantId)->where('code', '3000')->value('id'),
+                    'effective_from' => '2026-01-01',
+                    'is_active' => true,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ],
+            ]);
+
+            $postingProfileId = (int) DB::table('finance_posting_profiles')->insertGetId([
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => null,
+                'code' => 'invoice_posting',
+                'name' => 'Invoice Posting',
+                'is_active' => true,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+            DB::table('finance_posting_profile_rules')->insert([
+                [
+                    'tenant_id' => $tenantId,
+                    'posting_profile_id' => $postingProfileId,
+                    'line_key' => 'cash',
+                    'account_role_id' => $cashRoleId,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ],
+                [
+                    'tenant_id' => $tenantId,
+                    'posting_profile_id' => $postingProfileId,
+                    'line_key' => 'capital',
+                    'account_role_id' => $capitalRoleId,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ],
+            ]);
+
+            $year = FinanceFiscalYear::query()->create([
+                'tenant_id' => $tenantId,
+                'name' => 'FY 2026',
+                'start_date' => '2026-01-01',
+                'end_date' => '2026-12-31',
+                'status' => 'open',
+            ]);
+            FinanceFiscalPeriod::query()->create([
+                'tenant_id' => $tenantId,
+                'fiscal_year_id' => $year->getKey(),
+                'name' => 'June 2026',
+                'period_number' => 6,
+                'start_date' => '2026-06-01',
+                'end_date' => '2026-06-30',
+                'status' => 'open',
+            ]);
+        });
 
         return [$tenantId];
     }
@@ -122,6 +179,18 @@ final class InvoiceFinanceIntegrationTest extends TestCase
         ]);
     }
 
+    private function createAccountRole(int $tenantId, string $code, string $name): int
+    {
+        return (int) DB::table('finance_account_roles')->insertGetId([
+            'tenant_id' => $tenantId,
+            'code' => $code,
+            'name' => $name,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
     private function createTenant(): int
     {
         $suffix = Str::upper(Str::random(5));
@@ -132,6 +201,7 @@ final class InvoiceFinanceIntegrationTest extends TestCase
             'name' => 'Invoice Finance Integration '.$suffix,
             'slug' => 'invoice-finance-integration-'.Str::lower($suffix),
             'status' => 'active',
+            'status_changed_at' => now(),
             'created_at' => now(),
             'updated_at' => now()]);
     }

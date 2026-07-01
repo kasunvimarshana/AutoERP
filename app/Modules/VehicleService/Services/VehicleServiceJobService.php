@@ -127,7 +127,7 @@ final class VehicleServiceJobService
     {
         return [
             'customer', 'vehicle.make', 'vehicle.model', 'vehicle.currentOwnerships', 'supervisor', 'inspection.inspector',
-            'invoiceLinks.invoice.balance', 'paymentLinks.payment.lines.paymentMethod', 'paymentLinks.payment.lines.internalBankAccount', 'paymentLinks.payment.allocations', 'paymentLinks.invoice',
+            'invoiceLinks.invoice.balance', 'paymentLinks.payment.lines.paymentMethod', 'paymentLinks.payment.allocations', 'paymentLinks.invoice',
         ];
     }
 }

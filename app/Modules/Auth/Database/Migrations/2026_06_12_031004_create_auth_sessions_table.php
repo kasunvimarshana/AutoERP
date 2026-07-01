@@ -31,6 +31,7 @@ return new class extends Migration
             $table->timestamps();
 
             $table->unique('public_id', 'auth_session_public_uk');
+            $table->unique(['id', 'tenant_id'], 'auth_sessions_id_tenant_uk');
             $table->unique(['id', 'tenant_id', 'user_id'], 'auth_session_graph_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'auth_session_ou_fk')
                 ->references(['id', 'tenant_id'])->on('organization_units')->restrictOnDelete();

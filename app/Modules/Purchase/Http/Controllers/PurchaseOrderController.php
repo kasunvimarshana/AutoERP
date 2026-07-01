@@ -7,6 +7,8 @@ namespace Modules\Purchase\Http\Controllers;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Validation\ValidationException;
+use InvalidArgumentException;
 use Modules\Purchase\Http\Controllers\Concerns\ScopesPurchaseRequests;
 use Modules\Purchase\Http\Requests\ListPurchaseDocumentRequest;
 use Modules\Purchase\Http\Requests\PurchaseActionRequest;
@@ -77,9 +79,15 @@ final class PurchaseOrderController
     {
         $this->authorization->assert($request->currentUserId(), $request->tenantId(), PurchaseAuthorizationService::ORDERS_CREATE);
 
-        return (new PurchaseOrderResource($service->create($request->toData())))
-            ->response()
-            ->setStatusCode(201);
+        try {
+            return (new PurchaseOrderResource($service->create($request->toData())))
+                ->response()
+                ->setStatusCode(201);
+        } catch (InvalidArgumentException $exception) {
+            throw ValidationException::withMessages([
+                'purchase_order_number' => [$exception->getMessage()],
+            ]);
+        }
     }
 
     public function show(ListPurchaseDocumentRequest $request, int $order): PurchaseOrderResource
@@ -101,7 +109,13 @@ final class PurchaseOrderController
     {
         $this->authorization->assert($request->currentUserId(), $request->tenantId(), PurchaseAuthorizationService::ORDERS_UPDATE);
 
-        return new PurchaseOrderResource($service->update($this->scope(PurchaseOrder::query(), $request)->findOrFail($order), $request->toData()));
+        try {
+            return new PurchaseOrderResource($service->update($this->scope(PurchaseOrder::query(), $request)->findOrFail($order), $request->toData()));
+        } catch (InvalidArgumentException $exception) {
+            throw ValidationException::withMessages([
+                'purchase_order_number' => [$exception->getMessage()],
+            ]);
+        }
     }
 
     public function destroy(PurchaseActionRequest $request, int $order, PurchaseOrderService $service): JsonResponse
@@ -117,28 +131,52 @@ final class PurchaseOrderController
     {
         $this->authorization->assert($request->currentUserId(), $request->tenantId(), PurchaseAuthorizationService::ORDERS_APPROVE);
 
-        return new PurchaseOrderResource($service->approve($this->scope(PurchaseOrder::query(), $request)->findOrFail($order), $request->currentUserId()));
+        try {
+            return new PurchaseOrderResource($service->approve($this->scope(PurchaseOrder::query(), $request)->findOrFail($order), $request->currentUserId()));
+        } catch (InvalidArgumentException $exception) {
+            throw ValidationException::withMessages([
+                'purchase_order' => [$exception->getMessage()],
+            ]);
+        }
     }
 
     public function submit(PurchaseActionRequest $request, int $order, PurchaseOrderService $service): PurchaseOrderResource
     {
         $this->authorization->assert($request->currentUserId(), $request->tenantId(), PurchaseAuthorizationService::ORDERS_SUBMIT);
 
-        return new PurchaseOrderResource($service->submit($this->scope(PurchaseOrder::query(), $request)->findOrFail($order), $request->currentUserId()));
+        try {
+            return new PurchaseOrderResource($service->submit($this->scope(PurchaseOrder::query(), $request)->findOrFail($order), $request->currentUserId()));
+        } catch (InvalidArgumentException $exception) {
+            throw ValidationException::withMessages([
+                'purchase_order' => [$exception->getMessage()],
+            ]);
+        }
     }
 
     public function cancel(PurchaseActionRequest $request, int $order, PurchaseOrderService $service): PurchaseOrderResource
     {
         $this->authorization->assert($request->currentUserId(), $request->tenantId(), PurchaseAuthorizationService::ORDERS_CANCEL);
 
-        return new PurchaseOrderResource($service->cancel($this->scope(PurchaseOrder::query(), $request)->findOrFail($order)));
+        try {
+            return new PurchaseOrderResource($service->cancel($this->scope(PurchaseOrder::query(), $request)->findOrFail($order)));
+        } catch (InvalidArgumentException $exception) {
+            throw ValidationException::withMessages([
+                'purchase_order' => [$exception->getMessage()],
+            ]);
+        }
     }
 
     public function close(PurchaseActionRequest $request, int $order, PurchaseOrderService $service): PurchaseOrderResource
     {
         $this->authorization->assert($request->currentUserId(), $request->tenantId(), PurchaseAuthorizationService::ORDERS_CLOSE);
 
-        return new PurchaseOrderResource($service->close($this->scope(PurchaseOrder::query(), $request)->findOrFail($order), $request->currentUserId()));
+        try {
+            return new PurchaseOrderResource($service->close($this->scope(PurchaseOrder::query(), $request)->findOrFail($order), $request->currentUserId()));
+        } catch (InvalidArgumentException $exception) {
+            throw ValidationException::withMessages([
+                'purchase_order' => [$exception->getMessage()],
+            ]);
+        }
     }
 
     public function supplierItemMappings(ListPurchaseDocumentRequest $request, int $supplier): AnonymousResourceCollection

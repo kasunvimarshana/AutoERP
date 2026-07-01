@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { useCallback, useState, type FormEvent } from 'react';
 import { useAuth } from '@/modules/auth/AuthProvider';
 import { CustomerLookupSelect } from '@/modules/customer/components/CustomerLookupSelect';
 import type { CustomerSummary } from '@/modules/customer/customerTypes';
@@ -33,7 +33,6 @@ const enumOptions = (values: string[]) => values.map((value) => ({ value, label:
 interface EmployeeCommissionFiltersProps {
     value: EmployeeCommissionReportParams;
     loading: boolean;
-    resetToken: number;
     onChange: (patch: Partial<EmployeeCommissionReportParams>) => void;
     onApply: (event: FormEvent<HTMLFormElement>) => void;
     onReset: () => void;
@@ -42,7 +41,6 @@ interface EmployeeCommissionFiltersProps {
 export function EmployeeCommissionFilters({
     value,
     loading,
-    resetToken,
     onChange,
     onApply,
     onReset,
@@ -54,15 +52,6 @@ export function EmployeeCommissionFilters({
     const [supervisor, setSupervisor] = useState<EmployeeLookupOption | null>(null);
     const [customer, setCustomer] = useState<CustomerSummary | null>(null);
     const [vehicle, setVehicle] = useState<VehicleSummary | null>(null);
-
-    useEffect(() => {
-        setEmployee(null);
-        setDepartment(null);
-        setDesignation(null);
-        setSupervisor(null);
-        setCustomer(null);
-        setVehicle(null);
-    }, [resetToken]);
 
     const employeeSearch = useCallback(async (params: LookupLoadParams) => {
         const result = await searchEmployees(params);
@@ -100,7 +89,7 @@ export function EmployeeCommissionFilters({
                 />
                 <GenericLookupSelect<EmployeeLookupOption>
                     label="Employee"
-                    value={employee}
+                    value={value.employee_id ? employee : null}
                     onChange={(selected) => {
                         setEmployee(selected);
                         onChange({ employee_id: selected?.id ?? null });
@@ -110,7 +99,7 @@ export function EmployeeCommissionFilters({
                 />
                 <GenericLookupSelect<HrDepartment>
                     label="Department"
-                    value={department}
+                    value={value.department_id ? department : null}
                     onChange={(selected) => {
                         setDepartment(selected);
                         onChange({ department_id: selected?.id ?? null });
@@ -122,7 +111,7 @@ export function EmployeeCommissionFilters({
                 />
                 <GenericLookupSelect<HrDesignation>
                     label="Designation"
-                    value={designation}
+                    value={value.designation_id ? designation : null}
                     onChange={(selected) => {
                         setDesignation(selected);
                         onChange({ designation_id: selected?.id ?? null });
@@ -134,7 +123,7 @@ export function EmployeeCommissionFilters({
                 />
                 <GenericLookupSelect<EmployeeLookupOption>
                     label="Supervisor"
-                    value={supervisor}
+                    value={value.supervisor_id ? supervisor : null}
                     onChange={(selected) => {
                         setSupervisor(selected);
                         onChange({ supervisor_id: selected?.id ?? null });
@@ -142,11 +131,11 @@ export function EmployeeCommissionFilters({
                     search={employeeSearch}
                     formatLabel={(selected) => `${selected.employee_number} ${selected.display_name}`}
                 />
-                <CustomerLookupSelect value={customer} onChange={(selected) => {
+                <CustomerLookupSelect value={value.customer_id ? customer : null} onChange={(selected) => {
                     setCustomer(selected);
                     onChange({ customer_id: selected?.id ?? null });
                 }} />
-                <VehicleLookupSelect value={vehicle} onChange={(selected) => {
+                <VehicleLookupSelect value={value.vehicle_id ? vehicle : null} onChange={(selected) => {
                     setVehicle(selected);
                     onChange({ vehicle_id: selected?.id ?? null });
                 }} />

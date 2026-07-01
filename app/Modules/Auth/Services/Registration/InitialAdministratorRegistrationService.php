@@ -54,7 +54,7 @@ final readonly class InitialAdministratorRegistrationService
         $token = trim($token);
         $digest = $this->tokens->digestArbitrary($token, 'registration-invitation');
         $locator = $this->executionContext->runAsControlPlane(function () use ($digest): ?array {
-            $invitation = $this->invitationModel->newQueryWithoutScopes()
+            $invitation = $this->invitationModel->newQuery()
                 ->where('token_hash', $digest)
                 ->where('purpose', RegistrationInvitationPurpose::INITIAL_ADMINISTRATOR)
                 ->where('status', RegistrationInvitationStatus::PENDING)

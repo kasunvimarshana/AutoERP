@@ -100,7 +100,7 @@ final class CurrentTenantContextResolverTest extends TestCase
             'status' => 'active',
             'current_subscription' => [
                 'contract_status' => 'active',
-                'current_state' => 'active',
+                'current_state' => 'assigned',
                 'starts_at' => '2020-01-01 00:00:00',
                 'ends_at' => null,
                 'trial_ends_at' => null,
@@ -201,7 +201,7 @@ final class CurrentTenantContextResolverTest extends TestCase
             'status' => 'active',
             'current_subscription' => [
                 'contract_status' => 'active',
-                'current_state' => 'active',
+                'current_state' => 'assigned',
                 'starts_at' => '2020-01-01 00:00:00',
                 'ends_at' => null,
                 'trial_ends_at' => null,

@@ -8,6 +8,8 @@ final class UomErrorCode
 {
     public const INVALID_VALUE = 'UOM_INVALID_VALUE';
 
+    public const FORBIDDEN = 'UOM_FORBIDDEN';
+
     public const NOT_FOUND = 'UOM_NOT_FOUND';
 
     public const DUPLICATE_NAME = 'UOM_DUPLICATE_NAME';

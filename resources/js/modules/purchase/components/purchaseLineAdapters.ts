@@ -1,10 +1,10 @@
 import type { NamedResource } from '@/shared/types/common';
 import { decimalOr } from '../purchaseFormUtils';
 import type {
-    FastPurchasePayload,
     PurchaseOrder,
     PurchaseOrderPayload,
 } from '../purchaseTypes';
+import type { FastPurchasePayload } from '../types/fastPurchaseTypes';
 import type { EditablePurchaseLine } from './purchaseLineModel';
 import { purchaseLineKey } from './purchaseLineModel';
 

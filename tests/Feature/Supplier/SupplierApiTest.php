@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\Item\Services\ItemAuthorizationService;
 use Modules\Supplier\Services\SupplierAuthorizationService;
+use Modules\User\Constants\UserGuard;
 use Tests\TestCase;
 
 final class SupplierApiTest extends TestCase
@@ -192,7 +193,9 @@ final class SupplierApiTest extends TestCase
         ])->assertOk()->assertJsonPath('data.is_active', false);
         $this->withAuth($context)->postJson("/api/v1/suppliers/{$supplierId}/categories", [
             'category_id' => $categoryId,
-        ])->assertUnprocessable()->assertJsonPath('message', 'Inactive supplier category cannot be assigned.');
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['category_id'])
+            ->assertJsonPath('errors.category_id.0', 'Inactive supplier category cannot be assigned.');
         $this->withAuth($context)->deleteJson('/api/v1/supplier-categories/'.$categoryId)->assertNoContent();
     }
 
@@ -223,7 +226,9 @@ final class SupplierApiTest extends TestCase
             'item_id' => $itemId,
             'default_purchase_uom_id' => $uomId,
             'minimum_order_quantity' => '1.000000',
-        ])->assertUnprocessable()->assertJsonPath('message', 'Supplier item mapping already exists.');
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['item_id'])
+            ->assertJsonPath('errors.item_id.0', 'Supplier item mapping already exists.');
         $this->withAuth($context)->putJson("/api/v1/suppliers/{$supplierId}/item-mappings/{$mappingId}", [
             'item_id' => $itemId,
             'default_purchase_uom_id' => $uomId,
@@ -262,7 +267,9 @@ final class SupplierApiTest extends TestCase
             ->assertJsonPath('data.0.status', 'blacklisted');
         $this->withAuth($context)->patchJson("/api/v1/suppliers/{$supplierId}/status", [
             'status' => 'active',
-        ])->assertUnprocessable()->assertJsonPath('message', 'Invalid supplier status transition.');
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['status'])
+            ->assertJsonPath('errors.status.0', 'Invalid supplier status transition.');
     }
 
     public function test_duplicates_tenant_isolation_and_validation_error_format(): void
@@ -441,7 +448,7 @@ final class SupplierApiTest extends TestCase
             $permissionId = (int) DB::table('permissions')->insertGetId([
                 'tenant_id' => $tenantId,
                 'name' => $name,
-                'guard_name' => (string) config('auth.defaults.guard', 'api'),
+                'guard_name' => UserGuard::TENANT_API,
                 'module' => 'Supplier',
                 'description' => $description,
                 'row_version' => 1,

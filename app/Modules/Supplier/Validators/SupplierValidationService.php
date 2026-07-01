@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace Modules\Supplier\Validators;
 
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use Modules\ReferenceData\Models\CurrencyModel;
 use Modules\Core\Services\DecimalMath;
@@ -73,7 +76,17 @@ final class SupplierValidationService
 
     public function assertCategoryUsable(Supplier $supplier, int $categoryId): SupplierCategory
     {
-        $category = SupplierCategory::query()->findOrFail($categoryId);
+        $category = SupplierCategory::query()->find($categoryId);
+        if (! $category instanceof SupplierCategory) {
+            $this->missingTenantReference(
+                'supplier_categories',
+                SupplierCategory::class,
+                (int) $supplier->tenant_id,
+                $categoryId,
+                'Supplier reference belongs to a different tenant.',
+            );
+        }
+
         $this->assertScope(
             (int) $supplier->tenant_id,
             $supplier->organization_unit_id,
@@ -81,7 +94,9 @@ final class SupplierValidationService
             $category->organization_unit_id,
         );
         if (! (bool) $category->is_active) {
-            throw new InvalidArgumentException('Inactive supplier category cannot be assigned.');
+            throw ValidationException::withMessages([
+                'category_id' => ['Inactive supplier category cannot be assigned.'],
+            ]);
         }
 
         return $category;
@@ -94,7 +109,17 @@ final class SupplierValidationService
             throw new InvalidArgumentException('Supplier item lead time cannot be negative.');
         }
 
-        $item = Item::query()->findOrFail($data->itemId);
+        $item = Item::query()->find($data->itemId);
+        if (! $item instanceof Item) {
+            $this->missingTenantReference(
+                'items',
+                Item::class,
+                (int) $supplier->tenant_id,
+                $data->itemId,
+                'Supplier reference belongs to a different tenant.',
+            );
+        }
+
         $this->assertScope(
             (int) $supplier->tenant_id,
             $supplier->organization_unit_id,
@@ -106,7 +131,17 @@ final class SupplierValidationService
         }
 
         if ($data->itemVariantId !== null) {
-            $variant = ItemVariant::query()->findOrFail($data->itemVariantId);
+            $variant = ItemVariant::query()->find($data->itemVariantId);
+            if (! $variant instanceof ItemVariant) {
+                $this->missingTenantReference(
+                    'item_variants',
+                    ItemVariant::class,
+                    (int) $supplier->tenant_id,
+                    $data->itemVariantId,
+                    'Supplier reference belongs to a different tenant.',
+                );
+            }
+
             if ((int) $variant->item_id !== $data->itemId) {
                 throw new InvalidArgumentException('Supplier item variant must belong to the mapped item.');
             }
@@ -122,7 +157,17 @@ final class SupplierValidationService
         }
 
         if ($data->defaultPurchaseUomId !== null) {
-            $uom = UnitOfMeasureModel::query()->findOrFail($data->defaultPurchaseUomId);
+            $uom = UnitOfMeasureModel::query()->find($data->defaultPurchaseUomId);
+            if (! $uom instanceof UnitOfMeasureModel) {
+                $this->missingTenantReference(
+                    'unit_of_measures',
+                    UnitOfMeasureModel::class,
+                    (int) $supplier->tenant_id,
+                    $data->defaultPurchaseUomId,
+                    'Supplier reference belongs to a different tenant.',
+                );
+            }
+
             $this->assertScope(
                 (int) $supplier->tenant_id,
                 $supplier->organization_unit_id,
@@ -176,7 +221,17 @@ final class SupplierValidationService
             return;
         }
 
-        $organization = OrganizationUnitModel::query()->findOrFail($organizationUnitId);
+        $organization = OrganizationUnitModel::query()->find($organizationUnitId);
+        if (! $organization instanceof OrganizationUnitModel) {
+            $this->missingTenantReference(
+                'organization_units',
+                OrganizationUnitModel::class,
+                $tenantId,
+                $organizationUnitId,
+                'Supplier organization unit belongs to a different tenant.',
+            );
+        }
+
         if ((int) $organization->tenant_id !== $tenantId) {
             throw new InvalidArgumentException('Supplier organization unit belongs to a different tenant.');
         }
@@ -228,5 +283,22 @@ final class SupplierValidationService
         if ($id !== null) {
             $query->whereKeyNot($id);
         }
+    }
+
+    /**
+     * @param class-string $modelClass
+     */
+    private function missingTenantReference(
+        string $table,
+        string $modelClass,
+        int $tenantId,
+        int $id,
+        string $message,
+    ): never {
+        if (DB::table($table)->where('id', $id)->where('tenant_id', '<>', $tenantId)->exists()) {
+            throw new InvalidArgumentException($message);
+        }
+
+        throw (new ModelNotFoundException())->setModel($modelClass, [$id]);
     }
 }

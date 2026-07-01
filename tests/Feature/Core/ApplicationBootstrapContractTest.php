@@ -53,10 +53,11 @@ final class ApplicationBootstrapContractTest extends TestCase
     {
         $bootstrap = (string) file_get_contents($this->root.'/bootstrap/app.php');
         $command = (string) file_get_contents($this->root.'/app/Console/Commands/EnsureApplicationKeyCommand.php');
+        $configuration = (string) file_get_contents($this->root.'/app/Support/ApplicationKeyConfiguration.php');
 
         self::assertStringContainsString('EnsureApplicationKeyCommand::class', $bootstrap);
         self::assertStringNotContainsString('__construct(', $command);
-        self::assertStringContainsString('Encrypter::supported(', $command);
+        self::assertStringContainsString('Encrypter::supported(', $configuration);
     }
 
     /** @return array<string,mixed> */
@@ -66,7 +67,7 @@ final class ApplicationBootstrapContractTest extends TestCase
         self::assertIsString($contents);
 
         $decoded = json_decode($contents, true, flags: JSON_THROW_ON_ERROR);
-        self::assertIsArray($ecoded);
+        self::assertIsArray($decoded);
 
         return $decoded;
     }

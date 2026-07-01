@@ -145,7 +145,7 @@ export default function BankReconciliationPage() {
             <Panel title="New statement">
                 <ErrorAlert error={error} />
                 <form className="space-y-4" onSubmit={(event) => { event.preventDefault(); void save(); }}>
-                    <Select label="Bank account" value={form.bank_account_id ?? ''} onChange={(event) => setForm({ ...form, bank_account_id: event.target.value ? Number(event.target.value) : null })} options={(lookups.data?.bankAccounts ?? []).map((account) => ({ value: String(account.id), label: `${account.code} - ${account.name}` }))} error={fieldError(error, 'bank_account_id')} required />
+                    <Select label="Bank account" value={form.bank_account_id ?? ''} onChange={(event) => setForm({ ...form, bank_account_id: event.target.value ? Number(event.target.value) : null })} options={(lookups.data?.bank_accounts ?? []).map((account) => ({ value: String(account.id), label: `${account.code} - ${account.name}` }))} error={fieldError(error, 'bank_account_id')} required />
                     <div className="grid gap-4 sm:grid-cols-2">
                         <Input label="Statement reference" value={form.statement_reference} onChange={(event) => setForm({ ...form, statement_reference: event.target.value })} error={fieldError(error, 'statement_reference')} required />
                         <Input label="Statement date" type="date" value={form.statement_date} onChange={(event) => setForm({ ...form, statement_date: event.target.value })} error={fieldError(error, 'statement_date')} required />

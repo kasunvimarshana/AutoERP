@@ -105,7 +105,7 @@ describe('tenant subscription form rules', () => {
         );
 
         expect(payload.contract_status).toBe('trial');
-        expect(payload.trial_ends_at).toBe('2026-07-01T09:00:00.000Z');
+        expect(payload.trial_ends_at).toBe(new Date('2026-07-01T09:00').toISOString());
         expect(payload.ends_at).toBeNull();
         expect(payload.reason).toBe('Initial trial');
     });

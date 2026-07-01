@@ -41,6 +41,8 @@ final class UserOrganizationUnitModel extends TenantOwnedModel
         'is_default',
         'default_marker',
         'row_version',
+        'created_by_user_id',
+        'updated_by_user_id',
     ];
 
     protected function casts(): array

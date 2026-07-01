@@ -41,6 +41,8 @@ final class PurchaseHeaderAdjustment extends TenantOwnedModel
             'remaining_amount' => 'decimal:6',
             'is_allocatable' => 'boolean',
             'sort_order' => 'integer',
+            'created_by' => 'integer',
+            'updated_by' => 'integer',
         ]);
     }
 

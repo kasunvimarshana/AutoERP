@@ -75,12 +75,13 @@ final class PurchaseAdjustmentOwnershipBoundaryTest extends TestCase
 
     public function test_schema_removes_obsolete_adjustment_finance_columns(): void
     {
-        $migration = $this->source('../Database/Migrations/2026_06_30_000001_finalize_purchase_adjustment_ownership.php');
+        $migration = $this->source('../Database/Migrations/2026_06_12_170003_create_purchase_header_adjustments_table.php');
 
-        self::assertStringContainsString("'finance_posting_profile_id'", $migration);
-        self::assertStringContainsString("'finance_account_id'", $migration);
-        self::assertStringContainsString("'override_reason'", $migration);
-        self::assertStringContainsString("renameColumn('mapping_source', 'recognition_source')", $migration);
+        self::assertStringNotContainsString('finance_posting_profile_id', $migration);
+        self::assertStringNotContainsString('finance_account_id', $migration);
+        self::assertStringNotContainsString('override_reason', $migration);
+        self::assertStringNotContainsString('mapping_source', $migration);
+        self::assertStringContainsString('recognition_source', $migration);
     }
 
     private function source(string $relativePath): string

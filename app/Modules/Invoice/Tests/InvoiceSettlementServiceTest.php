@@ -23,8 +23,9 @@ final class InvoiceSettlementServiceTest extends TestCase
 
     public function test_it_applies_and_reverses_payment_allocations_through_invoice_owned_service(): void
     {
-        $invoice = app(InvoiceCreationService::class)->create(new CreateInvoiceData(
-            tenantId: $this->createTenant(),
+        $tenantId = $this->createTenant();
+        $invoice = $this->withTenantExecutionContext($tenantId, fn () => app(InvoiceCreationService::class)->create(new CreateInvoiceData(
+            tenantId: $tenantId,
             invoiceType: InvoiceType::Manual,
             direction: InvoiceDirection::Outbound,
             invoiceDate: '2026-06-06',
@@ -37,19 +38,19 @@ final class InvoiceSettlementServiceTest extends TestCase
                     unitPrice: '1000.000000',
                 ),
             ],
-        ));
+        )));
 
         $statuses = app(InvoiceStatusService::class);
-        $invoice = $statuses->transition($invoice, InvoiceStatus::Approved);
-        $invoice = $statuses->transition($invoice, InvoiceStatus::Posted);
+        $invoice = $this->withTenantExecutionContext($tenantId, fn () => $statuses->transition($invoice, InvoiceStatus::Approved));
+        $invoice = $this->withTenantExecutionContext($tenantId, fn () => $statuses->transition($invoice, InvoiceStatus::Posted));
 
         $settlements = app(InvoiceSettlementServiceInterface::class);
-        $applied = $settlements->applyPaymentAllocation((int) $invoice->getKey(), '400.000000');
+        $applied = $this->withTenantExecutionContext($tenantId, fn () => $settlements->applyPaymentAllocation((int) $invoice->getKey(), '400.000000'));
 
         $this->assertSame('1000.000000', $applied->balanceBefore);
         $this->assertSame('600.000000', $applied->balanceAfter);
 
-        $reversed = $settlements->reversePaymentAllocation((int) $invoice->getKey(), '400.000000');
+        $reversed = $this->withTenantExecutionContext($tenantId, fn () => $settlements->reversePaymentAllocation((int) $invoice->getKey(), '400.000000'));
 
         $this->assertSame('600.000000', $reversed->balanceBefore);
         $this->assertSame('1000.000000', $reversed->balanceAfter);
@@ -65,6 +66,7 @@ final class InvoiceSettlementServiceTest extends TestCase
             'name' => 'Invoice Settlement '.$suffix,
             'slug' => 'invoice-settlement-'.Str::lower($suffix),
             'status' => 'active',
+            'status_changed_at' => now(),
             'created_at' => now(),
             'updated_at' => now()]);
     }

@@ -6,7 +6,7 @@ namespace Modules\Item\Services;
 
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
-use InvalidArgumentException;
+use Illuminate\Validation\ValidationException;
 use Modules\Item\Models\ItemCategory;
 
 final class ItemCategoryService
@@ -59,10 +59,14 @@ final class ItemCategoryService
     public function delete(ItemCategory $category): void
     {
         if ($category->items()->exists()) {
-            throw new InvalidArgumentException('Item category cannot be deleted while items reference it.');
+            throw ValidationException::withMessages([
+                'item_category' => ['Item category cannot be deleted while items reference it.'],
+            ]);
         }
         if ($category->children()->exists()) {
-            throw new InvalidArgumentException('Item category cannot be deleted while child categories reference it.');
+            throw ValidationException::withMessages([
+                'item_category' => ['Item category cannot be deleted while child categories reference it.'],
+            ]);
         }
         $category->delete();
     }
@@ -75,7 +79,9 @@ final class ItemCategoryService
                 $duplicate->whereKeyNot($ignoreId);
             }
             if ($duplicate->exists()) {
-                throw new InvalidArgumentException('Item category code already exists for this tenant.');
+                throw ValidationException::withMessages([
+                    'code' => ['Item category code already exists for this tenant.'],
+                ]);
             }
         }
 
@@ -85,20 +91,28 @@ final class ItemCategoryService
                 $duplicate->whereKeyNot($ignoreId);
             }
             if ($duplicate->exists()) {
-                throw new InvalidArgumentException('Item category name already exists for this tenant.');
+                throw ValidationException::withMessages([
+                    'name' => ['Item category name already exists for this tenant.'],
+                ]);
             }
         }
 
         if (! empty($data['parent_id'])) {
             if ($ignoreId !== null && (int) $data['parent_id'] === $ignoreId) {
-                throw new InvalidArgumentException('Item category cannot be its own parent.');
+                throw ValidationException::withMessages([
+                    'parent_id' => ['Item category cannot be its own parent.'],
+                ]);
             }
             $parent = $this->query($tenantId, $organizationUnitId)->findOrFail((int) $data['parent_id']);
             if (! $parent->is_active) {
-                throw new InvalidArgumentException('Inactive item category cannot be used as a parent.');
+                throw ValidationException::withMessages([
+                    'parent_id' => ['Inactive item category cannot be used as a parent.'],
+                ]);
             }
             if ($ignoreId !== null && $this->wouldCreateCycle($ignoreId, (int) $parent->getKey())) {
-                throw new InvalidArgumentException('Item category parent would create a hierarchy cycle.');
+                throw ValidationException::withMessages([
+                    'parent_id' => ['Item category parent would create a hierarchy cycle.'],
+                ]);
             }
         }
     }
@@ -139,11 +153,15 @@ final class ItemCategoryService
     private function assertCanDeactivate(ItemCategory $category): void
     {
         if ($category->children()->where('is_active', true)->exists()) {
-            throw new InvalidArgumentException('Item category cannot be deactivated while active child categories reference it.');
+            throw ValidationException::withMessages([
+                'is_active' => ['Item category cannot be deactivated while active child categories reference it.'],
+            ]);
         }
 
         if ($category->items()->where('is_active', true)->exists()) {
-            throw new InvalidArgumentException('Item category cannot be deactivated while active items reference it.');
+            throw ValidationException::withMessages([
+                'is_active' => ['Item category cannot be deactivated while active items reference it.'],
+            ]);
         }
     }
 }

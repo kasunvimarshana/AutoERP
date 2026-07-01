@@ -5,8 +5,7 @@ declare(strict_types=1);
 namespace Modules\Payment\Services\Tax;
 
 use BackedEnum;
-use Modules\Invoice\Models\Invoice;
-use Modules\Invoice\Services\Tax\InvoiceTaxDocumentMapper;
+use Modules\Invoice\Contracts\InvoiceTaxDocumentProviderInterface;
 use Modules\Payment\Models\Payment;
 use Modules\Tax\Data\TaxPaymentWithholdingAllocationData;
 use Modules\Tax\Data\TaxPaymentWithholdingData;
@@ -14,7 +13,7 @@ use Modules\Tax\Data\TaxPaymentWithholdingData;
 final class PaymentTaxWithholdingMapper
 {
     public function __construct(
-        private readonly InvoiceTaxDocumentMapper $invoices,
+        private readonly InvoiceTaxDocumentProviderInterface $invoices,
     ) {}
 
     public function map(Payment $payment): TaxPaymentWithholdingData
@@ -29,12 +28,12 @@ final class PaymentTaxWithholdingMapper
                 continue;
             }
 
-            $invoice = Invoice::query()
-                ->where('tenant_id', (int) $payment->tenant_id)
-                ->where('organization_unit_id', $allocation->organization_unit_id)
-                ->findOrFail((int) $allocation->invoice_id);
             $allocations[] = new TaxPaymentWithholdingAllocationData(
-                invoice: $this->invoices->map($invoice),
+                invoice: $this->invoices->taxableDocument(
+                    (int) $payment->tenant_id,
+                    $allocation->organization_unit_id === null ? null : (int) $allocation->organization_unit_id,
+                    (int) $allocation->invoice_id,
+                ),
                 allocatedAmount: (string) $allocation->allocated_amount,
                 invoiceTotal: (string) $allocation->invoice_total,
             );

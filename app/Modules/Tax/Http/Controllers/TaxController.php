@@ -7,7 +7,7 @@ namespace Modules\Tax\Http\Controllers;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
-use Modules\Finance\Models\FinanceAccount;
+use Modules\Finance\Models\FinancePostingProfileRule;
 use Modules\Tax\DTOs\TaxAmountData;
 use Modules\Tax\DTOs\TaxCalculationResult;
 use Modules\Tax\DTOs\TaxLineCalculationResult;
@@ -172,7 +172,7 @@ final class TaxController
     {
         return TaxPostingProfileResource::collection(
             $this->scope(TaxPostingProfile::query(), $request)
-                ->with(['tax', 'account'])
+                ->with('tax')
                 ->orderByDesc('id')
                 ->paginate($request->perPage()),
         );
@@ -223,17 +223,25 @@ final class TaxController
             ->where('active', true)
             ->orderBy('code')
             ->get(['id', 'code', 'name', 'is_default']);
-        $accounts = $this->scope(FinanceAccount::query(), $request)
-            ->where('is_active', true)
-            ->where('is_posting_account', true)
-            ->orderBy('code')
-            ->get(['id', 'code', 'name', 'is_tax_account']);
+        $postingKeys = FinancePostingProfileRule::query()
+            ->where('tenant_id', $request->tenantId())
+            ->whereHas('postingProfile', function (Builder $query) use ($request): Builder {
+                $query->where('is_active', true);
+
+                return $request->organizationUnitId() === null
+                    ? $query->whereNull('organization_unit_id')
+                    : $query->where('organization_unit_id', $request->organizationUnitId());
+            })
+            ->orderBy('line_key')
+            ->pluck('line_key')
+            ->unique()
+            ->values();
 
         return response()->json([
             'data' => [
                 'taxes' => $taxes,
                 'groups' => $groups,
-                'accounts' => $accounts,
+                'posting_keys' => $postingKeys,
                 'calculation_methods' => config('tax.calculation_methods', []),
                 'exemption_statuses' => config('tax.exemption_statuses', []),
                 'posting_directions' => config('tax.posting_directions', []),

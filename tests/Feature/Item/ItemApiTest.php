@@ -94,7 +94,7 @@ final class ItemApiTest extends TestCase
             'effective_from' => '2026-01-01',
             'expected_version' => 1,
             'correction_reason' => 'Approved annual price correction.',
-        ])->assertOk()
+        ])->assertCreated()
             ->assertJsonPath('data.revision_no', 2)
             ->assertJsonPath('data.amount', '125.000000')
             ->assertJsonMissingPath('data.scope_key')
@@ -121,28 +121,36 @@ final class ItemApiTest extends TestCase
             'correction_reason' => 'Stale correction attempt.',
         ])->assertUnprocessable()->assertJsonValidationErrors(['expected_version']);
 
-        $item = Item::query()->findOrFail($itemId);
-        $resolver = app(ItemPriceResolutionService::class);
-        $resolved = $resolver->resolvePrice(
-            item: $item,
-            context: ItemPriceResolutionService::CONTEXT_SALES,
-            uomId: $pcsUomId,
-            organizationUnitId: $context['organization_unit_id'],
-            currencyId: $currencyId,
-            date: '2026-06-18',
+        [$resolved, $missingCurrency] = $this->withTenantExecutionContext(
+            $context['tenant_id'],
+            function () use ($itemId, $pcsUomId, $context, $currencyId, $otherCurrencyId): array {
+                $item = Item::query()->findOrFail($itemId);
+                $resolver = app(ItemPriceResolutionService::class);
+
+                return [
+                    $resolver->resolvePrice(
+                        item: $item,
+                        context: ItemPriceResolutionService::CONTEXT_SALES,
+                        uomId: $pcsUomId,
+                        organizationUnitId: $context['organization_unit_id'],
+                        currencyId: $currencyId,
+                        date: '2026-06-18',
+                    ),
+                    $resolver->resolvePrice(
+                        item: $item,
+                        context: ItemPriceResolutionService::CONTEXT_SALES,
+                        uomId: $pcsUomId,
+                        organizationUnitId: $context['organization_unit_id'],
+                        currencyId: $otherCurrencyId,
+                        date: '2026-06-18',
+                    ),
+                ];
+            },
         );
         $this->assertSame('item_price_revision', $resolved->source);
         $this->assertSame('125.000000', $resolved->amount);
         $this->assertSame(2, $resolved->metadata['revision_no']);
 
-        $missingCurrency = $resolver->resolvePrice(
-            item: $item,
-            context: ItemPriceResolutionService::CONTEXT_SALES,
-            uomId: $pcsUomId,
-            organizationUnitId: $context['organization_unit_id'],
-            currencyId: $otherCurrencyId,
-            date: '2026-06-18',
-        );
         $this->assertSame('manual', $missingCurrency->source);
         $this->assertNull($missingCurrency->amount);
 

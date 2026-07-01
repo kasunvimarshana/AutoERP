@@ -53,10 +53,16 @@ abstract class AbstractUserCrudService
         if (str_contains($lowerMessage, 'changed after it was loaded')) {
             return $this->failure(UserErrorCode::STALE_RECORD, $message);
         }
+        if (str_contains($lowerMessage, 'your own account')) {
+            return $this->failure(UserErrorCode::PROTECTED_ACCOUNT, $message);
+        }
+        if (str_contains($lowerMessage, 'last active super admin')) {
+            return $this->failure(UserErrorCode::LAST_ADMIN, $message);
+        }
         if (str_contains($lowerMessage, 'not found')) {
             return $this->failure(UserErrorCode::NOT_FOUND, $message);
         }
-        if (str_contains($lowerMessage, 'already exists') || str_contains($lowerMessage, 'cannot be') || str_contains($lowerMessage, 'before archiving')) {
+        if (str_contains($lowerMessage, 'already exists') || str_contains($lowerMessage, 'cannot be') || str_contains($lowerMessage, 'before archiving') || str_contains($lowerMessage, 'immutable')) {
             return $this->failure(UserErrorCode::CONFLICT, $message);
         }
 

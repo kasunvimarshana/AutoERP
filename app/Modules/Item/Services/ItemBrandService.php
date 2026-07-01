@@ -6,7 +6,7 @@ namespace Modules\Item\Services;
 
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
-use InvalidArgumentException;
+use Illuminate\Validation\ValidationException;
 use Modules\Item\Models\ItemBrand;
 
 final class ItemBrandService
@@ -55,7 +55,9 @@ final class ItemBrandService
             $this->assertUniqueName((int) $brand->tenant_id, (string) $data['name'], (int) $brand->getKey());
         }
         if (array_key_exists('is_active', $data) && $data['is_active'] === false && $brand->items()->where('is_active', true)->exists()) {
-            throw new InvalidArgumentException('Item brand cannot be deactivated while active items reference it.');
+            throw ValidationException::withMessages([
+                'is_active' => ['Item brand cannot be deactivated while active items reference it.'],
+            ]);
         }
         $brand->fill($data)->save();
 
@@ -65,7 +67,9 @@ final class ItemBrandService
     public function delete(ItemBrand $brand): void
     {
         if ($brand->items()->exists()) {
-            throw new InvalidArgumentException('Item brand cannot be deleted while items reference it.');
+            throw ValidationException::withMessages([
+                'item_brand' => ['Item brand cannot be deleted while items reference it.'],
+            ]);
         }
         $brand->delete();
     }
@@ -77,7 +81,9 @@ final class ItemBrandService
             $query->whereKeyNot($ignoreId);
         }
         if ($query->exists()) {
-            throw new InvalidArgumentException('Item brand code already exists for this tenant.');
+            throw ValidationException::withMessages([
+                'code' => ['Item brand code already exists for this tenant.'],
+            ]);
         }
     }
 
@@ -88,7 +94,9 @@ final class ItemBrandService
             $query->whereKeyNot($ignoreId);
         }
         if ($query->exists()) {
-            throw new InvalidArgumentException('Item brand name already exists for this tenant.');
+            throw ValidationException::withMessages([
+                'name' => ['Item brand name already exists for this tenant.'],
+            ]);
         }
     }
 

@@ -29,8 +29,8 @@ final class FinanceAccountRoleBoundaryTest extends TestCase
         $service = $this->source('../Services/AccountRoleAssignmentService.php');
         $posting = $this->source('../Services/PostingProfileService.php');
 
-        self::assertStringContainsString("whereDate('effective_from', '<=', $date)", $service);
-        self::assertStringContainsString("whereNull('effective_to')->orWhereDate('effective_to', '>=', $date)", $service);
+        self::assertStringContainsString("whereDate('effective_from', '<=', \$date)", $service);
+        self::assertStringContainsString("whereNull('effective_to')->orWhereDate('effective_to', '>=', \$date)", $service);
         self::assertStringContainsString("orderByRaw('organization_unit_id IS NULL ASC')", $service);
         self::assertStringContainsString('ambiguous effective assignments', $service);
         self::assertStringContainsString('effective period overlaps', $service);
@@ -39,14 +39,18 @@ final class FinanceAccountRoleBoundaryTest extends TestCase
 
     public function test_schema_migrates_direct_rules_without_silent_conflict_resolution(): void
     {
-        $migration = $this->source('../Database/Migrations/2026_06_30_000002_create_effective_account_role_assignments.php');
+        $roles = $this->source('../Database/Migrations/2026_06_12_070017_create_finance_account_roles_table.php');
+        $assignments = $this->source('../Database/Migrations/2026_06_12_070018_create_finance_account_assignments_table.php');
+        $rules = $this->source('../Database/Migrations/2026_06_12_070019_create_finance_posting_profile_rules_table.php');
+        $schema = $roles.$assignments.$rules;
 
-        self::assertStringContainsString("Schema::create(self::ROLES", $migration);
-        self::assertStringContainsString("Schema::create(self::ASSIGNMENTS", $migration);
-        self::assertStringContainsString('account_role_id', $migration);
-        self::assertStringContainsString('Conflicting direct posting mappings exist', $migration);
-        self::assertStringContainsString("Schema::drop(self::RULES)", $migration);
-        self::assertStringNotContainsString('suspense', strtolower($migration));
+        self::assertStringContainsString("Schema::create('finance_account_roles'", $roles);
+        self::assertStringContainsString("Schema::create('finance_account_assignments'", $assignments);
+        self::assertStringContainsString("Schema::create('finance_posting_profile_rules'", $rules);
+        self::assertStringContainsString('account_role_id', $schema);
+        self::assertStringContainsString('effective_from', $assignments);
+        self::assertStringNotContainsString('account_id', $rules);
+        self::assertStringNotContainsString('suspense', strtolower($schema));
     }
 
     public function test_finance_configuration_routes_have_a_single_owner(): void

@@ -15,7 +15,7 @@ return new class extends Migration
             $table->foreignId('tenant_id')->constrained('tenants', 'id', indexName: 'finance_posting_profile_rules_tenant_fk')->restrictOnDelete();
             $table->foreignId('posting_profile_id');
             $table->string('line_key', 100);
-            $table->foreignId('account_id');
+            $table->unsignedBigInteger('account_role_id');
             $table->string('description')->nullable();
             $table->timestamps();
 
@@ -24,9 +24,9 @@ return new class extends Migration
                 ->references(['id', 'tenant_id'])
                 ->on('finance_posting_profiles')
                 ->cascadeOnDelete();
-            $table->foreign(['account_id', 'tenant_id'], 'finance_posting_rules_account_tenant_fk')
+            $table->foreign(['account_role_id', 'tenant_id'], 'finance_posting_rules_role_tenant_fk')
                 ->references(['id', 'tenant_id'])
-                ->on('finance_accounts')
+                ->on('finance_account_roles')
                 ->restrictOnDelete();
             $table->unique(
                 ['posting_profile_id', 'line_key'],

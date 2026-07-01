@@ -21,8 +21,9 @@ final class InvoiceBalanceProviderTest extends TestCase
 
     public function test_it_exposes_invoice_balance_through_contract(): void
     {
-        $invoice = app(InvoiceCreationService::class)->create(new CreateInvoiceData(
-            tenantId: $this->createTenant(),
+        $tenantId = $this->createTenant();
+        $invoice = $this->withTenantExecutionContext($tenantId, fn () => app(InvoiceCreationService::class)->create(new CreateInvoiceData(
+            tenantId: $tenantId,
             invoiceType: InvoiceType::Manual,
             direction: InvoiceDirection::Outbound,
             invoiceDate: '2026-06-06',
@@ -35,18 +36,18 @@ final class InvoiceBalanceProviderTest extends TestCase
                     unitPrice: '1250.000000',
                 ),
             ],
-        ));
+        )));
 
         $provider = app(InvoiceBalanceProviderInterface::class);
 
-        $invoiceBalance = $provider->getInvoiceBalance((int) $invoice->getKey());
-        $sharedBalance = $provider->getBalance((int) $invoice->getKey());
+        $invoiceBalance = $this->withTenantExecutionContext($tenantId, fn () => $provider->getInvoiceBalance((int) $invoice->getKey()));
+        $sharedBalance = $this->withTenantExecutionContext($tenantId, fn () => $provider->getBalance((int) $invoice->getKey()));
 
         $this->assertSame((int) $invoice->getKey(), $invoiceBalance->invoiceId);
         $this->assertSame('1250.000000', $invoiceBalance->invoiceTotal);
         $this->assertSame('1250.000000', $invoiceBalance->remainingAmount);
         $this->assertSame('1250.000000', $sharedBalance->remainingAmount);
-        $this->assertSame('draft', $provider->getInvoiceStatus((int) $invoice->getKey()));
+        $this->assertSame('draft', $this->withTenantExecutionContext($tenantId, fn () => $provider->getInvoiceStatus((int) $invoice->getKey())));
     }
 
     private function createTenant(): int
@@ -59,6 +60,7 @@ final class InvoiceBalanceProviderTest extends TestCase
             'name' => 'Invoice Balance Provider '.$suffix,
             'slug' => 'invoice-balance-provider-'.Str::lower($suffix),
             'status' => 'active',
+            'status_changed_at' => now(),
             'created_at' => now(),
             'updated_at' => now()]);
     }

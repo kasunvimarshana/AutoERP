@@ -31,7 +31,6 @@ export default function EmployeeCommissionReportScreen() {
     const [result, setResult] = useState<EmployeeCommissionReportResult | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
-    const [resetToken, setResetToken] = useState(0);
 
     useEffect(() => {
         const controller = new AbortController();
@@ -65,7 +64,6 @@ export default function EmployeeCommissionReportScreen() {
     const reset = () => {
         setDraft(initialFilters);
         setFilters(initialFilters);
-        setResetToken((value) => value + 1);
     };
 
     const sort = (key: string) => {
@@ -87,7 +85,6 @@ export default function EmployeeCommissionReportScreen() {
                     <EmployeeCommissionFilters
                         value={draft}
                         loading={loading}
-                        resetToken={resetToken}
                         onChange={(patch) => setDraft((current) => ({ ...current, ...patch }))}
                         onApply={apply}
                         onReset={reset}

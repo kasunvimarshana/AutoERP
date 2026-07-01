@@ -21,6 +21,7 @@ return new class extends Migration
             $table->unsignedBigInteger('row_version')->default(1);
             $table->timestamps();
 
+            $table->unique(['id', 'tenant_id'], 'auth_user_credentials_id_tenant_uk');
             $table->unique(['tenant_id', 'user_id'], 'auth_user_credential_user_uk');
             $table->foreign(['user_id', 'tenant_id'], 'auth_user_credential_user_fk')
                 ->references(['id', 'tenant_id'])->on('users')->restrictOnDelete();

@@ -76,7 +76,7 @@ final class ItemController
         $model = $this->queries->item($item, $request->tenantId(), $request->organizationUnitId());
         $updated = $this->updates->update($model, $request->toData());
 
-        return new ItemResource($updated->load(['category', 'brand', 'tenant.currency', 'baseUom', 'defaultTaxGroup', 'purchaseTaxGroup', 'salesTaxGroup']));
+        return new ItemResource($updated->load(['category', 'brand', 'tenant.baseCurrency', 'baseUom', 'defaultTaxGroup', 'purchaseTaxGroup', 'salesTaxGroup']));
     }
 
     public function destroy(ListItemRequest $request, int $item): JsonResponse
@@ -138,6 +138,6 @@ final class ItemController
 
         $model = $this->queries->item($item, $request->tenantId(), $request->organizationUnitId());
 
-        return new ItemResource($this->updates->setActive($model, $isActive)->load(['category', 'brand', 'tenant.currency', 'baseUom', 'defaultTaxGroup', 'purchaseTaxGroup', 'salesTaxGroup']));
+        return new ItemResource($this->updates->setActive($model, $isActive)->load(['category', 'brand', 'tenant.baseCurrency', 'baseUom', 'defaultTaxGroup', 'purchaseTaxGroup', 'salesTaxGroup']));
     }
 }

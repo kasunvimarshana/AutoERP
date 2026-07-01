@@ -86,13 +86,15 @@ final class InvoiceResource extends JsonResource
 
     private function partySnapshot(): ?array
     {
-        if ($this->party_number_snapshot === null
+        if ($this->party_id === null
+            && $this->party_number_snapshot === null
             && $this->party_code_snapshot === null
             && $this->party_name_snapshot === null) {
             return null;
         }
 
         return [
+            'id' => $this->party_id === null ? null : (int) $this->party_id,
             'number' => $this->party_number_snapshot,
             'code' => $this->party_code_snapshot,
             'name' => $this->party_name_snapshot,
@@ -105,13 +107,15 @@ final class InvoiceResource extends JsonResource
 
     private function currencySnapshot(): ?array
     {
-        if ($this->currency_code_snapshot === null
+        if ($this->currency_id === null
+            && $this->currency_code_snapshot === null
             && $this->currency_name_snapshot === null
             && $this->currency_symbol_snapshot === null) {
             return null;
         }
 
         return [
+            'id' => $this->currency_id === null ? null : (int) $this->currency_id,
             'code' => $this->currency_code_snapshot,
             'name' => $this->currency_name_snapshot,
             'symbol' => $this->currency_symbol_snapshot,

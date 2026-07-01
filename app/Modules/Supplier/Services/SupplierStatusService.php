@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Modules\Supplier\Services;
 
 use Illuminate\Support\Facades\DB;
-use InvalidArgumentException;
+use Illuminate\Validation\ValidationException;
 use Modules\Supplier\DTOs\SupplierStatusChangeData;
 use Modules\Supplier\Enums\SupplierStatus;
 use Modules\Supplier\Models\Supplier;
@@ -104,7 +104,9 @@ final class SupplierStatusService
         ];
 
         if ($from !== $to && ! in_array($to, $allowed[$from->value] ?? [], true)) {
-            throw new InvalidArgumentException('Invalid supplier status transition.');
+            throw ValidationException::withMessages([
+                'status' => ['Invalid supplier status transition.'],
+            ]);
         }
     }
 }

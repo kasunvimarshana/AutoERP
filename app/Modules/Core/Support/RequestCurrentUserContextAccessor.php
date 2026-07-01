@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Support;
 
+use Illuminate\Contracts\Container\Container;
 use Illuminate\Http\Request;
 use LogicException;
 use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
@@ -12,13 +13,13 @@ use Modules\Core\DTOs\CurrentUserContext;
 final class RequestCurrentUserContextAccessor implements CurrentUserContextAccessorInterface
 {
     public function __construct(
-        private readonly Request $request,
+        private readonly Container $container,
         private readonly string $requestAttribute,
     ) {}
 
     public function current(): ?CurrentUserContext
     {
-        $context = $this->request->attributes->get($this->requestAttribute);
+        $context = $this->request()->attributes->get($this->requestAttribute);
 
         return $context instanceof CurrentUserContext ? $context : null;
     }
@@ -37,5 +38,10 @@ final class RequestCurrentUserContextAccessor implements CurrentUserContextAcces
     public function currentApplicationId(): ?string
     {
         return $this->current()?->applicationId();
+    }
+
+    private function request(): Request
+    {
+        return $this->container->make(Request::class);
     }
 }

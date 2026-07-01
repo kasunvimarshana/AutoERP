@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Supplier\Services;
 
-use InvalidArgumentException;
+use Illuminate\Validation\ValidationException;
 use Modules\Supplier\DTOs\SupplierContactData;
 use Modules\Supplier\Models\Supplier;
 use Modules\Supplier\Models\SupplierContact;
@@ -14,10 +14,14 @@ final class SupplierContactService
     public function create(Supplier $supplier, SupplierContactData $data): SupplierContact
     {
         if (trim($data->contactName) === '') {
-            throw new InvalidArgumentException('Supplier contact name is required.');
+            throw ValidationException::withMessages([
+                'contact_name' => ['Supplier contact name is required.'],
+            ]);
         }
         if ($data->isPrimary && $supplier->contacts()->where('is_primary', true)->exists()) {
-            throw new InvalidArgumentException('Supplier can have only one primary contact.');
+            throw ValidationException::withMessages([
+                'is_primary' => ['Supplier can have only one primary contact.'],
+            ]);
         }
 
         return $supplier->contacts()->create([
@@ -39,10 +43,14 @@ final class SupplierContactService
     {
         $this->assertOwned($supplier, $contact);
         if (trim($data->contactName) === '') {
-            throw new InvalidArgumentException('Supplier contact name is required.');
+            throw ValidationException::withMessages([
+                'contact_name' => ['Supplier contact name is required.'],
+            ]);
         }
         if ($data->isPrimary && $supplier->contacts()->whereKeyNot($contact->getKey())->where('is_primary', true)->exists()) {
-            throw new InvalidArgumentException('Supplier can have only one primary contact.');
+            throw ValidationException::withMessages([
+                'is_primary' => ['Supplier can have only one primary contact.'],
+            ]);
         }
 
         $contact->fill([
@@ -80,7 +88,9 @@ final class SupplierContactService
     private function assertOwned(Supplier $supplier, SupplierContact $contact): void
     {
         if ((int) $contact->supplier_id !== (int) $supplier->getKey()) {
-            throw new InvalidArgumentException('Supplier contact does not belong to the supplier.');
+            throw ValidationException::withMessages([
+                'contact_id' => ['Supplier contact does not belong to the supplier.'],
+            ]);
         }
     }
 }

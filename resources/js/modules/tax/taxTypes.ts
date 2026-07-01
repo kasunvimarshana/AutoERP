@@ -71,16 +71,14 @@ export interface TaxPostingProfile {
     tax_id: number;
     tax?: NamedResource & { tax_type?: string };
     direction: string;
-    account_id: number;
-    account?: NamedResource | null;
-    posting_key?: string | null;
+    posting_key: string;
     active: boolean;
 }
 
 export interface TaxLookups {
     taxes: Array<NamedResource & { tax_type: string; calculation_method: string }>;
     groups: Array<NamedResource & { is_default: boolean }>;
-    accounts: Array<NamedResource & { is_tax_account: boolean }>;
+    posting_keys: string[];
     calculation_methods: TaxCalculationMethod[];
     exemption_statuses: string[];
     posting_directions: string[];

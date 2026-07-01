@@ -9,7 +9,10 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
+use Modules\Finance\Contracts\FinancePostingInterface;
 use Modules\Finance\DTOs\FinancePostingLine;
+use Modules\Finance\DTOs\PostingContext;
+use Modules\Finance\DTOs\PostingResultData;
 use Modules\Inventory\DTOs\StockAdjustmentData;
 use Modules\Inventory\DTOs\StockAdjustmentLineData;
 use Modules\Inventory\DTOs\StockBalanceData;
@@ -28,8 +31,10 @@ use Modules\Item\Services\ItemCreationService;
 use Modules\Payment\DTOs\CreatePaymentData;
 use Modules\Payment\DTOs\PaymentAllocationData;
 use Modules\Payment\DTOs\PaymentLineData;
+use Modules\Payment\Enums\PaymentAllocationState;
 use Modules\Payment\Enums\PaymentDirection;
-use Modules\Payment\Enums\PaymentStatus;
+use Modules\Payment\Enums\PaymentDocumentStatus;
+use Modules\Payment\Enums\PaymentPostingStatus;
 use Modules\Payment\Enums\PaymentType;
 use Modules\Payment\Models\Payment;
 use Modules\Payment\Services\PaymentAllocationService;
@@ -124,7 +129,7 @@ final class PurchaseEngineTest extends TestCase
             'updated_at' => now(),
         ]);
 
-        $order = app(PurchaseOrderService::class)->create(new CreatePurchaseOrderData(
+        $order = $this->createPurchaseOrder(new CreatePurchaseOrderData(
             tenantId: $tenantId,
             purchaseOrderDate: '2026-06-06',
             supplierType: 'supplier',
@@ -165,7 +170,7 @@ final class PurchaseEngineTest extends TestCase
     {
         [$tenantId, $warehouseId, $item, $supplierId, $uomId] = $this->purchaseContext();
         $service = $this->createItem($tenantId, 'SVC-'.Str::upper(Str::random(4)), ItemType::Service, false, $uomId);
-        $order = app(PurchaseOrderService::class)->create(new CreatePurchaseOrderData(
+        $order = $this->createPurchaseOrder(new CreatePurchaseOrderData(
             tenantId: $tenantId,
             purchaseOrderDate: '2026-06-06',
             supplierType: 'supplier',
@@ -178,7 +183,7 @@ final class PurchaseEngineTest extends TestCase
         ));
         $order = $this->approveOrder($order);
 
-        $grn = app(GoodsReceiptNoteService::class)->create(new CreateGoodsReceiptNoteData(
+        $grn = $this->createGoodsReceiptNote(new CreateGoodsReceiptNoteData(
             tenantId: $tenantId,
             receivedDate: '2026-06-06',
             warehouseId: $warehouseId,
@@ -189,14 +194,29 @@ final class PurchaseEngineTest extends TestCase
             ],
         ));
 
-        $posted = app(GoodsReceiptNoteService::class)->post($grn);
+        $posted = $this->postGoodsReceiptNote($grn);
 
         $this->assertSame(GoodsReceiptNoteStatus::Posted, $posted->status);
-        $this->assertCount(1, InventoryMovement::query()->where('source_type', 'goods_receipt_note')->get());
-        $availability = app(StockAvailabilityService::class)->availability(new StockBalanceData($tenantId, (int) $item->getKey(), $warehouseId));
+        $movementCount = $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): int => InventoryMovement::query()->where('source_type', 'goods_receipt_note')->count(),
+        );
+        $availability = $this->withTenantExecutionContext(
+            $tenantId,
+            fn () => app(StockAvailabilityService::class)->availability(new StockBalanceData($tenantId, (int) $item->getKey(), $warehouseId)),
+        );
+        $this->assertSame(1, $movementCount);
         $this->assertSame('4.000000', $availability->quantityOnHand);
-        $this->assertSame(PurchaseOrderStatus::Approved, $order->refresh()->status);
-        $this->assertSame('4.000000', (string) $order->lines()->where('item_id', $item->getKey())->firstOrFail()->received_quantity);
+        $orderStatus = $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): PurchaseOrderStatus => $order->refresh()->status,
+        );
+        $receivedQuantity = $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): string => (string) $order->lines()->where('item_id', $item->getKey())->firstOrFail()->received_quantity,
+        );
+        $this->assertSame(PurchaseOrderStatus::Approved, $orderStatus);
+        $this->assertSame('4.000000', $receivedQuantity);
     }
 
     public function test_many_grns_can_create_one_supplier_invoice_with_header_adjustments(): void
@@ -205,7 +225,7 @@ final class PurchaseEngineTest extends TestCase
         $order = $this->createAdjustedOrder($tenantId, $warehouseId, $item);
         [$grnOne, $grnTwo] = $this->receiveOrderInTwoParts($order, $warehouseId, $item);
 
-        $invoice = app(PurchaseInvoiceIntegrationService::class)->createSupplierInvoice(new CreatePurchaseInvoiceData(
+        $invoice = $this->createSupplierInvoice(new CreatePurchaseInvoiceData(
             tenantId: $tenantId,
             invoiceDate: '2026-06-06',
             supplierType: 'supplier',
@@ -217,7 +237,11 @@ final class PurchaseEngineTest extends TestCase
         ));
 
         $this->assertSame('123000.000000', (string) $invoice->grand_total);
-        $this->assertCount(2, PurchaseInvoiceLink::query()->where('invoice_id', $invoice->getKey())->get());
+        $invoiceLinkCount = $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): int => PurchaseInvoiceLink::query()->where('invoice_id', $invoice->getKey())->count(),
+        );
+        $this->assertSame(2, $invoiceLinkCount);
         $this->assertCount(4, $invoice->adjustmentAllocations);
     }
 
@@ -232,7 +256,7 @@ final class PurchaseEngineTest extends TestCase
         );
 
         try {
-            app(PurchaseInvoiceIntegrationService::class)->createSupplierInvoice(
+            $this->createSupplierInvoice(
                 new CreatePurchaseInvoiceData(
                     tenantId: $tenantId,
                     invoiceDate: '2026-06-06',
@@ -262,13 +286,13 @@ final class PurchaseEngineTest extends TestCase
         [$grn] = $this->receiveOrderInTwoParts($order, $warehouseId, $item);
         $lineId = (int) $grn->lines->first()->getKey();
 
-        $invoiceOne = app(PurchaseInvoiceIntegrationService::class)->createSupplierInvoice(new CreatePurchaseInvoiceData(
+        $invoiceOne = $this->createSupplierInvoice(new CreatePurchaseInvoiceData(
             tenantId: $tenantId,
             invoiceDate: '2026-06-06',
             sources: [new PurchaseInvoiceSourceData('goods_receipt_note', (int) $grn->getKey(), [$lineId => '4.000000'])],
         ));
 
-        $invoiceTwo = app(PurchaseInvoiceIntegrationService::class)->createSupplierInvoice(new CreatePurchaseInvoiceData(
+        $invoiceTwo = $this->createSupplierInvoice(new CreatePurchaseInvoiceData(
             tenantId: $tenantId,
             invoiceDate: '2026-06-07',
             sources: [new PurchaseInvoiceSourceData('goods_receipt_note', (int) $grn->getKey())],
@@ -277,7 +301,11 @@ final class PurchaseEngineTest extends TestCase
         $this->assertSame('4920.000000', (string) $invoiceOne->grand_total);
         $this->assertSame('44280.000000', (string) $invoiceTwo->grand_total);
         $this->assertSame(GoodsReceiptNoteStatus::Posted, $grn->refresh()->status);
-        $this->assertSame('40.000000', (string) $grn->lines()->firstOrFail()->invoiced_quantity);
+        $invoicedQuantity = $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): string => (string) $grn->lines()->firstOrFail()->invoiced_quantity,
+        );
+        $this->assertSame('40.000000', $invoicedQuantity);
     }
 
     public function test_example_40_percent_grn_invoice_allocates_adjustments(): void
@@ -286,7 +314,7 @@ final class PurchaseEngineTest extends TestCase
         $order = $this->createAdjustedOrder($tenantId, $warehouseId, $item);
         [$grn] = $this->receiveOrderInTwoParts($order, $warehouseId, $item);
 
-        $invoice = app(PurchaseInvoiceIntegrationService::class)->createSupplierInvoice(new CreatePurchaseInvoiceData(
+        $invoice = $this->createSupplierInvoice(new CreatePurchaseInvoiceData(
             tenantId: $tenantId,
             invoiceDate: '2026-06-06',
             sources: [new PurchaseInvoiceSourceData('goods_receipt_note', (int) $grn->getKey())],
@@ -297,7 +325,11 @@ final class PurchaseEngineTest extends TestCase
         $this->assertSame('7200.000000', (string) $invoice->tax_total);
         $this->assertSame('4000.000000', (string) $invoice->charge_total);
         $this->assertSame('49200.000000', (string) $invoice->grand_total);
-        $this->assertSame(2, PurchaseHeaderAdjustment::query()->where('source_type', 'goods_receipt_note')->where('source_id', $grn->getKey())->count());
+        $adjustmentCount = $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): int => PurchaseHeaderAdjustment::query()->where('source_type', 'goods_receipt_note')->where('source_id', $grn->getKey())->count(),
+        );
+        $this->assertSame(2, $adjustmentCount);
     }
 
     public function test_partial_receipt_partial_invoice_and_supplier_payment_preparation_workflow(): void
@@ -307,7 +339,7 @@ final class PurchaseEngineTest extends TestCase
         [$grn] = $this->receiveOrderInTwoParts($order, $warehouseId, $item);
         $lineId = (int) $grn->lines->first()->getKey();
 
-        $invoice = app(PurchaseInvoiceIntegrationService::class)->createSupplierInvoice(
+        $invoice = $this->createSupplierInvoice(
             new CreatePurchaseInvoiceData(
                 tenantId: $tenantId,
                 invoiceDate: '2026-06-08',
@@ -322,25 +354,39 @@ final class PurchaseEngineTest extends TestCase
                 ],
             ),
         );
+        $invoice = $this->postInvoice($invoice);
 
-        $payment = app(PurchasePaymentIntegrationService::class)->prepareSupplierPayment(
-            tenantId: $tenantId,
-            paymentDate: '2026-06-09',
-            amount: (string) $invoice->grand_total,
-            supplierType: 'supplier',
-            supplierId: $supplierId,
-            allocations: [
-                new PaymentAllocationData(
-                    (int) $invoice->getKey(),
-                    (string) $invoice->grand_total,
-                    '2026-06-09',
-                ),
-            ],
+        $paymentMethodId = $this->paymentMethod($tenantId, 'PARTIAL');
+        $payment = $this->withTenantExecutionContext(
+            $tenantId,
+            fn () => app(PurchasePaymentIntegrationService::class)->prepareSupplierPayment(
+                tenantId: $tenantId,
+                paymentDate: '2026-06-09',
+                amount: (string) $invoice->grand_total,
+                supplierType: 'supplier',
+                supplierId: $supplierId,
+                lines: [new PaymentLineData((string) $invoice->grand_total, $paymentMethodId, 'PAY-PARTIAL')],
+                allocations: [
+                    new PaymentAllocationData(
+                        (int) $invoice->getKey(),
+                        (string) $invoice->grand_total,
+                        '2026-06-09',
+                    ),
+                ],
+            ),
         );
 
-        $this->assertSame(GoodsReceiptNoteStatus::Posted, $grn->refresh()->status);
-        $this->assertSame(PurchaseOrderStatus::Approved, $order->refresh()->status);
-        $this->assertSame('20.000000', (string) $grn->lines()->firstOrFail()->invoiced_quantity);
+        $documentState = $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): array => [
+                'grn_status' => $grn->refresh()->status,
+                'order_status' => $order->refresh()->status,
+                'invoiced_quantity' => (string) $grn->lines()->firstOrFail()->invoiced_quantity,
+            ],
+        );
+        $this->assertSame(GoodsReceiptNoteStatus::Posted, $documentState['grn_status']);
+        $this->assertSame(PurchaseOrderStatus::Approved, $documentState['order_status']);
+        $this->assertSame('20.000000', $documentState['invoiced_quantity']);
         $this->assertSame(PaymentType::SupplierPayment, $payment->paymentType);
         $this->assertSame(PaymentDirection::Outbound, $payment->direction);
         $this->assertSame((int) $invoice->getKey(), $payment->allocations[0]->invoiceId);
@@ -350,11 +396,12 @@ final class PurchaseEngineTest extends TestCase
     public function test_supplier_payment_creation_persists_payment_and_allocation(): void
     {
         [$tenantId, $warehouseId, $item, $supplierId, $uomId] = $this->purchaseContext();
+        $this->fakeFinancePosting();
         $order = $this->createAdjustedOrder($tenantId, $warehouseId, $item);
         [$grn] = $this->receiveOrderInTwoParts($order, $warehouseId, $item);
         $lineId = (int) $grn->lines->first()->getKey();
 
-        $invoice = app(PurchaseInvoiceIntegrationService::class)->createSupplierInvoice(
+        $invoice = $this->createSupplierInvoice(
             new CreatePurchaseInvoiceData(
                 tenantId: $tenantId,
                 invoiceDate: '2026-06-08',
@@ -372,27 +419,38 @@ final class PurchaseEngineTest extends TestCase
         $invoice = $this->postInvoice($invoice);
         $paymentMethodId = $this->paymentMethod($tenantId, 'PURCHASE');
 
-        $payment = app(PurchasePaymentIntegrationService::class)->createSupplierPayment(
-            tenantId: $tenantId,
-            paymentDate: '2026-06-09',
-            amount: (string) $invoice->grand_total,
-            supplierType: 'supplier',
-            supplierId: $supplierId,
-            lines: [new PaymentLineData((string) $invoice->grand_total, $paymentMethodId, 'PAY-PURCHASE')],
-            allocations: [
-                new PaymentAllocationData(
-                    (int) $invoice->getKey(),
-                    (string) $invoice->grand_total,
-                    '2026-06-09',
-                ),
-            ],
+        $payment = $this->withTenantExecutionContext(
+            $tenantId,
+            fn () => app(PurchasePaymentIntegrationService::class)->createSupplierPayment(
+                tenantId: $tenantId,
+                paymentDate: '2026-06-09',
+                amount: (string) $invoice->grand_total,
+                supplierType: 'supplier',
+                supplierId: $supplierId,
+                lines: [new PaymentLineData((string) $invoice->grand_total, $paymentMethodId, 'PAY-PURCHASE')],
+                allocations: [
+                    new PaymentAllocationData(
+                        (int) $invoice->getKey(),
+                        (string) $invoice->grand_total,
+                        '2026-06-09',
+                    ),
+                ],
+            ),
         );
 
-        $this->assertSame(1, Payment::query()->count());
+        $paymentCount = $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): int => Payment::query()->count(),
+        );
+        $this->assertSame(1, $paymentCount);
+        $invoiceBalanceDue = $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): string => (string) $invoice->refresh()->balance_due,
+        );
         $this->assertSame((string) $invoice->grand_total, (string) $payment->total_amount);
-        $this->assertSame('0.000000', (string) $payment->allocated_amount);
-        $this->assertSame((string) $invoice->grand_total, (string) $invoice->refresh()->balance_due);
-        $this->assertSame('pending', (string) $payment->allocations->firstOrFail()->status->value);
+        $this->assertSame((string) $invoice->grand_total, (string) $payment->allocated_amount);
+        $this->assertSame('0.000000', $invoiceBalanceDue);
+        $this->assertSame('active', (string) $payment->allocations->firstOrFail()->status->value);
     }
 
     public function test_supplier_payment_preview_is_non_persistent_and_preserves_invoice_balance(): void
@@ -401,7 +459,7 @@ final class PurchaseEngineTest extends TestCase
         $order = $this->createAdjustedOrder($tenantId, $warehouseId, $item);
         [$grn] = $this->receiveOrderInTwoParts($order, $warehouseId, $item);
         $lineId = (int) $grn->lines->first()->getKey();
-        $invoice = app(PurchaseInvoiceIntegrationService::class)->createSupplierInvoice(new CreatePurchaseInvoiceData(
+        $invoice = $this->createSupplierInvoice(new CreatePurchaseInvoiceData(
             tenantId: $tenantId,
             invoiceDate: '2026-06-08',
             supplierType: 'supplier',
@@ -413,21 +471,28 @@ final class PurchaseEngineTest extends TestCase
         $balanceBefore = (string) $invoice->refresh()->balance_due;
 
         for ($i = 0; $i < 2; $i++) {
-            $preview = app(PurchasePaymentIntegrationService::class)->previewSupplierPayment(
-                tenantId: $tenantId,
-                paymentDate: '2026-06-09',
-                amount: (string) $invoice->grand_total,
-                supplierType: 'supplier',
-                supplierId: $supplierId,
-                lines: [new PaymentLineData((string) $invoice->grand_total, $paymentMethodId, 'PAY-PREVIEW')],
-                allocations: [new PaymentAllocationData((int) $invoice->getKey(), (string) $invoice->grand_total, '2026-06-09')],
+            $preview = $this->withTenantExecutionContext(
+                $tenantId,
+                fn () => app(PurchasePaymentIntegrationService::class)->previewSupplierPayment(
+                    tenantId: $tenantId,
+                    paymentDate: '2026-06-09',
+                    amount: (string) $invoice->grand_total,
+                    supplierType: 'supplier',
+                    supplierId: $supplierId,
+                    lines: [new PaymentLineData((string) $invoice->grand_total, $paymentMethodId, 'PAY-PREVIEW')],
+                    allocations: [new PaymentAllocationData((int) $invoice->getKey(), (string) $invoice->grand_total, '2026-06-09')],
+                ),
             );
 
             $this->assertSame((string) $invoice->grand_total, $preview->allocationTotal);
             $this->assertSame('0.000000', $preview->unappliedAmount);
         }
 
-        $this->assertSame(0, Payment::query()->count());
+        $paymentCount = $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): int => Payment::query()->count(),
+        );
+        $this->assertSame(0, $paymentCount);
         $this->assertSame($balanceBefore, (string) $invoice->refresh()->balance_due);
     }
 
@@ -437,9 +502,7 @@ final class PurchaseEngineTest extends TestCase
         $order = $this->createAdjustedOrder($tenantId, $warehouseId, $item);
         [$grn] = $this->receiveOrderInTwoParts($order, $warehouseId, $item);
         $lineId = (int) $grn->lines->first()->getKey();
-        $returns = app(PurchaseReturnService::class);
-
-        $noApproval = $returns->create(new CreatePurchaseReturnData(
+        $noApproval = $this->createPurchaseReturn(new CreatePurchaseReturnData(
             tenantId: $tenantId,
             returnDate: '2026-06-10',
             warehouseId: $warehouseId,
@@ -452,16 +515,16 @@ final class PurchaseEngineTest extends TestCase
         ));
 
         try {
-            $returns->approve($noApproval);
+            $this->approvePurchaseReturn($noApproval);
             $this->fail('Expected non-approval return approval to fail.');
         } catch (InvalidArgumentException $exception) {
             $this->assertSame('Purchase return does not require approval.', $exception->getMessage());
         }
 
-        $postedWithoutApproval = $returns->post($noApproval);
+        $postedWithoutApproval = $this->postPurchaseReturn($noApproval);
         $this->assertSame(PurchaseReturnStatus::Posted->value, $postedWithoutApproval->status);
 
-        $approvalRequired = $returns->create(new CreatePurchaseReturnData(
+        $approvalRequired = $this->createPurchaseReturn(new CreatePurchaseReturnData(
             tenantId: $tenantId,
             returnDate: '2026-06-11',
             warehouseId: $warehouseId,
@@ -475,13 +538,13 @@ final class PurchaseEngineTest extends TestCase
         ));
 
         try {
-            $returns->post($approvalRequired);
+            $this->postPurchaseReturn($approvalRequired);
             $this->fail('Expected approval-required return posting to fail before approval.');
         } catch (InvalidArgumentException $exception) {
             $this->assertSame('Purchase return must be approved before posting.', $exception->getMessage());
         }
 
-        $approved = $returns->approve($approvalRequired);
+        $approved = $this->approvePurchaseReturn($approvalRequired);
         $this->assertSame(PurchaseReturnStatus::Approved, $approved->status);
         $this->assertTrue((bool) $approved->approval_required);
     }
@@ -493,7 +556,7 @@ final class PurchaseEngineTest extends TestCase
         [$grn] = $this->receiveOrderInTwoParts($order, $warehouseId, $item);
         $lineId = (int) $grn->lines->first()->getKey();
 
-        app(PurchaseInvoiceIntegrationService::class)->createSupplierInvoice(
+        $this->createSupplierInvoice(
             new CreatePurchaseInvoiceData(
                 tenantId: $tenantId,
                 invoiceDate: '2026-06-08',
@@ -511,7 +574,7 @@ final class PurchaseEngineTest extends TestCase
             'Purchase invoice quantity cannot exceed GRN remaining procurement quantity.',
         );
 
-        app(PurchaseInvoiceIntegrationService::class)->createSupplierInvoice(
+        $this->createSupplierInvoice(
             new CreatePurchaseInvoiceData(
                 tenantId: $tenantId,
                 invoiceDate: '2026-06-09',
@@ -532,18 +595,19 @@ final class PurchaseEngineTest extends TestCase
         $order = $this->createAdjustedOrder($tenantId, $warehouseId, $item);
         $order = $this->approveOrder($order);
         $poLineId = (int) $order->lines->first()->getKey();
-        $grn = app(GoodsReceiptNoteService::class)->create(new CreateGoodsReceiptNoteData(
+        $grn = $this->createGoodsReceiptNote(new CreateGoodsReceiptNoteData(
             tenantId: $tenantId,
             receivedDate: '2026-06-06',
             warehouseId: $warehouseId,
             purchaseOrderId: (int) $order->getKey(),
             lines: [new GoodsReceiptNoteLineData((int) $item->getKey(), '40.000000', '40.000000', '1000.000000', purchaseOrderLineId: $poLineId, orderedQuantity: '100.000000')],
         ));
-        $grn = app(GoodsReceiptNoteService::class)->post($grn)->load('lines');
+        $grn = $this->postGoodsReceiptNote($grn);
+        $grn = $this->withTenantExecutionContext($tenantId, fn (): GoodsReceiptNote => $grn->load('lines'));
         $grnLineId = (int) $grn->lines->first()->getKey();
 
         try {
-            app(PurchaseInvoiceIntegrationService::class)->previewSupplierInvoice(new CreatePurchaseInvoiceData(
+            $this->previewSupplierInvoice(new CreatePurchaseInvoiceData(
                 tenantId: $tenantId,
                 invoiceDate: '2026-06-08',
                 sources: [
@@ -565,7 +629,7 @@ final class PurchaseEngineTest extends TestCase
         [$tenantId, $warehouseId, $item, , $uomId] = $this->purchaseContext();
 
         try {
-            app(GoodsReceiptNoteService::class)->create(new CreateGoodsReceiptNoteData(
+            $this->createGoodsReceiptNote(new CreateGoodsReceiptNoteData(
                 tenantId: $tenantId,
                 receivedDate: '2026-06-06',
                 warehouseId: $warehouseId,
@@ -580,23 +644,31 @@ final class PurchaseEngineTest extends TestCase
     public function test_supplier_advance_can_be_allocated_after_purchase_invoice_creation(): void
     {
         [$tenantId, $warehouseId, $item, $supplierId] = $this->purchaseContext();
-        $advance = app(PaymentCreationService::class)->create(new CreatePaymentData(
+        $advance = $this->createPayment(new CreatePaymentData(
             tenantId: $tenantId,
             paymentType: PaymentType::Advance,
             direction: PaymentDirection::Outbound,
             paymentDate: '2026-06-05',
             partyType: 'supplier',
             partyId: $supplierId,
-            status: PaymentStatus::Posted,
             lines: [new PaymentLineData(
                 amount: '60000.000000',
                 paymentMethodId: $this->paymentMethod($tenantId, 'ADVANCE'),
             )],
         ));
+        $advance = $this->withTenantExecutionContext($tenantId, function () use ($advance): Payment {
+            $advance->forceFill([
+                'document_status' => PaymentDocumentStatus::Approved->value,
+                'posting_status' => PaymentPostingStatus::Posted->value,
+                'row_version' => (int) $advance->row_version + 1,
+            ])->save();
+
+            return $advance->refresh();
+        });
 
         $order = $this->createAdjustedOrder($tenantId, $warehouseId, $item);
         [$grn] = $this->receiveOrderInTwoParts($order, $warehouseId, $item);
-        $invoice = app(PurchaseInvoiceIntegrationService::class)->createSupplierInvoice(
+        $invoice = $this->createSupplierInvoice(
             new CreatePurchaseInvoiceData(
                 tenantId: $tenantId,
                 invoiceDate: '2026-06-08',
@@ -612,18 +684,28 @@ final class PurchaseEngineTest extends TestCase
         );
         $invoice = $this->postInvoice($invoice);
 
-        $advance = app(PaymentAllocationService::class)->allocate($advance, [
-            new PaymentAllocationData(
-                invoiceId: (int) $invoice->getKey(),
-                allocatedAmount: (string) $invoice->grand_total,
-                allocationDate: '2026-06-09',
-            ),
-        ]);
+        $advance = $this->allocatePayment(
+            $advance,
+            [
+                new PaymentAllocationData(
+                    invoiceId: (int) $invoice->getKey(),
+                    allocatedAmount: (string) $invoice->grand_total,
+                    allocationDate: '2026-06-09',
+                ),
+            ],
+            (int) $advance->row_version,
+        );
 
-        $this->assertSame(PaymentStatus::Posted, $advance->status);
+        $this->assertSame(PaymentDocumentStatus::Approved, $advance->document_status);
+        $this->assertSame(PaymentPostingStatus::Posted, $advance->posting_status);
+        $this->assertSame(PaymentAllocationState::PartiallyAllocated, $advance->allocation_status);
         $this->assertSame('49200.000000', (string) $advance->allocated_amount);
         $this->assertSame('10800.000000', (string) $advance->unapplied_amount);
-        $this->assertSame('0.000000', (string) $invoice->refresh()->balance->remaining_amount);
+        $remainingAmount = $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): string => (string) $invoice->refresh()->balance->remaining_amount,
+        );
+        $this->assertSame('0.000000', $remainingAmount);
     }
 
     public function test_cancelled_purchase_invoice_restores_grn_and_order_invoiceable_quantity(): void
@@ -631,7 +713,7 @@ final class PurchaseEngineTest extends TestCase
         [$tenantId, $warehouseId, $item] = $this->purchaseContext();
         $order = $this->createAdjustedOrder($tenantId, $warehouseId, $item);
         [$grn] = $this->receiveOrderInTwoParts($order, $warehouseId, $item);
-        $invoice = app(PurchaseInvoiceIntegrationService::class)->createSupplierInvoice(
+        $invoice = $this->createSupplierInvoice(
             new CreatePurchaseInvoiceData(
                 tenantId: $tenantId,
                 invoiceDate: '2026-06-08',
@@ -644,21 +726,27 @@ final class PurchaseEngineTest extends TestCase
             ),
         );
 
-        app(InvoiceStatusService::class)->transition($invoice, InvoiceStatus::Cancelled);
+        $this->withTenantExecutionContext(
+            $tenantId,
+            fn () => app(InvoiceStatusService::class)->transition($invoice, InvoiceStatus::Cancelled),
+        );
 
-        $grn = $grn->refresh()->load('lines');
-        $order = $order->refresh()->load('lines');
+        [$grn, $order] = $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): array => [$grn->refresh()->load('lines'), $order->refresh()->load('lines')],
+        );
         $this->assertSame(GoodsReceiptNoteStatus::Posted, $grn->status);
         $this->assertSame('0.000000', (string) $grn->lines->first()->invoiced_quantity);
         $this->assertSame('40.000000', (string) $grn->lines->first()->remaining_quantity);
         $this->assertSame('0.000000', (string) $order->lines->first()->invoiced_quantity);
         $this->assertSame('100.000000', (string) $order->lines->first()->remaining_invoiceable_quantity);
-        $this->assertSame(
-            'cancelled',
-            PurchaseInvoiceLink::query()->where('invoice_id', $invoice->getKey())->value('status'),
+        $linkStatus = $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): ?string => PurchaseInvoiceLink::query()->where('invoice_id', $invoice->getKey())->value('status'),
         );
+        $this->assertSame('cancelled', $linkStatus);
 
-        $replacement = app(PurchaseInvoiceIntegrationService::class)->createSupplierInvoice(
+        $replacement = $this->createSupplierInvoice(
             new CreatePurchaseInvoiceData(
                 tenantId: $tenantId,
                 invoiceDate: '2026-06-09',
@@ -678,7 +766,7 @@ final class PurchaseEngineTest extends TestCase
         [$tenantId, $warehouseId, $item, $supplierId] = $this->purchaseContext();
         $order = $this->createAdjustedOrder($tenantId, $warehouseId, $item);
         [$grn] = $this->receiveOrderInTwoParts($order, $warehouseId, $item);
-        $invoice = app(PurchaseInvoiceIntegrationService::class)->createSupplierInvoice(
+        $invoice = $this->createSupplierInvoice(
             new CreatePurchaseInvoiceData(
                 tenantId: $tenantId,
                 invoiceDate: '2026-06-08',
@@ -692,13 +780,10 @@ final class PurchaseEngineTest extends TestCase
                 ],
             ),
         );
-        $statuses = app(InvoiceStatusService::class);
-        $invoice = $statuses->transition($invoice, InvoiceStatus::Approved);
-        $invoice = $statuses->transition($invoice, InvoiceStatus::Posted);
+        $invoice = $this->postInvoice($invoice);
         $this->assertSame('posted', DB::table('invoices')->where('id', $invoice->getKey())->value('status'));
 
-        $debitNotes = app(PurchaseDebitNoteService::class);
-        $note = $debitNotes->create(new CreatePurchaseDebitNoteData(
+        $note = $this->createDebitNote(new CreatePurchaseDebitNoteData(
             tenantId: $tenantId,
             debitNoteDate: '2026-06-09',
             amount: '20.000000',
@@ -707,15 +792,22 @@ final class PurchaseEngineTest extends TestCase
             sourceType: 'price_dispute',
             reason: 'Price dispute',
         ));
-        $note = $debitNotes->approve($note);
-        $note = $debitNotes->post($note);
-        $note = $debitNotes->allocate($note, $invoice, '8.000000');
+        $note = $this->withTenantExecutionContext($tenantId, function () use ($note, $invoice): PurchaseDebitNote {
+            $debitNotes = app(PurchaseDebitNoteService::class);
+            $note = $debitNotes->approve($note);
+            $note = $debitNotes->post($note);
+
+            return $debitNotes->allocate($note, $invoice, '8.000000');
+        });
 
         $this->assertSame(PurchaseDebitNoteStatus::Posted, $note->status);
         $this->assertSame('12.000000', (string) $note->remaining_amount);
         $this->assertSame('49192.000000', (string) $invoice->refresh()->balance_due);
 
-        $note = $debitNotes->allocate($note, $invoice->refresh(), '12.000000');
+        $note = $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): PurchaseDebitNote => app(PurchaseDebitNoteService::class)->allocate($note, $invoice->refresh(), '12.000000'),
+        );
 
         $this->assertSame(PurchaseDebitNoteStatus::Posted, $note->status);
         $this->assertSame('0.000000', (string) $note->remaining_amount);
@@ -729,11 +821,13 @@ final class PurchaseEngineTest extends TestCase
         $otherOrganizationUnitId = $this->createOrganizationUnit($tenantId, 'PUR-ORG-B');
         $order = $this->createAdjustedOrder($tenantId, $warehouseId, $item);
         [$grn] = $this->receiveOrderInTwoParts($order, $warehouseId, $item);
-        $grn->organization_unit_id = $organizationUnitId;
-        $grn->save();
+        $this->withTenantExecutionContext($tenantId, function () use ($grn, $organizationUnitId): void {
+            $grn->organization_unit_id = $organizationUnitId;
+            $grn->save();
+        });
 
         try {
-            app(PurchaseInvoiceIntegrationService::class)->createSupplierInvoice(
+            $this->createSupplierInvoice(
                 new CreatePurchaseInvoiceData(
                     tenantId: $tenantId,
                     invoiceDate: '2026-06-08',
@@ -763,7 +857,7 @@ final class PurchaseEngineTest extends TestCase
         $line = $grn->lines->first();
 
         try {
-            app(PurchaseReturnService::class)->create(new CreatePurchaseReturnData(
+            $this->createPurchaseReturn(new CreatePurchaseReturnData(
                 tenantId: $tenantId,
                 returnDate: '2026-06-06',
                 warehouseId: $warehouseId,
@@ -774,21 +868,32 @@ final class PurchaseEngineTest extends TestCase
             $this->assertSame('Returned quantity cannot exceed received remaining quantity.', $exception->getMessage());
         }
 
-        $return = app(PurchaseReturnService::class)->create(new CreatePurchaseReturnData(
+        $return = $this->createPurchaseReturn(new CreatePurchaseReturnData(
             tenantId: $tenantId,
             returnDate: '2026-06-06',
             warehouseId: $warehouseId,
             lines: [new PurchaseReturnLineData('goods_receipt_note_line', (int) $line->getKey(), '8.000000')],
         ));
 
-        $result = app(PurchaseReturnService::class)->post($return);
+        $result = $this->postPurchaseReturn($return);
 
         $this->assertNotNull($result->debitNoteId);
-        $this->assertSame(1, PurchaseDebitNote::query()->count());
-        $note = PurchaseDebitNote::query()->firstOrFail();
+        $note = $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): PurchaseDebitNote => PurchaseDebitNote::query()->firstOrFail(),
+        );
+        $debitNoteCount = $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): int => PurchaseDebitNote::query()->count(),
+        );
+        $returnMovementCount = $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): int => InventoryMovement::query()->where('source_type', 'purchase_return')->count(),
+        );
+        $this->assertSame(1, $debitNoteCount);
         $this->assertSame(PurchaseDebitNoteStatus::Draft, $note->status);
         $this->assertSame('9840.000000', (string) $note->amount);
-        $this->assertSame(1, InventoryMovement::query()->where('source_type', 'purchase_return')->count());
+        $this->assertSame(1, $returnMovementCount);
     }
 
     public function test_purchase_return_rejects_mixed_grn_lines_and_ignores_spoofed_supplier(): void
@@ -799,7 +904,7 @@ final class PurchaseEngineTest extends TestCase
         $otherSupplierId = $this->createSupplier($tenantId, 'SUP-SPOOF-'.Str::upper(Str::random(4)));
 
         try {
-            app(PurchaseReturnService::class)->create(new CreatePurchaseReturnData(
+            $this->createPurchaseReturn(new CreatePurchaseReturnData(
                 tenantId: $tenantId,
                 returnDate: '2026-06-06',
                 warehouseId: $warehouseId,
@@ -813,7 +918,7 @@ final class PurchaseEngineTest extends TestCase
             $this->assertSame('Purchase return lines must belong to the same goods receipt note.', $exception->getMessage());
         }
 
-        $return = app(PurchaseReturnService::class)->create(new CreatePurchaseReturnData(
+        $return = $this->createPurchaseReturn(new CreatePurchaseReturnData(
             tenantId: $tenantId,
             returnDate: '2026-06-06',
             warehouseId: $warehouseId,
@@ -834,7 +939,7 @@ final class PurchaseEngineTest extends TestCase
     public function test_partial_return_prorates_line_discount_tax_and_charge(): void
     {
         [$tenantId, $warehouseId, $item, $supplierId, $uomId] = $this->purchaseContext();
-        $order = app(PurchaseOrderService::class)->create(new CreatePurchaseOrderData(
+        $order = $this->createPurchaseOrder(new CreatePurchaseOrderData(
             tenantId: $tenantId,
             purchaseOrderDate: '2026-06-06',
             supplierType: 'supplier',
@@ -852,21 +957,23 @@ final class PurchaseEngineTest extends TestCase
         ));
         $order = $this->approveOrder($order);
         $line = $order->lines->first();
-        $grn = app(GoodsReceiptNoteService::class)->create(new CreateGoodsReceiptNoteData(
+        $grn = $this->createGoodsReceiptNote(new CreateGoodsReceiptNoteData(
             tenantId: $tenantId,
             receivedDate: '2026-06-06',
             warehouseId: $warehouseId,
             purchaseOrderId: (int) $order->getKey(),
             lines: [new GoodsReceiptNoteLineData((int) $item->getKey(), '10.000000', '10.000000', '100.000000', purchaseOrderLineId: (int) $line->getKey(), orderedQuantity: '10.000000')],
         ));
-        $grn = app(GoodsReceiptNoteService::class)->post($grn)->load('lines');
+        $grn = $this->postGoodsReceiptNote($grn);
+        $grn = $this->withTenantExecutionContext($tenantId, fn (): GoodsReceiptNote => $grn->load('lines'));
 
-        $return = app(PurchaseReturnService::class)->create(new CreatePurchaseReturnData(
+        $return = $this->createPurchaseReturn(new CreatePurchaseReturnData(
             tenantId: $tenantId,
             returnDate: '2026-06-07',
             warehouseId: $warehouseId,
             lines: [new PurchaseReturnLineData('goods_receipt_note_line', (int) $grn->lines->first()->getKey(), '5.000000')],
-        ))->load('lines');
+        ));
+        $return = $this->withTenantExecutionContext($tenantId, fn () => $return->load('lines'));
         $returnLine = $return->lines->first();
 
         $this->assertSame('5.000000', (string) $returnLine->discount_amount);
@@ -881,7 +988,7 @@ final class PurchaseEngineTest extends TestCase
         [$tenantId, $warehouseId, $item] = $this->purchaseContext();
         $order = $this->createAdjustedOrder($tenantId, $warehouseId, $item);
         [$grn] = $this->receiveOrderInTwoParts($order, $warehouseId, $item);
-        $return = app(PurchaseReturnService::class)->create(new CreatePurchaseReturnData(
+        $return = $this->createPurchaseReturn(new CreatePurchaseReturnData(
             tenantId: $tenantId,
             returnDate: '2026-06-08',
             warehouseId: $warehouseId,
@@ -889,7 +996,7 @@ final class PurchaseEngineTest extends TestCase
         ));
 
         try {
-            app(GoodsReceiptNoteService::class)->reverse($grn);
+            $this->reverseGoodsReceiptNote($grn);
             $this->fail('Expected draft purchase return to block GRN reversal.');
         } catch (InvalidArgumentException $exception) {
             $this->assertStringContainsString('Cannot reverse GRN while purchase returns are unresolved or impacting', $exception->getMessage());
@@ -904,7 +1011,7 @@ final class PurchaseEngineTest extends TestCase
         [$tenantId, $warehouseId, $item] = $this->purchaseContext();
         $order = $this->createAdjustedOrder($tenantId, $warehouseId, $item);
         [$grn] = $this->receiveOrderInTwoParts($order, $warehouseId, $item);
-        $return = app(PurchaseReturnService::class)->create(new CreatePurchaseReturnData(
+        $return = $this->createPurchaseReturn(new CreatePurchaseReturnData(
             tenantId: $tenantId,
             returnDate: '2026-06-08',
             warehouseId: $warehouseId,
@@ -914,20 +1021,28 @@ final class PurchaseEngineTest extends TestCase
         DB::table('goods_receipt_note_lines')->where('goods_receipt_note_id', $grn->getKey())->update(['status' => 'reversed']);
 
         try {
-            app(PurchaseReturnService::class)->post($return);
+            $this->postPurchaseReturn($return);
             $this->fail('Expected reversed GRN to block purchase return posting.');
         } catch (InvalidArgumentException $exception) {
             $this->assertSame('Purchase return source goods receipt is no longer returnable.', $exception->getMessage());
         }
 
-        $this->assertSame(0, InventoryMovement::query()->where('source_type', 'purchase_return')->count());
-        $this->assertSame(0, PurchaseDebitNote::query()->count());
+        $returnMovementCount = $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): int => InventoryMovement::query()->where('source_type', 'purchase_return')->count(),
+        );
+        $debitNoteCount = $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): int => PurchaseDebitNote::query()->count(),
+        );
+        $this->assertSame(0, $returnMovementCount);
+        $this->assertSame(0, $debitNoteCount);
     }
 
     public function test_partial_return_final_residual_reconciles_source_amounts(): void
     {
         [$tenantId, $warehouseId, $item, $supplierId, $uomId] = $this->purchaseContext();
-        $order = app(PurchaseOrderService::class)->create(new CreatePurchaseOrderData(
+        $order = $this->createPurchaseOrder(new CreatePurchaseOrderData(
             tenantId: $tenantId,
             purchaseOrderDate: '2026-06-06',
             supplierType: 'supplier',
@@ -948,31 +1063,35 @@ final class PurchaseEngineTest extends TestCase
         ));
         $order = $this->approveOrder($order);
         $line = $order->lines->first();
-        $grn = app(GoodsReceiptNoteService::class)->create(new CreateGoodsReceiptNoteData(
+        $grn = $this->createGoodsReceiptNote(new CreateGoodsReceiptNoteData(
             tenantId: $tenantId,
             receivedDate: '2026-06-06',
             warehouseId: $warehouseId,
             purchaseOrderId: (int) $order->getKey(),
             lines: [new GoodsReceiptNoteLineData((int) $item->getKey(), '3.000000', '3.000000', '10.000000', purchaseOrderLineId: (int) $line->getKey(), orderedQuantity: '3.000000')],
         ));
-        $grn = app(GoodsReceiptNoteService::class)->post($grn)->load(['lines', 'adjustments']);
+        $grn = $this->postGoodsReceiptNote($grn);
+        $grn = $this->withTenantExecutionContext($tenantId, fn (): GoodsReceiptNote => $grn->load(['lines', 'adjustments']));
         $sourceLine = $grn->lines->first();
 
         for ($i = 0; $i < 3; $i++) {
-            $return = app(PurchaseReturnService::class)->create(new CreatePurchaseReturnData(
+            $return = $this->createPurchaseReturn(new CreatePurchaseReturnData(
                 tenantId: $tenantId,
                 returnDate: '2026-06-0'.(7 + $i),
                 warehouseId: $warehouseId,
                 lines: [new PurchaseReturnLineData('goods_receipt_note_line', (int) $sourceLine->getKey(), '1.000000')],
             ));
-            app(PurchaseReturnService::class)->post($return);
+            $this->postPurchaseReturn($return);
         }
 
-        $returnLines = PurchaseReturnLine::query()
-            ->where('source_line_type', 'goods_receipt_note_line')
-            ->where('source_line_id', $sourceLine->getKey())
-            ->orderBy('id')
-            ->get();
+        $returnLines = $this->withTenantExecutionContext(
+            $tenantId,
+            fn () => PurchaseReturnLine::query()
+                ->where('source_line_type', 'goods_receipt_note_line')
+                ->where('source_line_id', $sourceLine->getKey())
+                ->orderBy('id')
+                ->get(),
+        );
         $math = app(\Modules\Core\Services\DecimalMath::class);
 
         $this->assertSame('30.000000', $math->sum($returnLines->pluck('base_amount')->map(fn ($value): string => (string) $value)->all()));
@@ -996,9 +1115,12 @@ final class PurchaseEngineTest extends TestCase
         [$tenantId, $warehouseId, $item] = $this->purchaseContext();
         $order = $this->createAdjustedOrder($tenantId, $warehouseId, $item);
         [$grn] = $this->receiveOrderInTwoParts($order, $warehouseId, $item);
-        $order = $order->refresh()->load('lines');
-        app(PurchaseOrderService::class)->applyInvoiced($order->lines->first(), '100.000000');
-        $return = app(PurchaseReturnService::class)->create(new CreatePurchaseReturnData(
+        $order = $this->withTenantExecutionContext($tenantId, fn (): PurchaseOrder => $order->refresh()->load('lines'));
+        $this->withTenantExecutionContext(
+            $tenantId,
+            fn () => app(PurchaseOrderService::class)->applyInvoiced($order->lines->first(), '100.000000'),
+        );
+        $return = $this->createPurchaseReturn(new CreatePurchaseReturnData(
             tenantId: $tenantId,
             returnDate: '2026-06-08',
             warehouseId: $warehouseId,
@@ -1006,7 +1128,10 @@ final class PurchaseEngineTest extends TestCase
         ));
 
         try {
-            app(PurchaseOrderService::class)->close($order->refresh());
+            $this->withTenantExecutionContext(
+                $tenantId,
+                fn () => app(PurchaseOrderService::class)->close($order->refresh()),
+            );
             $this->fail('Expected unresolved return to block purchase order close.');
         } catch (InvalidArgumentException $exception) {
             $this->assertStringContainsString('Purchase order cannot be closed while purchase returns are unresolved', $exception->getMessage());
@@ -1019,12 +1144,18 @@ final class PurchaseEngineTest extends TestCase
         [$tenantId, $warehouseId, $item] = $this->purchaseContext();
         $order = $this->createAdjustedOrder($tenantId, $warehouseId, $item);
         $this->receiveOrderInTwoParts($order, $warehouseId, $item);
-        $order = $order->refresh()->load('lines');
-        app(PurchaseOrderService::class)->applyInvoiced($order->lines->first(), '100.000000');
-        $closed = app(PurchaseOrderService::class)->close($order->refresh());
+        $order = $this->withTenantExecutionContext($tenantId, fn (): PurchaseOrder => $order->refresh()->load('lines'));
+        $this->withTenantExecutionContext(
+            $tenantId,
+            fn () => app(PurchaseOrderService::class)->applyInvoiced($order->lines->first(), '100.000000'),
+        );
+        $closed = $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): PurchaseOrder => app(PurchaseOrderService::class)->close($order->refresh()),
+        );
 
         try {
-            app(GoodsReceiptNoteService::class)->create(new CreateGoodsReceiptNoteData(
+            $this->createGoodsReceiptNote(new CreateGoodsReceiptNoteData(
                 tenantId: $tenantId,
                 receivedDate: '2026-06-09',
                 warehouseId: $warehouseId,
@@ -1041,7 +1172,7 @@ final class PurchaseEngineTest extends TestCase
     {
         [$tenantId, $warehouseId, $item, $supplierId, $uomId] = $this->purchaseContext();
 
-        $manualReturn = app(PurchaseReturnService::class)->create(new CreatePurchaseReturnData(
+        $manualReturn = $this->createPurchaseReturn(new CreatePurchaseReturnData(
             tenantId: $tenantId,
             returnDate: '2026-06-06',
             warehouseId: $warehouseId,
@@ -1057,7 +1188,7 @@ final class PurchaseEngineTest extends TestCase
         $this->assertTrue((bool) $manualReturn->approval_required);
         $this->assertTrue((bool) $manualReturn->affects_supplier_balance);
 
-        $note = app(PurchaseDebitNoteService::class)->create(new CreatePurchaseDebitNoteData(
+        $note = $this->createDebitNote(new CreatePurchaseDebitNoteData(
             tenantId: $tenantId,
             debitNoteDate: '2026-06-06',
             amount: '20.000000',
@@ -1067,9 +1198,13 @@ final class PurchaseEngineTest extends TestCase
             reason: 'Price dispute',
         ));
         $this->assertSame('20.000000', (string) $note->amount);
-        $this->assertSame(0, InventoryMovement::query()->where('source_type', 'purchase_debit_note')->count());
+        $debitMovementCount = $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): int => InventoryMovement::query()->where('source_type', 'purchase_debit_note')->count(),
+        );
+        $this->assertSame(0, $debitMovementCount);
 
-        $adjustment = app(StockAdjustmentService::class)->create(new StockAdjustmentData(
+        $adjustment = $this->createStockAdjustment(new StockAdjustmentData(
             tenantId: $tenantId,
             adjustmentDate: '2026-06-06',
             adjustmentType: InventoryAdjustmentType::OpeningBalance,
@@ -1077,20 +1212,36 @@ final class PurchaseEngineTest extends TestCase
             reason: 'Opening correction',
             lines: [new StockAdjustmentLineData((int) $item->getKey(), '0.000000', '1.000000', '1.000000', '10.000000')],
         ));
-        app(StockAdjustmentService::class)->post($adjustment);
-        $this->assertSame(1, InventoryMovement::query()->where('source_type', 'inventory_adjustment')->count());
-        $this->assertSame(1, PurchaseDebitNote::query()->count());
-
-        $payment = app(PurchasePaymentIntegrationService::class)->prepareSupplierPayment(
-            tenantId: $tenantId,
-            paymentDate: '2026-06-06',
-            amount: '20.000000',
-            supplierType: 'supplier',
-            supplierId: $supplierId,
-            allocations: [new PaymentAllocationData(1, '20.000000', '2026-06-06')],
+        $this->postStockAdjustment($adjustment);
+        $inventoryMovementCount = $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): int => InventoryMovement::query()->where('source_type', 'inventory_adjustment')->count(),
         );
-        $this->assertCount(1, $payment->allocations);
-        $this->assertSame(0, Payment::query()->count());
+        $debitNoteCount = $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): int => PurchaseDebitNote::query()->count(),
+        );
+        $this->assertSame(1, $inventoryMovementCount);
+        $this->assertSame(1, $debitNoteCount);
+
+        $paymentMethodId = $this->paymentMethod($tenantId, 'MANUAL');
+        $payment = $this->withTenantExecutionContext(
+            $tenantId,
+            fn () => app(PurchasePaymentIntegrationService::class)->prepareSupplierPayment(
+                tenantId: $tenantId,
+                paymentDate: '2026-06-06',
+                amount: '20.000000',
+                supplierType: 'supplier',
+                supplierId: $supplierId,
+                lines: [new PaymentLineData('20.000000', $paymentMethodId, 'PAY-MANUAL')],
+            ),
+        );
+        $this->assertCount(0, $payment->allocations);
+        $paymentCount = $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): int => Payment::query()->count(),
+        );
+        $this->assertSame(0, $paymentCount);
     }
 
     public function test_tenant_isolation_is_enforced(): void
@@ -1100,7 +1251,7 @@ final class PurchaseEngineTest extends TestCase
         $otherWarehouse = $this->createWarehouse($otherTenant, 'WH-OTHER');
 
         try {
-            app(PurchaseOrderService::class)->create(new CreatePurchaseOrderData(
+            $this->createPurchaseOrder(new CreatePurchaseOrderData(
                 tenantId: $tenantId,
                 purchaseOrderDate: '2026-06-06',
                 supplierType: 'supplier',
@@ -1145,6 +1296,16 @@ final class PurchaseEngineTest extends TestCase
             'updated_at' => now(),
         ]);
 
+        $otherUserId = (int) \Tests\Support\TenantUserFixture::create([
+            'tenant_id' => $otherTenantId,
+            'first_name' => 'Other',
+            'last_name' => 'Auth',
+            'email' => 'purchase-other-auth-'.Str::lower(Str::random(6)).'@example.test',
+            'password' => 'secret',
+            'status' => 'active',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
         $otherPermissionId = $this->insertPurchasePermission($otherTenantId, PurchaseAuthorizationService::ORDERS_VIEW);
         $otherRoleId = $this->insertRole($otherTenantId, 'Other Tenant Purchase Role');
         DB::table('role_permissions')->insert([
@@ -1156,7 +1317,7 @@ final class PurchaseEngineTest extends TestCase
         ]);
         DB::table('user_roles')->insert([
             'tenant_id' => $otherTenantId,
-            'user_id' => $userId,
+            'user_id' => $otherUserId,
             'role_id' => $otherRoleId,
             'created_at' => now(),
             'updated_at' => now(),
@@ -1169,8 +1330,19 @@ final class PurchaseEngineTest extends TestCase
 
     public function test_payment_and_finance_preparation_dtos_are_created_without_persistence(): void
     {
-        [$tenantId] = $this->purchaseContext();
-        $payment = app(PurchasePaymentIntegrationService::class)->prepareSupplierPayment($tenantId, '2026-06-06', '100.000000');
+        [$tenantId, , , $supplierId] = $this->purchaseContext();
+        $paymentMethodId = $this->paymentMethod($tenantId, 'DTO');
+        $payment = $this->withTenantExecutionContext(
+            $tenantId,
+            fn () => app(PurchasePaymentIntegrationService::class)->prepareSupplierPayment(
+                tenantId: $tenantId,
+                paymentDate: '2026-06-06',
+                amount: '100.000000',
+                supplierType: 'supplier',
+                supplierId: $supplierId,
+                lines: [new PaymentLineData('100.000000', $paymentMethodId, 'PAY-DTO')],
+            ),
+        );
         $journal = app(PurchaseFinancePreparationService::class)->prepareJournal(
             tenantId: $tenantId,
             journalDate: '2026-06-06',
@@ -1185,11 +1357,156 @@ final class PurchaseEngineTest extends TestCase
         $this->assertSame('purchase', $journal->source->sourceModule);
     }
 
+    private function fakeFinancePosting(): void
+    {
+        $this->app->instance(FinancePostingInterface::class, new class implements FinancePostingInterface
+        {
+            public function createDraftJournal(PostingContext $request): PostingResultData
+            {
+                return $this->result('draft');
+            }
+
+            public function validatePosting(PostingContext $request): void {}
+
+            public function post(PostingContext $request, ?int $postedBy = null): PostingResultData
+            {
+                return $this->result('posted');
+            }
+
+            public function postJournal(int $journalId, ?int $postedBy = null): PostingResultData
+            {
+                return $this->result('posted');
+            }
+
+            public function reverseJournal(int $journalId, string $reversalDate, ?int $reversedBy = null, ?string $reason = null): PostingResultData
+            {
+                return $this->result('reversed');
+            }
+
+            private function result(string $status): PostingResultData
+            {
+                return new PostingResultData(1, 'JRN-TEST', $status, '0.000000', '0.000000');
+            }
+        });
+    }
+
+    private function createPurchaseOrder(CreatePurchaseOrderData $data): PurchaseOrder
+    {
+        return $this->withTenantExecutionContext(
+            $data->tenantId,
+            fn (): PurchaseOrder => app(PurchaseOrderService::class)->create($data),
+        );
+    }
+
+    private function createGoodsReceiptNote(CreateGoodsReceiptNoteData $data): GoodsReceiptNote
+    {
+        return $this->withTenantExecutionContext(
+            $data->tenantId,
+            fn (): GoodsReceiptNote => app(GoodsReceiptNoteService::class)->create($data),
+        );
+    }
+
+    private function postGoodsReceiptNote(GoodsReceiptNote $grn): GoodsReceiptNote
+    {
+        return $this->withTenantExecutionContext(
+            (int) $grn->tenant_id,
+            fn (): GoodsReceiptNote => app(GoodsReceiptNoteService::class)->post($grn),
+        );
+    }
+
+    private function reverseGoodsReceiptNote(GoodsReceiptNote $grn): GoodsReceiptNote
+    {
+        return $this->withTenantExecutionContext(
+            (int) $grn->tenant_id,
+            fn (): GoodsReceiptNote => app(GoodsReceiptNoteService::class)->reverse($grn),
+        );
+    }
+
+    private function createSupplierInvoice(CreatePurchaseInvoiceData $data): \Modules\Invoice\Models\Invoice
+    {
+        return $this->withTenantExecutionContext(
+            $data->tenantId,
+            fn (): \Modules\Invoice\Models\Invoice => app(PurchaseInvoiceIntegrationService::class)->createSupplierInvoice($data),
+        );
+    }
+
+    private function previewSupplierInvoice(CreatePurchaseInvoiceData $data): mixed
+    {
+        return $this->withTenantExecutionContext(
+            $data->tenantId,
+            fn (): mixed => app(PurchaseInvoiceIntegrationService::class)->previewSupplierInvoice($data),
+        );
+    }
+
+    private function createPurchaseReturn(CreatePurchaseReturnData $data): mixed
+    {
+        return $this->withTenantExecutionContext(
+            $data->tenantId,
+            fn (): mixed => app(PurchaseReturnService::class)->create($data),
+        );
+    }
+
+    private function postPurchaseReturn(mixed $return): mixed
+    {
+        return $this->withTenantExecutionContext(
+            (int) $return->tenant_id,
+            fn (): mixed => app(PurchaseReturnService::class)->post($return),
+        );
+    }
+
+    private function approvePurchaseReturn(mixed $return): mixed
+    {
+        return $this->withTenantExecutionContext(
+            (int) $return->tenant_id,
+            fn (): mixed => app(PurchaseReturnService::class)->approve($return),
+        );
+    }
+
+    private function createDebitNote(CreatePurchaseDebitNoteData $data): PurchaseDebitNote
+    {
+        return $this->withTenantExecutionContext(
+            $data->tenantId,
+            fn (): PurchaseDebitNote => app(PurchaseDebitNoteService::class)->create($data),
+        );
+    }
+
+    private function createPayment(CreatePaymentData $data): Payment
+    {
+        return $this->withTenantExecutionContext(
+            $data->tenantId,
+            fn (): Payment => app(PaymentCreationService::class)->create($data),
+        );
+    }
+
+    private function allocatePayment(Payment $payment, array $allocations, int $expectedVersion): Payment
+    {
+        return $this->withTenantExecutionContext(
+            (int) $payment->tenant_id,
+            fn (): Payment => app(PaymentAllocationService::class)->allocate($payment, $allocations, $expectedVersion),
+        );
+    }
+
+    private function createStockAdjustment(StockAdjustmentData $data): mixed
+    {
+        return $this->withTenantExecutionContext(
+            $data->tenantId,
+            fn (): mixed => app(StockAdjustmentService::class)->create($data),
+        );
+    }
+
+    private function postStockAdjustment(mixed $adjustment): mixed
+    {
+        return $this->withTenantExecutionContext(
+            (int) $adjustment->tenant_id,
+            fn (): mixed => app(StockAdjustmentService::class)->post($adjustment),
+        );
+    }
+
     private function createAdjustedOrder(int $tenantId, int $warehouseId, Item $item): PurchaseOrder
     {
         $taxGroupId = $this->taxGroup($tenantId);
 
-        return app(PurchaseOrderService::class)->create(new CreatePurchaseOrderData(
+        return $this->createPurchaseOrder(new CreatePurchaseOrderData(
             tenantId: $tenantId,
             purchaseOrderDate: '2026-06-06',
             supplierType: 'supplier',
@@ -1218,49 +1535,53 @@ final class PurchaseEngineTest extends TestCase
      */
     private function receiveOrderInTwoParts(PurchaseOrder $order, int $warehouseId, Item $item): array
     {
-        $order = $this->approveOrder($order);
-        $line = $order->lines->first();
-        $first = app(GoodsReceiptNoteService::class)->create(new CreateGoodsReceiptNoteData(
-            tenantId: (int) $order->tenant_id,
-            receivedDate: '2026-06-06',
-            warehouseId: $warehouseId,
-            purchaseOrderId: (int) $order->getKey(),
-            lines: [
-                new GoodsReceiptNoteLineData((int) $item->getKey(), '40.000000', '40.000000', '1000.000000', purchaseOrderLineId: (int) $line->getKey(), orderedQuantity: '100.000000'),
-            ],
-        ));
-        app(GoodsReceiptNoteService::class)->post($first);
+        return $this->withTenantExecutionContext((int) $order->tenant_id, function () use ($order, $warehouseId, $item): array {
+            $order = $this->approveOrder($order);
+            $line = $order->lines->first();
+            $first = app(GoodsReceiptNoteService::class)->create(new CreateGoodsReceiptNoteData(
+                tenantId: (int) $order->tenant_id,
+                receivedDate: '2026-06-06',
+                warehouseId: $warehouseId,
+                purchaseOrderId: (int) $order->getKey(),
+                lines: [
+                    new GoodsReceiptNoteLineData((int) $item->getKey(), '40.000000', '40.000000', '1000.000000', purchaseOrderLineId: (int) $line->getKey(), orderedQuantity: '100.000000'),
+                ],
+            ));
+            app(GoodsReceiptNoteService::class)->post($first);
 
-        $second = app(GoodsReceiptNoteService::class)->create(new CreateGoodsReceiptNoteData(
-            tenantId: (int) $order->tenant_id,
-            receivedDate: '2026-06-07',
-            warehouseId: $warehouseId,
-            purchaseOrderId: (int) $order->getKey(),
-            lines: [
-                new GoodsReceiptNoteLineData((int) $item->getKey(), '60.000000', '60.000000', '1000.000000', purchaseOrderLineId: (int) $line->getKey(), orderedQuantity: '100.000000'),
-            ],
-        ));
-        app(GoodsReceiptNoteService::class)->post($second);
+            $second = app(GoodsReceiptNoteService::class)->create(new CreateGoodsReceiptNoteData(
+                tenantId: (int) $order->tenant_id,
+                receivedDate: '2026-06-07',
+                warehouseId: $warehouseId,
+                purchaseOrderId: (int) $order->getKey(),
+                lines: [
+                    new GoodsReceiptNoteLineData((int) $item->getKey(), '60.000000', '60.000000', '1000.000000', purchaseOrderLineId: (int) $line->getKey(), orderedQuantity: '100.000000'),
+                ],
+            ));
+            app(GoodsReceiptNoteService::class)->post($second);
 
-        return [$first->refresh()->load(['lines', 'adjustments']), $second->refresh()->load(['lines', 'adjustments'])];
+            return [$first->refresh()->load(['lines', 'adjustments']), $second->refresh()->load(['lines', 'adjustments'])];
+        });
     }
 
     private function approveOrder(PurchaseOrder $order): PurchaseOrder
     {
-        if ($order->status === PurchaseOrderStatus::Approved) {
+        return $this->withTenantExecutionContext((int) $order->tenant_id, function () use ($order): PurchaseOrder {
+            if ($order->status === PurchaseOrderStatus::Approved) {
+                return $order->refresh()->load('lines');
+            }
+
+            $orders = app(PurchaseOrderService::class);
+            if ($order->status === PurchaseOrderStatus::Draft) {
+                $order = $orders->submit($order);
+            }
+
+            if ($order->status === PurchaseOrderStatus::PendingApproval) {
+                $order = $orders->approve($order);
+            }
+
             return $order->refresh()->load('lines');
-        }
-
-        $orders = app(PurchaseOrderService::class);
-        if ($order->status === PurchaseOrderStatus::Draft) {
-            $order = $orders->submit($order);
-        }
-
-        if ($order->status === PurchaseOrderStatus::PendingApproval) {
-            $order = $orders->approve($order);
-        }
-
-        return $order->refresh()->load('lines');
+        });
     }
 
     private function purchaseContext(): array
@@ -1276,10 +1597,12 @@ final class PurchaseEngineTest extends TestCase
 
     private function postInvoice(\Modules\Invoice\Models\Invoice $invoice): \Modules\Invoice\Models\Invoice
     {
-        $statuses = app(InvoiceStatusService::class);
-        $invoice = $statuses->transition($invoice, InvoiceStatus::Approved);
+        return $this->withTenantExecutionContext((int) $invoice->tenant_id, function () use ($invoice): \Modules\Invoice\Models\Invoice {
+            $statuses = app(InvoiceStatusService::class);
+            $invoice = $statuses->transition($invoice, InvoiceStatus::Approved);
 
-        return $statuses->transition($invoice, InvoiceStatus::Posted);
+            return $statuses->transition($invoice, InvoiceStatus::Posted);
+        });
     }
 
     private function paymentMethod(int $tenantId, string $suffix): int
@@ -1292,7 +1615,7 @@ final class PurchaseEngineTest extends TestCase
             'method_type' => 'cash',
             'direction_allowed' => 'outbound',
             'requires_reference' => false,
-            'requires_bank_account' => false,
+            'requires_instrument_details' => false,
             'is_active' => true,
             'created_at' => now(),
             'updated_at' => now(),
@@ -1317,6 +1640,7 @@ final class PurchaseEngineTest extends TestCase
             'updated_at' => now(),
         ]);
         DB::table('tax_rates')->insert([
+            'tenant_id' => $tenantId,
             'tax_id' => $taxId,
             'rate' => '18.000000',
             'effective_from' => '2026-01-01',
@@ -1334,6 +1658,7 @@ final class PurchaseEngineTest extends TestCase
             'updated_at' => now(),
         ]);
         DB::table('tax_group_lines')->insert([
+            'tenant_id' => $tenantId,
             'tax_group_id' => $groupId,
             'tax_id' => $taxId,
             'sequence' => 1,
@@ -1347,16 +1672,19 @@ final class PurchaseEngineTest extends TestCase
 
     private function createItem(int $tenantId, string $code, ItemType $type = ItemType::Stock, bool $stockable = true, ?int $uomId = null): Item
     {
-        return app(ItemCreationService::class)->create(new CreateItemData(
-            tenantId: $tenantId,
-            code: $code,
-            name: 'Purchase '.$code,
-            itemType: $type,
-            trackingType: TrackingType::None,
-            costingMethod: $stockable ? CostingMethod::Fifo : CostingMethod::None,
-            baseUomId: $uomId,
-            isStockable: $stockable,
-        ));
+        return $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): Item => app(ItemCreationService::class)->create(new CreateItemData(
+                tenantId: $tenantId,
+                code: $code,
+                name: 'Purchase '.$code,
+                itemType: $type,
+                trackingType: TrackingType::None,
+                costingMethod: $stockable ? CostingMethod::Fifo : CostingMethod::None,
+                baseUomId: $uomId,
+                isStockable: $stockable,
+            )),
+        );
     }
 
     private function createTenant(string $suffix = ''): int
@@ -1369,6 +1697,7 @@ final class PurchaseEngineTest extends TestCase
             'name' => 'Purchase Tenant '.$suffix,
             'slug' => 'purchase-tenant-'.Str::lower($suffix),
             'status' => 'active',
+            'status_changed_at' => now(),
             'created_at' => now(),
             'updated_at' => now()]);
     }

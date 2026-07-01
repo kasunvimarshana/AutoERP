@@ -13,11 +13,21 @@ use Modules\Item\Enums\TrackingType;
 
 final class UpdateItemRequest extends TenantScopedRequest
 {
+    private bool $clientProvidedOrganizationUnitId = false;
+
+    protected function prepareForValidation(): void
+    {
+        $this->clientProvidedOrganizationUnitId = $this->request->has('organization_unit_id')
+            || $this->query->has('organization_unit_id');
+
+        parent::prepareForValidation();
+    }
+
     public function rules(): array
     {
         return [
             'tenant_id' => ['required', 'integer', 'min:1'],
-            'organization_unit_id' => ['nullable', 'integer', 'min:1'],
+            'organization_unit_id' => [Rule::prohibitedIf($this->clientProvidedOrganizationUnitId), 'nullable', 'integer', 'min:1'],
             'code' => ['sometimes', 'string', 'max:80'],
             'name' => ['sometimes', 'string', 'max:255'],
             'item_type' => ['sometimes', Rule::enum(ItemType::class)],

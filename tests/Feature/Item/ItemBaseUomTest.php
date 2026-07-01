@@ -40,7 +40,11 @@ final class ItemBaseUomTest extends TestCase
 
         $this->auth($context)->putJson("/api/v1/items/{$itemId}", ['base_uom_id' => $newUomId])
             ->assertUnprocessable()
-            ->assertJsonPath('message', 'Base UOM cannot be edited directly after item usage. Use the Base UOM Conversion Wizard.');
+            ->assertJsonValidationErrors(['base_uom_id'])
+            ->assertJsonPath(
+                'errors.base_uom_id.0',
+                'Base UOM cannot be edited directly after item usage. Use the Base UOM Conversion Wizard.',
+            );
 
         $this->auth($context)->getJson("/api/v1/items/{$itemId}/base-uom/usage-audit")
             ->assertOk()
@@ -305,11 +309,11 @@ final class ItemBaseUomTest extends TestCase
         $newUomId = $this->uom($tenantA, 'BOX');
         $itemId = $this->item($tenantA, $oldUomId, 'SCOPE');
 
-        $this->auth($tenantB)->getJson("/api/v1/items/{$itemId}/base-uom/usage-audit")->assertNotFound();
+        $this->auth($tenantB)->getJson("/api/v1/items/{$itemId}/base-uom/usage-audit")->assertForbidden();
         $this->auth($tenantB)->postJson("/api/v1/items/{$itemId}/base-uom/preview-change", [
             'new_base_uom_id' => $newUomId,
             'conversion_factor' => '0.100000',
-        ])->assertNotFound();
+        ])->assertForbidden();
     }
 
     private function historicalLines(array $context, int $itemId, int $uomId, int $warehouseId): array

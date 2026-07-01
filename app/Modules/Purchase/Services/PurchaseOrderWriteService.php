@@ -188,7 +188,7 @@ final class PurchaseOrderWriteService
     {
         $tenantCurrencyId = TenantModel::query()
             ->whereKey($data->tenantId)
-            ->value('currency_id');
+            ->value('base_currency_id');
 
         if ($tenantCurrencyId !== null
             && (int) $tenantCurrencyId === $data->currencyId

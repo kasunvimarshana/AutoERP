@@ -4,13 +4,11 @@ declare(strict_types=1);
 
 namespace Modules\Tax\Services;
 
-use Illuminate\Database\Eloquent\Builder;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Finance\DTOs\PostingContext;
 use Modules\Finance\DTOs\PostingLine;
 use Modules\Finance\DTOs\PostingSourceData;
-use Modules\Finance\Models\FinanceAccount;
 use Modules\Tax\DTOs\TaxAmountData;
 use Modules\Tax\DTOs\TaxPostingContext;
 use Modules\Tax\Models\TaxPostingProfile;
@@ -26,13 +24,21 @@ final class TaxPostingContextService
         PostingSourceData $source,
         string $postingDate,
         array $taxLines,
-        string $counterpartyAccountCode,
-        string $counterpartyAccountName,
+        string $postingProfileCode,
+        string $counterpartyProfileKey,
+        string $counterpartyLineName,
         ?string $description = null,
-        ?string $postingProfileCode = null,
     ): TaxPostingContext {
         if ($source->tenantId === null) {
             throw new InvalidArgumentException('Tax posting source tenant is required.');
+        }
+        $postingProfileCode = trim($postingProfileCode);
+        $counterpartyProfileKey = trim($counterpartyProfileKey);
+        if ($postingProfileCode === '') {
+            throw new InvalidArgumentException('Tax posting context requires a Finance posting profile code.');
+        }
+        if ($counterpartyProfileKey === '') {
+            throw new InvalidArgumentException('Tax posting context requires a counterparty posting profile key.');
         }
 
         $financeLines = [];
@@ -41,28 +47,28 @@ final class TaxPostingContextService
                 continue;
             }
 
-            $account = $this->resolveAccount(
+            $profile = $this->resolveProfile(
                 (int) $source->tenantId,
                 $source->organizationUnitId,
                 $taxLine,
             );
+            $taxProfileKey = trim((string) $profile->posting_key);
             $lineDescription = $taxLine->taxCode.' '.$taxLine->taxName;
             $counterparty = new PostingLine(
-                accountCode: $counterpartyAccountCode,
-                accountName: $counterpartyAccountName,
+                accountName: $counterpartyLineName,
                 debit: $this->taxCreditsAccount($taxLine) ? $taxLine->taxAmount : '0.000000',
                 credit: $this->taxCreditsAccount($taxLine) ? '0.000000' : $taxLine->taxAmount,
                 description: $lineDescription.' counterparty',
+                profileKey: $counterpartyProfileKey,
                 sourceLineType: 'tax',
                 sourceLineId: $taxLine->taxId,
             );
             $taxPostingLine = new PostingLine(
-                accountCode: (string) $account->code,
-                accountName: (string) $account->name,
+                accountName: $lineDescription,
                 debit: $this->taxCreditsAccount($taxLine) ? '0.000000' : $taxLine->taxAmount,
                 credit: $this->taxCreditsAccount($taxLine) ? $taxLine->taxAmount : '0.000000',
                 description: $lineDescription,
-                profileKey: null,
+                profileKey: $taxProfileKey,
                 sourceLineType: 'tax',
                 sourceLineId: $taxLine->taxId,
             );
@@ -85,11 +91,10 @@ final class TaxPostingContextService
         );
     }
 
-    private function resolveAccount(int $tenantId, ?int $organizationUnitId, TaxAmountData $taxLine): FinanceAccount
+    private function resolveProfile(int $tenantId, ?int $organizationUnitId, TaxAmountData $taxLine): TaxPostingProfile
     {
         $direction = $this->directionFor($taxLine);
         $query = TaxPostingProfile::query()
-            ->with('account')
             ->where('tenant_id', $tenantId)
             ->where('tax_id', $taxLine->taxId)
             ->where('direction', $direction)
@@ -99,18 +104,14 @@ final class TaxPostingContextService
             : $query->where('organization_unit_id', $organizationUnitId);
 
         $profile = $query->first();
-        $account = $profile?->account;
-        if (! $profile instanceof TaxPostingProfile || ! $account instanceof FinanceAccount) {
-            throw new InvalidArgumentException("Tax account mapping is missing for tax [{$taxLine->taxCode}] direction [{$direction}].");
+        if (! $profile instanceof TaxPostingProfile) {
+            throw new InvalidArgumentException("Tax posting profile is missing for tax [{$taxLine->taxCode}] direction [{$direction}].");
         }
-        if (! (bool) $account->is_active || ! (bool) $account->is_posting_account) {
-            throw new InvalidArgumentException("Tax account mapping for [{$taxLine->taxCode}] is inactive or not postable.");
-        }
-        if ((int) $account->tenant_id !== $tenantId || $account->organization_unit_id !== $organizationUnitId) {
-            throw new InvalidArgumentException('Tax account mapping belongs to a different scope.');
+        if (trim((string) $profile->posting_key) === '') {
+            throw new InvalidArgumentException("Tax posting profile for tax [{$taxLine->taxCode}] direction [{$direction}] must define a Finance posting key.");
         }
 
-        return $account;
+        return $profile;
     }
 
     private function directionFor(TaxAmountData $taxLine): string

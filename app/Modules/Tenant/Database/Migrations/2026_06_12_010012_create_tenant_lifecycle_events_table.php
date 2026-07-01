@@ -22,6 +22,7 @@ return new class extends Migration
             $table->string('actor_email')->nullable();
             $table->dateTime('occurred_at');
 
+            $table->unique(['id', 'tenant_id'], 'tenant_lifecycle_events_id_tenant_uk');
             $table->index(['tenant_id', 'occurred_at'], 'tenant_lifecycle_events_tenant_time_ix');
         });
     }

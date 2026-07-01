@@ -3,7 +3,7 @@ import { DecimalInput } from '@/shared/components/DecimalInput';
 import { Input } from '@/shared/components/Input';
 import { Select } from '@/shared/components/Select';
 import { sumDecimals } from '@/shared/utils/decimal';
-import type { FastPurchaseOptionResource } from '../purchaseTypes';
+import type { FastPurchaseOptionResource } from '../types/fastPurchaseTypes';
 
 export interface PurchasePaymentMethodRow {
     key: string;

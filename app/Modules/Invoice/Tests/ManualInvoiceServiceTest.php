@@ -34,11 +34,11 @@ final class ManualInvoiceServiceTest extends TestCase
         $data = $this->invoiceData($tenantId, $organizationUnitId, $customerId, '100.000000');
         $service = app(ManualInvoiceService::class);
 
-        $first = $service->create($data, 'manual-invoice-request-1');
-        $second = $service->create($data, 'manual-invoice-request-1');
+        $first = $this->withTenantExecutionContext($tenantId, fn () => $service->create($data, 'manual-invoice-request-1'));
+        $second = $this->withTenantExecutionContext($tenantId, fn () => $service->create($data, 'manual-invoice-request-1'));
 
         $this->assertSame($first->getKey(), $second->getKey());
-        $this->assertSame(1, Invoice::query()->where('tenant_id', $tenantId)->count());
+        $this->assertSame(1, $this->withTenantExecutionContext($tenantId, fn () => Invoice::query()->where('tenant_id', $tenantId)->count()));
     }
 
     public function test_invoice_status_actions_reject_stale_versions(): void
@@ -46,27 +46,27 @@ final class ManualInvoiceServiceTest extends TestCase
         $tenantId = $this->createTenant();
         $organizationUnitId = $this->createOrganizationUnit($tenantId);
         $customerId = $this->createCustomer($tenantId, $organizationUnitId);
-        $invoice = app(ManualInvoiceService::class)->create(
+        $invoice = $this->withTenantExecutionContext($tenantId, fn () => app(ManualInvoiceService::class)->create(
             $this->invoiceData($tenantId, $organizationUnitId, $customerId, '100.000000'),
             'manual-invoice-version-test',
-        );
+        ));
         $initialVersion = (int) $invoice->row_version;
 
-        $approved = app(InvoiceStatusService::class)->transitionIfVersion(
+        $approved = $this->withTenantExecutionContext($tenantId, fn () => app(InvoiceStatusService::class)->transitionIfVersion(
             $invoice,
             InvoiceStatus::Approved,
             $initialVersion,
-        );
+        ));
 
         $this->assertGreaterThan($initialVersion, (int) $approved->row_version);
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Invoice was changed by another request. Reload it before performing this action.');
 
-        app(InvoiceStatusService::class)->transitionIfVersion(
+        $this->withTenantExecutionContext($tenantId, fn () => app(InvoiceStatusService::class)->transitionIfVersion(
             $approved,
             InvoiceStatus::Posted,
             $initialVersion,
-        );
+        ));
     }
 
     public function test_non_draft_invoices_cannot_be_deleted(): void
@@ -74,23 +74,23 @@ final class ManualInvoiceServiceTest extends TestCase
         $tenantId = $this->createTenant();
         $organizationUnitId = $this->createOrganizationUnit($tenantId);
         $customerId = $this->createCustomer($tenantId, $organizationUnitId);
-        $invoice = app(ManualInvoiceService::class)->create(
+        $invoice = $this->withTenantExecutionContext($tenantId, fn () => app(ManualInvoiceService::class)->create(
             $this->invoiceData($tenantId, $organizationUnitId, $customerId, '100.000000'),
             'manual-invoice-delete-test',
-        );
-        $invoice = app(InvoiceStatusService::class)->transition($invoice, InvoiceStatus::Approved);
+        ));
+        $invoice = $this->withTenantExecutionContext($tenantId, fn () => app(InvoiceStatusService::class)->transition($invoice, InvoiceStatus::Approved));
 
         $this->expectException(LogicException::class);
         $this->expectExceptionMessage('Only draft invoices can be deleted.');
 
-        $invoice->delete();
+        $this->withTenantExecutionContext($tenantId, fn () => $invoice->delete());
     }
 
     public function test_requested_posted_status_uses_governed_issuance_transitions(): void
     {
         $tenantId = $this->createTenant();
 
-        $invoice = app(InvoiceCreationService::class)->create(new CreateInvoiceData(
+        $invoice = $this->withTenantExecutionContext($tenantId, fn () => app(InvoiceCreationService::class)->create(new CreateInvoiceData(
             tenantId: $tenantId,
             invoiceType: InvoiceType::Manual,
             direction: InvoiceDirection::Outbound,
@@ -102,7 +102,7 @@ final class ManualInvoiceServiceTest extends TestCase
                 quantity: '1.000000',
                 unitPrice: '100.000000',
             )],
-        ));
+        )));
 
         $this->assertSame(InvoiceStatus::Posted, $invoice->status);
         $this->assertNotNull($invoice->approved_at);
@@ -115,10 +115,10 @@ final class ManualInvoiceServiceTest extends TestCase
         $tenantId = $this->createTenant();
         $organizationUnitId = $this->createOrganizationUnit($tenantId);
         $customerId = $this->createCustomer($tenantId, $organizationUnitId);
-        $invoice = app(ManualInvoiceService::class)->create(
+        $invoice = $this->withTenantExecutionContext($tenantId, fn () => app(ManualInvoiceService::class)->create(
             $this->invoiceData($tenantId, $organizationUnitId, $customerId, '100.000000'),
             'manual-invoice-snapshot-test',
-        );
+        ));
         $originalName = (string) $invoice->party_name_snapshot;
         $originalCode = (string) $invoice->party_code_snapshot;
 
@@ -128,7 +128,7 @@ final class ManualInvoiceServiceTest extends TestCase
             'updated_at' => now(),
         ]);
 
-        $invoice->refresh();
+        $this->withTenantExecutionContext($tenantId, fn () => $invoice->refresh());
         $this->assertSame($originalCode, (string) $invoice->party_code_snapshot);
         $this->assertSame($originalName, (string) $invoice->party_name_snapshot);
     }
@@ -140,18 +140,18 @@ final class ManualInvoiceServiceTest extends TestCase
         $customerId = $this->createCustomer($tenantId, $organizationUnitId);
         $service = app(ManualInvoiceService::class);
 
-        $service->create(
+        $this->withTenantExecutionContext($tenantId, fn () => $service->create(
             $this->invoiceData($tenantId, $organizationUnitId, $customerId, '100.000000'),
             'manual-invoice-request-2',
-        );
+        ));
 
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Idempotency key was already used for a different request payload.');
 
-        $service->create(
+        $this->withTenantExecutionContext($tenantId, fn () => $service->create(
             $this->invoiceData($tenantId, $organizationUnitId, $customerId, '200.000000'),
             'manual-invoice-request-2',
-        );
+        ));
     }
 
     private function invoiceData(int $tenantId, int $organizationUnitId, int $customerId, string $unitPrice): ManualInvoiceData
@@ -199,6 +199,7 @@ final class ManualInvoiceServiceTest extends TestCase
             'name' => 'Tenant '.$suffix,
             'slug' => 'tenant-'.Str::lower($suffix),
             'status' => 'active',
+            'status_changed_at' => now(),
             'created_at' => now(),
             'updated_at' => now(),
         ]);

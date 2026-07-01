@@ -38,7 +38,6 @@ return new class extends Migration
             $table->unique(['tenant_id', 'email'], 'users_tenant_email_uk');
             $table->unique(['tenant_id', 'username'], 'users_tenant_username_uk');
             $table->index(['tenant_id', 'status', 'deleted_at'], 'users_tenant_status_ix');
-            $table->index(['tenant_id', 'email'], 'users_tenant_email_ix');
 
             $table->index(['tenant_id', 'created_by_user_id'], 'users_created_by_ix');
             $table->index(['tenant_id', 'updated_by_user_id'], 'users_updated_by_ix');

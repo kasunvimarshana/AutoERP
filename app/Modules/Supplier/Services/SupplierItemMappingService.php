@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Supplier\Services;
 
+use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Supplier\DTOs\SupplierItemMappingData;
@@ -26,7 +27,9 @@ final class SupplierItemMappingService
             ->where('item_id', $data->itemId)
             ->where('item_variant_id', $data->itemVariantId)
             ->exists()) {
-            throw new InvalidArgumentException('Supplier item mapping already exists.');
+            throw ValidationException::withMessages([
+                'item_id' => ['Supplier item mapping already exists.'],
+            ]);
         }
 
         if ($data->isPreferred) {
@@ -63,7 +66,9 @@ final class SupplierItemMappingService
             ? $duplicate->whereNull('item_variant_id')
             : $duplicate->where('item_variant_id', $data->itemVariantId);
         if ($duplicate->exists()) {
-            throw new InvalidArgumentException('Supplier item mapping already exists.');
+            throw ValidationException::withMessages([
+                'item_id' => ['Supplier item mapping already exists.'],
+            ]);
         }
         if ($data->isPreferred) {
             $this->clearPreferredForItem($supplier, $data);
@@ -117,7 +122,9 @@ final class SupplierItemMappingService
     private function assertOwned(Supplier $supplier, SupplierItemMapping $mapping): void
     {
         if ((int) $mapping->supplier_id !== (int) $supplier->getKey()) {
-            throw new InvalidArgumentException('Supplier item mapping does not belong to the supplier.');
+            throw ValidationException::withMessages([
+                'mapping_id' => ['Supplier item mapping does not belong to the supplier.'],
+            ]);
         }
     }
 }

@@ -7,6 +7,7 @@ namespace Modules\Reporting\Tests;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Testing\TestResponse;
 use Modules\Invoice\Enums\InvoiceDirection;
 use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Enums\InvoiceType;
@@ -16,11 +17,14 @@ use Modules\Item\Enums\ItemType;
 use Modules\Item\Enums\TrackingType;
 use Modules\Item\Models\Item;
 use Modules\Item\Services\ItemCreationService;
+use Modules\Payment\Enums\PaymentAllocationState;
 use Modules\Payment\Enums\PaymentDirection;
-use Modules\Payment\Enums\PaymentStatus;
+use Modules\Payment\Enums\PaymentDocumentStatus;
+use Modules\Payment\Enums\PaymentPostingStatus;
 use Modules\Payment\Enums\PaymentType;
 use Modules\Reporting\Services\ReportingAuthorizationService;
-use Modules\User\Constants\UserPermission;
+use Modules\User\Constants\UserGuard;
+use Modules\User\Constants\UserSystemRole;
 use Modules\User\Models\UserModel;
 use Modules\VehicleService\DTOs\VehicleServiceEmployeeAssignmentData;
 use Modules\VehicleService\DTOs\VehicleServiceJobData;
@@ -46,6 +50,7 @@ final class TechnicianWorkReportTest extends TestCase
         parent::setUp();
 
         $this->withoutMiddleware();
+        $this->trustTenantScopedRequestContextFromPayload();
     }
 
     public function test_report_returns_readable_rows_and_summary_totals(): void
@@ -57,9 +62,9 @@ final class TechnicianWorkReportTest extends TestCase
 
         $assignment = $this->assignment($job, $line, $context['employee_id'], 'technician', '2.000000', '50.000000', VehicleServiceCommissionType::Fixed, '30.000000');
         $this->assignment($job, $line, $context['employee_id'], 'helper', '1.000000', '25.000000', VehicleServiceCommissionType::Fixed, '10.000000');
-        $this->linkInvoiceAndPayment($context, $job, InvoiceStatus::Posted, PaymentStatus::Allocated);
+        $this->linkInvoiceAndPayment($context, $job, InvoiceStatus::Posted);
 
-        $this->getJson('/api/v1/reports/vehicle-service/technician-work?'.http_build_query($this->scope($context)))
+        $this->reportGetJson($context, '/api/v1/reports/vehicle-service/technician-work?'.http_build_query($this->scope($context)))
             ->assertOk()
             ->assertJsonPath('data.0.id', (int) $assignment->getKey())
             ->assertJsonPath('data.0.job_number', (string) $job->job_number)
@@ -80,7 +85,9 @@ final class TechnicianWorkReportTest extends TestCase
             ->assertJsonPath('data.0.commission_amount', '30.000000')
             ->assertJsonPath('data.0.supervisor_commission_amount', '15.000000')
             ->assertJsonPath('data.0.invoice_status', 'posted')
-            ->assertJsonPath('data.0.payment_status', 'allocated')
+            ->assertJsonPath('data.0.payment_document_status', 'approved')
+            ->assertJsonPath('data.0.payment_posting_status', 'posted')
+            ->assertJsonPath('data.0.payment_allocation_status', 'fully_allocated')
             ->assertJsonPath('summary.total_assigned_hours', '3.000000')
             ->assertJsonPath('summary.total_labour_amount', '125.000000')
             ->assertJsonPath('summary.total_technician_commission', '40.000000')
@@ -95,15 +102,25 @@ final class TechnicianWorkReportTest extends TestCase
         $matchingJob = $this->createJob($context, date: '2026-06-03', supervisorCommissionType: VehicleServiceCommissionType::Fixed, supervisorCommissionValue: '5.000000');
         $matchingLine = $this->line($matchingJob, $context['labour'], '1.000000', '100.000000', 'Precision alignment');
         $matching = $this->assignment($matchingJob, $matchingLine, $context['employee_id'], 'technician', '1.000000', '40.000000', VehicleServiceCommissionType::Percentage, '10.000000');
-        $matchingJob->forceFill(['status' => VehicleServiceJobStatus::Completed])->save();
-        $matchingJob = $matchingJob->refresh();
-        $this->linkInvoiceAndPayment($context, $matchingJob, InvoiceStatus::Paid, PaymentStatus::Allocated);
+        $matchingJob = $this->withTenantExecutionContext((int) $context['tenant_id'], function () use ($matchingJob): VehicleServiceJob {
+            $matchingJob->forceFill(['status' => VehicleServiceJobStatus::Completed])->save();
+
+            return $matchingJob->refresh();
+        });
+        $this->linkInvoiceAndPayment($context, $matchingJob, InvoiceStatus::Paid);
 
         $other = $this->alternateResources($context, 'ALT');
         $otherJob = $this->createJob($other, date: '2026-05-20', status: VehicleServiceJobStatus::Draft);
         $otherLine = $this->line($otherJob, $other['labour'], '1.000000', '80.000000', 'Oil service');
         $this->assignment($otherJob, $otherLine, $other['employee_id'], 'helper', '1.000000', '20.000000', VehicleServiceCommissionType::None, '0.000000');
-        $this->linkInvoiceAndPayment($other, $otherJob, InvoiceStatus::Draft, PaymentStatus::Draft);
+        $this->linkInvoiceAndPayment(
+            $other,
+            $otherJob,
+            InvoiceStatus::Draft,
+            PaymentDocumentStatus::Draft,
+            PaymentPostingStatus::NotPosted,
+            PaymentAllocationState::Unallocated,
+        );
 
         $filters = [
             ['employee_id' => $context['employee_id']],
@@ -114,13 +131,13 @@ final class TechnicianWorkReportTest extends TestCase
             ['role_type' => 'technician'],
             ['commission_type' => 'percentage'],
             ['invoice_status' => 'paid'],
-            ['payment_status' => 'allocated'],
+            ['payment_allocation_status' => 'fully_allocated'],
             ['date_from' => '2026-06-01', 'date_to' => '2026-06-30'],
             ['search' => 'Precision'],
         ];
 
         foreach ($filters as $filter) {
-            $this->getJson('/api/v1/reports/vehicle-service/technician-work?'.http_build_query([
+            $this->reportGetJson($context, '/api/v1/reports/vehicle-service/technician-work?'.http_build_query([
                 ...$this->scope($context),
                 ...$filter,
             ]))
@@ -141,7 +158,7 @@ final class TechnicianWorkReportTest extends TestCase
         $this->assignmentForContext($otherOrg, 'Other org work');
         $this->authorize($context);
 
-        $this->getJson('/api/v1/reports/vehicle-service/technician-work?'.http_build_query($this->scope($context)))
+        $this->reportGetJson($context, '/api/v1/reports/vehicle-service/technician-work?'.http_build_query($this->scope($context)))
             ->assertOk()
             ->assertJsonPath('meta.total', 1)
             ->assertJsonPath('data.0.line_description', 'Tenant A work');
@@ -161,9 +178,9 @@ final class TechnicianWorkReportTest extends TestCase
         $line = $this->line($job, $context['labour'], '2.000000', '100.000000', 'Commission labour');
         $top = $this->assignment($job, $line, $context['employee_id'], 'technician', '2.000000', '50.000000', VehicleServiceCommissionType::Fixed, '30.000000');
         $helper = $this->assignment($job, $line, $other['employee_id'], 'helper', '1.000000', '40.000000', VehicleServiceCommissionType::Fixed, '10.000000');
-        $this->linkInvoiceAndPayment($context, $job, InvoiceStatus::Posted, PaymentStatus::Allocated);
+        $this->linkInvoiceAndPayment($context, $job, InvoiceStatus::Posted);
 
-        $response = $this->getJson('/api/v1/reports/vehicle-service/employee-commissions?'.http_build_query([
+        $response = $this->reportGetJson($context, '/api/v1/reports/vehicle-service/employee-commissions?'.http_build_query([
             ...$this->scope($context),
             'group_by' => 'employee',
         ]))
@@ -192,7 +209,7 @@ final class TechnicianWorkReportTest extends TestCase
             'commission_amount' => '25.000000',
         ]);
 
-        $this->getJson('/api/v1/reports/vehicle-service/employee-commissions?'.http_build_query([
+        $this->reportGetJson($context, '/api/v1/reports/vehicle-service/employee-commissions?'.http_build_query([
             ...$this->scope($context),
             'commission_source' => 'technician',
             'sort' => 'labour_amount',
@@ -202,7 +219,7 @@ final class TechnicianWorkReportTest extends TestCase
             ->assertJsonPath('meta.total', 2)
             ->assertJsonPath('data.0.id', 'technician-'.$helper->getKey());
 
-        $this->getJson('/api/v1/reports/vehicle-service/employee-commissions?'.http_build_query([
+        $this->reportGetJson($context, '/api/v1/reports/vehicle-service/employee-commissions?'.http_build_query([
             ...$this->scope($context),
             'commission_source' => 'supervisor',
         ]))
@@ -221,9 +238,11 @@ final class TechnicianWorkReportTest extends TestCase
         $this->assignmentForContext($otherOrg, 'Other organization commission');
         $this->linkInvoiceAndPayment(
             $context,
-            VehicleServiceJob::query()->findOrFail($matching->vehicle_service_job_id),
+            $this->withTenantExecutionContext(
+                (int) $context['tenant_id'],
+                fn (): VehicleServiceJob => VehicleServiceJob::query()->findOrFail($matching->vehicle_service_job_id),
+            ),
             InvoiceStatus::Posted,
-            PaymentStatus::Allocated,
         );
 
         foreach ([
@@ -235,12 +254,12 @@ final class TechnicianWorkReportTest extends TestCase
             ['vehicle_id' => $context['vehicle_id']],
             ['job_status' => 'draft'],
             ['invoice_status' => 'posted'],
-            ['payment_status' => 'allocated'],
+            ['payment_allocation_status' => 'fully_allocated'],
             ['commission_type' => 'fixed'],
             ['date_from' => '2026-06-01', 'date_to' => '2026-06-30'],
             ['search' => 'Matching commission'],
         ] as $filter) {
-            $this->getJson('/api/v1/reports/vehicle-service/employee-commissions?'.http_build_query([
+            $this->reportGetJson($context, '/api/v1/reports/vehicle-service/employee-commissions?'.http_build_query([
                 ...$this->scope($context),
                 ...$filter,
             ]))
@@ -249,7 +268,7 @@ final class TechnicianWorkReportTest extends TestCase
                 ->assertJsonPath('data.0.id', 'technician-'.$matching->getKey());
         }
 
-        $this->get('/api/v1/reports/vehicle-service/employee-commissions/export/csv?'.http_build_query($this->scope($context)))
+        $this->reportGet($context, '/api/v1/reports/vehicle-service/employee-commissions/export/csv?'.http_build_query($this->scope($context)))
             ->assertOk()
             ->assertHeader('content-type', 'text/csv; charset=UTF-8')
             ->assertSee('Employee code')
@@ -276,14 +295,16 @@ final class TechnicianWorkReportTest extends TestCase
             VehicleServiceCommissionType::Fixed,
             '20.000000',
         );
-        $job->forceFill(['status' => VehicleServiceJobStatus::Cancelled])->save();
+        $this->withTenantExecutionContext((int) $context['tenant_id'], function () use ($job): void {
+            $job->forceFill(['status' => VehicleServiceJobStatus::Cancelled])->save();
+        });
 
-        $this->getJson('/api/v1/reports/vehicle-service/employee-commissions?'.http_build_query($this->scope($context)))
+        $this->reportGetJson($context, '/api/v1/reports/vehicle-service/employee-commissions?'.http_build_query($this->scope($context)))
             ->assertOk()
             ->assertJsonPath('meta.total', 0)
             ->assertJsonPath('summary.total_commission', '0.000000');
 
-        $this->getJson('/api/v1/reports/vehicle-service/employee-commissions?'.http_build_query([
+        $this->reportGetJson($context, '/api/v1/reports/vehicle-service/employee-commissions?'.http_build_query([
             ...$this->scope($context),
             'include_cancelled' => true,
         ]))
@@ -313,7 +334,7 @@ final class TechnicianWorkReportTest extends TestCase
             '/api/v1/reports/vehicle-service/technician-work/export/pdf' => 'vehicle-service-technician-work.pdf',
             '/api/v1/reports/vehicle-service/employee-commissions/export/pdf' => 'vehicle-service-employee-commissions.pdf',
         ] as $path => $filename) {
-            $this->get($path.'?'.http_build_query($this->scope($context)))->assertOk();
+            $this->reportGet($context, $path.'?'.http_build_query($this->scope($context)))->assertOk();
 
             Pdf::assertRespondedWithPdf(
                 fn (PdfBuilder $pdf): bool => $pdf->viewName === (
@@ -403,6 +424,32 @@ final class TechnicianWorkReportTest extends TestCase
     /**
      * @param  array<string, mixed>  $context
      */
+    private function reportGetJson(array $context, string $uri): TestResponse
+    {
+        return $this->withTenantRequestContext(
+            (int) $context['tenant_id'],
+            (int) $context['user_id'],
+            fn (): TestResponse => $this->getJson($uri),
+            (int) $context['organization_unit_id'],
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $context
+     */
+    private function reportGet(array $context, string $uri): TestResponse
+    {
+        return $this->withTenantRequestContext(
+            (int) $context['tenant_id'],
+            (int) $context['user_id'],
+            fn (): TestResponse => $this->get($uri),
+            (int) $context['organization_unit_id'],
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $context
+     */
     private function assignmentForContext(array $context, string $description): VehicleServiceLineEmployee
     {
         $job = $this->createJob($context);
@@ -421,34 +468,36 @@ final class TechnicianWorkReportTest extends TestCase
         VehicleServiceCommissionType $supervisorCommissionType = VehicleServiceCommissionType::None,
         string $supervisorCommissionValue = '0.000000',
     ): VehicleServiceJob {
-        $job = app(VehicleServiceJobService::class)->create(new VehicleServiceJobData(
-            tenantId: $context['tenant_id'],
-            jobDate: $date,
-            customerId: $context['customer_id'],
-            vehicleId: $context['vehicle_id'],
-            organizationUnitId: $context['organization_unit_id'],
-            supervisorEmployeeId: $context['supervisor_id'],
-            supervisorCommissionType: $supervisorCommissionType,
-            supervisorCommissionValue: $supervisorCommissionValue,
-        ));
+        return $this->withTenantExecutionContext((int) $context['tenant_id'], function () use ($context, $date, $status, $supervisorCommissionType, $supervisorCommissionValue): VehicleServiceJob {
+            $job = app(VehicleServiceJobService::class)->create(new VehicleServiceJobData(
+                tenantId: $context['tenant_id'],
+                jobDate: $date,
+                customerId: $context['customer_id'],
+                vehicleId: $context['vehicle_id'],
+                organizationUnitId: $context['organization_unit_id'],
+                supervisorEmployeeId: $context['supervisor_id'],
+                supervisorCommissionType: $supervisorCommissionType,
+                supervisorCommissionValue: $supervisorCommissionValue,
+            ));
 
-        if ($status !== VehicleServiceJobStatus::Draft) {
-            $job->forceFill(['status' => $status])->save();
-        }
+            if ($status !== VehicleServiceJobStatus::Draft) {
+                $job->forceFill(['status' => $status])->save();
+            }
 
-        return $job->refresh();
+            return $job->refresh();
+        });
     }
 
     private function line(VehicleServiceJob $job, Item $item, string $quantity, string $unitPrice, string $description)
     {
-        return app(VehicleServiceLineService::class)->create($job, new VehicleServiceLineData(
+        return $this->withTenantExecutionContext((int) $job->tenant_id, fn () => app(VehicleServiceLineService::class)->create($job, new VehicleServiceLineData(
             lineSourceType: VehicleServiceLineSourceType::LabourItem,
             description: $description,
             quantity: $quantity,
             unitPrice: $unitPrice,
             itemId: (int) $item->getKey(),
             uomId: (int) $item->base_uom_id,
-        ));
+        )));
     }
 
     private function assignment(
@@ -461,20 +510,27 @@ final class TechnicianWorkReportTest extends TestCase
         VehicleServiceCommissionType $commissionType,
         string $commissionValue,
     ): VehicleServiceLineEmployee {
-        return app(VehicleServiceEmployeeAssignmentService::class)->create($job, $line, new VehicleServiceEmployeeAssignmentData(
+        return $this->withTenantExecutionContext((int) $job->tenant_id, fn (): VehicleServiceLineEmployee => app(VehicleServiceEmployeeAssignmentService::class)->create($job, $line, new VehicleServiceEmployeeAssignmentData(
             employeeId: $employeeId,
             roleType: $roleType,
             assignedHours: $assignedHours,
             rate: $rate,
             commissionType: $commissionType,
             commissionValue: $commissionValue,
-        ));
+        )));
     }
 
     /**
      * @param  array<string, mixed>  $context
      */
-    private function linkInvoiceAndPayment(array $context, VehicleServiceJob $job, InvoiceStatus $invoiceStatus, PaymentStatus $paymentStatus): void
+    private function linkInvoiceAndPayment(
+        array $context,
+        VehicleServiceJob $job,
+        InvoiceStatus $invoiceStatus,
+        PaymentDocumentStatus $paymentDocumentStatus = PaymentDocumentStatus::Approved,
+        PaymentPostingStatus $paymentPostingStatus = PaymentPostingStatus::Posted,
+        PaymentAllocationState $paymentAllocationStatus = PaymentAllocationState::FullyAllocated,
+    ): void
     {
         $now = now();
         $invoiceId = (int) DB::table('invoices')->insertGetId([
@@ -515,10 +571,12 @@ final class TechnicianWorkReportTest extends TestCase
             'party_type' => 'customer',
             'party_id' => $context['customer_id'],
             'payment_date' => '2026-06-07',
-            'status' => $paymentStatus->value,
+            'document_status' => $paymentDocumentStatus->value,
+            'posting_status' => $paymentPostingStatus->value,
+            'allocation_status' => $paymentAllocationStatus->value,
             'total_amount' => '100.000000',
-            'allocated_amount' => '100.000000',
-            'unapplied_amount' => '0.000000',
+            'allocated_amount' => $paymentAllocationStatus === PaymentAllocationState::Unallocated ? '0.000000' : '100.000000',
+            'unapplied_amount' => $paymentAllocationStatus === PaymentAllocationState::Unallocated ? '100.000000' : '0.000000',
             'created_at' => $now,
             'updated_at' => $now,
         ]);
@@ -538,17 +596,20 @@ final class TechnicianWorkReportTest extends TestCase
 
     private function item(int $tenantId, int $organizationUnitId, string $code, int $uomId): Item
     {
-        return app(ItemCreationService::class)->create(new CreateItemData(
-            tenantId: $tenantId,
-            code: $code,
-            name: str_replace('-', ' ', $code),
-            itemType: ItemType::Labour,
-            organizationUnitId: $organizationUnitId,
-            trackingType: TrackingType::None,
-            costingMethod: CostingMethod::None,
-            baseUomId: $uomId,
-            isStockable: false,
-        ));
+        return $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): Item => app(ItemCreationService::class)->create(new CreateItemData(
+                tenantId: $tenantId,
+                code: $code,
+                name: str_replace('-', ' ', $code),
+                itemType: ItemType::Labour,
+                organizationUnitId: $organizationUnitId,
+                trackingType: TrackingType::None,
+                costingMethod: CostingMethod::None,
+                baseUomId: $uomId,
+                isStockable: false,
+            )),
+        );
     }
 
     private function tenant(string $suffix): int
@@ -559,6 +620,7 @@ final class TechnicianWorkReportTest extends TestCase
             'name' => 'Report Tenant '.$suffix,
             'slug' => 'report-tenant-'.Str::lower($suffix),
             'status' => 'active',
+            'status_changed_at' => now(),
             'created_at' => now(),
             'updated_at' => now()]);
     }
@@ -679,11 +741,11 @@ final class TechnicianWorkReportTest extends TestCase
     }
 
     /** @param array<string, mixed> $context */
-    private function authorize(array $context): void
+    private function authorize(array &$context): void
     {
         $tenantId = (int) $context['tenant_id'];
         $organizationUnitId = (int) $context['organization_unit_id'];
-        $guard = (string) config('auth.defaults.guard', 'web');
+        $guard = UserGuard::TENANT_API;
         $now = now();
         $userId = (int) \Tests\Support\TenantUserFixture::create([
             'tenant_id' => $tenantId,
@@ -697,19 +759,33 @@ final class TechnicianWorkReportTest extends TestCase
         ]);
         $roleId = (int) DB::table('roles')->insertGetId([
             'tenant_id' => $tenantId,
-            'name' => \Modules\User\Constants\UserSystemRole::SUPER_ADMIN,
+            'name' => UserSystemRole::SUPER_ADMIN_NAME,
+            'active_name_key' => mb_strtolower(UserSystemRole::SUPER_ADMIN_NAME),
             'guard_name' => $guard,
+            'system_key' => UserSystemRole::SUPER_ADMIN,
+            'is_system' => true,
             'created_at' => $now,
             'updated_at' => $now,
         ]);
 
+        $permissionIds = [];
         foreach (ReportingAuthorizationService::descriptions() as $name => $description) {
-            DB::table('permissions')->insert([
+            $permissionIds[] = (int) DB::table('permissions')->insertGetId([
                 'tenant_id' => $tenantId,
                 'name' => $name,
                 'guard_name' => $guard,
                 'module' => 'Reporting',
                 'description' => $description,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+        }
+
+        foreach ($permissionIds as $permissionId) {
+            DB::table('role_permissions')->insert([
+                'tenant_id' => $tenantId,
+                'role_id' => $roleId,
+                'permission_id' => $permissionId,
                 'created_at' => $now,
                 'updated_at' => $now,
             ]);
@@ -723,6 +799,10 @@ final class TechnicianWorkReportTest extends TestCase
             'updated_at' => $now,
         ]);
 
-        $this->actingAs(UserModel::query()->where('tenant_id', $tenantId)->findOrFail($userId));
+        $this->actingAs($this->withTenantExecutionContext(
+            $tenantId,
+            fn (): UserModel => UserModel::query()->findOrFail($userId),
+        ));
+        $context['user_id'] = $userId;
     }
 }

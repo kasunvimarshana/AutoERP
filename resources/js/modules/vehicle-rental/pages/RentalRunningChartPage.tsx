@@ -144,7 +144,10 @@ export default function RentalRunningChartPage() {
         allocationId !== null,
     );
 
-    const allocationRows = allocations.data?.data ?? [];
+    const allocationRows = useMemo(
+        () => allocations.data?.data ?? [],
+        [allocations.data],
+    );
     const selectedAllocation = useMemo(
         () => allocationRows.find((row) => row.id === allocationId) ?? null,
         [allocationId, allocationRows],

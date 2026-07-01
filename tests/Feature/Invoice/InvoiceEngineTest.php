@@ -22,6 +22,8 @@ use Modules\Invoice\Enums\InvoiceType;
 use Modules\Invoice\Services\InvoiceBalanceService;
 use Modules\Invoice\Services\InvoiceCreationService;
 use Modules\Invoice\Services\InvoiceStatusService;
+use Modules\Supplier\Enums\SupplierStatus;
+use Modules\Supplier\Enums\SupplierType;
 use Tests\TestCase;
 
 final class InvoiceEngineTest extends TestCase
@@ -31,14 +33,16 @@ final class InvoiceEngineTest extends TestCase
     public function test_it_creates_progressive_invoices_and_allocates_header_adjustments(): void
     {
         $tenantId = $this->createTenant();
+        $supplierId = $this->createSupplier($tenantId);
         $creator = app(InvoiceCreationService::class);
 
-        $invoiceOne = $creator->create($this->progressiveInvoiceData(
+        $invoiceOne = $this->withTenantExecutionContext($tenantId, fn () => $creator->create($this->progressiveInvoiceData(
             tenantId: $tenantId,
+            supplierId: $supplierId,
             invoiceNumber: 'INV-001',
             invoiceQuantity: '40.000000',
             expectedLineTotal: '40000.000000',
-        ));
+        )));
 
         $this->assertSame('40000.000000', (string) $invoiceOne->subtotal);
         $this->assertSame('2000.000000', (string) $invoiceOne->discount_total);
@@ -62,12 +66,13 @@ final class InvoiceEngineTest extends TestCase
             'remaining_amount' => '3000.000000',
         ]);
 
-        $invoiceTwo = $creator->create($this->progressiveInvoiceData(
+        $invoiceTwo = $this->withTenantExecutionContext($tenantId, fn () => $creator->create($this->progressiveInvoiceData(
             tenantId: $tenantId,
+            supplierId: $supplierId,
             invoiceNumber: 'INV-002',
             invoiceQuantity: '60.000000',
             expectedLineTotal: '60000.000000',
-        ));
+        )));
 
         $this->assertSame('60000.000000', (string) $invoiceTwo->subtotal);
         $this->assertSame('3000.000000', (string) $invoiceTwo->discount_total);
@@ -87,16 +92,18 @@ final class InvoiceEngineTest extends TestCase
     public function test_it_prevents_over_invoicing_source_lines(): void
     {
         $tenantId = $this->createTenant();
+        $supplierId = $this->createSupplier($tenantId);
 
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Invoice quantity cannot exceed source remaining quantity.');
 
-        app(InvoiceCreationService::class)->create($this->progressiveInvoiceData(
+        $this->withTenantExecutionContext($tenantId, fn () => app(InvoiceCreationService::class)->create($this->progressiveInvoiceData(
             tenantId: $tenantId,
+            supplierId: $supplierId,
             invoiceNumber: 'INV-OVER',
             invoiceQuantity: '101.000000',
             expectedLineTotal: '101000.000000',
-        ));
+        )));
     }
 
     public function test_it_blocks_invalid_status_transitions(): void
@@ -112,7 +119,7 @@ final class InvoiceEngineTest extends TestCase
     public function test_it_updates_balance_after_payment_without_payment_ownership(): void
     {
         $tenantId = $this->createTenant();
-        $invoice = app(InvoiceCreationService::class)->create(new CreateInvoiceData(
+        $invoice = $this->withTenantExecutionContext($tenantId, fn () => app(InvoiceCreationService::class)->create(new CreateInvoiceData(
             tenantId: $tenantId,
             invoiceType: InvoiceType::Manual,
             direction: InvoiceDirection::Outbound,
@@ -126,22 +133,33 @@ final class InvoiceEngineTest extends TestCase
                     unitPrice: '1000.000000',
                 ),
             ],
-        ));
+        )));
 
         $statusService = app(InvoiceStatusService::class);
-        $invoice = $statusService->transition($invoice, InvoiceStatus::Approved);
-        $invoice = $statusService->transition($invoice, InvoiceStatus::Posted);
-
         $balanceService = app(InvoiceBalanceService::class);
-        $balance = $balanceService->applyPayment($invoice, '400.000000');
+        $balance = $this->withTenantExecutionContext($tenantId, function () use ($statusService, $balanceService, $invoice) {
+            $invoice = $statusService->transition($invoice, InvoiceStatus::Approved);
+            $invoice = $statusService->transition($invoice, InvoiceStatus::Posted);
+
+            return $balanceService->applyPayment($invoice, '400.000000');
+        });
 
         $this->assertSame('600.000000', (string) $balance->remaining_amount);
-        $this->assertSame(InvoiceStatus::PartiallyPaid, $invoice->refresh()->status);
+        $this->assertSame(
+            InvoiceStatus::PartiallyPaid,
+            $this->withTenantExecutionContext($tenantId, fn () => $invoice->refresh()->status),
+        );
 
-        $balance = $balanceService->applyPayment($invoice->refresh(), '600.000000');
+        $balance = $this->withTenantExecutionContext(
+            $tenantId,
+            fn () => $balanceService->applyPayment($invoice->refresh(), '600.000000'),
+        );
 
         $this->assertSame('0.000000', (string) $balance->remaining_amount);
-        $this->assertSame(InvoiceStatus::Paid, $invoice->refresh()->status);
+        $this->assertSame(
+            InvoiceStatus::Paid,
+            $this->withTenantExecutionContext($tenantId, fn () => $invoice->refresh()->status),
+        );
     }
 
     public function test_it_prevents_cross_tenant_sources(): void
@@ -152,7 +170,7 @@ final class InvoiceEngineTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Invoice source tenant must match invoice tenant.');
 
-        app(InvoiceCreationService::class)->create(new CreateInvoiceData(
+        $this->withTenantExecutionContext($tenantId, fn () => app(InvoiceCreationService::class)->create(new CreateInvoiceData(
             tenantId: $tenantId,
             invoiceType: InvoiceType::Purchase,
             direction: InvoiceDirection::Inbound,
@@ -165,7 +183,7 @@ final class InvoiceEngineTest extends TestCase
                     sourceId: 1001,
                 ),
             ],
-        ));
+        )));
     }
 
     public function test_it_rejects_inconsistent_caller_supplied_line_totals(): void
@@ -175,8 +193,9 @@ final class InvoiceEngineTest extends TestCase
             'Invoice line total must match its quantity, price, discount, tax, and charge.',
         );
 
-        app(InvoiceCreationService::class)->create(new CreateInvoiceData(
-            tenantId: $this->createTenant(),
+        $tenantId = $this->createTenant();
+        $this->withTenantExecutionContext($tenantId, fn () => app(InvoiceCreationService::class)->create(new CreateInvoiceData(
+            tenantId: $tenantId,
             invoiceType: InvoiceType::Manual,
             direction: InvoiceDirection::Outbound,
             invoiceDate: '2026-06-06',
@@ -190,7 +209,7 @@ final class InvoiceEngineTest extends TestCase
                     lineTotal: '99.000000',
                 ),
             ],
-        ));
+        )));
     }
 
     public function test_it_requires_source_lines_to_reference_declared_sources(): void
@@ -202,7 +221,7 @@ final class InvoiceEngineTest extends TestCase
             'Invoice source line must reference an invoice source.',
         );
 
-        app(InvoiceCreationService::class)->create(new CreateInvoiceData(
+        $this->withTenantExecutionContext($tenantId, fn () => app(InvoiceCreationService::class)->create(new CreateInvoiceData(
             tenantId: $tenantId,
             invoiceType: InvoiceType::Purchase,
             direction: InvoiceDirection::Inbound,
@@ -221,28 +240,34 @@ final class InvoiceEngineTest extends TestCase
                     sourceLineTotal: '10.000000',
                 ),
             ],
-        ));
+        )));
     }
 
     public function test_cancelled_invoice_restores_source_quantity_and_adjustment_capacity(): void
     {
         $tenantId = $this->createTenant();
+        $supplierId = $this->createSupplier($tenantId);
         $creator = app(InvoiceCreationService::class);
-        $first = $creator->create($this->progressiveInvoiceData(
+        $first = $this->withTenantExecutionContext($tenantId, fn () => $creator->create($this->progressiveInvoiceData(
             tenantId: $tenantId,
+            supplierId: $supplierId,
             invoiceNumber: 'INV-CANCELLED-SOURCE',
             invoiceQuantity: '40.000000',
             expectedLineTotal: '40000.000000',
-        ));
+        )));
 
-        app(InvoiceStatusService::class)->transition($first, InvoiceStatus::Cancelled);
+        $this->withTenantExecutionContext(
+            $tenantId,
+            fn () => app(InvoiceStatusService::class)->transition($first, InvoiceStatus::Cancelled),
+        );
 
-        $replacement = $creator->create($this->progressiveInvoiceData(
+        $replacement = $this->withTenantExecutionContext($tenantId, fn () => $creator->create($this->progressiveInvoiceData(
             tenantId: $tenantId,
+            supplierId: $supplierId,
             invoiceNumber: 'INV-REPLACEMENT-SOURCE',
             invoiceQuantity: '100.000000',
             expectedLineTotal: '100000.000000',
-        ));
+        )));
 
         $this->assertDatabaseHas('invoice_source_lines', [
             'invoice_id' => $replacement->getKey(),
@@ -270,7 +295,7 @@ final class InvoiceEngineTest extends TestCase
             'Invoice source organization unit must match invoice organization unit.',
         );
 
-        app(InvoiceCreationService::class)->create(new CreateInvoiceData(
+        $this->withTenantExecutionContext($tenantId, fn () => app(InvoiceCreationService::class)->create(new CreateInvoiceData(
             tenantId: $tenantId,
             invoiceType: InvoiceType::Manual,
             direction: InvoiceDirection::Outbound,
@@ -285,11 +310,12 @@ final class InvoiceEngineTest extends TestCase
                     organizationUnitId: $otherOrganizationUnitId,
                 ),
             ],
-        ));
+        )));
     }
 
     private function progressiveInvoiceData(
         int $tenantId,
+        int $supplierId,
         string $invoiceNumber,
         string $invoiceQuantity,
         string $expectedLineTotal,
@@ -301,7 +327,7 @@ final class InvoiceEngineTest extends TestCase
             invoiceDate: '2026-06-06',
             invoiceNumber: $invoiceNumber,
             partyType: 'supplier',
-            partyId: 501,
+            partyId: $supplierId,
             lines: [
                 new InvoiceLineData(
                     lineNumber: 1,
@@ -390,8 +416,28 @@ final class InvoiceEngineTest extends TestCase
             'name' => 'Tenant '.$suffix,
             'slug' => 'tenant-'.Str::lower($suffix),
             'status' => 'active',
+            'status_changed_at' => now(),
             'created_at' => now(),
             'updated_at' => now()]);
+    }
+
+    private function createSupplier(int $tenantId): int
+    {
+        $suffix = Str::upper(Str::random(8));
+
+        return (int) DB::table('suppliers')->insertGetId([
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => null,
+            'supplier_number' => 'SUP-'.$suffix,
+            'code' => 'SUP-'.$suffix,
+            'name' => 'Supplier '.$suffix,
+            'legal_name' => 'Supplier '.$suffix,
+            'display_name' => 'Supplier '.$suffix,
+            'supplier_type' => SupplierType::Company->value,
+            'status' => SupplierStatus::Active->value,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
     }
 
     private function createOrganizationUnit(int $tenantId, string $name): int

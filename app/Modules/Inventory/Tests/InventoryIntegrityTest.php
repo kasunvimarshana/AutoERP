@@ -50,48 +50,50 @@ final class InventoryIntegrityTest extends TestCase
     {
         [$tenantId, $warehouseId, $item, $baseUomId, $boxUomId] = $this->uomStockContext();
 
-        $movement = app(StockMovementService::class)->record(new StockMovementData(
-            tenantId: $tenantId,
-            movementDate: '2026-06-14',
-            movementType: InventoryMovementType::Receipt,
-            direction: InventoryDirection::In,
-            itemId: (int) $item->getKey(),
-            warehouseId: $warehouseId,
-            quantity: '2.000000',
-            unitCost: '60.000000',
-            uomId: $boxUomId,
-        ));
+        $this->withTenantExecutionContext($tenantId, function () use ($tenantId, $warehouseId, $item, $baseUomId, $boxUomId): void {
+            $movement = app(StockMovementService::class)->record(new StockMovementData(
+                tenantId: $tenantId,
+                movementDate: '2026-06-14',
+                movementType: InventoryMovementType::Receipt,
+                direction: InventoryDirection::In,
+                itemId: (int) $item->getKey(),
+                warehouseId: $warehouseId,
+                quantity: '2.000000',
+                unitCost: '60.000000',
+                uomId: $boxUomId,
+            ));
 
-        $this->assertSame($baseUomId, $movement->base_uom_id);
-        $this->assertSame($boxUomId, $movement->entered_uom_id);
-        $this->assertSame('2.000000', (string) $movement->entered_quantity);
-        $this->assertSame('60.000000', (string) $movement->entered_unit_cost);
-        $this->assertSame('12.000000', (string) $movement->conversion_factor);
-        $this->assertSame('24.000000', (string) $movement->quantity);
-        $this->assertSame('5.000000', (string) $movement->unit_cost);
+            $this->assertSame($baseUomId, $movement->base_uom_id);
+            $this->assertSame($boxUomId, $movement->entered_uom_id);
+            $this->assertSame('2.000000', (string) $movement->entered_quantity);
+            $this->assertSame('60.000000', (string) $movement->entered_unit_cost);
+            $this->assertSame('12.000000', (string) $movement->conversion_factor);
+            $this->assertSame('24.000000', (string) $movement->quantity);
+            $this->assertSame('5.000000', (string) $movement->unit_cost);
 
-        $reservation = app(StockReservationService::class)->reserve(new ReservationData(
-            tenantId: $tenantId,
-            reservationDate: '2026-06-14',
-            itemId: (int) $item->getKey(),
-            warehouseId: $warehouseId,
-            quantityReserved: '1.000000',
-            uomId: $boxUomId,
-        ));
-        $allocation = app(StockAllocationService::class)->allocate(new AllocationData(
-            tenantId: $tenantId,
-            allocationDate: '2026-06-14',
-            itemId: (int) $item->getKey(),
-            warehouseId: $warehouseId,
-            quantityAllocated: '0.500000',
-            reservationId: (int) $reservation->getKey(),
-            uomId: $boxUomId,
-        ));
+            $reservation = app(StockReservationService::class)->reserve(new ReservationData(
+                tenantId: $tenantId,
+                reservationDate: '2026-06-14',
+                itemId: (int) $item->getKey(),
+                warehouseId: $warehouseId,
+                quantityReserved: '1.000000',
+                uomId: $boxUomId,
+            ));
+            $allocation = app(StockAllocationService::class)->allocate(new AllocationData(
+                tenantId: $tenantId,
+                allocationDate: '2026-06-14',
+                itemId: (int) $item->getKey(),
+                warehouseId: $warehouseId,
+                quantityAllocated: '0.500000',
+                reservationId: (int) $reservation->getKey(),
+                uomId: $boxUomId,
+            ));
 
-        $this->assertSame('1.000000', (string) $reservation->entered_quantity);
-        $this->assertSame('12.000000', (string) $reservation->quantity_reserved);
-        $this->assertSame('0.500000', (string) $allocation->entered_quantity);
-        $this->assertSame('6.000000', (string) $allocation->quantity_allocated);
+            $this->assertSame('1.000000', (string) $reservation->entered_quantity);
+            $this->assertSame('12.000000', (string) $reservation->quantity_reserved);
+            $this->assertSame('0.500000', (string) $allocation->entered_quantity);
+            $this->assertSame('6.000000', (string) $allocation->quantity_allocated);
+        });
 
         $this->assertDatabaseHas('inventory_stock_balances', [
             'tenant_id' => $tenantId,
@@ -112,15 +114,17 @@ final class InventoryIntegrityTest extends TestCase
         $data = new StockBalanceData($tenantId, (int) $item->getKey(), $warehouseId);
         $balances = app(StockBalanceService::class);
 
-        $first = $balances->getOrCreate($data);
-        $second = $balances->getOrCreate($data);
+        [$first, $second] = $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): array => [$balances->getOrCreate($data), $balances->getOrCreate($data)],
+        );
 
         $this->assertSame($first->getKey(), $second->getKey());
-        $this->assertSame(1, InventoryStockBalance::query()->count());
+        $this->assertSame(1, $this->withTenantExecutionContext($tenantId, fn (): int => InventoryStockBalance::query()->count()));
         $this->assertSame(64, strlen((string) $first->dimension_key));
 
         $this->expectException(QueryException::class);
-        $first->replicate()->save();
+        $this->withTenantExecutionContext($tenantId, fn () => $first->replicate()->save());
     }
 
     public function test_inventory_numbers_are_tenant_scoped_and_monotonic(): void
@@ -142,7 +146,7 @@ final class InventoryIntegrityTest extends TestCase
         $this->receipt($tenantId, $warehouseId, $item, '10.000000');
 
         $counts = app(InventoryStockCountService::class);
-        $count = $counts->create(new StockCountData(
+        $count = $this->withTenantExecutionContext($tenantId, fn () => $counts->create(new StockCountData(
             tenantId: $tenantId,
             countDate: '2026-06-14',
             warehouseId: $warehouseId,
@@ -152,11 +156,11 @@ final class InventoryIntegrityTest extends TestCase
                     countedQuantity: '9.000000',
                 ),
             ],
-        ));
+        )));
         $this->receipt($tenantId, $warehouseId, $item, '1.000000');
 
         try {
-            $counts->post($count);
+            $this->withTenantExecutionContext($tenantId, fn () => $counts->post($count));
             $this->fail('Posting a stale inventory stock count should fail.');
         } catch (InvalidArgumentException $exception) {
             $this->assertSame(
@@ -189,10 +193,10 @@ final class InventoryIntegrityTest extends TestCase
             sourceLineId: 200,
         );
 
-        $allocations->allocate($data);
+        $this->withTenantExecutionContext($tenantId, fn () => $allocations->allocate($data));
 
         try {
-            $allocations->allocate($data);
+            $this->withTenantExecutionContext($tenantId, fn () => $allocations->allocate($data));
             $this->fail('A duplicate active source allocation should fail.');
         } catch (InvalidArgumentException $exception) {
             $this->assertSame(
@@ -215,7 +219,7 @@ final class InventoryIntegrityTest extends TestCase
         $this->receipt($tenantId, $warehouseId, $item, '10.000000');
 
         $adjustments = app(StockAdjustmentService::class);
-        $adjustment = $adjustments->create(new StockAdjustmentData(
+        $adjustment = $this->withTenantExecutionContext($tenantId, fn () => $adjustments->create(new StockAdjustmentData(
             tenantId: $tenantId,
             adjustmentDate: '2026-06-14',
             adjustmentType: AdjustmentType::Recount,
@@ -228,11 +232,11 @@ final class InventoryIntegrityTest extends TestCase
                     adjustmentQuantity: '-1.000000',
                 ),
             ],
-        ));
+        )));
         $this->receipt($tenantId, $warehouseId, $item, '1.000000');
 
         $this->assertInvalidOperation(
-            fn () => $adjustments->post($adjustment),
+            fn () => $this->withTenantExecutionContext($tenantId, fn () => $adjustments->post($adjustment)),
             'Inventory stock changed after the adjustment was created. Create a new adjustment before posting.',
         );
         $this->assertDatabaseHas('inventory_adjustments', [
@@ -249,13 +253,13 @@ final class InventoryIntegrityTest extends TestCase
     {
         [$tenantId, $warehouseId, $item] = $this->stockContext();
         $this->receipt($tenantId, $warehouseId, $item, '10.000000');
-        $balance = InventoryStockBalance::query()->firstOrFail();
+        $balance = $this->withTenantExecutionContext($tenantId, fn () => InventoryStockBalance::query()->firstOrFail());
         $balance->quantity_available = '9.000000';
 
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Inventory available quantity is not reconciled to its stock states.');
 
-        app(StockBalanceService::class)->assertReconciled($balance);
+        $this->withTenantExecutionContext($tenantId, fn () => app(StockBalanceService::class)->assertReconciled($balance));
     }
 
     public function test_duplicate_workflow_dimension_lines_are_rejected(): void
@@ -265,7 +269,7 @@ final class InventoryIntegrityTest extends TestCase
         $itemId = (int) $item->getKey();
 
         $this->assertInvalidOperation(
-            fn () => app(InventoryStockCountService::class)->create(new StockCountData(
+            fn () => $this->withTenantExecutionContext($tenantId, fn () => app(InventoryStockCountService::class)->create(new StockCountData(
                 tenantId: $tenantId,
                 countDate: '2026-06-14',
                 warehouseId: $warehouseId,
@@ -273,11 +277,11 @@ final class InventoryIntegrityTest extends TestCase
                     new StockCountLineData($itemId, '1.000000'),
                     new StockCountLineData($itemId, '1.000000'),
                 ],
-            )),
+            ))),
             'Inventory stock count contains duplicate stock dimension lines.',
         );
         $this->assertInvalidOperation(
-            fn () => app(StockAdjustmentService::class)->create(new StockAdjustmentData(
+            fn () => $this->withTenantExecutionContext($tenantId, fn () => app(StockAdjustmentService::class)->create(new StockAdjustmentData(
                 tenantId: $tenantId,
                 adjustmentDate: '2026-06-14',
                 adjustmentType: AdjustmentType::Increase,
@@ -286,11 +290,11 @@ final class InventoryIntegrityTest extends TestCase
                     new StockAdjustmentLineData($itemId, '0.000000', '1.000000', '1.000000'),
                     new StockAdjustmentLineData($itemId, '0.000000', '1.000000', '1.000000'),
                 ],
-            )),
+            ))),
             'Inventory adjustment contains duplicate stock dimension lines.',
         );
         $this->assertInvalidOperation(
-            fn () => app(StockTransferService::class)->create(new StockTransferData(
+            fn () => $this->withTenantExecutionContext($tenantId, fn () => app(StockTransferService::class)->create(new StockTransferData(
                 tenantId: $tenantId,
                 transferDate: '2026-06-14',
                 fromWarehouseId: $warehouseId,
@@ -299,7 +303,7 @@ final class InventoryIntegrityTest extends TestCase
                     new StockTransferLineData($itemId, '1.000000'),
                     new StockTransferLineData($itemId, '1.000000'),
                 ],
-            )),
+            ))),
             'Inventory transfer contains duplicate stock dimension lines.',
         );
     }
@@ -353,7 +357,7 @@ final class InventoryIntegrityTest extends TestCase
         Item $item,
         string $quantity,
     ): InventoryMovement {
-        return app(StockMovementService::class)->record(new StockMovementData(
+        return $this->withTenantExecutionContext($tenantId, fn (): InventoryMovement => app(StockMovementService::class)->record(new StockMovementData(
             tenantId: $tenantId,
             movementDate: '2026-06-14',
             movementType: InventoryMovementType::Receipt,
@@ -362,7 +366,7 @@ final class InventoryIntegrityTest extends TestCase
             warehouseId: $warehouseId,
             quantity: $quantity,
             unitCost: '1.000000',
-        ));
+        )));
     }
 
     /**
@@ -375,7 +379,7 @@ final class InventoryIntegrityTest extends TestCase
     ): Item {
         $code = 'ITEM-'.Str::upper(Str::random(8));
 
-        return app(ItemCreationService::class)->create(new CreateItemData(
+        return $this->withTenantExecutionContext($tenantId, fn (): Item => app(ItemCreationService::class)->create(new CreateItemData(
             tenantId: $tenantId,
             code: $code,
             name: 'Inventory '.$code,
@@ -385,7 +389,7 @@ final class InventoryIntegrityTest extends TestCase
             baseUomId: $baseUomId,
             isStockable: true,
             units: $units,
-        ));
+        )));
     }
 
     private function createTenant(string $suffix = ''): int
@@ -398,6 +402,7 @@ final class InventoryIntegrityTest extends TestCase
             'name' => 'Inventory Tenant '.$suffix,
             'slug' => 'inventory-tenant-'.Str::lower($suffix),
             'status' => 'active',
+            'status_changed_at' => now(),
             'created_at' => now(),
             'updated_at' => now()]);
     }

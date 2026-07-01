@@ -9,8 +9,6 @@ use Modules\Finance\DTOs\FinancePostingLine;
 use Modules\Finance\DTOs\FinancePostingRequest;
 use Modules\Finance\DTOs\PostingResultData;
 use Modules\Finance\DTOs\PostingSourceData;
-use Modules\Finance\Models\FinanceAccount;
-use Modules\Finance\Models\FinancePostingProfile;
 use Modules\Inventory\Models\InventoryMovement;
 use Modules\Invoice\DTOs\InvoiceAdjustmentData;
 use Modules\Invoice\DTOs\InvoiceLineData;
@@ -284,17 +282,12 @@ trait CreatesFastSalesDocuments
             postingProfileCode: 'sales_invoice',
         ), $resolved['current_user_id']);
         if (! $this->math->isZero($withholding)) {
-            $receivableAccount = $this->postingProfileAccount(
-                (int) $invoice->tenant_id,
-                $invoice->organization_unit_id === null ? null : (int) $invoice->organization_unit_id,
-                'sales_invoice',
-                'receivable',
-            );
             $context = $this->taxDocuments->withholdingPostingContextForDocument(
                 $this->invoiceTaxDocuments->map($invoice),
                 (string) $resolved['transaction_date'],
-                (string) $receivableAccount->code,
-                (string) $receivableAccount->name,
+                'sales_invoice',
+                'receivable',
+                'Customer receivable',
             );
             if ($context->financeContext->lines !== []) {
                 $postings[] = $this->financePostings->post($context->financeContext, $resolved['current_user_id']);
@@ -361,26 +354,4 @@ trait CreatesFastSalesDocuments
         );
     }
 
-    private function postingProfileAccount(int $tenantId, ?int $organizationUnitId, string $profileCode, string $lineKey): FinanceAccount
-    {
-        $profile = FinancePostingProfile::query()
-            ->with('rules.account')
-            ->where('tenant_id', $tenantId)
-            ->where('code', $profileCode)
-            ->where('is_active', true)
-            ->when(
-                $organizationUnitId === null,
-                fn ($query) => $query->whereNull('organization_unit_id'),
-                fn ($query) => $query->where('organization_unit_id', $organizationUnitId),
-            )
-            ->first();
-        if (! $profile instanceof FinancePostingProfile) {
-            throw new InvalidArgumentException("Posting profile [{$profileCode}] is missing or inactive for this scope.");
-        }
-        $account = $profile->rules->firstWhere('line_key', $lineKey)?->account;
-        if (! $account instanceof FinanceAccount) {
-            throw new InvalidArgumentException("Posting profile [{$profileCode}] is missing account mapping [{$lineKey}].");
-        }
-        return $account;
-    }
 }

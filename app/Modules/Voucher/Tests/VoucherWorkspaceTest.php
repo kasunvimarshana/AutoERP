@@ -29,13 +29,13 @@ final class VoucherWorkspaceTest extends TestCase
         $tenantId = $this->tenantId();
         $payment = $this->payment($tenantId);
 
-        $payload = app(VoucherSourceResolver::class)->resolve(
+        $payload = $this->withTenantExecutionContext($tenantId, fn (): array => app(VoucherSourceResolver::class)->resolve(
             VoucherType::Receipt,
             (int) $payment->getKey(),
             $tenantId,
             null,
             'payment',
-        )->toArray();
+        )->toArray());
 
         self::assertSame('receipt_voucher', $payload['voucher_type']);
         self::assertSame('Voucher Customer', $payload['party_name']);
@@ -48,57 +48,59 @@ final class VoucherWorkspaceTest extends TestCase
 
     private function payment(int $tenantId): Payment
     {
-        $method = PaymentMethod::query()->create([
-            'tenant_id' => $tenantId,
-            'code' => 'CASH-'.Str::upper(Str::random(6)),
-            'name' => 'Cash',
-            'method_type' => 'cash',
-            'direction_allowed' => PaymentDirection::Inbound->value,
-            'requires_reference' => false,
-            'requires_instrument_details' => false,
-            'is_active' => true,
-        ]);
-        $payment = Payment::query()->create([
-            'tenant_id' => $tenantId,
-            'payment_number' => 'RV-2026-0001',
-            'payment_type' => PaymentType::CustomerReceipt->value,
-            'direction' => PaymentDirection::Inbound->value,
-            'party_type' => 'customer',
-            'party_id' => 10,
-            'party_number_snapshot' => 'CUS-0010',
-            'party_code_snapshot' => 'CUS-0010',
-            'party_name_snapshot' => 'Voucher Customer',
-            'document_status' => PaymentDocumentStatus::Approved->value,
-            'allocation_status' => PaymentAllocationState::Unallocated->value,
-            'posting_status' => PaymentPostingStatus::Posted->value,
-            'instrument_status' => PaymentInstrumentStatus::Cleared->value,
-            'payment_date' => '2026-06-29',
-            'currency_code_snapshot' => 'LKR',
-            'currency_name_snapshot' => 'Sri Lankan Rupee',
-            'currency_symbol_snapshot' => 'Rs',
-            'exchange_rate' => '1.000000',
-            'total_amount' => '1000.000000',
-            'allocated_amount' => '0.000000',
-            'unapplied_amount' => '1000.000000',
-            'refunded_amount' => '0.000000',
-            'finance_posting_reference' => 'JV-RV-2026-0001',
-        ]);
-        PaymentLine::query()->create([
-            'tenant_id' => $tenantId,
-            'payment_id' => $payment->getKey(),
-            'line_number' => 1,
-            'payment_method_id' => $method->getKey(),
-            'payment_method_code_snapshot' => (string) $method->code,
-            'payment_method_name_snapshot' => 'Cash',
-            'payment_method_type_snapshot' => 'cash',
-            'requires_reference_snapshot' => false,
-            'requires_instrument_details_snapshot' => false,
-            'amount' => '1000.000000',
-            'cleared_amount' => '1000.000000',
-            'status' => 'cleared',
-        ]);
+        return $this->withTenantExecutionContext($tenantId, function () use ($tenantId): Payment {
+            $method = PaymentMethod::query()->create([
+                'tenant_id' => $tenantId,
+                'code' => 'CASH-'.Str::upper(Str::random(6)),
+                'name' => 'Cash',
+                'method_type' => 'cash',
+                'direction_allowed' => PaymentDirection::Inbound->value,
+                'requires_reference' => false,
+                'requires_instrument_details' => false,
+                'is_active' => true,
+            ]);
+            $payment = Payment::query()->create([
+                'tenant_id' => $tenantId,
+                'payment_number' => 'RV-2026-0001',
+                'payment_type' => PaymentType::CustomerReceipt->value,
+                'direction' => PaymentDirection::Inbound->value,
+                'party_type' => 'customer',
+                'party_id' => 10,
+                'party_number_snapshot' => 'CUS-0010',
+                'party_code_snapshot' => 'CUS-0010',
+                'party_name_snapshot' => 'Voucher Customer',
+                'document_status' => PaymentDocumentStatus::Approved->value,
+                'allocation_status' => PaymentAllocationState::Unallocated->value,
+                'posting_status' => PaymentPostingStatus::Posted->value,
+                'instrument_status' => PaymentInstrumentStatus::Cleared->value,
+                'payment_date' => '2026-06-29',
+                'currency_code_snapshot' => 'LKR',
+                'currency_name_snapshot' => 'Sri Lankan Rupee',
+                'currency_symbol_snapshot' => 'Rs',
+                'exchange_rate' => '1.000000',
+                'total_amount' => '1000.000000',
+                'allocated_amount' => '0.000000',
+                'unapplied_amount' => '1000.000000',
+                'refunded_amount' => '0.000000',
+                'finance_posting_reference' => 'JV-RV-2026-0001',
+            ]);
+            PaymentLine::query()->create([
+                'tenant_id' => $tenantId,
+                'payment_id' => $payment->getKey(),
+                'line_number' => 1,
+                'payment_method_id' => $method->getKey(),
+                'payment_method_code_snapshot' => (string) $method->code,
+                'payment_method_name_snapshot' => 'Cash',
+                'payment_method_type_snapshot' => 'cash',
+                'requires_reference_snapshot' => false,
+                'requires_instrument_details_snapshot' => false,
+                'amount' => '1000.000000',
+                'cleared_amount' => '1000.000000',
+                'status' => 'cleared',
+            ]);
 
-        return $payment->refresh();
+            return $payment->refresh();
+        });
     }
 
     private function tenantId(): int
@@ -111,6 +113,7 @@ final class VoucherWorkspaceTest extends TestCase
             'name' => 'Voucher Tenant '.$suffix,
             'slug' => 'voucher-tenant-'.Str::lower($suffix),
             'status' => 'active',
+            'status_changed_at' => now(),
             'created_at' => now(),
             'updated_at' => now(),
         ]);

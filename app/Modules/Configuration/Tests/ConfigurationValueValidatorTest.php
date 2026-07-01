@@ -10,7 +10,7 @@ use Modules\Configuration\Constants\ConfigurationValueType;
 use Modules\Configuration\Data\ConfigurationDefinition;
 use Modules\Configuration\Services\ConfigurationValueValidator;
 use Modules\ReferenceData\Contracts\ReferenceValueLookupInterface;
-use PHPUnit\Framework\TestCase;
+use Tests\TestCase;
 
 final class ConfigurationValueValidatorTest extends TestCase
 {

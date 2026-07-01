@@ -90,7 +90,8 @@ final class PurchaseOrderApiTest extends TestCase
         $this->withAuth($context)->postJson('/api/v1/purchase/orders', $payload)->assertCreated();
         $this->withAuth($context)->postJson('/api/v1/purchase/orders', $payload)
             ->assertUnprocessable()
-            ->assertJsonPath('error.message', 'Purchase order number already exists for this tenant.');
+            ->assertJsonValidationErrors(['purchase_order_number'])
+            ->assertJsonPath('error.details.fields.purchase_order_number.0', 'Purchase order number already exists for this tenant.');
     }
 
     public function test_validation_errors_for_missing_lines_and_invalid_quantity(): void
@@ -145,9 +146,11 @@ final class PurchaseOrderApiTest extends TestCase
 
         $this->withAuth($context)->patchJson('/api/v1/purchase/orders/'.$closeId.'/submit', ['tenant_id' => $context['tenant_id']])->assertOk();
         $this->withAuth($context)->patchJson('/api/v1/purchase/orders/'.$closeId.'/approve', ['tenant_id' => $context['tenant_id']])->assertOk();
-        $closeOrder = PurchaseOrder::query()->with('lines')->findOrFail($closeId);
-        app(PurchaseOrderService::class)->applyReceived($closeOrder->lines->first(), '2.000000');
-        app(PurchaseOrderService::class)->applyInvoiced($closeOrder->lines->first(), '2.000000');
+        $this->withTenantExecutionContext((int) $context['tenant_id'], function () use ($closeId): void {
+            $closeOrder = PurchaseOrder::query()->with('lines')->findOrFail($closeId);
+            app(PurchaseOrderService::class)->applyReceived($closeOrder->lines->first(), '2.000000');
+            app(PurchaseOrderService::class)->applyInvoiced($closeOrder->lines->first(), '2.000000');
+        });
         $this->withAuth($context)->patchJson('/api/v1/purchase/orders/'.$closeId.'/close', ['tenant_id' => $context['tenant_id']])
             ->assertOk()
             ->assertJsonPath('data.status', 'closed');
@@ -160,21 +163,25 @@ final class PurchaseOrderApiTest extends TestCase
 
         $this->withAuth($context)->patchJson('/api/v1/purchase/orders/'.$id.'/close', ['tenant_id' => $context['tenant_id']])
             ->assertUnprocessable()
-            ->assertJsonPath('error.message', 'Invalid purchase order status transition.');
+            ->assertJsonValidationErrors(['purchase_order'])
+            ->assertJsonPath('error.details.fields.purchase_order.0', 'Invalid purchase order status transition.');
     }
 
     public function test_received_purchase_order_cannot_be_cancelled(): void
     {
         $context = $this->context();
         $id = $this->withAuth($context)->postJson('/api/v1/purchase/orders', $this->payload($context))->json('data.id');
-        $order = PurchaseOrder::query()->with('lines')->findOrFail($id);
-        $service = app(PurchaseOrderService::class);
-        $service->approve($service->submit($order));
-        $service->applyReceived($order->lines->first(), '1.000000');
+        $this->withTenantExecutionContext((int) $context['tenant_id'], function () use ($id): void {
+            $order = PurchaseOrder::query()->with('lines')->findOrFail($id);
+            $service = app(PurchaseOrderService::class);
+            $service->approve($service->submit($order));
+            $service->applyReceived($order->lines->first(), '1.000000');
+        });
 
         $this->withAuth($context)->patchJson('/api/v1/purchase/orders/'.$id.'/cancel', ['tenant_id' => $context['tenant_id']])
             ->assertUnprocessable()
-            ->assertJsonPath('error.message', 'Purchase orders with received or invoiced quantities cannot be cancelled.');
+            ->assertJsonValidationErrors(['purchase_order'])
+            ->assertJsonPath('error.details.fields.purchase_order.0', 'Purchase orders with received or invoiced quantities cannot be cancelled.');
     }
 
     public function test_purchase_order_resource_exposes_quantity_aggregates(): void
@@ -182,12 +189,14 @@ final class PurchaseOrderApiTest extends TestCase
         $context = $this->context();
         $id = $this->withAuth($context)->postJson('/api/v1/purchase/orders', $this->payload($context))
             ->json('data.id');
-        $order = PurchaseOrder::query()->with('lines')->findOrFail($id);
-        $service = app(PurchaseOrderService::class);
-        $service->approve($service->submit($order));
-        $service->applyReceived($order->lines->first(), '1.000000');
-        $service->applyInvoiced($order->lines->first()->refresh(), '0.500000');
-        $service->applyReturned($order->lines->first()->refresh(), '0.250000');
+        $this->withTenantExecutionContext((int) $context['tenant_id'], function () use ($id): void {
+            $order = PurchaseOrder::query()->with('lines')->findOrFail($id);
+            $service = app(PurchaseOrderService::class);
+            $service->approve($service->submit($order));
+            $service->applyReceived($order->lines->first(), '1.000000');
+            $service->applyInvoiced($order->lines->first()->refresh(), '0.500000');
+            $service->applyReturned($order->lines->first()->refresh(), '0.250000');
+        });
 
         $this->withAuth($context)->getJson('/api/v1/purchase/orders/'.$id.'?tenant_id='.$context['tenant_id'])
             ->assertOk()
@@ -313,20 +322,22 @@ final class PurchaseOrderApiTest extends TestCase
         $context = $this->context('CAPN1');
         $service = app(PurchaseOrderService::class);
 
-        for ($i = 0; $i < 25; $i++) {
-            $order = $service->create(new CreatePurchaseOrderData(
-                tenantId: $context['tenant_id'],
-                purchaseOrderDate: '2026-06-18',
-                organizationUnitId: $context['organization_unit_id'],
-                supplierType: 'supplier',
-                supplierId: $context['supplier_id'],
-                warehouseId: $context['warehouse_id'],
-                lines: [new PurchaseOrderLineData($context['item_id'], '1.000000', '10.000000', uomId: $context['uom_id'])],
-            ));
-            $order = $service->approve($service->submit($order))->load('lines');
-            $service->applyReceived($order->lines->first(), '1.000000');
-            $service->applyInvoiced($order->lines->first()->refresh(), '1.000000');
-        }
+        $this->withTenantExecutionContext((int) $context['tenant_id'], function () use ($context, $service): void {
+            for ($i = 0; $i < 25; $i++) {
+                $order = $service->create(new CreatePurchaseOrderData(
+                    tenantId: $context['tenant_id'],
+                    purchaseOrderDate: '2026-06-18',
+                    organizationUnitId: $context['organization_unit_id'],
+                    supplierType: 'supplier',
+                    supplierId: $context['supplier_id'],
+                    warehouseId: $context['warehouse_id'],
+                    lines: [new PurchaseOrderLineData($context['item_id'], '1.000000', '10.000000', uomId: $context['uom_id'])],
+                ));
+                $order = $service->approve($service->submit($order))->load('lines');
+                $service->applyReceived($order->lines->first(), '1.000000');
+                $service->applyInvoiced($order->lines->first()->refresh(), '1.000000');
+            }
+        });
 
         DB::flushQueryLog();
         DB::enableQueryLog();
@@ -371,25 +382,28 @@ final class PurchaseOrderApiTest extends TestCase
     {
         $context = $this->context();
         $orders = app(PurchaseOrderService::class);
-        $order = $orders->create(new CreatePurchaseOrderData(
-            tenantId: $context['tenant_id'],
-            purchaseOrderDate: '2026-06-18',
-            organizationUnitId: $context['organization_unit_id'],
-            supplierType: 'supplier',
-            supplierId: $context['supplier_id'],
-            warehouseId: $context['warehouse_id'],
-            lines: [new PurchaseOrderLineData($context['item_id'], '2.000000', '10.000000', uomId: $context['uom_id'])],
-        ));
-        $order = $orders->approve($orders->submit($order));
-        $grn = app(GoodsReceiptNoteService::class)->create(new CreateGoodsReceiptNoteData(
-            tenantId: $context['tenant_id'],
-            receivedDate: '2026-06-18',
-            warehouseId: $context['warehouse_id'],
-            organizationUnitId: $context['organization_unit_id'],
-            purchaseOrderId: (int) $order->getKey(),
-            lines: [new GoodsReceiptNoteLineData($context['item_id'], '2.000000', '2.000000', '10.000000', purchaseOrderLineId: (int) $order->lines->first()->getKey(), orderedQuantity: '2.000000')],
-        ));
-        $grn = app(GoodsReceiptNoteService::class)->post($grn)->load('lines');
+        [$order, $grn] = $this->withTenantExecutionContext((int) $context['tenant_id'], function () use ($context, $orders): array {
+            $order = $orders->create(new CreatePurchaseOrderData(
+                tenantId: $context['tenant_id'],
+                purchaseOrderDate: '2026-06-18',
+                organizationUnitId: $context['organization_unit_id'],
+                supplierType: 'supplier',
+                supplierId: $context['supplier_id'],
+                warehouseId: $context['warehouse_id'],
+                lines: [new PurchaseOrderLineData($context['item_id'], '2.000000', '10.000000', uomId: $context['uom_id'])],
+            ));
+            $order = $orders->approve($orders->submit($order));
+            $grn = app(GoodsReceiptNoteService::class)->create(new CreateGoodsReceiptNoteData(
+                tenantId: $context['tenant_id'],
+                receivedDate: '2026-06-18',
+                warehouseId: $context['warehouse_id'],
+                organizationUnitId: $context['organization_unit_id'],
+                purchaseOrderId: (int) $order->getKey(),
+                lines: [new GoodsReceiptNoteLineData($context['item_id'], '2.000000', '2.000000', '10.000000', purchaseOrderLineId: (int) $order->lines->first()->getKey(), orderedQuantity: '2.000000')],
+            ));
+
+            return [$order, app(GoodsReceiptNoteService::class)->post($grn)->load('lines')];
+        });
 
         $invalidPayload = [
             'tenant_id' => $context['tenant_id'],
@@ -617,7 +631,18 @@ final class PurchaseOrderApiTest extends TestCase
             'currency_id' => $currencyId,
             'uom_id' => $purchaseUomId,
             'amount' => '12.500000',
-            'is_active' => true,
+            'effective_from' => '2026-01-01',
+            'scope_key' => hash('sha256', implode('|', [
+                $context['tenant_id'],
+                $context['organization_unit_id'],
+                $context['item_id'],
+                'purchase',
+                $currencyId,
+                $purchaseUomId,
+            ])),
+            'lineage_key' => (string) Str::uuid(),
+            'revision_no' => 1,
+            'recorded_from' => now(),
             'created_at' => now(),
             'updated_at' => now(),
         ]);
@@ -653,7 +678,7 @@ final class PurchaseOrderApiTest extends TestCase
 
         $this->assertSame('Order Discount', $discount['default_name'] ?? null);
         $this->assertSame(['decrease'], $discount['allowed_effects'] ?? null);
-        $this->assertSame('Freight-in / landed cost', $freight['finance_mapping_label'] ?? null);
+        $this->assertSame('Capitalize for stock; expense otherwise', $freight['recognition_label'] ?? null);
 
         $response = $this->withAuth($context)->postJson('/api/v1/purchase/orders', $this->payload($context, [
             'adjustments' => [[

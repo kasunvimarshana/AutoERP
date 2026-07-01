@@ -42,7 +42,7 @@ abstract class InventoryTestCase extends TestCase
         ?int $batchId = null,
         ?int $serialId = null,
     ): InventoryMovement {
-        return app(StockMovementService::class)->record(new StockMovementData(
+        return $this->withTenantExecutionContext($tenantId, fn (): InventoryMovement => app(StockMovementService::class)->record(new StockMovementData(
             tenantId: $tenantId,
             movementDate: '2026-06-06',
             movementType: InventoryMovementType::Receipt,
@@ -53,7 +53,7 @@ abstract class InventoryTestCase extends TestCase
             batchId: $batchId,
             serialNumberId: $serialId,
             unitCost: $unitCost,
-        ));
+        )));
     }
 
     protected function createItem(
@@ -64,7 +64,7 @@ abstract class InventoryTestCase extends TestCase
         ItemType $type = ItemType::Stock,
         bool $stockable = true,
     ): Item {
-        return app(ItemCreationService::class)->create(new CreateItemData(
+        return $this->withTenantExecutionContext($tenantId, fn (): Item => app(ItemCreationService::class)->create(new CreateItemData(
             tenantId: $tenantId,
             code: $code,
             name: 'Inventory '.$code,
@@ -72,7 +72,7 @@ abstract class InventoryTestCase extends TestCase
             trackingType: $tracking,
             costingMethod: $costing,
             isStockable: $stockable,
-        ));
+        )));
     }
 
     protected function createTenant(string $suffix = ''): int
@@ -85,6 +85,7 @@ abstract class InventoryTestCase extends TestCase
             'name' => 'Inventory Tenant '.$suffix,
             'slug' => 'inventory-tenant-'.Str::lower($suffix),
             'status' => 'active',
+            'status_changed_at' => now(),
             'created_at' => now(),
             'updated_at' => now()]);
     }

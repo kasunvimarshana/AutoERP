@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import type { FastPurchaseResult } from '../purchaseTypes';
+import type { FastPurchaseResult } from '../types/fastPurchaseTypes';
 
 const emptySummary = {
     subtotal: '0.000000',

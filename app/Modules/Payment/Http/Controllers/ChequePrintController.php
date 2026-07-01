@@ -65,7 +65,7 @@ final class ChequePrintController
     {
         $query = Payment::query()
             ->where('tenant_id', $request->tenantId())
-            ->with(['lines.paymentMethod', 'lines.internalBankAccount', 'bankAccount']);
+            ->with(['lines.paymentMethod']);
 
         $request->organizationUnitId() === null
             ? $query->whereNull('organization_unit_id')

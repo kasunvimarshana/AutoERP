@@ -33,6 +33,7 @@ return new class extends Migration
             $table->foreign(['client_id', 'tenant_id'], 'auth_access_client_fk')
                 ->references(['id', 'tenant_id'])->on('auth_clients')->restrictOnDelete();
             $table->unique('token_key', 'auth_access_key_uk');
+            $table->unique(['id', 'tenant_id'], 'auth_access_tokens_id_tenant_uk');
             $table->unique(['id', 'tenant_id', 'session_id', 'user_id'], 'auth_access_graph_uk');
             $table->index(['session_id', 'status', 'expires_at'], 'auth_access_session_ix');
         });

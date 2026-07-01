@@ -35,6 +35,7 @@ use Modules\Customer\Services\CustomerCreditProfileService;
 use Modules\Customer\Services\CustomerDocumentService;
 use Modules\Customer\Services\CustomerLookupService;
 use Modules\Customer\Services\CustomerStatusService;
+use Modules\User\Models\UserModel;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 use Tests\TestCase;
 
@@ -47,7 +48,7 @@ final class CustomerEngineTest extends TestCase
         [$tenantId, $organizationUnitId, $currencyId] = $this->scopeContext();
         $category = $this->createCategory($tenantId, $organizationUnitId, 'RETAIL');
 
-        $customer = app(CustomerCreationService::class)->create(new CreateCustomerData(
+        $customer = $this->withTenantExecutionContext($tenantId, fn (): Customer => app(CustomerCreationService::class)->create(new CreateCustomerData(
             tenantId: $tenantId,
             organizationUnitId: $organizationUnitId,
             code: 'CUS-ACME',
@@ -80,7 +81,7 @@ final class CustomerEngineTest extends TestCase
             documents: [
                 new CustomerDocumentData(CustomerDocumentType::BusinessRegistration, 'BR-001', status: CustomerDocumentStatus::Active),
             ],
-        ));
+        )));
 
         $this->assertSame(CustomerStatus::Active, $customer->status);
         $this->assertSame('50000.000000', (string) $customer->credit_limit);
@@ -93,13 +94,13 @@ final class CustomerEngineTest extends TestCase
         $this->assertCount(1, $customer->documents);
         $this->assertCount(1, $customer->statusHistories);
 
-        $profile = app(CustomerCreditProfileService::class)->get($customer);
+        $profile = $this->withTenantExecutionContext($tenantId, fn () => app(CustomerCreditProfileService::class)->get($customer));
         $this->assertNotNull($profile);
         $this->assertSame('50000.000000', (string) $profile->credit_limit);
         $this->assertSame(30, $profile->credit_period_days);
         $this->assertSame('75.000000', (string) $profile->warning_threshold_percent);
 
-        $result = app(CustomerLookupService::class)->result($customer);
+        $result = $this->withTenantExecutionContext($tenantId, fn () => app(CustomerLookupService::class)->result($customer));
         $this->assertSame('50000.000000', $result->creditLimit);
         $this->assertSame('250.000000', $result->openingBalance);
     }
@@ -124,7 +125,7 @@ final class CustomerEngineTest extends TestCase
     public function test_primary_contact_address_and_bank_account_constraints_are_enforced(): void
     {
         [$tenantId, $organizationUnitId, $currencyId] = $this->scopeContext();
-        $customer = app(CustomerCreationService::class)->create(new CreateCustomerData(
+        $customer = $this->withTenantExecutionContext($tenantId, fn (): Customer => app(CustomerCreationService::class)->create(new CreateCustomerData(
             tenantId: $tenantId,
             organizationUnitId: $organizationUnitId,
             code: 'PRIMARY',
@@ -139,11 +140,12 @@ final class CustomerEngineTest extends TestCase
             addresses: [
                 new CustomerAddressData(CustomerAddressType::Billing, 'Address A', isPrimary: true),
             ],
-        ));
+        )));
 
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Customer can have only one primary contact.');
-        app(CustomerContactService::class)->create($customer, new CustomerContactData('Contact B', isPrimary: true));
+        $this->withTenantExecutionContext($tenantId, fn () => app(CustomerContactService::class)
+            ->create($customer, new CustomerContactData('Contact B', isPrimary: true)));
     }
 
     public function test_relation_services_cover_address_bank_category_and_document_crud(): void
@@ -152,17 +154,22 @@ final class CustomerEngineTest extends TestCase
         $customer = $this->createCustomer($tenantId, 'REL', organizationUnitId: $organizationUnitId);
         $category = $this->createCategory($tenantId, $organizationUnitId, 'REL-CAT');
 
-        $address = app(CustomerAddressService::class)->create($customer, new CustomerAddressData(CustomerAddressType::Shipping, 'Ship line', isPrimary: true));
-        $account = app(CustomerBankAccountService::class)->create($customer, new CustomerBankAccountData('Bank', 'Rel Customer', '200', currencyId: $currencyId, isPrimary: true));
-        $document = app(CustomerDocumentService::class)->create($customer, new CustomerDocumentData(CustomerDocumentType::IdDocument, 'ID-1'));
-        $assigned = app(CustomerCategoryService::class)->attach($customer, (int) $category->getKey());
+        [$address, $account, $document, $assigned] = $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): array => [
+                app(CustomerAddressService::class)->create($customer, new CustomerAddressData(CustomerAddressType::Shipping, 'Ship line', isPrimary: true)),
+                app(CustomerBankAccountService::class)->create($customer, new CustomerBankAccountData('Bank', 'Rel Customer', '200', currencyId: $currencyId, isPrimary: true)),
+                app(CustomerDocumentService::class)->create($customer, new CustomerDocumentData(CustomerDocumentType::IdDocument, 'ID-1')),
+                app(CustomerCategoryService::class)->attach($customer, (int) $category->getKey()),
+            ],
+        );
 
         $this->assertSame((int) $category->getKey(), (int) $assigned->getKey());
         $this->assertDatabaseHas('customer_addresses', ['id' => $address->getKey(), 'address_type' => CustomerAddressType::Shipping->value]);
         $this->assertDatabaseHas('customer_bank_accounts', ['id' => $account->getKey(), 'account_number' => '200']);
         $this->assertDatabaseHas('customer_documents', ['id' => $document->getKey(), 'document_type' => CustomerDocumentType::IdDocument->value]);
 
-        app(CustomerCategoryService::class)->detach($customer, (int) $category->getKey());
+        $this->withTenantExecutionContext($tenantId, fn () => app(CustomerCategoryService::class)->detach($customer, (int) $category->getKey()));
         $this->assertDatabaseMissing('customer_category_assignments', [
             'customer_id' => $customer->getKey(),
             'customer_category_id' => $category->getKey(),
@@ -174,17 +181,19 @@ final class CustomerEngineTest extends TestCase
         [$tenantId] = $this->scopeContext();
         $customer = $this->createCustomer($tenantId, 'STATUS', status: CustomerStatus::Active);
 
-        app(CustomerStatusService::class)->change($customer, new CustomerStatusChangeData(
-            CustomerStatus::Blacklisted,
-            reason: 'Compliance failure',
-            changedBy: 42,
-        ));
+        $this->withTenantExecutionContext($tenantId, function () use ($customer, $tenantId): void {
+            app(CustomerStatusService::class)->change($customer, new CustomerStatusChangeData(
+                CustomerStatus::Blacklisted,
+                reason: 'Compliance failure',
+                changedBy: 42,
+            ));
 
-        $this->assertSame(CustomerStatus::Blacklisted, $customer->refresh()->status);
-        $this->assertCount(2, $customer->statusHistories()->get());
-        $this->assertFalse(app(CustomerLookupService::class)->activeCustomers($tenantId)->contains($customer));
-        $this->assertTrue(app(CustomerLookupService::class)->restrictedCustomers($tenantId)->contains($customer));
-        $this->assertTrue(app(CustomerLookupService::class)->blacklistedCustomers($tenantId)->contains($customer));
+            $this->assertSame(CustomerStatus::Blacklisted, $customer->refresh()->status);
+            $this->assertCount(2, $customer->statusHistories()->get());
+            $this->assertFalse(app(CustomerLookupService::class)->activeCustomers($tenantId)->contains($customer));
+            $this->assertTrue(app(CustomerLookupService::class)->restrictedCustomers($tenantId)->contains($customer));
+            $this->assertTrue(app(CustomerLookupService::class)->blacklistedCustomers($tenantId)->contains($customer));
+        });
     }
 
     public function test_credit_profile_validation_and_on_hold_lookup(): void
@@ -192,21 +201,23 @@ final class CustomerEngineTest extends TestCase
         [$tenantId] = $this->scopeContext();
         $customer = $this->createCustomer($tenantId, 'CREDIT', status: CustomerStatus::Active);
 
-        app(CustomerCreditProfileService::class)->set($customer, new CustomerCreditProfileData(
-            creditLimit: '10000.000000',
-            creditPeriodDays: 45,
-            warningThresholdPercent: '90.000000',
-            allowOverCredit: false,
-        ));
-        app(CustomerStatusService::class)->change($customer, new CustomerStatusChangeData(CustomerStatus::OnHold));
+        $this->withTenantExecutionContext($tenantId, function () use ($customer, $tenantId): void {
+            app(CustomerCreditProfileService::class)->set($customer, new CustomerCreditProfileData(
+                creditLimit: '10000.000000',
+                creditPeriodDays: 45,
+                warningThresholdPercent: '90.000000',
+                allowOverCredit: false,
+            ));
+            app(CustomerStatusService::class)->change($customer, new CustomerStatusChangeData(CustomerStatus::OnHold));
 
-        $this->assertTrue(app(CustomerLookupService::class)->customersOnHold($tenantId)->contains($customer));
+            $this->assertTrue(app(CustomerLookupService::class)->customersOnHold($tenantId)->contains($customer));
+        });
 
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Customer credit warning threshold must be between 0 and 100.');
-        app(CustomerCreditProfileService::class)->set($customer, new CustomerCreditProfileData(
+        $this->withTenantExecutionContext($tenantId, fn () => app(CustomerCreditProfileService::class)->set($customer, new CustomerCreditProfileData(
             warningThresholdPercent: '101.000000',
-        ));
+        )));
     }
 
     public function test_cross_tenant_and_organization_references_are_rejected(): void
@@ -218,16 +229,18 @@ final class CustomerEngineTest extends TestCase
 
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Customer reference belongs to a different tenant.');
-        app(CustomerCategoryService::class)->assign($customer, [(int) $otherCategory->getKey()]);
+        $this->withTenantExecutionContext($tenantId, fn () => app(CustomerCategoryService::class)->assign($customer, [(int) $otherCategory->getKey()]));
     }
 
     public function test_customer_api_crud_lookup_and_readable_resource_response(): void
     {
         $this->withoutMiddleware();
+        $this->trustTenantScopedRequestContextFromPayload();
         $this->mock(CustomerAuthorizationService::class, fn ($mock) => $mock->shouldReceive('assert')->zeroOrMoreTimes());
         [$tenantId, $organizationUnitId] = $this->scopeContext();
+        $this->actingAsTenantUser($tenantId);
 
-        $create = $this->postJson('/api/v1/customers/with-relations', [
+        $create = $this->tenantPostJson($tenantId, '/api/v1/customers/with-relations', [
             'tenant_id' => $tenantId,
             'organization_unit_id' => $organizationUnitId,
             'customer' => [
@@ -253,23 +266,25 @@ final class CustomerEngineTest extends TestCase
             ->assertJsonStructure(['data' => ['id', 'customer_number', 'code', 'name', 'contacts', 'addresses', 'documents', 'credit_profile']]);
 
         $id = (int) $create->json('data.id');
-        $this->getJson("/api/v1/customers/lookup/active?tenant_id={$tenantId}&organization_unit_id={$organizationUnitId}")
+        $this->tenantGetJson($tenantId, "/api/v1/customers/lookup/active?tenant_id={$tenantId}&organization_unit_id={$organizationUnitId}")
             ->assertOk()
             ->assertJsonFragment(['code' => 'API-CUS']);
 
-        $this->putJson("/api/v1/customers/{$id}", [
+        $this->withTenantExecutionContext($tenantId, fn () => $this->putJson("/api/v1/customers/{$id}", [
             'tenant_id' => $tenantId,
             'organization_unit_id' => $organizationUnitId,
             'name' => 'API Customer Updated',
-        ])->assertOk()->assertJsonPath('data.name', 'API Customer Updated');
+        ]))->assertOk()->assertJsonPath('data.name', 'API Customer Updated');
     }
 
     public function test_customer_validation_error_response(): void
     {
         $this->withoutMiddleware();
+        $this->trustTenantScopedRequestContextFromPayload();
         [$tenantId] = $this->scopeContext();
+        $this->actingAsTenantUser($tenantId);
 
-        $this->postJson('/api/v1/customers', [
+        $this->tenantPostJson($tenantId, '/api/v1/customers', [
             'tenant_id' => $tenantId,
             'code' => '',
             'name' => '',
@@ -286,7 +301,10 @@ final class CustomerEngineTest extends TestCase
 
         $this->assertDatabaseHas('customer_categories', ['tenant_id' => $tenantId, 'code' => 'GENERAL']);
         $this->assertDatabaseHas('customers', ['tenant_id' => $tenantId, 'customer_number' => 'CUS-000001']);
-        $this->assertSame(1, Customer::query()->where('tenant_id', $tenantId)->count());
+        $this->assertSame(1, $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): int => Customer::query()->where('tenant_id', $tenantId)->count(),
+        ));
     }
 
     private function createCustomer(
@@ -296,7 +314,7 @@ final class CustomerEngineTest extends TestCase
         CustomerStatus $status = CustomerStatus::PendingApproval,
         ?int $organizationUnitId = null,
     ): Customer {
-        return app(CustomerCreationService::class)->create(new CreateCustomerData(
+        return $this->withTenantExecutionContext($tenantId, fn (): Customer => app(CustomerCreationService::class)->create(new CreateCustomerData(
             tenantId: $tenantId,
             organizationUnitId: $organizationUnitId,
             customerNumber: $number,
@@ -304,17 +322,17 @@ final class CustomerEngineTest extends TestCase
             name: 'Customer '.$code,
             customerType: CustomerType::Company,
             status: $status,
-        ));
+        )));
     }
 
     private function createCategory(int $tenantId, ?int $organizationUnitId, string $code): CustomerCategory
     {
-        return app(CustomerCategoryService::class)->create(new CustomerCategoryData(
+        return $this->withTenantExecutionContext($tenantId, fn (): CustomerCategory => app(CustomerCategoryService::class)->create(new CustomerCategoryData(
             tenantId: $tenantId,
             organizationUnitId: $organizationUnitId,
             code: $code,
             name: 'Category '.$code,
-        ));
+        )));
     }
 
     /**
@@ -330,6 +348,7 @@ final class CustomerEngineTest extends TestCase
             'name' => 'Customer Tenant '.$suffix,
             'slug' => 'customer-tenant-'.Str::lower($suffix).'-'.Str::lower(Str::random(3)),
             'status' => 'active',
+            'status_changed_at' => now(),
             'base_currency_id' => $currencyId,
             'created_at' => now(),
             'updated_at' => now()]);
@@ -357,5 +376,20 @@ final class CustomerEngineTest extends TestCase
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+    }
+
+    private function actingAsTenantUser(int $tenantId): void
+    {
+        $userId = \Tests\Support\TenantUserFixture::create([
+            'tenant_id' => $tenantId,
+            'email' => 'customer-test-'.Str::lower(Str::random(8)).'@example.test',
+        ]);
+
+        $user = $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): UserModel => UserModel::query()->findOrFail($userId),
+        );
+
+        $this->actingAs($user, (string) config('module-auth.protected_route_guard', 'auth-api'));
     }
 }

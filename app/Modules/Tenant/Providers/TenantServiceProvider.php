@@ -79,7 +79,10 @@ final class TenantServiceProvider extends ServiceProvider
         $this->mergeConfigFrom(__DIR__.'/../Config/tenant.php', 'tenant');
         $this->app->singleton(TenantConfigurationTargetReaderInterface::class, TenantConfigurationTargetReader::class);
         $this->app->bind(CurrentTenantContextResolverInterface::class, CurrentTenantContextResolver::class);
-        $this->app->singleton(TenantValueNormalizerInterface::class, TenantValueNormalizer::class);
+        $this->app->singleton(
+            TenantValueNormalizerInterface::class,
+            fn (): TenantValueNormalizerInterface => new TenantValueNormalizer($this->centralHosts()),
+        );
         $this->app->singleton(TenantBrandingAssetReaderInterface::class, TenantBrandingAssetReader::class);
         $this->app->singleton(TenantDomainOwnershipVerifierInterface::class, DnsTenantDomainOwnershipVerifier::class);
         $this->app->singleton(TenantDocumentScannerInterface::class, function (): TenantDocumentScannerInterface {
@@ -238,17 +241,7 @@ final class TenantServiceProvider extends ServiceProvider
 
     private function validateResolutionConfiguration(): void
     {
-        $centralHosts = config('tenant.resolution.central_hosts', []);
-        if (! is_array($centralHosts)) {
-            throw new LogicException('Tenant central hosts must be configured as a list.');
-        }
-
-        $normalizedHosts = array_values(array_filter(array_map(
-            static fn (mixed $host): string => is_scalar($host)
-                ? strtolower(rtrim(trim((string) $host), '.'))
-                : '',
-            $centralHosts,
-        )));
+        $normalizedHosts = $this->centralHosts();
 
         if ($this->app->environment('production') && $normalizedHosts === []) {
             throw new LogicException('TENANT_CENTRAL_HOSTS must contain at least one trusted platform host in production.');
@@ -259,5 +252,21 @@ final class TenantServiceProvider extends ServiceProvider
                 throw new LogicException("Tenant selection header [{$selectionHeader}] is not configured.");
             }
         }
+    }
+
+    /** @return list<string> */
+    private function centralHosts(): array
+    {
+        $centralHosts = config('tenant.resolution.central_hosts', []);
+        if (! is_array($centralHosts)) {
+            throw new LogicException('Tenant central hosts must be configured as a list.');
+        }
+
+        return array_values(array_filter(array_map(
+            static fn (mixed $host): string => is_scalar($host)
+                ? strtolower(rtrim(trim((string) $host), '.'))
+                : '',
+            $centralHosts,
+        )));
     }
 }

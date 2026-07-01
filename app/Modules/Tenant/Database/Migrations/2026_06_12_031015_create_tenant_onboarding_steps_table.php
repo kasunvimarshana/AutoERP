@@ -25,6 +25,7 @@ return new class extends Migration
             $table->uuid('correlation_id')->nullable();
             $table->timestamps();
 
+            $table->unique(['id', 'tenant_id'], 'tenant_onboarding_steps_id_tenant_uk');
             $table->unique(['tenant_id', 'step'], 'tenant_onboarding_steps_tenant_step_uk');
             $table->index(['tenant_id', 'status'], 'tenant_onboarding_steps_status_ix');
             $table->index('operation_id', 'tenant_onboarding_steps_operation_ix');

@@ -23,6 +23,7 @@ return new class extends Migration
             $table->string('actor_email')->nullable();
             $table->dateTime('occurred_at');
 
+            $table->unique(['id', 'tenant_id'], 'tenant_subscription_events_id_tenant_uk');
             $table->foreign(
                 ['tenant_subscription_id', 'tenant_id'],
                 'tenant_subscription_events_subscription_tenant_fk',

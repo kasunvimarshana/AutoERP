@@ -83,7 +83,7 @@ final class ItemCreationService
             return $item->refresh()->load([
                 'category',
                 'brand',
-                'tenant.currency',
+                'tenant.baseCurrency',
                 'baseUom',
                 'defaultTaxGroup',
                 'purchaseTaxGroup',

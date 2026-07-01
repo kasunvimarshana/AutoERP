@@ -32,7 +32,7 @@ final class UpdateWarehouseService
                     ->lockForUpdate()
                     ->first();
                 if (! $warehouse instanceof WarehouseModel) {
-                    return Result::failure(new Error(WarehouseErrorCode::NOT_FOUND, 'Warehouse not found.'));
+                    return $this->missingResult($id, $tenantId);
                 }
 
                 $expectedVersion = (int) ($payload['row_version'] ?? 0);
@@ -98,7 +98,7 @@ final class UpdateWarehouseService
                     ->lockForUpdate()
                     ->first();
                 if (! $warehouse instanceof WarehouseModel) {
-                    return Result::failure(new Error(WarehouseErrorCode::NOT_FOUND, 'Warehouse not found.'));
+                    return $this->missingResult($id, $tenantId);
                 }
 
                 $warehouse->is_active = $isActive;
@@ -117,5 +117,19 @@ final class UpdateWarehouseService
 
             return Result::failure(new Error(WarehouseErrorCode::INVALID_VALUE, 'Warehouse status could not be changed.'));
         }
+    }
+
+    private function missingResult(int|string $id, int $tenantId): Result
+    {
+        $owner = DB::table('warehouses')
+            ->where('id', $id)
+            ->whereNull('deleted_at')
+            ->first(['tenant_id']);
+
+        if ($owner !== null && (int) $owner->tenant_id !== $tenantId) {
+            return Result::failure(new Error(WarehouseErrorCode::SCOPE_MISMATCH, 'Warehouse belongs to another tenant.'));
+        }
+
+        return Result::failure(new Error(WarehouseErrorCode::NOT_FOUND, 'Warehouse not found.'));
     }
 }

@@ -24,6 +24,8 @@ return new class extends Migration
             $table->unsignedBigInteger('source_id')->nullable();
             $table->string('source_number', 150)->nullable();
             $table->date('source_date')->nullable();
+            $table->char('source_key', 64)->nullable();
+            $table->char('posting_fingerprint', 64)->nullable();
             $table->string('journal_type', 40)->default('general');
             $table->string('status', 40)->default('draft');
             $table->text('description')->nullable();
@@ -47,6 +49,7 @@ return new class extends Migration
             $table->index(['tenant_id', 'source_module', 'source_type', 'source_id'], 'finance_journals_tenant_source_ix', );
             $table->index('journal_date', 'finance_journals_date_ix');
             $table->index('status', 'finance_journals_status_ix');
+            $table->unique('source_key', 'finance_journal_entries_source_key_uk');
 
             $table->unique(['id', 'tenant_id'], 'finance_journal_entries_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'finance_journal_entries_organization_unit_id_tenant_fk')

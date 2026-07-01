@@ -247,19 +247,19 @@ final class FinanceSeeder extends Seeder
         $definitions = [
             'sales_invoice' => [
                 'name' => 'Sales Invoice',
-                'rules' => ['receivable' => '1100', 'revenue' => '4100', 'tax_payable' => '2200'],
+                'rules' => ['receivable' => '1100', 'revenue' => '4100', 'tax_payable' => '2200', 'withholding_receivable' => '1300'],
             ],
             'purchase_invoice' => [
                 'name' => 'Purchase Invoice',
-                'rules' => ['expense' => '5100', 'payable' => '2100', 'tax_receivable' => '1300'],
+                'rules' => ['expense' => '5100', 'payable' => '2100', 'tax_receivable' => '1300', 'withholding_payable' => '2200'],
             ],
             'payment_received' => [
                 'name' => 'Payment Received',
-                'rules' => ['cash' => '1010', 'bank' => '1020', 'receivable' => '1100'],
+                'rules' => ['cash' => '1010', 'bank' => '1020', 'receivable' => '1100', 'withholding_receivable' => '1300'],
             ],
             'payment_made' => [
                 'name' => 'Payment Made',
-                'rules' => ['cash' => '1010', 'bank' => '1020', 'payable' => '2100'],
+                'rules' => ['cash' => '1010', 'bank' => '1020', 'payable' => '2100', 'withholding_payable' => '2200'],
             ],
             'inventory_receipt' => [
                 'name' => 'Inventory Receipt',

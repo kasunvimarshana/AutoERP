@@ -19,6 +19,7 @@ return new class extends Migration
             $table->dateTime('processed_at');
             $table->timestamps();
 
+            $table->unique(['id', 'tenant_id'], 'auth_processed_events_id_tenant_uk');
             $table->unique(['tenant_id', 'source_system', 'event_id'], 'auth_event_idempotency_uk');
             $table->index('processed_at', 'auth_event_processed_ix');
         });

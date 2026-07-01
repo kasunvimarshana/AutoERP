@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Support;
 
+use Illuminate\Contracts\Container\Container;
 use Illuminate\Http\Request;
 use LogicException;
 use Modules\Core\Contracts\CurrentOrganizationUnitContextAccessorInterface;
@@ -13,13 +14,13 @@ use Modules\Core\DTOs\DataRecord;
 final class RequestCurrentOrganizationUnitContextAccessor implements CurrentOrganizationUnitContextAccessorInterface
 {
     public function __construct(
-        private readonly Request $request,
+        private readonly Container $container,
         private readonly string $requestAttribute,
     ) {}
 
     public function current(): ?CurrentOrganizationUnitContext
     {
-        $context = $this->request->attributes->get($this->requestAttribute);
+        $context = $this->request()->attributes->get($this->requestAttribute);
 
         return $context instanceof CurrentOrganizationUnitContext ? $context : null;
     }
@@ -63,5 +64,10 @@ final class RequestCurrentOrganizationUnitContextAccessor implements CurrentOrga
     public function currentApplicationId(): ?string
     {
         return $this->current()?->applicationId();
+    }
+
+    private function request(): Request
+    {
+        return $this->container->make(Request::class);
     }
 }

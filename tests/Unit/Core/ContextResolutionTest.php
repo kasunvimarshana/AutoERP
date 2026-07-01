@@ -102,6 +102,7 @@ final class ContextResolutionTest extends TestCase
     {
         $currentUser = $this->createMock(CurrentUserContextAccessorInterface::class);
         $currentUser->method('currentUserId')->willReturn(7);
+        $currentUser->method('current')->willReturn($this->currentUserContext(7, 10));
         $currentUser->method('currentApplicationId')->willReturn(null);
 
         $currentTenant = $this->createMock(CurrentTenantContextAccessorInterface::class);

@@ -162,6 +162,7 @@ final class WarehouseController extends Controller
     {
         $status = match ($error->code) {
             'WAREHOUSE_NOT_FOUND' => 404,
+            'WAREHOUSE_SCOPE_MISMATCH' => 403,
             'WAREHOUSE_STALE_RECORD' => 409,
             default => 422,
         };

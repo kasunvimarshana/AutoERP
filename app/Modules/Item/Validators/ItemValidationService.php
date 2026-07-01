@@ -86,7 +86,9 @@ final class ItemValidationService
         if (in_array('base_uom_id', $data->provided, true)
             && (int) ($data->baseUomId ?? 0) !== (int) ($item->base_uom_id ?? 0)
             && $this->baseUomUsageAudit->audit($item)['has_usage']) {
-            throw new InvalidArgumentException('Base UOM cannot be edited directly after item usage. Use the Base UOM Conversion Wizard.');
+            throw ValidationException::withMessages([
+                'base_uom_id' => ['Base UOM cannot be edited directly after item usage. Use the Base UOM Conversion Wizard.'],
+            ]);
         }
         if ($data->code !== null) {
             $this->assertText($data->code, 'Item code is required.');
@@ -136,13 +138,8 @@ final class ItemValidationService
         }
 
         $this->assertPositiveDecimal($data->conversionFactor, 'Item unit conversion factor must be greater than zero.');
-        $this->assertScopedRecord(
-            (int) $item->tenant_id,
-            $data->organizationUnitId,
-            (int) $item->tenant_id,
-            $item->organization_unit_id === null ? null : (int) $item->organization_unit_id,
-        );
-        $this->assertUomIsUsable((int) $item->tenant_id, $data->organizationUnitId, $data->uomId);
+        $organizationUnitId = $item->organization_unit_id === null ? null : (int) $item->organization_unit_id;
+        $this->assertUomIsUsable((int) $item->tenant_id, $organizationUnitId, $data->uomId);
         $this->assertUomCompatibleWithItemBase($item, $data->uomId);
 
         $duplicate = $item->units()
@@ -197,7 +194,9 @@ final class ItemValidationService
         $this->assertItemScope($parent, $child);
 
         if ($this->wouldCreateCycle((int) $parent->getKey(), $data->childItemId)) {
-            throw new InvalidArgumentException('Item bundle cannot create a circular composition.');
+            throw ValidationException::withMessages([
+                'child_item_id' => ['Item bundle cannot create a circular composition.'],
+            ]);
         }
 
         $childType = $child->item_type instanceof ItemType ? $child->item_type->value : (string) $child->item_type;
@@ -457,7 +456,9 @@ final class ItemValidationService
         $uom = UnitOfMeasureModel::query()->findOrFail($uomId);
         $this->assertScopedRecord($tenantId, $organizationUnitId, (int) $uom->tenant_id, $uom->organization_unit_id);
         if (! (bool) $uom->is_active) {
-            throw new InvalidArgumentException('Inactive UOM cannot be used for item master data.');
+            throw ValidationException::withMessages([
+                'uom_id' => ['Inactive UOM cannot be used for item master data.'],
+            ]);
         }
     }
 

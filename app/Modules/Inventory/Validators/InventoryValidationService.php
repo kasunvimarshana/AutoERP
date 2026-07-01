@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Inventory\Validators;
 
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Inventory\Enums\BatchStatus;
@@ -37,7 +40,7 @@ final class InventoryValidationService
 
     public function item(int $tenantId, ?int $organizationUnitId, int $itemId): Item
     {
-        $item = Item::query()->findOrFail($itemId);
+        $item = $this->tenantRecord(Item::class, 'items', $tenantId, $itemId);
         $this->assertScope($tenantId, $organizationUnitId, (int) $item->tenant_id, $item->organization_unit_id);
 
         if (! (bool) $item->is_active) {
@@ -71,7 +74,7 @@ final class InventoryValidationService
 
     public function warehouse(int $tenantId, ?int $organizationUnitId, int $warehouseId): WarehouseModel
     {
-        $warehouse = WarehouseModel::query()->findOrFail($warehouseId);
+        $warehouse = $this->tenantRecord(WarehouseModel::class, 'warehouses', $tenantId, $warehouseId);
         $this->assertScope($tenantId, $organizationUnitId, (int) $warehouse->tenant_id, $warehouse->organization_unit_id);
 
         if (! (bool) $warehouse->is_active) {
@@ -187,5 +190,26 @@ final class InventoryValidationService
         if ($organizationUnitId !== null && $recordOrganizationUnitId !== null && (int) $recordOrganizationUnitId !== $organizationUnitId) {
             throw new InvalidArgumentException('Inventory reference belongs to a different organization unit.');
         }
+    }
+
+    /**
+     * @template TModel of Model
+     *
+     * @param  class-string<TModel>  $modelClass
+     * @return TModel
+     */
+    private function tenantRecord(string $modelClass, string $table, int $tenantId, int $id): Model
+    {
+        $record = $modelClass::query()->find($id);
+
+        if ($record instanceof Model) {
+            return $record;
+        }
+
+        if (DB::table($table)->where('id', $id)->where('tenant_id', '<>', $tenantId)->exists()) {
+            throw new InvalidArgumentException('Inventory reference belongs to a different tenant.');
+        }
+
+        throw (new ModelNotFoundException())->setModel($modelClass, [$id]);
     }
 }

@@ -45,7 +45,7 @@ final class ItemEngineTest extends TestCase
         $category = $this->createCategory($tenantId, $organizationUnitId, 'PARTS');
         $brand = $this->createBrand($tenantId, $organizationUnitId, 'GEN');
 
-        $item = app(ItemCreationService::class)->create(new CreateItemData(
+        $item = $this->createItem(new CreateItemData(
             tenantId: $tenantId,
             code: 'ITM-001',
             name: 'Generic Part',
@@ -102,8 +102,10 @@ final class ItemEngineTest extends TestCase
         $parent = $this->createCategory($tenantId, null, 'ROOT');
         $child = $this->createCategory($tenantId, null, 'CHILD', (int) $parent->getKey());
 
-        $this->assertSame((int) $parent->getKey(), (int) $child->parent->getKey());
-        $this->assertTrue($parent->children->contains($child));
+        $this->withTenantExecutionContext($tenantId, function () use ($parent, $child): void {
+            $this->assertSame((int) $parent->getKey(), (int) $child->load('parent')->parent->getKey());
+            $this->assertTrue($parent->load('children')->children->contains($child));
+        });
     }
 
     public function test_bundle_creation_and_circular_bundle_prevention(): void
@@ -112,7 +114,7 @@ final class ItemEngineTest extends TestCase
         $uomId = $this->createUom($tenantId, null, 'PCS');
         $component = $this->createBasicItem($tenantId, 'CHILD', ItemType::Stock, true, $uomId);
 
-        $package = app(ItemCreationService::class)->create(new CreateItemData(
+        $package = $this->createItem(new CreateItemData(
             tenantId: $tenantId,
             code: 'KIT-001',
             name: 'Starter Kit',
@@ -126,7 +128,7 @@ final class ItemEngineTest extends TestCase
         $this->assertTrue((bool) $package->is_combo);
         $this->assertCount(1, $package->bundleLines);
 
-        $nestedPackage = app(ItemCreationService::class)->create(new CreateItemData(
+        $nestedPackage = $this->createItem(new CreateItemData(
             tenantId: $tenantId,
             code: 'KIT-002',
             name: 'Nested Kit',
@@ -150,13 +152,16 @@ final class ItemEngineTest extends TestCase
             'updated_at' => now(),
         ]);
 
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(ValidationException::class);
         $this->expectExceptionMessage('Item bundle cannot create a circular composition.');
 
-        app(ItemBundleService::class)->addLine($package, new ItemBundleData(
-            childItemId: (int) $nestedPackage->getKey(),
-            quantity: '1.000000',
-            lineType: ItemType::NonStock->value,
+        $this->withTenantExecutionContext($tenantId, fn () => app(ItemBundleService::class)->addLine(
+            $package,
+            new ItemBundleData(
+                childItemId: (int) $nestedPackage->getKey(),
+                quantity: '1.000000',
+                lineType: ItemType::NonStock->value,
+            ),
         ));
     }
 
@@ -166,7 +171,7 @@ final class ItemEngineTest extends TestCase
 
         $this->expectException(ValidationException::class);
 
-        app(ItemCreationService::class)->create(new CreateItemData(
+        $this->createItem(new CreateItemData(
             tenantId: $tenantId,
             code: 'SVC-STOCK',
             name: 'Invalid Service',
@@ -198,10 +203,12 @@ final class ItemEngineTest extends TestCase
 
         $lookup = app(ItemLookupService::class);
 
-        $this->assertCount(3, $lookup->activeItems($tenantId));
-        $this->assertCount(1, $lookup->stockItems($tenantId));
-        $this->assertCount(1, $lookup->serviceItems($tenantId));
-        $this->assertCount(1, $lookup->labourItems($tenantId));
+        $this->withTenantExecutionContext($tenantId, function () use ($lookup, $tenantId): void {
+            $this->assertCount(3, $lookup->activeItems($tenantId));
+            $this->assertCount(1, $lookup->stockItems($tenantId));
+            $this->assertCount(1, $lookup->serviceItems($tenantId));
+            $this->assertCount(1, $lookup->labourItems($tenantId));
+        });
     }
 
     public function test_cross_organization_uom_reference_is_rejected(): void
@@ -214,7 +221,7 @@ final class ItemEngineTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Item reference belongs to a different organization unit.');
 
-        app(ItemCreationService::class)->create(new CreateItemData(
+        $this->createItem(new CreateItemData(
             tenantId: $tenantId,
             organizationUnitId: $orgTwo,
             code: 'ORG-MISMATCH',
@@ -242,7 +249,10 @@ final class ItemEngineTest extends TestCase
             'tenant_id' => $tenantId,
             'code' => 'FULL-SERVICE-PACKAGE',
         ]);
-        $this->assertSame(6, Item::query()->where('tenant_id', $tenantId)->count());
+        $this->assertSame(6, $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): int => Item::query()->where('tenant_id', $tenantId)->count(),
+        ));
     }
 
     private function createBasicItem(
@@ -257,7 +267,7 @@ final class ItemEngineTest extends TestCase
             throw new InvalidArgumentException('Test helper does not create bundled parent items.');
         }
 
-        return app(ItemCreationService::class)->create(new CreateItemData(
+        return $this->createItem(new CreateItemData(
             tenantId: $tenantId,
             code: $code,
             name: 'Item '.$code,
@@ -272,14 +282,19 @@ final class ItemEngineTest extends TestCase
     {
         $suffix = $suffix !== '' ? $suffix : Str::upper(Str::random(4));
 
-        return (int) DB::table('tenants')->insertGetId([
+        $tenantId = (int) DB::table('tenants')->insertGetId([
             'uuid' => (string) Str::uuid(),
             'code' => 'TEN-ITEM-'.$suffix,
             'name' => 'Item Tenant '.$suffix,
             'slug' => 'item-tenant-'.Str::lower($suffix),
             'status' => 'active',
+            'status_changed_at' => now(),
             'created_at' => now(),
             'updated_at' => now()]);
+
+        \Tests\Support\ActiveTenantSubscriptionFixture::create($tenantId);
+
+        return $tenantId;
     }
 
     private function createCurrency(string $code): int
@@ -330,24 +345,32 @@ final class ItemEngineTest extends TestCase
 
     private function createCategory(int $tenantId, ?int $organizationUnitId, string $code, ?int $parentId = null): ItemCategory
     {
-        return ItemCategory::query()->create([
+        return $this->withTenantExecutionContext($tenantId, fn (): ItemCategory => ItemCategory::query()->create([
             'tenant_id' => $tenantId,
             'organization_unit_id' => $organizationUnitId,
             'parent_id' => $parentId,
             'code' => $code,
             'name' => 'Category '.$code,
             'is_active' => true,
-        ]);
+        ]));
     }
 
     private function createBrand(int $tenantId, ?int $organizationUnitId, string $code): ItemBrand
     {
-        return ItemBrand::query()->create([
+        return $this->withTenantExecutionContext($tenantId, fn (): ItemBrand => ItemBrand::query()->create([
             'tenant_id' => $tenantId,
             'organization_unit_id' => $organizationUnitId,
             'code' => $code,
             'name' => 'Brand '.$code,
             'is_active' => true,
-        ]);
+        ]));
+    }
+
+    private function createItem(CreateItemData $data): Item
+    {
+        return $this->withTenantExecutionContext(
+            $data->tenantId,
+            fn (): Item => app(ItemCreationService::class)->create($data),
+        );
     }
 }

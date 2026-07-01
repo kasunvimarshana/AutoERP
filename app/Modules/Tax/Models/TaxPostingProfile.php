@@ -6,7 +6,6 @@ namespace Modules\Tax\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Core\Models\TenantOwnedModel;
-use Modules\Finance\Models\FinanceAccount;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Tenant\Models\TenantModel;
 
@@ -22,7 +21,6 @@ final class TaxPostingProfile extends TenantOwnedModel
             'tenant_id' => 'integer',
             'organization_unit_id' => 'integer',
             'tax_id' => 'integer',
-            'account_id' => 'integer',
             'active' => 'boolean',
         ]);
     }
@@ -42,8 +40,4 @@ final class TaxPostingProfile extends TenantOwnedModel
         return $this->belongsTo(Tax::class, 'tax_id');
     }
 
-    public function account(): BelongsTo
-    {
-        return $this->belongsTo(FinanceAccount::class, 'account_id');
-    }
 }

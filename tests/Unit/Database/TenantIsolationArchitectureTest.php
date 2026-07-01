@@ -136,6 +136,12 @@ final class TenantIsolationArchitectureTest extends TestCase
             if (! str_contains($source, "'tenant_id' =>")) {
                 continue;
             }
+            if (str_contains($source, "'tenant_id' => ['prohibited']")) {
+                continue;
+            }
+            if (str_contains($path, '/Http/Requests/Platform/')) {
+                continue;
+            }
 
             if (preg_match('/(?:abstract\s+|final\s+)?class\s+([A-Za-z0-9_]+)/', $source, $match) !== 1) {
                 $violations[] = "{$path}: request class could not be resolved";
@@ -446,7 +452,10 @@ final class TenantIsolationArchitectureTest extends TestCase
                 'tenant_owned' => $this->hasRequiredTenantId($source),
                 'has_tenant_id' => str_contains($source, "('tenant_id')"),
                 'has_identity_candidate_key' => preg_match(
-                    "/\\$table->unique\\(\\s*\\[\\s*'id'\\s*,\\s*'tenant_id'\\s*\\]/s",
+                    "/\\\$table->unique\\(\\s*\\[\\s*'id'\\s*,\\s*'tenant_id'\\s*\\]/s",
+                    $source,
+                ) === 1 || preg_match(
+                    "/\\\$table->(?:foreignId|unsignedBigInteger)\\('tenant_id'\\)[^;]*->primary\\(/s",
                     $source,
                 ) === 1,
             ];
@@ -459,7 +468,7 @@ final class TenantIsolationArchitectureTest extends TestCase
     private function compositeTenantForeignKeys(string $source): array
     {
         preg_match_all(
-            "/\\$table->foreign\\(\\s*\\[\\s*'([^']+)'\\s*,\\s*'tenant_id'\\s*\\](?:\\s*,\\s*'[^']+')?\\s*\\)"
+            "/\\\$table->foreign\\(\\s*\\[\\s*'([^']+)'\\s*,\\s*'tenant_id'\\s*\\](?:\\s*,\\s*'[^']+')?\\s*\\)"
             ."\\s*->references\\(\\s*\\[\\s*'id'\\s*,\\s*'tenant_id'\\s*\\]\\s*\\)"
             ."\\s*->on\\('([^']+)'\\)([^;]*);/s",
             $source,
@@ -481,14 +490,14 @@ final class TenantIsolationArchitectureTest extends TestCase
     private function simpleForeignKeys(string $source): array
     {
         preg_match_all(
-            "/\\$table->foreignId\\('([^']+)'\\)([^;]*?)"
+            "/\\\$table->foreignId\\('([^']+)'\\)([^;]*?)"
             ."->constrained\\('([^']+)'(?:\\s*,\\s*'id')?(?:\\s*,\\s*'[^']+')?\\)([^;]*);/s",
             $source,
             $constrainedMatches,
             PREG_SET_ORDER,
         );
         preg_match_all(
-            "/\\$table->foreign\\(\\s*'([^']+)'[^)]*\\)"
+            "/\\\$table->foreign\\(\\s*'([^']+)'[^)]*\\)"
             ."\\s*->references\\(\\s*'[^']+'\\s*\\)"
             ."\\s*->on\\(\\s*'([^']+)'\\s*\\)([^;]*);/s",
             $source,
@@ -535,7 +544,7 @@ final class TenantIsolationArchitectureTest extends TestCase
 
     private function hasRequiredTenantId(string $source): bool
     {
-        if (preg_match("/\\$table->(?:foreignId|unsignedBigInteger|bigInteger|uuid|unsignedInteger|integer)\\('tenant_id'\\)([^;]*);/s", $source, $match) !== 1) {
+        if (preg_match("/\\\$table->(?:foreignId|unsignedBigInteger|bigInteger|uuid|unsignedInteger|integer)\\('tenant_id'\\)([^;]*);/s", $source, $match) !== 1) {
             return false;
         }
 

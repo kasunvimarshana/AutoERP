@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Modules\Vehicle\Validators;
 
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
@@ -57,7 +59,11 @@ final class VehicleValidationService
 
     public function validateModelData(VehicleModelData $data): VehicleMake
     {
-        $make = VehicleMake::query()->findOrFail($data->vehicleMakeId);
+        $make = VehicleMake::query()->find($data->vehicleMakeId);
+        if (! $make instanceof VehicleMake) {
+            $this->missingTenantReference('vehicle_makes', VehicleMake::class, $data->tenantId, $data->vehicleMakeId, 'Vehicle reference belongs to a different tenant.');
+        }
+
         $this->assertScope($data->tenantId, $data->organizationUnitId, (int) $make->tenant_id, $make->organization_unit_id);
         if (! (bool) $make->is_active) {
             throw new InvalidArgumentException('Inactive vehicle make cannot be used for a model.');
@@ -80,7 +86,17 @@ final class VehicleValidationService
         if ($organizationUnitId === null) {
             return;
         }
-        $organization = OrganizationUnitModel::query()->findOrFail($organizationUnitId);
+        $organization = OrganizationUnitModel::query()->find($organizationUnitId);
+        if (! $organization instanceof OrganizationUnitModel) {
+            $this->missingTenantReference(
+                'organization_units',
+                OrganizationUnitModel::class,
+                $tenantId,
+                $organizationUnitId,
+                'Vehicle organization unit belongs to a different tenant.',
+            );
+        }
+
         if ((int) $organization->tenant_id !== $tenantId) {
             throw new InvalidArgumentException('Vehicle organization unit belongs to a different tenant.');
         }
@@ -111,22 +127,38 @@ final class VehicleValidationService
     private function assertReferences(int $tenantId, ?int $organizationUnitId, ?int $makeId, ?int $modelId, ?int $typeId, ?int $categoryId): void
     {
         if ($makeId !== null) {
-            $make = VehicleMake::query()->findOrFail($makeId);
+            $make = VehicleMake::query()->find($makeId);
+            if (! $make instanceof VehicleMake) {
+                $this->missingTenantReference('vehicle_makes', VehicleMake::class, $tenantId, $makeId, 'Vehicle reference belongs to a different tenant.');
+            }
+
             $this->assertReferenceUsable($tenantId, $organizationUnitId, $make, 'Inactive vehicle make cannot be used.');
         }
         if ($modelId !== null) {
-            $model = VehicleModel::query()->findOrFail($modelId);
+            $model = VehicleModel::query()->find($modelId);
+            if (! $model instanceof VehicleModel) {
+                $this->missingTenantReference('vehicle_models', VehicleModel::class, $tenantId, $modelId, 'Vehicle reference belongs to a different tenant.');
+            }
+
             $this->assertReferenceUsable($tenantId, $organizationUnitId, $model, 'Inactive vehicle model cannot be used.');
             if ($makeId !== null && (int) $model->vehicle_make_id !== $makeId) {
                 throw new InvalidArgumentException('Vehicle model must belong to the selected make.');
             }
         }
         if ($typeId !== null) {
-            $type = VehicleType::query()->findOrFail($typeId);
+            $type = VehicleType::query()->find($typeId);
+            if (! $type instanceof VehicleType) {
+                $this->missingTenantReference('vehicle_types', VehicleType::class, $tenantId, $typeId, 'Vehicle reference belongs to a different tenant.');
+            }
+
             $this->assertReferenceUsable($tenantId, $organizationUnitId, $type, 'Inactive vehicle type cannot be used.');
         }
         if ($categoryId !== null) {
-            $category = VehicleCategory::query()->findOrFail($categoryId);
+            $category = VehicleCategory::query()->find($categoryId);
+            if (! $category instanceof VehicleCategory) {
+                $this->missingTenantReference('vehicle_categories', VehicleCategory::class, $tenantId, $categoryId, 'Vehicle reference belongs to a different tenant.');
+            }
+
             $this->assertReferenceUsable($tenantId, $organizationUnitId, $category, 'Inactive vehicle category cannot be used.');
         }
     }
@@ -171,5 +203,22 @@ final class VehicleValidationService
         if ($id !== null) {
             $query->whereKeyNot($id);
         }
+    }
+
+    /**
+     * @param class-string $modelClass
+     */
+    private function missingTenantReference(
+        string $table,
+        string $modelClass,
+        int $tenantId,
+        int $id,
+        string $message,
+    ): never {
+        if (DB::table($table)->where('id', $id)->where('tenant_id', '<>', $tenantId)->exists()) {
+            throw new InvalidArgumentException($message);
+        }
+
+        throw (new ModelNotFoundException())->setModel($modelClass, [$id]);
     }
 }

@@ -31,7 +31,6 @@ export default function TechnicianWorkReportPage() {
     const [result, setResult] = useState<TechnicianWorkReportResult | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
-    const [resetToken, setResetToken] = useState(0);
 
     useEffect(() => {
         const controller = new AbortController();
@@ -61,7 +60,6 @@ export default function TechnicianWorkReportPage() {
     const reset = () => {
         setDraft(initialFilters);
         setFilters(initialFilters);
-        setResetToken((value) => value + 1);
     };
 
     const sort = (column: string) => {
@@ -83,7 +81,6 @@ export default function TechnicianWorkReportPage() {
                     <ServiceAssignmentFilters
                         value={draft}
                         loading={loading}
-                        resetToken={resetToken}
                         onChange={(patch) => setDraft((current) => ({ ...current, ...patch }))}
                         onApply={apply}
                         onReset={reset}

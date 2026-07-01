@@ -44,6 +44,15 @@ function resourceOrNull(resource: NamedResource | null | undefined): NamedResour
     return resource?.id ? resource : null;
 }
 
+function recognitionLabelFromAdjustment(adjustment: NonNullable<PurchaseOrder['adjustments']>[number]): string | undefined {
+    const recognition = adjustment.recognition;
+    if (!recognition) return undefined;
+
+    const fallback = [recognition.cost_treatment, recognition.tax_treatment].filter(Boolean).join(' / ');
+
+    return recognition.final_treatment ?? (fallback || undefined);
+}
+
 function adjustmentFromOrder(adjustment: NonNullable<PurchaseOrder['adjustments']>[number]): EditableHeaderAdjustment {
     return {
         name: adjustment.name,
@@ -54,13 +63,7 @@ function adjustmentFromOrder(adjustment: NonNullable<PurchaseOrder['adjustments'
         rate: adjustment.rate,
         amount: adjustment.amount,
         allocation_method: adjustment.allocation_method,
-        finance_mapping_label: adjustment.finance_mapping
-            ? [adjustment.finance_mapping.cost_treatment, adjustment.finance_mapping.tax_treatment].filter(Boolean).join(' / ')
-            : undefined,
-        cost_treatment: adjustment.cost_treatment ?? undefined,
-        tax_treatment: adjustment.tax_treatment ?? undefined,
-        mapping_source: (adjustment.mapping_source as 'catalogue' | 'override' | undefined) ?? 'catalogue',
-        override_reason: adjustment.override_reason ?? '',
+        recognition_label: recognitionLabelFromAdjustment(adjustment),
         description: adjustment.description ?? '',
     };
 }
@@ -293,10 +296,6 @@ export function PurchaseOrderForm({ order }: { order?: PurchaseOrder }) {
             rate: decimalOr(adjustment.rate),
             amount: decimalOr(adjustment.amount),
             allocation_method: adjustment.allocation_method,
-            cost_treatment: adjustment.cost_treatment,
-            tax_treatment: adjustment.tax_treatment,
-            mapping_source: adjustment.mapping_source,
-            override_reason: adjustment.override_reason || undefined,
             sort_order: index,
             description: adjustment.description || undefined,
         })),

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Core\Support;
 
+use Carbon\CarbonImmutable;
 use DateTimeImmutable;
 use DateTimeZone;
 use Modules\Core\Contracts\ClockInterface;
@@ -19,6 +20,6 @@ final class SystemClock implements ClockInterface
 
     public function now(): DateTimeImmutable
     {
-        return new DateTimeImmutable('now', $this->utc);
+        return CarbonImmutable::now($this->utc);
     }
 }

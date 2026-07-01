@@ -13,7 +13,7 @@ final class FinancePostingIdempotencyBoundaryTest extends TestCase
         $posting = $this->source('../Services/FinancePostingService.php');
         $creation = $this->source('../Services/JournalEntryCreationService.php');
         $data = $this->source('../DTOs/CreateJournalEntryData.php');
-        $migration = $this->source('../Database/Migrations/2026_06_30_000001_add_journal_posting_identity.php');
+        $migration = $this->source('../Database/Migrations/2026_06_12_070009_create_finance_journal_entries_table.php');
 
         self::assertStringContainsString('sourceKey:', $posting);
         self::assertStringContainsString('postingFingerprint:', $posting);

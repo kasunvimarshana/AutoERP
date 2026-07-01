@@ -18,7 +18,7 @@ final class ArtisanBootstrapSafetyTest extends TestCase
 
         foreach ($commandFiles as $commandFile) {
             $relativePath = substr($commandFile, strlen(app_path()) + 1, -4);
-            $commandClass = str_replace(DIRECTORY_SEPARATOR, '\\', $relativePath);
+            $commandClass = str_replace(['/', '\\'], '\\', $relativePath);
 
             self::assertTrue(class_exists($commandClass), sprintf('Command class %s could not be loaded.', $commandClass));
             self::assertTrue(

@@ -107,7 +107,7 @@ final readonly class OAuthAuthorizationService
         }
 
         $locator = $this->executionContext->runAsControlPlane(function () use ($parsed): ?array {
-            $code = AuthAuthorizationCodeModel::withoutGlobalScopes()
+            $code = AuthAuthorizationCodeModel::query()
                 ->where('code_key', $parsed['key'])
                 ->first(['id', 'tenant_id']);
             return $code instanceof AuthAuthorizationCodeModel

@@ -29,31 +29,34 @@ final class FinancePostingContractTest extends TestCase
     {
         [$tenantId] = $this->createChart();
 
-        $contract = app(FinancePostingInterface::class);
-        $request = new FinancePostingRequest(
-            source: new PostingSourceData('invoice', 1001, $tenantId),
-            postingDate: '2026-06-06',
-            lines: [
-                new FinancePostingLine('1010', 'Cash', debit: '1000.000000', description: 'Cash debit'),
-                new FinancePostingLine('3000', 'Capital', credit: '1000.000000', description: 'Capital credit'),
-            ],
-            description: 'Contract posting test',
-        );
+        $this->withTenantExecutionContext($tenantId, function () use ($tenantId): void {
+            $contract = app(FinancePostingInterface::class);
+            $request = new FinancePostingRequest(
+                source: new PostingSourceData('invoice', 1001, $tenantId),
+                postingDate: '2026-06-06',
+                lines: [
+                    new FinancePostingLine(null, 'Cash', debit: '1000.000000', description: 'Cash debit', profileKey: 'cash'),
+                    new FinancePostingLine(null, 'Capital', credit: '1000.000000', description: 'Capital credit', profileKey: 'capital'),
+                ],
+                description: 'Contract posting test',
+                postingProfileCode: 'contract_posting',
+            );
 
-        $contract->validatePosting($request);
-        $draft = $contract->createDraftJournal($request);
+            $contract->validatePosting($request);
+            $draft = $contract->createDraftJournal($request);
 
-        $this->assertSame(JournalStatus::Draft->value, $draft->status);
-        $this->assertSame('1000.000000', $draft->totalDebit);
-        $this->assertSame('1000.000000', $draft->totalCredit);
+            $this->assertSame(JournalStatus::Draft->value, $draft->status);
+            $this->assertSame('1000.000000', $draft->totalDebit);
+            $this->assertSame('1000.000000', $draft->totalCredit);
 
-        $posted = $contract->postJournal($draft->journalId);
-        $this->assertSame(JournalStatus::Posted->value, $posted->status);
-        $this->assertSame(2, $posted->ledgerEntryCount);
+            $posted = $contract->postJournal($draft->journalId);
+            $this->assertSame(JournalStatus::Posted->value, $posted->status);
+            $this->assertSame(2, $posted->ledgerEntryCount);
 
-        $reversal = $contract->reverseJournal($draft->journalId, '2026-06-07');
-        $this->assertSame(JournalStatus::Posted->value, $reversal->status);
-        $this->assertSame(2, $reversal->ledgerEntryCount);
+            $reversal = $contract->reverseJournal($draft->journalId, '2026-06-07');
+            $this->assertSame(JournalStatus::Posted->value, $reversal->status);
+            $this->assertSame(2, $reversal->ledgerEntryCount);
+        });
     }
 
     public function test_integration_contracts_do_not_create_circular_module_dependencies(): void
@@ -76,41 +79,98 @@ final class FinancePostingContractTest extends TestCase
     private function createChart(): array
     {
         $tenantId = $this->createTenant();
-        $assetType = $this->createAccountType($tenantId, 'ASSET', NormalBalance::Debit);
-        $equityType = $this->createAccountType($tenantId, 'EQUITY', NormalBalance::Credit);
+        $this->withTenantExecutionContext($tenantId, function () use ($tenantId): void {
+            $assetType = $this->createAccountType($tenantId, 'ASSET', NormalBalance::Debit);
+            $equityType = $this->createAccountType($tenantId, 'EQUITY', NormalBalance::Credit);
 
-        app(ChartOfAccountsService::class)->createAccount(new CreateAccountData(
-            tenantId: $tenantId,
-            accountTypeId: (int) $assetType->getKey(),
-            code: '1010',
-            name: 'Cash',
-            normalBalance: NormalBalance::Debit,
-        ));
+            $cash = app(ChartOfAccountsService::class)->createAccount(new CreateAccountData(
+                tenantId: $tenantId,
+                accountTypeId: (int) $assetType->getKey(),
+                code: '1010',
+                name: 'Cash',
+                normalBalance: NormalBalance::Debit,
+            ));
 
-        app(ChartOfAccountsService::class)->createAccount(new CreateAccountData(
-            tenantId: $tenantId,
-            accountTypeId: (int) $equityType->getKey(),
-            code: '3000',
-            name: 'Capital',
-            normalBalance: NormalBalance::Credit,
-        ));
+            $capital = app(ChartOfAccountsService::class)->createAccount(new CreateAccountData(
+                tenantId: $tenantId,
+                accountTypeId: (int) $equityType->getKey(),
+                code: '3000',
+                name: 'Capital',
+                normalBalance: NormalBalance::Credit,
+            ));
 
-        $year = FinanceFiscalYear::query()->create([
-            'tenant_id' => $tenantId,
-            'name' => 'FY 2026',
-            'start_date' => '2026-01-01',
-            'end_date' => '2026-12-31',
-            'status' => 'open',
-        ]);
-        FinanceFiscalPeriod::query()->create([
-            'tenant_id' => $tenantId,
-            'fiscal_year_id' => $year->getKey(),
-            'name' => 'June 2026',
-            'period_number' => 6,
-            'start_date' => '2026-06-01',
-            'end_date' => '2026-06-30',
-            'status' => 'open',
-        ]);
+            $cashRoleId = $this->createAccountRole($tenantId, 'cash', 'Cash');
+            $capitalRoleId = $this->createAccountRole($tenantId, 'capital', 'Capital');
+
+            $now = now();
+            DB::table('finance_account_assignments')->insert([
+                [
+                    'tenant_id' => $tenantId,
+                    'organization_unit_id' => null,
+                    'account_role_id' => $cashRoleId,
+                    'account_id' => (int) $cash->getKey(),
+                    'effective_from' => '2026-01-01',
+                    'is_active' => true,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ],
+                [
+                    'tenant_id' => $tenantId,
+                    'organization_unit_id' => null,
+                    'account_role_id' => $capitalRoleId,
+                    'account_id' => (int) $capital->getKey(),
+                    'effective_from' => '2026-01-01',
+                    'is_active' => true,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ],
+            ]);
+
+            $postingProfileId = (int) DB::table('finance_posting_profiles')->insertGetId([
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => null,
+                'code' => 'contract_posting',
+                'name' => 'Contract Posting',
+                'is_active' => true,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+            DB::table('finance_posting_profile_rules')->insert([
+                [
+                    'tenant_id' => $tenantId,
+                    'posting_profile_id' => $postingProfileId,
+                    'line_key' => 'cash',
+                    'account_role_id' => $cashRoleId,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ],
+                [
+                    'tenant_id' => $tenantId,
+                    'posting_profile_id' => $postingProfileId,
+                    'line_key' => 'capital',
+                    'account_role_id' => $capitalRoleId,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ],
+            ]);
+
+            $year = FinanceFiscalYear::query()->create([
+                'tenant_id' => $tenantId,
+                'name' => 'FY 2026',
+                'start_date' => '2026-01-01',
+                'end_date' => '2026-12-31',
+                'status' => 'open',
+            ]);
+            FinanceFiscalPeriod::query()->create([
+                'tenant_id' => $tenantId,
+                'fiscal_year_id' => $year->getKey(),
+                'name' => 'June 2026',
+                'period_number' => 6,
+                'start_date' => '2026-06-01',
+                'end_date' => '2026-06-30',
+                'status' => 'open',
+            ]);
+        });
 
         return [$tenantId];
     }
@@ -127,6 +187,18 @@ final class FinancePostingContractTest extends TestCase
         ]);
     }
 
+    private function createAccountRole(int $tenantId, string $code, string $name): int
+    {
+        return (int) DB::table('finance_account_roles')->insertGetId([
+            'tenant_id' => $tenantId,
+            'code' => $code,
+            'name' => $name,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
     private function createTenant(): int
     {
         $suffix = Str::upper(Str::random(5));
@@ -137,6 +209,7 @@ final class FinancePostingContractTest extends TestCase
             'name' => 'Finance Posting Contract '.$suffix,
             'slug' => 'finance-posting-contract-'.Str::lower($suffix),
             'status' => 'active',
+            'status_changed_at' => now(),
             'created_at' => now(),
             'updated_at' => now()]);
     }

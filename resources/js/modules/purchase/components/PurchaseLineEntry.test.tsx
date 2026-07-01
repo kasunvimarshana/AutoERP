@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { FastPurchaseLines, blankFastPurchaseLine } from './FastPurchaseLines';
 import { PurchaseOrderLineEditor, type EditablePurchaseLine } from './PurchaseOrderLineEditor';
 import { fastPurchaseLineToPayload, purchaseOrderLineFromResource, purchaseOrderLineToPayload } from './purchaseLineAdapters';
-import type { FastPurchaseContext } from '../purchaseTypes';
+import type { FastPurchaseContext } from '../types/fastPurchaseTypes';
 vi.mock('./PurchaseLookups', () => ({
     ItemLookupSelect: ({ value, onChange, error }: {
         value: { id: number; code?: string; name?: string } | null;

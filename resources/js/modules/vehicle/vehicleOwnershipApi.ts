@@ -6,8 +6,8 @@ import type { PartyVehiclePayload, PartyVehicleRelationship } from '@/shared/typ
 export type VehicleOwnerType = 'customer' | 'supplier' | 'company';
 
 function listParams(ownerType: VehicleOwnerType, params: ListParams): ListParams {
-    const ownerId = ownerType === 'customer' ? params.customer_id : ownerType === 'supplier' ? params.supplier_id : undefined;
-    const { customer_id: _customerId, supplier_id: _supplierId, ...rest } = params;
+    const { customer_id, supplier_id, ...rest } = params;
+    const ownerId = ownerType === 'customer' ? customer_id : ownerType === 'supplier' ? supplier_id : undefined;
 
     return {
         ...rest,

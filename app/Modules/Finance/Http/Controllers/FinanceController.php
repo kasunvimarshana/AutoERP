@@ -8,6 +8,8 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Validation\ValidationException;
+use InvalidArgumentException;
 use Modules\Finance\Http\Requests\FinanceActionRequest;
 use Modules\Finance\Http\Requests\ListFinanceRequest;
 use Modules\Finance\Http\Requests\StoreFinanceAccountRequest;
@@ -90,7 +92,11 @@ final class FinanceController
 
     public function createJournal(StoreJournalEntryRequest $request, JournalEntryCreationService $service): JournalEntryResource
     {
-        return new JournalEntryResource($service->create($request->toData()));
+        try {
+            return new JournalEntryResource($service->create($request->toData()));
+        } catch (InvalidArgumentException $exception) {
+            $this->rejectFinanceOperation('journal', $exception);
+        }
     }
 
     public function journals(ListFinanceRequest $request): AnonymousResourceCollection
@@ -141,10 +147,14 @@ final class FinanceController
         int $journal,
         JournalEntryCreationService $service,
     ): JournalEntryResource {
-        return new JournalEntryResource($service->update(
-            $this->findJournal($request, $journal),
-            $request->toData(),
-        ));
+        try {
+            return new JournalEntryResource($service->update(
+                $this->findJournal($request, $journal),
+                $request->toData(),
+            ));
+        } catch (InvalidArgumentException $exception) {
+            $this->rejectFinanceOperation('journal', $exception);
+        }
     }
 
     public function cancelJournal(
@@ -152,12 +162,20 @@ final class FinanceController
         int $journal,
         JournalEntryCreationService $service,
     ): JournalEntryResource {
-        return new JournalEntryResource($service->cancel($this->findJournal($request, $journal)));
+        try {
+            return new JournalEntryResource($service->cancel($this->findJournal($request, $journal)));
+        } catch (InvalidArgumentException $exception) {
+            $this->rejectFinanceOperation('journal', $exception);
+        }
     }
 
     public function postJournal(FinanceActionRequest $request, int $journal, JournalPostingService $service): JsonResponse
     {
-        $result = $service->post($this->findJournal($request, $journal), $request->currentUserId());
+        try {
+            $result = $service->post($this->findJournal($request, $journal), $request->currentUserId());
+        } catch (InvalidArgumentException $exception) {
+            $this->rejectFinanceOperation('journal', $exception);
+        }
 
         return response()->json(['data' => get_object_vars($result)]);
     }
@@ -169,12 +187,16 @@ final class FinanceController
             'reversal_reason' => ['required', 'string', 'max:1000'],
         ]);
 
-        return new JournalEntryResource($service->reverse(
-            $this->findJournal($request, $journal),
-            (string) $request->input('reversal_date'),
-            $request->currentUserId(),
-            (string) $request->input('reversal_reason'),
-        ));
+        try {
+            return new JournalEntryResource($service->reverse(
+                $this->findJournal($request, $journal),
+                (string) $request->input('reversal_date'),
+                $request->currentUserId(),
+                (string) $request->input('reversal_reason'),
+            ));
+        } catch (InvalidArgumentException $exception) {
+            $this->rejectFinanceOperation('journal', $exception);
+        }
     }
 
     public function ledger(ListFinanceRequest $request, GeneralLedgerReportService $service): AnonymousResourceCollection
@@ -662,6 +684,13 @@ final class FinanceController
         int $journal,
     ): FinanceJournalEntry {
         return $this->scope(FinanceJournalEntry::query(), $request)->findOrFail($journal);
+    }
+
+    private function rejectFinanceOperation(string $field, InvalidArgumentException $exception): never
+    {
+        throw ValidationException::withMessages([
+            $field => [$exception->getMessage()],
+        ]);
     }
 
     private function scope(

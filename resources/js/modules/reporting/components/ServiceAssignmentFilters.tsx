@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { useCallback, useState, type FormEvent } from 'react';
 import { CustomerLookupSelect } from '@/modules/customer/components/CustomerLookupSelect';
 import type { CustomerSummary } from '@/modules/customer/customerTypes';
 import { searchEmployees } from '@/modules/hr/hrApi';
@@ -49,7 +49,6 @@ const options = (values: string[][]) => values.map(([value, label]) => ({ value,
 interface ServiceAssignmentFiltersProps {
     value: TechnicianWorkReportParams;
     loading: boolean;
-    resetToken: number;
     onChange: (patch: Partial<TechnicianWorkReportParams>) => void;
     onApply: (event: FormEvent<HTMLFormElement>) => void;
     onReset: () => void;
@@ -58,7 +57,6 @@ interface ServiceAssignmentFiltersProps {
 export function ServiceAssignmentFilters({
     value,
     loading,
-    resetToken,
     onChange,
     onApply,
     onReset,
@@ -67,13 +65,6 @@ export function ServiceAssignmentFilters({
     const [supervisor, setSupervisor] = useState<EmployeeSummary | null>(null);
     const [customer, setCustomer] = useState<CustomerSummary | null>(null);
     const [vehicle, setVehicle] = useState<VehicleSummary | null>(null);
-
-    useEffect(() => {
-        setEmployee(null);
-        setSupervisor(null);
-        setCustomer(null);
-        setVehicle(null);
-    }, [resetToken]);
 
     const employeeSearch = useCallback(
         (params: LookupLoadParams) => searchEmployees(params),
@@ -89,7 +80,7 @@ export function ServiceAssignmentFilters({
                 <Select label="Job status" value={value.job_status ?? ''} options={options(jobStatuses)} onChange={(event) => onChange({ job_status: event.target.value })} />
                 <GenericLookupSelect<EmployeeSummary>
                     label="Technician"
-                    value={employee}
+                    value={value.employee_id ? employee : null}
                     onChange={(selected) => {
                         setEmployee(selected);
                         onChange({ employee_id: selected?.id ?? null });
@@ -99,7 +90,7 @@ export function ServiceAssignmentFilters({
                 />
                 <GenericLookupSelect<EmployeeSummary>
                     label="Supervisor"
-                    value={supervisor}
+                    value={value.supervisor_id ? supervisor : null}
                     onChange={(selected) => {
                         setSupervisor(selected);
                         onChange({ supervisor_id: selected?.id ?? null });
@@ -107,11 +98,11 @@ export function ServiceAssignmentFilters({
                     search={employeeSearch}
                     formatLabel={(selected) => `${selected.employee_number} ${selected.display_name}`}
                 />
-                <CustomerLookupSelect value={customer} onChange={(selected) => {
+                <CustomerLookupSelect value={value.customer_id ? customer : null} onChange={(selected) => {
                     setCustomer(selected);
                     onChange({ customer_id: selected?.id ?? null });
                 }} />
-                <VehicleLookupSelect value={vehicle} onChange={(selected) => {
+                <VehicleLookupSelect value={value.vehicle_id ? vehicle : null} onChange={(selected) => {
                     setVehicle(selected);
                     onChange({ vehicle_id: selected?.id ?? null });
                 }} />

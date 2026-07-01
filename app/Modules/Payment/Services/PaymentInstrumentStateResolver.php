@@ -26,14 +26,14 @@ final class PaymentInstrumentStateResolver
         }
 
         foreach ([
-            PaymentInstrumentStatus::Refunded => [PaymentInstrumentStatus::Refunded->value],
-            PaymentInstrumentStatus::Reversed => [PaymentInstrumentStatus::Reversed->value],
-            PaymentInstrumentStatus::Settled => [PaymentInstrumentStatus::Settled->value],
-            PaymentInstrumentStatus::Cleared => [
+            [PaymentInstrumentStatus::Refunded, [PaymentInstrumentStatus::Refunded->value]],
+            [PaymentInstrumentStatus::Reversed, [PaymentInstrumentStatus::Reversed->value]],
+            [PaymentInstrumentStatus::Settled, [PaymentInstrumentStatus::Settled->value]],
+            [PaymentInstrumentStatus::Cleared, [
                 PaymentInstrumentStatus::Cleared->value,
                 PaymentInstrumentStatus::Settled->value,
-            ],
-        ] as $aggregate => $finalStates) {
+            ]],
+        ] as [$aggregate, $finalStates]) {
             if (array_diff($values, $finalStates) === []) {
                 return $aggregate;
             }

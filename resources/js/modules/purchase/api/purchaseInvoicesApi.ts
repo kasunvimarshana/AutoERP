@@ -5,7 +5,8 @@ import type { NamedResource } from '@/shared/types/common';
 import type { Invoice } from '@/modules/invoice/invoiceApi';
 import type { LookupLoadParams, LookupResult } from '@/shared/types/lookup';
 import type { Payment } from '@/modules/payment/paymentApi';
-import type { FastPurchaseOptionResource, PurchaseInvoicePayload, PurchasePaymentCreatePayload, PurchasePaymentPreview } from '../purchaseTypes';
+import type { PurchaseInvoicePayload, PurchasePaymentCreatePayload, PurchasePaymentPreview } from '../purchaseTypes';
+import type { FastPurchaseOptionResource } from '../types/fastPurchaseTypes';
 
 export async function previewPurchaseInvoice(payload: PurchaseInvoicePayload) {
     const response = await apiClient.post<ApiResource<Record<string, unknown>>>(
@@ -42,7 +43,6 @@ export async function createPurchasePayment(payload: PurchasePaymentCreatePayloa
 export async function getPurchasePaymentContext(signal?: AbortSignal) {
     const response = await apiClient.get<ApiResource<{
         payment_methods: FastPurchaseOptionResource[];
-        payment_accounts: FastPurchaseOptionResource[];
     }>>(`${endpoints.purchase}/payments/context`, { signal });
     return response.data.data;
 }

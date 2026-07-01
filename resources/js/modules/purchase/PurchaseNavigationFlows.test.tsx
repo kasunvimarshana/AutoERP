@@ -188,11 +188,12 @@ function goodsReceipt() {
 function payment(): Payment {
     return {
         id: 5,
+        row_version: 1,
         payment_number: 'PAY-5',
         payment_date: '2026-06-18',
         payment_type: 'supplier_payment',
         direction: 'outbound',
-        status: 'draft',
+        document_status: 'draft',
         party: { id: 11, name: 'Supplier A' },
         total_amount: '100.000000',
         allocated_amount: '0.000000',

@@ -37,7 +37,6 @@ describe('PurchasePaymentCreateForm', () => {
         vi.clearAllMocks();
         purchaseApiMocks.getPurchasePaymentContext.mockResolvedValue({
             payment_methods: [{ id: 1, name: 'Cash', method_type: 'cash' }],
-            payment_accounts: [{ id: 2, name: 'Cash Account' }],
         });
         purchaseApiMocks.listOutstandingSupplierInvoices.mockResolvedValue(collection([invoice()]));
         purchaseApiMocks.preparePurchasePayment.mockResolvedValue({
@@ -53,7 +52,7 @@ describe('PurchasePaymentCreateForm', () => {
             currency_id: 5,
             exchange_rate: '1.000000',
             reference_number: null,
-            lines: [{ amount: '100.000000', payment_method_id: 1, source_account_id: 2 }],
+            lines: [{ amount: '100.000000', payment_method_id: 1 }],
             allocations: [{
                 invoice_id: 42,
                 invoice_number: 'SI-42',
@@ -107,7 +106,6 @@ describe('PurchasePaymentCreateForm', () => {
         await user.click(screen.getByRole('tab', { name: /Payment Methods/ }));
         const selects = screen.getAllByRole('combobox');
         await user.selectOptions(selects[0], '1');
-        await user.selectOptions(selects[1], '2');
 
         await user.click(screen.getByRole('button', { name: 'Preview Payment' }));
 
@@ -196,6 +194,7 @@ function PaymentQueryHarness() {
 function invoice(id = 42, invoiceNumber = 'SI-42', balance = '100.000000'): Invoice {
     return {
         id,
+        row_version: 1,
         invoice_number: invoiceNumber,
         invoice_date: '2026-06-18',
         invoice_type: 'purchase',

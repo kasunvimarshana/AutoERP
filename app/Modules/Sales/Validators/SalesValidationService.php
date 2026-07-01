@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Modules\Sales\Validators;
 
 use InvalidArgumentException;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Facades\DB;
 use Modules\ReferenceData\Models\CurrencyModel;
 use Modules\Core\Services\DecimalMath;
 use Modules\Customer\Enums\CustomerStatus;
@@ -42,7 +44,11 @@ final class SalesValidationService
 
     public function customer(int $tenantId, ?int $organizationUnitId, int $customerId): Customer
     {
-        $customer = Customer::query()->with(['creditProfile', 'defaultCurrency'])->findOrFail($customerId);
+        $customer = Customer::query()->with(['creditProfile', 'defaultCurrency'])->find($customerId);
+        if (! $customer instanceof Customer) {
+            $this->missingTenantReference('customers', Customer::class, $tenantId, $customerId);
+        }
+
         $this->assertTenantOrg((int) $customer->tenant_id, $customer->organization_unit_id, $tenantId, $organizationUnitId);
         if ($customer->status !== CustomerStatus::Active) {
             throw new InvalidArgumentException('Sales customer must be active.');
@@ -53,7 +59,11 @@ final class SalesValidationService
 
     public function item(int $tenantId, ?int $organizationUnitId, int $itemId): Item
     {
-        $item = Item::query()->findOrFail($itemId);
+        $item = Item::query()->find($itemId);
+        if (! $item instanceof Item) {
+            $this->missingTenantReference('items', Item::class, $tenantId, $itemId);
+        }
+
         $this->assertTenantOrg((int) $item->tenant_id, $item->organization_unit_id, $tenantId, $organizationUnitId);
         if (! (bool) $item->is_active) {
             throw new InvalidArgumentException('Sales item must be active.');
@@ -64,7 +74,11 @@ final class SalesValidationService
 
     public function itemVariant(int $tenantId, ?int $organizationUnitId, int $itemId, int $variantId): ItemVariant
     {
-        $variant = ItemVariant::query()->findOrFail($variantId);
+        $variant = ItemVariant::query()->find($variantId);
+        if (! $variant instanceof ItemVariant) {
+            $this->missingTenantReference('item_variants', ItemVariant::class, $tenantId, $variantId);
+        }
+
         $this->assertTenantOrg((int) $variant->tenant_id, $variant->organization_unit_id, $tenantId, $organizationUnitId);
         if ((int) $variant->item_id !== $itemId || ! (bool) $variant->is_active) {
             throw new InvalidArgumentException('Sales item variant must be active and belong to the selected item.');
@@ -75,7 +89,11 @@ final class SalesValidationService
 
     public function warehouse(int $tenantId, ?int $organizationUnitId, int $warehouseId): WarehouseModel
     {
-        $warehouse = WarehouseModel::query()->findOrFail($warehouseId);
+        $warehouse = WarehouseModel::query()->find($warehouseId);
+        if (! $warehouse instanceof WarehouseModel) {
+            $this->missingTenantReference('warehouses', WarehouseModel::class, $tenantId, $warehouseId);
+        }
+
         $this->assertTenantOrg((int) $warehouse->tenant_id, $warehouse->organization_unit_id ?? null, $tenantId, $organizationUnitId);
         if (! (bool) $warehouse->is_active) {
             throw new InvalidArgumentException('Sales warehouse must be active.');
@@ -86,13 +104,17 @@ final class SalesValidationService
 
     public function warehouseLocation(int $tenantId, ?int $organizationUnitId, int $warehouseId, int $locationId): WarehouseLocationModel
     {
-        $location = WarehouseLocationModel::query()->findOrFail($locationId);
+        $location = WarehouseLocationModel::query()->find($locationId);
+        if (! $location instanceof WarehouseLocationModel) {
+            $this->missingTenantReference('warehouse_locations', WarehouseLocationModel::class, $tenantId, $locationId);
+        }
+
         $this->assertTenantOrg((int) $location->tenant_id, $location->organization_unit_id ?? null, $tenantId, $organizationUnitId);
         if ((int) $location->warehouse_id !== $warehouseId || ! (bool) $location->is_active) {
             throw new InvalidArgumentException('Sales warehouse location must be active and belong to the selected warehouse.');
         }
 
-        $warehouse = WarehouseModel::query()->findOrFail($warehouseId);
+        $warehouse = $this->warehouse($tenantId, $organizationUnitId, $warehouseId);
         if ((int) $location->tenant_id !== (int) $warehouse->tenant_id
             || $location->organization_unit_id !== $warehouse->organization_unit_id) {
             throw new InvalidArgumentException('Sales warehouse location scope must match the selected warehouse.');
@@ -116,7 +138,11 @@ final class SalesValidationService
      */
     public function resolveUom(int $tenantId, ?int $organizationUnitId, Item $item, int $uomId, string $quantity): array
     {
-        $uom = UnitOfMeasureModel::query()->findOrFail($uomId);
+        $uom = UnitOfMeasureModel::query()->find($uomId);
+        if (! $uom instanceof UnitOfMeasureModel) {
+            $this->missingTenantReference('unit_of_measures', UnitOfMeasureModel::class, $tenantId, $uomId);
+        }
+
         $this->assertTenantOrg((int) $uom->tenant_id, $uom->organization_unit_id, $tenantId, $organizationUnitId);
         if (! (bool) $uom->is_active) {
             throw new InvalidArgumentException('Sales UOM must be active.');
@@ -176,5 +202,17 @@ final class SalesValidationService
         if ($this->math->compare($quantity, $remaining) > 0) {
             throw new InvalidArgumentException('Returned quantity cannot exceed delivery remaining quantity.');
         }
+    }
+
+    /**
+     * @param class-string $modelClass
+     */
+    private function missingTenantReference(string $table, string $modelClass, int $tenantId, int $id): never
+    {
+        if (DB::table($table)->where('id', $id)->where('tenant_id', '<>', $tenantId)->exists()) {
+            throw new InvalidArgumentException('Sales reference belongs to a different tenant.');
+        }
+
+        throw (new ModelNotFoundException())->setModel($modelClass, [$id]);
     }
 }

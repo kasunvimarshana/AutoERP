@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Customer\Validators;
 
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\ReferenceData\Models\CurrencyModel;
 use Modules\Core\Services\DecimalMath;
@@ -68,7 +69,24 @@ final class CustomerValidationService
 
     public function assertCategoryUsable(Customer $customer, int $categoryId): CustomerCategory
     {
-        $category = CustomerCategory::query()->findOrFail($categoryId);
+        $category = CustomerCategory::query()->find($categoryId);
+        if (! $category instanceof CustomerCategory) {
+            $owner = DB::table('customer_categories')
+                ->where('id', $categoryId)
+                ->whereNull('deleted_at')
+                ->first(['tenant_id', 'organization_unit_id']);
+
+            if ($owner !== null) {
+                $this->assertScope(
+                    (int) $customer->tenant_id,
+                    $customer->organization_unit_id,
+                    (int) $owner->tenant_id,
+                    $owner->organization_unit_id === null ? null : (int) $owner->organization_unit_id,
+                );
+            }
+
+            throw new InvalidArgumentException('Customer category was not found.');
+        }
         $this->assertScope(
             (int) $customer->tenant_id,
             $customer->organization_unit_id,

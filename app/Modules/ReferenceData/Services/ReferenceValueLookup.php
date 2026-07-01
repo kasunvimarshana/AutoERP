@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\ReferenceData\Services;
 
+use DateTimeZone;
 use InvalidArgumentException;
 use Modules\ReferenceData\Contracts\ReferenceValueLookupInterface;
 use Modules\ReferenceData\Models\CountryModel;
@@ -31,6 +32,17 @@ final class ReferenceValueLookup implements ReferenceValueLookupInterface
             ?? throw new InvalidArgumentException(
                 "Unknown reference-data catalog [{$catalog}].",
             );
+
+        if ($catalog === 'timezones' && is_string($value)) {
+            $timezone = TimezoneModel::query()
+                ->where('name', $value)
+                ->first();
+            if ($timezone instanceof TimezoneModel) {
+                return (bool) $timezone->is_active;
+            }
+
+            return in_array($value, DateTimeZone::listIdentifiers(), true);
+        }
 
         return $model::query()
             ->where($column, $value)

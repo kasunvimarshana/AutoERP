@@ -16,8 +16,7 @@ final class TenantDomainRulesTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        config()->set('tenant.resolution.central_hosts', ['platform.autoerp.example']);
-        $this->rules = new TenantValueNormalizer();
+        $this->rules = new TenantValueNormalizer(['platform.autoerp.example']);
     }
 
     public function test_it_normalizes_tenant_codes_and_public_hostnames(): void

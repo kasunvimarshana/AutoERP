@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\UOM\Services\UnitOfMeasures;
 
+use Illuminate\Support\Facades\DB;
 use Modules\Core\Contracts\CurrentTenantContextAccessorInterface;
 use Modules\Core\Results\Error;
 use Modules\Core\Results\Result;
@@ -29,6 +30,15 @@ final class GetUnitOfMeasureService
             $record = $this->repository->findByIdInTenant($id, $tenantId);
 
             if ($record === null) {
+                $ownerTenantId = DB::table('unit_of_measures')
+                    ->where('id', $id)
+                    ->whereNull('deleted_at')
+                    ->value('tenant_id');
+
+                if (is_numeric($ownerTenantId) && (int) $ownerTenantId !== $tenantId) {
+                    return Result::failure(new Error(UomErrorCode::FORBIDDEN, 'UnitOfMeasure belongs to a different tenant.'));
+                }
+
                 return Result::failure(new Error(UomErrorCode::NOT_FOUND, 'UnitOfMeasure not found.'));
             }
 

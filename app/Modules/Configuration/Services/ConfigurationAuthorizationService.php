@@ -24,7 +24,7 @@ final class ConfigurationAuthorizationService
     public function canViewScopeCurrent(string $scope): bool
     {
         if ($scope === ConfigurationScope::GLOBAL) {
-            return $this->allowsPlatformPermission(PlatformPermission::CONFIGURATION_VIEW);
+            return $this->allowsPlatformConfigurationRead();
         }
 
         return $this->allowsTenantPermission(ConfigurationPermission::ENTRIES_VIEW);
@@ -57,7 +57,7 @@ final class ConfigurationAuthorizationService
     public function canViewPlatformScope(string $scope): bool
     {
         return in_array($scope, ConfigurationScope::values(), true)
-            && $this->allowsPlatformPermission(PlatformPermission::CONFIGURATION_VIEW);
+            && $this->allowsPlatformConfigurationRead();
     }
 
     public function canManagePlatformScope(string $scope): bool
@@ -78,6 +78,12 @@ final class ConfigurationAuthorizationService
 
         return $userId !== null
             && $this->platformPermissions->allows($userId, $permission);
+    }
+
+    private function allowsPlatformConfigurationRead(): bool
+    {
+        return $this->allowsPlatformPermission(PlatformPermission::CONFIGURATION_VIEW)
+            || $this->allowsPlatformPermission(PlatformPermission::CONFIGURATION_MANAGE);
     }
 
     private function allowsTenantPermission(string $permission): bool

@@ -123,7 +123,9 @@ final class UnitOfMeasureController extends Controller
         $result = $this->getService->execute($id);
 
         if ($result->isFailure()) {
-            return response()->json(['message' => $result->errorOrFail()->message], 404);
+            $error = $result->errorOrFail();
+
+            return response()->json(['message' => $error->message], $this->errorStatus($error->code));
         }
 
         return new UnitOfMeasureResource($result->valueOrFail());
@@ -138,7 +140,9 @@ final class UnitOfMeasureController extends Controller
 
         $result = $this->getService->execute($id);
         if ($result->isFailure()) {
-            return response()->json(['message' => $result->errorOrFail()->message], 404);
+            $error = $result->errorOrFail();
+
+            return response()->json(['message' => $error->message], $this->errorStatus($error->code));
         }
 
         return response()->json([
@@ -166,9 +170,8 @@ final class UnitOfMeasureController extends Controller
 
         if ($result->isFailure()) {
             $error = $result->errorOrFail();
-            $status = $error->code === UomErrorCode::NOT_FOUND ? 404 : 422;
 
-            return response()->json(['message' => $error->message], $status);
+            return response()->json(['message' => $error->message], $this->errorStatus($error->code));
         }
 
         return new UnitOfMeasureResource($result->valueOrFail());
@@ -189,7 +192,9 @@ final class UnitOfMeasureController extends Controller
         $result = $this->deleteService->execute($id);
 
         if ($result->isFailure()) {
-            return response()->json(['message' => $result->errorOrFail()->message], 404);
+            $error = $result->errorOrFail();
+
+            return response()->json(['message' => $error->message], $this->errorStatus($error->code));
         }
 
         return response()->json(null, 204);
@@ -201,9 +206,8 @@ final class UnitOfMeasureController extends Controller
 
         if ($result->isFailure()) {
             $error = $result->errorOrFail();
-            $status = $error->code === UomErrorCode::NOT_FOUND ? 404 : 422;
 
-            return response()->json(['message' => $error->message], $status);
+            return response()->json(['message' => $error->message], $this->errorStatus($error->code));
         }
 
         return new UnitOfMeasureResource($result->valueOrFail());
@@ -231,5 +235,14 @@ final class UnitOfMeasureController extends Controller
         unset($validated['page'], $validated['per_page'], $validated['tenant_id'], $validated['organization_unit_id']);
 
         return $validated;
+    }
+
+    private function errorStatus(string $code): int
+    {
+        return match ($code) {
+            UomErrorCode::FORBIDDEN => 403,
+            UomErrorCode::NOT_FOUND => 404,
+            default => 422,
+        };
     }
 }

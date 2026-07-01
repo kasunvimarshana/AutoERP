@@ -150,8 +150,9 @@ final class TaxDocumentIntegrationService
     public function withholdingPostingContextForDocument(
         TaxableDocumentData $document,
         string $postingDate,
-        string $counterpartyAccountCode,
-        string $counterpartyAccountName,
+        string $postingProfileCode,
+        string $counterpartyProfileKey,
+        string $counterpartyLineName,
     ): TaxPostingContext {
         $this->ensureSnapshot($document);
         $taxLines = TaxDocumentSnapshot::query()
@@ -176,8 +177,9 @@ final class TaxDocumentIntegrationService
             ),
             postingDate: $postingDate,
             taxLines: $taxLines,
-            counterpartyAccountCode: $counterpartyAccountCode,
-            counterpartyAccountName: $counterpartyAccountName,
+            postingProfileCode: $postingProfileCode,
+            counterpartyProfileKey: $counterpartyProfileKey,
+            counterpartyLineName: $counterpartyLineName,
             description: 'Withholding tax '.$document->sourceNumber,
         );
     }
@@ -185,8 +187,9 @@ final class TaxDocumentIntegrationService
     public function withholdingPostingContextForPayment(
         TaxPaymentWithholdingData $payment,
         string $postingDate,
-        string $counterpartyAccountCode,
-        string $counterpartyAccountName,
+        string $postingProfileCode,
+        string $counterpartyProfileKey,
+        string $counterpartyLineName,
     ): TaxPostingContext {
         $taxLines = [];
         foreach ($payment->allocations as $allocation) {
@@ -218,8 +221,9 @@ final class TaxDocumentIntegrationService
             ),
             postingDate: $postingDate,
             taxLines: $taxLines,
-            counterpartyAccountCode: $counterpartyAccountCode,
-            counterpartyAccountName: $counterpartyAccountName,
+            postingProfileCode: $postingProfileCode,
+            counterpartyProfileKey: $counterpartyProfileKey,
+            counterpartyLineName: $counterpartyLineName,
             description: 'Withholding tax '.$payment->paymentNumber,
         );
     }

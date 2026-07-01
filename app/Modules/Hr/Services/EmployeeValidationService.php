@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Modules\Hr\Services;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Hr\DTOs\CreateEmployeeData;
@@ -101,7 +103,7 @@ final class EmployeeValidationService
             if ($id === null) {
                 continue;
             }
-            $model = $class::query()->findOrFail($id);
+            $model = $this->findReference($class, $id, $tenantId);
             $this->assertScope($tenantId, $organizationUnitId, (int) $model->tenant_id, $model->organization_unit_id);
             if ($model instanceof HrEmployee) {
                 if ($model->status->value === 'terminated') {
@@ -118,10 +120,41 @@ final class EmployeeValidationService
         if ($organizationUnitId === null) {
             return;
         }
-        $organization = OrganizationUnitModel::query()->findOrFail($organizationUnitId);
+        $organization = OrganizationUnitModel::query()->find($organizationUnitId);
+        if (! $organization instanceof OrganizationUnitModel) {
+            if (DB::table('organization_units')
+                ->where('id', $organizationUnitId)
+                ->where('tenant_id', '<>', $tenantId)
+                ->exists()) {
+                throw new InvalidArgumentException('Employee organization unit must be active and belong to the tenant.');
+            }
+
+            throw (new ModelNotFoundException)->setModel(OrganizationUnitModel::class, [$organizationUnitId]);
+        }
         if ((int) $organization->tenant_id !== $tenantId || ! (bool) $organization->is_active) {
             throw new InvalidArgumentException('Employee organization unit must be active and belong to the tenant.');
         }
+    }
+
+    /**
+     * @param class-string<Model> $class
+     */
+    private function findReference(string $class, int $id, int $tenantId): Model
+    {
+        $model = $class::query()->find($id);
+        if ($model instanceof Model) {
+            return $model;
+        }
+
+        $table = (new $class)->getTable();
+        if (DB::table($table)
+            ->where('id', $id)
+            ->where('tenant_id', '<>', $tenantId)
+            ->exists()) {
+            throw new InvalidArgumentException('HR reference belongs to a different tenant.');
+        }
+
+        throw (new ModelNotFoundException)->setModel($class, [$id]);
     }
 
     private function assertDates(?string $joinedDate, ?string $resignedDate): void

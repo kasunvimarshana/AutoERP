@@ -58,7 +58,7 @@ final class IdempotencyService
         }
 
         $now = $this->clock->now();
-        $inserted = DB::table('idempotency_records')->insertOrIgnore([
+        $inserted = IdempotencyRecord::query()->insertOrIgnore([
             'tenant_id' => $tenantId,
             'organization_unit_id' => $organizationUnitId,
             'operation' => $operation,

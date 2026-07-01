@@ -10,7 +10,8 @@ use Illuminate\Support\Str;
 use Modules\Core\Contracts\PermissionDefinitionRegistryInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\Core\Contracts\TenantAccessProvisionerInterface;
-use Modules\User\Constants\UserPermission;
+use Modules\User\Constants\UserGuard;
+use Modules\User\Constants\UserSystemRole;
 use Tests\TestCase;
 
 final class TenantAccessProvisionerTest extends TestCase
@@ -69,7 +70,10 @@ final class TenantAccessProvisionerTest extends TestCase
             1,
             DB::table('roles')
                 ->where('tenant_id', $firstTenantId)
-                ->where('name', \Modules\User\Constants\UserSystemRole::SUPER_ADMIN)
+                ->where('name', UserSystemRole::SUPER_ADMIN_NAME)
+                ->where('guard_name', UserGuard::TENANT_API)
+                ->where('system_key', UserSystemRole::SUPER_ADMIN)
+                ->where('is_system', true)
                 ->count(),
         );
         self::assertTrue($executionContext->runForTenant(

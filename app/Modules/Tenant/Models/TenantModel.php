@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Models;
 
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use LogicException;
 use Modules\Core\Models\CoreModel;
+use Modules\ReferenceData\Models\CurrencyModel;
 use Modules\Tenant\Services\TenantLifecycleState;
 
 final class TenantModel extends CoreModel
@@ -47,6 +49,11 @@ final class TenantModel extends CoreModel
     public function currentSubscription(): HasOne
     {
         return $this->hasOne(TenantCurrentSubscriptionModel::class, 'tenant_id');
+    }
+
+    public function baseCurrency(): BelongsTo
+    {
+        return $this->belongsTo(CurrencyModel::class, 'base_currency_id');
     }
 
     public function subscriptions(): HasMany

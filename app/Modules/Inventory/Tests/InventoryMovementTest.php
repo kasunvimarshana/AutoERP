@@ -31,7 +31,7 @@ final class InventoryMovementTest extends InventoryTestCase
     {
         [$tenantId, $warehouseId, $item] = $this->stockContext();
 
-        app(StockMovementService::class)->record(new StockMovementData(
+        $this->withTenantExecutionContext($tenantId, fn () => app(StockMovementService::class)->record(new StockMovementData(
             tenantId: $tenantId,
             movementDate: '2026-06-06',
             movementType: InventoryMovementType::Receipt,
@@ -40,13 +40,13 @@ final class InventoryMovementTest extends InventoryTestCase
             warehouseId: $warehouseId,
             quantity: '10.000000',
             unitCost: '5.000000',
-        ));
+        )));
 
-        $availability = app(StockAvailabilityService::class)->availability(new StockBalanceData(
+        $availability = $this->withTenantExecutionContext($tenantId, fn () => app(StockAvailabilityService::class)->availability(new StockBalanceData(
             tenantId: $tenantId,
             itemId: (int) $item->getKey(),
             warehouseId: $warehouseId,
-        ));
+        )));
 
         $this->assertSame('10.000000', $availability->quantityOnHand);
         $this->assertSame('10.000000', $availability->quantityAvailable);
@@ -61,7 +61,7 @@ final class InventoryMovementTest extends InventoryTestCase
         [$tenantId, $warehouseId, $item] = $this->stockContext();
         $this->receipt($tenantId, $warehouseId, $item, '10.000000', '5.000000');
 
-        app(StockMovementService::class)->record(new StockMovementData(
+        $this->withTenantExecutionContext($tenantId, fn () => app(StockMovementService::class)->record(new StockMovementData(
             tenantId: $tenantId,
             movementDate: '2026-06-06',
             movementType: InventoryMovementType::Issue,
@@ -69,15 +69,15 @@ final class InventoryMovementTest extends InventoryTestCase
             itemId: (int) $item->getKey(),
             warehouseId: $warehouseId,
             quantity: '4.000000',
-        ));
+        )));
 
-        $availability = app(StockAvailabilityService::class)->availability(new StockBalanceData($tenantId, (int) $item->getKey(), $warehouseId));
+        $availability = $this->withTenantExecutionContext($tenantId, fn () => app(StockAvailabilityService::class)->availability(new StockBalanceData($tenantId, (int) $item->getKey(), $warehouseId)));
         $this->assertSame('6.000000', $availability->quantityOnHand);
 
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Inventory issue quantity cannot exceed available stock.');
 
-        app(StockMovementService::class)->record(new StockMovementData(
+        $this->withTenantExecutionContext($tenantId, fn () => app(StockMovementService::class)->record(new StockMovementData(
             tenantId: $tenantId,
             movementDate: '2026-06-06',
             movementType: InventoryMovementType::Issue,
@@ -85,7 +85,7 @@ final class InventoryMovementTest extends InventoryTestCase
             itemId: (int) $item->getKey(),
             warehouseId: $warehouseId,
             quantity: '7.000000',
-        ));
+        )));
     }
 
     public function test_batch_and_serial_tracking_rules_are_enforced(): void
@@ -105,7 +105,7 @@ final class InventoryMovementTest extends InventoryTestCase
         $tenantId = $this->createTenant();
         $warehouseId = $this->createWarehouse($tenantId, 'WH-SERIAL');
         $item = $this->createItem($tenantId, 'SERIAL-ITEM', TrackingType::Serial);
-        $serial = app(SerialTrackingService::class)->create($tenantId, (int) $item->getKey(), 'SN-001');
+        $serial = $this->withTenantExecutionContext($tenantId, fn () => app(SerialTrackingService::class)->create($tenantId, (int) $item->getKey(), 'SN-001'));
 
         try {
             $this->receipt($tenantId, $warehouseId, $item, '2.000000', '1.000000', serialId: (int) $serial->getKey());
@@ -116,7 +116,7 @@ final class InventoryMovementTest extends InventoryTestCase
 
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Inventory serial number already exists for this tenant.');
-        app(SerialTrackingService::class)->create($tenantId, (int) $item->getKey(), 'SN-001');
+        $this->withTenantExecutionContext($tenantId, fn () => app(SerialTrackingService::class)->create($tenantId, (int) $item->getKey(), 'SN-001'));
     }
 
     public function test_two_issue_and_allocation_callers_cannot_overdraw_stock(): void
@@ -124,7 +124,7 @@ final class InventoryMovementTest extends InventoryTestCase
         [$tenantId, $warehouseId, $item] = $this->stockContext();
         $this->receipt($tenantId, $warehouseId, $item, '5.000000', '2.000000');
         $movements = app(StockMovementService::class);
-        $first = $movements->create(new StockMovementData(
+        $first = $this->withTenantExecutionContext($tenantId, fn () => $movements->create(new StockMovementData(
             $tenantId,
             '2026-06-06',
             InventoryMovementType::Issue,
@@ -132,8 +132,8 @@ final class InventoryMovementTest extends InventoryTestCase
             (int) $item->getKey(),
             $warehouseId,
             '4.000000',
-        ));
-        $second = $movements->create(new StockMovementData(
+        )));
+        $second = $this->withTenantExecutionContext($tenantId, fn () => $movements->create(new StockMovementData(
             $tenantId,
             '2026-06-06',
             InventoryMovementType::Issue,
@@ -141,30 +141,30 @@ final class InventoryMovementTest extends InventoryTestCase
             (int) $item->getKey(),
             $warehouseId,
             '4.000000',
-        ));
-        $movements->post($first);
+        )));
+        $this->withTenantExecutionContext($tenantId, fn () => $movements->post($first));
         try {
-            $movements->post($second);
+            $this->withTenantExecutionContext($tenantId, fn () => $movements->post($second));
             $this->fail('Expected the second issue caller to be rejected.');
         } catch (InvalidArgumentException $exception) {
             $this->assertSame('Inventory issue quantity cannot exceed available stock.', $exception->getMessage());
         }
 
-        $balance = InventoryStockBalance::query()->where('item_id', $item->getKey())->firstOrFail();
+        $balance = $this->withTenantExecutionContext($tenantId, fn () => InventoryStockBalance::query()->where('item_id', $item->getKey())->firstOrFail());
         $this->assertSame('1.000000', (string) $balance->quantity_on_hand);
         $this->assertSame('1.000000', (string) $balance->quantity_available);
 
         $other = $this->createItem($tenantId, 'ALLOC-RACE');
         $this->receipt($tenantId, $warehouseId, $other, '5.000000', '2.000000');
         $allocations = app(StockAllocationService::class);
-        $allocations->allocate(new AllocationData($tenantId, '2026-06-06', (int) $other->getKey(), $warehouseId, '4.000000'));
+        $this->withTenantExecutionContext($tenantId, fn () => $allocations->allocate(new AllocationData($tenantId, '2026-06-06', (int) $other->getKey(), $warehouseId, '4.000000')));
         try {
-            $allocations->allocate(new AllocationData($tenantId, '2026-06-06', (int) $other->getKey(), $warehouseId, '4.000000'));
+            $this->withTenantExecutionContext($tenantId, fn () => $allocations->allocate(new AllocationData($tenantId, '2026-06-06', (int) $other->getKey(), $warehouseId, '4.000000')));
             $this->fail('Expected the second allocation caller to be rejected.');
         } catch (InvalidArgumentException $exception) {
             $this->assertSame('Inventory allocation cannot exceed available stock.', $exception->getMessage());
         }
-        $otherBalance = InventoryStockBalance::query()->where('item_id', $other->getKey())->firstOrFail();
+        $otherBalance = $this->withTenantExecutionContext($tenantId, fn () => InventoryStockBalance::query()->where('item_id', $other->getKey())->firstOrFail());
         $this->assertSame('4.000000', (string) $otherBalance->quantity_allocated);
         $this->assertSame('1.000000', (string) $otherBalance->quantity_available);
     }
@@ -197,18 +197,20 @@ final class InventoryMovementTest extends InventoryTestCase
         [$tenantId, $warehouseId, $item] = $this->stockContext();
         $data = new StockBalanceData($tenantId, (int) $item->getKey(), $warehouseId);
 
-        $availability = app(StockAvailabilityService::class)->availability($data);
+        $availability = $this->withTenantExecutionContext($tenantId, fn () => app(StockAvailabilityService::class)->availability($data));
 
         $this->assertSame('0.000000', $availability->quantityOnHand);
         $this->assertDatabaseCount('inventory_stock_balances', 0);
 
         $this->receipt($tenantId, $warehouseId, $item, '10.000000', '2.000000');
-        $balance = InventoryStockBalance::query()->where('item_id', $item->getKey())->firstOrFail();
-        $balance->quantity_scrapped = '2.000000';
-        app(StockBalanceService::class)->recalculateAvailable($balance);
-        $balance->save();
+        $this->withTenantExecutionContext($tenantId, function () use ($item): void {
+            $balance = InventoryStockBalance::query()->where('item_id', $item->getKey())->firstOrFail();
+            $balance->quantity_scrapped = '2.000000';
+            app(StockBalanceService::class)->recalculateAvailable($balance);
+            $balance->save();
+        });
 
-        $this->assertSame('8.000000', app(StockAvailabilityService::class)->availability($data)->quantityAvailable);
+        $this->assertSame('8.000000', $this->withTenantExecutionContext($tenantId, fn () => app(StockAvailabilityService::class)->availability($data)->quantityAvailable));
     }
 
     public function test_serial_movements_require_a_receipt_and_matching_stock_location(): void
@@ -217,14 +219,14 @@ final class InventoryMovementTest extends InventoryTestCase
         $firstWarehouseId = $this->createWarehouse($tenantId, 'WH-SERIAL-A');
         $secondWarehouseId = $this->createWarehouse($tenantId, 'WH-SERIAL-B');
         $item = $this->createItem($tenantId, 'SERIAL-LOCATION', TrackingType::Serial);
-        $unreceived = app(SerialTrackingService::class)->create($tenantId, (int) $item->getKey(), 'SN-UNRECEIVED');
-        $received = app(SerialTrackingService::class)->create($tenantId, (int) $item->getKey(), 'SN-RECEIVED');
-        $other = app(SerialTrackingService::class)->create($tenantId, (int) $item->getKey(), 'SN-OTHER');
+        $unreceived = $this->withTenantExecutionContext($tenantId, fn () => app(SerialTrackingService::class)->create($tenantId, (int) $item->getKey(), 'SN-UNRECEIVED'));
+        $received = $this->withTenantExecutionContext($tenantId, fn () => app(SerialTrackingService::class)->create($tenantId, (int) $item->getKey(), 'SN-RECEIVED'));
+        $other = $this->withTenantExecutionContext($tenantId, fn () => app(SerialTrackingService::class)->create($tenantId, (int) $item->getKey(), 'SN-OTHER'));
         $this->receipt($tenantId, $firstWarehouseId, $item, '1.000000', '5.000000', serialId: (int) $received->getKey());
         $this->receipt($tenantId, $secondWarehouseId, $item, '1.000000', '5.000000', serialId: (int) $other->getKey());
 
         try {
-            app(StockMovementService::class)->record(new StockMovementData(
+            $this->withTenantExecutionContext($tenantId, fn () => app(StockMovementService::class)->record(new StockMovementData(
                 $tenantId,
                 '2026-06-06',
                 InventoryMovementType::Issue,
@@ -233,7 +235,7 @@ final class InventoryMovementTest extends InventoryTestCase
                 $firstWarehouseId,
                 '1.000000',
                 serialNumberId: (int) $unreceived->getKey(),
-            ));
+            )));
             $this->fail('Expected an unreceived serial issue to fail.');
         } catch (InvalidArgumentException $exception) {
             $this->assertSame('Inventory serial number has no available receipt to issue.', $exception->getMessage());
@@ -247,7 +249,7 @@ final class InventoryMovementTest extends InventoryTestCase
         }
 
         try {
-            app(StockMovementService::class)->record(new StockMovementData(
+            $this->withTenantExecutionContext($tenantId, fn () => app(StockMovementService::class)->record(new StockMovementData(
                 $tenantId,
                 '2026-06-06',
                 InventoryMovementType::Issue,
@@ -256,18 +258,18 @@ final class InventoryMovementTest extends InventoryTestCase
                 $secondWarehouseId,
                 '1.000000',
                 serialNumberId: (int) $received->getKey(),
-            ));
+            )));
             $this->fail('Expected a serial issue from the wrong warehouse to fail.');
         } catch (InvalidArgumentException $exception) {
             $this->assertSame('Inventory serial number does not match the issue stock location.', $exception->getMessage());
         }
 
-        $this->assertSame('1.000000', app(StockAvailabilityService::class)->availability(
+        $this->assertSame('1.000000', $this->withTenantExecutionContext($tenantId, fn () => app(StockAvailabilityService::class)->availability(
             new StockBalanceData($tenantId, (int) $item->getKey(), $firstWarehouseId),
-        )->quantityAvailable);
-        $this->assertSame('1.000000', app(StockAvailabilityService::class)->availability(
+        )->quantityAvailable));
+        $this->assertSame('1.000000', $this->withTenantExecutionContext($tenantId, fn () => app(StockAvailabilityService::class)->availability(
             new StockBalanceData($tenantId, (int) $item->getKey(), $secondWarehouseId),
-        )->quantityAvailable);
+        )->quantityAvailable));
     }
 
     public function test_adjustment_rejects_a_location_from_another_warehouse(): void
@@ -281,7 +283,7 @@ final class InventoryMovementTest extends InventoryTestCase
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Warehouse location must belong to the warehouse.');
 
-        app(StockAdjustmentService::class)->create(new StockAdjustmentData(
+        $this->withTenantExecutionContext($tenantId, fn () => app(StockAdjustmentService::class)->create(new StockAdjustmentData(
             tenantId: $tenantId,
             adjustmentDate: '2026-06-06',
             adjustmentType: AdjustmentType::Increase,
@@ -290,7 +292,7 @@ final class InventoryMovementTest extends InventoryTestCase
             lines: [
                 new StockAdjustmentLineData((int) $item->getKey(), '0.000000', '1.000000', '1.000000'),
             ],
-        ));
+        )));
     }
 
     public function test_inventory_movement_report_searches_real_columns(): void

@@ -34,6 +34,7 @@ return new class extends Migration
             $table->foreign(['session_id', 'tenant_id', 'user_id'], 'auth_code_session_fk')
                 ->references(['id', 'tenant_id', 'user_id'])->on('auth_sessions')->restrictOnDelete();
             $table->unique('code_key', 'auth_code_key_uk');
+            $table->unique(['id', 'tenant_id'], 'auth_authorization_codes_id_tenant_uk');
             $table->index(['tenant_id', 'client_id', 'status', 'expires_at'], 'auth_code_client_ix');
         });
     }

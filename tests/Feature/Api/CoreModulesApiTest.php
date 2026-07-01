@@ -7,6 +7,9 @@ namespace Tests\Feature\Api;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Modules\Core\Contracts\TenantExecutionContextInterface;
+use Modules\Finance\Constants\FinancePermission;
+use Modules\Invoice\Constants\InvoicePermission;
 use Modules\Invoice\Models\Invoice;
 use Modules\Item\DTOs\CreateItemData;
 use Modules\Item\Enums\CostingMethod;
@@ -22,7 +25,8 @@ use Modules\Purchase\Services\GoodsReceiptNoteService;
 use Modules\Purchase\Services\PurchaseOrderService;
 use Modules\Payment\Services\PaymentAuthorizationService;
 use Modules\Supplier\Services\SupplierAuthorizationService;
-use Modules\User\Constants\UserPermission;
+use Modules\User\Constants\UserGuard;
+use Modules\User\Constants\UserSystemRole;
 use Modules\User\Models\UserModel;
 use Tests\TestCase;
 
@@ -34,6 +38,7 @@ final class CoreModulesApiTest extends TestCase
     {
         parent::setUp();
         $this->withoutMiddleware();
+        $this->trustTenantScopedRequestContextFromPayload();
         $this->mock(SupplierAuthorizationService::class, fn ($mock) => $mock->shouldReceive('assert')->zeroOrMoreTimes());
     }
 
@@ -41,8 +46,13 @@ final class CoreModulesApiTest extends TestCase
     {
         [$tenantId, $organizationUnitId] = $this->scope();
         [$otherTenantId, $otherOrganizationUnitId] = $this->scope();
+        $this->actingAsSuperAdministrator($tenantId, $organizationUnitId, [
+            SupplierAuthorizationService::VIEW,
+            SupplierAuthorizationService::CREATE,
+            SupplierAuthorizationService::UPDATE,
+        ], 'Supplier');
 
-        $created = $this->postJson('/api/v1/suppliers', [
+        $created = $this->tenantPostJson($tenantId, '/api/v1/suppliers', [
             'tenant_id' => $tenantId,
             'organization_unit_id' => $organizationUnitId,
             'code' => 'SUP-API',
@@ -52,13 +62,13 @@ final class CoreModulesApiTest extends TestCase
             'contacts' => [['contact_name' => 'Primary Contact', 'is_primary' => true]],
         ])->assertSuccessful()->json('data');
 
-        $this->patchJson('/api/v1/suppliers/'.$created['id'], [
+        $this->tenantPatchJson($tenantId, '/api/v1/suppliers/'.$created['id'], [
             'tenant_id' => $tenantId,
             'organization_unit_id' => $organizationUnitId,
             'name' => 'Updated API Supplier',
         ])->assertSuccessful()->assertJsonPath('data.name', 'Updated API Supplier');
 
-        $this->postJson('/api/v1/suppliers', [
+        $this->tenantPostJson($otherTenantId, '/api/v1/suppliers', [
             'tenant_id' => $otherTenantId,
             'organization_unit_id' => $otherOrganizationUnitId,
             'code' => 'SUP-OTHER',
@@ -66,12 +76,12 @@ final class CoreModulesApiTest extends TestCase
             'supplier_type' => 'company',
         ])->assertSuccessful();
 
-        $this->getJson('/api/v1/suppliers?tenant_id='.$tenantId.'&organization_unit_id='.$organizationUnitId)
+        $this->tenantGetJson($tenantId, '/api/v1/suppliers?tenant_id='.$tenantId.'&organization_unit_id='.$organizationUnitId)
             ->assertSuccessful()
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.code', 'SUP-API');
 
-        $this->postJson('/api/v1/suppliers', [
+        $this->tenantPostJson($tenantId, '/api/v1/suppliers', [
             'tenant_id' => $tenantId,
             'organization_unit_id' => $organizationUnitId,
             'code' => 'SUP-BAD',
@@ -87,13 +97,12 @@ final class CoreModulesApiTest extends TestCase
 
         $item = $this->createItemViaApi($tenantId, $organizationUnitId, 'ITEM-API');
 
-        $this->patchJson('/api/v1/items/'.$item['id'], [
+        $this->tenantPatchJson($tenantId, '/api/v1/items/'.$item['id'], [
             'tenant_id' => $tenantId,
-            'organization_unit_id' => $organizationUnitId,
             'name' => 'Updated API Item',
         ])->assertSuccessful()->assertJsonPath('data.name', 'Updated API Item');
 
-        $this->getJson('/api/v1/items/lookup/stockable?tenant_id='.$tenantId.'&organization_unit_id='.$organizationUnitId)
+        $this->tenantGetJson($tenantId, '/api/v1/items/lookup/stockable?tenant_id='.$tenantId.'&organization_unit_id='.$organizationUnitId)
             ->assertSuccessful()
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.code', 'ITEM-API');
@@ -102,40 +111,43 @@ final class CoreModulesApiTest extends TestCase
     public function test_purchase_order_grn_and_inventory_api(): void
     {
         [$tenantId, $organizationUnitId] = $this->scope();
+        $this->actingAsSuperAdministrator($tenantId, $organizationUnitId, [], 'Inventory');
         $warehouseId = $this->warehouse($tenantId, $organizationUnitId);
         $supplierId = $this->supplier($tenantId, $organizationUnitId);
         $uomId = $this->uom($tenantId, $organizationUnitId);
         $item = $this->createItemDirect($tenantId, $organizationUnitId, $uomId, 'PUR-ITEM');
 
-        $orders = app(PurchaseOrderService::class);
-        $order = $orders->create(new CreatePurchaseOrderData(
-            tenantId: $tenantId,
-            purchaseOrderDate: '2026-06-06',
-            organizationUnitId: $organizationUnitId,
-            supplierType: 'supplier',
-            supplierId: $supplierId,
-            warehouseId: $warehouseId,
-            lines: [new PurchaseOrderLineData((int) $item['id'], '5.000000', '100.000000', uomId: $uomId)],
-        ));
-        $order = $orders->approve($orders->submit($order))->load('lines');
-        $grn = app(GoodsReceiptNoteService::class)->create(new CreateGoodsReceiptNoteData(
-            tenantId: $tenantId,
-            receivedDate: '2026-06-06',
-            warehouseId: $warehouseId,
-            organizationUnitId: $organizationUnitId,
-            purchaseOrderId: (int) $order->getKey(),
-            lines: [new GoodsReceiptNoteLineData((int) $item['id'], '2.000000', '2.000000', '100.000000', purchaseOrderLineId: (int) $order->lines[0]->getKey(), uomId: $uomId, orderedQuantity: '5.000000')],
-        ));
-        app(GoodsReceiptNoteService::class)->post($grn);
+        $this->withTenantExecutionContext($tenantId, function () use ($tenantId, $organizationUnitId, $warehouseId, $supplierId, $uomId, $item): void {
+            $orders = app(PurchaseOrderService::class);
+            $order = $orders->create(new CreatePurchaseOrderData(
+                tenantId: $tenantId,
+                purchaseOrderDate: '2026-06-06',
+                organizationUnitId: $organizationUnitId,
+                supplierType: 'supplier',
+                supplierId: $supplierId,
+                warehouseId: $warehouseId,
+                lines: [new PurchaseOrderLineData((int) $item['id'], '5.000000', '100.000000', uomId: $uomId)],
+            ));
+            $order = $orders->approve($orders->submit($order))->load('lines');
+            $grn = app(GoodsReceiptNoteService::class)->create(new CreateGoodsReceiptNoteData(
+                tenantId: $tenantId,
+                receivedDate: '2026-06-06',
+                warehouseId: $warehouseId,
+                organizationUnitId: $organizationUnitId,
+                purchaseOrderId: (int) $order->getKey(),
+                lines: [new GoodsReceiptNoteLineData((int) $item['id'], '2.000000', '2.000000', '100.000000', purchaseOrderLineId: (int) $order->lines[0]->getKey(), uomId: $uomId, orderedQuantity: '5.000000')],
+            ));
+            app(GoodsReceiptNoteService::class)->post($grn);
+        });
 
-        $this->getJson('/api/v1/inventory/availability?'.http_build_query([
+        $this->tenantGetJson($tenantId, '/api/v1/inventory/availability?'.http_build_query([
             'tenant_id' => $tenantId,
             'organization_unit_id' => $organizationUnitId,
             'item_id' => $item['id'],
             'warehouse_id' => $warehouseId,
         ]))->assertSuccessful()->assertJsonPath('data.quantityOnHand', '2.000000');
 
-        $this->postJson('/api/v1/inventory/reservations', [
+        $this->tenantPostJson($tenantId, '/api/v1/inventory/reservations', [
             'tenant_id' => $tenantId,
             'organization_unit_id' => $organizationUnitId,
             'reservation_date' => '2026-06-06',
@@ -148,34 +160,49 @@ final class CoreModulesApiTest extends TestCase
     public function test_invoice_preview_create_and_lifecycle_api(): void
     {
         [$tenantId, $organizationUnitId] = $this->scope();
+        $this->actingAsSuperAdministrator($tenantId, $organizationUnitId, [
+            InvoicePermission::PREVIEW,
+            InvoicePermission::CREATE,
+            InvoicePermission::APPROVE,
+            InvoicePermission::POST,
+            InvoicePermission::VIEW_BALANCE,
+        ], 'Invoice');
         $payload = $this->invoicePayload($tenantId, $organizationUnitId);
 
-        $this->postJson('/api/v1/invoices/preview', $payload)
+        $this->tenantPostJson($tenantId, '/api/v1/invoices/preview', $payload)
             ->assertSuccessful()
-            ->assertJsonPath('data.grandTotal', '120.000000');
+            ->assertJsonPath('data.grandTotal', '100.000000');
 
-        $invoice = $this->postJson('/api/v1/invoices', $payload)
+        $invoicePayload = $payload + ['idempotency_key' => 'invoice-'.Str::uuid()->toString()];
+        $invoice = $this->tenantPostJson($tenantId, '/api/v1/invoices', $invoicePayload)
             ->assertSuccessful()
-            ->assertJsonPath('data.grand_total', '120.000000')
-            ->assertJsonPath('data.balance.remaining_amount', '120.000000')
-            ->assertJsonPath('data.lines.0.line_total', '120.000000')
+            ->assertJsonPath('data.grand_total', '100.000000')
+            ->assertJsonPath('data.balance.remaining_amount', '100.000000')
+            ->assertJsonPath('data.lines.0.line_total', '100.000000')
             ->json('data');
 
         $scope = ['tenant_id' => $tenantId, 'organization_unit_id' => $organizationUnitId];
-        $this->postJson('/api/v1/invoices/'.$invoice['id'].'/approve', $scope)->assertSuccessful();
-        $this->postJson('/api/v1/invoices/'.$invoice['id'].'/post', $scope)
+        $invoice = $this->tenantPostJson($tenantId, '/api/v1/invoices/'.$invoice['id'].'/approve', $scope + [
+            'expected_version' => $invoice['row_version'],
+        ])->assertSuccessful()->json('data');
+        $this->tenantPostJson($tenantId, '/api/v1/invoices/'.$invoice['id'].'/post', $scope + [
+            'expected_version' => $invoice['row_version'],
+        ])
             ->assertSuccessful()->assertJsonPath('data.status', 'posted');
-        $this->getJson('/api/v1/invoices/'.$invoice['id'].'/balance?'.http_build_query($scope))
-            ->assertSuccessful()->assertJsonPath('data.remainingAmount', '120.000000');
+        $this->tenantGetJson($tenantId, '/api/v1/invoices/'.$invoice['id'].'/balance?'.http_build_query($scope))
+            ->assertSuccessful()->assertJsonPath('data.remainingAmount', '100.000000');
     }
 
     public function test_invoice_request_validates_consumed_nested_fields(): void
     {
         [$tenantId, $organizationUnitId] = $this->scope();
+        $this->actingAsSuperAdministrator($tenantId, $organizationUnitId, [
+            InvoicePermission::PREVIEW,
+        ], 'Invoice');
         $payload = $this->invoicePayload($tenantId, $organizationUnitId);
         $payload['lines'][0]['metadata'] = 'not-an-array';
 
-        $this->postJson('/api/v1/invoices/preview', $payload)
+        $this->tenantPostJson($tenantId, '/api/v1/invoices/preview', $payload)
             ->assertStatus(422)
             ->assertJsonValidationErrors('lines.0.metadata');
     }
@@ -194,7 +221,7 @@ final class CoreModulesApiTest extends TestCase
         $invoice = $this->createPostedInvoice($tenantId, $organizationUnitId);
         $paymentMethodId = $this->paymentMethod($tenantId);
 
-        $payment = $this->postJson('/api/v1/payments', [
+        $payment = $this->tenantPostJson($tenantId, '/api/v1/payments', [
             'tenant_id' => $tenantId,
             'organization_unit_id' => $organizationUnitId,
             'payment_type' => 'customer_receipt',
@@ -209,10 +236,17 @@ final class CoreModulesApiTest extends TestCase
         ])->assertSuccessful()->json('data');
 
         $scope = ['tenant_id' => $tenantId, 'organization_unit_id' => $organizationUnitId];
-        $this->postJson('/api/v1/payments/'.$payment['id'].'/submit-approval', $scope)->assertSuccessful();
-        $this->postJson('/api/v1/payments/'.$payment['id'].'/approve', $scope)->assertSuccessful();
-        $this->postJson('/api/v1/payments/'.$payment['id'].'/post', $scope)->assertSuccessful();
-        $this->postJson('/api/v1/payments/'.$payment['id'].'/allocations', $scope + [
+        $payment = $this->tenantPostJson($tenantId, '/api/v1/payments/'.$payment['id'].'/submit-approval', $scope + [
+            'expected_version' => $payment['row_version'],
+        ])->assertSuccessful()->json('data');
+        $payment = $this->tenantPostJson($tenantId, '/api/v1/payments/'.$payment['id'].'/approve', $scope + [
+            'expected_version' => $payment['row_version'],
+        ])->assertSuccessful()->json('data');
+        $payment = $this->tenantPostJson($tenantId, '/api/v1/payments/'.$payment['id'].'/post', $scope + [
+            'expected_version' => $payment['row_version'],
+        ])->assertSuccessful()->json('data');
+        $this->tenantPostJson($tenantId, '/api/v1/payments/'.$payment['id'].'/allocations', $scope + [
+            'expected_version' => $payment['row_version'],
             'allocations' => [[
                 'invoice_id' => $invoice->getKey(),
                 'allocated_amount' => '80.000000',
@@ -222,12 +256,21 @@ final class CoreModulesApiTest extends TestCase
             ->assertJsonPath('data.allocated_amount', '80.000000')
             ->assertJsonPath('data.unapplied_amount', '0.000000');
 
-        $this->assertSame('40.000000', (string) $invoice->refresh()->balance_due);
+        $balanceDue = $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): string => (string) $invoice->refresh()->balance_due,
+        );
+        $this->assertSame('20.000000', $balanceDue);
     }
 
     public function test_finance_account_and_journal_posting_api(): void
     {
         [$tenantId, $organizationUnitId] = $this->scope();
+        $this->actingAsSuperAdministrator($tenantId, $organizationUnitId, [
+            FinancePermission::ACCOUNTS_MANAGE,
+            FinancePermission::JOURNALS_CREATE,
+            FinancePermission::JOURNALS_POST,
+        ], 'Finance');
         $debitType = $this->accountType($tenantId, 'ASSET', 'debit');
         $creditType = $this->accountType($tenantId, 'EQUITY', 'credit');
 
@@ -235,7 +278,7 @@ final class CoreModulesApiTest extends TestCase
         $capital = $this->createAccountViaApi($tenantId, $organizationUnitId, $creditType, '3000', 'Capital', 'credit');
         $this->fiscalPeriod($tenantId, $organizationUnitId);
 
-        $journal = $this->postJson('/api/v1/finance/journals', [
+        $journal = $this->tenantPostJson($tenantId, '/api/v1/finance/journals', [
             'tenant_id' => $tenantId,
             'organization_unit_id' => $organizationUnitId,
             'journal_date' => '2026-06-06',
@@ -245,7 +288,7 @@ final class CoreModulesApiTest extends TestCase
             ],
         ])->assertSuccessful()->json('data');
 
-        $this->postJson('/api/v1/finance/journals/'.$journal['id'].'/post', [
+        $this->tenantPostJson($tenantId, '/api/v1/finance/journals/'.$journal['id'].'/post', [
             'tenant_id' => $tenantId,
             'organization_unit_id' => $organizationUnitId,
         ])->assertSuccessful()
@@ -263,6 +306,7 @@ final class CoreModulesApiTest extends TestCase
             'name' => 'Tenant '.$suffix,
             'slug' => 'tenant-'.Str::lower($suffix),
             'status' => 'active',
+            'status_changed_at' => now(),
             'created_at' => now(),
             'updated_at' => now()]);
         $organizationUnitId = (int) \Tests\Support\OrganizationUnitFixture::create([
@@ -285,7 +329,7 @@ final class CoreModulesApiTest extends TestCase
             ItemAuthorizationService::UPDATE,
         ], 'Item');
 
-        return $this->postJson('/api/v1/items', [
+        return $this->tenantPostJson($tenantId, '/api/v1/items', [
             'tenant_id' => $tenantId,
             'organization_unit_id' => $organizationUnitId,
             'code' => $code,
@@ -307,7 +351,6 @@ final class CoreModulesApiTest extends TestCase
         string $module,
     ): void
     {
-        $guard = (string) config('auth.defaults.guard', 'web');
         $now = now();
         $userId = (int) \Tests\Support\TenantUserFixture::create([
             'tenant_id' => $tenantId,
@@ -321,18 +364,28 @@ final class CoreModulesApiTest extends TestCase
         ]);
         $roleId = (int) DB::table('roles')->insertGetId([
             'tenant_id' => $tenantId,
-            'name' => \Modules\User\Constants\UserSystemRole::SUPER_ADMIN,
-            'guard_name' => $guard,
+            'name' => UserSystemRole::SUPER_ADMIN_NAME,
+            'guard_name' => UserGuard::TENANT_API,
+            'system_key' => UserSystemRole::SUPER_ADMIN,
+            'is_system' => true,
             'created_at' => $now,
             'updated_at' => $now,
         ]);
 
         foreach ($permissions as $permission) {
-            DB::table('permissions')->insert([
+            $permissionId = (int) DB::table('permissions')->insertGetId([
                 'tenant_id' => $tenantId,
                 'name' => $permission,
-                'guard_name' => $guard,
+                'guard_name' => UserGuard::TENANT_API,
                 'module' => $module,
+                'is_active' => true,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+            DB::table('role_permissions')->insert([
+                'tenant_id' => $tenantId,
+                'role_id' => $roleId,
+                'permission_id' => $permissionId,
                 'created_at' => $now,
                 'updated_at' => $now,
             ]);
@@ -346,22 +399,30 @@ final class CoreModulesApiTest extends TestCase
             'updated_at' => $now,
         ]);
 
-        $this->actingAs(UserModel::query()->findOrFail($userId));
+        $user = app(TenantExecutionContextInterface::class)->runForTenant(
+            $tenantId,
+            fn (): UserModel => UserModel::query()->findOrFail($userId),
+        );
+
+        $this->actingAs($user);
     }
 
     private function createItemDirect(int $tenantId, int $organizationUnitId, int $uomId, string $code): array
     {
-        $item = app(ItemCreationService::class)->create(new CreateItemData(
-            tenantId: $tenantId,
-            code: $code,
-            name: $code,
-            itemType: ItemType::Stock,
-            trackingType: TrackingType::None,
-            costingMethod: CostingMethod::Fifo,
-            baseUomId: $uomId,
-            organizationUnitId: $organizationUnitId,
-            isStockable: true,
-        ));
+        $item = $this->withTenantExecutionContext(
+            $tenantId,
+            fn () => app(ItemCreationService::class)->create(new CreateItemData(
+                tenantId: $tenantId,
+                code: $code,
+                name: $code,
+                itemType: ItemType::Stock,
+                trackingType: TrackingType::None,
+                costingMethod: CostingMethod::Fifo,
+                baseUomId: $uomId,
+                organizationUnitId: $organizationUnitId,
+                isStockable: true,
+            )),
+        );
 
         return ['id' => (int) $item->getKey()];
     }
@@ -430,30 +491,36 @@ final class CoreModulesApiTest extends TestCase
         return [
             'tenant_id' => $tenantId,
             'organization_unit_id' => $organizationUnitId,
-            'invoice_type' => 'sales',
             'direction' => 'outbound',
             'invoice_date' => '2026-06-06',
-            'party_type' => 'customer',
-            'party_id' => $customerId,
+            'customer_id' => $customerId,
             'lines' => [[
-                'line_number' => 1,
                 'description' => 'API invoice line',
                 'quantity' => '2.000000',
                 'unit_price' => '50.000000',
-                'tax_amount' => '20.000000',
             ]],
         ];
     }
 
     private function createPostedInvoice(int $tenantId, int $organizationUnitId): Invoice
     {
-        $invoice = $this->postJson('/api/v1/invoices', $this->invoicePayload($tenantId, $organizationUnitId))
+        $payload = $this->invoicePayload($tenantId, $organizationUnitId) + [
+            'idempotency_key' => 'invoice-'.Str::uuid()->toString(),
+        ];
+        $invoice = $this->tenantPostJson($tenantId, '/api/v1/invoices', $payload)
             ->assertSuccessful()->json('data');
         $scope = ['tenant_id' => $tenantId, 'organization_unit_id' => $organizationUnitId];
-        $this->postJson('/api/v1/invoices/'.$invoice['id'].'/approve', $scope)->assertSuccessful();
-        $this->postJson('/api/v1/invoices/'.$invoice['id'].'/post', $scope)->assertSuccessful();
+        $invoice = $this->tenantPostJson($tenantId, '/api/v1/invoices/'.$invoice['id'].'/approve', $scope + [
+            'expected_version' => $invoice['row_version'],
+        ])->assertSuccessful()->json('data');
+        $this->tenantPostJson($tenantId, '/api/v1/invoices/'.$invoice['id'].'/post', $scope + [
+            'expected_version' => $invoice['row_version'],
+        ])->assertSuccessful();
 
-        return Invoice::query()->findOrFail($invoice['id']);
+        return $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): Invoice => Invoice::query()->findOrFail($invoice['id']),
+        );
     }
 
     private function customer(int $tenantId, int $organizationUnitId): int
@@ -483,7 +550,7 @@ final class CoreModulesApiTest extends TestCase
             'method_type' => 'cash',
             'direction_allowed' => 'inbound',
             'requires_reference' => false,
-            'requires_bank_account' => false,
+            'requires_instrument_details' => false,
             'is_active' => true,
             'created_at' => now(),
             'updated_at' => now(),
@@ -528,18 +595,58 @@ final class CoreModulesApiTest extends TestCase
             'created_at' => now(),
             'updated_at' => now(),
         ]);
-        DB::table('finance_posting_profile_rules')->insert([
+        $cashRoleId = (int) DB::table('finance_account_roles')->insertGetId([
+            'tenant_id' => $tenantId,
+            'code' => 'cash',
+            'name' => 'Cash',
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $receivableRoleId = (int) DB::table('finance_account_roles')->insertGetId([
+            'tenant_id' => $tenantId,
+            'code' => 'receivable',
+            'name' => 'Receivable',
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('finance_account_assignments')->insert([
             [
-                'posting_profile_id' => $profileId,
-                'line_key' => 'cash',
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $organizationUnitId,
+                'account_role_id' => $cashRoleId,
                 'account_id' => $cashAccountId,
+                'effective_from' => '2026-01-01',
+                'is_active' => true,
                 'created_at' => now(),
                 'updated_at' => now(),
             ],
             [
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $organizationUnitId,
+                'account_role_id' => $receivableRoleId,
+                'account_id' => $receivableAccountId,
+                'effective_from' => '2026-01-01',
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ]);
+        DB::table('finance_posting_profile_rules')->insert([
+            [
+                'tenant_id' => $tenantId,
+                'posting_profile_id' => $profileId,
+                'line_key' => 'cash',
+                'account_role_id' => $cashRoleId,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'tenant_id' => $tenantId,
                 'posting_profile_id' => $profileId,
                 'line_key' => 'receivable',
-                'account_id' => $receivableAccountId,
+                'account_role_id' => $receivableRoleId,
                 'created_at' => now(),
                 'updated_at' => now(),
             ],
@@ -594,7 +701,7 @@ final class CoreModulesApiTest extends TestCase
         string $name,
         string $normalBalance,
     ): array {
-        return $this->postJson('/api/v1/finance/accounts', [
+        return $this->tenantPostJson($tenantId, '/api/v1/finance/accounts', [
             'tenant_id' => $tenantId,
             'organization_unit_id' => $organizationUnitId,
             'account_type_id' => $accountTypeId,

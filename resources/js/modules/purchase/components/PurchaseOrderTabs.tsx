@@ -73,7 +73,7 @@ function AdjustmentTable({ order }: { order: PurchaseOrder }) {
         { key: 'type', header: 'Type', render: (adjustment) => adjustment.adjustment_type },
         { key: 'effect', header: 'Effect', render: (adjustment) => adjustment.effect },
         { key: 'calculation', header: 'Calculation', render: (adjustment) => adjustment.calculation_type },
-        { key: 'mapping', header: 'Finance Mapping', render: (adjustment) => adjustment.finance_mapping?.cost_treatment ?? adjustment.cost_treatment ?? '-' },
+        { key: 'recognition', header: 'Recognition', render: (adjustment) => adjustment.recognition?.final_treatment ?? adjustment.recognition?.cost_treatment ?? '-' },
         { key: 'amount', header: 'Amount', render: (adjustment) => <MoneyDisplay value={adjustment.amount} currency={order.currency?.code ?? undefined} /> },
         { key: 'allocated', header: 'Allocated', render: (adjustment) => <MoneyDisplay value={adjustment.allocated_amount} currency={order.currency?.code ?? undefined} /> },
         { key: 'remaining', header: 'Remaining', render: (adjustment) => <MoneyDisplay value={adjustment.remaining_amount ?? adjustment.amount} currency={order.currency?.code ?? undefined} /> },

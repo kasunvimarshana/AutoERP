@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Item\Services;
 
+use Illuminate\Validation\ValidationException;
 use Modules\Item\DTOs\ItemUsageRuleData;
 use Modules\Item\Models\Item;
 use Modules\Item\Models\ItemUsageRule;
@@ -21,7 +22,7 @@ final class ItemUsageRuleService
             ->where('item_id', $item->getKey())
             ->where('module_code', $data->moduleCode)
             ->exists()) {
-            throw new \InvalidArgumentException('Item usage rule already exists for this module.');
+            throw $this->duplicateModuleCode();
         }
 
         return ItemUsageRule::query()->create([
@@ -44,7 +45,7 @@ final class ItemUsageRuleService
             ->whereKeyNot($rule->getKey())
             ->exists();
         if ($duplicate) {
-            throw new \InvalidArgumentException('Item usage rule already exists for this module.');
+            throw $this->duplicateModuleCode();
         }
 
         $rule->fill([
@@ -66,5 +67,12 @@ final class ItemUsageRuleService
         if ((int) $rule->item_id !== (int) $item->getKey()) {
             throw new \InvalidArgumentException('Item usage rule does not belong to the item.');
         }
+    }
+
+    private function duplicateModuleCode(): ValidationException
+    {
+        return ValidationException::withMessages([
+            'module_code' => ['Item usage rule already exists for this module.'],
+        ]);
     }
 }

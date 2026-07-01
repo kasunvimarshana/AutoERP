@@ -95,6 +95,7 @@ final class AuthServiceProvider extends ServiceProvider
 
         $this->configureRateLimiters();
         $this->configureGuards();
+        $this->resetResolvedBearerGuardsWhenRequestChanges();
         $this->app->make(Router::class)->aliasMiddleware(
             (string) config('module-auth.platform_mfa.middleware_alias', 'platform.step-up'),
             RequireRecentPlatformAuthenticationMiddleware::class,
@@ -118,6 +119,15 @@ final class AuthServiceProvider extends ServiceProvider
                 __DIR__.'/../Config/auth.php' => config_path('module-auth.php'),
             ], 'auth-config');
         }
+    }
+
+    private function resetResolvedBearerGuardsWhenRequestChanges(): void
+    {
+        $this->app->rebinding('request', static function ($app, Request $request): void {
+            if ($app->resolved('auth') && trim((string) $request->bearerToken()) !== '') {
+                $app['auth']->forgetGuards();
+            }
+        });
     }
 
     private function configureGuards(): void

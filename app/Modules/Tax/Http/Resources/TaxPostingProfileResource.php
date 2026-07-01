@@ -23,12 +23,6 @@ final class TaxPostingProfileResource extends JsonResource
                 'tax_type' => $this->tax->tax_type,
             ] : null),
             'direction' => $this->direction,
-            'account_id' => $this->account_id,
-            'account' => $this->whenLoaded('account', fn () => $this->account ? [
-                'id' => $this->account->id,
-                'code' => $this->account->code,
-                'name' => $this->account->name,
-            ] : null),
             'posting_key' => $this->posting_key,
             'active' => (bool) $this->active,
         ];

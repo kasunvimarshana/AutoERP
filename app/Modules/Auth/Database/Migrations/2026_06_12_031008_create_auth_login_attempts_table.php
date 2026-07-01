@@ -24,6 +24,7 @@ return new class extends Migration
 
             $table->foreign(['user_id', 'tenant_id'], 'auth_login_user_fk')
                 ->references(['id', 'tenant_id'])->on('users')->restrictOnDelete();
+            $table->unique(['id', 'tenant_id'], 'auth_login_attempts_id_tenant_uk');
             $table->index(['tenant_id', 'login_identifier_hash', 'attempted_at'], 'auth_login_account_ix');
             $table->index(['tenant_id', 'ip_address', 'attempted_at'], 'auth_login_ip_ix');
         });
