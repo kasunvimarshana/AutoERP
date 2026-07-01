@@ -6,7 +6,6 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use RuntimeException;
 
 return new class extends Migration
 {
@@ -120,7 +119,9 @@ return new class extends Migration
             return;
         }
 
-        throw new RuntimeException("Unsupported database driver for rental calculation source integrity: {$driver}");
+        throw new \RuntimeException(
+            "Unsupported database driver for rental calculation source integrity: {$driver}",
+        );
     }
 
     private function addSqliteSourceShapeTrigger(string $suffix, string $operation): void
