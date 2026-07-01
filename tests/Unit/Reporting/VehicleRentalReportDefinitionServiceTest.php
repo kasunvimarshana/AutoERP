@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit\Reporting;
 
 use Modules\Core\Services\DecimalMath;
+use Modules\Reporting\DTOs\ReportDefinition;
 use Modules\Reporting\Services\VehicleRentalReportDefinitionService;
 use Modules\VehicleRental\Models\RentalUsageFact;
 use Modules\VehicleRental\Models\RentalUsageLog;
@@ -18,32 +19,31 @@ final class VehicleRentalReportDefinitionServiceTest extends TestCase
             self::markTestSkipped('BCMath is required by DecimalMath.');
         }
 
-        $definitions = collect(
-            (new VehicleRentalReportDefinitionService(new DecimalMath()))->definitions(),
-        )->keyBy(fn ($definition) => $definition->key);
+        $definitions = [];
+        foreach ((new VehicleRentalReportDefinitionService(new DecimalMath()))->definitions() as $definition) {
+            $definitions[$definition->key] = $definition;
+        }
 
-        self::assertSame(
-            RentalUsageLog::class,
-            $definitions->get('vehicle-rental.running-chart')->model,
-        );
-        self::assertNotNull(
-            $definitions->get('vehicle-rental.running-chart')->column('net_operational_distance_km'),
-        );
-        self::assertNull(
-            $definitions->get('vehicle-rental.running-chart')->column('chargeable_distance_km'),
-        );
+        $physical = $this->definition($definitions, 'vehicle-rental.running-chart');
+        self::assertSame(RentalUsageLog::class, $physical->model);
+        self::assertNotNull($physical->column('net_operational_distance_km'));
+        self::assertNull($physical->column('chargeable_distance_km'));
 
-        self::assertSame(
-            RentalUsageFact::class,
-            $definitions->get('vehicle-rental.customer-running-chart')->model,
-        );
-        self::assertSame(
-            'revenue',
-            $definitions->get('vehicle-rental.customer-running-chart')->constraints['financial_side'],
-        );
-        self::assertSame(
-            'cost',
-            $definitions->get('vehicle-rental.owner-running-chart')->constraints['financial_side'],
-        );
+        $customer = $this->definition($definitions, 'vehicle-rental.customer-running-chart');
+        self::assertSame(RentalUsageFact::class, $customer->model);
+        self::assertSame('revenue', $customer->constraints['financial_side']);
+
+        $owner = $this->definition($definitions, 'vehicle-rental.owner-running-chart');
+        self::assertSame('cost', $owner->constraints['financial_side']);
+    }
+
+    /**
+     * @param array<string, ReportDefinition> $definitions
+     */
+    private function definition(array $definitions, string $key): ReportDefinition
+    {
+        self::assertArrayHasKey($key, $definitions);
+
+        return $definitions[$key];
     }
 }
