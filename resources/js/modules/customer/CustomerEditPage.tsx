@@ -20,23 +20,74 @@ export default function CustomerEditPage() {
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
     const formGuard = useMutationFormGuard(submitting);
+
     useEffect(() => {
         const controller = new AbortController();
         getCustomer(customerId, controller.signal).then((customer) => {
             if (controller.signal.aborted) return;
-            setForm({ customer_number: customer.customer_number, code: customer.code, name: customer.name, customer_type: customer.customer_type, legal_name: customer.legal_name, display_name: customer.display_name, email: customer.email, phone: customer.phone, mobile: customer.mobile, website: customer.website, default_currency_id: customer.default_currency ? Number(customer.default_currency.id) : null, tax_registration_number: customer.tax_registration_number, vat_number: customer.vat_number, svat_number: customer.svat_number, business_registration_number: customer.business_registration_number, credit_limit: customer.credit_limit, is_credit_allowed: customer.is_credit_allowed, is_advance_allowed: customer.is_advance_allowed, is_tax_exempt: customer.is_tax_exempt, marketing_consent: customer.marketing_consent, preferred_communication_channel: customer.preferred_communication_channel ?? null, notes: customer.notes });
+            setForm({
+                customer_number: customer.customer_number,
+                code: customer.code,
+                name: customer.name,
+                customer_type: customer.customer_type,
+                legal_name: customer.legal_name,
+                display_name: customer.display_name,
+                email: customer.email,
+                phone: customer.phone,
+                mobile: customer.mobile,
+                website: customer.website,
+                default_currency_id: customer.default_currency ? Number(customer.default_currency.id) : null,
+                tax_registration_number: customer.tax_registration_number,
+                vat_number: customer.vat_number,
+                svat_number: customer.svat_number,
+                business_registration_number: customer.business_registration_number,
+                credit_limit: customer.credit_limit,
+                is_credit_allowed: customer.is_credit_allowed,
+                is_advance_allowed: customer.is_advance_allowed,
+                is_tax_exempt: customer.is_tax_exempt,
+                marketing_consent: customer.marketing_consent,
+                preferred_communication_channel: customer.preferred_communication_channel ?? null,
+                notes: customer.notes,
+            });
             setCurrency(customer.default_currency ?? null);
-        }).catch((requestError) => !controller.signal.aborted && setError(toApiError(requestError))).finally(() => !controller.signal.aborted && setLoading(false));
+        }).catch((requestError) => !controller.signal.aborted && setError(toApiError(requestError)))
+            .finally(() => !controller.signal.aborted && setLoading(false));
         return () => controller.abort();
     }, [customerId]);
+
     if (loading) return <LoadingState />;
     if (!form) return <ErrorAlert error={error} />;
+
     async function save() {
         if (!form) return;
-        setSubmitting(true); setError(null);
-        try { const saved = await updateCustomer(customerId, form); formGuard.markSaved(); navigate(`/customers/${saved.id}`); }
-        catch (requestError) { setError(toApiError(requestError)); }
-        finally { setSubmitting(false); }
+        setSubmitting(true);
+        setError(null);
+        try {
+            const saved = await updateCustomer(customerId, form);
+            formGuard.markSaved();
+            navigate(`/customers/${saved.id}`);
+        } catch (requestError) {
+            setError(toApiError(requestError));
+        } finally {
+            setSubmitting(false);
+        }
     }
-    return <><ContentHeader title="Edit customer" description="Basic customer profile only; balances are owned by Finance journals." /><ErrorAlert error={error} /><form className="space-y-5" onSubmit={(event) => { event.preventDefault(); void save(); }}><CustomerForm value={form} onChange={(next) => { formGuard.markDirty(); setForm(next); }} currency={currency} onCurrencyChange={(next) => { formGuard.markDirty(); setCurrency(next); }} error={error} /><div className="flex justify-end gap-2"><Button type="button" variant="secondary" onClick={() => navigate(-1)}>Cancel</Button><Button type="submit" loading={submitting}>Save customer</Button></div></form></>;
+
+    return <>
+        <ContentHeader title="Edit customer" description="Basic customer profile only; balances are owned by Finance journals." />
+        <ErrorAlert error={error} />
+        <form className="space-y-5" onSubmit={(event) => { event.preventDefault(); void save(); }}>
+            <CustomerForm
+                value={form}
+                onChange={(next) => { formGuard.markDirty(); setForm(next); }}
+                currency={currency}
+                onCurrencyChange={(next) => { formGuard.markDirty(); setCurrency(next); }}
+                error={error}
+            />
+            <div className="flex justify-end gap-2">
+                <Button type="button" variant="secondary" onClick={() => navigate(-1)}>Cancel</Button>
+                <Button type="submit" loading={submitting}>Save customer</Button>
+            </div>
+        </form>
+    </>;
 }

@@ -33,7 +33,6 @@ export default function FinanceAccountEditPage() {
                     name: account.name,
                     description: account.description,
                     normal_balance: account.normal_balance,
-                    opening_balance: account.opening_balance,
                     is_control_account: account.is_control_account,
                     is_posting_account: account.is_posting_account,
                     is_cash_account: account.is_cash_account,
@@ -66,7 +65,7 @@ export default function FinanceAccountEditPage() {
     }
 
     return <>
-        <ContentHeader title="Edit account" description="Update account classification and posting behavior." />
+        <ContentHeader title="Edit account" description="Update account classification and posting behavior. Financial balances are ledger-derived." />
         <ErrorAlert error={error} />
         <form className="space-y-5" onSubmit={(event) => { event.preventDefault(); void save(); }}>
             <AccountForm value={form} onChange={(next) => { formGuard.markDirty(); setForm(next); }} lookups={lookups} error={error} accountId={accountId} />

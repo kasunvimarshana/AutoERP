@@ -12,7 +12,6 @@ import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { readableRelation } from '@/shared/utils/object';
 import { LinkButton } from '@/shared/components/Button';
-import { MoneyDisplay } from '@/shared/components/MoneyDisplay';
 
 type Tab = 'summary' | 'balance' | 'ledger' | 'children';
 const tabs = [{ id: 'summary' as Tab, label: 'Summary' }, { id: 'balance' as Tab, label: 'Balance' }, { id: 'ledger' as Tab, label: 'Ledger' }, { id: 'children' as Tab, label: 'Child Accounts' }];
@@ -39,11 +38,10 @@ export default function FinanceAccountDetailPage() {
                         { label: 'Parent', value: readableRelation(value.parent) },
                         { label: 'Normal balance', value: value.normal_balance },
                         { label: 'Postable', value: value.is_posting_account ? 'Yes' : 'No' },
-                        { label: 'Current balance', value: <MoneyDisplay value={value.current_balance} /> },
                     ]} />}
                     {tabState.activeTab === 'children' && <RecordTable rows={value.children ?? []} fields={['code', 'name', 'normal_balance', 'is_active']} rowKey={(row, index) => String(row.id ?? row.code ?? `child-account-${index}`)} />}
                     {tabState.activeTab === 'balance' && (balance.loading ? <LoadingState /> : balance.error ? <ErrorAlert error={balance.error} /> : <RecordTable rows={balance.data ? [balance.data] : []} fields={['opening_debit', 'opening_credit', 'period_debit', 'period_credit', 'closing_debit', 'closing_credit', 'balance']} rowKey={() => `account-${id}-balance`} />)}
-                    {tabState.activeTab === 'ledger' && (ledger.loading ? <LoadingState /> : ledger.error ? <ErrorAlert error={ledger.error} /> : <RecordTable rows={ledger.data?.data ?? []} fields={['entry_date', 'journal_entry', 'debit', 'credit', 'balance_after', 'source_number']} rowKey={(row, index) => String(row.id ?? `${String(row.journal_entry ?? row.source_number ?? 'ledger')}-${String(row.entry_date ?? index)}`)} />)}
+                    {tabState.activeTab === 'ledger' && (ledger.loading ? <LoadingState /> : ledger.error ? <ErrorAlert error={ledger.error} /> : <RecordTable rows={ledger.data?.data ?? []} fields={['entry_date', 'journal_entry', 'debit', 'credit', 'source_number']} rowKey={(row, index) => String(row.id ?? `${String(row.journal_entry ?? row.source_number ?? 'ledger')}-${String(row.entry_date ?? index)}`)} />)}
                 </div>
             </Panel>
         </>

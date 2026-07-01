@@ -26,9 +26,11 @@ final class FinanceValidationService
         if ($data->tenantId < 1) {
             throw new InvalidArgumentException('Finance account tenant is required.');
         }
+
         if (trim($data->code) === '' || trim($data->name) === '') {
             throw new InvalidArgumentException('Finance account code and name are required.');
         }
+
         $duplicate = FinanceAccount::query()
             ->where('tenant_id', $data->tenantId)
             ->where('code', trim($data->code))
@@ -37,6 +39,7 @@ final class FinanceValidationService
         if ($duplicate) {
             throw new InvalidArgumentException('Finance account code already exists for this tenant.');
         }
+
         $accountType = FinanceAccountType::query()->findOrFail($data->accountTypeId);
         if ($accountType->tenant_id !== null && (int) $accountType->tenant_id !== $data->tenantId) {
             throw new InvalidArgumentException('Finance account type belongs to a different tenant.');
@@ -47,6 +50,7 @@ final class FinanceValidationService
         if ($typeNormalBalance !== $data->normalBalance->value) {
             throw new InvalidArgumentException('Finance account normal balance must match its account type.');
         }
+
         if ($data->accountCategoryId !== null) {
             $category = FinanceAccountCategory::query()->findOrFail($data->accountCategoryId);
             if (($category->tenant_id !== null && (int) $category->tenant_id !== $data->tenantId)
@@ -54,6 +58,7 @@ final class FinanceValidationService
                 throw new InvalidArgumentException('Finance account category is invalid for the selected type and tenant.');
             }
         }
+
         if ($data->parentId !== null) {
             $parent = FinanceAccount::query()->findOrFail($data->parentId);
             $this->assertSameScope($data->tenantId, $data->organizationUnitId, (int) $parent->tenant_id, $parent->organization_unit_id);
@@ -74,42 +79,62 @@ final class FinanceValidationService
         if ($data->tenantId < 1) {
             throw new InvalidArgumentException('Journal tenant is required.');
         }
+
         if (trim($data->journalDate) === '') {
             throw new InvalidArgumentException('Journal date is required.');
         }
+
         if ($data->lines === []) {
             throw new InvalidArgumentException('Journal requires at least one line.');
         }
+
         if ($this->math->isNegative($data->exchangeRate) || $this->math->isZero($data->exchangeRate)) {
             throw new InvalidArgumentException('Journal exchange rate must be greater than zero.');
         }
+
         foreach ($data->lines as $line) {
             if (! $line instanceof JournalLineData) {
                 throw new InvalidArgumentException('Journal lines must be JournalLineData instances.');
             }
+
             $this->validateJournalLine($line);
             $account = FinanceAccount::query()->findOrFail($line->accountId);
             $this->assertSameScope($data->tenantId, $data->organizationUnitId, (int) $account->tenant_id, $account->organization_unit_id);
+
             if ($line->dimensionId !== null) {
                 $dimension = FinanceDimension::query()->findOrFail($line->dimensionId);
-                $this->assertSameScope($data->tenantId, $data->organizationUnitId, (int) $dimension->tenant_id, $dimension->organization_unit_id);
+                $this->assertSameScope(
+                    $data->tenantId,
+                    $data->organizationUnitId,
+                    (int) $dimension->tenant_id,
+                    $dimension->organization_unit_id,
+                );
                 if (! (bool) $dimension->is_active) {
                     throw new InvalidArgumentException('Journal dimension must be active.');
                 }
             }
         }
+
         if ($data->source !== null) {
             if ($data->source->tenantId !== null && $data->source->tenantId !== $data->tenantId) {
                 throw new InvalidArgumentException('Journal source tenant scope mismatch.');
             }
-            if ($data->source->organizationUnitId !== null && $data->source->organizationUnitId !== $data->organizationUnitId) {
+            if ($data->source->organizationUnitId !== null
+                && $data->source->organizationUnitId !== $data->organizationUnitId) {
                 throw new InvalidArgumentException('Journal source organization unit scope mismatch.');
             }
         }
+
         if ($data->postingProfileId !== null) {
             $profile = FinancePostingProfile::query()->findOrFail($data->postingProfileId);
-            $this->assertSameScope($data->tenantId, $data->organizationUnitId, (int) $profile->tenant_id, $profile->organization_unit_id);
+            $this->assertSameScope(
+                $data->tenantId,
+                $data->organizationUnitId,
+                (int) $profile->tenant_id,
+                $profile->organization_unit_id,
+            );
         }
+
         [$totalDebit, $totalCredit] = $this->journalTotals($data->lines);
         if ($this->math->compare($totalDebit, $totalCredit) !== 0) {
             throw new InvalidArgumentException('Journal must be balanced before it can be created.');
@@ -118,13 +143,18 @@ final class FinanceValidationService
 
     public function validateForPosting(FinanceJournalEntry $journal): void
     {
-        $status = $journal->status instanceof JournalStatus ? $journal->status : JournalStatus::from((string) $journal->status);
+        $status = $journal->status instanceof JournalStatus
+            ? $journal->status
+            : JournalStatus::from((string) $journal->status);
+
         if ($status !== JournalStatus::Draft) {
             throw new InvalidArgumentException('Only draft journals can be posted.');
         }
+
         if ($this->math->compare((string) $journal->total_debit, (string) $journal->total_credit) !== 0) {
             throw new InvalidArgumentException('Unbalanced journal cannot be posted.');
         }
+
         foreach ($journal->lines as $line) {
             $this->validateJournalLine(new JournalLineData(
                 accountId: (int) $line->account_id,
@@ -132,37 +162,49 @@ final class FinanceValidationService
                 debit: (string) $line->debit,
                 credit: (string) $line->credit,
             ));
+
             $account = $line->account;
             if (! (bool) $account->is_active) {
                 throw new InvalidArgumentException('Cannot post to inactive account.');
             }
+
             if (! (bool) $account->is_posting_account) {
                 throw new InvalidArgumentException('Cannot post to non-posting account.');
             }
+
             $this->assertSameScope((int) $journal->tenant_id, $journal->organization_unit_id, (int) $account->tenant_id, $account->organization_unit_id);
         }
     }
 
     public function assertReversible(FinanceJournalEntry $journal): void
     {
-        $status = $journal->status instanceof JournalStatus ? $journal->status : JournalStatus::from((string) $journal->status);
+        $status = $journal->status instanceof JournalStatus
+            ? $journal->status
+            : JournalStatus::from((string) $journal->status);
+
         if ($status !== JournalStatus::Posted) {
             throw new InvalidArgumentException('Only posted journals can be reversed.');
         }
+
         if ($journal->reversals()->exists()) {
             throw new InvalidArgumentException('Journal has already been reversed.');
         }
     }
 
-    /** @param list<JournalLineData> $lines @return array{0:string,1:string} */
+    /**
+     * @param  list<JournalLineData>  $lines
+     * @return array{0: string, 1: string}
+     */
     public function journalTotals(array $lines): array
     {
         $totalDebit = '0.000000';
         $totalCredit = '0.000000';
+
         foreach ($lines as $line) {
             $totalDebit = $this->math->add($totalDebit, $line->debit);
             $totalCredit = $this->math->add($totalCredit, $line->credit);
         }
+
         return [$totalDebit, $totalCredit];
     }
 
@@ -171,13 +213,17 @@ final class FinanceValidationService
         if ($line->lineNumber < 1) {
             throw new InvalidArgumentException('Journal line number must be positive.');
         }
+
         $this->assertNonNegative($line->debit, 'Journal line debit');
         $this->assertNonNegative($line->credit, 'Journal line credit');
+
         $hasDebit = ! $this->math->isZero($line->debit);
         $hasCredit = ! $this->math->isZero($line->credit);
+
         if ($hasDebit && $hasCredit) {
             throw new InvalidArgumentException('Journal line cannot have both debit and credit.');
         }
+
         if (! $hasDebit && ! $hasCredit) {
             throw new InvalidArgumentException('Journal line must have either debit or credit.');
         }
@@ -187,6 +233,7 @@ final class FinanceValidationService
     {
         $visited = [];
         $current = $parent;
+
         while (true) {
             $currentId = (int) $current->getKey();
             if ($currentId === $accountId) {
@@ -196,9 +243,11 @@ final class FinanceValidationService
                 throw new InvalidArgumentException('Existing Finance account hierarchy contains a cycle.');
             }
             $visited[$currentId] = true;
+
             if ($current->parent_id === null) {
                 return false;
             }
+
             $current = FinanceAccount::query()->findOrFail((int) $current->parent_id);
         }
     }
@@ -208,6 +257,7 @@ final class FinanceValidationService
         if ($tenantId !== $targetTenantId) {
             throw new InvalidArgumentException('Finance posting tenant scope mismatch.');
         }
+
         if ($organizationUnitId !== $targetOrganizationUnitId) {
             throw new InvalidArgumentException('Finance posting organization unit scope mismatch.');
         }

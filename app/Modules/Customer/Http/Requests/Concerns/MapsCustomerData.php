@@ -13,7 +13,6 @@ use Modules\Customer\DTOs\CustomerDocumentData;
 use Modules\Customer\Enums\CustomerAddressType;
 use Modules\Customer\Enums\CustomerDocumentStatus;
 use Modules\Customer\Enums\CustomerDocumentType;
-use Modules\Customer\Enums\CustomerStatus;
 use Modules\Customer\Enums\CustomerType;
 use Modules\Customer\Enums\PreferredCommunicationChannel;
 
@@ -30,7 +29,6 @@ trait MapsCustomerData
             customerNumber: $this->nullableString($customer, 'customer_number'),
             legalName: $this->nullableString($customer, 'legal_name'),
             displayName: $this->nullableString($customer, 'display_name'),
-            status: CustomerStatus::from((string) ($customer['status'] ?? CustomerStatus::PendingApproval->value)),
             email: $this->nullableString($customer, 'email'),
             phone: $this->nullableString($customer, 'phone'),
             mobile: $this->nullableString($customer, 'mobile'),
@@ -42,7 +40,6 @@ trait MapsCustomerData
             svatNumber: $this->nullableString($customer, 'svat_number'),
             businessRegistrationNumber: $this->nullableString($customer, 'business_registration_number'),
             creditLimit: (string) ($customer['credit_limit'] ?? '0.000000'),
-            openingBalance: (string) ($customer['opening_balance'] ?? '0.000000'),
             isCreditAllowed: (bool) ($customer['is_credit_allowed'] ?? true),
             isAdvanceAllowed: (bool) ($customer['is_advance_allowed'] ?? true),
             isTaxExempt: (bool) ($customer['is_tax_exempt'] ?? false),

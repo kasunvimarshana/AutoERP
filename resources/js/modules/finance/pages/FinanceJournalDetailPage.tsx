@@ -116,7 +116,6 @@ export default function FinanceJournalDetailPage() {
                 { key: 'account', header: 'Account', render: (row) => row.account ? `${row.account.code} - ${row.account.name}` : '-' },
                 { key: 'debit', header: 'Debit', render: (row) => <MoneyDisplay value={row.debit} /> },
                 { key: 'credit', header: 'Credit', render: (row) => <MoneyDisplay value={row.credit} /> },
-                { key: 'balance', header: 'Balance after', render: (row) => <MoneyDisplay value={row.balance_after} /> },
             ]} />
         </Panel>
 

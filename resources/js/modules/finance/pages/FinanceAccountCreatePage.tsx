@@ -17,7 +17,6 @@ const initial: AccountPayload = {
     code: '',
     name: '',
     normal_balance: 'debit',
-    opening_balance: '0.000000',
     is_control_account: false,
     is_posting_account: true,
     is_cash_account: false,
@@ -52,7 +51,7 @@ export default function FinanceAccountCreatePage() {
     }
 
     return <>
-        <ContentHeader title="New account" description="Add a scoped chart-of-accounts record." />
+        <ContentHeader title="New account" description="Add a scoped chart-of-accounts record. Opening balances must be posted through a governed opening journal." />
         <ErrorAlert error={error} />
         <form className="space-y-5" onSubmit={(event) => { event.preventDefault(); void save(); }}>
             <AccountForm value={form} onChange={(next) => { formGuard.markDirty(); setForm(next); }} lookups={lookups.data} error={error} />
