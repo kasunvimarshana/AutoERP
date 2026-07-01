@@ -17,6 +17,7 @@ use Modules\VehicleRental\Http\Resources\RentalCalculationRunResource;
 use Modules\VehicleRental\Models\RentalAgreement;
 use Modules\VehicleRental\Models\RentalCalculationRun;
 use Modules\VehicleRental\Services\RentalCalculationService;
+use Modules\VehicleRental\Services\RentalCalculationTransitionService;
 use Modules\VehicleRental\Services\RentalInvoiceIntegrationService;
 use Modules\VehicleRental\Services\VehicleRentalAuthorizationService;
 
@@ -48,16 +49,23 @@ final class RentalCalculationController
         return new RentalCalculationRunResource($this->scope(RentalCalculationRun::query(), $request)->with($service->relations())->findOrFail($run));
     }
 
-    public function transition(RentalTransitionRequest $request, int $run, RentalCalculationService $service): RentalCalculationRunResource
-    {
+    public function transition(
+        RentalTransitionRequest $request,
+        int $run,
+        RentalCalculationTransitionService $service,
+    ): RentalCalculationRunResource {
         $status = RentalCalculationStatus::from((string) $request->input('status'));
         $permission = in_array($status, [RentalCalculationStatus::Approved, RentalCalculationStatus::Reversed], true)
             ? VehicleRentalAuthorizationService::APPROVE_CALCULATIONS
             : VehicleRentalAuthorizationService::CALCULATE;
         $this->authorization->assert($request->currentUserId(), $request->tenantId(), $permission);
+
         return new RentalCalculationRunResource($service->transition(
             $this->scope(RentalCalculationRun::query(), $request)->findOrFail($run),
-            $status, $request->currentUserId(), $request->input('reason'),
+            $status,
+            (int) $request->input('expected_version'),
+            $request->currentUserId(),
+            $request->input('reason'),
         ));
     }
 
