@@ -188,10 +188,12 @@ export const calculateRentalAgreement = (
 ) => post<RentalCalculationRun>(`agreements/${agreementId}/calculate`, payload);
 export const transitionRentalCalculationRun = (
     id: number,
+    expectedVersion: number,
     status: string,
     reason?: string,
 ) =>
     patch<RentalCalculationRun>(`calculation-runs/${id}/transition`, {
+        expected_version: expectedVersion,
         status,
         reason,
     });
