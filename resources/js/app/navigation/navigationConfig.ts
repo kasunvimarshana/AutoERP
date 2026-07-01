@@ -452,6 +452,23 @@ export const tenantNavigationSections: NavigationSection[] = [
                 ],
             },
             {
+                id: "inventory",
+                type: "module",
+                label: "Inventory",
+                icon: "list",
+                access: operationalAccess(["inventory"]),
+                children: [
+                    {
+                        id: "inventory-workspace",
+                        type: "link",
+                        label: "Inventory",
+                        to: "/inventory",
+                        match: ["/inventory"],
+                        access: operationalAccess(["inventory"]),
+                    },
+                ],
+            },
+            {
                 id: "purchase",
                 type: "module",
                 label: "Purchase",

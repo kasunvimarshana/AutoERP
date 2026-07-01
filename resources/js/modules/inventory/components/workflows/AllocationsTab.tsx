@@ -12,6 +12,7 @@ import { compactObject } from '@/shared/utils/object';
 import type { NamedResource } from '@/shared/types/common';
 import { createAllocation, issueAllocation, releaseAllocation } from '../../inventoryApi';
 import type { AllocationPayload, InventoryRecord } from '../../inventoryTypes';
+import { emptyInventoryDimensions, InventoryDimensionFields } from '../InventoryDimensionFields';
 import {
     label,
     localToday,
@@ -34,6 +35,7 @@ export function AllocationsTab({
     const [form, setForm] = useState({ allocation_date: localToday(), quantity_allocated: '1.000000', reservation: '' });
     const [item, setItem] = useState<NamedResource | null>(null);
     const [warehouse, setWarehouse] = useState<NamedResource | null>(null);
+    const [dimensions, setDimensions] = useState(emptyInventoryDimensions);
     const [busy, setBusy] = useState(false);
     const [actionError, setActionError] = useState<ApiError | null>(null);
     const recordAction = useRecordAction(reload, setActionError);
@@ -44,6 +46,11 @@ export function AllocationsTab({
             warehouse_id: warehouse?.id ?? 0,
             quantity_allocated: form.quantity_allocated,
             reservation_id: form.reservation ? Number(form.reservation) : undefined,
+            item_variant_id: dimensions.itemVariant?.id,
+            warehouse_location_id: dimensions.warehouseLocation?.id,
+            batch_id: dimensions.batch?.id,
+            serial_number_id: dimensions.serial?.id,
+            uom_id: dimensions.uom?.id,
         }) as AllocationPayload);
         reload();
     });
@@ -51,8 +58,8 @@ export function AllocationsTab({
     return (
         <WorkflowPanel title="Allocation management" loading={loading} error={error} actionError={actionError}>
             <form className="grid gap-4 lg:grid-cols-[1fr_1fr_10rem_1fr_12rem_auto]" onSubmit={submit}>
-                <LookupSelect label="Item" value={item} onChange={setItem} search={lookupApi.stockableItems} error={fieldError(actionError, 'item_id')} />
-                <LookupSelect label="Warehouse" value={warehouse} onChange={setWarehouse} search={searchWarehouses} error={fieldError(actionError, 'warehouse_id')} loadOnOpen minSearchLength={0} />
+                <LookupSelect label="Item" value={item} onChange={(value) => { setItem(value); setDimensions(emptyInventoryDimensions()); }} search={lookupApi.stockableItems} error={fieldError(actionError, 'item_id')} />
+                <LookupSelect label="Warehouse" value={warehouse} onChange={(value) => { setWarehouse(value); setDimensions({ ...dimensions, warehouseLocation: null, serial: null }); }} search={searchWarehouses} error={fieldError(actionError, 'warehouse_id')} loadOnOpen minSearchLength={0} />
                 <DecimalInput label="Quantity (base)" value={form.quantity_allocated} error={fieldError(actionError, 'quantity_allocated')} onChange={(event) => setForm({ ...form, quantity_allocated: event.target.value })} />
                 <Input label="Date" type="date" value={form.allocation_date} error={fieldError(actionError, 'allocation_date')} onChange={(event) => setForm({ ...form, allocation_date: event.target.value })} />
                 <Select
@@ -68,6 +75,20 @@ export function AllocationsTab({
                     onChange={(event) => setForm({ ...form, reservation: event.target.value })}
                 />
                 <div className="flex items-end"><Button type="submit" loading={busy} disabled={!item || !warehouse}>Allocate</Button></div>
+                <InventoryDimensionFields
+                    item={item}
+                    warehouse={warehouse}
+                    value={dimensions}
+                    onChange={setDimensions}
+                    includeSerial
+                    errors={{
+                        itemVariant: fieldError(actionError, 'item_variant_id'),
+                        warehouseLocation: fieldError(actionError, 'warehouse_location_id'),
+                        batch: fieldError(actionError, 'batch_id'),
+                        serial: fieldError(actionError, 'serial_number_id'),
+                        uom: fieldError(actionError, 'uom_id'),
+                    }}
+                />
             </form>
             <RecordList rows={data} columns={columns((row) => {
                 const issueKey = `issue-allocation:${row.id}`;

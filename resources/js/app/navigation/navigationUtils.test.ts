@@ -178,6 +178,28 @@ describe('navigation access and matching', () => {
         ]);
     });
 
+    it('shows inventory navigation through the Inventory route entitlement', () => {
+        const sections = filterNavigation(tenantNavigationSections, {
+            tenantId: 10,
+            isPlatformOperator: false,
+            organizationUnitId: 20,
+            roles: [],
+            permissions: [],
+            permissionsLoaded: true,
+            enabledModules: ['inventory'],
+            enabledModulesLoaded: true,
+        });
+        const inventoryModule = sections
+            .flatMap((section) => section.items)
+            .find((item) => item.id === 'inventory');
+
+        expect(inventoryModule?.type).toBe('module');
+        expect(inventoryModule?.type === 'module' ? inventoryModule.children.map((child) => child.label) : []).toEqual([
+            'Inventory',
+        ]);
+        expect(findNavigationMatch('/inventory', '', tenantNavigationSections)?.parent?.id).toBe('inventory');
+    });
+
     it('preserves navigation-specific module constraints for shared route paths', () => {
         const sections = filterNavigation(tenantNavigationSections, {
             tenantId: 10,

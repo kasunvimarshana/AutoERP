@@ -12,6 +12,7 @@ import { compactObject } from '@/shared/utils/object';
 import type { NamedResource } from '@/shared/types/common';
 import { createAdjustment, postAdjustment } from '../../inventoryApi';
 import type { AdjustmentPayload, InventoryRecord } from '../../inventoryTypes';
+import { emptyInventoryDimensions, InventoryDimensionFields } from '../InventoryDimensionFields';
 import {
     label,
     localToday,
@@ -35,6 +36,7 @@ export function AdjustmentsTab({ data, loading, error, reload }: WorkflowProps) 
     });
     const [item, setItem] = useState<NamedResource | null>(null);
     const [warehouse, setWarehouse] = useState<NamedResource | null>(null);
+    const [dimensions, setDimensions] = useState(emptyInventoryDimensions);
     const [busy, setBusy] = useState(false);
     const [actionError, setActionError] = useState<ApiError | null>(null);
     const recordAction = useRecordAction(reload, setActionError);
@@ -43,6 +45,7 @@ export function AdjustmentsTab({ data, loading, error, reload }: WorkflowProps) 
             adjustment_date: form.adjustment_date,
             adjustment_type: form.adjustment_type,
             warehouse_id: warehouse?.id ?? 0,
+            warehouse_location_id: dimensions.warehouseLocation?.id,
             reason: form.reason,
             lines: [{
                 item_id: item?.id ?? 0,
@@ -50,6 +53,10 @@ export function AdjustmentsTab({ data, loading, error, reload }: WorkflowProps) 
                 counted_quantity: form.counted_quantity,
                 adjustment_quantity: subtractDecimals(form.counted_quantity, form.system_quantity),
                 unit_cost: form.unit_cost,
+                item_variant_id: dimensions.itemVariant?.id,
+                batch_id: dimensions.batch?.id,
+                serial_number_id: dimensions.serial?.id,
+                uom_id: dimensions.uom?.id,
                 reason: form.reason,
             }],
         }) as AdjustmentPayload);
@@ -59,8 +66,8 @@ export function AdjustmentsTab({ data, loading, error, reload }: WorkflowProps) 
     return (
         <WorkflowPanel title="Stock adjustment workflow" loading={loading} error={error} actionError={actionError}>
             <form className="grid gap-4 xl:grid-cols-[1fr_1fr_10rem_9rem_9rem_9rem_1fr_1fr_auto]" onSubmit={submit}>
-                <LookupSelect label="Item" value={item} onChange={setItem} search={lookupApi.stockableItems} error={fieldError(actionError, 'lines.0.item_id')} />
-                <LookupSelect label="Warehouse" value={warehouse} onChange={setWarehouse} search={searchWarehouses} error={fieldError(actionError, 'warehouse_id')} loadOnOpen minSearchLength={0} />
+                <LookupSelect label="Item" value={item} onChange={(value) => { setItem(value); setDimensions(emptyInventoryDimensions()); }} search={lookupApi.stockableItems} error={fieldError(actionError, 'lines.0.item_id')} />
+                <LookupSelect label="Warehouse" value={warehouse} onChange={(value) => { setWarehouse(value); setDimensions({ ...dimensions, warehouseLocation: null, serial: null }); }} search={searchWarehouses} error={fieldError(actionError, 'warehouse_id')} loadOnOpen minSearchLength={0} />
                 <Select
                     label="Type"
                     value={form.adjustment_type}
@@ -73,6 +80,20 @@ export function AdjustmentsTab({ data, loading, error, reload }: WorkflowProps) 
                 <Input label="Reason" value={form.reason} error={fieldError(actionError, 'reason')} onChange={(event) => setForm({ ...form, reason: event.target.value })} />
                 <Input label="Date" type="date" value={form.adjustment_date} error={fieldError(actionError, 'adjustment_date')} onChange={(event) => setForm({ ...form, adjustment_date: event.target.value })} />
                 <div className="flex items-end"><Button type="submit" loading={busy} disabled={!item || !warehouse}>Create</Button></div>
+                <InventoryDimensionFields
+                    item={item}
+                    warehouse={warehouse}
+                    value={dimensions}
+                    onChange={setDimensions}
+                    includeSerial
+                    errors={{
+                        itemVariant: fieldError(actionError, 'lines.0.item_variant_id'),
+                        warehouseLocation: fieldError(actionError, 'warehouse_location_id'),
+                        batch: fieldError(actionError, 'lines.0.batch_id'),
+                        serial: fieldError(actionError, 'lines.0.serial_number_id'),
+                        uom: fieldError(actionError, 'lines.0.uom_id'),
+                    }}
+                />
             </form>
             <RecordList rows={data} columns={columns((row) => {
                 const key = `post-adjustment:${row.id}`;

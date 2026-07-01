@@ -32,4 +32,11 @@ describe('resolved tenant route entitlements', () => {
         expect(resolveTenantRouteEntitlement('/payments')?.permissions).toContain('payments.view');
         expect(resolveTenantRouteEntitlement('/customers')?.permissions).toContain('customers.view');
     });
+
+    it('protects the Inventory workspace route at its exact path', () => {
+        const entitlement = resolveTenantRouteEntitlement('/inventory');
+
+        expect(entitlement?.modules).toContain('inventory');
+        expect(entitlement?.requiresOrganizationUnit).toBe(true);
+    });
 });

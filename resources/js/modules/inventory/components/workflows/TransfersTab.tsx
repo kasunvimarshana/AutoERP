@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type ReactNode } from 'react';
+import { useCallback, useState, type FormEvent, type ReactNode } from 'react';
 import { Button } from '@/shared/components/Button';
 import { DecimalInput } from '@/shared/components/DecimalInput';
 import { Input } from '@/shared/components/Input';
@@ -6,11 +6,13 @@ import { LookupSelect } from '@/shared/components/LookupSelect';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { fieldError, type ApiError } from '@/shared/api/apiError';
 import { lookupApi } from '@/shared/api/lookupApi';
-import { searchWarehouses } from '@/shared/api/referenceApi';
+import { searchWarehouseLocations, searchWarehouses } from '@/shared/api/referenceApi';
 import { compactObject } from '@/shared/utils/object';
 import type { NamedResource } from '@/shared/types/common';
+import type { LookupLoadParams } from '@/shared/types/lookup';
 import { cancelTransfer, createTransfer, dispatchTransfer, receiveTransfer } from '../../inventoryApi';
 import type { InventoryRecord, TransferPayload } from '../../inventoryTypes';
+import { emptyInventoryDimensions, InventoryDimensionFields } from '../InventoryDimensionFields';
 import {
     label,
     localToday,
@@ -27,15 +29,36 @@ export function TransfersTab({ data, loading, error, reload }: WorkflowProps) {
     const [item, setItem] = useState<NamedResource | null>(null);
     const [fromWarehouse, setFromWarehouse] = useState<NamedResource | null>(null);
     const [toWarehouse, setToWarehouse] = useState<NamedResource | null>(null);
+    const [fromLocation, setFromLocation] = useState<NamedResource | null>(null);
+    const [toLocation, setToLocation] = useState<NamedResource | null>(null);
+    const [dimensions, setDimensions] = useState(emptyInventoryDimensions);
     const [busy, setBusy] = useState(false);
     const [actionError, setActionError] = useState<ApiError | null>(null);
     const recordAction = useRecordAction(reload, setActionError);
+    const fromLocationSearch = useCallback(
+        (params: LookupLoadParams) => searchWarehouseLocations(params, fromWarehouse?.id),
+        [fromWarehouse?.id],
+    );
+    const toLocationSearch = useCallback(
+        (params: LookupLoadParams) => searchWarehouseLocations(params, toWarehouse?.id),
+        [toWarehouse?.id],
+    );
     const submit = (event: FormEvent) => void runFormAction(event, setBusy, setActionError, async () => {
         await createTransfer(compactObject({
             transfer_date: form.transfer_date,
             from_warehouse_id: fromWarehouse?.id ?? 0,
             to_warehouse_id: toWarehouse?.id ?? 0,
-            lines: [{ item_id: item?.id ?? 0, quantity: form.quantity, unit_cost: form.unit_cost }],
+            from_warehouse_location_id: fromLocation?.id,
+            to_warehouse_location_id: toLocation?.id,
+            lines: [compactObject({
+                item_id: item?.id ?? 0,
+                quantity: form.quantity,
+                unit_cost: form.unit_cost,
+                item_variant_id: dimensions.itemVariant?.id,
+                batch_id: dimensions.batch?.id,
+                serial_number_id: dimensions.serial?.id,
+                uom_id: dimensions.uom?.id,
+            })],
         }) as TransferPayload);
         reload();
     });
@@ -43,15 +66,31 @@ export function TransfersTab({ data, loading, error, reload }: WorkflowProps) {
     return (
         <WorkflowPanel title="Transfer workflow" loading={loading} error={error} actionError={actionError}>
             <form className="grid gap-4 xl:grid-cols-[1fr_1fr_1fr_9rem_9rem_1fr_auto]" onSubmit={submit}>
-                <LookupSelect label="Item" value={item} onChange={setItem} search={lookupApi.stockableItems} error={fieldError(actionError, 'lines.0.item_id')} />
-                <LookupSelect label="From warehouse" value={fromWarehouse} onChange={setFromWarehouse} search={searchWarehouses} error={fieldError(actionError, 'from_warehouse_id')} loadOnOpen minSearchLength={0} />
-                <LookupSelect label="To warehouse" value={toWarehouse} onChange={setToWarehouse} search={searchWarehouses} error={fieldError(actionError, 'to_warehouse_id')} loadOnOpen minSearchLength={0} />
+                <LookupSelect label="Item" value={item} onChange={(value) => { setItem(value); setDimensions(emptyInventoryDimensions()); }} search={lookupApi.stockableItems} error={fieldError(actionError, 'lines.0.item_id')} />
+                <LookupSelect label="From warehouse" value={fromWarehouse} onChange={(value) => { setFromWarehouse(value); setFromLocation(null); setDimensions({ ...dimensions, serial: null }); }} search={searchWarehouses} error={fieldError(actionError, 'from_warehouse_id')} loadOnOpen minSearchLength={0} />
+                <LookupSelect label="To warehouse" value={toWarehouse} onChange={(value) => { setToWarehouse(value); setToLocation(null); }} search={searchWarehouses} error={fieldError(actionError, 'to_warehouse_id')} loadOnOpen minSearchLength={0} />
                 <DecimalInput label="Qty (base)" value={form.quantity} error={fieldError(actionError, 'lines.0.quantity')} onChange={(event) => setForm({ ...form, quantity: event.target.value })} />
                 <DecimalInput label="Cost/base" value={form.unit_cost} error={fieldError(actionError, 'lines.0.unit_cost')} onChange={(event) => setForm({ ...form, unit_cost: event.target.value })} />
                 <Input label="Date" type="date" value={form.transfer_date} error={fieldError(actionError, 'transfer_date')} onChange={(event) => setForm({ ...form, transfer_date: event.target.value })} />
                 <div className="flex items-end">
                     <Button type="submit" loading={busy} disabled={!item || !fromWarehouse || !toWarehouse || fromWarehouse.id === toWarehouse.id}>Create</Button>
                 </div>
+                <LookupSelect label="From location" value={fromLocation} onChange={(value) => { setFromLocation(value); setDimensions({ ...dimensions, serial: null }); }} search={fromLocationSearch} error={fieldError(actionError, 'from_warehouse_location_id')} disabled={!fromWarehouse} loadOnOpen minSearchLength={0} />
+                <LookupSelect label="To location" value={toLocation} onChange={setToLocation} search={toLocationSearch} error={fieldError(actionError, 'to_warehouse_location_id')} disabled={!toWarehouse} loadOnOpen minSearchLength={0} />
+                <InventoryDimensionFields
+                    item={item}
+                    warehouse={fromWarehouse}
+                    value={dimensions}
+                    onChange={setDimensions}
+                    includeLocation={false}
+                    includeSerial
+                    errors={{
+                        itemVariant: fieldError(actionError, 'lines.0.item_variant_id'),
+                        batch: fieldError(actionError, 'lines.0.batch_id'),
+                        serial: fieldError(actionError, 'lines.0.serial_number_id'),
+                        uom: fieldError(actionError, 'lines.0.uom_id'),
+                    }}
+                />
             </form>
             <RecordList rows={data} columns={columns((row) => {
                 const status = String(row.status ?? '');

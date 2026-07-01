@@ -19,6 +19,7 @@ import {
     listStockBalances,
 } from '../inventoryApi';
 import type { InventoryAvailability, InventoryRecord } from '../inventoryTypes';
+import { emptyInventoryDimensions, InventoryDimensionFields } from './InventoryDimensionFields';
 import {
     type ApiResult,
     quantity,
@@ -107,6 +108,7 @@ export function DashboardTab({
 export function AvailabilityTab() {
     const [item, setItem] = useState<NamedResource | null>(null);
     const [warehouse, setWarehouse] = useState<NamedResource | null>(null);
+    const [dimensions, setDimensions] = useState(emptyInventoryDimensions);
     const [availability, setAvailability] = useState<InventoryAvailability | null>(null);
     const [error, setError] = useState<ApiError | null>(null);
     const [checking, setChecking] = useState(false);
@@ -124,7 +126,13 @@ export function AvailabilityTab() {
                     setChecking(true);
                     setError(null);
                     try {
-                        setAvailability(await getAvailability({ item_id: item.id, warehouse_id: warehouse.id }));
+                        setAvailability(await getAvailability({
+                            item_id: item.id,
+                            warehouse_id: warehouse.id,
+                            item_variant_id: dimensions.itemVariant?.id,
+                            warehouse_location_id: dimensions.warehouseLocation?.id,
+                            batch_id: dimensions.batch?.id,
+                        }));
                     } catch (requestError) {
                         setError(toApiError(requestError));
                     } finally {
@@ -132,11 +140,19 @@ export function AvailabilityTab() {
                     }
                 }}
             >
-                <LookupSelect label="Item" value={item} onChange={setItem} search={lookupApi.stockableItems} placeholder="Search stockable items..." />
-                <LookupSelect label="Warehouse" value={warehouse} onChange={setWarehouse} search={searchWarehouses} placeholder="Search warehouses..." loadOnOpen minSearchLength={0} />
+                <LookupSelect label="Item" value={item} onChange={(value) => { setItem(value); setDimensions(emptyInventoryDimensions()); setAvailability(null); }} search={lookupApi.stockableItems} placeholder="Search stockable items..." />
+                <LookupSelect label="Warehouse" value={warehouse} onChange={(value) => { setWarehouse(value); setDimensions({ ...dimensions, warehouseLocation: null, serial: null }); setAvailability(null); }} search={searchWarehouses} placeholder="Search warehouses..." loadOnOpen minSearchLength={0} />
                 <div className="flex items-end">
                     <Button type="submit" loading={checking} disabled={!item || !warehouse}>Check</Button>
                 </div>
+                <InventoryDimensionFields
+                    item={item}
+                    warehouse={warehouse}
+                    value={dimensions}
+                    onChange={(value) => { setDimensions(value); setAvailability(null); }}
+                    includeSerial={false}
+                    includeUom={false}
+                />
             </form>
             <div className="mt-4"><ErrorAlert error={error} /></div>
             {availability && (

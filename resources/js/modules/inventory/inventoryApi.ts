@@ -1,6 +1,9 @@
 import { apiClient } from '@/shared/api/apiClient';
 import { endpoints } from '@/shared/api/endpoints';
 import type { ApiCollection, ApiResource, ListParams } from '@/shared/types/api';
+import type { NamedResource } from '@/shared/types/common';
+import type { LookupLoadParams, LookupResult } from '@/shared/types/lookup';
+import { compactObject, readableRelation } from '@/shared/utils/object';
 import type {
     AllocationPayload,
     AdjustmentPayload,
@@ -108,3 +111,67 @@ export const listSerials = (params: ListParams, signal?: AbortSignal) =>
 
 export const listStateChanges = (params: ListParams, signal?: AbortSignal) =>
     apiClient.get<ApiCollection<InventoryRecord>>(`${endpoints.inventory}/state-changes`, { params, signal }).then((response) => response.data);
+
+interface InventoryDimensionLookupFilters {
+    itemId?: number | null;
+    itemVariantId?: number | null;
+    warehouseId?: number | null;
+    warehouseLocationId?: number | null;
+    batchId?: number | null;
+}
+
+export async function searchInventoryBatches(
+    { search, page, perPage, signal }: LookupLoadParams,
+    filters: InventoryDimensionLookupFilters = {},
+): Promise<LookupResult<NamedResource>> {
+    const result = await listBatches(compactObject({
+        search,
+        page,
+        per_page: perPage,
+        item_id: filters.itemId,
+        item_variant_id: filters.itemVariantId,
+        status: 'active',
+    }), signal);
+
+    return {
+        data: result.data.map((row) => toNamedResource(row, 'batch_number', 'lot_number')),
+        links: result.links,
+        meta: result.meta,
+    };
+}
+
+export async function searchInventorySerials(
+    { search, page, perPage, signal }: LookupLoadParams,
+    filters: InventoryDimensionLookupFilters = {},
+): Promise<LookupResult<NamedResource>> {
+    const result = await listSerials(compactObject({
+        search,
+        page,
+        per_page: perPage,
+        item_id: filters.itemId,
+        item_variant_id: filters.itemVariantId,
+        warehouse_id: filters.warehouseId,
+        warehouse_location_id: filters.warehouseLocationId,
+        batch_id: filters.batchId,
+        status: 'available',
+    }), signal);
+
+    return {
+        data: result.data.map((row) => toNamedResource(row, 'serial_number')),
+        links: result.links,
+        meta: result.meta,
+    };
+}
+
+function toNamedResource(row: InventoryRecord, primaryKey: string, fallbackKey?: string): NamedResource {
+    const code = String(row[primaryKey] ?? (fallbackKey ? row[fallbackKey] : '') ?? '');
+    const item = readableRelation(row.item);
+    const variant = readableRelation(row.variant);
+    const context = [item, variant].filter((value) => value !== '-').join(' / ');
+
+    return {
+        id: Number(row.id),
+        code,
+        name: context || code,
+    };
+}
