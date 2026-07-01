@@ -755,6 +755,6 @@ final class RentalUsageService
             );
         }
 
-        return $start->diffInMinutes($end);
+        return (int) $start->diffInMinutes($end);
     }
 }
