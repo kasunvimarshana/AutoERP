@@ -49,8 +49,8 @@ return new class extends Migration
             $table->unique(['tenant_id', 'fingerprint'], 'rental_calculation_lines_fingerprint_uk');
             $table->index(['usage_context_id', 'component_code'], 'rental_calculation_lines_usage_component_ix');
             $table->index(['source_type', 'source_id'], 'rental_calculation_lines_source_ix');
-
             $table->unique(['id', 'tenant_id'], 'rental_calculation_lines_id_tenant_uk');
+
             $table->foreign(['organization_unit_id', 'tenant_id'], 'rental_calculation_lines_organization_unit_id_tenant_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('organization_units')
@@ -58,7 +58,7 @@ return new class extends Migration
             $table->foreign(['calculation_run_id', 'tenant_id'], 'rental_calculation_lines_calculation_run_id_tenant_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('rental_calculation_runs')
-                ->cascadeOnDelete();
+                ->restrictOnDelete();
             $table->foreign(['usage_context_id', 'tenant_id'], 'rental_calculation_lines_usage_context_id_tenant_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('rental_usage_contexts')
@@ -75,7 +75,6 @@ return new class extends Migration
                 ->references(['id', 'tenant_id'])
                 ->on('tax_groups')
                 ->restrictOnDelete();
-
             $table->foreign(['created_by', 'tenant_id'], 'rental_calculation_lines_created_by_tenant_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('users')
