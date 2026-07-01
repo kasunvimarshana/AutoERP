@@ -5,8 +5,9 @@ declare(strict_types=1);
 namespace Database\Seeders\Concerns;
 
 use Illuminate\Support\Facades\Schema;
-use Modules\ReferenceData\Models\CurrencyModel;
+use Modules\OrganizationUnit\Constants\OrganizationUnitHierarchy;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
+use Modules\ReferenceData\Models\CurrencyModel;
 use Modules\Tenant\Models\TenantModel;
 
 trait ResolvesSeedContext
@@ -35,7 +36,9 @@ trait ResolvesSeedContext
 
         return OrganizationUnitModel::query()
             ->where('tenant_id', $tenant->getKey())
-            ->where('code', $this->defaultOrganizationUnitCode())
+            ->where('root_marker', OrganizationUnitHierarchy::ROOT_MARKER)
+            ->where('is_active', true)
+            ->whereNull('retired_at')
             ->first();
     }
 
@@ -53,11 +56,6 @@ trait ResolvesSeedContext
     private function defaultTenantCode(): string
     {
         return strtoupper(trim((string) config('app.bootstrap.tenant_code', 'AUTOERP')));
-    }
-
-    private function defaultOrganizationUnitCode(): string
-    {
-        return strtoupper(trim((string) config('app.bootstrap.organization_unit_code', 'HQ')));
     }
 
     private function defaultCurrencyCode(): string

@@ -120,7 +120,6 @@ return [
 
     'bootstrap' => [
         'tenant_code' => env('AUTOERP_TENANT_CODE', 'AUTOERP'),
-        'organization_unit_code' => env('AUTOERP_ORGANIZATION_UNIT_CODE', 'HQ'),
         'currency_code' => env('AUTOERP_CURRENCY_CODE', 'USD'),
     ],
 
