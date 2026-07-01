@@ -5,15 +5,14 @@ declare(strict_types=1);
 namespace Modules\Customer\Validators;
 
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
-use Modules\ReferenceData\Models\CurrencyModel;
 use Modules\Core\Services\DecimalMath;
 use Modules\Customer\DTOs\CreateCustomerData;
 use Modules\Customer\DTOs\UpdateCustomerData;
 use Modules\Customer\Models\Customer;
 use Modules\Customer\Models\CustomerCategory;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
+use Modules\ReferenceData\Models\CurrencyModel;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 final class CustomerValidationService
@@ -59,32 +58,13 @@ final class CustomerValidationService
 
     public function assertCustomerScope(Customer $customer, int $tenantId, ?int $organizationUnitId): void
     {
-        $this->assertScope(
-            $tenantId,
-            $organizationUnitId,
-            (int) $customer->tenant_id,
-            $customer->organization_unit_id,
-        );
+        $this->assertScope($tenantId, $organizationUnitId, (int) $customer->tenant_id, $customer->organization_unit_id);
     }
 
     public function assertCategoryUsable(Customer $customer, int $categoryId): CustomerCategory
     {
         $category = CustomerCategory::query()->find($categoryId);
         if (! $category instanceof CustomerCategory) {
-            $owner = DB::table('customer_categories')
-                ->where('id', $categoryId)
-                ->whereNull('deleted_at')
-                ->first(['tenant_id', 'organization_unit_id']);
-
-            if ($owner !== null) {
-                $this->assertScope(
-                    (int) $customer->tenant_id,
-                    $customer->organization_unit_id,
-                    (int) $owner->tenant_id,
-                    $owner->organization_unit_id === null ? null : (int) $owner->organization_unit_id,
-                );
-            }
-
             throw new InvalidArgumentException('Customer category was not found.');
         }
         $this->assertScope(
@@ -159,12 +139,8 @@ final class CustomerValidationService
         }
     }
 
-    private function assertScope(
-        int $tenantId,
-        ?int $organizationUnitId,
-        int $recordTenantId,
-        ?int $recordOrganizationUnitId,
-    ): void {
+    private function assertScope(int $tenantId, ?int $organizationUnitId, int $recordTenantId, ?int $recordOrganizationUnitId): void
+    {
         if ($recordTenantId !== $tenantId) {
             throw new InvalidArgumentException('Customer reference belongs to a different tenant.');
         }

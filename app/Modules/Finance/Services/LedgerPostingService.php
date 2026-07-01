@@ -4,28 +4,32 @@ declare(strict_types=1);
 
 namespace Modules\Finance\Services;
 
+use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Finance\Models\FinanceJournalEntry;
 use Modules\Finance\Models\FinanceLedgerEntry;
 
 final class LedgerPostingService
 {
-    public function __construct(
-        private readonly DecimalMath $math,
-        private readonly AccountBalanceService $balances,
-    ) {}
+    public function __construct(private readonly DecimalMath $math) {}
 
     public function post(FinanceJournalEntry $journal): int
     {
         if ($journal->ledgerEntries()->exists()) {
-            throw new \InvalidArgumentException('Journal has already been posted to ledger.');
+            throw new InvalidArgumentException('Journal has already been posted to ledger.');
         }
 
         $count = 0;
+        $lines = $journal->lines->sortBy([
+            ['account_id', 'asc'],
+            ['line_number', 'asc'],
+        ]);
 
-        foreach ($journal->lines as $line) {
+        foreach ($lines as $line) {
             $account = $line->account()->lockForUpdate()->firstOrFail();
-            $balanceAfter = $this->balances->accountBalanceAfter($account, (string) $line->debit, (string) $line->credit);
+            if (! (bool) $account->is_active || ! (bool) $account->is_posting_account) {
+                throw new InvalidArgumentException('Posting account must remain active and postable.');
+            }
 
             FinanceLedgerEntry::query()->create([
                 'tenant_id' => $journal->tenant_id,
@@ -37,7 +41,6 @@ final class LedgerPostingService
                 'entry_date' => $journal->journal_date,
                 'debit' => $this->math->normalize((string) $line->debit),
                 'credit' => $this->math->normalize((string) $line->credit),
-                'balance_after' => $balanceAfter,
                 'source_module' => $journal->source_module,
                 'source_type' => $journal->source_type,
                 'source_id' => $journal->source_id,
@@ -47,12 +50,6 @@ final class LedgerPostingService
                 'source_line_id' => $line->source_line_id,
             ]);
 
-            $account->forceFill([
-                'current_balance' => $balanceAfter,
-            ])->save();
-
-            $line->setRelation('account', $account->refresh());
-            $this->balances->applyJournalLine($journal, $line);
             $count++;
         }
 

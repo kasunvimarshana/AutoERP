@@ -66,7 +66,6 @@ final class CustomerLookupService
             customerType: $customer->customer_type,
             status: $customer->status,
             creditLimit: (string) $customer->credit_limit,
-            openingBalance: (string) $customer->opening_balance,
             isCreditAllowed: (bool) $customer->is_credit_allowed,
             isAdvanceAllowed: (bool) $customer->is_advance_allowed,
             isTaxExempt: (bool) $customer->is_tax_exempt,

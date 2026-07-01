@@ -14,7 +14,6 @@ use Modules\Supplier\DTOs\SupplierItemMappingData;
 use Modules\Supplier\Enums\SupplierAddressType;
 use Modules\Supplier\Enums\SupplierDocumentStatus;
 use Modules\Supplier\Enums\SupplierDocumentType;
-use Modules\Supplier\Enums\SupplierStatus;
 use Modules\Supplier\Enums\SupplierType;
 
 trait MapsSupplierData
@@ -30,7 +29,6 @@ trait MapsSupplierData
             supplierNumber: $this->nullableString($supplier, 'supplier_number'),
             legalName: $this->nullableString($supplier, 'legal_name'),
             displayName: $this->nullableString($supplier, 'display_name'),
-            status: SupplierStatus::from((string) ($supplier['status'] ?? SupplierStatus::PendingApproval->value)),
             email: $this->nullableString($supplier, 'email'),
             phone: $this->nullableString($supplier, 'phone'),
             mobile: $this->nullableString($supplier, 'mobile'),

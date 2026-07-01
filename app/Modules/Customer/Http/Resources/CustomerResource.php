@@ -21,7 +21,6 @@ final class CustomerResource extends JsonResource
             'svat_number' => $this->svat_number,
             'business_registration_number' => $this->business_registration_number,
             'credit_limit' => (string) $this->credit_limit,
-            'opening_balance' => (string) $this->opening_balance,
             'is_tax_exempt' => (bool) $this->is_tax_exempt,
             'marketing_consent' => (bool) $this->marketing_consent,
             'preferred_communication_channel' => $this->preferred_communication_channel instanceof PreferredCommunicationChannel

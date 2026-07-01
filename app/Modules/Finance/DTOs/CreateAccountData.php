@@ -8,9 +8,7 @@ use Modules\Finance\Enums\NormalBalance;
 
 final readonly class CreateAccountData
 {
-    /**
-     * @param  array<string, mixed>|null  $metadata
-     */
+    /** @param array<string, mixed>|null $metadata */
     public function __construct(
         public int $tenantId,
         public int $accountTypeId,
@@ -28,7 +26,6 @@ final readonly class CreateAccountData
         public bool $isTaxAccount = false,
         public bool $isSystem = false,
         public bool $isActive = true,
-        public string $openingBalance = '0.000000',
         public ?array $metadata = null,
     ) {}
 }

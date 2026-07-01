@@ -12,12 +12,14 @@ final class PurchaseAdjustmentOwnershipBoundaryTest extends TestCase
     {
         $dto = $this->source('../DTOs/PurchaseHeaderAdjustmentData.php');
         $model = $this->source('../Models/PurchaseHeaderAdjustment.php');
+        $allocationModel = $this->source('../Models/PurchaseAdjustmentAllocation.php');
         $catalogue = $this->source('../Services/PurchaseAdjustmentCatalogueService.php');
         $policy = $this->source('../Services/PurchaseAdjustmentPolicyResolver.php');
         $persistence = $this->source('../Services/PurchaseHeaderAdjustmentService.php');
+        $allocationLedger = $this->source('../Services/PurchaseAdjustmentAllocationLedger.php');
         $posting = $this->source('../Services/FastPurchasePostingCoordinator.php');
 
-        $domain = $dto.$model.$catalogue.$policy.$persistence;
+        $domain = $dto.$model.$allocationModel.$catalogue.$policy.$persistence.$allocationLedger;
 
         self::assertStringNotContainsString('Modules\\Finance', $domain);
         self::assertStringNotContainsString('FinanceAccount', $domain);
@@ -75,13 +77,15 @@ final class PurchaseAdjustmentOwnershipBoundaryTest extends TestCase
 
     public function test_schema_removes_obsolete_adjustment_finance_columns(): void
     {
-        $migration = $this->source('../Database/Migrations/2026_06_12_170003_create_purchase_header_adjustments_table.php');
+        $headerMigration = $this->source('../Database/Migrations/2026_06_12_170003_create_purchase_header_adjustments_table.php');
+        $allocationMigration = $this->source('../Database/Migrations/2026_06_12_170011_create_purchase_adjustment_allocations_table.php');
+        $schema = $headerMigration.$allocationMigration;
 
-        self::assertStringNotContainsString('finance_posting_profile_id', $migration);
-        self::assertStringNotContainsString('finance_account_id', $migration);
-        self::assertStringNotContainsString('override_reason', $migration);
-        self::assertStringNotContainsString('mapping_source', $migration);
-        self::assertStringContainsString('recognition_source', $migration);
+        self::assertStringNotContainsString('finance_posting_profile_id', $schema);
+        self::assertStringNotContainsString('finance_account_id', $schema);
+        self::assertStringNotContainsString('override_reason', $schema);
+        self::assertStringNotContainsString('mapping_source', $schema);
+        self::assertStringContainsString('recognition_source', $headerMigration);
     }
 
     private function source(string $relativePath): string

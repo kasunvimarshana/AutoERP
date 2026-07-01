@@ -10,12 +10,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Modules\ReferenceData\Models\CurrencyModel;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\Customer\Enums\CustomerStatus;
 use Modules\Customer\Enums\CustomerType;
 use Modules\Customer\Enums\PreferredCommunicationChannel;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
+use Modules\ReferenceData\Models\CurrencyModel;
 use Modules\Tenant\Models\TenantModel;
 
 final class Customer extends TenantOwnedModel
@@ -36,7 +36,6 @@ final class Customer extends TenantOwnedModel
             'default_currency_id' => 'integer',
             'payment_term_id' => 'integer',
             'credit_limit' => 'decimal:6',
-            'opening_balance' => 'decimal:6',
             'is_credit_allowed' => 'boolean',
             'is_advance_allowed' => 'boolean',
             'is_tax_exempt' => 'boolean',
@@ -80,12 +79,9 @@ final class Customer extends TenantOwnedModel
 
     public function categories(): BelongsToMany
     {
-        return $this->belongsToMany(
-            CustomerCategory::class,
-            'customer_category_assignments',
-            'customer_id',
-            'customer_category_id',
-        )->withPivot(['tenant_id', 'organization_unit_id'])->withTimestamps();
+        return $this->belongsToMany(CustomerCategory::class, 'customer_category_assignments', 'customer_id', 'customer_category_id')
+            ->withPivot(['tenant_id', 'organization_unit_id'])
+            ->withTimestamps();
     }
 
     public function categoryAssignments(): HasMany

@@ -14,7 +14,6 @@ export function CustomerSummaryCard({ customer }: { customer: Customer }) {
         { label: 'Phone', value: customer.phone ?? customer.mobile },
         { label: 'Currency', value: readableRelation(customer.default_currency) },
         { label: 'Reference credit limit', value: <MoneyDisplay value={customer.credit_limit} /> },
-        { label: 'Opening balance', value: <MoneyDisplay value={customer.opening_balance} /> },
         { label: 'Credit allowed', value: customer.is_credit_allowed ? 'Yes' : 'No' },
         { label: 'Advance allowed', value: customer.is_advance_allowed ? 'Yes' : 'No' },
         { label: 'Tax exempt', value: customer.is_tax_exempt ? 'Yes' : 'No' },

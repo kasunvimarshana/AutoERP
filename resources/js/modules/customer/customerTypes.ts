@@ -32,7 +32,6 @@ export interface Customer extends CustomerSummary {
     svat_number?: string | null;
     business_registration_number?: string | null;
     credit_limit: string;
-    opening_balance: string;
     preferred_communication_channel?: string | null;
     notes?: string | null;
     metadata?: Record<string, unknown> | null;
@@ -50,7 +49,6 @@ export interface CustomerPayload {
     code: string;
     name: string;
     customer_type: string;
-    status?: string;
     legal_name?: string | null;
     display_name?: string | null;
     email?: string | null;
@@ -63,7 +61,6 @@ export interface CustomerPayload {
     svat_number?: string | null;
     business_registration_number?: string | null;
     credit_limit?: string;
-    opening_balance?: string;
     is_credit_allowed: boolean;
     is_advance_allowed: boolean;
     is_tax_exempt: boolean;

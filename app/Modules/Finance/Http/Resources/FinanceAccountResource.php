@@ -17,8 +17,6 @@ final class FinanceAccountResource extends JsonResource
             'name' => (string) $this->name,
             'description' => $this->description,
             'normal_balance' => $this->enum($this->normal_balance),
-            'opening_balance' => (string) $this->opening_balance,
-            'current_balance' => (string) $this->current_balance,
             'is_control_account' => (bool) $this->is_control_account,
             'is_posting_account' => (bool) $this->is_posting_account,
             'is_cash_account' => (bool) $this->is_cash_account,
@@ -30,7 +28,6 @@ final class FinanceAccountResource extends JsonResource
             'account_category' => $this->whenLoaded('accountCategory'),
             'parent' => FinanceAccountSummaryResource::make($this->whenLoaded('parent')),
             'children' => FinanceAccountSummaryResource::collection($this->whenLoaded('children')),
-            'balances' => $this->whenLoaded('balances'),
             'can_edit' => true,
         ];
     }

@@ -23,6 +23,7 @@ final class InvoiceCreationService
         private readonly InvoiceValidationService $validator,
         private readonly InvoiceNumberService $numbers,
         private readonly InvoiceCalculationService $calculations,
+        private readonly InvoiceSourceAllocationGuardService $sourceAllocationGuards,
         private readonly InvoiceSourceAllocationService $sourceAllocations,
         private readonly InvoiceAdjustmentAllocationService $adjustmentAllocations,
         private readonly InvoiceLineService $lines,
@@ -41,6 +42,7 @@ final class InvoiceCreationService
         $this->validator->validateForCreation($data);
 
         return DB::transaction(function () use ($data): Invoice {
+            $this->sourceAllocationGuards->lock($data);
             $sourceLineRows = $this->sourceAllocations->prepareSourceLineAllocations($data, lockRows: true);
             $preparedAdjustments = $this->adjustmentAllocations->prepareAdjustmentAllocations($data, $sourceLineRows);
             $calculation = $this->calculations->calculate(

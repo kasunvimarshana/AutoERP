@@ -7,7 +7,6 @@ namespace Modules\Supplier\Http\Requests;
 use Illuminate\Validation\Rule;
 use Modules\Core\Http\Requests\TenantScopedRequest;
 use Modules\Supplier\DTOs\CreateSupplierData;
-use Modules\Supplier\Enums\SupplierStatus;
 use Modules\Supplier\Enums\SupplierType;
 use Modules\Supplier\Http\Requests\Concerns\MapsSupplierData;
 
@@ -36,7 +35,7 @@ final class StoreSupplierRequest extends TenantScopedRequest
             $key('code') => ['required', 'string', 'max:80'],
             $key('name') => ['required', 'string', 'max:255'],
             $key('supplier_type') => ['required', Rule::enum(SupplierType::class)],
-            $key('status') => ['nullable', Rule::enum(SupplierStatus::class)],
+            $key('status') => ['prohibited'],
             $key('legal_name') => ['nullable', 'string', 'max:255'],
             $key('display_name') => ['nullable', 'string', 'max:255'],
             $key('email') => ['nullable', 'email', 'max:255'],

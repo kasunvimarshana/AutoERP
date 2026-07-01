@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Warehouse\Services\Warehouses;
 
-use Illuminate\Support\Facades\DB;
 use Modules\Core\Results\Error;
 use Modules\Core\Results\Result;
 use Modules\Warehouse\Constants\WarehouseErrorCode;
@@ -23,7 +22,7 @@ final class GetWarehouseService
                 ->find($id);
 
             if ($record === null) {
-                return $this->missingResult($id, $tenantId);
+                return $this->missingResult();
             }
 
             return Result::success($record);
@@ -34,17 +33,8 @@ final class GetWarehouseService
         }
     }
 
-    private function missingResult(int|string $id, int $tenantId): Result
+    private function missingResult(): Result
     {
-        $owner = DB::table('warehouses')
-            ->where('id', $id)
-            ->whereNull('deleted_at')
-            ->first(['tenant_id']);
-
-        if ($owner !== null && (int) $owner->tenant_id !== $tenantId) {
-            return Result::failure(new Error(WarehouseErrorCode::SCOPE_MISMATCH, 'Warehouse belongs to another tenant.'));
-        }
-
         return Result::failure(new Error(WarehouseErrorCode::NOT_FOUND, 'Warehouse not found.'));
     }
 }

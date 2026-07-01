@@ -7,7 +7,6 @@ namespace Modules\Customer\Http\Requests;
 use Illuminate\Validation\Rule;
 use Modules\Core\Http\Requests\TenantScopedRequest;
 use Modules\Customer\DTOs\CreateCustomerData;
-use Modules\Customer\Enums\CustomerStatus;
 use Modules\Customer\Enums\CustomerType;
 use Modules\Customer\Enums\PreferredCommunicationChannel;
 use Modules\Customer\Http\Requests\Concerns\MapsCustomerData;
@@ -37,7 +36,7 @@ final class StoreCustomerRequest extends TenantScopedRequest
             $key('code') => ['required', 'string', 'max:80'],
             $key('name') => ['required', 'string', 'max:255'],
             $key('customer_type') => ['required', Rule::enum(CustomerType::class)],
-            $key('status') => ['nullable', Rule::enum(CustomerStatus::class)],
+            $key('status') => ['prohibited'],
             $key('legal_name') => ['nullable', 'string', 'max:255'],
             $key('display_name') => ['nullable', 'string', 'max:255'],
             $key('email') => ['nullable', 'email', 'max:255'],
@@ -51,7 +50,7 @@ final class StoreCustomerRequest extends TenantScopedRequest
             $key('svat_number') => ['nullable', 'string', 'max:100'],
             $key('business_registration_number') => ['nullable', 'string', 'max:100'],
             $key('credit_limit') => ['nullable', 'decimal:0,6', 'gte:0'],
-            $key('opening_balance') => ['nullable', 'decimal:0,6'],
+            $key('opening_balance') => ['prohibited'],
             $key('is_credit_allowed') => ['nullable', 'boolean'],
             $key('is_advance_allowed') => ['nullable', 'boolean'],
             $key('is_tax_exempt') => ['nullable', 'boolean'],

@@ -27,7 +27,7 @@ final class DeleteWarehouseService
                     ->lockForUpdate()
                     ->first();
                 if (! $warehouse instanceof WarehouseModel) {
-                    return $this->missingResult($id, $tenantId);
+                    return $this->missingResult();
                 }
 
                 $this->domain->assertWarehouseCanBeDeleted($warehouse);
@@ -47,17 +47,8 @@ final class DeleteWarehouseService
         }
     }
 
-    private function missingResult(int|string $id, int $tenantId): Result
+    private function missingResult(): Result
     {
-        $owner = DB::table('warehouses')
-            ->where('id', $id)
-            ->whereNull('deleted_at')
-            ->first(['tenant_id']);
-
-        if ($owner !== null && (int) $owner->tenant_id !== $tenantId) {
-            return Result::failure(new Error(WarehouseErrorCode::SCOPE_MISMATCH, 'Warehouse belongs to another tenant.'));
-        }
-
         return Result::failure(new Error(WarehouseErrorCode::NOT_FOUND, 'Warehouse not found.'));
     }
 }

@@ -4,17 +4,13 @@ declare(strict_types=1);
 
 namespace Modules\Finance\Services;
 
-use Modules\Core\Services\DecimalMath;
 use Modules\Finance\DTOs\CreateAccountData;
 use Modules\Finance\Models\FinanceAccount;
 use Modules\Finance\Validators\FinanceValidationService;
 
 final class ChartOfAccountsService
 {
-    public function __construct(
-        private readonly DecimalMath $math,
-        private readonly FinanceValidationService $validator,
-    ) {}
+    public function __construct(private readonly FinanceValidationService $validator) {}
 
     public function createAccount(CreateAccountData $data): FinanceAccount
     {
@@ -26,8 +22,8 @@ final class ChartOfAccountsService
             'account_type_id' => $data->accountTypeId,
             'account_category_id' => $data->accountCategoryId,
             'parent_id' => $data->parentId,
-            'code' => $data->code,
-            'name' => $data->name,
+            'code' => trim($data->code),
+            'name' => trim($data->name),
             'description' => $data->description,
             'normal_balance' => $data->normalBalance->value,
             'is_control_account' => $data->isControlAccount,
@@ -37,8 +33,6 @@ final class ChartOfAccountsService
             'is_tax_account' => $data->isTaxAccount,
             'is_system' => $data->isSystem,
             'is_active' => $data->isActive,
-            'opening_balance' => $this->math->normalize($data->openingBalance),
-            'current_balance' => $this->math->normalize($data->openingBalance),
             'metadata' => $data->metadata,
         ]);
     }
@@ -52,10 +46,8 @@ final class ChartOfAccountsService
             throw new \InvalidArgumentException('Finance account scope cannot be changed.');
         }
 
-        if ($account->ledgerEntries()->exists()
-            && ($account->normal_balance !== $data->normalBalance
-                || $this->math->compare((string) $account->opening_balance, $data->openingBalance) !== 0)) {
-            throw new \InvalidArgumentException('Posted accounts cannot change normal balance or opening balance.');
+        if ($account->ledgerEntries()->exists() && $account->normal_balance !== $data->normalBalance) {
+            throw new \InvalidArgumentException('Posted accounts cannot change normal balance.');
         }
 
         $account->forceFill([
@@ -72,10 +64,6 @@ final class ChartOfAccountsService
             'is_bank_account' => $data->isBankAccount,
             'is_tax_account' => $data->isTaxAccount,
             'is_active' => $data->isActive,
-            'opening_balance' => $this->math->normalize($data->openingBalance),
-            'current_balance' => $account->ledgerEntries()->exists()
-                ? (string) $account->current_balance
-                : $this->math->normalize($data->openingBalance),
             'metadata' => $data->metadata,
         ])->save();
 

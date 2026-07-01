@@ -28,8 +28,6 @@ return new class extends Migration
             $table->boolean('is_tax_account')->default(false);
             $table->boolean('is_system')->default(false);
             $table->boolean('is_active')->default(true);
-            $table->decimal('opening_balance', 20, 6)->default('0');
-            $table->decimal('current_balance', 20, 6)->default('0');
             $table->json('metadata')->nullable();
             $table->timestamps();
             $table->softDeletes();
@@ -38,29 +36,13 @@ return new class extends Migration
             $table->index(['tenant_id', 'organization_unit_id'], 'finance_accounts_tenant_org_ix');
             $table->index('account_type_id', 'finance_accounts_type_ix');
             $table->index('parent_id', 'finance_accounts_parent_ix');
-
             $table->unique(['id', 'tenant_id'], 'finance_accounts_id_tenant_uk');
-            $table->foreign(['organization_unit_id', 'tenant_id'], 'finance_accounts_organization_unit_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('organization_units')
-                ->restrictOnDelete();
-            $table->foreign(['account_type_id', 'tenant_id'], 'finance_accounts_account_type_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('finance_account_types')
-                ->restrictOnDelete();
-            $table->foreign(['account_category_id', 'tenant_id'], 'finance_accounts_account_category_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('finance_account_categories')
-                ->restrictOnDelete();
-            $table->foreign(['parent_id', 'tenant_id'], 'finance_accounts_parent_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('finance_accounts')
-                ->restrictOnDelete();
+            $table->foreign(['organization_unit_id', 'tenant_id'], 'finance_accounts_organization_unit_id_tenant_fk')->references(['id', 'tenant_id'])->on('organization_units')->restrictOnDelete();
+            $table->foreign(['account_type_id', 'tenant_id'], 'finance_accounts_account_type_id_tenant_fk')->references(['id', 'tenant_id'])->on('finance_account_types')->restrictOnDelete();
+            $table->foreign(['account_category_id', 'tenant_id'], 'finance_accounts_account_category_id_tenant_fk')->references(['id', 'tenant_id'])->on('finance_account_categories')->restrictOnDelete();
+            $table->foreign(['parent_id', 'tenant_id'], 'finance_accounts_parent_id_tenant_fk')->references(['id', 'tenant_id'])->on('finance_accounts')->restrictOnDelete();
         });
     }
 
-    public function down(): void
-    {
-        Schema::dropIfExists('finance_accounts');
-    }
+    public function down(): void { Schema::dropIfExists('finance_accounts'); }
 };

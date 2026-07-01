@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Supplier\DTOs;
 
-use Modules\Supplier\Enums\SupplierStatus;
 use Modules\Supplier\Enums\SupplierType;
 
 final readonly class CreateSupplierData
@@ -27,7 +26,6 @@ final readonly class CreateSupplierData
         public ?string $supplierNumber = null,
         public ?string $legalName = null,
         public ?string $displayName = null,
-        public SupplierStatus $status = SupplierStatus::PendingApproval,
         public ?string $email = null,
         public ?string $phone = null,
         public ?string $mobile = null,

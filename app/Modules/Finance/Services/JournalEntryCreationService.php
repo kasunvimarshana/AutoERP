@@ -40,7 +40,7 @@ final class JournalEntryCreationService
                 'source_key' => $data->sourceKey,
                 'posting_fingerprint' => $data->postingFingerprint,
                 'journal_type' => $data->journalType->value,
-                'status' => $data->status->value,
+                'status' => JournalStatus::Draft->value,
                 'description' => $data->description,
                 'total_debit' => $totalDebit,
                 'total_credit' => $totalCredit,
@@ -65,7 +65,6 @@ final class JournalEntryCreationService
         return DB::transaction(function () use ($journal, $data, $totalDebit, $totalCredit): FinanceJournalEntry {
             $journal = FinanceJournalEntry::query()->lockForUpdate()->findOrFail($journal->getKey());
             $this->assertDraft($journal, 'Only draft journals can be edited.');
-
             $journal->lines()->delete();
             $journal->forceFill([
                 'journal_date' => $data->journalDate,
@@ -84,7 +83,6 @@ final class JournalEntryCreationService
                 'currency_id' => $data->currencyId,
                 'exchange_rate' => $this->math->normalize($data->exchangeRate),
             ])->save();
-
             $this->saveLines($journal, $data);
 
             return $journal->refresh()->load(['lines.account', 'postingProfile']);
@@ -123,10 +121,7 @@ final class JournalEntryCreationService
 
     private function assertDraft(FinanceJournalEntry $journal, string $message): void
     {
-        $status = $journal->status instanceof JournalStatus
-            ? $journal->status
-            : JournalStatus::from((string) $journal->status);
-
+        $status = $journal->status instanceof JournalStatus ? $journal->status : JournalStatus::from((string) $journal->status);
         if ($status !== JournalStatus::Draft) {
             throw new \InvalidArgumentException($message);
         }

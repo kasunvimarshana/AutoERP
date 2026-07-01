@@ -38,7 +38,6 @@ final readonly class UpdateCustomerData
         public ?string $svatNumber = null,
         public ?string $businessRegistrationNumber = null,
         public ?string $creditLimit = null,
-        public ?string $openingBalance = null,
         public ?bool $isCreditAllowed = null,
         public ?bool $isAdvanceAllowed = null,
         public ?bool $isTaxExempt = null,

@@ -21,7 +21,6 @@ return new class extends Migration
             $table->date('entry_date');
             $table->decimal('debit', 20, 6)->default('0');
             $table->decimal('credit', 20, 6)->default('0');
-            $table->decimal('balance_after', 20, 6)->default('0');
             $table->string('source_module', 100)->nullable();
             $table->string('source_type')->nullable();
             $table->unsignedBigInteger('source_id')->nullable();
@@ -32,37 +31,17 @@ return new class extends Migration
             $table->timestamps();
 
             $table->index(['tenant_id', 'organization_unit_id'], 'finance_ledger_tenant_org_ix');
-            $table->index('account_id', 'finance_ledger_account_ix');
-            $table->index('entry_date', 'finance_ledger_date_ix');
+            $table->index(['tenant_id', 'account_id', 'entry_date', 'id'], 'finance_ledger_account_date_ix');
             $table->index(['source_type', 'source_id'], 'finance_ledger_source_ix');
-            $table->index(['tenant_id', 'source_module', 'source_type', 'source_id'], 'finance_ledger_tenant_source_trace_ix', );
-
+            $table->index(['tenant_id', 'source_module', 'source_type', 'source_id'], 'finance_ledger_tenant_source_trace_ix');
             $table->unique(['id', 'tenant_id'], 'finance_ledger_entries_id_tenant_uk');
-            $table->foreign(['organization_unit_id', 'tenant_id'], 'finance_ledger_entries_organization_unit_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('organization_units')
-                ->restrictOnDelete();
-            $table->foreign(['journal_entry_id', 'tenant_id'], 'finance_ledger_entries_journal_entry_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('finance_journal_entries')
-                ->restrictOnDelete();
-            $table->foreign(['journal_line_id', 'tenant_id'], 'finance_ledger_entries_journal_line_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('finance_journal_lines')
-                ->restrictOnDelete();
-            $table->foreign(['account_id', 'tenant_id'], 'finance_ledger_entries_account_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('finance_accounts')
-                ->restrictOnDelete();
-            $table->foreign(['dimension_id', 'tenant_id'], 'finance_ledger_entries_dimension_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('finance_dimensions')
-                ->restrictOnDelete();
+            $table->foreign(['organization_unit_id', 'tenant_id'], 'finance_ledger_entries_organization_unit_id_tenant_fk')->references(['id', 'tenant_id'])->on('organization_units')->restrictOnDelete();
+            $table->foreign(['journal_entry_id', 'tenant_id'], 'finance_ledger_entries_journal_entry_id_tenant_fk')->references(['id', 'tenant_id'])->on('finance_journal_entries')->restrictOnDelete();
+            $table->foreign(['journal_line_id', 'tenant_id'], 'finance_ledger_entries_journal_line_id_tenant_fk')->references(['id', 'tenant_id'])->on('finance_journal_lines')->restrictOnDelete();
+            $table->foreign(['account_id', 'tenant_id'], 'finance_ledger_entries_account_id_tenant_fk')->references(['id', 'tenant_id'])->on('finance_accounts')->restrictOnDelete();
+            $table->foreign(['dimension_id', 'tenant_id'], 'finance_ledger_entries_dimension_id_tenant_fk')->references(['id', 'tenant_id'])->on('finance_dimensions')->restrictOnDelete();
         });
     }
 
-    public function down(): void
-    {
-        Schema::dropIfExists('finance_ledger_entries');
-    }
+    public function down(): void { Schema::dropIfExists('finance_ledger_entries'); }
 };

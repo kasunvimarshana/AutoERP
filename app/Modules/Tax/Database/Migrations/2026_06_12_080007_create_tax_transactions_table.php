@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('tax_transactions', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants', 'id', indexName: 'tax_transactions_tenant_fk')->restrictOnDelete();
+            $table->foreignId('tenant_id')->constrained('tenants', indexName: 'tax_transactions_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('tax_id')->nullable();
             $table->foreignId('tax_document_snapshot_id')->nullable();
@@ -33,7 +33,6 @@ return new class extends Migration
             $table->boolean('recoverable')->default(false);
             $table->boolean('payable')->default(false);
             $table->boolean('receivable')->default(false);
-            $table->foreignId('account_id')->nullable();
             $table->json('metadata')->nullable();
             $table->timestamps();
 
@@ -54,10 +53,6 @@ return new class extends Migration
             $table->foreign(['tax_document_snapshot_id', 'tenant_id'], 'tax_transactions_tax_document_snapshot_id_tenant_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('tax_document_snapshots')
-                ->restrictOnDelete();
-            $table->foreign(['account_id', 'tenant_id'], 'tax_transactions_account_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('finance_accounts')
                 ->restrictOnDelete();
         });
     }

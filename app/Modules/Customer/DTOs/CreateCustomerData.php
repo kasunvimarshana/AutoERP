@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Customer\DTOs;
 
-use Modules\Customer\Enums\CustomerStatus;
 use Modules\Customer\Enums\CustomerType;
 use Modules\Customer\Enums\PreferredCommunicationChannel;
 
@@ -27,7 +26,6 @@ final readonly class CreateCustomerData
         public ?string $customerNumber = null,
         public ?string $legalName = null,
         public ?string $displayName = null,
-        public CustomerStatus $status = CustomerStatus::PendingApproval,
         public ?string $email = null,
         public ?string $phone = null,
         public ?string $mobile = null,
@@ -39,7 +37,6 @@ final readonly class CreateCustomerData
         public ?string $svatNumber = null,
         public ?string $businessRegistrationNumber = null,
         public string $creditLimit = '0.000000',
-        public string $openingBalance = '0.000000',
         public bool $isCreditAllowed = true,
         public bool $isAdvanceAllowed = true,
         public bool $isTaxExempt = false,

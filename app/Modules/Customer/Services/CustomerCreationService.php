@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Modules\Core\Services\DecimalMath;
 use Modules\Customer\DTOs\CreateCustomerData;
 use Modules\Customer\DTOs\CustomerCreditProfileData;
+use Modules\Customer\Enums\CustomerStatus;
 use Modules\Customer\Models\Customer;
 use Modules\Customer\Validators\CustomerValidationService;
 
@@ -40,7 +41,7 @@ final class CustomerCreationService
                 'legal_name' => $data->legalName,
                 'display_name' => $data->displayName,
                 'customer_type' => $data->customerType,
-                'status' => $data->status,
+                'status' => CustomerStatus::PendingApproval,
                 'email' => $data->email,
                 'phone' => $data->phone,
                 'mobile' => $data->mobile,
@@ -52,7 +53,6 @@ final class CustomerCreationService
                 'svat_number' => $data->svatNumber,
                 'business_registration_number' => $data->businessRegistrationNumber,
                 'credit_limit' => $this->math->normalize($data->creditProfile?->creditLimit ?? $data->creditLimit),
-                'opening_balance' => $this->math->normalize($data->openingBalance),
                 'is_credit_allowed' => $data->isCreditAllowed,
                 'is_advance_allowed' => $data->isAdvanceAllowed,
                 'is_tax_exempt' => $data->isTaxExempt,
@@ -60,8 +60,8 @@ final class CustomerCreationService
                 'preferred_communication_channel' => $data->preferredCommunicationChannel,
                 'notes' => $data->notes,
                 'metadata' => $data->metadata,
-                'approved_by' => $data->status->value === 'active' ? $data->createdBy : null,
-                'approved_at' => $data->status->value === 'active' ? now() : null,
+                'approved_by' => null,
+                'approved_at' => null,
             ]);
 
             foreach ($data->contacts as $contact) {
