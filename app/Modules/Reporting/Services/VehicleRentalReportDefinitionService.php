@@ -196,8 +196,8 @@ final class VehicleRentalReportDefinitionService
             defaultSort: 'started_at',
             constraints: ['financial_side' => $side->value],
             description: $revenue
-                ? 'Customer-approved billable usage facts, independent from physical movement and owner settlement.'
-                : 'Vehicle-owner-approved payable usage facts, independent from physical movement and customer billing.',
+                ? 'Customer billable usage facts, independent from physical movement and owner settlement.'
+                : 'Vehicle-owner payable usage facts, independent from physical movement and customer billing.',
             orientation: 'landscape',
         );
     }
@@ -215,7 +215,7 @@ final class VehicleRentalReportDefinitionService
             options: array_map(
                 static fn (RentalUsageStatus|RentalUsageFactStatus $status): array => [
                     'value' => $status->value,
-                    'label' => str($status->value)->replace('_', ' ')->title()->toString(),
+                    'label' => ucwords(str_replace('_', ' ', $status->value)),
                 ],
                 $statuses,
             ),
