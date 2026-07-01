@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace Modules\Tenant\Services;
 
 use Modules\Audit\Constants\AuditEventCategory;
+use Modules\Audit\Constants\AuditActorType;
 use Modules\Audit\Contracts\AuditRecorderInterface;
 use Modules\Audit\Data\AuditEventData;
+use Modules\Audit\Data\PlatformAuditActorData;
 use Modules\Core\Contracts\ClockInterface;
 use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
@@ -176,7 +178,7 @@ final class TenantLifecycleService
                 'occurred_at' => $now,
             ]);
 
-            $this->audit->recordPlatform(new AuditEventData(
+            $auditEvent = new AuditEventData(
                 eventName: 'tenant.status_changed',
                 eventCategory: AuditEventCategory::SECURITY,
                 sourceModule: 'tenant',
@@ -191,7 +193,20 @@ final class TenantLifecycleService
                     ],
                 ],
                 tags: ['tenant', 'lifecycle'],
-            ), $tenantId);
+            );
+            if ($this->currentUser->current() === null) {
+                $this->audit->recordPlatformActor(
+                    $auditEvent,
+                    new PlatformAuditActorData(
+                        AuditActorType::SYSTEM,
+                        'tenant-lifecycle-command',
+                        'Tenant lifecycle command',
+                    ),
+                    $tenantId,
+                );
+            } else {
+                $this->audit->recordPlatform($auditEvent, $tenantId);
+            }
             $this->outbox->enqueueStatusChanged(
                 tenantId: $tenantId,
                 previousStatus: $currentStatus,
