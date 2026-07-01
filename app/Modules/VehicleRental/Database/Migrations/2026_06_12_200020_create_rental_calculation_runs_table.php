@@ -43,8 +43,8 @@ return new class extends Migration
             $table->unique(['billing_period_id', 'run_version'], 'rental_calculation_runs_period_version_uk');
             $table->unique(['tenant_id', 'fingerprint'], 'rental_calculation_runs_fingerprint_uk');
             $table->index(['billing_period_id', 'calculation_status'], 'rental_calculation_runs_period_status_ix');
-
             $table->unique(['id', 'tenant_id'], 'rental_calculation_runs_id_tenant_uk');
+
             $table->foreign(['organization_unit_id', 'tenant_id'], 'rental_calculation_runs_organization_unit_id_tenant_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('organization_units')
@@ -52,12 +52,11 @@ return new class extends Migration
             $table->foreign(['billing_period_id', 'tenant_id'], 'rental_calculation_runs_billing_period_id_tenant_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('rental_billing_periods')
-                ->cascadeOnDelete();
+                ->restrictOnDelete();
             $table->foreign(['supersedes_run_id', 'tenant_id'], 'rental_calculation_runs_supersedes_run_id_tenant_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('rental_calculation_runs')
                 ->restrictOnDelete();
-
             $table->foreign(['submitted_by', 'tenant_id'], 'rental_calculation_runs_submitted_by_tenant_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('users')
