@@ -93,7 +93,7 @@ final class RentalUsageFactService
             if ($this->math->compare($commercialDistance, $commercialOdometerDistance) > 0) {
                 throw new InvalidArgumentException('Commercial distance cannot exceed the selected commercial odometer range.');
             }
-            $workingMinutes = $startedAt->diffInMinutes($endedAt);
+            $workingMinutes = (int) $startedAt->diffInMinutes($endedAt);
             $normalOvertime = (int) ($data['normal_overtime_minutes'] ?? 0);
             $doubleOvertime = (int) ($data['double_overtime_minutes'] ?? 0);
             $tripleOvertime = (int) ($data['triple_overtime_minutes'] ?? 0);
