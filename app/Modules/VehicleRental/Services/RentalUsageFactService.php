@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
-use Modules\VehicleRental\Enums\RentalCalculationLineStatus;
+use Modules\VehicleRental\Enums\RentalCalculationSourceStatus;
 use Modules\VehicleRental\Enums\RentalCalculationStatus;
 use Modules\VehicleRental\Enums\RentalUsageFactStatus;
 use Modules\VehicleRental\Enums\RentalUsageStatus;
@@ -234,9 +234,9 @@ final class RentalUsageFactService
 
     private function assertNoActiveCalculation(RentalUsageContext $context): void
     {
-        $active = $context->calculationLines()
-            ->whereNot('status', RentalCalculationLineStatus::Reversed->value)
-            ->whereHas('run', fn (Builder $query) => $query
+        $active = $context->calculationSources()
+            ->whereNot('status', RentalCalculationSourceStatus::Reversed->value)
+            ->whereHas('run', fn (Builder $query): Builder => $query
                 ->whereNot('calculation_status', RentalCalculationStatus::Reversed->value))
             ->exists();
         if ($active) {
