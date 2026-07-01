@@ -240,19 +240,40 @@ export interface RentalExpense {
 export interface RentalCalculationLine {
     id: number;
     line_number: number;
+    source_type: string;
+    source_id: number;
     component_code: string;
     description: string;
+    measured_quantity: string;
+    allowed_quantity: string;
     chargeable_quantity: string;
     unit?: string | null;
     rate: string;
+    multiplier: string;
     net_amount: string;
+    discount_amount: string;
     tax_amount: string;
     withholding_amount: string;
     total_amount: string;
+    applied_rule: string;
     status: string;
+}
+export interface RentalCalculationSource {
+    id: number;
+    source_kind: "usage_context" | "expense_allocation";
+    status: string;
+    usage?: NamedResource | null;
+    financial_side?: "revenue" | "cost" | null;
+    usage_fact?: {
+        id: number;
+        row_version: number;
+        status: string;
+    } | null;
+    expense_allocation?: NamedResource | null;
 }
 export interface RentalCalculationRun {
     id: number;
+    row_version: number;
     billing_period?: {
         id: number;
         agreement?: NamedResource | null;
@@ -262,12 +283,15 @@ export interface RentalCalculationRun {
         status: string;
     } | null;
     run_version: number;
+    currency?: RentalCurrency | null;
     calculation_status: string;
     document_status: string;
     net_total: string;
+    discount_total: string;
     tax_total: string;
     withholding_total: string;
     grand_total: string;
+    sources: RentalCalculationSource[];
     lines: RentalCalculationLine[];
 }
 export interface RentalDepositLink {
