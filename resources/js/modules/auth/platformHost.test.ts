@@ -2,12 +2,12 @@ import { describe, expect, it, vi } from 'vitest';
 import { isCentralPlatformHost, workspaceLoginUrl } from './platformHost';
 
 describe('isCentralPlatformHost', () => {
-    it('does not block loopback tenant login when local fallback is enabled for a built frontend', () => {
+    it('does not block tenant login on the configured platform host when local fallback is enabled', () => {
         vi.stubEnv('DEV', false);
-        vi.stubEnv('VITE_PLATFORM_PUBLIC_URL', 'http://127.0.0.1:8000');
+        vi.stubEnv('VITE_PLATFORM_PUBLIC_URL', 'https://platform.example.test');
         vi.stubEnv('VITE_TENANT_LOCAL_FALLBACK_ENABLED', 'true');
 
-        expect(isCentralPlatformHost('127.0.0.1:8000', '127.0.0.1')).toBe(false);
+        expect(isCentralPlatformHost('platform.example.test')).toBe(false);
 
         vi.unstubAllEnvs();
     });
@@ -17,7 +17,7 @@ describe('isCentralPlatformHost', () => {
         vi.stubEnv('VITE_PLATFORM_PUBLIC_URL', 'https://platform.example.test');
         vi.stubEnv('VITE_TENANT_LOCAL_FALLBACK_ENABLED', 'false');
 
-        expect(isCentralPlatformHost('platform.example.test', 'platform.example.test')).toBe(true);
+        expect(isCentralPlatformHost('platform.example.test')).toBe(true);
 
         vi.unstubAllEnvs();
     });

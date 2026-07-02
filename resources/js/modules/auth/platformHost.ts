@@ -1,11 +1,8 @@
-const LOOPBACK_HOSTNAMES = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
-
 export function isCentralPlatformHost(
     currentHost = window.location.host,
-    currentHostname = window.location.hostname,
 ): boolean {
     if (import.meta.env.DEV) return false;
-    if (localTenantFallbackEnabled() && LOOPBACK_HOSTNAMES.has(currentHostname.toLowerCase())) return false;
+    if (localTenantFallbackEnabled()) return false;
 
     const configured = String(import.meta.env.VITE_PLATFORM_PUBLIC_URL ?? '').trim();
     if (configured === '') return false;
