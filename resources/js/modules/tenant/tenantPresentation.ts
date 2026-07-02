@@ -120,6 +120,18 @@ export function hostnameError(value: string): string | null {
     return null;
 }
 
+export function platformHostDomainError(
+    value: string,
+    currentHostname = typeof window === 'undefined' ? '' : window.location.hostname,
+): string | null {
+    const hostname = normalizeHostname(value);
+    const platformHostname = normalizeHostname(currentHostname);
+
+    return hostname !== '' && platformHostname !== '' && hostname === platformHostname
+        ? 'The platform host cannot also be used as a tenant domain. Use a separate tenant workspace hostname.'
+        : null;
+}
+
 function isIpv4Address(value: string): boolean {
     const octets = value.split('.');
     return octets.length === 4

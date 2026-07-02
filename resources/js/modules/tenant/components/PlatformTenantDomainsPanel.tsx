@@ -20,7 +20,13 @@ import {
     requestPlatformDomainVerification,
     verifyPlatformTenantDomain,
 } from '../tenantApi';
-import { formatTenantDateTime, hostnameError, isFuture, normalizeHostname } from '../tenantPresentation';
+import {
+    formatTenantDateTime,
+    hostnameError,
+    isFuture,
+    normalizeHostname,
+    platformHostDomainError,
+} from '../tenantPresentation';
 import type {
     DomainVerificationChallenge,
     TenantDomain,
@@ -50,7 +56,9 @@ export function PlatformTenantDomainsPanel({ tenant, canManage, canAudit, disabl
     const [challenge, setChallenge] = useState<{ domainId: number; value: DomainVerificationChallenge } | null>(null);
     const [pendingAction, setPendingAction] = useState<PendingAction>(null);
     const normalizedDomain = normalizeHostname(domainName);
-    const validationError = domainName.trim() === '' ? null : hostnameError(domainName);
+    const validationError = domainName.trim() === ''
+        ? null
+        : hostnameError(domainName) ?? platformHostDomainError(domainName);
     const mutationDisabled = disabled || busyId !== null || tenant.status === 'archived';
 
     async function mutate(id: number, operation: () => Promise<unknown>, message: string) {
@@ -61,7 +69,9 @@ export function PlatformTenantDomainsPanel({ tenant, canManage, canAudit, disabl
     }
 
     async function createDomain() {
-        const nextError = hostnameError(domainName); if (nextError) return;
+        const nextError = hostnameError(domainName) ?? platformHostDomainError(domainName);
+        if (nextError) return;
+
         setBusyId(0); setError(null); setSuccess(null);
         try { const created = await createPlatformTenantDomain(tenant.id, normalizedDomain); setDomainName(''); setSuccess(`${created.domain} was added. Generate its DNS challenge next.`); domains.reload(); readiness.reload(); onChanged(); }
         catch (requestError: unknown) { setError(toApiError(requestError)); }

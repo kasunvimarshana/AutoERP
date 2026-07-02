@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
     hostnameError,
     normalizeHostname,
+    platformHostDomainError,
     readinessLabel,
     readinessStepId,
     humanize,
@@ -21,6 +22,12 @@ describe('tenant presentation rules', () => {
     it('directs local addresses to the explicit local/testing fallback', () => {
         expect(hostnameError('127.0.0.1')).toContain('local/testing fallback');
         expect(hostnameError('localhost')).toContain('local/testing fallback');
+    });
+
+    it('rejects the current platform host as a tenant domain', () => {
+        expect(platformHostDomainError('autoerp.tapromall.com', 'autoerp.tapromall.com'))
+            .toContain('platform host cannot also be used');
+        expect(platformHostDomainError('tenant.tapromall.com', 'autoerp.tapromall.com')).toBeNull();
     });
 
     it('uses a safe fallback for missing enum values', () => {
