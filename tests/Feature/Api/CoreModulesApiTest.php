@@ -17,17 +17,19 @@ use Modules\Item\Enums\ItemType;
 use Modules\Item\Enums\TrackingType;
 use Modules\Item\Services\ItemAuthorizationService;
 use Modules\Item\Services\ItemCreationService;
+use Modules\Payment\Constants\PaymentPermission;
 use Modules\Purchase\DTOs\CreateGoodsReceiptNoteData;
 use Modules\Purchase\DTOs\CreatePurchaseOrderData;
 use Modules\Purchase\DTOs\GoodsReceiptNoteLineData;
 use Modules\Purchase\DTOs\PurchaseOrderLineData;
 use Modules\Purchase\Services\GoodsReceiptNoteService;
 use Modules\Purchase\Services\PurchaseOrderService;
-use Modules\Payment\Services\PaymentAuthorizationService;
 use Modules\Supplier\Services\SupplierAuthorizationService;
 use Modules\User\Constants\UserGuard;
 use Modules\User\Constants\UserSystemRole;
 use Modules\User\Models\UserModel;
+use Tests\Support\OrganizationUnitFixture;
+use Tests\Support\TenantUserFixture;
 use Tests\TestCase;
 
 final class CoreModulesApiTest extends TestCase
@@ -211,11 +213,11 @@ final class CoreModulesApiTest extends TestCase
     {
         [$tenantId, $organizationUnitId] = $this->scope();
         $this->actingAsSuperAdministrator($tenantId, $organizationUnitId, [
-            PaymentAuthorizationService::PAYMENTS_CREATE,
-            PaymentAuthorizationService::PAYMENTS_SUBMIT,
-            PaymentAuthorizationService::PAYMENTS_APPROVE,
-            PaymentAuthorizationService::PAYMENTS_POST,
-            PaymentAuthorizationService::PAYMENTS_ALLOCATE,
+            PaymentPermission::PAYMENTS_CREATE,
+            PaymentPermission::PAYMENTS_SUBMIT,
+            PaymentPermission::PAYMENTS_APPROVE,
+            PaymentPermission::PAYMENTS_POST,
+            PaymentPermission::PAYMENTS_ALLOCATE,
         ], 'Payment');
         $this->paymentFinanceContext($tenantId, $organizationUnitId);
         $invoice = $this->createPostedInvoice($tenantId, $organizationUnitId);
@@ -308,7 +310,7 @@ final class CoreModulesApiTest extends TestCase
             'status_changed_at' => now(),
             'created_at' => now(),
             'updated_at' => now()]);
-        $organizationUnitId = (int) \Tests\Support\OrganizationUnitFixture::create([
+        $organizationUnitId = (int) OrganizationUnitFixture::create([
             'tenant_id' => $tenantId,
             'name' => 'Organization '.$suffix,
             'code' => 'ORG-'.$suffix,
@@ -348,10 +350,9 @@ final class CoreModulesApiTest extends TestCase
         int $organizationUnitId,
         array $permissions,
         string $module,
-    ): void
-    {
+    ): void {
         $now = now();
-        $userId = (int) \Tests\Support\TenantUserFixture::create([
+        $userId = (int) TenantUserFixture::create([
             'tenant_id' => $tenantId,
             'first_name' => 'Item',
             'last_name' => 'Administrator',

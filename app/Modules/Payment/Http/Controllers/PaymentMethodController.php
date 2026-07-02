@@ -6,6 +6,7 @@ namespace Modules\Payment\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Modules\Payment\Constants\PaymentPermission;
 use Modules\Payment\Http\Requests\ListPaymentMethodRequest;
 use Modules\Payment\Http\Requests\UpsertPaymentMethodRequest;
 use Modules\Payment\Http\Resources\PaymentMethodResource;
@@ -21,7 +22,7 @@ final class PaymentMethodController
 
     public function index(ListPaymentMethodRequest $request): AnonymousResourceCollection
     {
-        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PaymentAuthorizationService::METHODS_VIEW);
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PaymentPermission::METHODS_VIEW);
 
         return PaymentMethodResource::collection($this->methods->paginate([
             'effective' => ! $request->boolean('include_overrides', false),
@@ -35,7 +36,7 @@ final class PaymentMethodController
 
     public function store(UpsertPaymentMethodRequest $request): JsonResponse
     {
-        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PaymentAuthorizationService::METHODS_CREATE);
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PaymentPermission::METHODS_CREATE);
 
         return (new PaymentMethodResource($this->methods->create(
             $request->validated(),
@@ -46,14 +47,14 @@ final class PaymentMethodController
 
     public function show(ListPaymentMethodRequest $request, int $id): PaymentMethodResource
     {
-        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PaymentAuthorizationService::METHODS_VIEW);
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PaymentPermission::METHODS_VIEW);
 
         return new PaymentMethodResource($this->methods->find($id, $request->tenantId(), $request->organizationUnitId()));
     }
 
     public function update(UpsertPaymentMethodRequest $request, int $id): PaymentMethodResource
     {
-        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PaymentAuthorizationService::METHODS_UPDATE);
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PaymentPermission::METHODS_UPDATE);
         $method = $this->methods->find($id, $request->tenantId(), $request->organizationUnitId());
 
         return new PaymentMethodResource($this->methods->update($method, $request->validated()));
@@ -61,7 +62,7 @@ final class PaymentMethodController
 
     public function activate(ListPaymentMethodRequest $request, int $id): PaymentMethodResource
     {
-        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PaymentAuthorizationService::METHODS_UPDATE);
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PaymentPermission::METHODS_UPDATE);
 
         return new PaymentMethodResource($this->methods->setActive(
             $this->methods->find($id, $request->tenantId(), $request->organizationUnitId()),
@@ -71,7 +72,7 @@ final class PaymentMethodController
 
     public function deactivate(ListPaymentMethodRequest $request, int $id): PaymentMethodResource
     {
-        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PaymentAuthorizationService::METHODS_UPDATE);
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PaymentPermission::METHODS_UPDATE);
 
         return new PaymentMethodResource($this->methods->setActive(
             $this->methods->find($id, $request->tenantId(), $request->organizationUnitId()),
@@ -81,7 +82,7 @@ final class PaymentMethodController
 
     public function destroy(ListPaymentMethodRequest $request, int $id): JsonResponse
     {
-        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PaymentAuthorizationService::METHODS_DELETE);
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PaymentPermission::METHODS_DELETE);
         $this->methods->delete($this->methods->find($id, $request->tenantId(), $request->organizationUnitId()));
 
         return response()->json(status: 204);

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Payment\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
+use Modules\Payment\Constants\PaymentPermission;
 use Modules\Payment\Http\Requests\ChequePrintRequest;
 use Modules\Payment\Http\Resources\ChequePrintLogResource;
 use Modules\Payment\Models\Payment;
@@ -24,7 +25,7 @@ final class ChequePrintController
         ChequeTemplateService $templates,
         ChequePrintService $prints,
     ): JsonResponse {
-        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PaymentAuthorizationService::CHEQUES_PREVIEW);
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PaymentPermission::CHEQUES_PREVIEW);
         [$row, $paymentLine] = $this->paymentLine($request, $payment, $line);
         $template = $templates->resolveActive(
             $request->tenantId(),
@@ -42,7 +43,7 @@ final class ChequePrintController
         ChequeTemplateService $templates,
         ChequePrintService $prints,
     ): JsonResponse {
-        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PaymentAuthorizationService::CHEQUES_PRINT);
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PaymentPermission::CHEQUES_PRINT);
         [$row, $paymentLine] = $this->paymentLine($request, $payment, $line);
         $template = $templates->resolveActive(
             $request->tenantId(),

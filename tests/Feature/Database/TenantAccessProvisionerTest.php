@@ -8,10 +8,11 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\Core\Contracts\PermissionDefinitionRegistryInterface;
-use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\Core\Contracts\TenantAccessProvisionerInterface;
+use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\User\Constants\UserGuard;
 use Modules\User\Constants\UserSystemRole;
+use Modules\User\Database\Seeders\TenantPermissionSeeder;
 use Tests\TestCase;
 
 final class TenantAccessProvisionerTest extends TestCase
@@ -89,6 +90,33 @@ final class TenantAccessProvisionerTest extends TestCase
                 $secondTenantId,
                 (int) $second['role_id'],
             ),
+        ));
+    }
+
+    public function test_tenant_permission_seeder_runs_each_tenant_inside_a_tenant_context(): void
+    {
+        $tenantId = $this->tenant('ACCESS-SEED');
+        $definitions = app(PermissionDefinitionRegistryInterface::class)->all();
+
+        app(TenantPermissionSeeder::class)->run();
+
+        $roleId = DB::table('roles')
+            ->where('tenant_id', $tenantId)
+            ->where('system_key', UserSystemRole::SUPER_ADMIN)
+            ->value('id');
+
+        self::assertIsNumeric($roleId);
+        self::assertSame(
+            count($definitions),
+            DB::table('permissions')
+                ->where('tenant_id', $tenantId)
+                ->where('guard_name', UserGuard::TENANT_API)
+                ->where('is_active', true)
+                ->count(),
+        );
+        self::assertTrue(app(TenantExecutionContextInterface::class)->runForTenant(
+            $tenantId,
+            static fn (): bool => app(TenantAccessProvisionerInterface::class)->isReady($tenantId, (int) $roleId),
         ));
     }
 
