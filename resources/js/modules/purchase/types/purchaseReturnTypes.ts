@@ -5,11 +5,18 @@ export type PurchaseReturnStatus = 'draft' | 'approved' | 'posted' | 'cancelled'
 
 export interface ReturnableLine {
     id: number;
-    source_line_type: string;
-    source_line_id: number;
+    purchase_order_line_id?: number | null;
+    item_id?: number | null;
     item?: NamedResource | null;
+    item_variant_id?: number | null;
+    item_variant?: NamedResource | null;
+    uom_id?: number | null;
     uom?: NamedResource | null;
-    returnable_quantity: string;
+    accepted_quantity?: string;
+    returned_quantity?: string;
+    remaining_returnable_quantity: string;
+    can_return?: boolean;
+    block_reason?: string | null;
     unit_price: string;
 }
 

@@ -73,6 +73,7 @@ describe('Purchase source create flows', () => {
         purchaseApiMocks.getPurchaseOrder.mockResolvedValue(purchaseOrder(31));
         purchaseApiMocks.getReceivablePurchaseOrderLines.mockResolvedValue([purchaseOrderLine(401), purchaseOrderLine(401)]);
         purchaseApiMocks.getReturnableGoodsReceiptLines.mockResolvedValue([returnableLine(601), returnableLine(601)]);
+        purchaseApiMocks.createPurchaseReturn.mockResolvedValue({ id: 901 });
     });
     it('loads an invoice query GRN once in StrictMode and deduplicates source lines', async () => {
         renderInvoice('/purchase/invoices/create?goods_receipt_id=77&tab=details', true);
@@ -201,6 +202,24 @@ describe('Purchase source create flows', () => {
         expect(screen.queryByText('GRN-77')).not.toBeInTheDocument();
         expect(screen.queryByText('Widget')).not.toBeInTheDocument();
     });
+    it('submits returnable GRN line ids from the backend returnable-line contract', async () => {
+        renderReturn('/purchase/returns/create?goods_receipt_id=77');
+        await waitFor(() => expect(screen.getAllByText('Widget')).toHaveLength(2));
+        fireEvent.click(screen.getByRole('button', { name: 'Select All' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Return Selected' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Save Draft' }));
+        await waitFor(() => expect(purchaseApiMocks.createPurchaseReturn).toHaveBeenCalledTimes(1));
+        expect(purchaseApiMocks.createPurchaseReturn).toHaveBeenCalledWith(expect.objectContaining({
+            return_type: 'referenced',
+            source_id: 77,
+            lines: [{
+                source_line_type: 'goods_receipt_note_line',
+                source_line_id: 601,
+                returned_quantity: '5.000000',
+                reason: undefined,
+            }],
+        }));
+    });
 });
 function renderInvoice(initialEntry: string, strict = false) {
     renderWithRoute(initialEntry, '/purchase/invoices/create', <PurchaseInvoiceCreatePage />, strict);
@@ -304,11 +323,16 @@ function goodsReceiptLine(id: number, itemName = 'Widget'): GoodsReceiptLine {
 function returnableLine(id: number, itemName = 'Widget'): ReturnableLine {
     return {
         id,
-        source_line_type: 'goods_receipt_note_line',
-        source_line_id: id,
+        purchase_order_line_id: 401,
+        item_id: 101,
         item: { id: 101, name: itemName },
+        uom_id: 201,
         uom: { id: 201, code: 'EA', name: 'Each' },
-        returnable_quantity: '5.000000',
+        accepted_quantity: '5.000000',
+        returned_quantity: '0.000000',
+        remaining_returnable_quantity: '5.000000',
+        can_return: true,
+        block_reason: null,
         unit_price: '10.000000',
     };
 }

@@ -30,7 +30,7 @@ export function PurchaseReturnLineEditor({ lines, onChange, errorFor }: {
     };
     const selectAll = () => onChange(lines.map((line) => ({ ...line, include: true })));
     const returnSelected = () => onChange(lines.map((line) => (
-        line.include ? { ...line, returned_quantity: line.source.returnable_quantity } : line
+        line.include ? { ...line, returned_quantity: line.source.remaining_returnable_quantity } : line
     )));
     const clearQuantities = () => onChange(lines.map((line) => ({ ...line, include: false, returned_quantity: '0.000000' })));
     const columns: DataColumn<EditableReturnLine & { rowIndex: number }>[] = [
@@ -39,7 +39,7 @@ export function PurchaseReturnLineEditor({ lines, onChange, errorFor }: {
         { key: 'quantity', header: 'Quantity now', render: (line) => line.returned_quantity, className: 'tabular-nums' },
         { key: 'uom', header: 'UOM', render: (line) => line.source.uom?.code ?? '-' },
         { key: 'price', header: 'Unit price', render: (line) => line.source.unit_price, className: 'tabular-nums' },
-        { key: 'returnable', header: 'Remaining quantity', render: (line) => line.source.returnable_quantity, className: 'tabular-nums' },
+        { key: 'returnable', header: 'Remaining quantity', render: (line) => line.source.remaining_returnable_quantity, className: 'tabular-nums' },
         { key: 'reason', header: 'Reason', render: (line) => line.reason || '-' },
         { key: 'actions', header: 'Actions', className: 'text-right', render: (line) => <button type="button" className="font-semibold text-sky-700" onClick={() => setDialog({ index: line.rowIndex, line })}>Edit line</button> },
     ];
@@ -102,7 +102,7 @@ function PurchaseReturnLineForm({ line, errorFor, onSave, onCancel }: {
             <div className="rounded-lg border border-slate-200 p-4 text-sm">
                 <h3 className="font-semibold text-slate-900">Source Line</h3>
                 <div className="mt-2 grid gap-2 sm:grid-cols-3">
-                    <Summary label="Remaining quantity" value={draft.source.returnable_quantity} />
+                    <Summary label="Remaining quantity" value={draft.source.remaining_returnable_quantity} />
                     <Summary label="Unit price" value={draft.source.unit_price} />
                     <Summary label="UOM" value={draft.source.uom?.code ?? '-'} />
                 </div>
@@ -124,5 +124,5 @@ function Summary({ label, value }: { label: string; value: string }) {
 }
 
 function ReturnLineMobileDetails({ line }: { line: EditableReturnLine }) {
-    return <div className="grid grid-cols-2 gap-2"><Summary label="Include" value={line.include ? 'Yes' : 'No'} /><Summary label="Quantity now" value={line.returned_quantity} /><Summary label="Remaining quantity" value={line.source.returnable_quantity} /><Summary label="UOM" value={line.source.uom?.code ?? '-'} /><Summary label="Unit price" value={line.source.unit_price} /></div>;
+    return <div className="grid grid-cols-2 gap-2"><Summary label="Include" value={line.include ? 'Yes' : 'No'} /><Summary label="Quantity now" value={line.returned_quantity} /><Summary label="Remaining quantity" value={line.source.remaining_returnable_quantity} /><Summary label="UOM" value={line.source.uom?.code ?? '-'} /><Summary label="Unit price" value={line.source.unit_price} /></div>;
 }

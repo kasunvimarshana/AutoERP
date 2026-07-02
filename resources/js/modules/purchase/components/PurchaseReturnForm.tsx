@@ -150,7 +150,7 @@ export function PurchaseReturnForm() {
         source_id: source?.id,
         lines: lines.filter((line) => line.include && isPositiveDecimal(line.returned_quantity)).map((line) => ({
             source_line_type: 'goods_receipt_note_line',
-            source_line_id: line.source.source_line_id,
+            source_line_id: line.source.id,
             returned_quantity: decimalOr(line.returned_quantity),
             reason: line.reason || undefined,
         })),
@@ -227,7 +227,7 @@ function goodsReceiptLabel(grn: GoodsReceipt): NamedResource {
 }
 
 function editableReturnLine(row: ReturnableLine): EditableReturnLine | null {
-    if (normalizeSourceId(row.source_line_id) === null) return null;
+    if (normalizeSourceId(row.id) === null) return null;
 
     return { source: row, include: false, returned_quantity: '0.000000', reason: '' };
 }
@@ -236,7 +236,7 @@ function dedupeReturnLines(sourceId: number, lines: EditableReturnLine[]): Edita
     const seen = new Set<string>();
 
     return lines.filter((line) => {
-        const key = sourceLineKey('goods_receipt_note', sourceId, line.source.source_line_id);
+        const key = sourceLineKey('goods_receipt_note', sourceId, line.source.id);
         if (!key || seen.has(key)) return false;
         seen.add(key);
         return true;
