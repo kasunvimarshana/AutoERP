@@ -1,15 +1,15 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { Button, LinkButton } from '@/shared/components/Button';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
-import { LoadingState } from '@/shared/components/LoadingState';
 import { useAuth } from './AuthProvider';
+import { GuardLoadingState } from './GuardLoadingState';
 
 export function ProtectedRoute() {
     const auth = useAuth();
     const location = useLocation();
 
     if (auth.isLoading) {
-        return <LoadingState label="Checking access..." fullPage />;
+        return <GuardLoadingState label="Checking access..." />;
     }
 
     if (auth.bootstrapError) {

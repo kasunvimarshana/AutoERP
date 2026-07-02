@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react';
 import { Outlet } from 'react-router-dom';
 import { AccessDeniedPage } from '@/app/errors/AccessDeniedPage';
-import { LoadingState } from '@/shared/components/LoadingState';
 import { useAuth } from './AuthProvider';
+import { GuardLoadingState } from './GuardLoadingState';
 
 interface PlatformOperatorRouteProps {
     children?: ReactNode;
@@ -12,7 +12,7 @@ export function PlatformOperatorRoute({ children }: PlatformOperatorRouteProps) 
     const auth = useAuth();
 
     if (auth.isLoading) {
-        return <LoadingState label="Checking platform access..." fullPage />;
+        return <GuardLoadingState label="Checking platform access..." />;
     }
 
     if (auth.authMode !== 'platform' || !auth.isPlatformOperator) {

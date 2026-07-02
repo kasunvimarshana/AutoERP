@@ -4,9 +4,9 @@ import { parseEnabledTenantModules } from '@/app/access/tenantModules';
 import { AccessDeniedPage } from '@/app/errors/AccessDeniedPage';
 import { ModuleUnavailablePage } from '@/app/errors/ModuleUnavailablePage';
 import { OrganizationUnitRequiredPage } from '@/app/errors/OrganizationUnitRequiredPage';
-import { LoadingState } from '@/shared/components/LoadingState';
 import { meetsAccessRequirement } from './accessControl';
 import { useAuth } from './AuthProvider';
+import { GuardLoadingState } from './GuardLoadingState';
 
 export function TenantEntitlementRoute() {
     const auth = useAuth();
@@ -28,7 +28,7 @@ export function TenantEntitlementRoute() {
 
     if (entitlement.modules && entitlement.modules.length > 0) {
         if (!auth.enabledModulesLoaded) {
-            return <LoadingState label="Checking tenant plan..." fullPage />;
+            return <GuardLoadingState label="Checking tenant plan..." />;
         }
 
         const enabled = parseEnabledTenantModules(auth.enabledModules);
@@ -40,7 +40,7 @@ export function TenantEntitlementRoute() {
 
     if ((entitlement.permissions?.length ?? 0) > 0 || (entitlement.roles?.length ?? 0) > 0) {
         if (!auth.permissionsLoaded) {
-            return <LoadingState label="Checking access..." fullPage />;
+            return <GuardLoadingState label="Checking access..." />;
         }
 
         if (!meetsAccessRequirement(auth, entitlement)) {

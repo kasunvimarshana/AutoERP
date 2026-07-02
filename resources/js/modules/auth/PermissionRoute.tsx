@@ -1,9 +1,9 @@
 import type { ReactNode } from 'react';
 import { Outlet } from 'react-router-dom';
 import { AccessDeniedPage } from '@/app/errors/AccessDeniedPage';
-import { LoadingState } from '@/shared/components/LoadingState';
 import { hasPermission } from './accessControl';
 import { useAuth } from './AuthProvider';
+import { GuardLoadingState } from './GuardLoadingState';
 
 interface PermissionRouteProps {
     permission?: string;
@@ -15,7 +15,7 @@ export function PermissionRoute({ permission, anyOf, children }: PermissionRoute
     const auth = useAuth();
 
     if (auth.isLoading || !auth.permissionsLoaded) {
-        return <LoadingState label="Checking access..." fullPage />;
+        return <GuardLoadingState label="Checking access..." />;
     }
 
     const required = anyOf ?? (permission ? [permission] : []);

@@ -1,13 +1,13 @@
 import { Outlet } from 'react-router-dom';
 import { AccessDeniedPage } from '@/app/errors/AccessDeniedPage';
-import { LoadingState } from '@/shared/components/LoadingState';
 import { useAuth } from './AuthProvider';
+import { GuardLoadingState } from './GuardLoadingState';
 
 export function TenantRoute() {
     const auth = useAuth();
 
     if (auth.isLoading) {
-        return <LoadingState label="Checking tenant access..." fullPage />;
+        return <GuardLoadingState label="Checking tenant access..." />;
     }
 
     if (auth.authMode !== 'tenant' || auth.isPlatformOperator || !auth.tenant) {
