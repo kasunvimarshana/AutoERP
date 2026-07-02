@@ -40,7 +40,7 @@ final class OpaqueTokenCodecTest extends TestCase
 
         self::assertNotSame(
             $codec->digestArbitrary('same-value', 'invitation'),
-            $codec->digestArbitrary('same-value', 'mfa-enrollment'),
+            $codec->digestArbitrary('same-value', 'operator-invitation'),
         );
     }
 

@@ -7,7 +7,6 @@ describe('public API request classification', () => {
         expect(isPublicApiRequest('/api/v1/auth/login')).toBe(true);
         expect(isPublicApiRequest('/api/v1/auth/initial-administrator/inspect')).toBe(true);
         expect(isPublicApiRequest('/api/v1/platform/operator-invitations/accept')).toBe(true);
-        expect(isPublicApiRequest('/api/v1/platform/auth/mfa/enrollment/confirm')).toBe(true);
         expect(isPublicApiRequest('/api/v1/items')).toBe(false);
         expect(isPublicApiRequest('/api/v1/platform/operators')).toBe(false);
     });
@@ -23,7 +22,6 @@ describe('shouldAttachAuthorizationHeader', () => {
         expect(shouldAttachAuthorizationHeader('/api/v1/auth/login', 'tenant-token')).toBe(false);
         expect(shouldAttachAuthorizationHeader('/api/v1/auth/initial-administrator/inspect', 'tenant-token')).toBe(false);
         expect(shouldAttachAuthorizationHeader('/api/v1/platform/operator-invitations/accept', 'platform-token')).toBe(false);
-        expect(shouldAttachAuthorizationHeader('/api/v1/platform/auth/mfa/enrollment/confirm', 'platform-token')).toBe(false);
     });
 
     it('sends a non-empty bearer token only to protected endpoints', () => {

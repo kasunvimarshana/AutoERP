@@ -21,7 +21,6 @@ use Modules\Core\Http\Middleware\RequestCorrelationIdMiddleware;
 use Modules\User\Constants\PlatformOperatorInvitationDeliveryStatus;
 use Modules\User\Constants\PlatformOperatorInvitationStatus;
 use Modules\User\Constants\PlatformOperatorStatus;
-use Modules\User\Contracts\PlatformMfaEnrollmentIssuerInterface;
 use Modules\User\Contracts\PlatformOperatorCredentialProvisionerInterface;
 use Modules\User\Jobs\DeliverPlatformOperatorInvitation;
 use Modules\User\Models\PlatformOperatorInvitationDeliveryModel;
@@ -40,7 +39,6 @@ final class PlatformOperatorInvitationService
         private readonly PlatformOperatorInvitationDeliveryModel $deliveries,
         private readonly PlatformOperatorModel $operators,
         private readonly PlatformOperatorCredentialProvisionerInterface $credentials,
-        private readonly PlatformMfaEnrollmentIssuerInterface $mfaEnrollment,
         private readonly PlatformOperatorInvitationTokenCodec $tokens,
         private readonly ClockInterface $clock,
         private readonly CurrentUserContextAccessorInterface $currentUser,
@@ -183,14 +181,10 @@ final class PlatformOperatorInvitationService
                 $this->revokePendingInvitations((int) $operator->getKey(), 'Operator registration completed.', (int) $invitation->getKey());
                 $this->recordAcceptanceAudit($operator);
 
-                $email = (string) $operator->getAttribute('email');
-                $enrollment = $this->mfaEnrollment->issueForOperator((int) $operator->getKey(), $email);
-
                 return [
                     'operator_name' => trim((string) $operator->getAttribute('first_name').' '.(string) $operator->getAttribute('last_name')),
-                    'email' => $email,
+                    'email' => (string) $operator->getAttribute('email'),
                     'status' => PlatformOperatorStatus::ACTIVE,
-                    'mfa_enrollment' => $enrollment,
                 ];
             }, 3);
         });

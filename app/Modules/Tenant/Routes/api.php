@@ -24,7 +24,7 @@ $currentUserMiddleware = (string) config('core.current_user.middleware_alias', '
 $currentTenantMiddleware = (string) config('core.current_tenant.middleware_alias', 'current.tenant');
 $platformHostMiddleware = (string) config('tenant.platform.host_middleware_alias', 'platform.host');
 $platformOperatorMiddleware = (string) config('tenant.platform.operator_middleware_alias', 'platform.operator');
-$platformStepUpMiddleware = (string) config('module-auth.platform_mfa.middleware_alias', 'platform.step-up');
+$platformStepUpMiddleware = (string) config('module-auth.platform_step_up.middleware_alias', 'platform.step-up');
 $domainVerificationThrottle = 'throttle:'.max(1, (int) config('tenant.domains.verification_rate_limit_per_minute', 10)).',1';
 $domainProbeThrottle = 'throttle:'.max(1, (int) config('tenant.domains.probe_rate_limit_per_minute', 120)).',1';
 

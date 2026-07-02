@@ -217,7 +217,6 @@ final readonly class PlatformTokenService
                 'scopes' => ['platform'],
                 'grant_type' => (string) $token->getAttribute('grant_type'),
                 'authenticated_at' => $this->values->atom($session->getAttribute('authenticated_at')),
-                'mfa_verified_at' => $this->values->atom($session->getAttribute('mfa_verified_at')),
                 'issued_at' => $this->values->atom($token->getAttribute('issued_at')),
                 'expires_at' => $this->values->atom($token->getAttribute('expires_at')),
             ];

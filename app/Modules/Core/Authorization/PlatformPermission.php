@@ -24,7 +24,6 @@ final class PlatformPermission
     public const OPERATORS_MANAGE = 'platform.operators.manage';
     public const SESSIONS_VIEW = 'platform.sessions.view';
     public const SESSIONS_MANAGE = 'platform.sessions.manage';
-    public const MFA_MANAGE = 'platform.mfa.manage';
     public const HEALTH_VIEW = 'platform.health.view';
     public const HEALTH_MANAGE = 'platform.health.manage';
 
@@ -50,7 +49,6 @@ final class PlatformPermission
             self::OPERATORS_MANAGE => 'Invite, activate, deactivate, and govern platform operators.',
             self::SESSIONS_VIEW => 'View platform operator sessions.',
             self::SESSIONS_MANAGE => 'Revoke platform operator sessions.',
-            self::MFA_MANAGE => 'Reset platform operator MFA and recovery credentials.',
             self::HEALTH_VIEW => 'View platform tenant, domain, subscription, storage, queue, and outbox health.',
             self::HEALTH_MANAGE => 'Retry and recover failed platform operations with an audited reason.',
         ];

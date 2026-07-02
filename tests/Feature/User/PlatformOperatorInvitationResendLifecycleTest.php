@@ -15,7 +15,6 @@ use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\User\Constants\PlatformOperatorInvitationDeliveryStatus;
 use Modules\User\Constants\PlatformOperatorInvitationStatus;
 use Modules\User\Constants\PlatformOperatorStatus;
-use Modules\User\Contracts\PlatformMfaEnrollmentIssuerInterface;
 use Modules\User\Contracts\PlatformOperatorCredentialProvisionerInterface;
 use Modules\User\Jobs\DeliverPlatformOperatorInvitation;
 use Modules\User\Models\PlatformOperatorInvitationDeliveryModel;
@@ -172,7 +171,6 @@ final class PlatformOperatorInvitationResendLifecycleTest extends TestCase
             new PlatformOperatorInvitationDeliveryModel,
             new PlatformOperatorModel,
             $credentials,
-            $this->createMock(PlatformMfaEnrollmentIssuerInterface::class),
             $codec ?? $this->app->make(PlatformOperatorInvitationTokenCodec::class),
             $this->app->make(ClockInterface::class),
             $currentUser,

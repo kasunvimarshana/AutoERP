@@ -19,7 +19,6 @@ use Modules\Core\Contracts\PlatformPermissionCheckerInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\User\Constants\PlatformOperatorStatus;
 use Modules\Core\Authorization\PlatformPermission;
-use Modules\User\Contracts\PlatformMfaEnrollmentIssuerInterface;
 use Modules\User\Contracts\PlatformOperatorCredentialProvisionerInterface;
 use Modules\User\Contracts\PlatformOperatorSessionRevokerInterface;
 use Modules\User\Models\PlatformOperatorModel;
@@ -38,7 +37,6 @@ final class PlatformOperatorService
         private readonly PlatformPermissionCatalogSynchronizer $catalogue,
         private readonly PlatformOperatorSessionRevokerInterface $sessions,
         private readonly PlatformOperatorCredentialProvisionerInterface $credentials,
-        private readonly PlatformMfaEnrollmentIssuerInterface $mfa,
         private readonly PlatformOperatorInvitationService $invitations,
         private readonly ClockInterface $clock,
         private readonly CurrentUserContextAccessorInterface $currentUser,
@@ -275,7 +273,6 @@ final class PlatformOperatorService
                         $recoveryReason = 'Platform access recovery: '.$reason;
                         $this->sessions->revokeAllForOperator($operatorId, $recoveryReason);
                         $this->credentials->revoke($operatorId);
-                        $this->mfa->revokeForOperator($operatorId);
 
                         $now = $this->clock->now();
                         $operator->forceFill([

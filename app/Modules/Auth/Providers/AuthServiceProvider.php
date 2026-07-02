@@ -22,7 +22,6 @@ use Modules\Auth\Http\Middleware\RequireRecentPlatformAuthenticationMiddleware;
 use Modules\Auth\Listeners\RevokeTenantAccessOnStatusChange;
 use Modules\Auth\Services\Credentials\PasswordCredentialService;
 use Modules\Auth\Services\CurrentUserContextResolver;
-use Modules\Auth\Services\Mfa\PlatformMfaService;
 use Modules\Auth\Services\OrganizationUnit\AuthOrganizationUnitLifecycleBlocker;
 use Modules\Auth\Services\OrganizationUnit\RevokeOrganizationUnitAuthScopeService;
 use Modules\Auth\Services\PlatformSessionService;
@@ -45,7 +44,6 @@ use Modules\Core\Contracts\OrganizationUnitAuthScopeRevokerInterface;
 use Modules\Tenant\Events\TenantStatusChanged;
 use Modules\Tenant\Services\Contracts\TenantAuthenticationProvisionerInterface;
 use Modules\User\Contracts\AuthenticationPrincipalProviderInterface;
-use Modules\User\Contracts\PlatformMfaEnrollmentIssuerInterface;
 use Modules\User\Contracts\PlatformOperatorCredentialProvisionerInterface;
 use Modules\User\Contracts\PlatformOperatorSessionRevokerInterface;
 use Modules\User\Contracts\TenantUserAccessRevokerInterface;
@@ -70,14 +68,12 @@ final class AuthServiceProvider extends ServiceProvider
         $this->app->scoped(AccessTokenRouter::class);
         $this->app->scoped(AccountLoginThrottle::class);
         $this->app->scoped(AuthReadinessService::class);
-        $this->app->scoped(PlatformMfaService::class);
         $this->app->scoped(RegistrationInvitationService::class);
         $this->app->scoped(PasswordCredentialService::class);
 
         $this->app->scoped(TenantUserInvitationIssuerInterface::class, RegistrationInvitationService::class);
         $this->app->scoped(TenantUserAccessRevokerInterface::class, TenantUserAccessRevoker::class);
         $this->app->scoped(PlatformOperatorCredentialProvisionerInterface::class, PasswordCredentialService::class);
-        $this->app->scoped(PlatformMfaEnrollmentIssuerInterface::class, PlatformMfaService::class);
         $this->app->scoped(TenantAuthenticationProvisionerInterface::class, TenantAuthenticationProvisioner::class);
         $this->app->scoped(PlatformOperatorSessionRevokerInterface::class, PlatformSessionService::class);
         $this->app->scoped(OrganizationUnitAuthScopeRevokerInterface::class, RevokeOrganizationUnitAuthScopeService::class);
@@ -97,7 +93,7 @@ final class AuthServiceProvider extends ServiceProvider
         $this->configureGuards();
         $this->resetResolvedBearerGuardsWhenRequestChanges();
         $this->app->make(Router::class)->aliasMiddleware(
-            (string) config('module-auth.platform_mfa.middleware_alias', 'platform.step-up'),
+            (string) config('module-auth.platform_step_up.middleware_alias', 'platform.step-up'),
             RequireRecentPlatformAuthenticationMiddleware::class,
         );
 

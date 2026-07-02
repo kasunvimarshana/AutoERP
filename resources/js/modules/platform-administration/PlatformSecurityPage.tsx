@@ -28,13 +28,13 @@ interface OperatorOption extends NamedResource {
 type SecurityAction =
     | { type: 'session'; session: PlatformSession }
     | { type: 'operator_sessions'; operator: OperatorOption }
-    | { type: 'mfa'; operator: OperatorOption }
+    | { type: 'recovery'; operator: OperatorOption }
     | null;
 
 export default function PlatformSecurityPage() {
     const auth = useAuth();
     const canManageSessions = hasPermission(auth, PLATFORM_PERMISSION.sessionsManage);
-    const canManageMfa = hasPermission(auth, PLATFORM_PERMISSION.mfaManage);
+    const canRecoverOperators = hasPermission(auth, PLATFORM_PERMISSION.operatorsManage);
     const [operator, setOperator] = useState<OperatorOption | null>(null);
     const [page, setPage] = useState(1);
     const sessions = useApi(
@@ -158,8 +158,8 @@ export default function PlatformSecurityPage() {
                                     Revoke all sessions
                                 </Button>
                             ) : null}
-                            {canManageMfa ? (
-                                <Button variant="secondary" disabled={!operator} onClick={() => operator && openAction({ type: 'mfa', operator })}>
+                            {canRecoverOperators ? (
+                                <Button variant="secondary" disabled={!operator} onClick={() => operator && openAction({ type: 'recovery', operator })}>
                                     Start recovery
                                 </Button>
                             ) : null}
@@ -229,13 +229,13 @@ async function searchOperators({ search, page, perPage, signal }: { search: stri
 function actionTitle(action: SecurityAction): string {
     if (action?.type === 'session') return 'Revoke platform session';
     if (action?.type === 'operator_sessions') return `Revoke all sessions for ${action.operator.name}`;
-    if (action?.type === 'mfa') return `Start recovery for ${action.operator.name}`;
+    if (action?.type === 'recovery') return `Start recovery for ${action.operator.name}`;
     return 'Platform security action';
 }
 
 function actionMessage(action: SecurityAction): string {
     if (action?.type === 'session') return 'This immediately invalidates the selected platform session and its access and refresh tokens.';
     if (action?.type === 'operator_sessions') return 'This immediately invalidates every active platform session for the selected operator.';
-    if (action?.type === 'mfa') return 'This revokes the operator’s credentials, MFA method, and active sessions, then queues a recipient-owned invitation for password and MFA setup.';
+    if (action?.type === 'recovery') return 'This revokes the operator’s credentials and active sessions, then queues a recipient-owned invitation for password setup.';
     return '';
 }

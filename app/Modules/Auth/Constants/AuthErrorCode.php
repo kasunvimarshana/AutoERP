@@ -40,13 +40,5 @@ final class AuthErrorCode
 
     public const INVITATION_INVALID = 'AUTH_INVITATION_INVALID';
 
-    public const MFA_ENROLLMENT_REQUIRED = 'AUTH_MFA_ENROLLMENT_REQUIRED';
-
-    public const MFA_ENROLLMENT_FAILED = 'AUTH_MFA_ENROLLMENT_FAILED';
-
-    public const MFA_REQUIRED = 'AUTH_MFA_REQUIRED';
-
-    public const MFA_INVALID_CODE = 'AUTH_MFA_INVALID_CODE';
-
     private function __construct() {}
 }

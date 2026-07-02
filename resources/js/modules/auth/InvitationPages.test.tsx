@@ -10,7 +10,6 @@ const mocks = vi.hoisted(() => ({
     acceptInitialAdministratorInvitation: vi.fn(),
     inspectPlatformOperatorInvitation: vi.fn(),
     acceptPlatformOperatorInvitation: vi.fn(),
-    confirmPlatformMfaEnrollment: vi.fn(),
 }));
 
 vi.mock('./authApi', () => ({
@@ -124,18 +123,10 @@ describe('PlatformOperatorInvitationPage', () => {
             operator_name: 'Platform Operator',
             email: 'operator@example.test',
             status: 'active',
-            mfa_enrollment: {
-                enrollment_proof: 'enrollment-proof',
-                provisioning_uri: 'otpauth://totp/AutoERP:operator@example.test?secret=ABC123',
-            },
-        });
-        mocks.confirmPlatformMfaEnrollment.mockResolvedValue({
-            enabled: true,
-            backup_codes: ['BACKUP-ONE', 'BACKUP-TWO'],
         });
     });
 
-    it('removes the token from browser chrome and requires password plus MFA before sign-in', async () => {
+    it('removes the token from browser chrome and completes password setup before sign-in', async () => {
         const user = userEvent.setup();
         render(
             <TestRouter initialEntries={['/register/platform-operator']}>
@@ -153,7 +144,7 @@ describe('PlatformOperatorInvitationPage', () => {
 
         await user.type(getPasswordInput('password'), 'AnotherStrongPassword!456');
         await user.type(getPasswordInput('password_confirmation'), 'AnotherStrongPassword!456');
-        await user.click(screen.getByRole('button', { name: 'Set password and continue to MFA' }));
+        await user.click(screen.getByRole('button', { name: 'Set password' }));
 
         await waitFor(() => expect(mocks.acceptPlatformOperatorInvitation).toHaveBeenCalledWith({
             token: platformOperatorToken,
@@ -161,15 +152,7 @@ describe('PlatformOperatorInvitationPage', () => {
             password_confirmation: 'AnotherStrongPassword!456',
         }));
 
-        expect(await screen.findByText('Set up multi-factor authentication')).toBeInTheDocument();
-        await user.type(screen.getByLabelText('Authenticator code'), '123456');
-        await user.click(screen.getByRole('button', { name: 'Enable MFA' }));
-
-        await waitFor(() => expect(mocks.confirmPlatformMfaEnrollment).toHaveBeenCalledWith(
-            'enrollment-proof',
-            '123456',
-        ));
-        expect(await screen.findByText('Save these one-time backup codes now')).toBeInTheDocument();
-        expect(screen.getByText('BACKUP-ONE')).toBeInTheDocument();
+        expect(await screen.findByText('Platform operator account is ready')).toBeInTheDocument();
+        expect(screen.getByRole('link', { name: 'Continue to sign in' })).toBeInTheDocument();
     });
 });

@@ -18,8 +18,6 @@ final class AuthPayloadResource extends JsonResource
         'password',
         'password_hash',
         'secret',
-        'backup_code_hashes',
-        'enrollment_proof_digest',
     ];
 
     /** @return array<string,mixed> */

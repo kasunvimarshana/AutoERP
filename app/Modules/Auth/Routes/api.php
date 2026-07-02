@@ -10,7 +10,6 @@ use Modules\Auth\Http\Controllers\AuthReadinessController;
 use Modules\Auth\Http\Controllers\InitialAdministratorInvitationController;
 use Modules\Auth\Http\Controllers\OrganizationUnitContextController;
 use Modules\Auth\Http\Controllers\PlatformAuthController;
-use Modules\Auth\Http\Controllers\PlatformMfaController;
 use Modules\Auth\Http\Controllers\PlatformSecurityController;
 use Modules\Core\Authorization\PlatformPermission;
 
@@ -31,7 +30,7 @@ $currentOrganizationUnit = (string) config(
 );
 $platformHost = (string) config('tenant.platform.host_middleware_alias', 'platform.host');
 $platformOperator = (string) config('tenant.platform.operator_middleware_alias', 'platform.operator');
-$stepUp = (string) config('module-auth.platform_mfa.middleware_alias', 'platform.step-up');
+$stepUp = (string) config('module-auth.platform_step_up.middleware_alias', 'platform.step-up');
 
 Route::prefix('api/v1/auth')
     ->middleware(['api', $resolveCurrentTenant])
@@ -93,9 +92,6 @@ Route::prefix('api/v1/platform/auth')
         Route::post('login', [PlatformAuthController::class, 'login'])
             ->middleware('throttle:auth.platform.login')
             ->name('login');
-        Route::post('mfa/enrollment/confirm', [PlatformMfaController::class, 'confirm'])
-            ->middleware('throttle:auth.invitations')
-            ->name('mfa.enrollment.confirm');
         Route::post('refresh', [PlatformAuthController::class, 'refresh'])
             ->middleware('throttle:auth.platform.refresh')
             ->name('refresh');

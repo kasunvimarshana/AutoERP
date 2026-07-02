@@ -1,6 +1,6 @@
 import { apiClient } from '@/shared/api/apiClient';
 import { endpoints } from '@/shared/api/endpoints';
-import type { AcceptInitialAdministratorInvitationPayload, AcceptPlatformOperatorInvitationPayload, AuthSession, CurrentUserResponse, InitialAdministratorInvitationAcceptance, InitialAdministratorInvitationInspection, LoginPayload, PlatformMfaConfirmation, PlatformOperatorInvitationAcceptance, PlatformOperatorInvitationInspection, OrganizationUnitContextOptions, AuthOrganizationUnit } from './authTypes';
+import type { AcceptInitialAdministratorInvitationPayload, AcceptPlatformOperatorInvitationPayload, AuthSession, CurrentUserResponse, InitialAdministratorInvitationAcceptance, InitialAdministratorInvitationInspection, LoginPayload, PlatformOperatorInvitationAcceptance, PlatformOperatorInvitationInspection, OrganizationUnitContextOptions, AuthOrganizationUnit } from './authTypes';
 
 const platformAuthEndpoint = '/api/v1/platform/auth';
 
@@ -45,8 +45,6 @@ export const authApi = {
             const { data } = await apiClient.post<AuthSession>(`${platformAuthEndpoint}/login`, {
                 email: payload.identifier,
                 password: payload.password,
-                totp_code: payload.totp_code || undefined,
-                backup_code: payload.backup_code || undefined,
                 device_name: payload.device_name || undefined,
             });
             return data;
@@ -62,14 +60,6 @@ export const authApi = {
         return data;
     },
 
-
-    async confirmPlatformMfaEnrollment(enrollmentProof: string, code: string): Promise<PlatformMfaConfirmation> {
-        const { data } = await apiClient.post<PlatformMfaConfirmation>(`${platformAuthEndpoint}/mfa/enrollment/confirm`, {
-            enrollment_proof: enrollmentProof,
-            code,
-        });
-        return data;
-    },
 
     async logout(authMode: LoginPayload['auth_mode']): Promise<void> {
         const endpoint = authMode === 'platform' ? platformAuthEndpoint : endpoints.auth;

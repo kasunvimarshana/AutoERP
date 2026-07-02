@@ -104,10 +104,6 @@ final class AuthLoginFlowTest extends TestCase
 
     public function test_platform_login_returns_complete_session_and_supports_me_and_logout(): void
     {
-        config()->set('module-auth.platform_mfa.enabled', false);
-        config()->set('module-auth.platform_mfa.required', false);
-        config()->set('module-auth.platform_mfa.login_challenge', false);
-
         $now = now();
         $email = 'platform-auth@example.test';
         $operatorId = (int) DB::table('platform_operators')->insertGetId([

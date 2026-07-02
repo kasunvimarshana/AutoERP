@@ -1,6 +1,6 @@
 # Auth module
 
-The Auth module owns authentication credentials, identities, sessions, access and refresh tokens, OAuth authorization codes, platform MFA, invitation acceptance, and authentication security history. It does not own tenant lifecycle, user profiles and permissions, organization hierarchy, or platform-operator profile governance.
+The Auth module owns authentication credentials, identities, sessions, access and refresh tokens, OAuth authorization codes, invitation acceptance, and authentication security history. It does not own tenant lifecycle, user profiles and permissions, organization hierarchy, or platform-operator profile governance.
 
 ## Trust boundaries
 
@@ -11,7 +11,7 @@ The following values are always derived on the server and must never be accepted
 - access-token and refresh-token scopes, grant type, and lifetime;
 - OAuth authorization subject and session;
 - current organization-unit session context;
-- credential, MFA, token, session, and authorization-code status timestamps.
+- credential, token, session, and authorization-code status timestamps.
 
 Tenant context is resolved from the verified request host. The authenticated subject is resolved from the validated bearer token and its active owning session. Refresh tokens are read from secure HTTP-only cookies.
 
@@ -24,7 +24,7 @@ Tenant realm
 User credential -> tenant session -> tenant access/refresh token family
 
 Platform realm
-Platform-operator credential + MFA -> platform session
+Platform-operator credential -> platform session
 -> platform access/refresh token family
 ```
 
@@ -36,7 +36,7 @@ A successful login is one atomic application outcome:
 
 ```text
 credential verification
-  -> locked organization access / MFA verification
+  -> locked organization access / platform credential verification
   -> session and token issuance
   -> complete profile and permission readiness
   -> successful login-attempt audit
@@ -81,17 +81,13 @@ issued for current authenticated tenant subject/session
 
 The exchange request cannot replace the approved subject, session, or scopes. Confidential-client secrets are accepted only at exchange.
 
-## Platform MFA and recovery
+## Platform Recovery
 
-Initial MFA enrollment is bound to a short-lived, one-time proof issued during recipient-owned platform-operator invitation acceptance. Password-only public enrollment is not supported.
-
-TOTP verification persists the accepted counter to prevent replay inside the valid time window. Backup codes are individually hashed and removed atomically when used.
-
-Platform account recovery is owned by the User module because it changes the platform-operator aggregate. The recovery command revokes Auth-owned sessions, credentials, and MFA, moves the operator to the invited lifecycle, and issues a new recipient-owned invitation. It protects self-recovery and the last active platform manager.
+Platform account recovery is owned by the User module because it changes the platform-operator aggregate. The recovery command revokes Auth-owned sessions and credentials, moves the operator to the invited lifecycle, and issues a new recipient-owned invitation. It protects self-recovery and the last active platform manager.
 
 ## Module ownership
 
-- **Auth**: credentials, identities, login, MFA, sessions, tokens, OAuth, invitation acceptance, Auth retention.
+- **Auth**: credentials, identities, login, sessions, tokens, OAuth, invitation acceptance, Auth retention.
 - **User**: tenant-user and platform-operator profile/lifecycle, roles, permissions, organization access, operator invitations and recovery orchestration.
 - **Tenant**: verified tenant resolution, tenant lifecycle, tenant directory and provisioning policy.
 - **OrganizationUnit**: organization-unit existence, hierarchy, lifecycle and membership directory.
@@ -105,7 +101,7 @@ Supported public entry points are deliberately small:
 - tenant login and cookie-owned refresh;
 - OAuth code exchange;
 - initial tenant-administrator invitation inspect/accept;
-- platform login, MFA enrollment confirmation, and cookie-owned refresh;
+- platform login and cookie-owned refresh;
 - platform-operator invitation inspect/accept in the User module.
 
 Generic token issuance, public token introspection, generic verification challenges, SSO aliases, and external identity mutation endpoints are not exposed.
@@ -129,9 +125,9 @@ Generic token issuance, public token introspection, generic verification challen
 
 `auth:purge-expired` removes expired authorization codes, tokens, sessions, login-attempt history, invitation delivery operations, and processed integration events in dependency-safe order using configured retention periods.
 
-Auth configuration is validated during provider boot. Invalid TTL, rate-limit, password, OAuth-scope, MFA, cookie, or retention configuration must fail startup rather than silently use an unsafe fallback. Route-level throttling provides a coarse IP boundary; the service-level account/account-IP throttle is the authoritative credential-abuse policy. Both depend on the cache probe covered by `auth:readiness`.
+Auth configuration is validated during provider boot. Invalid TTL, rate-limit, password, OAuth-scope, cookie, or retention configuration must fail startup rather than silently use an unsafe fallback. Route-level throttling provides a coarse IP boundary; the service-level account/account-IP throttle is the authoritative credential-abuse policy. Both depend on the cache probe covered by `auth:readiness`.
 
-Platform operators are invitation-first identities. `AUTOERP_PLATFORM_ADMIN_EMAIL` can seed an invitation when explicitly enabled; no administrator password is accepted from environment configuration. The recipient establishes the credential and MFA through the guided invitation flow.
+Platform operators are invitation-first identities. `AUTOERP_PLATFORM_ADMIN_EMAIL` can seed an invitation when explicitly enabled; no administrator password is accepted from environment configuration. The recipient establishes the credential through the guided invitation flow.
 
 ## Verification expectations
 
@@ -143,6 +139,6 @@ A release environment must run:
 4. tenant/platform login-refresh-logout-session tests;
 5. OAuth impersonation, scope, redirect, PKCE, and one-time-code tests;
 6. refresh reuse/family compromise tests;
-7. MFA replay, backup-code, enrollment, and recovery tests;
+7. Platform account recovery tests;
 8. Tenant-A/Tenant-B and OU-A/OU-B adversarial tests;
 9. browser tests using verified tenant hosts and HTTP-only refresh cookies.

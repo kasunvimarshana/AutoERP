@@ -22,7 +22,7 @@ A production release still requires migrated-database and Tenant-A/Tenant-B adve
 
 - `OrganizationUnit` owns the protected root hierarchy and root invariants.
 - `User` owns tenant permission catalogues, roles, and administrator assignments.
-- `Auth` owns providers, invitations, authentication, MFA, sessions, and tokens.
+- `Auth` owns providers, invitations, authentication, sessions, and tokens.
 - `Configuration` owns typed global, tenant, and organization-unit overrides.
 - `ReferenceData` owns currencies and other shared catalogues.
 - `Communication` and platform infrastructure own transport-level mail capabilities.
@@ -87,18 +87,13 @@ Infrastructure settings are not generic key/value configuration:
 
 Dedicated tenant database, storage-provider, or mail-provider profiles are not claimed as supported. Adding them requires dedicated encrypted profile models, lifecycle management, connection/provider factories, queue-worker context restoration, health checks, secret rotation, and migration/rollback workflows.
 
-## Platform MFA policy
+## Platform Step-Up Policy
 
-Platform MFA capability, enrollment policy, login challenge policy, and sensitive-action step-up policy are separate:
+Sensitive platform actions require recent platform authentication. The step-up window is configured through Auth:
 
 ```dotenv
-AUTH_PLATFORM_MFA_ENABLED=true
-AUTH_PLATFORM_MFA_REQUIRED=true
-AUTH_PLATFORM_MFA_LOGIN_CHALLENGE=true
-AUTH_PLATFORM_MFA_STEP_UP_REQUIRED=true
+AUTH_PLATFORM_STEP_UP_TTL_SECONDS=900
 ```
-
-Set `AUTH_PLATFORM_MFA_ENABLED=false` to disable MFA enrollment, login challenges, and MFA step-up checks. Existing enrolled secrets are retained for safe re-enablement. Recent password authentication can still be required independently for sensitive platform actions.
 
 After environment changes, clear cached configuration and restart long-lived PHP/queue workers.
 

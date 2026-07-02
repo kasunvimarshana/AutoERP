@@ -4,7 +4,6 @@ const PUBLIC_API_EXACT_PATHS = new Set([
     '/api/v1/auth/oauth/token',
     '/api/v1/platform/auth/login',
     '/api/v1/platform/auth/refresh',
-    '/api/v1/platform/auth/mfa/enrollment/confirm',
 ]);
 
 const PUBLIC_API_PATH_PREFIXES = [

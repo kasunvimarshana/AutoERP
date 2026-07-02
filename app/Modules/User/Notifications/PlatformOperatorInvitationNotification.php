@@ -30,7 +30,7 @@ final class PlatformOperatorInvitationNotification extends Notification
             ->subject('Complete your AutoERP platform operator account')
             ->greeting("Hello {$this->operatorName},")
             ->line('You have been invited to the AutoERP platform control plane.')
-            ->line('Use the secure link below to choose your own password. MFA enrollment is required at first sign-in.')
+            ->line('Use the secure link below to choose your own password before signing in.')
             ->action('Complete platform operator registration', $this->acceptanceUrl)
             ->line("This invitation expires at {$this->expiresAt}.")
             ->line('Ignore this message if you were not expecting this invitation.');

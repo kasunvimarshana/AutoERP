@@ -57,18 +57,6 @@ export interface LoginPayload {
     password: string;
     organization_unit_id?: number | null;
     device_name?: string | null;
-    totp_code?: string | null;
-    backup_code?: string | null;
-}
-
-export interface PlatformMfaEnrollment {
-    enrollment_proof: string;
-    provisioning_uri: string;
-}
-
-export interface PlatformMfaConfirmation {
-    enabled: true;
-    backup_codes: string[];
 }
 
 
@@ -117,5 +105,4 @@ export interface PlatformOperatorInvitationAcceptance {
     operator_name: string;
     email: string;
     status: 'active';
-    mfa_enrollment?: PlatformMfaEnrollment;
 }

@@ -2,15 +2,6 @@
 
 declare(strict_types=1);
 
-$platformMfaRequired = filter_var(
-    env('AUTH_PLATFORM_MFA_REQUIRED', env('APP_ENV') === 'production'),
-    FILTER_VALIDATE_BOOL,
-);
-$platformMfaEnabled = filter_var(
-    env('AUTH_PLATFORM_MFA_ENABLED', $platformMfaRequired),
-    FILTER_VALIDATE_BOOL,
-);
-
 return [
     'internal_provider_key' => 'internal',
     'protected_route_guard' => env('MODULE_AUTH_PROTECTED_GUARD', 'auth-api'),
@@ -76,14 +67,8 @@ return [
             rtrim((string) env('PLATFORM_PUBLIC_URL', ''), '/').'/register/invitation',
         ),
     ],
-    'platform_mfa' => [
-        'enabled' => $platformMfaEnabled,
-        'required' => $platformMfaEnabled && $platformMfaRequired,
-        'login_challenge' => $platformMfaEnabled && filter_var(env('AUTH_PLATFORM_MFA_LOGIN_CHALLENGE', true), FILTER_VALIDATE_BOOL),
-        'step_up_required' => $platformMfaEnabled && filter_var(env('AUTH_PLATFORM_MFA_STEP_UP_REQUIRED', $platformMfaRequired), FILTER_VALIDATE_BOOL),
-        'issuer' => env('AUTH_PLATFORM_MFA_ISSUER', env('APP_NAME', 'AutoERP')),
-        'step_up_ttl_seconds' => (int) env('AUTH_PLATFORM_STEP_UP_TTL_SECONDS', 900),
-        'enrollment_proof_ttl_seconds' => (int) env('AUTH_PLATFORM_MFA_ENROLLMENT_PROOF_TTL', 600),
+    'platform_step_up' => [
+        'ttl_seconds' => (int) env('AUTH_PLATFORM_STEP_UP_TTL_SECONDS', 900),
         'middleware_alias' => 'platform.step-up',
     ],
     'retention' => [

@@ -1338,7 +1338,7 @@ export const platformNavigationSections: NavigationSection[] = [
             {
                 id: "platform-security",
                 type: "link",
-                label: "Sessions & MFA",
+                label: "Sessions & Recovery",
                 to: "/administration/platform-security",
                 icon: "permission",
                 access: { requiresPlatformOperator: true, permissions: [PLATFORM_PERMISSION.sessionsView] },

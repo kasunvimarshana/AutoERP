@@ -35,8 +35,6 @@ final class PlatformAuthController extends Controller
             $payload = $this->authentication->login(
                 (string) $request->validated('email'),
                 (string) $request->validated('password'),
-                is_string($request->validated('totp_code')) ? $request->validated('totp_code') : null,
-                is_string($request->validated('backup_code')) ? $request->validated('backup_code') : null,
                 ClientContext::fromRequest(
                     $request,
                     is_string($request->validated('device_name'))

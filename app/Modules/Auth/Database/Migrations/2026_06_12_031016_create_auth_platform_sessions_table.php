@@ -19,7 +19,6 @@ return new class extends Migration
             $table->string('user_agent', 1024)->nullable();
             $table->string('device_name', 160)->nullable();
             $table->dateTime('authenticated_at');
-            $table->timestamp('mfa_verified_at')->nullable();
             $table->dateTime('last_activity_at');
             $table->dateTime('expires_at');
             $table->timestamp('revoked_at')->nullable();

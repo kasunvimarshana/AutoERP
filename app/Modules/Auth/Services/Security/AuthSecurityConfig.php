@@ -22,7 +22,6 @@ final readonly class AuthSecurityConfig
         public int $accountIpMaxAttempts,
         public int $globalIpMaxAttempts,
         public int $loginWindowSeconds,
-        public int $mfaEnrollmentProofTtlSeconds,
         public int $passwordMinimumLength,
         public array $oauthScopes,
     ) {
@@ -63,7 +62,6 @@ final readonly class AuthSecurityConfig
             accountIpMaxAttempts: (int) config('module-auth.rate_limits.account_ip_max_attempts'),
             globalIpMaxAttempts: (int) config('module-auth.rate_limits.global_ip_max_attempts'),
             loginWindowSeconds: (int) config('module-auth.rate_limits.window_seconds'),
-            mfaEnrollmentProofTtlSeconds: (int) config('module-auth.platform_mfa.enrollment_proof_ttl_seconds'),
             passwordMinimumLength: (int) config('module-auth.password.minimum_length'),
             oauthScopes: array_values(array_unique($oauthScopes)),
         );
@@ -108,10 +106,6 @@ final readonly class AuthSecurityConfig
             throw new ConfigurationException('Auth login-attempt window must be between one minute and one day.');
         }
 
-        if ($this->mfaEnrollmentProofTtlSeconds < 60 || $this->mfaEnrollmentProofTtlSeconds > 1800) {
-            throw new ConfigurationException('Auth MFA enrollment proof TTL must be between one and 30 minutes.');
-        }
-
         if ($this->passwordMinimumLength < 12) {
             throw new ConfigurationException('Auth password minimum length cannot be below 12 characters.');
         }
@@ -129,7 +123,7 @@ final readonly class AuthSecurityConfig
             'platform guard' => config('module-auth.platform_protected_route_guard'),
             'tenant token guard driver' => config('module-auth.token_guard_driver'),
             'platform token guard driver' => config('module-auth.platform_token_guard_driver'),
-            'platform MFA middleware alias' => config('module-auth.platform_mfa.middleware_alias'),
+            'platform step-up middleware alias' => config('module-auth.platform_step_up.middleware_alias'),
         ] as $name => $value) {
             if (! is_string($value) || trim($value) === '') {
                 throw new ConfigurationException(sprintf('Auth %s must be a non-empty string.', $name));
@@ -151,15 +145,10 @@ final readonly class AuthSecurityConfig
 
         self::assertIntegerRange(
             'platform step-up TTL',
-            config('module-auth.platform_mfa.step_up_ttl_seconds'),
+            config('module-auth.platform_step_up.ttl_seconds'),
             60,
             3600,
         );
-
-        $issuer = trim((string) config('module-auth.platform_mfa.issuer'));
-        if ($issuer === '' || mb_strlen($issuer) > 120) {
-            throw new ConfigurationException('Auth platform MFA issuer must contain 1 to 120 characters.');
-        }
 
         self::assertIntegerRange(
             'registration invitation expiry',

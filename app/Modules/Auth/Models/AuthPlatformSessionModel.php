@@ -11,7 +11,7 @@ final class AuthPlatformSessionModel extends CoreModel
     protected $table = 'auth_platform_sessions';
     protected $fillable = [
         'public_id', 'platform_operator_id', 'status', 'ip_address', 'user_agent',
-        'device_name', 'authenticated_at', 'mfa_verified_at', 'last_activity_at',
+        'device_name', 'authenticated_at', 'last_activity_at',
         'expires_at', 'revoked_at', 'revocation_reason', 'row_version',
     ];
 
@@ -19,7 +19,7 @@ final class AuthPlatformSessionModel extends CoreModel
     {
         return array_merge(parent::casts(), [
             'platform_operator_id' => 'integer', 'authenticated_at' => 'immutable_datetime',
-            'mfa_verified_at' => 'immutable_datetime', 'last_activity_at' => 'immutable_datetime',
+            'last_activity_at' => 'immutable_datetime',
             'expires_at' => 'immutable_datetime', 'revoked_at' => 'immutable_datetime',
         ]);
     }

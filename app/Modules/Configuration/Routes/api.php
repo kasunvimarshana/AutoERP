@@ -18,7 +18,7 @@ $currentOrganization = (string) config(
 );
 $platformHost = (string) config('tenant.platform.host_middleware_alias', 'platform.host');
 $platformOperator = (string) config('tenant.platform.operator_middleware_alias', 'platform.operator');
-$platformStepUp = (string) config('module-auth.platform_mfa.middleware_alias', 'platform.step-up');
+$platformStepUp = (string) config('module-auth.platform_step_up.middleware_alias', 'platform.step-up');
 
 $registerTenantScope = static function (
     string $path,

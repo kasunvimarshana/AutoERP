@@ -12,7 +12,6 @@ describe('shouldAttemptAuthRefresh', () => {
 
         expect(shouldAttemptAuthRefresh('/api/v1/auth/initial-administrator/inspect')).toBe(false);
         expect(shouldAttemptAuthRefresh('/api/v1/platform/operator-invitations/accept')).toBe(false);
-        expect(shouldAttemptAuthRefresh('/api/v1/platform/auth/mfa/enrollment/confirm')).toBe(false);
     });
 
     it('allows one refresh attempt for a protected endpoint when a session exists', () => {

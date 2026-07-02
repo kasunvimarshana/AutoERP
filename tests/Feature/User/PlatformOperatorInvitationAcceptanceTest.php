@@ -18,7 +18,6 @@ final class PlatformOperatorInvitationAcceptanceTest extends TestCase
 
     public function test_public_acceptance_uses_an_explicit_audit_actor_and_completes_registration(): void
     {
-        config()->set('module-auth.platform_mfa.enabled', true);
         $fixture = $this->createInvitation();
 
         $response = $this->postJson('/api/v1/platform/operator-invitations/accept', [
@@ -29,8 +28,7 @@ final class PlatformOperatorInvitationAcceptanceTest extends TestCase
 
         $response->assertOk()
             ->assertJsonPath('data.status', PlatformOperatorStatus::ACTIVE)
-            ->assertJsonPath('data.email', 'operator@example.test')
-            ->assertJsonStructure(['data' => ['mfa_enrollment' => ['enrollment_proof', 'provisioning_uri']]]);
+            ->assertJsonPath('data.email', 'operator@example.test');
 
         $this->assertDatabaseHas('platform_operators', [
             'id' => $fixture['operator_id'],

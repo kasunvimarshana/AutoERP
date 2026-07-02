@@ -79,7 +79,7 @@ Route::prefix('api/v1/platform/operator-invitations')
 
 $platformGuard = (string) config('module-auth.platform_protected_route_guard', 'platform-api');
 $platformOperator = (string) config('tenant.platform.operator_middleware_alias', 'platform.operator');
-$platformStepUp = (string) config('module-auth.platform_mfa.middleware_alias', 'platform.step-up');
+$platformStepUp = (string) config('module-auth.platform_step_up.middleware_alias', 'platform.step-up');
 
 Route::prefix('api/v1/platform/operators')
     ->middleware(['api', $platformHost, 'auth:'.$platformGuard, $currentUserMiddleware, $platformOperator])
@@ -108,7 +108,7 @@ Route::prefix('api/v1/platform/operators')
             ->whereNumber('operator')
             ->middleware([
                 $platformStepUp,
-                'platform.permission:'.\Modules\Core\Authorization\PlatformPermission::MFA_MANAGE,
+                'platform.permission:'.\Modules\Core\Authorization\PlatformPermission::OPERATORS_MANAGE,
             ])
             ->name('security-recovery');
     });

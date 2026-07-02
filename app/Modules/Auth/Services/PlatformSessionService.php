@@ -126,7 +126,6 @@ final readonly class PlatformSessionService implements PlatformOperatorSessionRe
             'device_name' => $session->getAttribute('device_name'),
             'user_agent' => $session->getAttribute('user_agent'),
             'authenticated_at' => $session->getAttribute('authenticated_at')?->format(DATE_ATOM),
-            'mfa_verified_at' => $session->getAttribute('mfa_verified_at')?->format(DATE_ATOM),
             'last_activity_at' => $session->getAttribute('last_activity_at')?->format(DATE_ATOM),
             'expires_at' => $expiresAt?->format(DATE_ATOM),
             'revoked_at' => $session->getAttribute('revoked_at')?->format(DATE_ATOM),

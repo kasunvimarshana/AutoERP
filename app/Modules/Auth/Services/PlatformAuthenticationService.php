@@ -12,8 +12,6 @@ use Modules\Auth\Enums\SessionStatus;
 use Modules\Auth\Exceptions\AuthFailure;
 use Modules\Auth\Models\AuthPlatformSessionModel;
 use Modules\Auth\Services\Credentials\PasswordCredentialService;
-use Modules\Auth\Services\Mfa\PlatformMfaPolicy;
-use Modules\Auth\Services\Mfa\PlatformMfaService;
 use Modules\Auth\Services\Security\AccountLoginThrottle;
 use Modules\Auth\Services\Security\AuthSecurityConfig;
 use Modules\Core\Contracts\ClockInterface;
@@ -31,8 +29,6 @@ final readonly class PlatformAuthenticationService
         private TenantExecutionContextInterface $executionContext,
         private PlatformOperatorAuthenticationDirectoryInterface $operators,
         private PasswordCredentialService $credentials,
-        private PlatformMfaService $mfa,
-        private PlatformMfaPolicy $mfaPolicy,
         private AccountLoginThrottle $throttle,
         private PlatformTokenService $tokens,
         private PlatformAuthProfileBuilder $profiles,
@@ -44,8 +40,6 @@ final readonly class PlatformAuthenticationService
     public function login(
         string $email,
         string $password,
-        ?string $totpCode,
-        ?string $backupCode,
         ClientContext $client,
     ): array {
         $email = mb_strtolower(trim($email));
@@ -84,63 +78,10 @@ final readonly class PlatformAuthenticationService
         }
 
         $operatorId = (int) $operator['id'];
-        $mfaVerifiedAt = null;
-        if ($this->mfaPolicy->isEnabled()) {
-            if (! $this->mfa->isActive($operatorId)) {
-                $enrollment = $this->mfa->issueForOperator($operatorId, $email);
-                $failure = new AuthFailure(
-                    AuthErrorCode::MFA_ENROLLMENT_REQUIRED,
-                    'Multi-factor authentication enrollment is required.',
-                    409,
-                    array_merge(['stage' => 'mfa_enrollment'], $enrollment ?? []),
-                );
-                $this->attempts->recordPlatformFailureBestEffort(
-                    $operatorId,
-                    $email,
-                    $failure->errorCode,
-                    $client,
-                );
-                throw $failure;
-            }
-
-            if ($this->mfaPolicy->shouldChallengeLogin(true)) {
-                if ($totpCode === null && $backupCode === null) {
-                    $failure = new AuthFailure(
-                        AuthErrorCode::MFA_REQUIRED,
-                        'A multi-factor authentication code is required.',
-                        401,
-                        ['stage' => 'mfa_challenge'],
-                    );
-                    $this->attempts->recordPlatformFailureBestEffort(
-                        $operatorId,
-                        $email,
-                        $failure->errorCode,
-                        $client,
-                    );
-                    throw $failure;
-                }
-                if (! $this->mfa->verify($operatorId, $totpCode, $backupCode)) {
-                    $this->throttle->recordFailure(self::REALM, $email, $client->ipAddress);
-                    $this->attempts->recordPlatformFailureBestEffort(
-                        $operatorId,
-                        $email,
-                        AuthErrorCode::MFA_INVALID_CODE,
-                        $client,
-                    );
-                    throw new AuthFailure(
-                        AuthErrorCode::MFA_INVALID_CODE,
-                        'The multi-factor authentication code is invalid.',
-                        401,
-                        ['stage' => 'mfa_challenge'],
-                    );
-                }
-                $mfaVerifiedAt = $this->clock->now();
-            }
-        }
 
         try {
             $payload = $this->executionContext->runAsControlPlane(fn (): array => $this->database->transaction(
-                function () use ($operatorId, $mfaVerifiedAt, $email, $client): array {
+                function () use ($operatorId, $email, $client): array {
                     $now = $this->clock->now();
                     $session = AuthPlatformSessionModel::query()->create([
                         'public_id' => (string) Str::uuid(),
@@ -150,7 +91,6 @@ final readonly class PlatformAuthenticationService
                         'user_agent' => $client->userAgent,
                         'device_name' => $client->deviceName,
                         'authenticated_at' => $now,
-                        'mfa_verified_at' => $mfaVerifiedAt,
                         'last_activity_at' => $now,
                         'expires_at' => $now->modify('+'.$this->config->platformSessionTtlSeconds.' seconds'),
                         'row_version' => 1,

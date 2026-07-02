@@ -23,19 +23,19 @@ final class AuthErrorContractTest extends TestCase
         $this->app->instance('request', $request);
 
         $response = $this->app->make(AuthResponseFactory::class)->failure(new AuthFailure(
-            AuthErrorCode::MFA_ENROLLMENT_REQUIRED,
-            'Multi-factor authentication enrollment is required.',
+            AuthErrorCode::INVITATION_INVALID,
+            'The invitation is invalid.',
             409,
             [
-                'stage' => 'mfa_enrollment',
-                'enrollment_proof' => 'one-time-proof',
+                'stage' => 'invitation',
+                'invitation_id' => 'platform-operator',
             ],
         ));
 
         self::assertSame(409, $response->getStatusCode());
-        self::assertSame(AuthErrorCode::MFA_ENROLLMENT_REQUIRED, $response->getData(true)['error']['code']);
-        self::assertSame('mfa_enrollment', $response->getData(true)['error']['details']['stage']);
-        self::assertSame('one-time-proof', $response->getData(true)['error']['details']['enrollment_proof']);
+        self::assertSame(AuthErrorCode::INVITATION_INVALID, $response->getData(true)['error']['code']);
+        self::assertSame('invitation', $response->getData(true)['error']['details']['stage']);
+        self::assertSame('platform-operator', $response->getData(true)['error']['details']['invitation_id']);
         self::assertSame(
             '01AUTHERRORCONTRACT0000000000',
             $response->headers->get(RequestCorrelationIdMiddleware::HEADER),
@@ -53,15 +53,15 @@ final class AuthErrorContractTest extends TestCase
         $response = $this->app->make(EnsureApiErrorResponseMiddleware::class)->handle(
             $request,
             static fn (): JsonResponse => response()->json([
-                'message' => 'A multi-factor authentication code is required.',
-                'code' => AuthErrorCode::MFA_REQUIRED,
-                'details' => ['stage' => 'mfa_challenge'],
+                'message' => 'The authentication token is invalid.',
+                'code' => AuthErrorCode::TOKEN_INVALID,
+                'details' => ['stage' => 'token'],
             ], 401),
         );
 
         $payload = json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR);
-        self::assertSame(AuthErrorCode::MFA_REQUIRED, $payload['error']['code']);
-        self::assertSame('mfa_challenge', $payload['error']['details']['stage']);
+        self::assertSame(AuthErrorCode::TOKEN_INVALID, $payload['error']['code']);
+        self::assertSame('token', $payload['error']['details']['stage']);
         self::assertSame('01AUTHNORMALIZE000000000000', $payload['error']['details']['correlation_id']);
     }
 }
