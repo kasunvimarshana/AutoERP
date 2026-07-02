@@ -264,8 +264,6 @@ export interface TenantDocument {
     mime_type: string;
     size_bytes: number;
     checksum_sha256: string;
-    scan_engine: string | null;
-    scanned_at: string | null;
     row_version: number;
     created_at: string;
     updated_at: string;

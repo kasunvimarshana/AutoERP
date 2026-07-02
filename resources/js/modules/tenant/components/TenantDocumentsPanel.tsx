@@ -6,7 +6,6 @@ import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { Pagination } from '@/shared/components/Pagination';
-import { StatusBadge } from '@/shared/components/StatusBadge';
 import { Panel } from '@/shared/components/Panel';
 import { useApi } from '@/shared/hooks/useApi';
 import {
@@ -95,7 +94,7 @@ export function TenantDocumentsPanel({ canManage }: { canManage: boolean }) {
             <div className="space-y-3">
                 {items.map((document) => <Panel key={document.id}>
                     <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
-                        <div><div className="flex flex-wrap items-center gap-2"><p className="font-semibold text-slate-900">{document.name}</p><StatusBadge status={document.scanned_at ? 'scanned' : 'pending_scan'} /></div><p className="mt-1 text-sm text-slate-500">{document.document_type ?? 'General document'} · {document.original_filename} · {formatBytes(document.size_bytes)}</p>{document.scanned_at ? <p className="mt-1 text-xs text-slate-500">Scanned by {document.scan_engine ?? 'configured scanner'}</p> : null}</div>
+                        <div><p className="font-semibold text-slate-900">{document.name}</p><p className="mt-1 text-sm text-slate-500">{document.document_type ?? 'General document'} · {document.original_filename} · {formatBytes(document.size_bytes)}</p></div>
                         <div className="flex flex-wrap gap-2"><Button variant="secondary" loading={busy === document.id} onClick={() => void download(document)}>Download</Button>{canManage && <><Button variant="secondary" onClick={() => edit(document)}>Edit</Button><Button variant="danger" onClick={() => setRemoveTarget(document)}>Remove</Button></>}</div>
                     </div>
                 </Panel>)}

@@ -60,9 +60,6 @@ use Modules\Tenant\Services\Directory\TenantConfigurationTargetReader;
 use Modules\Tenant\Services\Directory\TenantDirectory;
 use Modules\Tenant\Services\Domains\DnsTenantDomainOwnershipVerifier;
 use Modules\Tenant\Services\Domains\TenantDomainReadinessPolicy;
-use Modules\Tenant\Services\Documents\Scanning\ClamAvTenantDocumentScanner;
-use Modules\Tenant\Services\Documents\Scanning\TenantDocumentScannerInterface;
-use Modules\Tenant\Services\Documents\Scanning\TrustedLocalTenantDocumentScanner;
 use Modules\Tenant\Services\Hosts\PlatformHostPolicy;
 use Modules\Tenant\Services\Rules\TenantValueNormalizer;
 use Modules\Tenant\Services\Storage\TenantBrandingAssetReader;
@@ -85,19 +82,6 @@ final class TenantServiceProvider extends ServiceProvider
         );
         $this->app->singleton(TenantBrandingAssetReaderInterface::class, TenantBrandingAssetReader::class);
         $this->app->singleton(TenantDomainOwnershipVerifierInterface::class, DnsTenantDomainOwnershipVerifier::class);
-        $this->app->singleton(TenantDocumentScannerInterface::class, function (): TenantDocumentScannerInterface {
-            $driver = strtolower(trim((string) config('tenant.documents.scanner.driver', 'clamav')));
-
-            return match ($driver) {
-                'clamav' => new ClamAvTenantDocumentScanner(
-                    trim((string) config('tenant.documents.scanner.clamav.host', '127.0.0.1')),
-                    (int) config('tenant.documents.scanner.clamav.port', 3310),
-                    (float) config('tenant.documents.scanner.clamav.timeout_seconds', 10),
-                ),
-                'trusted_local' => new TrustedLocalTenantDocumentScanner(),
-                default => throw new LogicException(sprintf('Unsupported tenant document scanner [%s].', $driver)),
-            };
-        });
         $this->app->singleton(PlatformHostPolicy::class);
         $this->app->scoped(TenantAggregateLockInterface::class, TenantAggregateLock::class);
         $this->app->scoped(TenantAuthenticationDirectoryInterface::class, TenantAuthenticationDirectory::class);
@@ -154,7 +138,6 @@ final class TenantServiceProvider extends ServiceProvider
             ->register('tenant', TenantPermission::descriptions());
         $this->validateInfrastructureConfiguration();
         $this->validateDocumentDisk();
-        $this->validateDocumentScanner();
         $this->validateResolutionConfiguration();
         $router = $this->app->make(Router::class);
         $router->aliasMiddleware(
@@ -215,27 +198,6 @@ final class TenantServiceProvider extends ServiceProvider
             || (bool) ($configuration['serve'] ?? false)
         ) {
             throw new LogicException('Tenant documents require a non-public, non-served storage disk.');
-        }
-    }
-
-
-    private function validateDocumentScanner(): void
-    {
-        $driver = strtolower(trim((string) config('tenant.documents.scanner.driver', 'clamav')));
-        if (! in_array($driver, ['clamav', 'trusted_local'], true)) {
-            throw new LogicException(sprintf('Unsupported tenant document scanner [%s].', $driver));
-        }
-
-        if ($this->app->environment('production') && $driver !== 'clamav') {
-            throw new LogicException('Production tenant document uploads require the ClamAV scanner.');
-        }
-
-        if ($driver === 'clamav') {
-            $host = trim((string) config('tenant.documents.scanner.clamav.host', ''));
-            $port = (int) config('tenant.documents.scanner.clamav.port', 0);
-            if ($host === '' || $port < 1 || $port > 65535) {
-                throw new LogicException('ClamAV tenant document scanner connection is not configured.');
-            }
         }
     }
 

@@ -11,7 +11,7 @@ final class UserAssetStorageService
 {
     public function __construct(private readonly TenantPrivateFileServiceInterface $files) {}
 
-    /** @return array{object_key:string,original_filename:string,mime_type:string,size_bytes:int,checksum_sha256:string,scan_engine:string,scanned_at:\DateTimeInterface} */
+    /** @return array{object_key:string,original_filename:string,mime_type:string,size_bytes:int,checksum_sha256:string} */
     public function storeDocument(
         int $tenantId,
         int $userId,
@@ -28,7 +28,7 @@ final class UserAssetStorageService
         }
         $maxBytes = max((int) config('user.storage.documents.max_size_kb', 10240), 1) * 1024;
 
-        return $this->files->storeScannedFile(
+        return $this->files->storeFile(
             $tenantId,
             "users/{$userId}/documents",
             $temporaryPath,

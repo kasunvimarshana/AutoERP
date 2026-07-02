@@ -5,10 +5,8 @@ declare(strict_types=1);
 namespace Modules\OrganizationUnit\Services\Storage;
 
 use InvalidArgumentException;
-use Modules\Core\Contracts\ClockInterface;
 use Modules\PrivateObject\Contracts\PrivateObjectStorageInterface;
 use Modules\Core\Contracts\UuidGeneratorInterface;
-use Modules\Tenant\Services\Documents\Scanning\TenantDocumentScannerInterface;
 use Modules\Tenant\Services\Storage\TenantStorageCleanupService;
 use Modules\Tenant\Services\Storage\TenantStoragePathPolicy;
 use Psr\Log\LoggerInterface;
@@ -19,11 +17,9 @@ final class OrganizationUnitAssetStorageService
 {
     public function __construct(
         private readonly PrivateObjectStorageInterface $files,
-        private readonly TenantDocumentScannerInterface $scanner,
         private readonly TenantStoragePathPolicy $tenantPaths,
         private readonly TenantStorageCleanupService $cleanup,
         private readonly UuidGeneratorInterface $uuid,
-        private readonly ClockInterface $clock,
         private readonly LoggerInterface $logger,
     ) {}
 
@@ -66,9 +62,7 @@ final class OrganizationUnitAssetStorageService
      *   original_filename:string,
      *   mime_type:string,
      *   size_bytes:int,
-     *   checksum_sha256:string,
-     *   scan_engine:string,
-     *   scanned_at:\DateTimeInterface
+     *   checksum_sha256:string
      * }
      */
     public function storeDocument(
@@ -104,8 +98,6 @@ final class OrganizationUnitAssetStorageService
             'mime_type' => $metadata['mime_type'],
             'size_bytes' => $metadata['size_bytes'],
             'checksum_sha256' => $checksum,
-            'scan_engine' => $metadata['scan_engine'],
-            'scanned_at' => $this->clock->now(),
         ];
     }
 
@@ -176,7 +168,7 @@ final class OrganizationUnitAssetStorageService
         }
     }
 
-    /** @return array{mime_type:string,size_bytes:int,scan_engine:string} */
+    /** @return array{mime_type:string,size_bytes:int} */
     private function inspect(
         int $tenantId,
         int $organizationUnitId,
@@ -202,22 +194,9 @@ final class OrganizationUnitAssetStorageService
             throw new InvalidArgumentException(ucfirst($assetLabel).' file size is invalid.');
         }
 
-        $scan = $this->scanner->scan($temporaryPath);
-        if (! $scan->clean) {
-            $this->logger->warning('An organization-unit asset upload was rejected by security scanning.', [
-                'tenant_id' => $tenantId,
-                'organization_unit_id' => $organizationUnitId,
-                'asset' => $assetLabel,
-                'scan_engine' => $scan->engine,
-                'signature' => $scan->signature,
-            ]);
-            throw new InvalidArgumentException('The uploaded file failed security scanning.');
-        }
-
         return [
             'mime_type' => $mimeType,
             'size_bytes' => (int) $size,
-            'scan_engine' => $scan->engine,
         ];
     }
 

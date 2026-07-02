@@ -40,7 +40,6 @@ export interface OrganizationUnitDocument {
     mime_type: string;
     size_bytes: number;
     checksum_sha256: string;
-    scanned_at: string;
     row_version: number;
 }
 

@@ -7,7 +7,6 @@ namespace Modules\Tenant\Services\Storage;
 use InvalidArgumentException;
 use Modules\PrivateObject\Contracts\PrivateObjectStorageInterface;
 use Modules\Core\Contracts\UuidGeneratorInterface;
-use Modules\Tenant\Services\Documents\Scanning\TenantDocumentScannerInterface;
 use Psr\Log\LoggerInterface;
 use RuntimeException;
 use Throwable;
@@ -16,7 +15,6 @@ final class TenantLogoStorageService
 {
     public function __construct(
         private readonly PrivateObjectStorageInterface $files,
-        private readonly TenantDocumentScannerInterface $scanner,
         private readonly TenantStoragePathPolicy $paths,
         private readonly TenantStorageCleanupService $cleanup,
         private readonly UuidGeneratorInterface $uuid,
@@ -40,16 +38,6 @@ final class TenantLogoStorageService
         $maximumBytes = max((int) config('tenant.branding.max_logo_size_kb', 5120), 1) * 1024;
         if ($size === false || $size < 1 || $size > $maximumBytes) {
             throw new InvalidArgumentException('Tenant logo file size is invalid.');
-        }
-
-        $scan = $this->scanner->scan($temporaryPath);
-        if (! $scan->clean) {
-            $this->logger->warning('A tenant logo upload was rejected by security scanning.', [
-                'tenant_id' => $tenantId,
-                'scan_engine' => $scan->engine,
-                'signature' => $scan->signature,
-            ]);
-            throw new InvalidArgumentException('The uploaded tenant logo failed security scanning.');
         }
 
         $extension = match ($mimeType) {

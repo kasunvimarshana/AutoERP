@@ -22,7 +22,6 @@ final class OrganizationUnitDocumentModel extends TenantOwnedModel
             'organization_unit_id' => 'integer',
             'row_version' => 'integer',
             'size_bytes' => 'integer',
-            'scanned_at' => 'datetime',
         ]);
     }
 

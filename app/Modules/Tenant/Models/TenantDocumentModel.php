@@ -20,8 +20,6 @@ final class TenantDocumentModel extends TenantOwnedModel
         'mime_type',
         'size_bytes',
         'checksum_sha256',
-        'scan_engine',
-        'scanned_at',
         'row_version',
         'created_by',
         'updated_by',
@@ -32,7 +30,6 @@ final class TenantDocumentModel extends TenantOwnedModel
         return array_merge(parent::casts(), [
             'tenant_id' => 'integer',
             'size_bytes' => 'integer',
-            'scanned_at' => 'datetime',
         ]);
     }
 

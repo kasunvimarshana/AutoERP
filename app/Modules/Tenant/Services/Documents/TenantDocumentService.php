@@ -10,7 +10,6 @@ use InvalidArgumentException;
 use Modules\Audit\Constants\AuditEventCategory;
 use Modules\Audit\Contracts\AuditRecorderInterface;
 use Modules\Audit\Data\AuditEventData;
-use Modules\Core\Contracts\ClockInterface;
 use Modules\Core\Contracts\CurrentUserContextAccessorInterface;
 use Modules\PrivateObject\Contracts\PrivateObjectStorageInterface;
 use Modules\Core\Contracts\TransactionManagerInterface;
@@ -22,7 +21,6 @@ use Modules\Tenant\Constants\TenantErrorCode;
 use Modules\Tenant\Repositories\TenantDocumentRepositoryInterface;
 use Modules\Tenant\Repositories\TenantRepositoryInterface;
 use Modules\Tenant\Services\Contracts\TenantValueNormalizerInterface;
-use Modules\Tenant\Services\Documents\Scanning\TenantDocumentScannerInterface;
 use Modules\Tenant\Services\Storage\TenantStorageCleanupService;
 use Modules\Tenant\Services\Storage\TenantStoragePathPolicy;
 use Modules\Tenant\Services\TenantEntitlementService;
@@ -39,10 +37,8 @@ final class TenantDocumentService
         private readonly TenantEntitlementService $entitlements,
         private readonly TenantStorageCleanupService $storageCleanup,
         private readonly TenantStoragePathPolicy $storagePaths,
-        private readonly TenantDocumentScannerInterface $scanner,
         private readonly PrivateObjectStorageInterface $files,
         private readonly UuidGeneratorInterface $uuid,
-        private readonly ClockInterface $clock,
         private readonly CurrentUserContextAccessorInterface $currentUser,
         private readonly AuditRecorderInterface $auditRecorder,
         private readonly TransactionManagerInterface $transactions,
@@ -286,7 +282,7 @@ final class TenantDocumentService
 
     /**
      * @param array<string, mixed> $payload
-     * @return array{object_key:string,original_filename:string,mime_type:string,size_bytes:int,checksum_sha256:string,scan_engine:string,scanned_at:\DateTimeInterface}
+     * @return array{object_key:string,original_filename:string,mime_type:string,size_bytes:int,checksum_sha256:string}
      */
     private function storeUploadedFile(int $tenantId, array $payload): array
     {
@@ -313,17 +309,6 @@ final class TenantDocumentService
             throw new RuntimeException('Document checksum could not be calculated.');
         }
 
-        $scan = $this->scanner->scan($temporaryPath);
-        if (! $scan->clean) {
-            $this->logger->warning('A tenant document upload was rejected by security scanning.', [
-                'tenant_id' => $tenantId,
-                'checksum_sha256' => $checksum,
-                'scan_engine' => $scan->engine,
-                'signature' => $scan->signature,
-            ]);
-            throw new InvalidArgumentException('The uploaded document failed security scanning.');
-        }
-
         $storedPath = $this->files->store(
             $temporaryPath,
             $this->storagePaths->documentDirectory($tenantId),
@@ -338,8 +323,6 @@ final class TenantDocumentService
             'mime_type' => $mimeType,
             'size_bytes' => (int) $size,
             'checksum_sha256' => $checksum,
-            'scan_engine' => $scan->engine,
-            'scanned_at' => $this->clock->now(),
         ];
     }
 
@@ -435,7 +418,6 @@ final class TenantDocumentService
                 'document_type' => $record->get('document_type'),
                 'mime_type' => $record->get('mime_type'),
                 'size_bytes' => $record->get('size_bytes'),
-                'scan_engine' => $record->get('scan_engine'),
             ],
             tags: ['tenant', 'document'],
         ));

@@ -265,7 +265,6 @@ final class UserDocumentService extends AbstractUserCrudService
             'mime_type' => (string) $document->getAttribute('mime_type'),
             'size_bytes' => (int) $document->getAttribute('size_bytes'),
             'checksum_sha256' => (string) $document->getAttribute('checksum_sha256'),
-            'scanned_at' => $document->getAttribute('scanned_at')?->toAtomString(),
             'created_at' => $document->getAttribute('created_at')?->toAtomString(),
             'updated_at' => $document->getAttribute('updated_at')?->toAtomString(),
         ]);

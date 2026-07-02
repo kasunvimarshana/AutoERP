@@ -5,11 +5,9 @@ declare(strict_types=1);
 namespace Modules\Tenant\Services\Storage;
 
 use InvalidArgumentException;
-use Modules\Core\Contracts\ClockInterface;
 use Modules\PrivateObject\Contracts\PrivateObjectStorageInterface;
 use Modules\Core\Contracts\TenantPrivateFileServiceInterface;
 use Modules\Core\Contracts\UuidGeneratorInterface;
-use Modules\Tenant\Services\Documents\Scanning\TenantDocumentScannerInterface;
 use Psr\Log\LoggerInterface;
 use RuntimeException;
 use Throwable;
@@ -18,15 +16,13 @@ final class TenantPrivateFileService implements TenantPrivateFileServiceInterfac
 {
     public function __construct(
         private readonly PrivateObjectStorageInterface $files,
-        private readonly TenantDocumentScannerInterface $scanner,
         private readonly TenantStoragePathPolicy $paths,
         private readonly TenantStorageCleanupService $cleanup,
         private readonly UuidGeneratorInterface $uuid,
-        private readonly ClockInterface $clock,
         private readonly LoggerInterface $logger,
     ) {}
 
-    public function storeScannedFile(
+    public function storeFile(
         int $tenantId,
         string $relativeDirectory,
         string $temporaryPath,
@@ -51,16 +47,6 @@ final class TenantPrivateFileService implements TenantPrivateFileServiceInterfac
             throw new InvalidArgumentException('Private file size is invalid.');
         }
 
-        $scan = $this->scanner->scan($temporaryPath);
-        if (! $scan->clean) {
-            $this->logger->warning('A tenant private file was rejected by security scanning.', [
-                'tenant_id' => $tenantId,
-                'scan_engine' => $scan->engine,
-                'signature' => $scan->signature,
-            ]);
-            throw new InvalidArgumentException('The uploaded file failed security scanning.');
-        }
-
         $checksum = hash_file('sha256', $temporaryPath);
         if (! is_string($checksum) || strlen($checksum) !== 64) {
             throw new RuntimeException('Private file checksum could not be calculated.');
@@ -83,8 +69,6 @@ final class TenantPrivateFileService implements TenantPrivateFileServiceInterfac
             'mime_type' => $mimeType,
             'size_bytes' => (int) $size,
             'checksum_sha256' => $checksum,
-            'scan_engine' => $scan->engine,
-            'scanned_at' => $this->clock->now(),
         ];
     }
 

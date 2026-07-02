@@ -58,14 +58,6 @@ return [
         'disk' => env('TENANT_DOCUMENT_DISK', 'tenant_private'),
         'max_size_kb' => (int) env('TENANT_DOCUMENT_MAX_SIZE_KB', 10240),
         'allowed_mime_types' => ['application/pdf', 'image/jpeg', 'image/png'],
-        'scanner' => [
-            'driver' => env('TENANT_DOCUMENT_SCANNER', 'clamav'),
-            'clamav' => [
-                'host' => env('TENANT_DOCUMENT_CLAMAV_HOST', '127.0.0.1'),
-                'port' => (int) env('TENANT_DOCUMENT_CLAMAV_PORT', 3310),
-                'timeout_seconds' => (float) env('TENANT_DOCUMENT_CLAMAV_TIMEOUT_SECONDS', 10),
-            ],
-        ],
     ],
     'domains' => [
         'verification_ttl_minutes' => (int) env('TENANT_DOMAIN_VERIFICATION_TTL_MINUTES', 1440),

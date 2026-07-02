@@ -16,7 +16,7 @@ final class UserDocumentModel extends TenantOwnedModel
     protected $fillable = [
         'tenant_id', 'row_version', 'user_id', 'name',
         'active_name_key', 'document_type', 'object_key', 'original_filename',
-        'mime_type', 'size_bytes', 'checksum_sha256', 'scan_engine', 'scanned_at',
+        'mime_type', 'size_bytes', 'checksum_sha256',
         'uploaded_by_user_id', 'updated_by_user_id',
     ];
     protected $hidden = ['object_key', 'active_name_key'];
@@ -32,7 +32,7 @@ final class UserDocumentModel extends TenantOwnedModel
 
     protected function casts(): array
     {
-        return array_merge(parent::casts(), ['row_version' => 'integer', 'size_bytes' => 'integer', 'scanned_at' => 'datetime']);
+        return array_merge(parent::casts(), ['row_version' => 'integer', 'size_bytes' => 'integer']);
     }
 
     public function user(): BelongsTo { return $this->belongsTo(UserModel::class, 'user_id'); }

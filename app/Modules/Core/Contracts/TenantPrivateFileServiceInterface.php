@@ -8,9 +8,9 @@ interface TenantPrivateFileServiceInterface
 {
     /**
      * @param list<string> $allowedMimeTypes
-     * @return array{object_key:string,original_filename:string,mime_type:string,size_bytes:int,checksum_sha256:string,scan_engine:string,scanned_at:\DateTimeInterface}
+     * @return array{object_key:string,original_filename:string,mime_type:string,size_bytes:int,checksum_sha256:string}
      */
-    public function storeScannedFile(
+    public function storeFile(
         int $tenantId,
         string $relativeDirectory,
         string $temporaryPath,

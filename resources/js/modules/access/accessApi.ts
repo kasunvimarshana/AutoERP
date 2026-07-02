@@ -62,7 +62,6 @@ export interface AccessUserDocument {
     mime_type: string;
     size_bytes: number;
     checksum_sha256: string;
-    scanned_at?: string | null;
     created_at?: string | null;
     updated_at?: string | null;
 }

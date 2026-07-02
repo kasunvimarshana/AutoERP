@@ -8,7 +8,6 @@ import { LoadingState } from '@/shared/components/LoadingState';
 import { Pagination } from '@/shared/components/Pagination';
 import { Panel } from '@/shared/components/Panel';
 import { Select } from '@/shared/components/Select';
-import { StatusBadge } from '@/shared/components/StatusBadge';
 import { useApi } from '@/shared/hooks/useApi';
 import { accessApi, type AccessUserDocument } from './accessApi';
 
@@ -135,7 +134,7 @@ export function UserDocumentsPanel({ userId, canManage }: { userId: number; canM
                             accept="application/pdf,image/jpeg,image/png,image/webp"
                             onChange={(event) => setFile(event.target.files?.[0] ?? null)}
                             required={!editing}
-                            hint="PDF, JPEG, PNG, or WebP. The server verifies the real type, size, checksum, security scan, and private storage location."
+                            hint="PDF, JPEG, PNG, or WebP. The server verifies the real type, size, checksum, and private storage location."
                         />
                         <div className="flex gap-2 md:col-span-2 md:justify-end">
                             {editing && <Button variant="secondary" onClick={resetForm}>Cancel</Button>}
@@ -152,10 +151,7 @@ export function UserDocumentsPanel({ userId, canManage }: { userId: number; canM
                     <Panel key={document.id}>
                         <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
                             <div>
-                                <div className="flex flex-wrap items-center gap-2">
-                                    <p className="font-semibold text-slate-900">{document.name}</p>
-                                    <StatusBadge status={document.scanned_at ? 'scanned' : 'pending_scan'} />
-                                </div>
+                                <p className="font-semibold text-slate-900">{document.name}</p>
                                 <p className="mt-1 text-sm text-slate-500">
                                     {documentTypeLabel(document.document_type)} · {document.original_filename} · {formatBytes(document.size_bytes)}
                                 </p>

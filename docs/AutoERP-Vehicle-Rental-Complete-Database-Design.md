@@ -1,6 +1,6 @@
 # AutoERP Vehicle Rental — Complete Database Design
 
-> **Current architecture note (2026-06-28):** This document began as a clone-84 workflow/schema study. Current AutoERP ownership decisions supersede its historical implementation references: Vehicle owns `vehicle_ownerships`; the generic Extension/attachments subsystem is removed; scanned private files use owner-module metadata backed by the `PrivateObject` capability.
+> **Current architecture note (2026-06-28):** This document began as a clone-84 workflow/schema study. Current AutoERP ownership decisions supersede its historical implementation references: Vehicle owns `vehicle_ownerships`; the generic Extension/attachments subsystem is removed; private files use owner-module metadata backed by the `PrivateObject` capability.
 ## Videos as Source of Truth + clone-84 Schema Alignment
 
 > **Source of truth**
@@ -113,7 +113,7 @@ These two financial sides must retain independent:
 11. `rental_payment_links` duplicates Payment module source/allocation capabilities.
 12. `rental_expenses` is overly wide and combines expense, recovery, tax and generated-charge concerns.
 13. Billing, run, calculation and charge tables repeatedly copy agreement, party and period data, creating drift risk.
-14. Attachment arrays and generic polymorphic attachment persistence are unsafe; rental-owned document metadata must reference scanned private objects explicitly.
+14. Attachment arrays and generic polymorphic attachment persistence are unsafe; rental-owned document metadata must reference private objects explicitly.
 15. Agreement conditions are stored only as one JSON snapshot.
 16. Current statuses do not fully cover suspension, termination, reversal, supersession and period reopening.
 17. Current inspection tables cannot represent accessories, missing documents, keys or individual damage items cleanly.
@@ -561,7 +561,7 @@ Indexes:
 - `(vehicle_id, occurred_at)`.
 - `(vehicle_allocation_id, event_type, occurred_at)`.
 - `(status, occurred_at)`.
-- Attach photos/signatures through rental-owned document metadata backed by scanned `PrivateObject` storage.
+- Attach photos/signatures through rental-owned document metadata backed by `PrivateObject` storage.
 
 ---
 
@@ -831,7 +831,7 @@ Constraints:
 - Unique `(tenant_id, fingerprint)`.
 - Index `(vehicle_id, expense_date, status)`.
 - Index `(agreement_id, expense_type, status)`.
-- Attach files through rental-owned document metadata backed by scanned `PrivateObject` storage, not JSON arrays.
+- Attach files through rental-owned document metadata backed by `PrivateObject` storage, not JSON arrays.
 
 ---
 

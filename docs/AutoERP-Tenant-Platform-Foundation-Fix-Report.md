@@ -289,7 +289,6 @@ The supplied source package does not contain `vendor/`, so these checks could no
 - queue/outbox workers;
 - SMTP invitation delivery;
 - real DNS, reverse-proxy, TLS, and reachability checks;
-- ClamAV integration;
 - browser onboarding and Tenant-A/Tenant-B E2E tests.
 
 A fresh development database is required because the corrected source consolidates schema changes into original create migrations. Do not apply this package blindly to an existing production schema. Production data requires an explicit reviewed migration plan.
