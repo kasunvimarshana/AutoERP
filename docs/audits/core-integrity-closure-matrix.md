@@ -4,20 +4,21 @@ Authoritative base reviewed: `worktree` commit `71c09566e47306a972b1f16efa2268fe
 
 Status meanings:
 
-- **Closed** — source fix and focused regression contract are included.
+- **Source-complete** — the owning module contains the fix and a focused regression contract, but the full runtime gate is still pending.
+- **Closed** — source-complete and all required runtime gates passed.
 - **Verified existing** — the audited source already contains the required foundation.
 - **Open** — confirmed issue remains and must be fixed in its owning module.
 - **Runtime gate** — source work alone is insufficient; an executable environment is required.
 
 | Area | Finding | Status | Owner / next action |
 |---|---|---:|---|
-| Vehicle Rental | Draft agreement update was non-transactional and did not lock the aggregate | **Closed** | `VehicleRental/RentalAgreementService` now locks and updates inside one transaction. |
-| Vehicle Rental | Agreement update and lifecycle requests accepted `expected_version` without enforcing it | **Closed** | Update and transition commands validate the locked row version and increment it. |
-| Vehicle Rental | Customer/supplier exclusivity existed only in application code | **Closed** | `rental_agreements` now installs a database party-kind invariant for MySQL/PostgreSQL/SQL Server and SQLite. |
-| Vehicle Rental | `terminated_by` lacked a tenant-scoped foreign key | **Closed** | Added the composite tenant foreign key in the owning migration. |
-| Vehicle Rental | Billing timezone was hardcoded to `Asia/Colombo` | **Closed** | Configuration now owns the default through `config/vehicle_rental.php`; the database stores the explicit value. |
-| Vehicle Rental | Rate activation rewrote prior active effective periods | **Closed** | Activation rejects overlaps and never mutates an existing active version. |
-| Vehicle Rental | Rate activation lacked optimistic concurrency and terminal-agreement checks | **Closed** | Activation requires `expected_version`, locks both records, increments the version, and rejects terminal agreements. |
+| Vehicle Rental | Draft agreement update was non-transactional and did not lock the aggregate | **Source-complete** | `VehicleRental/RentalAgreementService` now locks and updates inside one transaction; run the full Laravel/MySQL suite before closure. |
+| Vehicle Rental | Agreement update and lifecycle requests accepted `expected_version` without enforcing it | **Source-complete** | Update and transition commands validate the locked row version and increment it; concurrency runtime coverage remains required. |
+| Vehicle Rental | Customer/supplier exclusivity existed only in application code | **Source-complete** | `rental_agreements` installs a database party-kind invariant for MySQL/PostgreSQL/SQL Server and SQLite; MySQL migration verification remains required. |
+| Vehicle Rental | `terminated_by` lacked a tenant-scoped foreign key | **Source-complete** | Added the composite tenant foreign key in the owning migration; verify through `migrate:fresh` on MySQL. |
+| Vehicle Rental | Billing timezone was hardcoded to `Asia/Colombo` | **Source-complete** | Configuration now owns the default through `config/vehicle_rental.php`; the database stores the explicit value. |
+| Vehicle Rental | Rate activation rewrote prior active effective periods | **Source-complete** | Activation rejects overlaps and never mutates an existing active version; runtime overlap tests remain required. |
+| Vehicle Rental | Rate activation lacked optimistic concurrency and terminal-agreement checks | **Source-complete** | Activation requires `expected_version`, locks both records, increments the version, and rejects terminal agreements. |
 | Vehicle Rental | Destructive agreement-term replacement has no stable term command model | **Open** | Introduce explicit term create/update/archive commands only when term-level editing requirements are confirmed. |
 | Vehicle Rental | Full recorded-time correction lineage for rate versions is absent | **Open** | Add a dedicated supersede/correction command with lineage and recorded-time columns; do not overload activation. |
 | Tax | Legal rates and profiles are mutable current rows | **Open** | Implement immutable revisions with effective and recorded time in Tax. |
@@ -41,4 +42,4 @@ Status meanings:
 
 ## Closure rule
 
-A row moves to **Closed** only when the owning module contains the fix, focused regression coverage exists, and required runtime gates have passed. Documentation or compatibility aliases alone never close a finding.
+A row moves to **Closed** only when the owning module contains the fix, focused regression coverage exists, and all required runtime gates have passed. Documentation or compatibility aliases alone never close a finding.

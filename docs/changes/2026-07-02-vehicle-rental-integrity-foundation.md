@@ -2,7 +2,7 @@
 
 ## Scope
 
-This change closes the first unresolved audit batch for Vehicle Rental agreements and rate activation.
+This change source-completes the first unresolved audit batch for Vehicle Rental agreements and rate activation. Full runtime closure remains explicitly pending.
 
 ## Changes
 
@@ -26,6 +26,10 @@ This change closes the first unresolved audit batch for Vehicle Rental agreement
 
 - PHP syntax validation for every changed PHP file.
 - Focused static contract assertions for concurrency, database constraints, configuration ownership, immutable activation and frontend version propagation.
-- Exact branch diff review before publication.
+- TypeScript parser validation for the changed frontend files.
+- Executable SQLite insert and update trigger checks for the agreement party invariant.
+- Exact remote blob and branch diff review before publication.
 
-Runtime database and frontend build execution still require a complete project checkout with installed dependencies.
+## Runtime gate still required
+
+A complete project checkout with installed Composer and npm dependencies was not available in this turn. Laravel/MySQL migration and concurrency tests, the full backend suite, frontend lint/typecheck/build, and browser E2E remain required before these findings move from **Source-complete** to **Closed**.
