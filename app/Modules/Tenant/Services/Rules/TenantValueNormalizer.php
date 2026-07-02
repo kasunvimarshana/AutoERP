@@ -9,6 +9,14 @@ use Modules\Tenant\Services\Contracts\TenantValueNormalizerInterface;
 
 final class TenantValueNormalizer implements TenantValueNormalizerInterface
 {
+    private const MAX_HOSTNAME_LENGTH = 253;
+
+    /** @var list<string> */
+    private const RESERVED_PUBLIC_TLDS = ['example', 'invalid', 'localhost', 'local', 'test', 'internal'];
+
+    /** @var list<string> */
+    private const RESERVED_HOSTNAMES = ['localhost', 'localhost.localdomain'];
+
     /** @param list<string> $centralHosts */
     public function __construct(private readonly array $centralHosts = []) {}
 
@@ -72,22 +80,37 @@ final class TenantValueNormalizer implements TenantValueNormalizerInterface
 
         $value = strtolower($value);
         $labels = explode('.', $value);
-        $reservedTlds = ['example', 'invalid', 'localhost', 'local', 'test', 'internal'];
         $lastLabel = end($labels);
         $centralHosts = array_map(
             static fn (string $host): string => strtolower(rtrim(trim($host), '.')),
             $this->centralHosts,
         );
 
-        if (
-            strlen($value) > 253
-            || count($labels) < 2
-            || in_array($lastLabel, $reservedTlds, true)
-            || in_array($value, ['localhost', 'localhost.localdomain'], true)
-            || in_array($value, $centralHosts, true)
-            || filter_var($value, FILTER_VALIDATE_IP) !== false
-            || filter_var($value, FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME) === false
-        ) {
+        if (strlen($value) > self::MAX_HOSTNAME_LENGTH) {
+            throw new InvalidArgumentException('Tenant hostname must be 253 characters or fewer.');
+        }
+
+        if (in_array($value, self::RESERVED_HOSTNAMES, true)) {
+            throw new InvalidArgumentException('Reserved local, test, internal, and example domains cannot become tenant domains.');
+        }
+
+        if (count($labels) < 2) {
+            throw new InvalidArgumentException('Use a fully qualified public tenant hostname such as erp.example.com.');
+        }
+
+        if (in_array($lastLabel, self::RESERVED_PUBLIC_TLDS, true)) {
+            throw new InvalidArgumentException('Reserved local, test, internal, and example domains cannot become tenant domains.');
+        }
+
+        if (in_array($value, $centralHosts, true)) {
+            throw new InvalidArgumentException('The platform host cannot also be used as a tenant domain. Use a separate tenant workspace hostname.');
+        }
+
+        if (filter_var($value, FILTER_VALIDATE_IP) !== false) {
+            throw new InvalidArgumentException('IP addresses cannot become tenant domains. Use a public hostname or the local/testing tenant-code fallback.');
+        }
+
+        if (filter_var($value, FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME) === false) {
             throw new InvalidArgumentException('A valid public custom hostname is required.');
         }
 

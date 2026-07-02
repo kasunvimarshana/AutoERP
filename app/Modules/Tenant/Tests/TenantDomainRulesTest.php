@@ -16,7 +16,7 @@ final class TenantDomainRulesTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->rules = new TenantValueNormalizer(['platform.autoerp.example']);
+        $this->rules = new TenantValueNormalizer(['platform.autoerp.com']);
     }
 
     public function test_it_normalizes_tenant_codes_and_public_hostnames(): void
@@ -32,6 +32,15 @@ final class TenantDomainRulesTest extends TestCase
         $this->rules->normalizeDomain($value);
     }
 
+    #[DataProvider('invalidDomainMessages')]
+    public function test_it_explains_why_tenant_hostnames_are_rejected(string $value, string $expectedMessage): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage($expectedMessage);
+
+        $this->rules->normalizeDomain($value);
+    }
+
     /** @return iterable<string, array{string}> */
     public static function invalidDomains(): iterable
     {
@@ -42,7 +51,31 @@ final class TenantDomainRulesTest extends TestCase
         yield 'reserved example tld' => ['erp.example'];
         yield 'localhost' => ['localhost'];
         yield 'ip address' => ['127.0.0.1'];
-        yield 'configured central host' => ['platform.autoerp.example'];
+        yield 'configured central host' => ['platform.autoerp.com'];
         yield 'empty' => [''];
+    }
+
+    /** @return iterable<string, array{string, string}> */
+    public static function invalidDomainMessages(): iterable
+    {
+        yield 'configured central host' => [
+            'platform.autoerp.com',
+            'The platform host cannot also be used as a tenant domain.',
+        ];
+
+        yield 'ip address' => [
+            '127.0.0.1',
+            'IP addresses cannot become tenant domains.',
+        ];
+
+        yield 'reserved local hostname' => [
+            'localhost',
+            'Reserved local, test, internal, and example domains cannot become tenant domains.',
+        ];
+
+        yield 'single label hostname' => [
+            'autoerp',
+            'Use a fully qualified public tenant hostname such as erp.example.com.',
+        ];
     }
 }
