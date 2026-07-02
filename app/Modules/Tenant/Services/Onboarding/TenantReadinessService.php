@@ -108,12 +108,8 @@ final class TenantReadinessService
 
             $rootOrganizationUnitId = $this->positiveInt($state?->getAttribute('root_organization_unit_id'));
             $superAdminRoleId = $this->positiveInt($state?->getAttribute('super_admin_role_id'));
-            $invitationId = $this->positiveInt($state?->getAttribute('invitation_id'));
-            $acceptedAdministratorId = $this->authentication->acceptedInitialAdministratorUserId(
-                $tenantId,
-                $invitationId,
-                $lockForUpdate,
-            );
+            $administratorUserId = $this->positiveInt($state?->getAttribute('administrator_user_id'));
+            $administratorEmail = strtolower(trim((string) $state?->getAttribute('initial_admin_email')));
 
             $rootReady = $rootOrganizationUnitId !== null
                 && $this->organizations->isReady($tenantId, $rootOrganizationUnitId, $lockForUpdate);
@@ -121,16 +117,17 @@ final class TenantReadinessService
             $superAdminReady = $superAdminRoleId !== null
                 && $this->access->superAdminRoleIsReady($tenantId, $superAdminRoleId, $lockForUpdate);
             $providerReady = $this->authentication->providerIsReady($tenantId, $lockForUpdate);
-            $invitationAccepted = $acceptedAdministratorId !== null;
-            $operationalAdministrator = $acceptedAdministratorId !== null
+            $administratorAccountReady = $administratorUserId !== null;
+            $operationalAdministrator = $administratorUserId !== null
                 && $rootOrganizationUnitId !== null
                 && $superAdminRoleId !== null
                 && $this->access->hasOperationalAdministrator(
                     $tenantId,
-                    $acceptedAdministratorId,
+                    $administratorUserId,
                     $rootOrganizationUnitId,
                     $superAdminRoleId,
                     $lockForUpdate,
+                    $administratorEmail,
                 );
             $routing = $this->routingReadiness->inspect(
                 (string) $tenant->get('code'),
@@ -161,7 +158,7 @@ final class TenantReadinessService
                 TenantReadinessCheck::PERMISSION_CATALOGUE => $catalogueReady,
                 TenantReadinessCheck::SUPER_ADMIN_ACCESS => $superAdminReady,
                 TenantReadinessCheck::AUTHENTICATION_PROVIDER => $providerReady,
-                TenantReadinessCheck::ADMINISTRATOR_INVITATION_ACCEPTED => $invitationAccepted,
+                TenantReadinessCheck::ADMINISTRATOR_ACCOUNT_READY => $administratorAccountReady,
                 TenantReadinessCheck::OPERATIONAL_ADMINISTRATOR => $operationalAdministrator,
                 TenantReadinessCheck::BASE_CURRENCY => $this->baseCurrencies->isActive(
                     $this->positiveInt($tenant->get('base_currency_id')),
@@ -230,7 +227,7 @@ final class TenantReadinessService
             && ($checks[TenantReadinessCheck::PERMISSION_CATALOGUE] ?? false)
             && ($checks[TenantReadinessCheck::SUPER_ADMIN_ACCESS] ?? false)
             && ($checks[TenantReadinessCheck::AUTHENTICATION_PROVIDER] ?? false)
-            && ! ($checks[TenantReadinessCheck::ADMINISTRATOR_INVITATION_ACCEPTED] ?? false)
+            && ! ($checks[TenantReadinessCheck::ADMINISTRATOR_ACCOUNT_READY] ?? false)
         ) {
             return TenantOnboardingStatus::AWAITING_ADMINISTRATOR;
         }
@@ -256,7 +253,7 @@ final class TenantReadinessService
             TenantReadinessCheck::PERMISSION_CATALOGUE,
             TenantReadinessCheck::SUPER_ADMIN_ACCESS,
             TenantReadinessCheck::AUTHENTICATION_PROVIDER,
-            TenantReadinessCheck::ADMINISTRATOR_INVITATION_ACCEPTED,
+            TenantReadinessCheck::ADMINISTRATOR_ACCOUNT_READY,
             TenantReadinessCheck::OPERATIONAL_ADMINISTRATOR => 'foundation',
             TenantReadinessCheck::BASE_CURRENCY => 'identity',
             TenantReadinessCheck::ACTIVE_PLAN,
@@ -273,7 +270,7 @@ final class TenantReadinessService
             TenantReadinessCheck::PERMISSION_CATALOGUE,
             TenantReadinessCheck::SUPER_ADMIN_ACCESS => 'User access',
             TenantReadinessCheck::AUTHENTICATION_PROVIDER,
-            TenantReadinessCheck::ADMINISTRATOR_INVITATION_ACCEPTED => 'Authentication',
+            TenantReadinessCheck::ADMINISTRATOR_ACCOUNT_READY,
             TenantReadinessCheck::OPERATIONAL_ADMINISTRATOR => 'User access',
             TenantReadinessCheck::BASE_CURRENCY => 'Tenant identity',
             TenantReadinessCheck::ACTIVE_PLAN,
@@ -290,8 +287,8 @@ final class TenantReadinessService
             TenantReadinessCheck::PERMISSION_CATALOGUE => 'Synchronize the tenant permission catalogue.',
             TenantReadinessCheck::SUPER_ADMIN_ACCESS => 'Repair the fully granted Super Admin role.',
             TenantReadinessCheck::AUTHENTICATION_PROVIDER => 'Provision an active tenant authentication provider.',
-            TenantReadinessCheck::ADMINISTRATOR_INVITATION_ACCEPTED => 'Ask the invited administrator to accept the current invitation.',
-            TenantReadinessCheck::OPERATIONAL_ADMINISTRATOR => 'Ensure the accepted administrator is active and assigned to the protected root and Super Admin role.',
+            TenantReadinessCheck::ADMINISTRATOR_ACCOUNT_READY => 'Create the initial administrator account.',
+            TenantReadinessCheck::OPERATIONAL_ADMINISTRATOR => 'Ensure the administrator is active and assigned to the protected root and Super Admin role.',
             TenantReadinessCheck::BASE_CURRENCY => 'Select an active base accounting currency.',
             TenantReadinessCheck::ACTIVE_PLAN => 'Select an active plan revision.',
             TenantReadinessCheck::SUBSCRIPTION_VALID => 'Assign or correct a usable current subscription revision.',

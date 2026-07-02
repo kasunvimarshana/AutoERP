@@ -1,26 +1,12 @@
 import { useMemo, useState, type FormEvent } from 'react';
-import { toApiError, type ApiError } from '@/shared/api/apiError';
+import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
-import { InlineFieldAction } from '@/shared/components/InlineFieldAction';
-import { Modal } from '@/shared/components/Modal';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { SuccessAlert } from '@/shared/components/SuccessAlert';
-import { Textarea } from '@/shared/components/Textarea';
-import { useApi } from '@/shared/hooks/useApi';
-import {
-    getInitialAdministratorInvitation,
-    provisionTenantOnboarding,
-    replaceInitialAdministratorInvitation,
-    resendInitialAdministratorInvitation,
-    revokeInitialAdministratorInvitation,
-} from '../tenantApi';
-import type {
-    TenantAdministratorInvitationState,
-    TenantOnboardingSummary,
-    TenantRecord,
-} from '../tenantTypes';
+import { provisionTenantOnboarding } from '../tenantApi';
+import type { TenantOnboardingSummary, TenantRecord } from '../tenantTypes';
 import { formatTenantDateTime } from '../tenantPresentation';
 
 interface Props {
@@ -30,86 +16,63 @@ interface Props {
     onTenantChanged: () => void;
 }
 
-type RecoveryAction = 'replace' | 'revoke' | null;
+interface AdministratorForm {
+    first_name: string;
+    last_name: string;
+    email: string;
+    password: string;
+    password_confirmation: string;
+}
+
+const emptyAdministratorForm = (tenant: TenantRecord): AdministratorForm => ({
+    first_name: '',
+    last_name: '',
+    email: tenant.onboarding?.initial_admin_email ?? '',
+    password: '',
+    password_confirmation: '',
+});
 
 export function PlatformTenantOnboardingPanel({ tenant, canProvision, disabled = false, onTenantChanged }: Props) {
-    const invitationRequest = useApi(
-        (signal) => getInitialAdministratorInvitation(tenant.id, signal),
-        [tenant.id, tenant.onboarding?.row_version],
-        tenant.onboarding !== null,
-        false,
-    );
-    const [emailInput, setEmailInput] = useState(tenant.onboarding?.initial_admin_email ?? '');
+    const [form, setForm] = useState<AdministratorForm>(() => emptyAdministratorForm(tenant));
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
-    const [provisionedState, setProvisionedState] = useState<TenantAdministratorInvitationState | null>(null);
-    const [recoveryAction, setRecoveryAction] = useState<RecoveryAction>(null);
-    const [replacementEmail, setReplacementEmail] = useState('');
-    const [reason, setReason] = useState('');
+    const [provisionedState, setProvisionedState] = useState<TenantOnboardingSummary | null>(null);
 
-    const state = provisionedState?.onboarding ?? invitationRequest.data?.onboarding ?? tenant.onboarding;
-    const invitation = provisionedState?.invitation ?? invitationRequest.data?.invitation ?? null;
+    const state = provisionedState ?? tenant.onboarding;
     const completedSteps = useMemo(() => new Set(state?.completed_steps ?? []), [state?.completed_steps]);
-    const canRun = canProvision && tenant.status === 'draft' && state?.status !== 'completed';
     const operationDisabled = disabled || saving;
+    const administratorCreated = Boolean(state?.administrator_user_id);
+    const canCreateAdministrator = canProvision && tenant.status === 'draft' && !administratorCreated;
 
-    async function run(operation: () => Promise<void>) {
+    function set(patch: Partial<AdministratorForm>) {
+        setForm((current) => ({ ...current, ...patch }));
+    }
+
+    async function provision(event: FormEvent) {
+        event.preventDefault();
+        if (!canCreateAdministrator || operationDisabled) return;
+
         setSaving(true);
         setError(null);
         setSuccess(null);
         try {
-            await operation();
+            const result = await provisionTenantOnboarding(tenant, {
+                firstName: form.first_name.trim(),
+                lastName: form.last_name.trim() || null,
+                email: form.email.trim().toLowerCase(),
+                password: form.password,
+                passwordConfirmation: form.password_confirmation,
+            });
+            setProvisionedState(result.state);
+            setForm((current) => ({ ...current, password: '', password_confirmation: '' }));
+            setSuccess(`Tenant foundation is provisioned and ${result.administrator?.email ?? form.email} is an active Super Admin.`);
+            onTenantChanged();
         } catch (requestError: unknown) {
             setError(toApiError(requestError));
         } finally {
             setSaving(false);
         }
-    }
-
-    function provision() {
-        const normalized = emailInput.trim().toLowerCase();
-        if (normalized === '') return;
-        void run(async () => {
-            const result = await provisionTenantOnboarding(tenant, normalized);
-            setProvisionedState({ onboarding: result.state, invitation: result.invitation });
-            setSuccess(result.invitation
-                ? 'Tenant foundation is provisioned. The administrator invitation is being delivered through the configured mail channel.'
-                : 'Tenant foundation is provisioned. Readiness has been recalculated.');
-            invitationRequest.reload();
-            onTenantChanged();
-        });
-    }
-
-    function resendInvitation() {
-        if (!invitation) return;
-        void run(async () => {
-            const updated = await resendInitialAdministratorInvitation(tenant.id, invitation);
-            setProvisionedState(updated);
-            setSuccess('Administrator invitation delivery was queued again.');
-        });
-    }
-
-    function submitRecovery(event: FormEvent) {
-        event.preventDefault();
-        if (!invitationRequest.data && !provisionedState) return;
-        const current = provisionedState ?? invitationRequest.data;
-        if (!current || !recoveryAction) return;
-
-        void run(async () => {
-            const updated = recoveryAction === 'replace'
-                ? await replaceInitialAdministratorInvitation(tenant.id, current, replacementEmail.trim().toLowerCase(), reason.trim())
-                : await revokeInitialAdministratorInvitation(tenant.id, current, reason.trim());
-            setProvisionedState(updated);
-            setRecoveryAction(null);
-            setReason('');
-            setReplacementEmail('');
-            setEmailInput(updated.onboarding.initial_admin_email ?? '');
-            setSuccess(recoveryAction === 'replace'
-                ? 'The previous invitation was revoked and a replacement invitation was queued.'
-                : 'The administrator invitation was revoked. A new email can now be used when provisioning resumes.');
-            onTenantChanged();
-        });
     }
 
     return (
@@ -118,13 +81,13 @@ export function PlatformTenantOnboardingPanel({ tenant, canProvision, disabled =
                 <div>
                     <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Step 2</p>
                     <h3 id="tenant-onboarding-title" className="mt-1 font-semibold text-slate-900">Provision tenant foundation</h3>
-                    <p className="mt-1 text-sm text-slate-500">Creates and verifies the protected root organization, complete permission catalogue, fully granted Super Admin role, authentication provider, and initial administrator invitation.</p>
+                    <p className="mt-1 text-sm text-slate-500">Creates the protected root organization, permission catalogue, Super Admin role, authentication provider, and initial administrator account.</p>
                 </div>
                 <StatusBadge status={state?.status ?? 'pending'} />
             </div>
 
             <SuccessAlert message={success} onDismiss={() => setSuccess(null)} />
-            <ErrorAlert error={error ?? invitationRequest.error} title="Foundation operation failed" />
+            <ErrorAlert error={error} title="Foundation operation failed" />
 
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                 {FOUNDATION_STEPS.map((step) => {
@@ -151,31 +114,52 @@ export function PlatformTenantOnboardingPanel({ tenant, canProvision, disabled =
                 </div>
             ) : null}
 
-            {canRun ? (
-                <div className="rounded-lg border border-slate-200 p-4">
-                    <InlineFieldAction
-                        id="initial-administrator-email"
+            {canCreateAdministrator ? (
+                <form className="space-y-4 rounded-lg border border-slate-200 p-4" onSubmit={provision}>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                        <Input label="First name" required value={form.first_name} error={fieldError(error, 'initial_admin_first_name')} onChange={(event) => set({ first_name: event.target.value })} />
+                        <Input label="Last name" value={form.last_name} error={fieldError(error, 'initial_admin_last_name')} onChange={(event) => set({ last_name: event.target.value })} />
+                    </div>
+                    <Input
                         label="Initial administrator email"
-                        input={(
-                            <Input
-                                id="initial-administrator-email"
-                                type="email"
-                                autoComplete="email"
-                                value={state?.initial_admin_email ?? emailInput}
-                                onChange={(event) => setEmailInput(event.target.value)}
-                                disabled={operationDisabled || Boolean(state?.initial_admin_email)}
-                                required
-                            />
-                        )}
-                        action={(
-                            <Button loading={saving} disabled={operationDisabled || emailInput.trim() === ''} onClick={provision}>
-                                {provisionButtonLabel(state?.status)}
-                            </Button>
-                        )}
-                        hint={state?.initial_admin_email
-                            ? 'This address belongs to the current invitation. Use Replace or Revoke to recover safely.'
-                            : 'The invitation is delivered by email. Raw invitation tokens are never shown in Platform Administration.'}
+                        type="email"
+                        autoComplete="email"
+                        required
+                        value={form.email}
+                        error={fieldError(error, 'initial_admin_email')}
+                        onChange={(event) => set({ email: event.target.value })}
                     />
+                    <div className="grid gap-4 sm:grid-cols-2">
+                        <Input
+                            label="Initial password"
+                            type="password"
+                            autoComplete="new-password"
+                            required
+                            value={form.password}
+                            error={fieldError(error, 'initial_admin_password')}
+                            hint="Use the authentication password policy. Share it with the administrator through a secure channel."
+                            onChange={(event) => set({ password: event.target.value })}
+                        />
+                        <Input
+                            label="Confirm password"
+                            type="password"
+                            autoComplete="new-password"
+                            required
+                            value={form.password_confirmation}
+                            error={fieldError(error, 'initial_admin_password_confirmation')}
+                            onChange={(event) => set({ password_confirmation: event.target.value })}
+                        />
+                    </div>
+                    <div className="flex justify-end">
+                        <Button type="submit" loading={saving} disabled={operationDisabled}>{provisionButtonLabel(state?.status)}</Button>
+                    </div>
+                </form>
+            ) : null}
+
+            {administratorCreated ? (
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+                    <p className="font-semibold">Initial administrator account created</p>
+                    <p className="mt-1">{state?.initial_admin_email}</p>
                 </div>
             ) : null}
 
@@ -185,51 +169,7 @@ export function PlatformTenantOnboardingPanel({ tenant, canProvision, disabled =
                 </p>
             ) : null}
 
-            {invitation ? (
-                <div className="space-y-3 rounded-lg border border-slate-200 p-4 text-sm">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div>
-                            <p className="font-semibold text-slate-900">Initial administrator invitation</p>
-                            <p className="mt-1 text-slate-600">{invitation.email}</p>
-                        </div>
-                        <div className="flex gap-2"><StatusBadge status={invitation.status} />{invitation.delivery ? <StatusBadge status={invitation.delivery.status} /> : null}</div>
-                    </div>
-                    <dl className="grid gap-2 text-xs text-slate-600 sm:grid-cols-2">
-                        <div><dt className="font-medium text-slate-800">Delivery requested</dt><dd>{formatTenantDateTime(invitation.delivery?.requested_at, 'Not requested')}</dd></div>
-                        <div><dt className="font-medium text-slate-800">Sent</dt><dd>{formatTenantDateTime(invitation.delivery?.sent_at, 'Not sent')}</dd></div>
-                        <div><dt className="font-medium text-slate-800">Expires</dt><dd>{formatTenantDateTime(invitation.expires_at, 'No expiry recorded')}</dd></div>
-                        <div><dt className="font-medium text-slate-800">Delivery attempts</dt><dd>{invitation.delivery?.attempt_number ?? 0}</dd></div>
-                    </dl>
-                    <p className="rounded bg-blue-50 p-3 text-blue-900">
-                        Invitation issuance is complete, but tenant activation remains blocked until the recipient accepts it and becomes an active Super Admin assigned to the protected root organization.
-                    </p>
-                    {invitation.delivery?.error_message ? <p className="rounded bg-rose-50 p-3 text-rose-800">{invitation.delivery.error_message}</p> : null}
-                    {invitation.status === 'pending' && canProvision ? (
-                        <div className="flex flex-wrap justify-end gap-2">
-                            <Button variant="secondary" disabled={operationDisabled} onClick={resendInvitation}>Resend invitation</Button>
-                            <Button variant="secondary" disabled={operationDisabled} onClick={() => { setReplacementEmail(invitation.email); setRecoveryAction('replace'); }}>Replace email</Button>
-                            <Button variant="danger" disabled={operationDisabled} onClick={() => setRecoveryAction('revoke')}>Revoke invitation</Button>
-                        </div>
-                    ) : null}
-                </div>
-            ) : null}
-
             {state?.provisioned_at ? <p className="text-xs text-slate-500">Foundation provisioned {formatTenantDateTime(state.provisioned_at)}.</p> : null}
-
-            <Modal open={recoveryAction !== null} title={recoveryAction === 'replace' ? 'Replace administrator invitation' : 'Revoke administrator invitation'} onClose={() => { if (!saving) setRecoveryAction(null); }} closeDisabled={saving}>
-                <form className="space-y-4" onSubmit={submitRecovery}>
-                    {recoveryAction === 'replace' ? (
-                        <Input label="New administrator email" type="email" value={replacementEmail} onChange={(event) => setReplacementEmail(event.target.value)} disabled={saving} required />
-                    ) : null}
-                    <Textarea label="Reason" value={reason} onChange={(event) => setReason(event.target.value)} disabled={saving} hint="At least 10 characters. This reason is retained in the platform audit trail." required />
-                    <div className="flex justify-end gap-2">
-                        <Button type="button" variant="secondary" disabled={saving} onClick={() => setRecoveryAction(null)}>Cancel</Button>
-                        <Button type="submit" variant={recoveryAction === 'revoke' ? 'danger' : 'primary'} loading={saving} disabled={reason.trim().length < 10 || (recoveryAction === 'replace' && replacementEmail.trim() === '')}>
-                            {recoveryAction === 'replace' ? 'Replace invitation' : 'Revoke invitation'}
-                        </Button>
-                    </div>
-                </form>
-            </Modal>
         </section>
     );
 }
@@ -239,13 +179,11 @@ const FOUNDATION_STEPS = [
     { key: 'permission_catalogue', label: 'Permission catalogue' },
     { key: 'super_admin_role', label: 'Super Admin role' },
     { key: 'authentication_provider', label: 'Authentication provider' },
-    { key: 'initial_admin_invitation', label: 'Administrator invitation issued' },
+    { key: 'initial_admin_account', label: 'Administrator account' },
 ] as const;
 
 function provisionButtonLabel(status: TenantOnboardingSummary['status'] | undefined): string {
     if (status === 'failed') return 'Retry failed step';
     if (status === 'provisioning') return 'Resume provisioning';
-    if (status === 'awaiting_administrator') return 'Repair and recheck foundation';
-    if (status === 'awaiting_domain' || status === 'ready') return 'Refresh readiness';
     return 'Provision foundation';
 }

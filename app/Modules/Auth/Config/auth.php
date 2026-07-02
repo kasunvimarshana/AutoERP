@@ -31,13 +31,11 @@ return [
         'window_seconds' => (int) env('AUTH_LOGIN_ATTEMPT_WINDOW', 900),
         'refresh_per_minute' => (int) env('AUTH_REFRESH_PER_MINUTE', 30),
         'oauth_exchange_per_minute' => (int) env('AUTH_OAUTH_EXCHANGE_PER_MINUTE', 30),
-        'invitations_per_minute' => (int) env('AUTH_INVITATIONS_PER_MINUTE', 10),
         'tenant_login' => env('AUTH_TENANT_LOGIN_LIMITER', 'auth.tenant.login'),
         'tenant_refresh' => env('AUTH_TENANT_REFRESH_LIMITER', 'auth.tenant.refresh'),
         'oauth_exchange' => env('AUTH_OAUTH_EXCHANGE_LIMITER', 'auth.oauth.exchange'),
         'platform_login' => env('AUTH_PLATFORM_LOGIN_LIMITER', 'auth.platform.login'),
         'platform_refresh' => env('AUTH_PLATFORM_REFRESH_LIMITER', 'auth.platform.refresh'),
-        'invitations' => env('AUTH_INVITATION_LIMITER', 'auth.invitations'),
     ],
     'password' => [
         'minimum_length' => (int) env('AUTH_PASSWORD_MINIMUM_LENGTH', 12),
@@ -57,15 +55,6 @@ return [
             'secure' => filter_var(env('AUTH_PLATFORM_REFRESH_COOKIE_SECURE', env('APP_ENV') === 'production'), FILTER_VALIDATE_BOOL),
             'same_site' => env('AUTH_PLATFORM_REFRESH_COOKIE_SAME_SITE', 'strict'),
         ],
-    ],
-    'registration' => [
-        'invitation_expiry_hours' => (int) env('AUTH_REGISTRATION_INVITATION_EXPIRY_HOURS', 72),
-        'delivery_lease_seconds' => (int) env('AUTH_REGISTRATION_DELIVERY_LEASE_SECONDS', 300),
-        'delivery_stale_after_seconds' => (int) env('AUTH_REGISTRATION_DELIVERY_STALE_AFTER_SECONDS', 900),
-        'invitation_url' => env(
-            'AUTH_REGISTRATION_INVITATION_URL',
-            rtrim((string) env('PLATFORM_PUBLIC_URL', ''), '/').'/register/invitation',
-        ),
     ],
     'platform_step_up' => [
         'ttl_seconds' => (int) env('AUTH_PLATFORM_STEP_UP_TTL_SECONDS', 900),

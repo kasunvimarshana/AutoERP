@@ -82,6 +82,13 @@ export interface AccessMutationResult {
     row_version: number;
 }
 
+export interface PasswordPolicyRequirements {
+    minimum_length: number;
+    mixed_case: boolean;
+    numbers: boolean;
+    symbols: boolean;
+}
+
 export interface AccessRole {
     id: number;
     row_version: number;
@@ -104,6 +111,8 @@ export interface CreateUserPayload {
     role_ids: number[];
     organization_unit_ids: number[];
     default_organization_unit_id: number;
+    password: string;
+    password_confirmation: string;
 }
 
 export interface UpdateUserProfilePayload {
@@ -133,6 +142,11 @@ export const accessApi = {
 
     async createUser(payload: CreateUserPayload): Promise<AccessUser> {
         const response = await apiClient.post<ApiResource<AccessUser>>(endpoints.users, payload);
+        return response.data.data;
+    },
+
+    async getUserPasswordPolicy(signal?: AbortSignal): Promise<PasswordPolicyRequirements> {
+        const response = await apiClient.get<ApiResource<PasswordPolicyRequirements>>(`${endpoints.users}/password-policy`, { signal });
         return response.data.data;
     },
 
@@ -176,13 +190,6 @@ export const accessApi = {
             expected_version: expectedVersion,
             status,
             reason,
-        });
-        return response.data.data;
-    },
-
-    async resendUserInvitation(id: number | string, expectedVersion: number): Promise<AccessUser> {
-        const response = await apiClient.post<ApiResource<AccessUser>>(`${endpoints.users}/${id}/invitation/resend`, {
-            expected_version: expectedVersion,
         });
         return response.data.data;
     },

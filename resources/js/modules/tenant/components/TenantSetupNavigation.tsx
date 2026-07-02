@@ -9,7 +9,7 @@ const REQUIRED_FOUNDATION_STEPS = [
     'permission_catalogue',
     'super_admin_role',
     'authentication_provider',
-    'initial_admin_invitation',
+    'initial_admin_account',
 ] as const;
 
 const SETUP_STEPS: Array<{ key: TenantSetupStep; label: string }> = [

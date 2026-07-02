@@ -2,8 +2,6 @@ import { apiClient } from '@/shared/api/apiClient';
 import type { ApiCollection, ApiResource } from '@/shared/types/api';
 import type {
     DomainVerificationChallenge,
-    InitialAdministratorInvitation,
-    TenantAdministratorInvitationState,
     TenantDocument,
     TenantDocumentPage,
     TenantDomain,
@@ -127,73 +125,27 @@ export async function getTenantOnboardingReadiness(
     return response.data.data;
 }
 
+export interface TenantOnboardingProvisionPayload {
+    firstName: string;
+    lastName?: string | null;
+    email: string;
+    password: string;
+    passwordConfirmation: string;
+}
+
 export async function provisionTenantOnboarding(
     tenant: TenantRecord,
-    initialAdminEmail: string,
+    administrator: TenantOnboardingProvisionPayload,
 ): Promise<TenantOnboardingProvisionResult> {
     const response = await apiClient.post<ApiResource<TenantOnboardingProvisionResult>>(
         `/api/v1/platform/tenants/${tenant.id}/onboarding/provision`,
         {
             expected_version: tenant.row_version,
-            initial_admin_email: initialAdminEmail,
-        },
-    );
-    return response.data.data;
-}
-
-export async function getInitialAdministratorInvitation(
-    tenantId: number,
-    signal?: AbortSignal,
-): Promise<TenantAdministratorInvitationState> {
-    const response = await apiClient.get<ApiResource<TenantAdministratorInvitationState>>(
-        `/api/v1/platform/tenants/${tenantId}/onboarding/initial-administrator-invitation`,
-        { signal },
-    );
-    return response.data.data;
-}
-
-export async function resendInitialAdministratorInvitation(
-    tenantId: number,
-    invitation: InitialAdministratorInvitation,
-): Promise<TenantAdministratorInvitationState> {
-    const response = await apiClient.post<ApiResource<TenantAdministratorInvitationState>>(
-        `/api/v1/platform/tenants/${tenantId}/onboarding/initial-administrator-invitations/${invitation.id}/resend`,
-        { expected_invitation_version: invitation.row_version },
-    );
-    return response.data.data;
-}
-
-export async function revokeInitialAdministratorInvitation(
-    tenantId: number,
-    state: TenantAdministratorInvitationState,
-    reason: string,
-): Promise<TenantAdministratorInvitationState> {
-    const invitation = requireInvitation(state);
-    const response = await apiClient.post<ApiResource<TenantAdministratorInvitationState>>(
-        `/api/v1/platform/tenants/${tenantId}/onboarding/initial-administrator-invitations/${invitation.id}/revoke`,
-        {
-            expected_invitation_version: invitation.row_version,
-            expected_onboarding_version: state.onboarding.row_version,
-            reason,
-        },
-    );
-    return response.data.data;
-}
-
-export async function replaceInitialAdministratorInvitation(
-    tenantId: number,
-    state: TenantAdministratorInvitationState,
-    email: string,
-    reason: string,
-): Promise<TenantAdministratorInvitationState> {
-    const invitation = requireInvitation(state);
-    const response = await apiClient.post<ApiResource<TenantAdministratorInvitationState>>(
-        `/api/v1/platform/tenants/${tenantId}/onboarding/initial-administrator-invitations/${invitation.id}/replace`,
-        {
-            expected_invitation_version: invitation.row_version,
-            expected_onboarding_version: state.onboarding.row_version,
-            email,
-            reason,
+            initial_admin_first_name: administrator.firstName,
+            initial_admin_last_name: administrator.lastName ?? null,
+            initial_admin_email: administrator.email,
+            initial_admin_password: administrator.password,
+            initial_admin_password_confirmation: administrator.passwordConfirmation,
         },
     );
     return response.data.data;
@@ -542,11 +494,6 @@ async function changeSubscription(
 function pageFromResponse<T>(response: ApiCollection<T>, label: string): { data: T[]; meta: TenantPage['meta'] } {
     if (!response.meta) throw new Error(`${label} pagination metadata is missing.`);
     return { data: response.data, meta: response.meta };
-}
-
-function requireInvitation(state: TenantAdministratorInvitationState): InitialAdministratorInvitation {
-    if (!state.invitation) throw new Error('No initial administrator invitation is available.');
-    return state.invitation;
 }
 
 function withMethodOverride(source: FormData, method: 'PATCH'): FormData {

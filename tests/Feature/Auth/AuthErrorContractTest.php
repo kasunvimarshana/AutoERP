@@ -23,19 +23,19 @@ final class AuthErrorContractTest extends TestCase
         $this->app->instance('request', $request);
 
         $response = $this->app->make(AuthResponseFactory::class)->failure(new AuthFailure(
-            AuthErrorCode::INVITATION_INVALID,
-            'The invitation is invalid.',
+            AuthErrorCode::TOKEN_INVALID,
+            'The authentication token is invalid.',
             409,
             [
-                'stage' => 'invitation',
-                'invitation_id' => 'platform-operator',
+                'stage' => 'token',
+                'token_id' => 'platform-token',
             ],
         ));
 
         self::assertSame(409, $response->getStatusCode());
-        self::assertSame(AuthErrorCode::INVITATION_INVALID, $response->getData(true)['error']['code']);
-        self::assertSame('invitation', $response->getData(true)['error']['details']['stage']);
-        self::assertSame('platform-operator', $response->getData(true)['error']['details']['invitation_id']);
+        self::assertSame(AuthErrorCode::TOKEN_INVALID, $response->getData(true)['error']['code']);
+        self::assertSame('token', $response->getData(true)['error']['details']['stage']);
+        self::assertSame('platform-token', $response->getData(true)['error']['details']['token_id']);
         self::assertSame(
             '01AUTHERRORCONTRACT0000000000',
             $response->headers->get(RequestCorrelationIdMiddleware::HEADER),

@@ -9,10 +9,10 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\User\Constants\PlatformOperatorStatus;
+use Modules\User\Contracts\PlatformOperatorCredentialProvisionerInterface;
 use Modules\User\Models\PlatformOperatorModel;
 use Modules\User\Models\PlatformOperatorPermissionModel;
 use Modules\User\Models\PlatformPermissionModel;
-use Modules\User\Services\Platform\Invitations\PlatformOperatorInvitationService;
 use Modules\User\Services\Platform\PlatformPermissionCatalogSynchronizer;
 use RuntimeException;
 
@@ -34,9 +34,11 @@ final class PlatformOperatorSeeder extends Seeder
         }
 
         $email = $this->requiredEmail();
-        app(TenantExecutionContextInterface::class)->runAsControlPlane(function () use ($email): void {
-            DB::transaction(function () use ($email): void {
+        $password = $this->requiredPassword();
+        app(TenantExecutionContextInterface::class)->runAsControlPlane(function () use ($email, $password): void {
+            DB::transaction(function () use ($email, $password): void {
                 app(PlatformPermissionCatalogSynchronizer::class)->synchronize();
+                $now = now();
                 $operator = PlatformOperatorModel::query()->where('email', $email)->lockForUpdate()->first();
                 if (! $operator instanceof PlatformOperatorModel) {
                     $operator = PlatformOperatorModel::query()->create([
@@ -44,9 +46,19 @@ final class PlatformOperatorSeeder extends Seeder
                         'first_name' => 'Platform',
                         'last_name' => 'Administrator',
                         'email' => $email,
-                        'status' => PlatformOperatorStatus::INVITED,
-                        'invited_at' => now(),
+                        'status' => PlatformOperatorStatus::ACTIVE,
+                        'credentials_ready_at' => $now,
+                        'activated_at' => $now,
                     ]);
+                } else {
+                    $operator->forceFill([
+                        'status' => PlatformOperatorStatus::ACTIVE,
+                        'credentials_ready_at' => $operator->getAttribute('credentials_ready_at') ?? $now,
+                        'activated_at' => $operator->getAttribute('activated_at') ?? $now,
+                        'deactivated_at' => null,
+                        'row_version' => (int) $operator->getAttribute('row_version') + 1,
+                        'updated_at' => $now,
+                    ])->save();
                 }
 
                 $permissionIds = PlatformPermissionModel::query()->where('is_active', true)->pluck('id')->all();
@@ -59,11 +71,7 @@ final class PlatformOperatorSeeder extends Seeder
                     ]);
                 }
 
-                if ($operator->getAttribute('status') === PlatformOperatorStatus::INVITED
-                    && ! $operator->invitations()->where('status', 'pending')->exists()
-                ) {
-                    app(PlatformOperatorInvitationService::class)->issueForOperator($operator);
-                }
+                app(PlatformOperatorCredentialProvisionerInterface::class)->provision((int) $operator->getKey(), $password);
             }, 3);
         });
     }
@@ -81,5 +89,15 @@ final class PlatformOperatorSeeder extends Seeder
         }
 
         return $email;
+    }
+
+    private function requiredPassword(): string
+    {
+        $password = (string) env('AUTOERP_PLATFORM_ADMIN_PASSWORD', '');
+        if (trim($password) === '') {
+            throw new RuntimeException('AUTOERP_PLATFORM_ADMIN_PASSWORD is required when platform operator seeding is enabled.');
+        }
+
+        return $password;
     }
 }

@@ -10,20 +10,13 @@ use Modules\User\Constants\PlatformOperatorStatus;
 use Modules\User\Http\Requests\Platform\ChangePlatformOperatorStatusRequest;
 use Modules\User\Http\Requests\Platform\CreatePlatformOperatorRequest;
 use Modules\User\Http\Requests\Platform\ListPlatformOperatorRequest;
-use Modules\User\Http\Requests\Platform\RecoverPlatformOperatorAccessRequest;
-use Modules\User\Http\Requests\Platform\ResendPlatformOperatorInvitationRequest;
-use Modules\User\Http\Requests\Platform\RevokePlatformOperatorInvitationRequest;
 use Modules\User\Http\Requests\Platform\UpdatePlatformOperatorPermissionsRequest;
 use Modules\User\Http\Resources\Platform\PlatformOperatorResource;
 use Modules\User\Services\Platform\PlatformOperatorService;
-use Modules\User\Services\Platform\Invitations\PlatformOperatorInvitationService;
 
 final class PlatformOperatorController extends Controller
 {
-    public function __construct(
-        private readonly PlatformOperatorService $operators,
-        private readonly PlatformOperatorInvitationService $invitations,
-    ) {}
+    public function __construct(private readonly PlatformOperatorService $operators) {}
 
     public function index(ListPlatformOperatorRequest $request): JsonResponse
     {
@@ -46,6 +39,7 @@ final class PlatformOperatorController extends Controller
                 'to' => $page->lastItem(),
             ],
             'available_permissions' => $this->operators->availablePermissions(),
+            'password_policy' => $this->operators->passwordRequirements(),
         ]);
     }
 
@@ -92,35 +86,4 @@ final class PlatformOperatorController extends Controller
         ));
     }
 
-    public function recoverAccess(
-        RecoverPlatformOperatorAccessRequest $request,
-        int $operator,
-    ): PlatformOperatorResource {
-        return new PlatformOperatorResource($this->operators->recoverAccess(
-            $operator,
-            (int) $request->validated('expected_version'),
-            (string) $request->validated('reason'),
-        ));
-    }
-
-    public function resendInvitation(
-        ResendPlatformOperatorInvitationRequest $request,
-        int $operator,
-    ): PlatformOperatorResource {
-        return new PlatformOperatorResource($this->invitations->resend(
-            $operator,
-            (int) $request->validated('expected_version'),
-        ));
-    }
-
-    public function revokeInvitation(
-        RevokePlatformOperatorInvitationRequest $request,
-        int $operator,
-    ): PlatformOperatorResource {
-        return new PlatformOperatorResource($this->invitations->revoke(
-            $operator,
-            (int) $request->validated('expected_version'),
-            (string) $request->validated('reason'),
-        ));
-    }
 }

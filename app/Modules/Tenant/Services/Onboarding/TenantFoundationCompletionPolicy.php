@@ -9,8 +9,8 @@ use Modules\Tenant\Constants\TenantOnboardingStepStatus;
 use Modules\Tenant\Models\TenantOnboardingStateModel;
 use Modules\Tenant\Models\TenantOnboardingStepModel;
 use Modules\Core\Contracts\TenantAccessProvisionerInterface;
-use Modules\Tenant\Services\Contracts\TenantAuthenticationProvisionerInterface;
 use Modules\Tenant\Services\Contracts\TenantOrganizationProvisionerInterface;
+use Modules\Tenant\Services\Contracts\TenantAuthenticationProvisionerInterface;
 
 final class TenantFoundationCompletionPolicy
 {
@@ -42,15 +42,8 @@ final class TenantFoundationCompletionPolicy
 
         $rootId = $this->positiveInt($state->getAttribute('root_organization_unit_id'));
         $roleId = $this->positiveInt($state->getAttribute('super_admin_role_id'));
-        $invitationId = $this->positiveInt($state->getAttribute('invitation_id'));
+        $administratorUserId = $this->positiveInt($state->getAttribute('administrator_user_id'));
         $email = strtolower(trim((string) $state->getAttribute('initial_admin_email')));
-        $invitation = $invitationId === null
-            ? null
-            : $this->authentication->initialAdministratorInvitationStatus(
-                $tenantId,
-                $invitationId,
-                $lockForUpdate,
-            );
 
         $checks = [
             TenantOnboardingStep::ROOT_ORGANIZATION => $rootId !== null
@@ -62,10 +55,9 @@ final class TenantFoundationCompletionPolicy
                 $tenantId,
                 $lockForUpdate,
             ),
-            TenantOnboardingStep::INITIAL_ADMIN_INVITATION => $this->invitationIsUsable(
+            TenantOnboardingStep::INITIAL_ADMIN_ACCOUNT => $this->administratorAccountIsReady(
                 $tenantId,
-                $invitation,
-                $invitationId,
+                $administratorUserId,
                 $rootId,
                 $roleId,
                 $email,
@@ -78,7 +70,7 @@ final class TenantFoundationCompletionPolicy
             TenantOnboardingStep::PERMISSION_CATALOGUE => 'Synchronize the complete tenant permission catalogue.',
             TenantOnboardingStep::SUPER_ADMIN_ROLE => 'Provision the exact fully granted Super Admin role.',
             TenantOnboardingStep::AUTHENTICATION_PROVIDER => 'Provision an active tenant authentication provider.',
-            TenantOnboardingStep::INITIAL_ADMIN_INVITATION => 'Issue a valid initial administrator invitation for the configured recipient.',
+            TenantOnboardingStep::INITIAL_ADMIN_ACCOUNT => 'Create an active initial administrator account for the configured recipient.',
         ];
 
         $blockers = [];
@@ -98,41 +90,31 @@ final class TenantFoundationCompletionPolicy
         return ['ready' => $blockers === [], 'blockers' => $blockers];
     }
 
-    /** @param array<string, mixed>|null $invitation */
-    private function invitationIsUsable(
+    private function administratorAccountIsReady(
         int $tenantId,
-        ?array $invitation,
-        ?int $invitationId,
+        ?int $administratorUserId,
         ?int $organizationUnitId,
         ?int $roleId,
         string $email,
         bool $lockForUpdate,
     ): bool {
         if (
-            $invitation === null
-            || $invitationId === null
+            $administratorUserId === null
             || $organizationUnitId === null
             || $roleId === null
             || $email === ''
-            || (int) ($invitation['id'] ?? 0) !== $invitationId
-            || (int) ($invitation['organization_unit_id'] ?? 0) !== $organizationUnitId
-            || (int) ($invitation['role_id'] ?? 0) !== $roleId
-            || strtolower(trim((string) ($invitation['email'] ?? ''))) !== $email
         ) {
             return false;
         }
 
-        $status = (string) ($invitation['status'] ?? '');
-        if ($status === 'accepted') {
-            return $this->positiveInt($invitation['accepted_by_user_id'] ?? null) !== null;
-        }
-
-        return $status === 'pending'
-            && $this->authentication->hasPendingInitialAdministratorInvitation(
-                $tenantId,
-                $invitationId,
-                $lockForUpdate,
-            );
+        return $this->access->hasOperationalAdministrator(
+            $tenantId,
+            $administratorUserId,
+            $organizationUnitId,
+            $roleId,
+            $lockForUpdate,
+            $email,
+        );
     }
 
     private function positiveInt(mixed $value): ?int

@@ -22,7 +22,7 @@ A production release still requires migrated-database and Tenant-A/Tenant-B adve
 
 - `OrganizationUnit` owns the protected root hierarchy and root invariants.
 - `User` owns tenant permission catalogues, roles, and administrator assignments.
-- `Auth` owns providers, invitations, authentication, sessions, and tokens.
+- `Auth` owns providers, authentication, sessions, tokens, and credential security records.
 - `Configuration` owns typed global, tenant, and organization-unit overrides.
 - `ReferenceData` owns currencies and other shared catalogues.
 - `Communication` and platform infrastructure own transport-level mail capabilities.
@@ -37,15 +37,15 @@ A foundation can move to `awaiting_administrator` only when all exact referenced
 2. complete tenant permission catalogue;
 3. exact fully granted Super Admin role;
 4. active internal authentication provider;
-5. unexpired pending or accepted initial-administrator invitation targeting that exact root, role, and recipient.
+5. active initial administrator account targeting that exact root, role, and recipient.
 
-Stored step statuses are progress records, not substitutes for owner-resource verification. Re-running provisioning reconciles pending resources idempotently. An accepted invitation that targets obsolete foundation resources is not silently replaced.
+Stored step statuses are progress records, not substitutes for owner-resource verification. Re-running provisioning reconciles pending resources idempotently. An administrator account that targets obsolete foundation resources is not silently accepted.
 
 Activation is evaluated from current authoritative data under lock. It requires:
 
 - compatible deployed schema;
 - complete foundation resources;
-- accepted and operational administrator assigned to the protected root and Super Admin role;
+- active and operational administrator assigned to the protected root and Super Admin role;
 - active base accounting currency;
 - active plan revision;
 - usable current subscription revision;

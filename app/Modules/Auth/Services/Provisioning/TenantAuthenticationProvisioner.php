@@ -7,15 +7,19 @@ namespace Modules\Auth\Services\Provisioning;
 use Illuminate\Support\Facades\DB;
 use Modules\Auth\Enums\ProviderStatus;
 use Modules\Auth\Models\AuthProviderModel;
-use Modules\Auth\Services\Registration\RegistrationInvitationService;
 use Modules\Tenant\Services\Contracts\TenantAuthenticationProvisionerInterface;
+use Modules\User\Contracts\TenantUserCredentialProvisionerInterface;
+use Modules\User\Contracts\TenantUserRegistrationInterface;
 
 final readonly class TenantAuthenticationProvisioner implements TenantAuthenticationProvisionerInterface
 {
     private const INTERNAL_PROVIDER_NAME = 'Internal authentication';
     private const INTERNAL_PROVIDER_DRIVER = 'internal';
 
-    public function __construct(private RegistrationInvitationService $invitations) {}
+    public function __construct(
+        private TenantUserRegistrationInterface $users,
+        private TenantUserCredentialProvisionerInterface $credentials,
+    ) {}
 
     public function provisionProvider(int $tenantId): array
     {
@@ -55,18 +59,41 @@ final readonly class TenantAuthenticationProvisioner implements TenantAuthentica
         }, 3);
     }
 
-    public function issueInitialAdministratorInvitation(
+    public function provisionInitialAdministratorAccount(
         int $tenantId,
         int $organizationUnitId,
         int $roleId,
+        string $firstName,
+        ?string $lastName,
         string $email,
+        string $password,
     ): array {
-        return $this->invitations->issueInitialAdministrator(
+        return DB::transaction(function () use (
             $tenantId,
             $organizationUnitId,
             $roleId,
+            $firstName,
+            $lastName,
             $email,
-        );
+            $password,
+        ): array {
+            $userId = $this->users->prepareProvisionedAccount(
+                $tenantId,
+                $organizationUnitId,
+                $roleId,
+                $firstName,
+                $lastName,
+                $email,
+            );
+            $this->credentials->provisionTenantUser($tenantId, $userId, $email, $password);
+            $user = $this->users->activateAfterCredentialSetup($tenantId, $userId);
+
+            return [
+                'user_id' => $userId,
+                'email' => mb_strtolower(trim($email)),
+                'status' => (string) ($user['status'] ?? 'active'),
+            ];
+        }, 3);
     }
 
     public function providerIsReady(int $tenantId, bool $lockForUpdate = false): bool
@@ -84,77 +111,4 @@ final readonly class TenantAuthenticationProvisioner implements TenantAuthentica
         return $query->exists();
     }
 
-    public function acceptedInitialAdministratorUserId(
-        int $tenantId,
-        ?int $invitationId = null,
-        bool $lockForUpdate = false,
-    ): ?int {
-        return $this->invitations->acceptedInitialAdministratorUserId(
-            $tenantId,
-            $invitationId,
-            $lockForUpdate,
-        );
-    }
-
-    public function hasPendingInitialAdministratorInvitation(
-        int $tenantId,
-        ?int $invitationId = null,
-        bool $lockForUpdate = false,
-    ): bool {
-        return $this->invitations->hasPendingInitialAdministratorInvitation(
-            $tenantId,
-            $invitationId,
-            $lockForUpdate,
-        );
-    }
-
-    public function initialAdministratorInvitationStatus(
-        int $tenantId,
-        ?int $invitationId = null,
-        bool $lockForUpdate = false,
-    ): ?array {
-        return $this->invitations->initialAdministratorStatus($tenantId, $invitationId, $lockForUpdate);
-    }
-
-    public function resendInitialAdministratorInvitation(
-        int $tenantId,
-        int $invitationId,
-        int $expectedVersion,
-    ): array {
-        return $this->invitations->resendInitialAdministrator($tenantId, $invitationId, $expectedVersion);
-    }
-
-    public function revokeInitialAdministratorInvitation(
-        int $tenantId,
-        int $invitationId,
-        int $expectedVersion,
-        string $reason,
-    ): void {
-        $this->invitations->revokeInitialAdministrator(
-            $tenantId,
-            $invitationId,
-            $expectedVersion,
-            $reason,
-        );
-    }
-
-    public function replaceInitialAdministratorInvitation(
-        int $tenantId,
-        int $invitationId,
-        int $expectedVersion,
-        int $organizationUnitId,
-        int $roleId,
-        string $email,
-        string $reason,
-    ): array {
-        return $this->invitations->replaceInitialAdministrator(
-            $tenantId,
-            $invitationId,
-            $expectedVersion,
-            $organizationUnitId,
-            $roleId,
-            $email,
-            $reason,
-        );
-    }
 }

@@ -19,6 +19,7 @@ final class AuthTrustBoundaryTest extends TestCase
     public function test_unsafe_legacy_auth_surfaces_are_not_routable(): void
     {
         $routes = $this->source('app/Modules/Auth/Routes/api.php');
+        $userRoutes = $this->source('app/Modules/User/Routes/api.php');
 
         foreach ([
             "Route::post('token'",
@@ -30,6 +31,10 @@ final class AuthTrustBoundaryTest extends TestCase
         ] as $legacySurface) {
             self::assertStringNotContainsString($legacySurface, $routes);
         }
+
+        self::assertStringNotContainsString('operator-invitations', $userRoutes);
+        self::assertStringNotContainsString('security-recovery', $userRoutes);
+        self::assertStringNotContainsString('/invitation', $userRoutes);
     }
 
     public function test_requests_reject_client_owned_security_context(): void
@@ -127,18 +132,6 @@ final class AuthTrustBoundaryTest extends TestCase
         self::assertStringContainsString('TenantDirectoryInterface', $validator);
         self::assertStringNotContainsString("DB::table('organization_units')", $validator);
         self::assertStringNotContainsString('deleted_at', $validator);
-    }
-
-    public function test_registration_invitation_delivery_uses_the_tenant_directory_boundary(): void
-    {
-        $delivery = $this->source(
-            'app/Modules/Auth/Services/Registration/RegistrationInvitationDeliveryService.php',
-        );
-
-        self::assertStringContainsString('TenantDirectoryInterface', $delivery);
-        self::assertStringContainsString('$this->tenants->summary($tenantId)', $delivery);
-        self::assertStringNotContainsString('invitation.tenant', $delivery);
-        self::assertStringNotContainsString('$invitation->tenant', $delivery);
     }
 
     private function source(string $relativePath): string

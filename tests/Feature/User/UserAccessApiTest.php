@@ -6,7 +6,6 @@ namespace Tests\Feature\User;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Modules\User\Constants\UserGuard;
 use Modules\User\Constants\UserPermission;
@@ -18,12 +17,6 @@ use Tests\TestCase;
 final class UserAccessApiTest extends TestCase
 {
     use RefreshDatabase;
-
-    protected function setUp(): void
-    {
-        parent::setUp();
-        Queue::fake();
-    }
 
     public function test_user_list_is_tenant_scoped_filtered_and_does_not_expose_credentials(): void
     {
@@ -45,7 +38,7 @@ final class UserAccessApiTest extends TestCase
             ->assertJsonMissingPath('data.0.remember_token');
     }
 
-    public function test_user_creation_is_invitation_first_and_access_assignments_are_atomic(): void
+    public function test_user_creation_creates_active_credentials_and_access_assignments_atomically(): void
     {
         $context = $this->createAuthContext();
         $roleId = $this->createRole($context['tenant_id'], 'Counter Staff');
@@ -60,9 +53,11 @@ final class UserAccessApiTest extends TestCase
             'role_ids' => [$roleId],
             'organization_unit_ids' => [$branchId],
             'default_organization_unit_id' => $branchId,
+            'password' => 'StrongPassword!123',
+            'password_confirmation' => 'StrongPassword!123',
         ])->assertCreated()
-            ->assertJsonPath('data.status', UserStatus::INVITED)
-            ->assertJsonPath('data.credentials_ready', false)
+            ->assertJsonPath('data.status', UserStatus::ACTIVE)
+            ->assertJsonPath('data.credentials_ready', true)
             ->assertJsonMissingPath('data.password');
 
         $userId = (int) $response->json('data.id');
@@ -77,26 +72,23 @@ final class UserAccessApiTest extends TestCase
             'organization_unit_id' => $branchId,
             'is_default' => true,
         ]);
-        $this->assertDatabaseHas('auth_registration_invitations', [
+        $this->assertDatabaseHas('auth_user_password_credentials', [
             'tenant_id' => $context['tenant_id'],
             'user_id' => $userId,
-            'email' => 'created.user@example.test',
-            'status' => 'pending',
-        ]);
-        $this->assertDatabaseMissing('auth_user_password_credentials', [
-            'tenant_id' => $context['tenant_id'],
-            'user_id' => $userId,
+            'status' => 'active',
+            'revoked_at' => null,
         ]);
     }
 
-    public function test_create_rejects_password_status_and_client_owned_tenant_fields(): void
+    public function test_create_requires_valid_password_and_rejects_status_and_client_owned_tenant_fields(): void
     {
         $context = $this->createAuthContext();
 
         $this->withAuth($context)->postJson('/api/v1/users', [
             'first_name' => 'Unsafe',
             'email' => 'unsafe@example.test',
-            'password' => 'administrator-known-password',
+            'password' => 'weak',
+            'password_confirmation' => 'weak',
             'status' => UserStatus::ACTIVE,
             'tenant_id' => $context['tenant_id'],
             'role_ids' => [],

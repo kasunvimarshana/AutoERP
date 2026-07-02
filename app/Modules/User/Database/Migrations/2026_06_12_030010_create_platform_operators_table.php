@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    private const INITIAL_STATUS = 'invited';
+    private const INITIAL_STATUS = 'active';
 
     public function up(): void
     {
@@ -20,7 +20,6 @@ return new class extends Migration
             $table->string('email')->unique('platform_operators_email_uk');
             $table->string('status', 30)->default(self::INITIAL_STATUS);
             $table->timestamp('credentials_ready_at')->nullable();
-            $table->timestamp('invited_at')->nullable();
             $table->timestamp('activated_at')->nullable();
             $table->timestamp('deactivated_at')->nullable();
             $table->unsignedBigInteger('created_by_operator_id')->nullable();

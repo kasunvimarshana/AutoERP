@@ -7,11 +7,10 @@ describe('shouldAttemptAuthRefresh', () => {
         clearStoredAuthSession();
     });
 
-    it('never refreshes an authenticated session for public onboarding endpoints', () => {
+    it('never refreshes an authenticated session for public login endpoints', () => {
         window.localStorage.setItem(AUTH_SESSION_MARKER_KEY, 'test-session');
 
-        expect(shouldAttemptAuthRefresh('/api/v1/auth/initial-administrator/inspect')).toBe(false);
-        expect(shouldAttemptAuthRefresh('/api/v1/platform/operator-invitations/accept')).toBe(false);
+        expect(shouldAttemptAuthRefresh('/api/v1/platform/auth/login')).toBe(false);
     });
 
     it('allows one refresh attempt for a protected endpoint when a session exists', () => {

@@ -14,6 +14,7 @@ const apiMocks = vi.hoisted(() => ({
     createUser: vi.fn(),
     changeUserStatus: vi.fn(),
     getUser: vi.fn(),
+    getUserPasswordPolicy: vi.fn(),
     listAllOrganizationUnits: vi.fn(),
     listAllPermissions: vi.fn(),
     listPermissions: vi.fn(),
@@ -58,6 +59,7 @@ describe('Access pages', () => {
         authState.permissions = Object.values(accessPermissions).filter((permission) => !excludedPermissions.has(permission));
         apiMocks.listUsers.mockResolvedValue(collection([accessUser()]));
         apiMocks.getUser.mockResolvedValue(accessUser());
+        apiMocks.getUserPasswordPolicy.mockResolvedValue({ minimum_length: 12, mixed_case: true, numbers: true, symbols: true });
         apiMocks.listAllRoles.mockResolvedValue([{ id: 5, row_version: 1, name: 'Manager' }]);
         apiMocks.listAllOrganizationUnits.mockResolvedValue([
             { id: 1, name: 'Head Office', is_default: true },
@@ -89,13 +91,14 @@ describe('Access pages', () => {
         apiMocks.listUserDocuments.mockResolvedValue(collection([]));
         apiMocks.listUserDevices.mockResolvedValue(collection([]));
     });
-    it('renders create user as a focused invitation flow without password entry', async () => {
+    it('renders create user as a focused direct account flow with password entry', async () => {
         renderPage(<CreateUserPage />, ['/access/users/create']);
-        expect(screen.getByRole('heading', { name: 'Invite User' })).toBeInTheDocument();
-        expect(await screen.findByText('Invitation workflow')).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: 'Create User' })).toBeInTheDocument();
+        expect(await screen.findByText('Initial password')).toBeInTheDocument();
         expect(screen.getByText('Initial roles')).toBeInTheDocument();
         expect(screen.getByText('Organization access')).toBeInTheDocument();
-        expect(screen.queryByLabelText('Temporary password')).not.toBeInTheDocument();
+        expect(screen.getByLabelText(/^Password/)).toBeInTheDocument();
+        expect(screen.getByLabelText(/^Confirm password/)).toBeInTheDocument();
         expect(screen.queryByRole('tab')).not.toBeInTheDocument();
     });
     it('uses server-side user filters without sending organization_unit_id as context', async () => {

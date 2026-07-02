@@ -6,11 +6,10 @@ namespace Modules\User\Contracts;
 
 interface TenantUserRegistrationInterface
 {
-    public function prepareFromInvitation(
+    public function prepareProvisionedAccount(
         int $tenantId,
-        ?int $targetUserId,
-        ?int $organizationUnitId,
-        ?int $roleId,
+        int $organizationUnitId,
+        int $roleId,
         string $firstName,
         ?string $lastName,
         string $email,

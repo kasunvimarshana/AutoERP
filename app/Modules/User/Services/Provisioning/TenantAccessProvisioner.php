@@ -201,6 +201,7 @@ final class TenantAccessProvisioner implements TenantAccessProvisionerInterface
         int $rootOrganizationUnitId,
         int $superAdminRoleId,
         bool $lockForUpdate = false,
+        ?string $email = null,
     ): bool {
         if (! $this->isReady($tenantId, $superAdminRoleId, $lockForUpdate)) {
             return false;
@@ -211,6 +212,8 @@ final class TenantAccessProvisioner implements TenantAccessProvisionerInterface
             ->where('status', UserStatus::ACTIVE)
             ->whereNotNull('credentials_ready_at')
             ->whereNull('deleted_at')
+            ->when($email !== null && trim($email) !== '', static fn ($query) => $query
+                ->where('email', strtolower(trim($email))))
             ->when($lockForUpdate, static fn ($query) => $query->lockForUpdate())
             ->exists();
         if (! $activeUser) {

@@ -30,7 +30,6 @@ use Modules\User\Services\Authentication\PlatformOperatorAuthenticationDirectory
 use Modules\User\Services\Authentication\TenantUserAuthenticationDirectory;
 use Modules\User\Services\PermissionDefinitionRegistry;
 use Modules\User\Services\PlatformOperatorAccessResolver;
-use Modules\User\Services\Platform\Invitations\PlatformOperatorInvitationTokenCodec;
 use Modules\User\Services\Provisioning\TenantAccessProvisioner;
 use Modules\User\Services\TenantUserRegistrationService;
 use Modules\User\Contracts\TenantUserRegistrationInterface;
@@ -56,7 +55,6 @@ final class UserServiceProvider extends ServiceProvider
         $this->app->tag([UserOrganizationUnitLifecycleBlocker::class], 'organization-unit.lifecycle_blocker');
 
         $this->app->singleton(AuthenticatedUserProviderInterface::class, AuthenticatedUserProvider::class);
-        $this->app->singleton(PlatformOperatorInvitationTokenCodec::class, fn (): PlatformOperatorInvitationTokenCodec => new PlatformOperatorInvitationTokenCodec((string) config('app.key')));
         $this->app->scoped(AuthenticationPrincipalProviderInterface::class, AuthenticationPrincipalProvider::class);
         $this->app->scoped(TenantUserAuthenticationDirectoryInterface::class, TenantUserAuthenticationDirectory::class);
         $this->app->scoped(PlatformOperatorAuthenticationDirectoryInterface::class, PlatformOperatorAuthenticationDirectory::class);

@@ -28,13 +28,11 @@ interface OperatorOption extends NamedResource {
 type SecurityAction =
     | { type: 'session'; session: PlatformSession }
     | { type: 'operator_sessions'; operator: OperatorOption }
-    | { type: 'recovery'; operator: OperatorOption }
     | null;
 
 export default function PlatformSecurityPage() {
     const auth = useAuth();
     const canManageSessions = hasPermission(auth, PLATFORM_PERMISSION.sessionsManage);
-    const canRecoverOperators = hasPermission(auth, PLATFORM_PERMISSION.operatorsManage);
     const [operator, setOperator] = useState<OperatorOption | null>(null);
     const [page, setPage] = useState(1);
     const sessions = useApi(
@@ -112,9 +110,6 @@ export default function PlatformSecurityPage() {
             } else if (action.type === 'operator_sessions') {
                 const count = await platformAdministrationApi.revokeOperatorSessions(action.operator.id, reason.trim());
                 setSuccess(`${count} active session${count === 1 ? '' : 's'} revoked for ${action.operator.name}.`);
-            } else {
-                await platformAdministrationApi.recoverOperatorAccess(action.operator, reason.trim());
-                setSuccess(`Security recovery started for ${action.operator.name}. Existing credentials and sessions were revoked, and a new invitation was queued.`);
             }
             setAction(null);
             setReason('');
@@ -130,8 +125,8 @@ export default function PlatformSecurityPage() {
     return (
         <>
             <ContentHeader
-                title="Platform sessions and account recovery"
-                description="Inspect control-plane sessions, revoke compromised access, and start recipient-owned platform account recovery."
+                title="Platform sessions"
+                description="Inspect control-plane sessions and revoke compromised access without changing operator credentials."
             />
 
             <div className="space-y-5">
@@ -158,14 +153,9 @@ export default function PlatformSecurityPage() {
                                     Revoke all sessions
                                 </Button>
                             ) : null}
-                            {canRecoverOperators ? (
-                                <Button variant="secondary" disabled={!operator} onClick={() => operator && openAction({ type: 'recovery', operator })}>
-                                    Start recovery
-                                </Button>
-                            ) : null}
                         </div>
                     </div>
-                    <p className="mt-3 text-xs text-slate-500">Select an operator to review or recover a specific account. Session and account-recovery changes require recent platform authentication and are recorded in the platform audit log.</p>
+                    <p className="mt-3 text-xs text-slate-500">Select an operator to review a specific account. Session revocation requires recent platform authentication and is recorded in the platform audit log.</p>
                 </section>
 
                 {sessions.loading && !sessions.data ? <LoadingState label="Loading platform sessions..." /> : (
@@ -229,13 +219,11 @@ async function searchOperators({ search, page, perPage, signal }: { search: stri
 function actionTitle(action: SecurityAction): string {
     if (action?.type === 'session') return 'Revoke platform session';
     if (action?.type === 'operator_sessions') return `Revoke all sessions for ${action.operator.name}`;
-    if (action?.type === 'recovery') return `Start recovery for ${action.operator.name}`;
     return 'Platform security action';
 }
 
 function actionMessage(action: SecurityAction): string {
     if (action?.type === 'session') return 'This immediately invalidates the selected platform session and its access and refresh tokens.';
     if (action?.type === 'operator_sessions') return 'This immediately invalidates every active platform session for the selected operator.';
-    if (action?.type === 'recovery') return 'This revokes the operator’s credentials and active sessions, then queues a recipient-owned invitation for password setup.';
     return '';
 }

@@ -8,7 +8,6 @@ export const accessPermissions = {
     usersAssignRoles: 'users.assign_roles',
     usersAssignPermissions: 'users.assign_permissions',
     usersManageOrganizationAccess: 'users.manage_organization_access',
-    usersManageInvitations: 'users.manage_invitations',
     userDocumentsView: 'users.documents.view',
     userDocumentsManage: 'users.documents.manage',
     userDevicesView: 'users.devices.view',

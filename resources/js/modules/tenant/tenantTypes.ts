@@ -124,7 +124,7 @@ export interface TenantOnboardingSummary {
     initial_admin_email: string | null;
     root_organization_unit_id: number | null;
     super_admin_role_id: number | null;
-    invitation_id: number | null;
+    administrator_user_id: number | null;
     completed_steps: string[];
     failed_step: string | null;
     last_error_code: string | null;
@@ -134,47 +134,6 @@ export interface TenantOnboardingSummary {
     completed_at: string | null;
     row_version: number;
     steps?: TenantOnboardingStep[];
-}
-
-export type InvitationDeliveryStatus =
-    | 'queued'
-    | 'sending'
-    | 'sent'
-    | 'delivered'
-    | 'bounced'
-    | 'failed'
-    | 'cancelled';
-
-export interface InitialAdministratorInvitationDelivery {
-    id: number;
-    public_id: string;
-    attempt_number: number;
-    status: InvitationDeliveryStatus;
-    processing_attempt_count: number;
-    requested_at: string | null;
-    sent_at: string | null;
-    delivered_at: string | null;
-    bounced_at: string | null;
-    failed_at: string | null;
-    cancelled_at: string | null;
-    provider: string | null;
-    provider_message_id: string | null;
-    error_code: string | null;
-    error_message: string | null;
-}
-
-export interface InitialAdministratorInvitation {
-    id: number;
-    public_id: string;
-    email: string;
-    status: 'pending' | 'accepted' | 'revoked' | 'expired';
-    delivery: InitialAdministratorInvitationDelivery | null;
-    expires_at: string | null;
-    accepted_at: string | null;
-    accepted_by_user_id: number | null;
-    revoked_at: string | null;
-    revocation_reason: string | null;
-    row_version: number;
 }
 
 export interface TenantRecord {
@@ -321,15 +280,14 @@ export interface TenantOnboardingReadiness {
 export interface TenantOnboardingProvisionResult {
     state: TenantOnboardingSummary;
     permission_count: number;
-    invitation: InitialAdministratorInvitation | null;
+    administrator: {
+        user_id: number;
+        email: string;
+        status: string;
+    } | null;
     tenant_row_version: number;
     readiness: TenantOnboardingReadiness | null;
     correlation_id: string;
-}
-
-export interface TenantAdministratorInvitationState {
-    onboarding: TenantOnboardingSummary;
-    invitation: InitialAdministratorInvitation | null;
 }
 
 export interface TenantPage {

@@ -6,9 +6,6 @@ return [
     'guard' => env('USER_MODULE_GUARD', (string) config('auth.defaults.guard', 'api')),
     'platform' => [
         'permission_middleware_alias' => env('PLATFORM_PERMISSION_MIDDLEWARE_ALIAS', 'platform.permission'),
-        'operator_invitation_url' => env('PLATFORM_OPERATOR_INVITATION_URL', rtrim((string) env('PLATFORM_PUBLIC_URL', env('APP_URL')), '/').'/register/platform-operator'),
-        'operator_invitation_ttl_minutes' => (int) env('PLATFORM_OPERATOR_INVITATION_TTL_MINUTES', 1440),
-        'operator_invitation_delivery_lease_seconds' => (int) env('PLATFORM_OPERATOR_INVITATION_DELIVERY_LEASE_SECONDS', 300),
     ],
     'storage' => [
         'documents' => [

@@ -36,9 +36,5 @@ final class AuthErrorCode
 
     public const AUTHORIZATION_CODE_INVALID = 'AUTH_AUTHORIZATION_CODE_INVALID';
 
-    public const REGISTRATION_DISABLED = 'AUTH_REGISTRATION_DISABLED';
-
-    public const INVITATION_INVALID = 'AUTH_INVITATION_INVALID';
-
     private function __construct() {}
 }

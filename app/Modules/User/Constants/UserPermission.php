@@ -15,7 +15,6 @@ final class UserPermission
     public const USERS_ASSIGN_ROLES = 'users.assign_roles';
     public const USERS_ASSIGN_PERMISSIONS = 'users.assign_permissions';
     public const USERS_MANAGE_ORGANIZATION_ACCESS = 'users.manage_organization_access';
-    public const USERS_MANAGE_INVITATIONS = 'users.manage_invitations';
     public const USER_DOCUMENTS_VIEW = 'users.documents.view';
     public const USER_DOCUMENTS_MANAGE = 'users.documents.manage';
     public const USER_DEVICES_VIEW = 'users.devices.view';
@@ -34,7 +33,7 @@ final class UserPermission
     {
         return [
             self::USERS_VIEW => 'View tenant users and access summaries.',
-            self::USERS_CREATE => 'Invite tenant users.',
+            self::USERS_CREATE => 'Create active tenant users.',
             self::USERS_UPDATE => 'Update tenant user profile fields.',
             self::USERS_DELETE => 'Archive tenant user accounts when policy allows it.',
             self::USERS_ACTIVATE => 'Reactivate credential-ready tenant user accounts.',
@@ -42,7 +41,6 @@ final class UserPermission
             self::USERS_ASSIGN_ROLES => 'Assign and remove tenant roles from users.',
             self::USERS_ASSIGN_PERMISSIONS => 'Assign exceptional direct permissions to tenant users.',
             self::USERS_MANAGE_ORGANIZATION_ACCESS => 'Manage user organization-unit access.',
-            self::USERS_MANAGE_INVITATIONS => 'Resend or revoke tenant user invitations.',
             self::USER_DOCUMENTS_VIEW => 'View user documents permitted by subject access policy.',
             self::USER_DOCUMENTS_MANAGE => 'Upload, replace, and remove permitted user documents.',
             self::USER_DEVICES_VIEW => 'View registered devices permitted by subject access policy.',

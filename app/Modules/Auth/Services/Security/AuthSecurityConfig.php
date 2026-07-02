@@ -138,7 +138,6 @@ final readonly class AuthSecurityConfig
         foreach ([
             'refresh rate limit' => config('module-auth.rate_limits.refresh_per_minute'),
             'OAuth exchange rate limit' => config('module-auth.rate_limits.oauth_exchange_per_minute'),
-            'invitation rate limit' => config('module-auth.rate_limits.invitations_per_minute'),
         ] as $name => $value) {
             self::assertIntegerRange($name, $value, 1, 10000);
         }
@@ -149,35 +148,6 @@ final readonly class AuthSecurityConfig
             60,
             3600,
         );
-
-        self::assertIntegerRange(
-            'registration invitation expiry',
-            config('module-auth.registration.invitation_expiry_hours'),
-            1,
-            720,
-        );
-        $leaseSeconds = self::assertIntegerRange(
-            'registration delivery lease',
-            config('module-auth.registration.delivery_lease_seconds'),
-            30,
-            3600,
-        );
-        $staleSeconds = self::assertIntegerRange(
-            'registration delivery stale threshold',
-            config('module-auth.registration.delivery_stale_after_seconds'),
-            60,
-            86400,
-        );
-        if ($staleSeconds < $leaseSeconds) {
-            throw new ConfigurationException('Auth delivery stale threshold cannot be shorter than its lease.');
-        }
-        $invitationUrl = trim((string) config('module-auth.registration.invitation_url'));
-        if (
-            $invitationUrl === ''
-            || (! str_starts_with($invitationUrl, '/') && filter_var($invitationUrl, FILTER_VALIDATE_URL) === false)
-        ) {
-            throw new ConfigurationException('Auth registration invitation URL is invalid.');
-        }
 
         foreach ([
             'authorization-code retention' => config('module-auth.retention.authorization_codes_days'),

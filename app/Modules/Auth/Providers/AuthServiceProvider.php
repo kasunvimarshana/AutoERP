@@ -27,8 +27,6 @@ use Modules\Auth\Services\OrganizationUnit\RevokeOrganizationUnitAuthScopeServic
 use Modules\Auth\Services\PlatformSessionService;
 use Modules\Auth\Services\Readiness\AuthReadinessService;
 use Modules\Auth\Services\Provisioning\TenantAuthenticationProvisioner;
-use Modules\Auth\Services\Registration\InvitationDeliveryHealthReader;
-use Modules\Auth\Services\Registration\RegistrationInvitationService;
 use Modules\Auth\Services\Security\AuthSecurityConfig;
 use Modules\Auth\Services\Security\AccountLoginThrottle;
 use Modules\Auth\Services\Security\OpaqueTokenCodec;
@@ -38,7 +36,6 @@ use Modules\Auth\Services\TenantTokenService;
 use Modules\Auth\Services\AccessTokenRouter;
 use Modules\Auth\Services\UserIntegration\TenantUserAccessRevoker;
 use Modules\Configuration\Contracts\ConfigurationDefinitionRegistryInterface;
-use Modules\Core\Contracts\AuthInvitationDeliveryHealthReaderInterface;
 use Modules\Core\Contracts\CurrentUserContextResolverInterface;
 use Modules\Core\Contracts\OrganizationUnitAuthScopeRevokerInterface;
 use Modules\Tenant\Events\TenantStatusChanged;
@@ -47,7 +44,7 @@ use Modules\User\Contracts\AuthenticationPrincipalProviderInterface;
 use Modules\User\Contracts\PlatformOperatorCredentialProvisionerInterface;
 use Modules\User\Contracts\PlatformOperatorSessionRevokerInterface;
 use Modules\User\Contracts\TenantUserAccessRevokerInterface;
-use Modules\User\Contracts\TenantUserInvitationIssuerInterface;
+use Modules\User\Contracts\TenantUserCredentialProvisionerInterface;
 
 final class AuthServiceProvider extends ServiceProvider
 {
@@ -61,18 +58,16 @@ final class AuthServiceProvider extends ServiceProvider
             (string) $this->app['config']->get('app.key'),
         ));
 
-        $this->app->scoped(AuthInvitationDeliveryHealthReaderInterface::class, InvitationDeliveryHealthReader::class);
         $this->app->scoped(CurrentUserContextResolverInterface::class, CurrentUserContextResolver::class);
         $this->app->scoped(TenantTokenService::class);
         $this->app->scoped(PlatformTokenService::class);
         $this->app->scoped(AccessTokenRouter::class);
         $this->app->scoped(AccountLoginThrottle::class);
         $this->app->scoped(AuthReadinessService::class);
-        $this->app->scoped(RegistrationInvitationService::class);
         $this->app->scoped(PasswordCredentialService::class);
 
-        $this->app->scoped(TenantUserInvitationIssuerInterface::class, RegistrationInvitationService::class);
         $this->app->scoped(TenantUserAccessRevokerInterface::class, TenantUserAccessRevoker::class);
+        $this->app->scoped(TenantUserCredentialProvisionerInterface::class, PasswordCredentialService::class);
         $this->app->scoped(PlatformOperatorCredentialProvisionerInterface::class, PasswordCredentialService::class);
         $this->app->scoped(TenantAuthenticationProvisionerInterface::class, TenantAuthenticationProvisioner::class);
         $this->app->scoped(PlatformOperatorSessionRevokerInterface::class, PlatformSessionService::class);
@@ -200,9 +195,6 @@ final class AuthServiceProvider extends ServiceProvider
         RateLimiter::for('auth.oauth.exchange', static fn (Request $request) => Limit::perMinute(
             max(1, (int) config('module-auth.rate_limits.oauth_exchange_per_minute', 30)),
         )->by('oauth-exchange:'.(string) $request->ip()));
-        RateLimiter::for('auth.invitations', static fn (Request $request) => Limit::perMinute(
-            max(1, (int) config('module-auth.rate_limits.invitations_per_minute', 10)),
-        )->by('auth-invitation:'.(string) $request->ip()));
     }
 
     private function positiveInt(mixed $value): ?int

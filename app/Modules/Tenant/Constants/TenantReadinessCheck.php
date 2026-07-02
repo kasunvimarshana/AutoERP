@@ -10,7 +10,7 @@ final class TenantReadinessCheck
     public const PERMISSION_CATALOGUE = 'permission_catalogue';
     public const SUPER_ADMIN_ACCESS = 'super_admin_access';
     public const AUTHENTICATION_PROVIDER = 'authentication_provider';
-    public const ADMINISTRATOR_INVITATION_ACCEPTED = 'administrator_invitation_accepted';
+    public const ADMINISTRATOR_ACCOUNT_READY = 'administrator_account_ready';
     public const OPERATIONAL_ADMINISTRATOR = 'operational_administrator';
     public const BASE_CURRENCY = 'base_currency';
     public const ACTIVE_PLAN = 'active_plan';
@@ -25,7 +25,7 @@ final class TenantReadinessCheck
             self::PERMISSION_CATALOGUE => 'Synchronize the complete tenant permission catalogue.',
             self::SUPER_ADMIN_ACCESS => 'Assign the exact permission catalogue to the protected Super Admin role.',
             self::AUTHENTICATION_PROVIDER => 'Provision an active tenant authentication provider.',
-            self::ADMINISTRATOR_INVITATION_ACCEPTED => 'The initial administrator must accept the invitation.',
+            self::ADMINISTRATOR_ACCOUNT_READY => 'Create the initial administrator account.',
             self::OPERATIONAL_ADMINISTRATOR => 'An active administrator with root organization and Super Admin access is required.',
             self::BASE_CURRENCY => 'Select an active base accounting currency.',
             self::ACTIVE_PLAN => 'Assign a revision from an active tenant plan.',

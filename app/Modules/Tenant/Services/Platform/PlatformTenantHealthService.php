@@ -8,7 +8,6 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Modules\Audit\Constants\AuditEventCategory;
 use Modules\Audit\Contracts\AuditRecorderInterface;
 use Modules\Audit\Data\AuditEventData;
-use Modules\Core\Contracts\AuthInvitationDeliveryHealthReaderInterface;
 use Modules\Core\Contracts\ClockInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\Tenant\Constants\TenantCurrentSubscriptionState;
@@ -37,7 +36,6 @@ final class PlatformTenantHealthService
         private readonly TenantDomainModel $domains,
         private readonly TenantCurrentSubscriptionModel $subscriptions,
         private readonly TenantDocumentModel $documents,
-        private readonly AuthInvitationDeliveryHealthReaderInterface $invitationDeliveries,
         private readonly TenantStorageCleanupJobModel $cleanupJobs,
         private readonly TenantEventOutboxModel $outboxRows,
         private readonly TenantEventOutboxService $outbox,
@@ -64,7 +62,6 @@ final class PlatformTenantHealthService
                 })->count();
             $deadOutbox = $this->outboxRows->newQuery()->where('status', 'dead')->count();
             $deadCleanup = $this->cleanupJobs->newQuery()->where('status', 'dead')->count();
-            $invitationDelivery = $this->invitationDeliveryHealth();
             $infrastructure = $this->infrastructureHealth();
 
             return [
@@ -91,7 +88,6 @@ final class PlatformTenantHealthService
                     'storage_cleanup' => $this->countsBy($this->cleanupJobs->newQuery(), 'status', ['pending', 'processing', 'completed', 'dead']),
                 ],
                 'infrastructure' => $infrastructure,
-                'invitation_delivery' => $invitationDelivery,
                 'storage' => [
                     'tracked_document_bytes' => (int) $this->documents->newQuery()->sum('size_bytes'),
                     'tracked_document_count' => $this->documents->newQuery()->count(),
@@ -101,15 +97,11 @@ final class PlatformTenantHealthService
                     'domain_failures' => $domainFailures,
                     'dead_outbox_events' => $deadOutbox,
                     'dead_storage_cleanup_jobs' => $deadCleanup,
-                    'failed_invitation_deliveries' => $invitationDelivery['failed'],
-                    'stale_invitation_deliveries' => $invitationDelivery['stale'],
                     'requires_attention' => (
                         $onboardingFailures
                         + $domainFailures
                         + $deadOutbox
                         + $deadCleanup
-                        + $invitationDelivery['failed']
-                        + $invitationDelivery['stale']
                     ) > 0
                         || ! $infrastructure['ready'],
                 ],
@@ -118,7 +110,6 @@ final class PlatformTenantHealthService
                     'domains' => $this->failedDomains(),
                     'outbox' => $this->deadOutboxEvents(),
                     'storage_cleanup' => $this->deadStorageCleanupJobs(),
-                    'invitation_delivery' => $this->failedInvitationDeliveries(),
                 ],
             ];
         });
@@ -155,7 +146,6 @@ final class PlatformTenantHealthService
                 ->first();
             $capacity = $this->capacity($tenantId, $currentSubscription);
             $infrastructure = $this->infrastructureHealth();
-            $invitationDelivery = $this->invitationDeliveryHealth($tenantId);
 
             return [
                 'generated_at' => $this->clock->now()->format(DATE_ATOM),
@@ -192,7 +182,6 @@ final class PlatformTenantHealthService
                 ],
                 'capacity' => $capacity,
                 'infrastructure' => $infrastructure,
-                'invitation_delivery' => $invitationDelivery,
                 'storage' => [
                     'tracked_document_bytes' => (int) $this->documents->newQuery()->where('tenant_id', $tenantId)->sum('size_bytes'),
                     'tracked_document_count' => $this->documents->newQuery()->where('tenant_id', $tenantId)->count(),
@@ -272,36 +261,6 @@ final class PlatformTenantHealthService
             ...$this->operationalInfrastructure->inspect(),
             'capabilities' => $this->infrastructureCapabilities->inspect(),
         ];
-    }
-
-    /** @return array{counts:array<string,int>,failed:int,stale:int} */
-    private function invitationDeliveryHealth(?int $tenantId = null): array
-    {
-        return $this->invitationDeliveries->health($tenantId);
-    }
-
-    /** @return list<array<string, mixed>> */
-    private function failedInvitationDeliveries(): array
-    {
-        $failures = $this->invitationDeliveries->failed(20);
-        if ($failures === []) {
-            return [];
-        }
-
-        $tenants = $this->tenants->newQuery()
-            ->whereIn('id', array_values(array_unique(array_column($failures, 'tenant_id'))))
-            ->get(['id', 'code', 'name'])
-            ->keyBy('id');
-
-        return array_map(static function (array $failure) use ($tenants): array {
-            $tenant = $tenants->get($failure['tenant_id']);
-
-            return [
-                ...$failure,
-                'tenant_code' => $tenant === null ? null : (string) $tenant->getAttribute('code'),
-                'tenant_name' => $tenant === null ? null : (string) $tenant->getAttribute('name'),
-            ];
-        }, $failures);
     }
 
     /** @return list<array<string, mixed>> */

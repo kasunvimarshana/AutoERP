@@ -5,7 +5,6 @@ import { Button, LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { DetailGrid } from '@/shared/components/DetailGrid';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
-import { useConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { FormActions } from '@/shared/components/FormActions';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { Modal } from '@/shared/components/Modal';
@@ -15,7 +14,7 @@ import { Textarea } from '@/shared/components/Textarea';
 import { useApi } from '@/shared/hooks/useApi';
 import { formatDate } from '@/shared/utils/formatDate';
 import { useAuth } from '@/modules/auth/AuthProvider';
-import { accessApi, type AccessUser } from './accessApi';
+import { accessApi } from './accessApi';
 import { accessPermissions, hasAccessPermission } from './accessPermissions';
 import { UserDocumentsPanel } from './UserDocumentsPanel';
 import { UserDevicesPanel } from './UserDevicesPanel';
@@ -32,7 +31,6 @@ export default function UserDetailPage() {
     const { id } = useParams();
     const navigate = useNavigate();
     const auth = useAuth();
-    const { confirm, confirmDialog } = useConfirmDialog();
     const [actionError, setActionError] = useState<ApiError | null>(null);
     const [busy, setBusy] = useState(false);
     const [lifecycleAction, setLifecycleAction] = useState<LifecycleAction | null>(null);
@@ -45,7 +43,6 @@ export default function UserDetailPage() {
     const canActivate = hasAccessPermission(auth, accessPermissions.usersActivate);
     const canDeactivate = hasAccessPermission(auth, accessPermissions.usersDeactivate);
     const canDelete = hasAccessPermission(auth, accessPermissions.usersDelete);
-    const canManageInvitations = hasAccessPermission(auth, accessPermissions.usersManageInvitations);
     const canViewDocuments = hasAccessPermission(auth, accessPermissions.userDocumentsView);
     const canManageDocuments = hasAccessPermission(auth, accessPermissions.userDocumentsManage);
     const canViewDevices = hasAccessPermission(auth, accessPermissions.userDevicesView);
@@ -55,26 +52,6 @@ export default function UserDetailPage() {
     const refresh = async () => {
         if (!id) return;
         user.setData(await accessApi.getUser(id));
-    };
-
-    const resendInvitation = async (record: AccessUser) => {
-        const confirmed = await confirm({
-            title: 'Resend user invitation',
-            message: `Send a new invitation email to ${record.email}? Existing pending delivery attempts will be superseded safely.`,
-            confirmLabel: 'Resend Invitation',
-            danger: false,
-        });
-        if (!confirmed) return;
-        setBusy(true);
-        setActionError(null);
-        try {
-            await accessApi.resendUserInvitation(record.id, record.row_version);
-            await refresh();
-        } catch (caught) {
-            setActionError(toApiError(caught));
-        } finally {
-            setBusy(false);
-        }
     };
 
     const executeLifecycleAction = async () => {
@@ -118,9 +95,6 @@ export default function UserDetailPage() {
                     <>
                         <Button variant="secondary" onClick={() => navigate('/access/users')}>Back</Button>
                         {record && canManage && <LinkButton variant="secondary" to={`/access/users/${record.id}/edit`}>Manage</LinkButton>}
-                        {record?.status === 'invited' && canManageInvitations && (
-                            <Button variant="secondary" loading={busy} onClick={() => void resendInvitation(record)}>Resend Invitation</Button>
-                        )}
                         {record?.status !== 'active' && record?.status !== 'invited' && record?.credentials_ready && canActivate && (
                             <Button loading={busy} onClick={() => openLifecycle({ kind: 'status', status: 'active', title: 'Activate user', confirmLabel: 'Activate User', danger: false })}>Activate</Button>
                         )}
@@ -209,7 +183,6 @@ export default function UserDetailPage() {
                     </FormActions>
                 </div>
             </Modal>
-            {confirmDialog}
         </>
     );
 }

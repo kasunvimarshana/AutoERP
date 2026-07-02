@@ -1,6 +1,6 @@
 # Auth module
 
-The Auth module owns authentication credentials, identities, sessions, access and refresh tokens, OAuth authorization codes, invitation acceptance, and authentication security history. It does not own tenant lifecycle, user profiles and permissions, organization hierarchy, or platform-operator profile governance.
+The Auth module owns authentication credentials, identities, sessions, access and refresh tokens, OAuth authorization codes, and authentication security history. It does not own tenant lifecycle, user profiles and permissions, organization hierarchy, or platform-operator profile governance.
 
 ## Trust boundaries
 
@@ -81,14 +81,14 @@ issued for current authenticated tenant subject/session
 
 The exchange request cannot replace the approved subject, session, or scopes. Confidential-client secrets are accepted only at exchange.
 
-## Platform Recovery
+## Platform Operators
 
-Platform account recovery is owned by the User module because it changes the platform-operator aggregate. The recovery command revokes Auth-owned sessions and credentials, moves the operator to the invited lifecycle, and issues a new recipient-owned invitation. It protects self-recovery and the last active platform manager.
+Platform operators are created as active password-backed accounts by an authorized platform manager. Auth owns the credential and session records; User owns operator profile, lifecycle, and permission assignment. There is no public platform-operator invitation or recovery-registration surface.
 
 ## Module ownership
 
-- **Auth**: credentials, identities, login, sessions, tokens, OAuth, invitation acceptance, Auth retention.
-- **User**: tenant-user and platform-operator profile/lifecycle, roles, permissions, organization access, operator invitations and recovery orchestration.
+- **Auth**: credentials, identities, login, sessions, tokens, OAuth, and Auth retention.
+- **User**: tenant-user and platform-operator profile/lifecycle, roles, permissions, and organization access.
 - **Tenant**: verified tenant resolution, tenant lifecycle, tenant directory and provisioning policy.
 - **OrganizationUnit**: organization-unit existence, hierarchy, lifecycle and membership directory.
 - **Audit**: immutable audit persistence; it consumes owner directories instead of querying Tenant/OrganizationUnit schemas directly.
@@ -100,9 +100,7 @@ Supported public entry points are deliberately small:
 
 - tenant login and cookie-owned refresh;
 - OAuth code exchange;
-- initial tenant-administrator invitation inspect/accept;
-- platform login and cookie-owned refresh;
-- platform-operator invitation inspect/accept in the User module.
+- platform login and cookie-owned refresh.
 
 Generic token issuance, public token introspection, generic verification challenges, SSO aliases, and external identity mutation endpoints are not exposed.
 
@@ -123,11 +121,11 @@ Generic token issuance, public token introspection, generic verification challen
 
 `auth:incident {correlationId}` locates a support reference in local structured Laravel logs without exposing server logs through a browser endpoint.
 
-`auth:purge-expired` removes expired authorization codes, tokens, sessions, login-attempt history, invitation delivery operations, and processed integration events in dependency-safe order using configured retention periods.
+`auth:purge-expired` removes expired authorization codes, tokens, sessions, login-attempt history, legacy registration-invitation delivery operations, and processed integration events in dependency-safe order using configured retention periods.
 
 Auth configuration is validated during provider boot. Invalid TTL, rate-limit, password, OAuth-scope, cookie, or retention configuration must fail startup rather than silently use an unsafe fallback. Route-level throttling provides a coarse IP boundary; the service-level account/account-IP throttle is the authoritative credential-abuse policy. Both depend on the cache probe covered by `auth:readiness`.
 
-Platform operators are invitation-first identities. `AUTOERP_PLATFORM_ADMIN_EMAIL` can seed an invitation when explicitly enabled; no administrator password is accepted from environment configuration. The recipient establishes the credential through the guided invitation flow.
+Platform operators are created as active accounts by an authorized platform manager using the configured password policy.
 
 ## Verification expectations
 
@@ -139,6 +137,5 @@ A release environment must run:
 4. tenant/platform login-refresh-logout-session tests;
 5. OAuth impersonation, scope, redirect, PKCE, and one-time-code tests;
 6. refresh reuse/family compromise tests;
-7. Platform account recovery tests;
-8. Tenant-A/Tenant-B and OU-A/OU-B adversarial tests;
-9. browser tests using verified tenant hosts and HTTP-only refresh cookies.
+7. Tenant-A/Tenant-B and OU-A/OU-B adversarial tests;
+8. browser tests using verified tenant hosts and HTTP-only refresh cookies.

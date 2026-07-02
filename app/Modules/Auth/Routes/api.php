@@ -7,7 +7,6 @@ use Modules\Auth\Http\Controllers\TenantAuthController;
 use Modules\Auth\Http\Controllers\TenantOAuthController;
 use Modules\Auth\Http\Controllers\TenantSessionController;
 use Modules\Auth\Http\Controllers\AuthReadinessController;
-use Modules\Auth\Http\Controllers\InitialAdministratorInvitationController;
 use Modules\Auth\Http\Controllers\OrganizationUnitContextController;
 use Modules\Auth\Http\Controllers\PlatformAuthController;
 use Modules\Auth\Http\Controllers\PlatformSecurityController;
@@ -68,16 +67,6 @@ Route::prefix('api/v1/auth')
             Route::post('organization-unit/switch', [OrganizationUnitContextController::class, 'switch'])
                 ->name('organization-unit.switch');
         });
-    });
-
-Route::prefix('api/v1/auth/initial-administrator')
-    ->middleware(['api', $platformHost, 'throttle:auth.invitations'])
-    ->name('api.v1.auth.initial-administrator.')
-    ->group(function (): void {
-        Route::post('inspect', [InitialAdministratorInvitationController::class, 'inspect'])
-            ->name('inspect');
-        Route::post('accept', [InitialAdministratorInvitationController::class, 'accept'])
-            ->name('accept');
     });
 
 Route::prefix('api/v1/platform/auth')

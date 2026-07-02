@@ -12,6 +12,11 @@ return new class extends Migration
 
     public function up(): void
     {
+        Schema::dropIfExists('platform_operator_invitation_deliveries');
+    }
+
+    public function down(): void
+    {
         Schema::create('platform_operator_invitation_deliveries', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('invitation_id')->constrained('platform_operator_invitations', 'id', indexName: 'platform_operator_invitation_deliveries_invite_fk')->cascadeOnDelete();
@@ -32,10 +37,5 @@ return new class extends Migration
             $table->unique(['invitation_id', 'attempt_number'], 'platform_operator_invitation_delivery_attempt_uk');
             $table->index(['status', 'lease_expires_at'], 'platform_operator_invitation_delivery_claim_ix');
         });
-    }
-
-    public function down(): void
-    {
-        Schema::dropIfExists('platform_operator_invitation_deliveries');
     }
 };

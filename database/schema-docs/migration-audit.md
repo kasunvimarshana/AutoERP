@@ -45,7 +45,7 @@ Tables (3): `organization_unit_types`, `organization_units`, `organization_unit_
 
 ### User
 
-Tables (14): `users`, `roles`, `permissions`, `role_permissions`, `user_roles`, `user_permissions`, `user_organization_units`, `user_documents`, `user_devices`, `platform_operators`, `platform_permissions`, `platform_operator_permissions`, `platform_operator_invitations`, `platform_operator_invitation_deliveries`.
+Tables (12): `users`, `roles`, `permissions`, `role_permissions`, `user_roles`, `user_permissions`, `user_organization_units`, `user_documents`, `user_devices`, `platform_operators`, `platform_permissions`, `platform_operator_permissions`.
 
 ### Auth
 

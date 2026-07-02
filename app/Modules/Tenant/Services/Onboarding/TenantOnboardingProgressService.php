@@ -61,14 +61,14 @@ final class TenantOnboardingProgressService
 
             $existingEmail = strtolower(trim((string) $state->getAttribute('initial_admin_email')));
             if (
-                is_numeric($state->getAttribute('invitation_id'))
+                is_numeric($state->getAttribute('administrator_user_id'))
                 && $existingEmail !== ''
                 && $existingEmail !== $email
             ) {
                 throw new TenantOnboardingOperationException(
                     TenantOnboardingErrorCode::EMAIL_CONFLICT,
-                    'A different initial administrator invitation already exists. Revoke or replace it before changing the email.',
-                    TenantOnboardingStep::INITIAL_ADMIN_INVITATION,
+                    'A different initial administrator account already exists for this onboarding workflow.',
+                    TenantOnboardingStep::INITIAL_ADMIN_ACCOUNT,
                     $correlationId,
                 );
             }
@@ -235,7 +235,7 @@ final class TenantOnboardingProgressService
             }
 
             $state->forceFill([
-                'status' => TenantOnboardingStatus::AWAITING_ADMINISTRATOR,
+                'status' => TenantOnboardingStatus::AWAITING_DOMAIN,
                 'operation_id' => null,
                 'operation_started_at' => null,
                 'operation_lease_expires_at' => null,
@@ -244,110 +244,6 @@ final class TenantOnboardingProgressService
                 'last_error_message' => null,
                 'provisioned_at' => $state->getAttribute('provisioned_at') ?? $this->clock->now(),
                 'row_version' => (int) $state->getAttribute('row_version') + 1,
-                'updated_by' => $this->currentUser->currentUserId(),
-            ])->save();
-
-            return $state->fresh(['steps']) ?? $state;
-        }, 3);
-    }
-
-    /** @param array<string, mixed> $invitation */
-    public function replaceInvitationReference(
-        int $tenantId,
-        int $expectedStateVersion,
-        string $email,
-        array $invitation,
-    ): TenantOnboardingStateModel {
-        return DB::transaction(function () use (
-            $tenantId,
-            $expectedStateVersion,
-            $email,
-            $invitation,
-        ): TenantOnboardingStateModel {
-            $state = $this->states->newQuery()->where('tenant_id', $tenantId)->lockForUpdate()->firstOrFail();
-            if ((int) $state->getAttribute('row_version') !== $expectedStateVersion) {
-                throw new TenantOnboardingOperationException(
-                    TenantOnboardingErrorCode::VERSION_CONFLICT,
-                    'The onboarding state changed after it was loaded. Refresh and try again.',
-                    TenantOnboardingStep::INITIAL_ADMIN_INVITATION,
-                    (string) $state->getAttribute('correlation_id'),
-                );
-            }
-
-            $step = $this->steps->newQuery()
-                ->where('tenant_id', $tenantId)
-                ->where('step', TenantOnboardingStep::INITIAL_ADMIN_INVITATION)
-                ->lockForUpdate()
-                ->firstOrFail();
-            $step->forceFill([
-                'status' => TenantOnboardingStepStatus::COMPLETED,
-                'attempt_count' => (int) $step->getAttribute('attempt_count') + 1,
-                'completed_at' => $this->clock->now(),
-                'error_code' => null,
-                'error_message' => null,
-            ])->save();
-
-            $state->forceFill([
-                'status' => TenantOnboardingStatus::PENDING,
-                'initial_admin_email' => strtolower(trim($email)),
-                'invitation_id' => (int) ($invitation['invitation_id'] ?? 0),
-                'failed_step' => null,
-                'last_error_code' => null,
-                'last_error_message' => null,
-                'row_version' => $expectedStateVersion + 1,
-                'updated_by' => $this->currentUser->currentUserId(),
-            ]);
-
-            $completion = $this->completionPolicy->inspect($state, true);
-            $state->setAttribute(
-                'status',
-                $completion['ready']
-                    ? TenantOnboardingStatus::AWAITING_ADMINISTRATOR
-                    : TenantOnboardingStatus::PENDING,
-            );
-            $state->save();
-
-            return $state->fresh(['steps']) ?? $state;
-        }, 3);
-    }
-
-    public function clearInvitationReference(
-        int $tenantId,
-        int $expectedStateVersion,
-    ): TenantOnboardingStateModel {
-        return DB::transaction(function () use ($tenantId, $expectedStateVersion): TenantOnboardingStateModel {
-            $state = $this->states->newQuery()->where('tenant_id', $tenantId)->lockForUpdate()->firstOrFail();
-            if ((int) $state->getAttribute('row_version') !== $expectedStateVersion) {
-                throw new TenantOnboardingOperationException(
-                    TenantOnboardingErrorCode::VERSION_CONFLICT,
-                    'The onboarding state changed after it was loaded. Refresh and try again.',
-                    TenantOnboardingStep::INITIAL_ADMIN_INVITATION,
-                    (string) $state->getAttribute('correlation_id'),
-                );
-            }
-
-            $this->steps->newQuery()
-                ->where('tenant_id', $tenantId)
-                ->where('step', TenantOnboardingStep::INITIAL_ADMIN_INVITATION)
-                ->update([
-                    'status' => TenantOnboardingStepStatus::PENDING,
-                    'operation_id' => null,
-                    'started_at' => null,
-                    'completed_at' => null,
-                    'error_code' => null,
-                    'error_message' => null,
-                    'correlation_id' => null,
-                    'updated_at' => $this->clock->now(),
-                ]);
-
-            $state->forceFill([
-                'status' => TenantOnboardingStatus::PENDING,
-                'initial_admin_email' => null,
-                'invitation_id' => null,
-                'failed_step' => null,
-                'last_error_code' => null,
-                'last_error_message' => null,
-                'row_version' => $expectedStateVersion + 1,
                 'updated_by' => $this->currentUser->currentUserId(),
             ])->save();
 
@@ -371,7 +267,7 @@ final class TenantOnboardingProgressService
                 'initial_admin_email',
                 'root_organization_unit_id',
                 'super_admin_role_id',
-                'invitation_id',
+                'administrator_user_id',
                 'failed_step',
                 'last_error_code',
                 'last_error_message',

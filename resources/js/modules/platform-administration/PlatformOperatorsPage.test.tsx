@@ -10,8 +10,6 @@ const mocks = vi.hoisted(() => ({
     updateOperatorPermissions: vi.fn(),
     changeOperatorStatus: vi.fn(),
     createOperator: vi.fn(),
-    resendOperatorInvitation: vi.fn(),
-    revokeOperatorInvitation: vi.fn(),
 }));
 
 vi.mock('@/modules/auth/AuthProvider', () => ({ useAuth: () => ({}) }));
@@ -22,8 +20,6 @@ vi.mock('./platformAdministrationApi', () => ({
         updateOperatorPermissions: mocks.updateOperatorPermissions,
         changeOperatorStatus: mocks.changeOperatorStatus,
         createOperator: mocks.createOperator,
-        resendOperatorInvitation: mocks.resendOperatorInvitation,
-        revokeOperatorInvitation: mocks.revokeOperatorInvitation,
     },
 }));
 
@@ -33,16 +29,14 @@ describe('PlatformOperatorsPage', () => {
         mocks.canManage = false;
         mocks.listOperators.mockResolvedValue(operatorPage([activeOperator()]));
         mocks.updateOperatorPermissions.mockResolvedValue({ ...activeOperator(), permissions: ['platform.audit.view'] });
-        mocks.createOperator.mockResolvedValue(invitedOperator());
-        mocks.resendOperatorInvitation.mockResolvedValue(invitedOperator());
-        mocks.revokeOperatorInvitation.mockResolvedValue({ ...invitedOperator(), status: 'inactive', invitation: null });
+        mocks.createOperator.mockResolvedValue({ ...activeOperator(), first_name: 'New', last_name: 'Operator', display_name: 'New Operator', email: 'new.operator@example.test' });
     });
 
     it('keeps lifecycle and permission controls hidden for view-only operators', async () => {
         render(<TestRouter initialEntries={['/administration/platform-operators']}><PlatformOperatorsPage /></TestRouter>);
 
         expect((await screen.findAllByText('Platform Manager')).length).toBeGreaterThan(0);
-        expect(screen.queryByRole('button', { name: 'Invite operator' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Create operator' })).not.toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'Permissions' })).not.toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'Deactivate' })).not.toBeInTheDocument();
     });
@@ -66,50 +60,33 @@ describe('PlatformOperatorsPage', () => {
         ));
     });
 
-    it('creates an invited identity without collecting an administrator-known password', async () => {
+    it('creates an active identity with an initial password', async () => {
         mocks.canManage = true;
         const user = userEvent.setup();
         render(<TestRouter initialEntries={['/administration/platform-operators']}><PlatformOperatorsPage /></TestRouter>);
 
         expect((await screen.findAllByText('Platform Manager')).length).toBeGreaterThan(0);
-        await user.click(screen.getByRole('button', { name: 'Invite operator' }));
-        const dialog = screen.getByRole('dialog', { name: 'Invite platform operator' });
-        expect(within(dialog).queryByLabelText(/password/i)).not.toBeInTheDocument();
+        await user.click(screen.getByRole('button', { name: 'Create operator' }));
+        const dialog = screen.getByRole('dialog', { name: 'Create platform operator' });
 
         await user.type(within(dialog).getByLabelText('First name'), 'New');
         await user.type(within(dialog).getByLabelText('Last name'), 'Operator');
         await user.type(within(dialog).getByRole('textbox', { name: /Platform email/ }), 'NEW.OPERATOR@EXAMPLE.TEST');
+        await user.type(within(dialog).getByLabelText(/^Password/), 'StrongPassword!123');
+        await user.type(within(dialog).getByLabelText(/^Confirm password/), 'StrongPassword!123');
         await user.click(within(dialog).getByRole('checkbox', { name: /operators.*manage/i }));
-        await user.click(within(dialog).getByRole('button', { name: 'Send invitation' }));
+        await user.click(within(dialog).getByRole('button', { name: 'Create operator' }));
 
         await waitFor(() => expect(mocks.createOperator).toHaveBeenCalledWith({
             first_name: 'New',
             last_name: 'Operator',
             email: 'new.operator@example.test',
             permissions: ['platform.operators.manage'],
+            password: 'StrongPassword!123',
+            password_confirmation: 'StrongPassword!123',
         }));
     });
 
-    it('explains safe resend transition and directs the operator to the newest email', async () => {
-        mocks.canManage = true;
-        mocks.listOperators.mockResolvedValue(operatorPage([invitedOperator()]));
-        const user = userEvent.setup();
-        render(<TestRouter initialEntries={['/administration/platform-operators']}><PlatformOperatorsPage /></TestRouter>);
-
-        expect((await screen.findAllByRole('button', { name: 'Resend invitation' })).length).toBeGreaterThan(0);
-        expect(screen.getAllByRole('button', { name: 'Revoke invitation' }).length).toBeGreaterThan(0);
-        expect(screen.queryByRole('button', { name: 'Activate' })).not.toBeInTheDocument();
-
-        await user.click(screen.getAllByRole('button', { name: 'Resend invitation' })[0]);
-        const dialog = screen.getByRole('dialog', { name: 'Resend invitation to Pending Operator' });
-        expect(within(dialog).getByText(/use the newest email/i)).toBeInTheDocument();
-        expect(within(dialog).getByText(/legacy or unreadable tokens are safely replaced/i)).toBeInTheDocument();
-        await user.click(within(dialog).getByRole('button', { name: 'Resend invitation' }));
-
-        await waitFor(() => expect(mocks.resendOperatorInvitation).toHaveBeenCalledWith(invitedOperator()));
-        expect(await screen.findByText(/invitation was queued/i)).toBeInTheDocument();
-        expect(screen.getByText(/current-format links remain valid/i)).toBeInTheDocument();
-    });
 });
 
 function activeOperator() {
@@ -120,7 +97,6 @@ function activeOperator() {
         display_name: 'Platform Manager',
         email: 'manager@example.test',
         status: 'active' as const,
-        invitation: null,
         permissions: ['platform.operators.manage'],
         row_version: 4,
         created_at: '2026-06-24T00:00:00Z',
@@ -128,33 +104,11 @@ function activeOperator() {
     };
 }
 
-function invitedOperator() {
-    return {
-        id: 3,
-        first_name: 'Pending',
-        last_name: 'Operator',
-        display_name: 'Pending Operator',
-        email: 'pending@example.test',
-        status: 'invited' as const,
-        invitation: {
-            status: 'pending' as const,
-            delivery_status: 'sent' as const,
-            expires_at: '2026-06-26T00:00:00Z',
-            sent_at: '2026-06-25T00:00:00Z',
-            failed_at: null,
-            error_message: null,
-        },
-        permissions: ['platform.operators.manage'],
-        row_version: 1,
-        created_at: '2026-06-25T00:00:00Z',
-        updated_at: '2026-06-25T00:00:00Z',
-    };
-}
-
-function operatorPage(data: Array<ReturnType<typeof activeOperator> | ReturnType<typeof invitedOperator>>) {
+function operatorPage(data: ReturnType<typeof activeOperator>[]) {
     return {
         data,
         meta: { current_page: 1, from: 1, last_page: 1, per_page: 20, to: 1, total: 1 },
         available_permissions: ['platform.audit.view', 'platform.operators.manage'],
+        password_policy: { minimum_length: 12, mixed_case: true, numbers: true, symbols: true },
     };
 }

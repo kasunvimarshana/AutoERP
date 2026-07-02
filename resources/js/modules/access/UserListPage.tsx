@@ -86,7 +86,7 @@ export default function UserListPage() {
             <ContentHeader
                 title="Users"
                 description="Search tenant users and open a guided account-management workflow."
-                actions={canCreate ? <LinkButton to="/access/users/create">Invite User</LinkButton> : null}
+                actions={canCreate ? <LinkButton to="/access/users/create">Create User</LinkButton> : null}
             />
             <div className="mb-5 grid gap-4 lg:grid-cols-4">
                 <Input label="Search" type="search" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} />

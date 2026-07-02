@@ -20,7 +20,7 @@ return new class extends Migration
             $table->string('initial_admin_email')->nullable();
             $table->unsignedBigInteger('root_organization_unit_id')->nullable();
             $table->unsignedBigInteger('super_admin_role_id')->nullable();
-            $table->unsignedBigInteger('invitation_id')->nullable();
+            $table->unsignedBigInteger('administrator_user_id')->nullable();
             $table->string('failed_step', 80)->nullable();
             $table->string('last_error_code', 100)->nullable();
             $table->string('last_error_message', 500)->nullable();
@@ -44,10 +44,10 @@ return new class extends Migration
                 ->on('roles')
                 ->restrictOnDelete();
             $table->foreign(
-                ['invitation_id', 'tenant_id'],
-                'tenant_onboarding_invitation_tenant_fk',
+                ['administrator_user_id', 'tenant_id'],
+                'tenant_onboarding_admin_user_tenant_fk',
             )->references(['id', 'tenant_id'])
-                ->on('auth_registration_invitations')
+                ->on('users')
                 ->restrictOnDelete();
             $table->index(['status', 'updated_at'], 'tenant_onboarding_status_ix');
         });

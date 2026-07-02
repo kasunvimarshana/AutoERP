@@ -6,6 +6,10 @@ namespace Modules\Auth\Services\Credentials;
 
 use Illuminate\Database\DatabaseManager;
 use Modules\Auth\Enums\CredentialStatus;
+use Modules\Auth\Enums\IdentityStatus;
+use Modules\Auth\Enums\ProviderStatus;
+use Modules\Auth\Models\AuthIdentityModel;
+use Modules\Auth\Models\AuthProviderModel;
 use Modules\Auth\Models\AuthPlatformOperatorPasswordCredentialModel;
 use Modules\Auth\Models\AuthUserPasswordCredentialModel;
 use Modules\Auth\Security\PasswordPolicy;
@@ -13,9 +17,13 @@ use Modules\Core\Contracts\ClockInterface;
 use Modules\Auth\Contracts\PasswordHasherInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\User\Contracts\PlatformOperatorCredentialProvisionerInterface;
+use Modules\User\Contracts\TenantUserCredentialProvisionerInterface;
 
-final readonly class PasswordCredentialService implements PlatformOperatorCredentialProvisionerInterface
+final readonly class PasswordCredentialService implements PlatformOperatorCredentialProvisionerInterface, TenantUserCredentialProvisionerInterface
 {
+    private const INTERNAL_PROVIDER_NAME = 'Internal authentication';
+    private const INTERNAL_PROVIDER_DRIVER = 'internal';
+
     public function __construct(
         private PasswordHasherInterface $hasher,
         private ClockInterface $clock,
@@ -32,20 +40,65 @@ final readonly class PasswordCredentialService implements PlatformOperatorCreden
     {
         PasswordPolicy::assert($plainPassword);
         $this->executionContext->runForTenant($tenantId, fn () => $this->database->transaction(function () use ($tenantId, $userId, $plainPassword): void {
-            $credential = AuthUserPasswordCredentialModel::query()
-                ->where('user_id', $userId)->lockForUpdate()->first();
-            $credential ??= new AuthUserPasswordCredentialModel();
-            $credential->forceFill([
-                'tenant_id' => $tenantId,
-                'user_id' => $userId,
-                'password_hash' => $this->hasher->hash($plainPassword),
-                'status' => CredentialStatus::ACTIVE->value,
-                'changed_at' => $this->clock->now(),
-                'revoked_at' => null,
-                'row_version' => $credential->exists
-                    ? (int) $credential->getAttribute('row_version') + 1
-                    : 1,
-            ])->save();
+            $this->upsertTenantUserPasswordCredential($tenantId, $userId, $plainPassword);
+        }, 3));
+    }
+
+    public function provisionTenantUser(int $tenantId, int $userId, string $email, string $plainPassword): void
+    {
+        PasswordPolicy::assert($plainPassword);
+        $email = mb_strtolower(trim($email));
+
+        $this->executionContext->runForTenant($tenantId, fn () => $this->database->transaction(function () use (
+            $tenantId,
+            $userId,
+            $email,
+            $plainPassword,
+        ): void {
+            $provider = AuthProviderModel::query()->firstOrCreate(
+                [
+                    'tenant_id' => $tenantId,
+                    'provider_key' => (string) config('module-auth.internal_provider_key', self::INTERNAL_PROVIDER_DRIVER),
+                ],
+                [
+                    'name' => self::INTERNAL_PROVIDER_NAME,
+                    'driver' => self::INTERNAL_PROVIDER_DRIVER,
+                    'status' => ProviderStatus::ACTIVE->value,
+                    'row_version' => 1,
+                ],
+            );
+            if ((string) $provider->getAttribute('status') !== ProviderStatus::ACTIVE->value) {
+                throw new \RuntimeException('The internal authentication provider is inactive.');
+            }
+
+            $identity = AuthIdentityModel::query()
+                ->where('provider_id', $provider->getKey())
+                ->where('user_id', $userId)
+                ->lockForUpdate()
+                ->first();
+            if (! $identity instanceof AuthIdentityModel) {
+                AuthIdentityModel::query()->create([
+                    'tenant_id' => $tenantId,
+                    'provider_id' => (int) $provider->getKey(),
+                    'user_id' => $userId,
+                    'provider_user_key' => $email,
+                    'status' => IdentityStatus::ACTIVE->value,
+                    'primary_marker' => 'primary',
+                    'verified_at' => $this->clock->now(),
+                    'row_version' => 1,
+                ]);
+            } else {
+                if ((string) $identity->getAttribute('status') !== IdentityStatus::ACTIVE->value) {
+                    throw new \RuntimeException('The user authentication identity is inactive.');
+                }
+                $identity->forceFill([
+                    'provider_user_key' => $email,
+                    'verified_at' => $identity->getAttribute('verified_at') ?? $this->clock->now(),
+                    'row_version' => (int) $identity->getAttribute('row_version') + 1,
+                ])->save();
+            }
+
+            $this->upsertTenantUserPasswordCredential($tenantId, $userId, $plainPassword);
         }, 3));
     }
 
@@ -118,19 +171,6 @@ final readonly class PasswordCredentialService implements PlatformOperatorCreden
         }, 3));
     }
 
-    public function revoke(int $platformOperatorId): void
-    {
-        $now = $this->clock->now();
-        $this->executionContext->runAsControlPlane(fn () => AuthPlatformOperatorPasswordCredentialModel::query()
-            ->where('platform_operator_id', $platformOperatorId)
-            ->where('status', CredentialStatus::ACTIVE->value)
-            ->increment('row_version', 1, [
-                'status' => CredentialStatus::REVOKED->value,
-                'revoked_at' => $now,
-                'updated_at' => $now,
-            ]));
-    }
-
     public function verifyPlatformOperator(int $operatorId, string $plainPassword): bool
     {
         return $this->executionContext->runAsControlPlane(function () use ($operatorId, $plainPassword): bool {
@@ -160,5 +200,23 @@ final readonly class PasswordCredentialService implements PlatformOperatorCreden
             }
             return true;
         });
+    }
+
+    private function upsertTenantUserPasswordCredential(int $tenantId, int $userId, string $plainPassword): void
+    {
+        $credential = AuthUserPasswordCredentialModel::query()
+            ->where('user_id', $userId)->lockForUpdate()->first();
+        $credential ??= new AuthUserPasswordCredentialModel();
+        $credential->forceFill([
+            'tenant_id' => $tenantId,
+            'user_id' => $userId,
+            'password_hash' => $this->hasher->hash($plainPassword),
+            'status' => CredentialStatus::ACTIVE->value,
+            'changed_at' => $this->clock->now(),
+            'revoked_at' => null,
+            'row_version' => $credential->exists
+                ? (int) $credential->getAttribute('row_version') + 1
+                : 1,
+        ])->save();
     }
 }

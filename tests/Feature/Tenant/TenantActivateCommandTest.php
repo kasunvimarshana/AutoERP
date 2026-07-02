@@ -7,8 +7,6 @@ namespace Tests\Feature\Tenant;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use Modules\Auth\Constants\RegistrationInvitationPurpose;
-use Modules\Auth\Constants\RegistrationInvitationStatus;
 use Modules\Core\Contracts\TenantAccessProvisionerInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\Tenant\Constants\TenantOnboardingStatus;
@@ -55,8 +53,7 @@ final class TenantActivateCommandTest extends TestCase
         ]);
         TenantAuthenticationFixture::provision($tenantId, $userId, $email);
         $this->assignAdministratorAccess($tenantId, $userId, $organizationUnitId, $roleId);
-        $invitationId = $this->acceptedInvitation($tenantId, $userId, $organizationUnitId, $roleId, $email);
-        $this->readyOnboardingState($tenantId, $organizationUnitId, $roleId, $invitationId, $email);
+        $this->readyOnboardingState($tenantId, $organizationUnitId, $roleId, $userId, $email);
 
         $this->artisan('tenant:activate', [
             'tenant' => (string) $tenantId,
@@ -149,44 +146,11 @@ final class TenantActivateCommandTest extends TestCase
         ]);
     }
 
-    private function acceptedInvitation(
-        int $tenantId,
-        int $userId,
-        int $organizationUnitId,
-        int $roleId,
-        string $email,
-    ): int {
-        $now = now();
-
-        return (int) DB::table('auth_registration_invitations')->insertGetId([
-            'public_id' => (string) Str::uuid(),
-            'row_version' => 2,
-            'tenant_id' => $tenantId,
-            'user_id' => null,
-            'organization_unit_id' => $organizationUnitId,
-            'role_id' => $roleId,
-            'email' => $email,
-            'token_hash' => hash('sha256', 'cli-activation-regression'),
-            'delivery_token' => null,
-            'purpose' => RegistrationInvitationPurpose::INITIAL_ADMINISTRATOR,
-            'status' => RegistrationInvitationStatus::ACCEPTED,
-            'expires_at' => $now->copy()->addHour(),
-            'accepted_at' => $now,
-            'accepted_by_user_id' => $userId,
-            'revoked_at' => null,
-            'revocation_reason' => null,
-            'created_by' => null,
-            'updated_by' => null,
-            'created_at' => $now,
-            'updated_at' => $now,
-        ]);
-    }
-
     private function readyOnboardingState(
         int $tenantId,
         int $organizationUnitId,
         int $roleId,
-        int $invitationId,
+        int $administratorUserId,
         string $email,
     ): void {
         $now = now();
@@ -200,7 +164,7 @@ final class TenantActivateCommandTest extends TestCase
             'initial_admin_email' => $email,
             'root_organization_unit_id' => $organizationUnitId,
             'super_admin_role_id' => $roleId,
-            'invitation_id' => $invitationId,
+            'administrator_user_id' => $administratorUserId,
             'failed_step' => null,
             'last_error_code' => null,
             'last_error_message' => null,

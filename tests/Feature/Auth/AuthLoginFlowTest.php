@@ -113,7 +113,6 @@ final class AuthLoginFlowTest extends TestCase
             'email' => $email,
             'status' => PlatformOperatorStatus::ACTIVE,
             'credentials_ready_at' => $now,
-            'invited_at' => $now,
             'activated_at' => $now,
             'deactivated_at' => null,
             'created_by_operator_id' => null,

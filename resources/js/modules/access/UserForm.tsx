@@ -46,7 +46,7 @@ export function UserForm({
                     required
                     readOnly={emailReadOnly}
                     className={emailReadOnly ? 'bg-slate-50 text-slate-600' : ''}
-                    hint={emailReadOnly ? 'Email changes require a dedicated verified-email workflow and cannot be changed here.' : 'The invitation will be sent to this address.'}
+                    hint={emailReadOnly ? 'Email changes require a dedicated verified-email workflow and cannot be changed here.' : 'Used for sign-in and account communication.'}
                     value={value.email}
                     error={fieldError(error, 'email')}
                     onChange={(event) => set({ email: event.target.value })}

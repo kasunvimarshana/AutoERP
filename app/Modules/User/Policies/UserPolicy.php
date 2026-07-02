@@ -65,12 +65,6 @@ final class UserPolicy
             && $this->can($actor, UserPermission::USERS_ASSIGN_PERMISSIONS);
     }
 
-    public function manageInvitations(UserModel $actor, UserModel $subject): bool
-    {
-        return $this->sameTenant($actor, $subject)
-            && $this->can($actor, UserPermission::USERS_MANAGE_INVITATIONS);
-    }
-
     public function viewDocuments(UserModel $actor, UserModel $subject): bool
     {
         return $this->sameTenant($actor, $subject)

@@ -207,7 +207,7 @@ final class EloquentTenantRepository implements TenantRepositoryInterface
         return $this->model->newQuery()->with([
             'currentSubscription:tenant_id,tenant_subscription_id,state,state_reason,state_changed_at,row_version,assigned_at,assigned_by',
             'currentSubscription.subscription.revision.plan:id,name,slug,is_active',
-            'onboardingState:tenant_id,status,operation_id,initial_admin_email,root_organization_unit_id,super_admin_role_id,invitation_id,failed_step,last_error_code,last_error_message,correlation_id,provisioned_at,completed_at,row_version',
+            'onboardingState:tenant_id,status,operation_id,initial_admin_email,root_organization_unit_id,super_admin_role_id,administrator_user_id,failed_step,last_error_code,last_error_message,correlation_id,provisioned_at,completed_at,row_version',
             'onboardingState.steps:id,tenant_id,step,status,attempt_count,owner_module,started_at,completed_at,error_code,error_message,correlation_id',
             'primaryDomainAssignment:tenant_id,tenant_domain_id',
             'primaryDomainAssignment.domain:id,tenant_id,domain,status,ownership_status,routing_status,tls_status,reachability_status,operational_status,verified_at,last_operational_check_at,tls_expires_at',
@@ -253,7 +253,7 @@ final class EloquentTenantRepository implements TenantRepositoryInterface
                 'operation_id',
                 'root_organization_unit_id',
                 'super_admin_role_id',
-                'invitation_id',
+                'administrator_user_id',
                 'failed_step',
                 'last_error_code',
                 'last_error_message',

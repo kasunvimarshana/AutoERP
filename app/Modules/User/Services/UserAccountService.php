@@ -19,7 +19,7 @@ use Modules\User\Constants\UserPermission;
 use Modules\User\Constants\UserStatus;
 use Modules\User\Constants\UserSystemRole;
 use Modules\User\Contracts\TenantUserAccessRevokerInterface;
-use Modules\User\Contracts\TenantUserInvitationIssuerInterface;
+use Modules\User\Contracts\TenantUserCredentialProvisionerInterface;
 use Modules\User\Models\UserDeviceModel;
 use Modules\User\Models\UserModel;
 use Modules\User\Models\UserOrganizationUnitModel;
@@ -38,7 +38,7 @@ final class UserAccountService extends AbstractUserCrudService
         private readonly TenantEntitlementReaderInterface $entitlements,
         private readonly UserRoleAssignmentService $roles,
         private readonly UserOrganizationAccessService $organizationAccess,
-        private readonly TenantUserInvitationIssuerInterface $invitations,
+        private readonly TenantUserCredentialProvisionerInterface $credentials,
         private readonly TenantUserAccessRevokerInterface $accessRevoker,
         private readonly UserAuditService $audit,
         private readonly ClockInterface $clock,
@@ -48,7 +48,7 @@ final class UserAccountService extends AbstractUserCrudService
     public function create(array $payload): Result
     {
         try {
-            $this->assertPermission(UserPermission::USERS_CREATE, 'You are not allowed to invite users.');
+            $this->assertPermission(UserPermission::USERS_CREATE, 'You are not allowed to create users.');
             $roleIds = $this->normalizeIds($payload['role_ids'] ?? []);
             $organizationUnitIds = $this->normalizeIds($payload['organization_unit_ids'] ?? []);
             $defaultOrganizationUnitId = is_numeric($payload['default_organization_unit_id'] ?? null)
@@ -65,7 +65,7 @@ final class UserAccountService extends AbstractUserCrudService
             $tenantId = $this->requireTenantId();
             $created = DB::transaction(function () use (
                 $tenantId, $payload, $roleIds, $organizationUnitIds, $defaultOrganizationUnitId,
-            ): array {
+            ): UserModel {
                 $this->tenantLock->lock($tenantId);
                 $limit = $this->entitlements->limit($tenantId, TenantPlanLimit::USERS);
                 if ($limit !== null && UserModel::query()->where('tenant_id', $tenantId)->count() >= $limit) {
@@ -84,25 +84,39 @@ final class UserAccountService extends AbstractUserCrudService
                     'last_name' => $this->nullableString($payload['last_name'] ?? null),
                     'username' => $username,
                     'email' => $email,
-                    'status' => UserStatus::INVITED,
+                    'email_verified_at' => $now,
+                    'status' => UserStatus::ACTIVE,
                     'phone' => $this->nullableString($payload['phone'] ?? null),
-                    'invited_at' => $now,
+                    'credentials_ready_at' => $now,
+                    'invited_at' => null,
+                    'activated_at' => $now,
                     'created_by_user_id' => $actorId,
                     'updated_by_user_id' => $actorId,
                 ]);
                 $this->roles->applyInitialAccess($user, $roleIds);
                 $this->organizationAccess->applyInitialAccess($user, $organizationUnitIds, $defaultOrganizationUnitId);
-                $invitation = $this->invitations->issueForUser($tenantId, (int) $user->getKey(), $email);
-                $this->audit->record('account.invited', 'user', $user, null, $this->snapshot($user) + ['invitation' => $invitation]);
-                return [$user, $invitation];
+                $this->credentials->provisionTenantUser(
+                    $tenantId,
+                    (int) $user->getKey(),
+                    $email,
+                    (string) ($payload['password'] ?? ''),
+                );
+                $this->audit->record('account.created', 'user', $user, null, $this->snapshot($user));
+                return $user;
             }, 3);
 
             /** @var UserModel $user */
-            $user = $created[0];
-            return Result::success(new DataRecord($this->snapshot($user->fresh() ?? $user) + ['invitation' => $created[1]]));
+            $user = $created;
+            return Result::success(new DataRecord($this->snapshot($user->fresh() ?? $user)));
         } catch (Throwable $exception) {
             return $this->fromThrowable($exception);
         }
+    }
+
+    /** @return array{minimum_length:int,mixed_case:bool,numbers:bool,symbols:bool} */
+    public function passwordRequirements(): array
+    {
+        return $this->credentials->passwordRequirements();
     }
 
     public function updateProfile(int|string $userId, int $expectedVersion, array $payload): Result
@@ -159,7 +173,7 @@ final class UserAccountService extends AbstractUserCrudService
                 }
                 if ($status === UserStatus::ACTIVE) {
                     if ($user->getAttribute('credentials_ready_at') === null) {
-                        throw new RuntimeException('The invited user must complete credential setup before activation.');
+                        throw new RuntimeException('The user account must have credentials before activation.');
                     }
                     if (! UserOrganizationUnitModel::query()->where('tenant_id', $tenantId)
                         ->where('user_id', $user->getKey())->where('status', UserOrganizationUnitStatus::ACTIVE)->where('is_default', true)->exists()) {
@@ -186,32 +200,6 @@ final class UserAccountService extends AbstractUserCrudService
                 return $user;
             }, 3);
             return Result::success(new DataRecord($this->snapshot($user->fresh() ?? $user)));
-        } catch (Throwable $exception) {
-            return $this->fromThrowable($exception);
-        }
-    }
-
-    public function resendInvitation(int|string $userId, int $expectedVersion): Result
-    {
-        try {
-            $this->assertPermission(UserPermission::USERS_MANAGE_INVITATIONS, 'You are not allowed to resend invitations.');
-            $tenantId = $this->requireTenantId();
-            $result = DB::transaction(function () use ($tenantId, $userId, $expectedVersion): array {
-                $user = $this->findLocked($tenantId, $userId);
-                $this->assertVersion($user, $expectedVersion);
-                if ((string) $user->getAttribute('status') !== UserStatus::INVITED || $user->getAttribute('credentials_ready_at') !== null) {
-                    throw new RuntimeException('Only a pending invited account can receive a replacement invitation.');
-                }
-                $invitation = $this->invitations->resendForUser($tenantId, (int) $user->getKey());
-                $user->forceFill([
-                    'invited_at' => $this->clock->now(),
-                    'row_version' => $expectedVersion + 1,
-                    'updated_by_user_id' => $this->actor->currentUserId(),
-                ])->save();
-                $this->audit->record('invitation.resent', 'user', $user, null, ['invitation' => $invitation]);
-                return [$user, $invitation];
-            }, 3);
-            return Result::success(new DataRecord($this->snapshot($result[0]) + ['invitation' => $result[1]]));
         } catch (Throwable $exception) {
             return $this->fromThrowable($exception);
         }

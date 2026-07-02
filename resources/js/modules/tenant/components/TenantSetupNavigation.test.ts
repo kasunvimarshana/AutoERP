@@ -7,7 +7,7 @@ const requiredSteps = [
     'permission_catalogue',
     'super_admin_role',
     'authentication_provider',
-    'initial_admin_invitation',
+    'initial_admin_account',
 ];
 
 function tenantWithCompletedSteps(completedSteps: string[]): TenantRecord {

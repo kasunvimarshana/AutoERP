@@ -15,8 +15,6 @@ import { RouteErrorPage } from "./errors/RouteErrorPage";
 import { tenantPermissions } from "@/modules/tenant/tenantPermissions";
 
 const LoginPage = lazy(() => import("@/modules/auth/LoginPage"));
-const InitialAdministratorInvitationPage = lazy(() => import("@/modules/auth/InitialAdministratorInvitationPage"));
-const PlatformOperatorInvitationPage = lazy(() => import("@/modules/auth/PlatformOperatorInvitationPage"));
 const AuditLogListPage = lazy(() => import("@/modules/audit/AuditLogListPage"));
 const AuditLogDetailPage = lazy(() => import("@/modules/audit/AuditLogDetailPage"));
 const DashboardPage = lazy(() => import("@/modules/dashboard/DashboardPage"));
@@ -451,8 +449,6 @@ const appRouter = createBrowserRouter(
     createRoutesFromElements(
         <Route errorElement={<RouteErrorPage />}>
             <Route path="/login" element={<LoginPage />} />
-            <Route path="/register/invitation" element={<InitialAdministratorInvitationPage />} />
-            <Route path="/register/platform-operator" element={<PlatformOperatorInvitationPage />} />
             <Route element={<ProtectedRoute />}>
                 <Route index element={<AuthenticatedHomeRedirect />} />
                 <Route element={<PlatformOperatorRoute />}>

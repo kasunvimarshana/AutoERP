@@ -45,6 +45,11 @@ final class UserController extends AbstractUserCrudController
         return $this->responseForStore($this->accounts->create($request->validated()));
     }
 
+    public function passwordPolicy(): JsonResponse
+    {
+        return response()->json(['data' => $this->accounts->passwordRequirements()]);
+    }
+
     public function update(UpdateUserProfileRequest $request, int|string $user): JsonResponse|UserRecordResource
     {
         $payload = $request->validated();
@@ -99,16 +104,6 @@ final class UserController extends AbstractUserCrudController
             (int) $payload['expected_version'],
             $payload['organization_unit_ids'],
             (int) $payload['default_organization_unit_id'],
-        ));
-    }
-
-    public function resendInvitation(
-        VersionedUserActionRequest $request,
-        int|string $user,
-    ): JsonResponse|UserRecordResource {
-        return $this->responseForUpdate($this->accounts->resendInvitation(
-            $user,
-            (int) $request->validated('expected_version'),
         ));
     }
 

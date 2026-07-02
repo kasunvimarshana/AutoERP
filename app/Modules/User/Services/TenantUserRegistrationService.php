@@ -25,18 +25,34 @@ final class TenantUserRegistrationService implements TenantUserRegistrationInter
         private readonly TenantAggregateLockInterface $tenantLock,
     ) {}
 
-    public function prepareFromInvitation(
+    public function prepareProvisionedAccount(
         int $tenantId,
-        ?int $targetUserId,
-        ?int $organizationUnitId,
-        ?int $roleId,
+        int $organizationUnitId,
+        int $roleId,
+        string $firstName,
+        ?string $lastName,
+        string $email,
+    ): int {
+        return $this->prepareAccount(
+            $tenantId,
+            $organizationUnitId,
+            $roleId,
+            $firstName,
+            $lastName,
+            $email,
+        );
+    }
+
+    private function prepareAccount(
+        int $tenantId,
+        int $organizationUnitId,
+        int $roleId,
         string $firstName,
         ?string $lastName,
         string $email,
     ): int {
         return DB::transaction(function () use (
             $tenantId,
-            $targetUserId,
             $organizationUnitId,
             $roleId,
             $firstName,
@@ -46,15 +62,14 @@ final class TenantUserRegistrationService implements TenantUserRegistrationInter
             $this->tenantLock->lock($tenantId);
             $email = strtolower(trim($email));
             if ($email === '') {
-                throw new RuntimeException('Invitation email is required.');
+                throw new RuntimeException('Account email is required.');
             }
 
-            $user = $targetUserId === null ? null : UserModel::query()
-                ->where('tenant_id', $tenantId)->whereKey($targetUserId)
-                ->lockForUpdate()->first();
-            if ($targetUserId !== null && ! $user instanceof UserModel) {
-                throw new RuntimeException('The invited user account no longer exists.');
-            }
+            $user = UserModel::query()
+                ->where('tenant_id', $tenantId)
+                ->where('email', $email)
+                ->lockForUpdate()
+                ->first();
 
             if (! $user instanceof UserModel) {
                 if (UserModel::withTrashed()->where('tenant_id', $tenantId)->where('email', $email)->exists()) {
@@ -67,15 +82,12 @@ final class TenantUserRegistrationService implements TenantUserRegistrationInter
                     'last_name' => $this->nullable($lastName),
                     'email' => $email,
                     'status' => UserStatus::INVITED,
-                    'invited_at' => $this->clock->now(),
+                    'invited_at' => null,
                 ]);
             } else {
-                if ((string) $user->getAttribute('email') !== $email) {
-                    throw new RuntimeException('Invitation email does not match the invited user account.');
-                }
                 if ((string) $user->getAttribute('status') !== UserStatus::INVITED
-                    || $user->getAttribute('credentials_ready_at') !== null) {
-                    throw new RuntimeException('The invited user account is no longer awaiting credential setup.');
+                    && (string) $user->getAttribute('status') !== UserStatus::ACTIVE) {
+                    throw new RuntimeException('The administrator account exists but is not eligible for provisioning.');
                 }
                 $user->forceFill([
                     'first_name' => trim($firstName) !== '' ? trim($firstName) : $user->getAttribute('first_name'),
@@ -84,34 +96,30 @@ final class TenantUserRegistrationService implements TenantUserRegistrationInter
                 ])->save();
             }
 
-            if ($roleId !== null) {
-                $role = RoleModel::query()->where('tenant_id', $tenantId)->whereKey($roleId)
-                    ->where('is_system', true)->lockForUpdate()->first();
-                if (! $role instanceof RoleModel) {
-                    throw new RuntimeException('The invitation role is unavailable.');
-                }
-                UserRoleModel::query()->firstOrCreate([
-                    'tenant_id' => $tenantId,
-                    'user_id' => $user->getKey(),
-                    'role_id' => $roleId,
-                ], ['row_version' => 1]);
+            $role = RoleModel::query()->where('tenant_id', $tenantId)->whereKey($roleId)
+                ->where('is_system', true)->lockForUpdate()->first();
+            if (! $role instanceof RoleModel) {
+                throw new RuntimeException('The administrator role is unavailable.');
             }
+            UserRoleModel::query()->firstOrCreate([
+                'tenant_id' => $tenantId,
+                'user_id' => $user->getKey(),
+                'role_id' => $roleId,
+            ], ['row_version' => 1]);
 
-            if ($organizationUnitId !== null) {
-                if (! $this->organizationUnits->isActive($tenantId, $organizationUnitId, true)) {
-                    throw new RuntimeException('The invitation organization unit is unavailable.');
-                }
-                UserOrganizationUnitModel::query()->firstOrCreate([
-                    'tenant_id' => $tenantId,
-                    'user_id' => $user->getKey(),
-                    'organization_unit_id' => $organizationUnitId,
-                ], [
-                    'status' => UserOrganizationUnitStatus::ACTIVE,
-                    'is_default' => true,
-                    'default_marker' => UserOrganizationUnitStatus::DEFAULT_MARKER,
-                    'row_version' => 1,
-                ]);
+            if (! $this->organizationUnits->isActive($tenantId, $organizationUnitId, true)) {
+                throw new RuntimeException('The administrator organization unit is unavailable.');
             }
+            UserOrganizationUnitModel::query()->firstOrCreate([
+                'tenant_id' => $tenantId,
+                'user_id' => $user->getKey(),
+                'organization_unit_id' => $organizationUnitId,
+            ], [
+                'status' => UserOrganizationUnitStatus::ACTIVE,
+                'is_default' => true,
+                'default_marker' => UserOrganizationUnitStatus::DEFAULT_MARKER,
+                'row_version' => 1,
+            ]);
 
             return (int) $user->getKey();
         }, 3);
@@ -123,8 +131,11 @@ final class TenantUserRegistrationService implements TenantUserRegistrationInter
             $this->tenantLock->lock($tenantId);
             $user = UserModel::query()->where('tenant_id', $tenantId)->whereKey($userId)
                 ->lockForUpdate()->first();
-            if (! $user instanceof UserModel || (string) $user->getAttribute('status') !== UserStatus::INVITED) {
-                throw new RuntimeException('The invited user cannot be activated.');
+            if (! $user instanceof UserModel || ! in_array((string) $user->getAttribute('status'), [
+                UserStatus::INVITED,
+                UserStatus::ACTIVE,
+            ], true)) {
+                throw new RuntimeException('The user account cannot be activated.');
             }
             $hasDefaultOrganizationUnit = UserOrganizationUnitModel::query()
                 ->where('tenant_id', $tenantId)->where('user_id', $userId)
@@ -136,7 +147,7 @@ final class TenantUserRegistrationService implements TenantUserRegistrationInter
             $now = $this->clock->now();
             $user->forceFill([
                 'status' => UserStatus::ACTIVE,
-                'credentials_ready_at' => $now,
+                'credentials_ready_at' => $user->getAttribute('credentials_ready_at') ?? $now,
                 'email_verified_at' => $user->getAttribute('email_verified_at') ?? $now,
                 'activated_at' => $user->getAttribute('activated_at') ?? $now,
                 'row_version' => (int) $user->getAttribute('row_version') + 1,

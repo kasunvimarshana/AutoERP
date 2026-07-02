@@ -6,17 +6,11 @@ const PUBLIC_API_EXACT_PATHS = new Set([
     '/api/v1/platform/auth/refresh',
 ]);
 
-const PUBLIC_API_PATH_PREFIXES = [
-    '/api/v1/auth/initial-administrator/',
-    '/api/v1/platform/operator-invitations/',
-];
-
 export function isPublicApiRequest(url: string | undefined): boolean {
     const path = requestPath(url);
     if (path === '') return false;
 
-    return PUBLIC_API_EXACT_PATHS.has(path)
-        || PUBLIC_API_PATH_PREFIXES.some((prefix) => path.startsWith(prefix));
+    return PUBLIC_API_EXACT_PATHS.has(path);
 }
 
 export function requestPath(url: string | undefined): string {

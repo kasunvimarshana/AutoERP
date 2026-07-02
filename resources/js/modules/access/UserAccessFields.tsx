@@ -45,7 +45,7 @@ export function UserAccessFields({
     return (
         <>
             <Panel title="Initial roles">
-                <p className="mb-3 text-sm text-slate-600">Roles define the user’s normal capabilities. Direct permissions can be managed separately after the invitation is created.</p>
+                <p className="mb-3 text-sm text-slate-600">Roles define the user&apos;s normal capabilities. Direct permissions can be managed separately after the account is created.</p>
                 {canAssignRoles ? (
                     <CheckboxList
                         items={roles}
@@ -55,7 +55,7 @@ export function UserAccessFields({
                         onToggle={toggleRole}
                     />
                 ) : (
-                    <p className="text-sm text-slate-500">You cannot assign roles. The user will be invited without a role.</p>
+                    <p className="text-sm text-slate-500">You cannot assign roles. The user will be created without a role.</p>
                 )}
             </Panel>
 

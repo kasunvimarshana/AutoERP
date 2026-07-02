@@ -25,5 +25,6 @@ interface TenantAccessProvisionerInterface
         int $rootOrganizationUnitId,
         int $superAdminRoleId,
         bool $lockForUpdate = false,
+        ?string $email = null,
     ): bool;
 }

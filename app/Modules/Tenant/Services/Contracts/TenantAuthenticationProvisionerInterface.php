@@ -9,49 +9,16 @@ interface TenantAuthenticationProvisionerInterface
     /** @return array{provider_id:int} */
     public function provisionProvider(int $tenantId): array;
 
-    /** @return array{invitation_id:int,invitation_expires_at:string,delivery_status:string} */
-    public function issueInitialAdministratorInvitation(
+    /** @return array{user_id:int,email:string,status:string} */
+    public function provisionInitialAdministratorAccount(
         int $tenantId,
         int $organizationUnitId,
         int $roleId,
+        string $firstName,
+        ?string $lastName,
         string $email,
+        string $password,
     ): array;
 
     public function providerIsReady(int $tenantId, bool $lockForUpdate = false): bool;
-
-    public function acceptedInitialAdministratorUserId(int $tenantId, ?int $invitationId = null, bool $lockForUpdate = false): ?int;
-
-    public function hasPendingInitialAdministratorInvitation(
-        int $tenantId,
-        ?int $invitationId = null,
-        bool $lockForUpdate = false,
-    ): bool;
-
-    /** @return array<string, mixed>|null */
-    public function initialAdministratorInvitationStatus(
-        int $tenantId,
-        ?int $invitationId = null,
-        bool $lockForUpdate = false,
-    ): ?array;
-
-    /** @return array<string, mixed> */
-    public function resendInitialAdministratorInvitation(int $tenantId, int $invitationId, int $expectedVersion): array;
-
-    public function revokeInitialAdministratorInvitation(
-        int $tenantId,
-        int $invitationId,
-        int $expectedVersion,
-        string $reason,
-    ): void;
-
-    /** @return array{invitation_id:int,invitation_expires_at:string,delivery_status:string} */
-    public function replaceInitialAdministratorInvitation(
-        int $tenantId,
-        int $invitationId,
-        int $expectedVersion,
-        int $organizationUnitId,
-        int $roleId,
-        string $email,
-        string $reason,
-    ): array;
 }

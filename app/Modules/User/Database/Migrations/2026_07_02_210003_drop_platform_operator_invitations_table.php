@@ -12,6 +12,11 @@ return new class extends Migration
 
     public function up(): void
     {
+        Schema::dropIfExists('platform_operator_invitations');
+    }
+
+    public function down(): void
+    {
         Schema::create('platform_operator_invitations', function (Blueprint $table): void {
             $table->id();
             $table->uuid('public_id')->unique('platform_operator_invitations_public_uk');
@@ -29,12 +34,7 @@ return new class extends Migration
 
             $table->foreign('created_by_operator_id', 'platform_operator_invitations_actor_fk')
                 ->references('id')->on('platform_operators')->restrictOnDelete();
-            $table->index(['platform_operator_id', 'status', 'expires_at'], 'platform_operator_invitations_operator_status_ix', );
+            $table->index(['platform_operator_id', 'status', 'expires_at'], 'platform_operator_invitations_operator_status_ix');
         });
-    }
-
-    public function down(): void
-    {
-        Schema::dropIfExists('platform_operator_invitations');
     }
 };

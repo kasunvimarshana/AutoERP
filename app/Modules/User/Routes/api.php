@@ -28,6 +28,7 @@ Route::prefix('api/v1')
     ->group(function (): void {
         Route::get('users', [UserController::class, 'index'])->name('users.index');
         Route::post('users', [UserController::class, 'store'])->name('users.store');
+        Route::get('users/password-policy', [UserController::class, 'passwordPolicy'])->name('users.password-policy');
         Route::get('users/{user}', [UserController::class, 'show'])->whereNumber('user')->name('users.show');
         Route::patch('users/{user}', [UserController::class, 'update'])->whereNumber('user')->name('users.update');
         Route::patch('users/{user}/status', [UserController::class, 'changeStatus'])->whereNumber('user')->name('users.status');
@@ -35,8 +36,6 @@ Route::prefix('api/v1')
         Route::put('users/{user}/permissions', [UserController::class, 'syncPermissions'])->whereNumber('user')->name('users.permissions.sync');
         Route::put('users/{user}/organization-access', [UserController::class, 'syncOrganizationAccess'])
             ->whereNumber('user')->name('users.organization-access.sync');
-        Route::post('users/{user}/invitation/resend', [UserController::class, 'resendInvitation'])
-            ->whereNumber('user')->name('users.invitation.resend');
         Route::delete('users/{user}', [UserController::class, 'destroy'])
             ->whereNumber('user')->name('users.destroy');
 
@@ -66,17 +65,6 @@ Route::prefix('api/v1')
 
 
 $platformHost = (string) config('tenant.platform.host_middleware_alias', 'platform.host');
-
-Route::prefix('api/v1/platform/operator-invitations')
-    ->middleware(['api', $platformHost, 'throttle:10,1'])
-    ->name('api.v1.platform.operator-invitations.')
-    ->group(function (): void {
-        Route::post('inspect', [\Modules\User\Http\Controllers\Platform\PlatformOperatorInvitationController::class, 'inspect'])
-            ->name('inspect');
-        Route::post('accept', [\Modules\User\Http\Controllers\Platform\PlatformOperatorInvitationController::class, 'accept'])
-            ->name('accept');
-    });
-
 $platformGuard = (string) config('module-auth.platform_protected_route_guard', 'platform-api');
 $platformOperator = (string) config('tenant.platform.operator_middleware_alias', 'platform.operator');
 $platformStepUp = (string) config('module-auth.platform_step_up.middleware_alias', 'platform.step-up');
@@ -91,24 +79,10 @@ Route::prefix('api/v1/platform/operators')
             ->whereNumber('operator')->middleware('platform.permission:'.\Modules\Core\Authorization\PlatformPermission::OPERATORS_VIEW)->name('show');
         Route::post('/', [\Modules\User\Http\Controllers\Platform\PlatformOperatorController::class, 'store'])
             ->middleware([$platformStepUp, 'platform.permission:'.\Modules\Core\Authorization\PlatformPermission::OPERATORS_MANAGE])->name('store');
-        Route::post('{operator}/invitation/resend', [\Modules\User\Http\Controllers\Platform\PlatformOperatorController::class, 'resendInvitation'])
-            ->whereNumber('operator')->middleware([$platformStepUp, 'platform.permission:'.\Modules\Core\Authorization\PlatformPermission::OPERATORS_MANAGE])->name('invitation.resend');
-        Route::delete('{operator}/invitation', [\Modules\User\Http\Controllers\Platform\PlatformOperatorController::class, 'revokeInvitation'])
-            ->whereNumber('operator')->middleware([$platformStepUp, 'platform.permission:'.\Modules\Core\Authorization\PlatformPermission::OPERATORS_MANAGE])->name('invitation.revoke');
         Route::put('{operator}/permissions', [\Modules\User\Http\Controllers\Platform\PlatformOperatorController::class, 'permissions'])
             ->whereNumber('operator')->middleware([$platformStepUp, 'platform.permission:'.\Modules\Core\Authorization\PlatformPermission::OPERATORS_MANAGE])->name('permissions');
         Route::patch('{operator}/activate', [\Modules\User\Http\Controllers\Platform\PlatformOperatorController::class, 'activate'])
             ->whereNumber('operator')->middleware([$platformStepUp, 'platform.permission:'.\Modules\Core\Authorization\PlatformPermission::OPERATORS_MANAGE])->name('activate');
         Route::patch('{operator}/deactivate', [\Modules\User\Http\Controllers\Platform\PlatformOperatorController::class, 'deactivate'])
             ->whereNumber('operator')->middleware([$platformStepUp, 'platform.permission:'.\Modules\Core\Authorization\PlatformPermission::OPERATORS_MANAGE])->name('deactivate');
-        Route::post(
-            '{operator}/security-recovery',
-            [\Modules\User\Http\Controllers\Platform\PlatformOperatorController::class, 'recoverAccess'],
-        )
-            ->whereNumber('operator')
-            ->middleware([
-                $platformStepUp,
-                'platform.permission:'.\Modules\Core\Authorization\PlatformPermission::OPERATORS_MANAGE,
-            ])
-            ->name('security-recovery');
     });
