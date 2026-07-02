@@ -23,31 +23,43 @@ export default function RentalAgreementDetailPage() {
     const result = useApi((signal) => getRentalAgreement(id, signal), [id]);
     const [busy, setBusy] = useState(false);
     const [actionError, setActionError] = useState<ApiError | null>(null);
+
     const transition = async (status: string) => {
+        if (!result.data) return;
+
         setBusy(true);
         setActionError(null);
         try {
-            await transitionRentalAgreement(id, status);
+            await transitionRentalAgreement(
+                id,
+                result.data.row_version,
+                status,
+            );
             navigate(0);
-        } catch (e) {
-            setActionError(toApiError(e));
+        } catch (error) {
+            setActionError(toApiError(error));
         } finally {
             setBusy(false);
         }
     };
-    if (result.loading)
+
+    if (result.loading) {
         return (
             <RentalPage>
                 <LoadingState />
             </RentalPage>
         );
-    if (!result.data)
+    }
+    if (!result.data) {
         return (
             <RentalPage>
                 <ErrorAlert error={result.error} />
             </RentalPage>
         );
+    }
+
     const row = result.data;
+
     return (
         <RentalPage>
             <ContentHeader

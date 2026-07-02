@@ -21,6 +21,8 @@ import type {
     VehicleFinanceAgreement,
 } from "./vehicleRentalTypes";
 
+type VersionedRentalAgreement = RentalAgreement & { row_version: number };
+
 const base = endpoints.vehicleRental;
 const collection = <T>(
     path: string,
@@ -79,24 +81,42 @@ export const transitionRentalReservation = (
 export const listRentalAgreements = (
     params: ListParams,
     signal?: AbortSignal,
-) => collection<RentalAgreement>("agreements", params, signal);
+) => collection<VersionedRentalAgreement>("agreements", params, signal);
 export const getRentalAgreement = (id: number, signal?: AbortSignal) =>
-    resource<RentalAgreement>(`agreements/${id}`, signal);
+    resource<VersionedRentalAgreement>(`agreements/${id}`, signal);
 export const createRentalAgreement = (payload: RentalPayload) =>
-    post<RentalAgreement>("agreements", payload);
-export const updateRentalAgreement = (id: number, payload: RentalPayload) =>
-    put<RentalAgreement>(`agreements/${id}`, payload);
+    post<VersionedRentalAgreement>("agreements", payload);
+export const updateRentalAgreement = (
+    id: number,
+    expectedVersion: number,
+    payload: RentalPayload,
+) =>
+    put<VersionedRentalAgreement>(`agreements/${id}`, {
+        ...payload,
+        expected_version: expectedVersion,
+    });
 export const transitionRentalAgreement = (
     id: number,
+    expectedVersion: number,
     status: string,
     reason?: string,
-) => patch<RentalAgreement>(`agreements/${id}/transition`, { status, reason });
+) =>
+    patch<VersionedRentalAgreement>(`agreements/${id}/transition`, {
+        expected_version: expectedVersion,
+        status,
+        reason,
+    });
 export const createRentalRateVersion = (
     agreementId: number,
     payload: RentalPayload,
 ) => post(`agreements/${agreementId}/rate-versions`, payload);
-export const activateRentalRateVersion = (versionId: number) =>
-    patch(`rate-versions/${versionId}/activate`);
+export const activateRentalRateVersion = (
+    versionId: number,
+    expectedVersion: number,
+) =>
+    patch(`rate-versions/${versionId}/activate`, {
+        expected_version: expectedVersion,
+    });
 
 export const listRentalAllocations = (
     params: ListParams,

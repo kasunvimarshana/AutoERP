@@ -12,6 +12,7 @@ final class RentalAgreementResource extends RentalResource
     {
         return [
             'id' => (int) $this->getKey(),
+            'row_version' => (int) $this->row_version,
             'agreement_number' => $this->agreement_number,
             'agreement_kind' => $this->enumValue($this->agreement_kind),
             'reservation_id' => $this->reservation_id,
@@ -34,14 +35,21 @@ final class RentalAgreementResource extends RentalResource
             'termination_reason' => $this->termination_reason,
             'remarks' => $this->remarks,
             'terms' => $this->loadedCollection('terms', fn ($term): array => [
-                'id' => (int) $term->getKey(), 'sequence' => (int) $term->sequence,
-                'term_code' => $term->term_code, 'title' => $term->title,
-                'content' => $term->content, 'is_printable' => (bool) $term->is_printable,
+                'id' => (int) $term->getKey(),
+                'sequence' => (int) $term->sequence,
+                'term_code' => $term->term_code,
+                'title' => $term->title,
+                'content' => $term->content,
+                'is_printable' => (bool) $term->is_printable,
             ]),
-            'active_rate_version' => $this->whenLoaded('activeRateVersion', fn () => $this->activeRateVersion === null ? null : (new RentalRateVersionResource($this->activeRateVersion))->resolve($request)),
+            'active_rate_version' => $this->whenLoaded('activeRateVersion', fn () => $this->activeRateVersion === null
+                ? null
+                : (new RentalRateVersionResource($this->activeRateVersion))->resolve($request)),
             'rate_versions' => $this->whenLoaded('rateVersions', fn () => RentalRateVersionResource::collection($this->rateVersions)->resolve($request), []),
             'allocations' => $this->whenLoaded('allocations', fn () => RentalAllocationResource::collection($this->allocations)->resolve($request), []),
-            'deposit_requirement' => $this->whenLoaded('depositRequirement', fn () => $this->depositRequirement === null ? null : (new RentalDepositRequirementResource($this->depositRequirement))->resolve($request)),
+            'deposit_requirement' => $this->whenLoaded('depositRequirement', fn () => $this->depositRequirement === null
+                ? null
+                : (new RentalDepositRequirementResource($this->depositRequirement))->resolve($request)),
             'approved_at' => $this->approved_at?->toISOString(),
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),

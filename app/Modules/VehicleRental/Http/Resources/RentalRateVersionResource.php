@@ -12,6 +12,7 @@ final class RentalRateVersionResource extends RentalResource
     {
         return [
             'id' => (int) $this->getKey(),
+            'row_version' => (int) $this->row_version,
             'version_number' => (int) $this->version_number,
             'effective_from' => $this->effective_from?->toISOString(),
             'effective_to' => $this->effective_to?->toISOString(),
@@ -31,7 +32,9 @@ final class RentalRateVersionResource extends RentalResource
             'status' => $this->enumValue($this->status),
             'components' => $this->loadedCollection('components', fn ($component): array => [
                 'id' => (int) $component->getKey(),
-                'vehicle_category' => $component->relationLoaded('vehicleCategory') ? $this->summary($component->vehicleCategory, ['code', 'name']) : null,
+                'vehicle_category' => $component->relationLoaded('vehicleCategory')
+                    ? $this->summary($component->vehicleCategory, ['code', 'name'])
+                    : null,
                 'component_code' => $this->enumValue($component->component_code),
                 'unit' => $this->enumValue($component->unit),
                 'included_quantity' => $this->decimal($component->included_quantity),

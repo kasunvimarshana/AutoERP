@@ -1,0 +1,86 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Tests\Unit\VehicleRental;
+
+use PHPUnit\Framework\TestCase;
+
+final class RentalAgreementIntegrityContractTest extends TestCase
+{
+    private string $root;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->root = dirname(__DIR__, 3);
+    }
+
+    public function test_agreement_writes_use_locked_optimistic_concurrency(): void
+    {
+        $service = $this->source('app/Modules/VehicleRental/Services/RentalAgreementService.php');
+        $controller = $this->source('app/Modules/VehicleRental/Http/Controllers/RentalAgreementController.php');
+        $updateRequest = $this->source('app/Modules/VehicleRental/Http/Requests/UpdateRentalAgreementRequest.php');
+        $transitionRequest = $this->source('app/Modules/VehicleRental/Http/Requests/RentalTransitionRequest.php');
+        $resource = $this->source('app/Modules/VehicleRental/Http/Resources/RentalAgreementResource.php');
+
+        self::assertStringContainsString('DB::transaction', $service);
+        self::assertStringContainsString('lockForUpdate()', $service);
+        self::assertStringContainsString('assertExpectedVersion', $service);
+        self::assertStringContainsString("'row_version' =>", $resource);
+        self::assertStringContainsString('$agreement->row_version = $expectedVersion + 1;', $service);
+        self::assertStringContainsString("'expected_version' => ['required', 'integer', 'min:1']", $updateRequest);
+        self::assertStringContainsString("'expected_version' => ['required', 'integer', 'min:1']", $transitionRequest);
+        self::assertStringContainsString("validated('expected_version')", $controller);
+    }
+
+    public function test_database_and_configuration_own_agreement_party_and_timezone_invariants(): void
+    {
+        $migration = $this->source('app/Modules/VehicleRental/Database/Migrations/2026_06_12_200002_create_rental_agreements_table.php');
+        $service = $this->source('app/Modules/VehicleRental/Services/RentalAgreementService.php');
+        $configuration = $this->source('config/vehicle_rental.php');
+
+        self::assertStringContainsString('rental_agreements_party_ck', $migration);
+        self::assertStringContainsString('customer_id IS NOT NULL AND supplier_id IS NULL', $migration);
+        self::assertStringContainsString('supplier_id IS NOT NULL AND customer_id IS NULL', $migration);
+        self::assertStringContainsString('rental_agreements_terminated_by_tenant_fk', $migration);
+        self::assertStringNotContainsString('Asia/Colombo', $migration.$service.$configuration);
+        self::assertStringContainsString("'vehicle_rental.billing_timezone'", $service);
+        self::assertStringContainsString('VEHICLE_RENTAL_BILLING_TIMEZONE', $configuration);
+    }
+
+    public function test_rate_activation_never_rewrites_existing_active_periods(): void
+    {
+        $service = $this->source('app/Modules/VehicleRental/Services/RentalRateVersionService.php');
+        $controller = $this->source('app/Modules/VehicleRental/Http/Controllers/RentalRateVersionController.php');
+        $request = $this->source('app/Modules/VehicleRental/Http/Requests/ActivateRentalRateVersionRequest.php');
+        $resource = $this->source('app/Modules/VehicleRental/Http/Resources/RentalRateVersionResource.php');
+
+        self::assertStringContainsString('assertExpectedVersion', $service);
+        self::assertStringContainsString('active immutable rate version', $service);
+        self::assertStringContainsString('$version->row_version = $expectedVersion + 1;', $service);
+        self::assertStringNotContainsString('$active->effective_to =', $service);
+        self::assertStringNotContainsString('$active->status = RentalRateVersionStatus::Superseded;', $service);
+        self::assertStringContainsString("'expected_version' => ['required', 'integer', 'min:1']", $request);
+        self::assertStringContainsString("validated('expected_version')", $controller);
+        self::assertStringContainsString("'row_version' =>", $resource);
+    }
+
+    public function test_frontend_sends_the_loaded_version_for_agreement_commands(): void
+    {
+        $api = $this->source('resources/js/modules/vehicle-rental/vehicleRentalApi.ts');
+        $detail = $this->source('resources/js/modules/vehicle-rental/pages/RentalAgreementDetailPage.tsx');
+
+        self::assertStringContainsString('expected_version: expectedVersion', $api);
+        self::assertStringContainsString('result.data.row_version', $detail);
+        self::assertStringContainsString('transitionRentalAgreement(', $detail);
+    }
+
+    private function source(string $relativePath): string
+    {
+        $source = file_get_contents($this->root.'/'.$relativePath);
+        self::assertIsString($source);
+
+        return $source;
+    }
+}

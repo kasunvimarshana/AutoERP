@@ -6,26 +6,38 @@ namespace Modules\VehicleRental\Services;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
+use Modules\VehicleRental\Enums\RentalAgreementStatus;
 use Modules\VehicleRental\Enums\RentalRateVersionStatus;
 use Modules\VehicleRental\Models\RentalAgreement;
 use Modules\VehicleRental\Models\RentalAgreementRateVersion;
 
 final class RentalRateVersionService
 {
+    private const OPEN_ENDED_EFFECTIVE_AT = '9999-12-31 23:59:59';
+
     public function __construct(private readonly RentalReferenceValidator $references) {}
 
     public function createDraft(RentalAgreement $agreement, array $data, ?int $userId = null): RentalAgreementRateVersion
     {
         return DB::transaction(function () use ($agreement, $data, $userId): RentalAgreementRateVersion {
-            $agreement = RentalAgreement::query()->lockForUpdate()->findOrFail($agreement->getKey());
+            $agreement = RentalAgreement::query()
+                ->where('tenant_id', $agreement->tenant_id)
+                ->lockForUpdate()
+                ->findOrFail($agreement->getKey());
+            $this->assertAgreementAllowsRateChanges($agreement);
+
             $versionNumber = ((int) $agreement->rateVersions()->max('version_number')) + 1;
             $effectiveFrom = CarbonImmutable::parse((string) ($data['effective_from'] ?? $agreement->starts_at));
-            $effectiveTo = isset($data['effective_to']) ? CarbonImmutable::parse((string) $data['effective_to']) : null;
+            $effectiveTo = isset($data['effective_to'])
+                ? CarbonImmutable::parse((string) $data['effective_to'])
+                : null;
             if ($effectiveTo !== null && ! $effectiveTo->greaterThan($effectiveFrom)) {
                 throw new InvalidArgumentException('Rate version end must be after its start.');
             }
-            if ($effectiveFrom->lessThan($agreement->starts_at) || $effectiveFrom->greaterThanOrEqualTo($agreement->ends_at)
+            if ($effectiveFrom->lessThan($agreement->starts_at)
+                || $effectiveFrom->greaterThanOrEqualTo($agreement->ends_at)
                 || ($effectiveTo !== null && $effectiveTo->greaterThan($agreement->ends_at))) {
                 throw new InvalidArgumentException('Rate version period must stay inside the agreement period.');
             }
@@ -55,8 +67,11 @@ final class RentalRateVersionService
             }
 
             $fingerprint = hash('sha256', implode('|', [
-                $agreement->tenant_id, $agreement->getKey(), $versionNumber,
-                $effectiveFrom->toIso8601String(), $effectiveTo?->toIso8601String() ?? '',
+                $agreement->tenant_id,
+                $agreement->getKey(),
+                $versionNumber,
+                $effectiveFrom->toIso8601String(),
+                $effectiveTo?->toIso8601String() ?? '',
             ]));
 
             $version = RentalAgreementRateVersion::query()->create([
@@ -107,14 +122,27 @@ final class RentalRateVersionService
             }
 
             return $version->load('components');
-        });
+        }, 3);
     }
 
-    public function activate(RentalAgreementRateVersion $version, ?int $userId = null): RentalAgreementRateVersion
-    {
-        return DB::transaction(function () use ($version, $userId): RentalAgreementRateVersion {
-            $version = RentalAgreementRateVersion::query()->lockForUpdate()->findOrFail($version->getKey());
-            RentalAgreement::query()->lockForUpdate()->findOrFail($version->agreement_id);
+    public function activate(
+        RentalAgreementRateVersion $version,
+        int $expectedVersion,
+        ?int $userId = null,
+    ): RentalAgreementRateVersion {
+        return DB::transaction(function () use ($version, $expectedVersion, $userId): RentalAgreementRateVersion {
+            $version = RentalAgreementRateVersion::query()
+                ->where('tenant_id', $version->tenant_id)
+                ->lockForUpdate()
+                ->findOrFail($version->getKey());
+            $this->assertExpectedVersion($version, $expectedVersion);
+
+            $agreement = RentalAgreement::query()
+                ->where('tenant_id', $version->tenant_id)
+                ->lockForUpdate()
+                ->findOrFail($version->agreement_id);
+            $this->assertAgreementAllowsRateChanges($agreement);
+
             if ($version->status !== RentalRateVersionStatus::Draft) {
                 throw new InvalidArgumentException('Only a draft rate version can be activated.');
             }
@@ -122,34 +150,34 @@ final class RentalRateVersionService
                 throw new InvalidArgumentException('At least one rate component is required.');
             }
 
-            $overlap = RentalAgreementRateVersion::query()
+            $overlaps = RentalAgreementRateVersion::query()
+                ->where('tenant_id', $version->tenant_id)
                 ->where('agreement_id', $version->agreement_id)
-                ->where('id', '!=', $version->getKey())
+                ->whereKeyNot($version->getKey())
                 ->where('status', RentalRateVersionStatus::Active->value)
-                ->where('effective_from', '<', $version->effective_to ?? '9999-12-31 23:59:59')
+                ->where('effective_from', '<', $version->effective_to ?? self::OPEN_ENDED_EFFECTIVE_AT)
                 ->where(function ($query) use ($version): void {
-                    $query->whereNull('effective_to')->orWhere('effective_to', '>', $version->effective_from);
+                    $query->whereNull('effective_to')
+                        ->orWhere('effective_to', '>', $version->effective_from);
                 })
                 ->lockForUpdate()
-                ->get();
-
-            foreach ($overlap as $active) {
-                if ($active->effective_from->lessThan($version->effective_from)) {
-                    $active->effective_to = $version->effective_from;
-                }
-                $active->status = RentalRateVersionStatus::Superseded;
-                $active->updated_by = $userId;
-                $active->save();
+                ->get(['id']);
+            if ($overlaps->isNotEmpty()) {
+                throw ValidationException::withMessages([
+                    'effective_from' => ['The rate period overlaps an active immutable rate version.'],
+                    'effective_to' => ['Choose a non-overlapping period; active rate history is never rewritten during activation.'],
+                ]);
             }
 
             $version->status = RentalRateVersionStatus::Active;
             $version->approved_by = $userId;
             $version->approved_at = now();
+            $version->row_version = $expectedVersion + 1;
             $version->updated_by = $userId;
             $version->save();
 
             return $version->refresh()->load('components');
-        });
+        }, 3);
     }
 
     public function resolve(RentalAgreement $agreement, string $at): RentalAgreementRateVersion
@@ -166,5 +194,25 @@ final class RentalRateVersionService
             ->with('components')
             ->latest('version_number')
             ->firstOrFail();
+    }
+
+    private function assertExpectedVersion(RentalAgreementRateVersion $version, int $expectedVersion): void
+    {
+        if ((int) $version->row_version !== $expectedVersion) {
+            throw ValidationException::withMessages([
+                'expected_version' => ['The rental rate version changed after it was loaded. Reload and review the latest version.'],
+            ]);
+        }
+    }
+
+    private function assertAgreementAllowsRateChanges(RentalAgreement $agreement): void
+    {
+        if (in_array($agreement->status, [
+            RentalAgreementStatus::Completed,
+            RentalAgreementStatus::Terminated,
+            RentalAgreementStatus::Cancelled,
+        ], true)) {
+            throw new InvalidArgumentException('Terminal rental agreements cannot receive or activate rate versions.');
+        }
     }
 }
