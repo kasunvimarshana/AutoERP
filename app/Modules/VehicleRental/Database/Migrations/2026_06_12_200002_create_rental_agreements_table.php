@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    private const PARTY_CONSTRAINT = 'rental_agreements_party_ck';
+
     public function up(): void
     {
         Schema::create('rental_agreements', function (Blueprint $table): void {
@@ -31,7 +34,7 @@ return new class extends Migration
             $table->string('billing_cycle', 30);
             $table->string('billing_basis', 30);
             $table->string('proration_rule', 30)->default('exact_day_count');
-            $table->string('billing_timezone', 60)->default('Asia/Colombo');
+            $table->string('billing_timezone', 60);
             $table->unsignedSmallInteger('payment_term_days')->nullable();
             $table->foreignId('currency_id')->constrained('currencies', indexName: 'rental_agreements_currency_fk')->restrictOnDelete();
             $table->string('status', 30)->default('draft');
@@ -74,6 +77,10 @@ return new class extends Migration
                 ->references(['id', 'tenant_id'])
                 ->on('users')
                 ->restrictOnDelete();
+            $table->foreign(['terminated_by', 'tenant_id'], 'rental_agreements_terminated_by_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('users')
+                ->restrictOnDelete();
             $table->foreign(['created_by', 'tenant_id'], 'rental_agreements_created_by_tenant_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('users')
@@ -83,10 +90,50 @@ return new class extends Migration
                 ->on('users')
                 ->restrictOnDelete();
         });
+
+        $this->installPartyConstraint();
     }
 
     public function down(): void
     {
         Schema::dropIfExists('rental_agreements');
+    }
+
+    private function installPartyConstraint(): void
+    {
+        $driver = DB::connection()->getDriverName();
+        $predicate = "((agreement_kind = 'customer_rental' AND customer_id IS NOT NULL AND supplier_id IS NULL) OR (agreement_kind = 'owner_supply' AND supplier_id IS NOT NULL AND customer_id IS NULL))";
+
+        if (in_array($driver, ['mysql', 'pgsql', 'sqlsrv'], true)) {
+            DB::statement(sprintf(
+                'ALTER TABLE rental_agreements ADD CONSTRAINT %s CHECK (%s)',
+                self::PARTY_CONSTRAINT,
+                $predicate,
+            ));
+
+            return;
+        }
+
+        if ($driver === 'sqlite') {
+            $sqlitePredicate = str_replace(
+                ['agreement_kind', 'customer_id', 'supplier_id'],
+                ['NEW.agreement_kind', 'NEW.customer_id', 'NEW.supplier_id'],
+                $predicate,
+            );
+            DB::unprepared(sprintf(
+                "CREATE TRIGGER %s_insert BEFORE INSERT ON rental_agreements WHEN NOT %s BEGIN SELECT RAISE(ABORT, 'Rental agreement party does not match agreement kind.'); END",
+                self::PARTY_CONSTRAINT,
+                $sqlitePredicate,
+            ));
+            DB::unprepared(sprintf(
+                "CREATE TRIGGER %s_update BEFORE UPDATE OF agreement_kind, customer_id, supplier_id ON rental_agreements WHEN NOT %s BEGIN SELECT RAISE(ABORT, 'Rental agreement party does not match agreement kind.'); END",
+                self::PARTY_CONSTRAINT,
+                $sqlitePredicate,
+            ));
+
+            return;
+        }
+
+        throw new \RuntimeException("Unsupported database driver [{$driver}] for the rental agreement party constraint.");
     }
 };
