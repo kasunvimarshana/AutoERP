@@ -71,7 +71,11 @@ final class VehicleServiceJobController extends VehicleServiceController
         int $job,
         VehicleServiceJobService $service,
     ): VehicleServiceJobResource {
-        return new VehicleServiceJobResource($service->update($this->job($request, $job), $request->toData()));
+        return new VehicleServiceJobResource($service->update(
+            $this->job($request, $job),
+            $request->toData(),
+            $request->expectedVersion(),
+        ));
     }
 
     public function destroy(
@@ -79,7 +83,7 @@ final class VehicleServiceJobController extends VehicleServiceController
         int $job,
         VehicleServiceJobService $service,
     ): JsonResponse {
-        $service->delete($this->job($request, $job));
+        $service->delete($this->job($request, $job), $request->expectedVersion());
 
         return response()->json(status: 204);
     }
@@ -90,7 +94,7 @@ final class VehicleServiceJobController extends VehicleServiceController
         VehicleServiceInspectionService $service,
     ): VehicleServiceInspectionResource {
         return new VehicleServiceInspectionResource(
-            $service->save($this->job($request, $job), $request->toData(true)),
+            $service->save($this->job($request, $job), $request->toData(true), $request->expectedVersion()),
         );
     }
 
@@ -135,7 +139,7 @@ final class VehicleServiceJobController extends VehicleServiceController
         VehicleServiceInspectionService $service,
     ): VehicleServiceInspectionResource {
         return new VehicleServiceInspectionResource(
-            $service->save($this->job($request, $job), $request->toData()),
+            $service->save($this->job($request, $job), $request->toData(), $request->expectedVersion()),
         );
     }
 
@@ -159,6 +163,7 @@ final class VehicleServiceJobController extends VehicleServiceController
             $status,
             $request->currentUserId(),
             $request->input('reason'),
+            $request->expectedVersion(),
         ));
     }
 }

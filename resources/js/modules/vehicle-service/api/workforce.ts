@@ -36,4 +36,7 @@ export const deleteVehicleServiceEmployee = (
     jobId: number,
     lineId: number,
     assignmentId: number,
-) => apiClient.delete(`${jobs}/${jobId}/lines/${lineId}/employees/${assignmentId}`);
+    expectedVersion: number,
+) => apiClient.delete(`${jobs}/${jobId}/lines/${lineId}/employees/${assignmentId}`, {
+    data: { expected_version: expectedVersion },
+});

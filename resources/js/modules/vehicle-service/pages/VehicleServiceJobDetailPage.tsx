@@ -42,18 +42,19 @@ export default function VehicleServiceJobDetailPage() {
     if (result.loading) return <LoadingState />;
     if (!result.data) return <ErrorAlert error={result.error} />;
     const job = result.data;
+    const expectedVersion = job.row_version ?? 0;
     const currentCustomerOwner = job.vehicle?.current_ownerships?.find((ownership) => ownership.owner_type === 'customer')?.owner ?? job.customer;
 
     const action = async (name: 'inspect' | 'start' | 'complete' | 'cancel' | 'delete') => {
         setBusy(true);
         setActionError(null);
         try {
-            if (name === 'inspect') await inspectVehicleServiceJob(job.id, {});
-            if (name === 'start') await startVehicleServiceJob(job.id);
-            if (name === 'complete') await completeVehicleServiceJob(job.id);
-            if (name === 'cancel') await cancelVehicleServiceJob(job.id);
+            if (name === 'inspect') await inspectVehicleServiceJob(job.id, { expected_version: expectedVersion });
+            if (name === 'start') await startVehicleServiceJob(job.id, expectedVersion);
+            if (name === 'complete') await completeVehicleServiceJob(job.id, expectedVersion);
+            if (name === 'cancel') await cancelVehicleServiceJob(job.id, expectedVersion);
             if (name === 'delete') {
-                await deleteVehicleServiceJob(job.id);
+                await deleteVehicleServiceJob(job.id, expectedVersion);
                 navigate('/vehicle-service/jobs');
                 return;
             }
@@ -139,13 +140,13 @@ export default function VehicleServiceJobDetailPage() {
                     <div className="p-5">
                         <Suspense fallback={<LoadingState />}>
                             <TabPanel tabsId="service-job-tabs" tabId="summary" active={tabs.activeTab}><VehicleServiceSummaryPanel job={job} /></TabPanel>
-                            {tabs.openedTabs.has('inspection') && <TabPanel tabsId="service-job-tabs" tabId="inspection" active={tabs.activeTab}><InspectionTab jobId={job.id} /></TabPanel>}
-                            {tabs.openedTabs.has('lines') && <TabPanel tabsId="service-job-tabs" tabId="lines" active={tabs.activeTab}><LinesTab jobId={job.id} /></TabPanel>}
-                            {tabs.openedTabs.has('workforce') && <TabPanel tabsId="service-job-tabs" tabId="workforce" active={tabs.activeTab}><WorkforceTab jobId={job.id} /></TabPanel>}
-                            {tabs.openedTabs.has('inventory') && <TabPanel tabsId="service-job-tabs" tabId="inventory" active={tabs.activeTab}><InventoryTab jobId={job.id} /></TabPanel>}
+                            {tabs.openedTabs.has('inspection') && <TabPanel tabsId="service-job-tabs" tabId="inspection" active={tabs.activeTab}><InspectionTab jobId={job.id} expectedVersion={expectedVersion} onChanged={result.reload} /></TabPanel>}
+                            {tabs.openedTabs.has('lines') && <TabPanel tabsId="service-job-tabs" tabId="lines" active={tabs.activeTab}><LinesTab jobId={job.id} expectedVersion={expectedVersion} onChanged={result.reload} /></TabPanel>}
+                            {tabs.openedTabs.has('workforce') && <TabPanel tabsId="service-job-tabs" tabId="workforce" active={tabs.activeTab}><WorkforceTab jobId={job.id} expectedVersion={expectedVersion} onChanged={result.reload} /></TabPanel>}
+                            {tabs.openedTabs.has('inventory') && <TabPanel tabsId="service-job-tabs" tabId="inventory" active={tabs.activeTab}><InventoryTab jobId={job.id} expectedVersion={expectedVersion} onChanged={result.reload} /></TabPanel>}
                             {tabs.openedTabs.has('invoice') && <TabPanel tabsId="service-job-tabs" tabId="invoice" active={tabs.activeTab}><InvoiceTab job={job} /></TabPanel>}
                             {tabs.openedTabs.has('payments') && <TabPanel tabsId="service-job-tabs" tabId="payments" active={tabs.activeTab}><PaymentTab job={job} /></TabPanel>}
-                            {tabs.openedTabs.has('documents') && <TabPanel tabsId="service-job-tabs" tabId="documents" active={tabs.activeTab}><DocumentTab jobId={job.id} /></TabPanel>}
+                            {tabs.openedTabs.has('documents') && <TabPanel tabsId="service-job-tabs" tabId="documents" active={tabs.activeTab}><DocumentTab jobId={job.id} expectedVersion={expectedVersion} onChanged={result.reload} /></TabPanel>}
                             {tabs.openedTabs.has('history') && <TabPanel tabsId="service-job-tabs" tabId="history" active={tabs.activeTab}><StatusHistoryTab jobId={job.id} /></TabPanel>}
                         </Suspense>
                     </div>

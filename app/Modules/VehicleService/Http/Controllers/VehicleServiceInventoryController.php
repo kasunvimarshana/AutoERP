@@ -27,6 +27,7 @@ final class VehicleServiceInventoryController extends VehicleServiceController
                 : null,
             array_map('intval', $request->input('line_ids', [])),
             $request->currentUserId(),
+            $request->expectedVersion(),
         );
 
         return response()->json([

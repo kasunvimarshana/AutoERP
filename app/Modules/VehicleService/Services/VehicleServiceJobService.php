@@ -11,9 +11,12 @@ use Modules\VehicleService\DTOs\VehicleServiceInspectionData;
 use Modules\VehicleService\DTOs\VehicleServiceJobData;
 use Modules\VehicleService\Enums\VehicleServiceJobStatus;
 use Modules\VehicleService\Models\VehicleServiceJob;
+use Modules\VehicleService\Services\Concerns\AssertsVehicleServiceExpectedVersion;
 
 final class VehicleServiceJobService
 {
+    use AssertsVehicleServiceExpectedVersion;
+
     public function __construct(
         private readonly DecimalMath $math,
         private readonly VehicleServiceNumberService $numbers,
@@ -49,11 +52,13 @@ final class VehicleServiceJobService
         });
     }
 
-    public function update(VehicleServiceJob $job, VehicleServiceJobData $data): VehicleServiceJob
+    public function update(VehicleServiceJob $job, VehicleServiceJobData $data, ?int $expectedVersion = null): VehicleServiceJob
     {
-        $this->validator->assertMutable($job);
+        return DB::transaction(function () use ($job, $data, $expectedVersion): VehicleServiceJob {
+            $job = VehicleServiceJob::query()->lockForUpdate()->findOrFail($job->getKey());
+            $this->assertExpectedVersion($job, $expectedVersion);
+            $this->validator->assertMutable($job);
 
-        return DB::transaction(function () use ($job, $data): VehicleServiceJob {
             if ((int) $job->tenant_id !== $data->tenantId || $job->organization_unit_id !== $data->organizationUnitId) {
                 throw new InvalidArgumentException('Service job scope cannot be changed.');
             }
@@ -72,14 +77,19 @@ final class VehicleServiceJobService
         });
     }
 
-    public function delete(VehicleServiceJob $job): void
+    public function delete(VehicleServiceJob $job, ?int $expectedVersion = null): void
     {
-        if ($job->status !== VehicleServiceJobStatus::Draft
-            || $job->invoiceLinks()->exists()
-            || $job->lines()->whereNotNull('inventory_movement_id')->exists()) {
-            throw new InvalidArgumentException('Only uninvoiced draft service jobs can be deleted.');
-        }
-        $job->delete();
+        DB::transaction(function () use ($job, $expectedVersion): void {
+            $job = VehicleServiceJob::query()->lockForUpdate()->findOrFail($job->getKey());
+            $this->assertExpectedVersion($job, $expectedVersion);
+
+            if ($job->status !== VehicleServiceJobStatus::Draft
+                || $job->invoiceLinks()->exists()
+                || $job->lines()->whereNotNull('inventory_movement_id')->exists()) {
+                throw new InvalidArgumentException('Only uninvoiced draft service jobs can be deleted.');
+            }
+            $job->delete();
+        });
     }
 
     /** @return array<string, mixed> */

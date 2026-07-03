@@ -11,7 +11,15 @@ import { useApi } from '@/shared/hooks/useApi';
 import { issueVehicleServiceInventory, listInventoryIssueLines } from '../vehicleServiceApi';
 import type { VehicleServiceJobLine } from '../vehicleServiceTypes';
 
-export default function VehicleServiceInventoryIssueTab({ jobId }: { jobId: number }) {
+export default function VehicleServiceInventoryIssueTab({
+    jobId,
+    expectedVersion,
+    onChanged,
+}: {
+    jobId: number;
+    expectedVersion: number;
+    onChanged?: () => void;
+}) {
     const [warehouse, setWarehouse] = useState<NamedResource | null>(null);
     const result = useApi(
         (signal) => listInventoryIssueLines(jobId, { warehouse_id: warehouse?.id }, signal),
@@ -47,9 +55,10 @@ export default function VehicleServiceInventoryIssueTab({ jobId }: { jobId: numb
                         setIssuing(true);
                         setError(null);
                         try {
-                            await issueVehicleServiceInventory(jobId, { warehouse_id: warehouse.id, line_ids: selected });
+                            await issueVehicleServiceInventory(jobId, { expected_version: expectedVersion, warehouse_id: warehouse.id, line_ids: selected });
                             setSelected([]);
                             result.reload();
+                            onChanged?.();
                         } catch (requestError) {
                             setError(toApiError(requestError));
                         } finally {

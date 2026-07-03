@@ -19,5 +19,5 @@ export const updateVehicleServiceLine = (
     apiClient.put<ApiResource<VehicleServiceJobLine>>(`${jobs}/${jobId}/lines/${lineId}`, payload)
         .then((response) => response.data.data);
 
-export const deleteVehicleServiceLine = (jobId: number, lineId: number) =>
-    apiClient.delete(`${jobs}/${jobId}/lines/${lineId}`);
+export const deleteVehicleServiceLine = (jobId: number, lineId: number, expectedVersion: number) =>
+    apiClient.delete(`${jobs}/${jobId}/lines/${lineId}`, { data: { expected_version: expectedVersion } });

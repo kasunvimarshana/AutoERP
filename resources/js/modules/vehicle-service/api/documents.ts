@@ -29,5 +29,5 @@ export async function downloadVehicleServiceDocument(jobId: number, document: Ve
     window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
 }
 
-export const deleteVehicleServiceDocument = (jobId: number, documentId: number) =>
-    apiClient.delete(`${jobs}/${jobId}/documents/${documentId}`);
+export const deleteVehicleServiceDocument = (jobId: number, documentId: number, expectedVersion: number) =>
+    apiClient.delete(`${jobs}/${jobId}/documents/${documentId}`, { data: { expected_version: expectedVersion } });

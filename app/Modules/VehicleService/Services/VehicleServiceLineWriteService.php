@@ -12,9 +12,12 @@ use Modules\VehicleService\Enums\VehicleServiceLineSourceType;
 use Modules\VehicleService\Enums\VehicleServiceLineStatus;
 use Modules\VehicleService\Models\VehicleServiceJob;
 use Modules\VehicleService\Models\VehicleServiceJobLine;
+use Modules\VehicleService\Services\Concerns\AssertsVehicleServiceExpectedVersion;
 
 final class VehicleServiceLineWriteService
 {
+    use AssertsVehicleServiceExpectedVersion;
+
     public function __construct(
         private readonly DecimalMath $math,
         private readonly VehicleServiceValidationService $jobValidator,
@@ -23,11 +26,17 @@ final class VehicleServiceLineWriteService
         private readonly VehicleServiceLineCalculationService $calculations,
     ) {}
 
-    public function create(VehicleServiceJob $job, VehicleServiceLineData $data): VehicleServiceJobLine
+    public function create(
+        VehicleServiceJob $job,
+        VehicleServiceLineData $data,
+        ?int $expectedVersion = null,
+    ): VehicleServiceJobLine
     {
-        $this->jobValidator->assertMutable($job);
+        return DB::transaction(function () use ($job, $data, $expectedVersion): VehicleServiceJobLine {
+            $job = VehicleServiceJob::query()->lockForUpdate()->findOrFail($job->getKey());
+            $this->assertExpectedVersion($job, $expectedVersion);
+            $this->jobValidator->assertMutable($job);
 
-        return DB::transaction(function () use ($job, $data): VehicleServiceJobLine {
             $line = $this->persist($job, $data);
             if ($data->lineSourceType === VehicleServiceLineSourceType::ComboParent && $data->expandCombo) {
                 $this->expandCombo($job, $line);
@@ -42,12 +51,16 @@ final class VehicleServiceLineWriteService
         VehicleServiceJob $job,
         VehicleServiceJobLine $line,
         VehicleServiceLineData $data,
+        ?int $expectedVersion = null,
     ): VehicleServiceJobLine {
-        $this->rules->assertBelongsToJob($job, $line);
-        $this->jobValidator->assertMutable($job);
-        $this->rules->assertCanUpdate($line, $data);
+        return DB::transaction(function () use ($job, $line, $data, $expectedVersion): VehicleServiceJobLine {
+            $job = VehicleServiceJob::query()->lockForUpdate()->findOrFail($job->getKey());
+            $line = $job->lines()->with('job')->findOrFail($line->getKey());
+            $this->assertExpectedVersion($job, $expectedVersion);
+            $this->rules->assertBelongsToJob($job, $line);
+            $this->jobValidator->assertMutable($job);
+            $this->rules->assertCanUpdate($line, $data);
 
-        return DB::transaction(function () use ($job, $line, $data): VehicleServiceJobLine {
             $item = $this->lineValidator->validate($job, $data);
             $attributes = $this->calculations->attributes($data, $item);
             if ($line->employeeAssignments()->exists() && ! $attributes['is_employee_assignable']) {
@@ -65,13 +78,16 @@ final class VehicleServiceLineWriteService
         });
     }
 
-    public function delete(VehicleServiceJob $job, VehicleServiceJobLine $line): void
+    public function delete(VehicleServiceJob $job, VehicleServiceJobLine $line, ?int $expectedVersion = null): void
     {
-        $this->rules->assertBelongsToJob($job, $line);
-        $this->jobValidator->assertMutable($job);
-        $this->rules->assertCanDelete($line);
+        DB::transaction(function () use ($job, $line, $expectedVersion): void {
+            $job = VehicleServiceJob::query()->lockForUpdate()->findOrFail($job->getKey());
+            $line = $job->lines()->with('job')->findOrFail($line->getKey());
+            $this->assertExpectedVersion($job, $expectedVersion);
+            $this->rules->assertBelongsToJob($job, $line);
+            $this->jobValidator->assertMutable($job);
+            $this->rules->assertCanDelete($line);
 
-        DB::transaction(function () use ($job, $line): void {
             $line->delete();
             $this->renumber($job);
             $this->calculations->recalculateJob($job);

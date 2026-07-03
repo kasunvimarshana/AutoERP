@@ -14,9 +14,12 @@ use Modules\Invoice\Services\InvoiceStatusService;
 use Modules\VehicleService\Enums\VehicleServiceJobStatus;
 use Modules\VehicleService\Models\VehicleServiceInvoiceLink;
 use Modules\VehicleService\Models\VehicleServiceJob;
+use Modules\VehicleService\Services\Concerns\AssertsVehicleServiceExpectedVersion;
 
 final class VehicleServiceInvoiceCreator
 {
+    use AssertsVehicleServiceExpectedVersion;
+
     public function __construct(
         private readonly DecimalMath $math,
         private readonly InvoiceCreationService $invoices,
@@ -36,6 +39,7 @@ final class VehicleServiceInvoiceCreator
         string $exchangeRate = '1.000000',
         ?string $notes = null,
         ?int $createdBy = null,
+        ?int $expectedVersion = null,
     ): Invoice {
         return DB::transaction(function () use (
             $job,
@@ -46,8 +50,10 @@ final class VehicleServiceInvoiceCreator
             $exchangeRate,
             $notes,
             $createdBy,
+            $expectedVersion,
         ): Invoice {
             $job = VehicleServiceJob::query()->lockForUpdate()->findOrFail($job->getKey());
+            $this->assertExpectedVersion($job, $expectedVersion);
             $data = $this->sources->toInvoiceData(
                 $job,
                 $invoiceDate,
@@ -77,10 +83,15 @@ final class VehicleServiceInvoiceCreator
             $invoice = $this->invoiceStatuses->transition($invoice, InvoiceStatus::Approved);
             $invoice = $this->invoiceStatuses->transition($invoice, InvoiceStatus::Posted);
 
+            $statusChanged = false;
             if (! $this->sources->hasRemainingBillableLines($job)
                 && $job->status === VehicleServiceJobStatus::Completed) {
                 $this->statuses->change($job, VehicleServiceJobStatus::Invoiced, $createdBy);
                 $this->payments->syncJobStatus($job->refresh(), $createdBy);
+                $statusChanged = true;
+            }
+            if (! $statusChanged) {
+                $this->bumpJobVersion($job);
             }
 
             return $invoice->refresh()->loadMissing([

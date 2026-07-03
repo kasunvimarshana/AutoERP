@@ -20,9 +20,12 @@ use Modules\Item\Enums\TrackingType;
 use Modules\VehicleService\Enums\VehicleServiceLineStatus;
 use Modules\VehicleService\Models\VehicleServiceJob;
 use Modules\VehicleService\Models\VehicleServiceJobLine;
+use Modules\VehicleService\Services\Concerns\AssertsVehicleServiceExpectedVersion;
 
 final class VehicleServiceInventoryIntegrationService
 {
+    use AssertsVehicleServiceExpectedVersion;
+
     public function __construct(
         private readonly DecimalMath $math,
         private readonly VehicleServiceValidationService $validator,
@@ -91,11 +94,13 @@ final class VehicleServiceInventoryIntegrationService
         ?int $warehouseLocationId = null,
         array $lineIds = [],
         ?int $postedBy = null,
+        ?int $expectedVersion = null,
     ): array {
-        $this->validator->assertMutable($job);
-
-        return DB::transaction(function () use ($job, $warehouseId, $warehouseLocationId, $lineIds, $postedBy): array {
+        return DB::transaction(function () use ($job, $warehouseId, $warehouseLocationId, $lineIds, $postedBy, $expectedVersion): array {
             $job = VehicleServiceJob::query()->lockForUpdate()->findOrFail($job->getKey());
+            $this->assertExpectedVersion($job, $expectedVersion);
+            $this->validator->assertMutable($job);
+
             $query = $job->lines()->with('item')->whereNull('inventory_movement_id');
             if ($lineIds !== []) {
                 $lineIds = array_values(array_unique($lineIds));
@@ -141,6 +146,10 @@ final class VehicleServiceInventoryIntegrationService
                 $line->status = VehicleServiceLineStatus::Issued;
                 $line->save();
                 $issued[] = $movement;
+            }
+
+            if ($issued !== []) {
+                $this->bumpJobVersion($job);
             }
 
             return $issued;

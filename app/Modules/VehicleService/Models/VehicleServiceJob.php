@@ -15,9 +15,11 @@ use Modules\Hr\Models\HrEmployee;
 use Modules\Vehicle\Models\Vehicle;
 use Modules\VehicleService\Enums\VehicleServiceCommissionType;
 use Modules\VehicleService\Enums\VehicleServiceJobStatus;
+use Modules\VehicleService\Models\Concerns\HasVehicleServiceJobRowVersion;
 
 final class VehicleServiceJob extends TenantOwnedModel
 {
+    use HasVehicleServiceJobRowVersion;
     use SoftDeletes;
 
     protected $table = 'vehicle_service_jobs';
@@ -28,6 +30,7 @@ final class VehicleServiceJob extends TenantOwnedModel
     {
         return array_merge(parent::casts(), [
             'tenant_id' => 'integer',
+            'row_version' => 'integer',
             'organization_unit_id' => 'integer',
             'job_date' => 'date',
             'expected_delivery_date' => 'date',

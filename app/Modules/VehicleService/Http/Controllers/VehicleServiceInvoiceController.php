@@ -39,6 +39,7 @@ final class VehicleServiceInvoiceController extends VehicleServiceController
             (string) $request->input('exchange_rate', '1.000000'),
             $request->filled('notes') ? (string) $request->input('notes') : null,
             $request->currentUserId(),
+            $request->expectedVersion(),
         )], 201);
     }
 

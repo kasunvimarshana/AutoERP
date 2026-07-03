@@ -8,14 +8,18 @@ use Illuminate\Validation\Rule;
 use Modules\Core\Http\Requests\TenantScopedRequest;
 use Modules\VehicleService\DTOs\VehicleServiceEmployeeAssignmentData;
 use Modules\VehicleService\Enums\VehicleServiceCommissionType;
+use Modules\VehicleService\Http\Requests\Concerns\HasExpectedVehicleServiceJobVersion;
 
 final class StoreVehicleServiceEmployeeRequest extends TenantScopedRequest
 {
+    use HasExpectedVehicleServiceJobVersion;
+
     public function rules(): array
     {
         return [
             'tenant_id' => ['required', 'integer', 'min:1'],
             'organization_unit_id' => ['nullable', 'integer', 'min:1'],
+            'expected_version' => $this->expectedVersionRules(),
             'employee_id' => ['required', 'integer', 'min:1'],
             'role_type' => ['required', Rule::in(['technician', 'helper', 'inspector', 'custom'])],
             'assigned_hours' => ['nullable', 'decimal:0,6', 'min:0'],

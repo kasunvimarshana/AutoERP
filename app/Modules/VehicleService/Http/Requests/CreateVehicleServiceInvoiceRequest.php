@@ -5,14 +5,18 @@ declare(strict_types=1);
 namespace Modules\VehicleService\Http\Requests;
 
 use Modules\Core\Http\Requests\TenantScopedRequest;
+use Modules\VehicleService\Http\Requests\Concerns\HasExpectedVehicleServiceJobVersion;
 
 final class CreateVehicleServiceInvoiceRequest extends TenantScopedRequest
 {
+    use HasExpectedVehicleServiceJobVersion;
+
     public function rules(): array
     {
         return [
             'tenant_id' => ['required', 'integer', 'min:1'],
             'organization_unit_id' => ['nullable', 'integer', 'min:1'],
+            'expected_version' => $this->expectedVersionRules($this->routeIs('api.v1.vehicle-service.invoices.store')),
             'invoice_date' => ['required', 'date'],
             'due_date' => ['nullable', 'date', 'after_or_equal:invoice_date'],
             'currency_id' => ['nullable', 'integer', 'min:1'],

@@ -31,7 +31,15 @@ function inspectionPayload(inspection: VehicleServiceInspection | null): Vehicle
     };
 }
 
-export default function VehicleServiceInspectionTab({ jobId }: { jobId: number }) {
+export default function VehicleServiceInspectionTab({
+    jobId,
+    expectedVersion,
+    onChanged,
+}: {
+    jobId: number;
+    expectedVersion: number;
+    onChanged?: () => void;
+}) {
     const result = useApi((signal) => getVehicleServiceInspection(jobId, signal), [jobId]);
 
     if (result.loading) return <LoadingState />;
@@ -40,18 +48,22 @@ export default function VehicleServiceInspectionTab({ jobId }: { jobId: number }
         <VehicleServiceInspectionEditor
             key={result.data?.id ?? `new-${jobId}`}
             jobId={jobId}
+            expectedVersion={expectedVersion}
             initialValue={result.data}
             loadError={result.error}
             onSaved={result.setData}
+            onChanged={onChanged}
         />
     );
 }
 
-function VehicleServiceInspectionEditor({ jobId, initialValue, loadError, onSaved }: {
+function VehicleServiceInspectionEditor({ jobId, expectedVersion, initialValue, loadError, onSaved, onChanged }: {
     jobId: number;
+    expectedVersion: number;
     initialValue: VehicleServiceInspection | null;
     loadError: ApiError | null;
     onSaved: (inspection: VehicleServiceInspection) => void;
+    onChanged?: () => void;
 }) {
     const [form, setForm] = useState<VehicleServiceInspectionPayload>(() => inspectionPayload(initialValue));
     const [saving, setSaving] = useState(false);
@@ -63,7 +75,8 @@ function VehicleServiceInspectionEditor({ jobId, initialValue, loadError, onSave
             setSaving(true);
             setError(null);
             try {
-                onSaved(await saveVehicleServiceInspection(jobId, form));
+                onSaved(await saveVehicleServiceInspection(jobId, { ...form, expected_version: expectedVersion }));
+                onChanged?.();
             } catch (requestError) {
                 setError(toApiError(requestError));
             } finally {

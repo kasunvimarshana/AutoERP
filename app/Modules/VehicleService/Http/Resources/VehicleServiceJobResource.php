@@ -13,6 +13,7 @@ final class VehicleServiceJobResource extends JsonResource
     {
         return [
             'id' => (int) $this->getKey(),
+            'row_version' => (int) $this->row_version,
             'job_number' => $this->job_number,
             'job_date' => $this->job_date?->toDateString(),
             'expected_delivery_date' => $this->expected_delivery_date?->toDateString(),

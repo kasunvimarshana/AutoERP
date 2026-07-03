@@ -38,6 +38,7 @@ describe('VehicleServiceInvoiceCreatePage', () => {
         await waitFor(() => expect(apiMocks.createVehicleServiceInvoice).toHaveBeenCalledWith(
             9,
             expect.objectContaining({
+                expected_version: 7,
                 line_quantities: { 21: '1.000000' },
                 exchange_rate: '1.000000',
             }),
@@ -68,6 +69,7 @@ function renderPage() {
 function job() {
     return {
         id: 9,
+        row_version: 7,
         job_number: 'JOB-1',
         job_date: '2026-06-20',
         customer_id: 5,

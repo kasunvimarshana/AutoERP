@@ -19,7 +19,15 @@ import {
 import type { VehicleServiceDocument } from '../vehicleServiceTypes';
 
 
-export default function VehicleServiceDocumentTab({ jobId }: { jobId: number }) {
+export default function VehicleServiceDocumentTab({
+    jobId,
+    expectedVersion,
+    onChanged,
+}: {
+    jobId: number;
+    expectedVersion: number;
+    onChanged?: () => void;
+}) {
     const result = useApi((signal) => listVehicleServiceDocuments(jobId, signal), [jobId]);
     const options = useApi((signal) => getVehicleServiceDocumentOptions(jobId, signal), [jobId]);
     const [type, setType] = useState('');
@@ -41,6 +49,7 @@ export default function VehicleServiceDocumentTab({ jobId }: { jobId: number }) 
         setSaving(true);
         setError(null);
         const payload = new FormData();
+        payload.set('expected_version', String(expectedVersion));
         payload.set('document_type', selectedType);
         if (description.trim() !== '') payload.set('description', description.trim());
         payload.set('file', file);
@@ -52,6 +61,7 @@ export default function VehicleServiceDocumentTab({ jobId }: { jobId: number }) 
             setFile(null);
             setFileInputKey((current) => current + 1);
             formGuard.markSaved();
+            onChanged?.();
         } catch (requestError) {
             setError(toApiError(requestError));
         } finally {
@@ -76,9 +86,10 @@ export default function VehicleServiceDocumentTab({ jobId }: { jobId: number }) 
         setBusyId(deleteTarget.id);
         setError(null);
         try {
-            await deleteVehicleServiceDocument(jobId, deleteTarget.id);
+            await deleteVehicleServiceDocument(jobId, deleteTarget.id, expectedVersion);
             result.setData((result.data ?? []).filter((document) => document.id !== deleteTarget.id));
             setDeleteTarget(null);
+            onChanged?.();
         } catch (requestError) {
             setError(toApiError(requestError));
         } finally {

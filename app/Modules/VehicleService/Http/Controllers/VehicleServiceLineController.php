@@ -37,7 +37,7 @@ final class VehicleServiceLineController extends VehicleServiceController
         VehicleServiceLineService $service,
     ): JsonResponse {
         return (new VehicleServiceJobLineResource(
-            $service->create($this->job($request, $job), $request->toData()),
+            $service->create($this->job($request, $job), $request->toData(), $request->expectedVersion()),
         ))->response()->setStatusCode(201);
     }
 
@@ -50,7 +50,7 @@ final class VehicleServiceLineController extends VehicleServiceController
         $jobModel = $this->job($request, $job);
 
         return new VehicleServiceJobLineResource(
-            $service->update($jobModel, $this->line($jobModel, $line), $request->toData()),
+            $service->update($jobModel, $this->line($jobModel, $line), $request->toData(), $request->expectedVersion()),
         );
     }
 
@@ -61,7 +61,7 @@ final class VehicleServiceLineController extends VehicleServiceController
         VehicleServiceLineService $service,
     ): JsonResponse {
         $jobModel = $this->job($request, $job);
-        $service->delete($jobModel, $this->line($jobModel, $line));
+        $service->delete($jobModel, $this->line($jobModel, $line), $request->expectedVersion());
 
         return response()->json(status: 204);
     }

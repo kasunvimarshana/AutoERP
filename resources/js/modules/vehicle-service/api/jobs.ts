@@ -25,22 +25,23 @@ export const updateVehicleServiceJob = (id: number, payload: VehicleServiceJobPa
     apiClient.put<ApiResource<VehicleServiceJob>>(`${jobs}/${id}`, payload)
         .then((response) => response.data.data);
 
-export const deleteVehicleServiceJob = (id: number) => apiClient.delete(`${jobs}/${id}`);
+export const deleteVehicleServiceJob = (id: number, expectedVersion: number) =>
+    apiClient.delete(`${jobs}/${id}`, { data: { expected_version: expectedVersion } });
 
 export const inspectVehicleServiceJob = (id: number, payload: VehicleServiceInspectionPayload) =>
     apiClient.patch<ApiResource<VehicleServiceInspection>>(`${jobs}/${id}/inspect`, payload)
         .then((response) => response.data.data);
 
-export const startVehicleServiceJob = (id: number) =>
-    apiClient.patch<ApiResource<VehicleServiceJob>>(`${jobs}/${id}/start`)
+export const startVehicleServiceJob = (id: number, expectedVersion: number) =>
+    apiClient.patch<ApiResource<VehicleServiceJob>>(`${jobs}/${id}/start`, { expected_version: expectedVersion })
         .then((response) => response.data.data);
 
-export const completeVehicleServiceJob = (id: number) =>
-    apiClient.patch<ApiResource<VehicleServiceJob>>(`${jobs}/${id}/complete`)
+export const completeVehicleServiceJob = (id: number, expectedVersion: number) =>
+    apiClient.patch<ApiResource<VehicleServiceJob>>(`${jobs}/${id}/complete`, { expected_version: expectedVersion })
         .then((response) => response.data.data);
 
-export const cancelVehicleServiceJob = (id: number, reason?: string) =>
-    apiClient.patch<ApiResource<VehicleServiceJob>>(`${jobs}/${id}/cancel`, { reason })
+export const cancelVehicleServiceJob = (id: number, expectedVersion: number, reason?: string) =>
+    apiClient.patch<ApiResource<VehicleServiceJob>>(`${jobs}/${id}/cancel`, { expected_version: expectedVersion, reason })
         .then((response) => response.data.data);
 
 export const getVehicleServiceInspection = (jobId: number, signal?: AbortSignal) =>

@@ -20,7 +20,15 @@ import {
 import { EmployeeAssignmentDialog } from './employee-assignment/EmployeeAssignmentDialog';
 import { EmployeeAssignmentTable } from './employee-assignment/EmployeeAssignmentTable';
 
-export default function VehicleServiceEmployeeAssignmentTab({ jobId }: { jobId: number }) {
+export default function VehicleServiceEmployeeAssignmentTab({
+    jobId,
+    expectedVersion,
+    onChanged,
+}: {
+    jobId: number;
+    expectedVersion: number;
+    onChanged?: () => void;
+}) {
     const result = useApi((signal) => listEmployeeAssignableLines(jobId, signal), [jobId]);
     const [dialog, setDialog] = useState<AssignmentDialogState | null>(null);
     const [removeTarget, setRemoveTarget] = useState<AssignmentRow | null>(null);
@@ -35,7 +43,7 @@ export default function VehicleServiceEmployeeAssignmentTab({ jobId }: { jobId: 
         setSaving(true);
         setError(null);
         try {
-            const payload = assignmentFormToPayload(value);
+            const payload = { ...assignmentFormToPayload(value), expected_version: expectedVersion };
             if (dialog.mode === 'edit') {
                 await updateVehicleServiceEmployee(
                     jobId,
@@ -48,6 +56,7 @@ export default function VehicleServiceEmployeeAssignmentTab({ jobId }: { jobId: 
             }
             setDialog(null);
             result.reload();
+            onChanged?.();
         } catch (requestError) {
             setError(toApiError(requestError));
         } finally {
@@ -60,9 +69,10 @@ export default function VehicleServiceEmployeeAssignmentTab({ jobId }: { jobId: 
         setRemoving(true);
         setError(null);
         try {
-            await deleteVehicleServiceEmployee(jobId, row.line.id, row.id);
+            await deleteVehicleServiceEmployee(jobId, row.line.id, row.id, expectedVersion);
             setRemoveTarget(null);
             result.reload();
+            onChanged?.();
         } catch (requestError) {
             setError(toApiError(requestError));
         } finally {

@@ -360,7 +360,10 @@ final class VehicleServiceEngineTest extends TestCase
         $this->line($job, VehicleServiceLineSourceType::LabourItem, $context['labour'], '1.000000', '125.500000');
         $job = $this->withTenantExecutionContext(
             (int) $context['tenant_id'],
-            fn (): VehicleServiceJob => $job->refresh()->load(app(VehicleServiceJobService::class)->relations()),
+            fn (): VehicleServiceJob => $job->refresh()->load(array_merge(
+                app(VehicleServiceJobService::class)->relations(),
+                ['lines.item', 'lines.variant', 'lines.uom'],
+            )),
         );
         $resource = (new VehicleServiceJobResource($job))->resolve();
 
@@ -368,6 +371,7 @@ final class VehicleServiceEngineTest extends TestCase
         $this->assertSame($context['customer_id'], $resource['customer']['id']);
         $this->assertSame($context['vehicle_id'], $resource['vehicle']['id']);
         $this->assertSame('125.500000', $resource['lines'][0]['line_total']);
+        $this->assertSame($this->currentJobVersion($job), $resource['row_version']);
     }
 
     public function test_vehicle_service_boolean_inputs_are_normalized_before_validation(): void
@@ -384,6 +388,7 @@ final class VehicleServiceEngineTest extends TestCase
             foreach ($values as $index => $value) {
                 $this->tenantPostJson($context['tenant_id'], "/api/v1/vehicle-service/jobs/{$job->getKey()}/lines", [
                     'tenant_id' => $context['tenant_id'],
+                    'expected_version' => $this->currentJobVersion($job),
                     'line_source_type' => 'service_item',
                     'item_id' => $context['service']->getKey(),
                     'description' => "Boolean line {$expected}-{$index}",
@@ -575,6 +580,41 @@ final class VehicleServiceEngineTest extends TestCase
         );
     }
 
+    public function test_vehicle_service_http_actions_reject_stale_expected_version(): void
+    {
+        $this->withoutMiddleware();
+        $context = $this->context();
+        $this->actingAsTenantUser($context['tenant_id']);
+        $job = $this->createJob($context);
+
+        $this->tenantPatchJson($context['tenant_id'], "/api/v1/vehicle-service/jobs/{$job->getKey()}/start", [
+            'tenant_id' => $context['tenant_id'],
+            'expected_version' => 999,
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors('expected_version');
+
+        $this->assertSame(VehicleServiceJobStatus::Draft, $this->refreshJob($job)->status);
+    }
+
+    public function test_inventory_issue_api_returns_domain_error_when_stock_is_short(): void
+    {
+        $this->withoutMiddleware();
+        $context = $this->context();
+        $this->actingAsTenantUser($context['tenant_id']);
+        $this->receiveStock($context, '1.000000');
+        $job = $this->createJob($context);
+        $line = $this->line($job, VehicleServiceLineSourceType::InventoryItem, $context['stock'], '2.000000', '20.000000');
+
+        $this->tenantPostJson($context['tenant_id'], "/api/v1/vehicle-service/jobs/{$job->getKey()}/issue-inventory", [
+            'tenant_id' => $context['tenant_id'],
+            'expected_version' => $this->currentJobVersion($job),
+            'warehouse_id' => $context['warehouse_id'],
+            'line_ids' => [(int) $line->getKey()],
+        ])->assertUnprocessable()
+            ->assertJsonPath('error.code', 'DOMAIN_RULE_FAILED')
+            ->assertJsonPath('error.message', 'Inventory issue quantity cannot exceed available stock.');
+    }
+
     public function test_tracked_inventory_lines_are_blocked_before_issue(): void
     {
         $context = $this->context();
@@ -625,6 +665,7 @@ final class VehicleServiceEngineTest extends TestCase
 
         $this->tenantPostJson($context['tenant_id'], "/api/v1/vehicle-service/jobs/{$job->getKey()}/documents", [
             'tenant_id' => $context['tenant_id'],
+            'expected_version' => $this->currentJobVersion($job),
             'document_type' => 'image',
         ])->assertUnprocessable()
             ->assertJsonValidationErrors('file');

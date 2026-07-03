@@ -4,15 +4,19 @@ declare(strict_types=1);
 
 namespace Modules\VehicleService\Services;
 
+use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\VehicleService\DTOs\VehicleServiceEmployeeAssignmentData;
 use Modules\VehicleService\Models\VehicleServiceJob;
 use Modules\VehicleService\Models\VehicleServiceJobLine;
 use Modules\VehicleService\Models\VehicleServiceLineEmployee;
+use Modules\VehicleService\Services\Concerns\AssertsVehicleServiceExpectedVersion;
 
 final class VehicleServiceEmployeeAssignmentService
 {
+    use AssertsVehicleServiceExpectedVersion;
+
     public function __construct(
         private readonly DecimalMath $math,
         private readonly VehicleServiceValidationService $validator,
@@ -23,19 +27,28 @@ final class VehicleServiceEmployeeAssignmentService
         VehicleServiceJob $job,
         VehicleServiceJobLine $line,
         VehicleServiceEmployeeAssignmentData $data,
+        ?int $expectedVersion = null,
     ): VehicleServiceLineEmployee {
-        $this->assertLine($job, $line);
-        $this->validator->assertMutable($job);
-        $this->validator->assertEmployeeAssignable($line);
-        $this->validator->employee((int) $job->tenant_id, $job->organization_unit_id, $data->employeeId);
+        return DB::transaction(function () use ($job, $line, $data, $expectedVersion): VehicleServiceLineEmployee {
+            $job = VehicleServiceJob::query()->lockForUpdate()->findOrFail($job->getKey());
+            $line = $job->lines()->findOrFail($line->getKey());
+            $this->assertExpectedVersion($job, $expectedVersion);
+            $this->assertLine($job, $line);
+            $this->validator->assertMutable($job);
+            $this->validator->assertEmployeeAssignable($line);
+            $this->validator->employee((int) $job->tenant_id, $job->organization_unit_id, $data->employeeId);
 
-        return VehicleServiceLineEmployee::query()->create(array_merge($this->attributes($line, $data), [
-            'tenant_id' => $job->tenant_id,
-            'organization_unit_id' => $job->organization_unit_id,
-            'vehicle_service_job_id' => $job->getKey(),
-            'vehicle_service_job_line_id' => $line->getKey(),
-            'assigned_at' => now(),
-        ]))->load('employee');
+            $assignment = VehicleServiceLineEmployee::query()->create(array_merge($this->attributes($line, $data), [
+                'tenant_id' => $job->tenant_id,
+                'organization_unit_id' => $job->organization_unit_id,
+                'vehicle_service_job_id' => $job->getKey(),
+                'vehicle_service_job_line_id' => $line->getKey(),
+                'assigned_at' => now(),
+            ]))->load('employee');
+            $this->bumpJobVersion($job);
+
+            return $assignment;
+        });
     }
 
     public function update(
@@ -43,24 +56,44 @@ final class VehicleServiceEmployeeAssignmentService
         VehicleServiceJobLine $line,
         VehicleServiceLineEmployee $assignment,
         VehicleServiceEmployeeAssignmentData $data,
+        ?int $expectedVersion = null,
     ): VehicleServiceLineEmployee {
-        $this->assertAssignment($job, $line, $assignment);
-        $this->validator->assertMutable($job);
-        $this->validator->assertEmployeeAssignable($line);
-        $this->validator->employee((int) $job->tenant_id, $job->organization_unit_id, $data->employeeId);
+        return DB::transaction(function () use ($job, $line, $assignment, $data, $expectedVersion): VehicleServiceLineEmployee {
+            $job = VehicleServiceJob::query()->lockForUpdate()->findOrFail($job->getKey());
+            $line = $job->lines()->findOrFail($line->getKey());
+            $assignment = $line->employeeAssignments()->findOrFail($assignment->getKey());
+            $this->assertExpectedVersion($job, $expectedVersion);
+            $this->assertAssignment($job, $line, $assignment);
+            $this->validator->assertMutable($job);
+            $this->validator->assertEmployeeAssignable($line);
+            $this->validator->employee((int) $job->tenant_id, $job->organization_unit_id, $data->employeeId);
 
-        $assignment->fill($this->attributes($line, $data));
-        $assignment->completed_at = $data->status === 'completed' ? now() : null;
-        $assignment->save();
+            $assignment->fill($this->attributes($line, $data));
+            $assignment->completed_at = $data->status === 'completed' ? now() : null;
+            $assignment->save();
+            $this->bumpJobVersion($job);
 
-        return $assignment->refresh()->load('employee');
+            return $assignment->refresh()->load('employee');
+        });
     }
 
-    public function delete(VehicleServiceJob $job, VehicleServiceJobLine $line, VehicleServiceLineEmployee $assignment): void
+    public function delete(
+        VehicleServiceJob $job,
+        VehicleServiceJobLine $line,
+        VehicleServiceLineEmployee $assignment,
+        ?int $expectedVersion = null,
+    ): void
     {
-        $this->assertAssignment($job, $line, $assignment);
-        $this->validator->assertMutable($job);
-        $assignment->delete();
+        DB::transaction(function () use ($job, $line, $assignment, $expectedVersion): void {
+            $job = VehicleServiceJob::query()->lockForUpdate()->findOrFail($job->getKey());
+            $line = $job->lines()->findOrFail($line->getKey());
+            $assignment = $line->employeeAssignments()->findOrFail($assignment->getKey());
+            $this->assertExpectedVersion($job, $expectedVersion);
+            $this->assertAssignment($job, $line, $assignment);
+            $this->validator->assertMutable($job);
+            $assignment->delete();
+            $this->bumpJobVersion($job);
+        });
     }
 
     /** @return array<string, mixed> */

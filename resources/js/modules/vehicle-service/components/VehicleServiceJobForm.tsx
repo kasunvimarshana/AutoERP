@@ -56,6 +56,7 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
     }, []);
 
     const payload = (): VehicleServiceJobPayload => ({
+        expected_version: job?.row_version,
         job_date: form.job_date,
         expected_delivery_date: form.expected_delivery_date || undefined,
         customer_id: customer?.id ?? 0,

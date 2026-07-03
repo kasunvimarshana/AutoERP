@@ -43,6 +43,7 @@ final class VehicleServiceInvoiceIntegrationService
         string $exchangeRate = '1.000000',
         ?string $notes = null,
         ?int $createdBy = null,
+        ?int $expectedVersion = null,
     ): Invoice {
         return $this->creator->create(
             $job,
@@ -53,6 +54,7 @@ final class VehicleServiceInvoiceIntegrationService
             $exchangeRate,
             $notes,
             $createdBy,
+            $expectedVersion,
         );
     }
 }

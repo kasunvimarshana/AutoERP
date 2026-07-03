@@ -8,10 +8,12 @@ use Illuminate\Validation\Rule;
 use Modules\Core\Http\Requests\TenantScopedRequest;
 use Modules\VehicleService\DTOs\VehicleServiceLineData;
 use Modules\VehicleService\Enums\VehicleServiceLineSourceType;
+use Modules\VehicleService\Http\Requests\Concerns\HasExpectedVehicleServiceJobVersion;
 use Modules\VehicleService\Http\Requests\Concerns\NormalizesBooleanInput;
 
 final class StoreVehicleServiceLineRequest extends TenantScopedRequest
 {
+    use HasExpectedVehicleServiceJobVersion;
     use NormalizesBooleanInput;
 
     public function rules(): array
@@ -19,6 +21,7 @@ final class StoreVehicleServiceLineRequest extends TenantScopedRequest
         return [
             'tenant_id' => ['required', 'integer', 'min:1'],
             'organization_unit_id' => ['nullable', 'integer', 'min:1'],
+            'expected_version' => $this->expectedVersionRules(),
             'parent_line_id' => ['nullable', 'integer', 'min:1'],
             'line_source_type' => ['required', Rule::enum(VehicleServiceLineSourceType::class)],
             'item_id' => ['nullable', 'integer', 'min:1'],

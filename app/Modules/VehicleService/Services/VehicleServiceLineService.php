@@ -16,22 +16,27 @@ final class VehicleServiceLineService
         private readonly VehicleServiceLineRuleService $rules,
     ) {}
 
-    public function create(VehicleServiceJob $job, VehicleServiceLineData $data): VehicleServiceJobLine
+    public function create(
+        VehicleServiceJob $job,
+        VehicleServiceLineData $data,
+        ?int $expectedVersion = null,
+    ): VehicleServiceJobLine
     {
-        return $this->writes->create($job, $data);
+        return $this->writes->create($job, $data, $expectedVersion);
     }
 
     public function update(
         VehicleServiceJob $job,
         VehicleServiceJobLine $line,
         VehicleServiceLineData $data,
+        ?int $expectedVersion = null,
     ): VehicleServiceJobLine {
-        return $this->writes->update($job, $line, $data);
+        return $this->writes->update($job, $line, $data, $expectedVersion);
     }
 
-    public function delete(VehicleServiceJob $job, VehicleServiceJobLine $line): void
+    public function delete(VehicleServiceJob $job, VehicleServiceJobLine $line, ?int $expectedVersion = null): void
     {
-        $this->writes->delete($job, $line);
+        $this->writes->delete($job, $line, $expectedVersion);
     }
 
     public function recalculateJob(VehicleServiceJob $job): VehicleServiceJob

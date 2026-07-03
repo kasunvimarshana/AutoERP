@@ -49,6 +49,7 @@ final class VehicleServiceDocumentController extends VehicleServiceController
             $request->file('file'),
             $request->filled('description') ? (string) $request->input('description') : null,
             $request->currentUserId(),
+            $request->expectedVersion(),
         );
 
         return (new VehicleServiceDocumentResource($document))->response()->setStatusCode(201);
@@ -87,8 +88,9 @@ final class VehicleServiceDocumentController extends VehicleServiceController
         int $document,
         VehicleServiceDocumentService $service,
     ): JsonResponse {
-        $model = $this->job($request, $job)->documents()->findOrFail($document);
-        $service->delete($model);
+        $jobModel = $this->job($request, $job);
+        $model = $jobModel->documents()->findOrFail($document);
+        $service->delete($jobModel, $model, $request->expectedVersion());
 
         return response()->json(status: 204);
     }

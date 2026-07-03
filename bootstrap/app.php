@@ -121,6 +121,12 @@ return Application::configure(basePath: dirname(__DIR__))
                 : null;
         });
 
+        $exceptions->render(function (InvalidArgumentException $exception, Request $request) use ($errorResponse) {
+            return $request->is('api/*') || $request->expectsJson()
+                ? $errorResponse(422, $exception->getMessage())
+                : null;
+        });
+
         $exceptions->render(function (ConfigurationException $exception, Request $request) {
             if (! ($request->is('api/*') || $request->expectsJson())) {
                 return null;

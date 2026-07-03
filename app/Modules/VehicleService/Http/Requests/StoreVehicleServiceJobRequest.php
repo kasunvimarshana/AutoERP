@@ -8,14 +8,18 @@ use Illuminate\Validation\Rule;
 use Modules\Core\Http\Requests\TenantScopedRequest;
 use Modules\VehicleService\DTOs\VehicleServiceJobData;
 use Modules\VehicleService\Enums\VehicleServiceCommissionType;
+use Modules\VehicleService\Http\Requests\Concerns\HasExpectedVehicleServiceJobVersion;
 
 final class StoreVehicleServiceJobRequest extends TenantScopedRequest
 {
+    use HasExpectedVehicleServiceJobVersion;
+
     public function rules(): array
     {
         return [
             'tenant_id' => ['required', 'integer', 'min:1'],
             'organization_unit_id' => ['nullable', 'integer', 'min:1'],
+            'expected_version' => $this->expectedVersionRules(! $this->isMethod('post')),
             'job_number' => ['nullable', 'string', 'max:100'],
             'job_date' => ['required', 'date'],
             'expected_delivery_date' => ['nullable', 'date', 'after_or_equal:job_date'],

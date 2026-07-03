@@ -51,6 +51,7 @@ export interface VehicleServiceInspection {
 }
 
 export interface VehicleServiceInspectionPayload {
+    expected_version?: number;
     customer_complaint?: string;
     inspection_notes?: string;
     diagnosis?: string;
@@ -77,6 +78,7 @@ export interface VehicleServiceEmployeeAssignment {
 }
 
 export interface VehicleServiceEmployeeAssignmentPayload {
+    expected_version?: number;
     employee_id: number;
     role_type: string;
     assigned_hours?: string;
@@ -190,6 +192,7 @@ export interface VehicleServiceJob {
 }
 
 export interface VehicleServiceJobPayload {
+    expected_version?: number;
     job_date: string;
     expected_delivery_date?: string;
     customer_id: number;
@@ -205,6 +208,7 @@ export interface VehicleServiceJobPayload {
 }
 
 export interface VehicleServiceLinePayload {
+    expected_version?: number;
     line_source_type: VehicleServiceLineSourceType;
     item_id?: number;
     uom_id?: number;
@@ -235,6 +239,7 @@ export interface VehicleServiceInvoicePreview {
 }
 
 export interface VehicleServiceInvoicePayload {
+    expected_version?: number;
     invoice_date: string;
     due_date?: string;
     currency_id?: number;
@@ -251,6 +256,7 @@ export interface VehicleServiceInvoiceCreated {
 }
 
 export interface VehicleServiceInventoryIssuePayload {
+    expected_version?: number;
     warehouse_id: number;
     warehouse_location_id?: number;
     line_ids?: number[];

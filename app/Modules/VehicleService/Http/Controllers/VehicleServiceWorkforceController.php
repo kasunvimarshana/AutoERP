@@ -39,6 +39,7 @@ final class VehicleServiceWorkforceController extends VehicleServiceController
             $jobModel,
             $this->line($jobModel, $line),
             $request->toData(),
+            $request->expectedVersion(),
         )))->response()->setStatusCode(201);
     }
 
@@ -57,6 +58,7 @@ final class VehicleServiceWorkforceController extends VehicleServiceController
             $lineModel,
             $this->assignment($lineModel, $assignment),
             $request->toData(),
+            $request->expectedVersion(),
         ));
     }
 
@@ -69,7 +71,7 @@ final class VehicleServiceWorkforceController extends VehicleServiceController
     ): JsonResponse {
         $jobModel = $this->job($request, $job);
         $lineModel = $this->line($jobModel, $line);
-        $service->delete($jobModel, $lineModel, $this->assignment($lineModel, $assignment));
+        $service->delete($jobModel, $lineModel, $this->assignment($lineModel, $assignment), $request->expectedVersion());
 
         return response()->json(status: 204);
     }

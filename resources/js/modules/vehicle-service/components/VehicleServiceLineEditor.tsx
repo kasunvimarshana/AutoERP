@@ -25,7 +25,15 @@ import {
 import { SummaryValue } from './line-editor/LineSummary';
 import { VehicleServiceLineForm } from './line-editor/VehicleServiceLineForm';
 
-export default function VehicleServiceLineEditor({ jobId }: { jobId: number }) {
+export default function VehicleServiceLineEditor({
+    jobId,
+    expectedVersion,
+    onChanged,
+}: {
+    jobId: number;
+    expectedVersion: number;
+    onChanged?: () => void;
+}) {
     const result = useApi((signal) => listVehicleServiceLines(jobId, signal), [jobId]);
     const [dialog, setDialog] = useState<LineDialog | null>(null);
     const [removeTarget, setRemoveTarget] = useState<VehicleServiceJobLine | null>(null);
@@ -38,7 +46,7 @@ export default function VehicleServiceLineEditor({ jobId }: { jobId: number }) {
         setSaving(true);
         setError(null);
         try {
-            const payload = lineFormToPayload(value);
+            const payload = { ...lineFormToPayload(value), expected_version: expectedVersion };
             if (dialog.mode === 'edit') {
                 await updateVehicleServiceLine(jobId, dialog.lineId, payload);
             } else {
@@ -46,6 +54,7 @@ export default function VehicleServiceLineEditor({ jobId }: { jobId: number }) {
             }
             setDialog(null);
             result.reload();
+            onChanged?.();
         } catch (requestError) {
             setError(toApiError(requestError));
         } finally {
@@ -58,9 +67,10 @@ export default function VehicleServiceLineEditor({ jobId }: { jobId: number }) {
         setRemoving(true);
         setError(null);
         try {
-            await deleteVehicleServiceLine(jobId, line.id);
+            await deleteVehicleServiceLine(jobId, line.id, expectedVersion);
             setRemoveTarget(null);
             result.reload();
+            onChanged?.();
         } catch (requestError) {
             setError(toApiError(requestError));
         } finally {

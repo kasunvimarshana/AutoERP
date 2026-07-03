@@ -6,10 +6,12 @@ namespace Modules\VehicleService\Http\Requests;
 
 use Modules\Core\Http\Requests\TenantScopedRequest;
 use Modules\VehicleService\DTOs\VehicleServiceInspectionData;
+use Modules\VehicleService\Http\Requests\Concerns\HasExpectedVehicleServiceJobVersion;
 use Modules\VehicleService\Http\Requests\Concerns\NormalizesBooleanInput;
 
 final class StoreVehicleServiceInspectionRequest extends TenantScopedRequest
 {
+    use HasExpectedVehicleServiceJobVersion;
     use NormalizesBooleanInput;
 
     public function rules(): array
@@ -17,6 +19,7 @@ final class StoreVehicleServiceInspectionRequest extends TenantScopedRequest
         return [
             'tenant_id' => ['required', 'integer', 'min:1'],
             'organization_unit_id' => ['nullable', 'integer', 'min:1'],
+            'expected_version' => $this->expectedVersionRules(),
             'customer_complaint' => ['nullable', 'string'],
             'inspection_notes' => ['nullable', 'string'],
             'diagnosis' => ['nullable', 'string'],

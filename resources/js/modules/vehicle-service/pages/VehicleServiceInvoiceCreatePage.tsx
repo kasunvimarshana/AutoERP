@@ -59,6 +59,7 @@ function VehicleServiceInvoiceEditor({ jobId, job, billableLines, loadError }: {
         Object.entries(quantities).filter(([, quantity]) => isPositiveDecimal(quantity)),
     );
     const payload = () => ({
+        expected_version: job.row_version ?? 0,
         invoice_date: form.invoice_date,
         due_date: form.due_date || undefined,
         exchange_rate: form.exchange_rate,
