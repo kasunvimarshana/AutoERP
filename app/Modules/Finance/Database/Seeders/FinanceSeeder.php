@@ -272,19 +272,7 @@ final class FinanceSeeder extends Seeder
                     ],
                 );
 
-                FinanceAccountAssignment::query()->updateOrCreate(
-                    [
-                        'tenant_id' => $tenantId,
-                        'organization_unit_id' => $organizationUnitId,
-                        'account_role_id' => $role->getKey(),
-                        'effective_from' => self::OPENING_EFFECTIVE_DATE,
-                    ],
-                    [
-                        'account_id' => $account->getKey(),
-                        'effective_to' => null,
-                        'is_active' => true,
-                    ],
-                );
+                $this->seedAccountAssignment($tenantId, $organizationUnitId, $role, $account);
 
                 FinancePostingProfileRule::query()->updateOrCreate(
                     [
@@ -298,6 +286,46 @@ final class FinanceSeeder extends Seeder
                     ],
                 );
             }
+        }
+    }
+
+    private function seedAccountAssignment(
+        int $tenantId,
+        ?int $organizationUnitId,
+        FinanceAccountRole $role,
+        FinanceAccount $account,
+    ): void {
+        FinanceAccountAssignment::query()->updateOrCreate(
+            [
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $organizationUnitId,
+                'account_role_id' => $role->getKey(),
+                'effective_from' => self::OPENING_EFFECTIVE_DATE,
+            ],
+            [
+                'account_id' => $account->getKey(),
+                'effective_to' => null,
+                'is_active' => true,
+            ],
+        );
+
+        $duplicates = FinanceAccountAssignment::query()
+            ->where('tenant_id', $tenantId)
+            ->when(
+                $organizationUnitId === null,
+                fn ($query) => $query->whereNull('organization_unit_id'),
+                fn ($query) => $query->where('organization_unit_id', $organizationUnitId),
+            )
+            ->where('account_role_id', $role->getKey())
+            ->where('account_id', $account->getKey())
+            ->whereDate('effective_from', self::OPENING_EFFECTIVE_DATE)
+            ->whereNull('effective_to')
+            ->where('is_active', true)
+            ->orderBy('id')
+            ->get();
+
+        foreach ($duplicates->skip(1) as $duplicate) {
+            $duplicate->forceFill(['is_active' => false])->save();
         }
     }
 }

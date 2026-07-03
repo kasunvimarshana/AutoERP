@@ -62,6 +62,58 @@ final class FinanceSeederTest extends TestCase
         $this->assertSame(0, DB::table('finance_account_assignments')->whereNull('organization_unit_id')->count());
     }
 
+    public function test_default_account_assignment_seeding_collapses_exact_duplicate_active_rows(): void
+    {
+        $tenantId = $this->createTenant('AUTOERP');
+
+        app(TenantExecutionContextInterface::class)->runAsControlPlane(function (): void {
+            $this->seed(OrganizationUnitSeeder::class);
+            $this->seed(FinanceSeeder::class);
+        });
+
+        $organizationUnitId = (int) DB::table('organization_units')
+            ->where('tenant_id', $tenantId)
+            ->where('root_marker', OrganizationUnitHierarchy::ROOT_MARKER)
+            ->value('id');
+        $inventoryAccountId = $this->accountId($tenantId, $organizationUnitId, '1200');
+        $inventoryRoleId = $this->roleId($tenantId, 'inventory');
+
+        $duplicateId = (int) DB::table('finance_account_assignments')->insertGetId([
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => $organizationUnitId,
+            'account_role_id' => $inventoryRoleId,
+            'account_id' => $inventoryAccountId,
+            'effective_from' => '1900-01-01',
+            'effective_to' => null,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        app(TenantExecutionContextInterface::class)->runAsControlPlane(function (): void {
+            $this->seed(FinanceSeeder::class);
+        });
+
+        $activeAssignmentIds = DB::table('finance_account_assignments')
+            ->where('tenant_id', $tenantId)
+            ->where('organization_unit_id', $organizationUnitId)
+            ->where('account_role_id', $inventoryRoleId)
+            ->where('account_id', $inventoryAccountId)
+            ->whereDate('effective_from', '1900-01-01')
+            ->whereNull('effective_to')
+            ->where('is_active', true)
+            ->orderBy('id')
+            ->pluck('id')
+            ->all();
+
+        $this->assertCount(1, $activeAssignmentIds);
+        $this->assertNotContains($duplicateId, $activeAssignmentIds);
+        $this->assertDatabaseHas('finance_account_assignments', [
+            'id' => $duplicateId,
+            'is_active' => false,
+        ]);
+    }
+
     private function createTenant(string $code): int
     {
         return (int) DB::table('tenants')->insertGetId([
