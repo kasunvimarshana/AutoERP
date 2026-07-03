@@ -18,7 +18,9 @@ final class VehicleServiceJobResource extends JsonResource
             'job_date' => $this->job_date?->toDateString(),
             'expected_delivery_date' => $this->expected_delivery_date?->toDateString(),
             'customer_id' => (int) $this->customer_id,
-            'customer' => $this->whenLoaded('customer', fn () => $this->customerSummary()),
+            'customer' => $this->whenLoaded('customer', fn () => $this->customerRelation($this->customer)),
+            'bill_to_customer_id' => $this->bill_to_customer_id === null ? null : (int) $this->bill_to_customer_id,
+            'bill_to_customer' => $this->whenLoaded('billToCustomer', fn () => $this->customerRelation($this->billToCustomer)),
             'vehicle_id' => (int) $this->vehicle_id,
             'vehicle' => $this->whenLoaded('vehicle', fn () => $this->vehicleSummary()),
             'supervisor_employee_id' => $this->supervisor_employee_id,
@@ -61,15 +63,6 @@ final class VehicleServiceJobResource extends JsonResource
     private function enum(mixed $value): mixed
     {
         return $value instanceof \BackedEnum ? $value->value : $value;
-    }
-
-    private function customerSummary(): ?array
-    {
-        return $this->customer === null ? null : [
-            'id' => (int) $this->customer->getKey(),
-            'code' => $this->customer->code,
-            'name' => $this->customer->display_name ?? $this->customer->name,
-        ];
     }
 
     private function vehicleSummary(): ?array

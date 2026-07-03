@@ -148,7 +148,7 @@ export default function VehicleServicePaymentPreparePage() {
 
     const clearPrepared = () => setPrepared(null);
     const payload = (): VehicleServicePaymentPayload => ({
-        expected_job_version: options.data?.job_version ?? 0,
+        expected_version: options.data?.job_version ?? 0,
         invoice_id: Number(invoiceId),
         payment_date: date,
         amount,

@@ -22,9 +22,7 @@ final class VehicleServiceInventoryController extends VehicleServiceController
         $movements = $service->issue(
             $this->job($request, $job),
             (int) $request->input('warehouse_id'),
-            $request->filled('warehouse_location_id')
-                ? (int) $request->input('warehouse_location_id')
-                : null,
+            (int) $request->input('warehouse_location_id'),
             array_map('intval', $request->input('line_ids', [])),
             $request->currentUserId(),
             $request->expectedVersion(),

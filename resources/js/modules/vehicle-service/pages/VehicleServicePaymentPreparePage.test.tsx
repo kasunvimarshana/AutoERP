@@ -56,7 +56,7 @@ describe('VehicleServicePaymentPreparePage', () => {
         await user.click(screen.getByRole('button', { name: 'Receive, post and allocate' }));
 
         await waitFor(() => expect(apiMocks.createVehicleServicePayment).toHaveBeenCalledWith(9, expect.objectContaining({
-            expected_job_version: 7,
+            expected_version: 7,
             invoice_id: 11,
             payment_method_id: 3,
             amount: '100.000000',
@@ -89,7 +89,7 @@ describe('VehicleServicePaymentPreparePage', () => {
         await user.click(screen.getByRole('button', { name: 'Review payment' }));
 
         await waitFor(() => expect(apiMocks.prepareVehicleServicePayment).toHaveBeenCalledWith(9, expect.objectContaining({
-            expected_job_version: 7,
+            expected_version: 7,
             payment_method_id: 4,
             reference_number: 'TRX-100',
             instrument_number: 'TRX-100',

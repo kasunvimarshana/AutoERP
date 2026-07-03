@@ -35,6 +35,7 @@ final class VehicleServiceJob extends TenantOwnedModel
             'job_date' => 'date',
             'expected_delivery_date' => 'date',
             'customer_id' => 'integer',
+            'bill_to_customer_id' => 'integer',
             'vehicle_id' => 'integer',
             'supervisor_employee_id' => 'integer',
             'supervisor_commission_type' => VehicleServiceCommissionType::class,
@@ -64,6 +65,11 @@ final class VehicleServiceJob extends TenantOwnedModel
     public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class, 'customer_id')->withTrashed();
+    }
+
+    public function billToCustomer(): BelongsTo
+    {
+        return $this->belongsTo(Customer::class, 'bill_to_customer_id')->withTrashed();
     }
 
     public function vehicle(): BelongsTo

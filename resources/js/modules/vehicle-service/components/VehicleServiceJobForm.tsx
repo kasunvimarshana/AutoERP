@@ -25,6 +25,7 @@ const currentCustomerOwner = (vehicle: VehicleLookupResource | null, fallback: N
 export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
     const navigate = useNavigate();
     const [customer, setCustomer] = useState<NamedResource | null>(job?.customer ?? null);
+    const [billToCustomer, setBillToCustomer] = useState<NamedResource | null>(job?.bill_to_customer ?? job?.customer ?? null);
     const [vehicle, setVehicle] = useState<VehicleLookupResource | null>(job?.vehicle ?? null);
     const [supervisor, setSupervisor] = useState<NamedResource | null>(job?.supervisor ?? null);
     const [form, setForm] = useState({
@@ -60,6 +61,7 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
         job_date: form.job_date,
         expected_delivery_date: form.expected_delivery_date || undefined,
         customer_id: customer?.id ?? 0,
+        bill_to_customer_id: billToCustomer?.id ?? customer?.id ?? 0,
         vehicle_id: vehicle?.id ?? 0,
         supervisor_employee_id: supervisor?.id,
         supervisor_commission_type: form.supervisor_commission_type,
@@ -67,7 +69,7 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
         odometer_reading: form.odometer_reading || undefined,
         fuel_level: form.fuel_level || undefined,
         priority: form.priority || undefined,
-        customer_complaint: form.customer_complaint || undefined,
+        customer_complaint: form.customer_complaint,
         notes: form.notes || undefined,
     });
 
@@ -91,7 +93,8 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
             <ErrorAlert error={error} />
             <Panel title="Service job">
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                    <GenericLookupSelect label="Customer" value={customer} onChange={(value) => { formGuard.markDirty(); setCustomer(value); setVehicle(null); }} search={searchCustomer} formatLabel={(value) => `${value.code ?? ''} ${value.name}`.trim()} error={errorFor('customer_id')} />
+                    <GenericLookupSelect label="Customer" value={customer} onChange={(value) => { formGuard.markDirty(); setCustomer(value); setBillToCustomer(value); setVehicle(null); }} search={searchCustomer} formatLabel={(value) => `${value.code ?? ''} ${value.name}`.trim()} error={errorFor('customer_id')} />
+                    <GenericLookupSelect label="Bill-to customer" value={billToCustomer} onChange={(value) => { formGuard.markDirty(); setBillToCustomer(value); }} search={searchCustomer} formatLabel={(value) => `${value.code ?? ''} ${value.name}`.trim()} error={errorFor('bill_to_customer_id')} />
                     <GenericLookupSelect label="Vehicle" value={vehicle} onChange={(value) => {
                         formGuard.markDirty();
                         setVehicle(value);

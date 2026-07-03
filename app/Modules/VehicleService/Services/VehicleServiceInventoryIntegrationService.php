@@ -47,16 +47,17 @@ final class VehicleServiceInventoryIntegrationService
             ->get()
             ->filter(fn ($line): bool => $this->lines->isInventoryIssueLine($line))
             ->each(function ($line) use ($job, $warehouseId, $warehouseLocationId): void {
-                $line->setAttribute('issue_eligible', true);
-                $line->setAttribute('inventory_warning', $warehouseId === null ? 'Select a warehouse to check stock availability.' : null);
+                $line->setAttribute('issue_eligible', false);
+                $line->setAttribute('inventory_warning', $warehouseId === null
+                    ? 'Select a warehouse to check stock availability.'
+                    : ($warehouseLocationId === null ? 'Select a warehouse location to check exact stock availability.' : null));
 
                 if ($line->item?->tracking_type !== TrackingType::None) {
-                    $line->setAttribute('issue_eligible', false);
                     $line->setAttribute('inventory_warning', 'Batch, lot, and serial tracked items require tracking references in the Inventory workflow.');
 
                     return;
                 }
-                if ($warehouseId === null) {
+                if ($warehouseId === null || $warehouseLocationId === null) {
                     return;
                 }
 
@@ -91,7 +92,7 @@ final class VehicleServiceInventoryIntegrationService
     public function issue(
         VehicleServiceJob $job,
         int $warehouseId,
-        ?int $warehouseLocationId = null,
+        int $warehouseLocationId,
         array $lineIds = [],
         ?int $postedBy = null,
         ?int $expectedVersion = null,
