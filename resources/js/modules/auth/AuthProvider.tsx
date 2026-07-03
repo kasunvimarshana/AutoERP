@@ -39,7 +39,7 @@ interface AuthContextValue {
     bootstrapError: ApiError | null;
     login: (payload: LoginPayload) => Promise<void>;
     logout: () => Promise<void>;
-    loadCurrentUser: (signal?: AbortSignal) => Promise<void>;
+    loadCurrentUser: (signal?: AbortSignal, options?: LoadCurrentUserOptions) => Promise<void>;
     switchOrganizationUnit: (organizationUnitId: number) => Promise<void>;
 }
 
@@ -53,6 +53,10 @@ interface SessionPayload {
     enabledModules: string[] | null;
     isPlatformOperator: boolean;
     authMode: AuthMode;
+}
+
+interface LoadCurrentUserOptions {
+    notifyOtherTabs?: boolean;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -97,12 +101,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         resetReactState();
     }, [resetReactState]);
 
-    const commitSession = useCallback((session: SessionPayload) => {
+    const commitSession = useCallback((session: SessionPayload, options: LoadCurrentUserOptions = {}) => {
         const tenantId = session.authMode === 'tenant' ? toPositiveInteger(session.tenant?.id) : null;
         commitAuthSession({
             accessToken: session.token,
             tenantId,
             authMode: session.authMode,
+        }, {
+            notifyOtherTabs: options.notifyOtherTabs,
         });
         setToken(session.token);
         setAuthMode(session.authMode);
@@ -119,7 +125,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         configureBusinessTimeZone(session.organizationUnit?.timezone ?? session.tenant?.timezone);
     }, []);
 
-    const loadCurrentUser = useCallback(async (signal?: AbortSignal) => {
+    const loadCurrentUser = useCallback(async (signal?: AbortSignal, options: LoadCurrentUserOptions = {}) => {
         const loadId = authLoadId.current + 1;
         authLoadId.current = loadId;
         setIsLoading(true);
@@ -153,6 +159,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 enabledModules: current.enabled_modules ?? null,
                 isPlatformOperator: current.is_platform_operator ?? current.user.is_platform_operator ?? false,
                 authMode: storedContext.authMode,
+            }, {
+                notifyOtherTabs: options.notifyOtherTabs ?? false,
             });
         } catch (error: unknown) {
             if (signal?.aborted) return;
@@ -208,7 +216,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         await authApi.switchOrganizationUnit(organizationUnitId);
-        await loadCurrentUser();
+        await loadCurrentUser(undefined, { notifyOtherTabs: true });
     }, [loadCurrentUser]);
 
     const logout = useCallback(async () => {

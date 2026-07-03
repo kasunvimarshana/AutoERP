@@ -13,6 +13,10 @@ export interface AuthSessionContext {
     authMode: AuthMode;
 }
 
+interface CommitAuthSessionOptions {
+    notifyOtherTabs?: boolean;
+}
+
 export const AUTH_SESSION_MARKER_KEY = 'autoerp.auth_session';
 export const AUTH_SESSION_INVALIDATED_EVENT = 'autoerp:auth-session-invalidated';
 
@@ -46,7 +50,7 @@ export function setTransientAccessToken(accessToken: string | null): void {
     accessTokenInMemory = normalizeToken(accessToken);
 }
 
-export function commitAuthSession(context: AuthSessionContext): void {
+export function commitAuthSession(context: AuthSessionContext, options: CommitAuthSessionOptions = {}): void {
     const accessToken = normalizeToken(context.accessToken);
     if (accessToken === null) {
         throw new Error('An access token is required to commit an authenticated session.');
@@ -56,7 +60,9 @@ export function commitAuthSession(context: AuthSessionContext): void {
     setPositiveInteger(TENANT_KEY, context.authMode === 'tenant' ? context.tenantId : null);
     window.localStorage.setItem(AUTH_MODE_KEY, context.authMode);
     LEGACY_AUTH_KEYS.forEach((key) => window.localStorage.removeItem(key));
-    window.localStorage.setItem(AUTH_SESSION_MARKER_KEY, createSessionMarker());
+    if ((options.notifyOtherTabs ?? true) || window.localStorage.getItem(AUTH_SESSION_MARKER_KEY) === null) {
+        window.localStorage.setItem(AUTH_SESSION_MARKER_KEY, createSessionMarker());
+    }
 }
 
 export function updateRefreshedSession(accessToken: string): void {

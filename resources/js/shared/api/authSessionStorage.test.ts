@@ -55,6 +55,39 @@ describe('authSessionStorage', () => {
         expect(window.localStorage.getItem('autoerp.access_token')).toBeNull();
     });
 
+    it('can restore session context without rotating the cross-tab session marker', () => {
+        commitAuthSession({ accessToken: 'old-token', tenantId: 8, authMode: 'tenant' });
+        const marker = window.localStorage.getItem(AUTH_SESSION_MARKER_KEY);
+
+        commitAuthSession(
+            { accessToken: 'restored-token', tenantId: 8, authMode: 'tenant' },
+            { notifyOtherTabs: false },
+        );
+
+        expect(getStoredApiContext()).toMatchObject({
+            accessToken: 'restored-token',
+            tenantId: 8,
+            authMode: 'tenant',
+            hasSession: true,
+        });
+        expect(window.localStorage.getItem(AUTH_SESSION_MARKER_KEY)).toBe(marker);
+    });
+
+    it('still creates a session marker when a silent commit starts from missing storage', () => {
+        commitAuthSession(
+            { accessToken: 'token', tenantId: null, authMode: 'platform' },
+            { notifyOtherTabs: false },
+        );
+
+        expect(getStoredApiContext()).toMatchObject({
+            accessToken: 'token',
+            tenantId: null,
+            authMode: 'platform',
+            hasSession: true,
+        });
+        expect(window.localStorage.getItem(AUTH_SESSION_MARKER_KEY)).toBeTruthy();
+    });
+
     it('clears all session state', () => {
         commitAuthSession({ accessToken: 'token', tenantId: 8, authMode: 'tenant' });
         setTransientAccessToken('other-token');
