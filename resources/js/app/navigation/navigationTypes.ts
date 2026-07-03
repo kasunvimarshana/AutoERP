@@ -7,7 +7,6 @@ export type NavigationIconName =
     | 'item'
     | 'users'
     | 'purchase'
-    | 'sales'
     | 'service'
     | 'rental'
     | 'invoice'

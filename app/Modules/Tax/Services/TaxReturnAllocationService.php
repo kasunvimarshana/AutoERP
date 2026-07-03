@@ -99,8 +99,6 @@ final class TaxReturnAllocationService
     {
         return match ($sourceLineType) {
             'goods_receipt_note_line' => 'goods_receipt_note',
-            'sales_delivery_line' => 'sales_delivery',
-            'sales_order_line' => 'sales_order',
             'invoice_line' => 'invoice',
             default => null,
         };

@@ -46,13 +46,13 @@ const sections: NavigationSection[] = [
                 ],
             },
             {
-                id: 'sales',
+                id: 'payment',
                 type: 'module',
-                label: 'Sales',
-                icon: 'sales',
+                label: 'Payments',
+                icon: 'payment',
                 access: { requiresPlatformOperator: true },
                 children: [
-                    { id: 'sales-orders', type: 'link', label: 'Sales Orders', to: '/sales/orders', access: { requiresPlatformOperator: true } },
+                    { id: 'payments-list', type: 'link', label: 'Payments', to: '/payments', access: { requiresPlatformOperator: true } },
                 ],
             },
         ],
@@ -70,21 +70,21 @@ describe('WorkspaceLayout sidebar expansion', () => {
 
         expect(screen.getByText('Purchase page')).toBeInTheDocument();
         expect(screen.getByRole('link', { name: 'Purchase Orders' })).toHaveAttribute('aria-current', 'page');
-        expect(screen.queryByRole('link', { name: 'Sales Orders' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('link', { name: 'Payments' })).not.toBeInTheDocument();
 
-        await user.click(screen.getByRole('button', { name: 'Sales' }));
+        await user.click(screen.getByRole('button', { name: 'Payments' }));
 
-        expect(screen.getByRole('link', { name: 'Sales Orders' })).toBeInTheDocument();
+        expect(screen.getByRole('link', { name: 'Payments' })).toBeInTheDocument();
         expect(screen.queryByRole('link', { name: 'Purchase Orders' })).not.toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Purchase' })).toHaveAttribute('aria-expanded', 'false');
-        expect(screen.getByRole('button', { name: 'Sales' })).toHaveAttribute('aria-expanded', 'true');
+        expect(screen.getByRole('button', { name: 'Payments' })).toHaveAttribute('aria-expanded', 'true');
 
         await act(async () => {
             await router.navigate('/purchase/orders?refresh=1');
         });
 
         expect(screen.getByRole('link', { name: 'Purchase Orders' })).toHaveAttribute('aria-current', 'page');
-        expect(screen.queryByRole('link', { name: 'Sales Orders' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('link', { name: 'Payments' })).not.toBeInTheDocument();
     });
 });
 
@@ -102,7 +102,7 @@ function renderWorkspace(initialEntry: string) {
             ),
             children: [
                 { path: 'purchase/orders', element: <div>Purchase page</div> },
-                { path: 'sales/orders', element: <div>Sales page</div> },
+                { path: 'payments', element: <div>Payments page</div> },
             ],
         },
     ], { initialEntries: [initialEntry] });

@@ -134,14 +134,6 @@ M  app/Modules/Payment/Http/Resources/ChequeTemplateResource.php
 M  app/Modules/Payment/Http/Resources/PaymentMethodResource.php
 M  app/Modules/Payment/Http/Resources/PaymentResource.php
 M  app/Modules/Purchase/Http/Resources/PurchaseResource.php
-M  app/Modules/Sales/Http/Resources/FastSalesResource.php
-M  app/Modules/Sales/Http/Resources/SalesAllocationLineResource.php
-M  app/Modules/Sales/Http/Resources/SalesAllocationResource.php
-M  app/Modules/Sales/Http/Resources/SalesCreditNoteResource.php
-M  app/Modules/Sales/Http/Resources/SalesDeliveryResource.php
-M  app/Modules/Sales/Http/Resources/SalesOrderResource.php
-M  app/Modules/Sales/Http/Resources/SalesQuotationResource.php
-M  app/Modules/Sales/Http/Resources/SalesReturnResource.php
 M  app/Modules/Sequence/Database/Seeders/SequenceSeeder.php
 M  app/Modules/Sequence/Http/Controllers/SequenceController.php
 M  app/Modules/Sequence/Routes/api.php

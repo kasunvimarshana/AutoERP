@@ -1,5 +1,4 @@
 import { purchasePermissions } from '@/modules/purchase/purchasePermissions';
-import { salesPermissions } from '@/modules/sales/salesPermissions';
 import { operational, type EntitlementRule } from './routeEntitlementPolicy';
 
 export const commerceRouteEntitlements: readonly EntitlementRule[] = [
@@ -26,24 +25,4 @@ export const commerceRouteEntitlements: readonly EntitlementRule[] = [
     operational('/purchase/debit-notes/create', ['purchase'], [purchasePermissions.debitNotesCreate]),
     operational('/purchase/debit-notes/:id', ['purchase'], [purchasePermissions.debitNotesView]),
     operational('/purchase/debit-notes', ['purchase'], [purchasePermissions.debitNotesView]),
-
-    operational('/sales/quotations/create', ['sales'], [salesPermissions.quotationsCreate]),
-    operational('/sales/quotations/:id/edit', ['sales'], [salesPermissions.quotationsUpdate]),
-    operational('/sales/quotations/:id', ['sales'], [salesPermissions.quotationsView]),
-    operational('/sales/quotations', ['sales'], [salesPermissions.quotationsView]),
-    operational('/sales/fast-sales', ['sales'], [salesPermissions.fastSalesView, salesPermissions.fastSalesExecute]),
-    operational('/sales/orders/create', ['sales'], [salesPermissions.ordersCreate]),
-    operational('/sales/orders/:id/edit', ['sales'], [salesPermissions.ordersUpdate]),
-    operational('/sales/orders/:id', ['sales'], [salesPermissions.ordersView]),
-    operational('/sales/orders', ['sales'], [salesPermissions.ordersView]),
-    operational('/sales/allocations/create', ['sales'], [salesPermissions.allocationsCreate]),
-    operational('/sales/allocations/:id', ['sales'], [salesPermissions.allocationsView]),
-    operational('/sales/allocations', ['sales'], [salesPermissions.allocationsView]),
-    operational('/sales/deliveries/create', ['sales'], [salesPermissions.deliveriesCreate]),
-    operational('/sales/deliveries', ['sales'], [salesPermissions.deliveriesView]),
-    operational('/sales/invoices/create', ['sales', 'invoice'], [salesPermissions.customerInvoicesCreate]),
-    operational('/sales/payments/prepare', ['sales', 'payment'], [salesPermissions.receiptsExecute]),
-    operational('/sales/returns/create', ['sales'], [salesPermissions.returnsCreate]),
-    operational('/sales/returns', ['sales'], [salesPermissions.returnsView]),
-    operational('/sales/credit-notes', ['sales'], [salesPermissions.creditNotesView, salesPermissions.creditNotesCreate]),
 ];

@@ -196,7 +196,7 @@ final class ItemApiTest extends TestCase
                 'effective_from' => '2026-01-01',
             ]],
             'codes' => [['code_type' => 'internal_code', 'code' => 'KIT-CODE', 'is_primary' => true]],
-            'usage_rules' => [['module_code' => 'sales', 'is_enabled' => true]],
+            'usage_rules' => [['module_code' => 'invoice', 'is_enabled' => true]],
         ])
             ->assertCreated()
             ->assertJsonPath('data.units.0.uom.code', 'PCS')
@@ -204,7 +204,7 @@ final class ItemApiTest extends TestCase
             ->assertJsonPath('data.bundles.0.quantity', '2.500000')
             ->assertJsonPath('data.prices.0.amount', '125.500000')
             ->assertJsonPath('data.codes.0.code', 'KIT-CODE')
-            ->assertJsonPath('data.usage_rules.0.module_code', 'sales');
+            ->assertJsonPath('data.usage_rules.0.module_code', 'invoice');
     }
 
     public function test_one_shot_relation_failure_rolls_back_item(): void

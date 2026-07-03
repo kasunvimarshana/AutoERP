@@ -381,10 +381,6 @@ final class WarehouseDomainService
             'purchase_orders' => ['warehouse_id'],
             'goods_receipt_notes' => ['warehouse_id'],
             'purchase_returns' => ['warehouse_id'],
-            'sales_orders' => ['warehouse_id'],
-            'sales_allocations' => ['warehouse_id'],
-            'sales_deliveries' => ['warehouse_id'],
-            'sales_returns' => ['warehouse_id'],
         ];
     }
 
@@ -407,10 +403,6 @@ final class WarehouseDomainService
             'purchase_orders' => ['warehouse_location_id'],
             'goods_receipt_notes' => ['warehouse_location_id'],
             'purchase_returns' => ['warehouse_location_id'],
-            'sales_orders' => ['warehouse_location_id'],
-            'sales_allocations' => ['warehouse_location_id'],
-            'sales_deliveries' => ['warehouse_location_id'],
-            'sales_returns' => ['warehouse_location_id'],
         ];
     }
 }

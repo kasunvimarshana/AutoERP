@@ -66,7 +66,6 @@ describe('navigation access and matching', () => {
         expect(itemIds).not.toContain('purchase');
         expect(itemIds).not.toContain('items');
         expect(itemIds).not.toContain('vehicle-rental');
-        expect(itemIds).not.toContain('sales');
         expect(itemIds).not.toContain('vehicle');
         expect(itemIds).not.toContain('users');
         expect(itemIds).not.toContain('users-access');
@@ -104,7 +103,6 @@ describe('navigation access and matching', () => {
         const itemIds = sections.flatMap((section) => section.items).map((item) => item.id);
 
         expect(itemIds).not.toContain('purchase');
-        expect(itemIds).not.toContain('sales');
         expect(itemIds).not.toContain('suppliers');
         expect(itemIds).not.toContain('vehicle');
     });

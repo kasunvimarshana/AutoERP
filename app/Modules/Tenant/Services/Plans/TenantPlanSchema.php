@@ -35,7 +35,6 @@ final class TenantPlanSchema
         'warehouse' => 'Warehouses',
         'inventory' => 'Inventory',
         'purchase' => 'Purchasing',
-        'sales' => 'Sales',
         'vehicle' => 'Vehicles',
         'vehicle-service' => 'Vehicle service',
         'vehicle-rental' => 'Vehicle rental',

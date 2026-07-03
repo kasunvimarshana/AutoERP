@@ -37,12 +37,12 @@ describe('access control', () => {
     it('uses any matching permission or role for a declared requirement', () => {
         const subject = {
             roles: ['Manager'],
-            permissions: ['sales.orders.view'],
+            permissions: ['purchase.orders.view'],
             permissionsLoaded: true,
         };
 
-        expect(meetsAccessRequirement(subject, { permissions: ['sales.orders.edit', 'sales.orders.view'] })).toBe(true);
+        expect(meetsAccessRequirement(subject, { permissions: ['purchase.orders.edit', 'purchase.orders.view'] })).toBe(true);
         expect(meetsAccessRequirement(subject, { roles: ['manager'] })).toBe(true);
-        expect(meetsAccessRequirement(subject, { permissions: ['purchase.orders.view'], roles: ['auditor'] })).toBe(false);
+        expect(meetsAccessRequirement(subject, { permissions: ['vehicle.view'], roles: ['auditor'] })).toBe(false);
     });
 });

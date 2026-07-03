@@ -32,7 +32,6 @@ AutoERP Tenant foundation changed-file manifest — clone-102
  M app/Modules/ReferenceData/Providers/ReferenceDataServiceProvider.php
  M app/Modules/Reporting/Providers/ReportingServiceProvider.php
  M app/Modules/Reporting/Services/ReportBrandingResolver.php
- M app/Modules/Sales/Providers/SalesServiceProvider.php
  M app/Modules/Supplier/Providers/SupplierServiceProvider.php
  M app/Modules/Tenant/Config/tenant.php
  M app/Modules/Tenant/Console/Commands/TenantActivateCommand.php

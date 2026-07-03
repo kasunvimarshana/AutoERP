@@ -23,10 +23,6 @@ use Modules\Purchase\Models\GoodsReceiptNote;
 use Modules\Purchase\Models\PurchaseReturn;
 use Modules\Purchase\Services\Tax\GoodsReceiptNoteTaxDocumentMapper;
 use Modules\Purchase\Services\Tax\PurchaseReturnTaxDocumentMapper;
-use Modules\Sales\Models\SalesDelivery;
-use Modules\Sales\Models\SalesReturn;
-use Modules\Sales\Services\Tax\SalesDeliveryTaxDocumentMapper;
-use Modules\Sales\Services\Tax\SalesReturnTaxDocumentMapper;
 use Modules\Tax\DTOs\ApplicableTaxData;
 use Modules\Tax\DTOs\TaxAmountData;
 use Modules\Tax\DTOs\TaxCalculationData;
@@ -563,51 +559,6 @@ final class TaxEngineTest extends TestCase
         );
     }
 
-    public function test_partial_sales_return_reverses_original_snapshot_tax_and_blocks_duplicate(): void
-    {
-        $tenantId = $this->createTenant();
-        $customerId = $this->createCustomer($tenantId, 'CUST-RET');
-        $warehouseId = $this->createWarehouse($tenantId, 'SWH-RET');
-        $tax = $this->createTax($tenantId, 'SOUT-10', 'VAT', 'exclusive', '10.000000');
-        $group = $this->createGroup($tenantId, 'SOUT-GROUP', $tax);
-        $itemId = $this->createItem($tenantId, 'SOUT-ITEM', defaultTaxGroupId: (int) $group->getKey());
-        $delivery = $this->createSalesDelivery($tenantId, $customerId, $warehouseId, $itemId, '10.000000', '100.000000');
-
-        $this->withTenantExecutionContext(
-            $tenantId,
-            fn () => app(TaxDocumentIntegrationService::class)->post(app(SalesDeliveryTaxDocumentMapper::class)->map($delivery)),
-        );
-        DB::table('tax_rates')->where('tax_id', $tax->getKey())->update([
-            'rate' => '20.000000',
-        ]);
-        $sourceLineId = $this->withTenantExecutionContext(
-            $tenantId,
-            fn (): int => (int) $delivery->lines()->firstOrFail()->getKey(),
-        );
-        $return = $this->createSalesReturn($tenantId, $customerId, $warehouseId, $sourceLineId, $itemId, '4.000000', '10.000000', '100.000000');
-        $created = $this->withTenantExecutionContext(
-            $tenantId,
-            fn (): array => app(TaxReturnAllocationService::class)->reverse(app(SalesReturnTaxDocumentMapper::class)->map($return, 123)),
-        );
-
-        $this->assertCount(1, $created);
-        $this->assertSame('10.000000', (string) $created[0]->rate);
-        $this->assertSame('-40.000000', (string) $created[0]->tax_amount);
-        $this->assertSame(123, $created[0]->metadata['credit_note_id']);
-        $summary = $this->withTenantExecutionContext(
-            $tenantId,
-            fn (): array => app(TaxReportService::class)->summary($tenantId, null, ['tax_code' => 'SOUT-10']),
-        );
-        $this->assertSame('60.000000', $summary['totals']['tax_amount']);
-
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Tax reversal already exists');
-        $this->withTenantExecutionContext(
-            $tenantId,
-            fn () => app(TaxReturnAllocationService::class)->reverse(app(SalesReturnTaxDocumentMapper::class)->map($return->refresh())),
-        );
-    }
-
     public function test_wht_invoice_context_generates_finance_context_and_missing_profile_fails(): void
     {
         $tenantId = $this->createTenant();
@@ -899,45 +850,6 @@ final class TaxEngineTest extends TestCase
         );
     }
 
-    private function createSalesDelivery(
-        int $tenantId,
-        int $customerId,
-        int $warehouseId,
-        int $itemId,
-        string $quantity,
-        string $unitPrice,
-    ): SalesDelivery {
-        $lineTotal = app(DecimalMath::class)->mul($quantity, $unitPrice);
-        $deliveryId = (int) DB::table('sales_deliveries')->insertGetId([
-            'tenant_id' => $tenantId,
-            'delivery_number' => 'SD-TAX-'.Str::upper(Str::random(6)),
-            'delivery_date' => '2026-06-11',
-            'customer_id' => $customerId,
-            'warehouse_id' => $warehouseId,
-            'status' => 'posted',
-            'posted_at' => now(),
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-        DB::table('sales_delivery_lines')->insert([
-            'tenant_id' => $tenantId,
-            'sales_delivery_id' => $deliveryId,
-            'item_id' => $itemId,
-            'delivered_quantity' => $quantity,
-            'remaining_quantity' => $quantity,
-            'unit_price' => $unitPrice,
-            'line_total' => $lineTotal,
-            'status' => 'posted',
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-
-        return $this->withTenantExecutionContext(
-            $tenantId,
-            fn (): SalesDelivery => SalesDelivery::query()->with('lines')->findOrFail($deliveryId),
-        );
-    }
-
     private function createPurchaseReturn(
         int $tenantId,
         int $supplierId,
@@ -984,58 +896,6 @@ final class TaxEngineTest extends TestCase
         return $this->withTenantExecutionContext(
             $tenantId,
             fn (): PurchaseReturn => PurchaseReturn::query()->with('lines')->findOrFail($returnId),
-        );
-    }
-
-    private function createSalesReturn(
-        int $tenantId,
-        int $customerId,
-        int $warehouseId,
-        int $sourceLineId,
-        int $itemId,
-        string $returnedQuantity,
-        string $sourceQuantity,
-        string $unitPrice,
-    ): SalesReturn {
-        $math = app(DecimalMath::class);
-        $lineTotal = $math->mul($returnedQuantity, $unitPrice);
-        $returnId = (int) DB::table('sales_returns')->insertGetId([
-            'tenant_id' => $tenantId,
-            'return_number' => 'SRET-TAX-'.Str::upper(Str::random(6)),
-            'return_date' => '2026-06-11',
-            'customer_id' => $customerId,
-            'warehouse_id' => $warehouseId,
-            'return_type' => 'referenced_customer_return',
-            'status' => 'posted',
-            'subtotal' => $lineTotal,
-            'grand_total' => $lineTotal,
-            'affects_inventory' => true,
-            'affects_customer_balance' => true,
-            'approval_required' => false,
-            'posted_at' => now(),
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-        DB::table('sales_return_lines')->insert([
-            'tenant_id' => $tenantId,
-            'sales_return_id' => $returnId,
-            'item_id' => $itemId,
-            'source_line_type' => 'sales_delivery_line',
-            'source_line_id' => $sourceLineId,
-            'returned_quantity' => $returnedQuantity,
-            'source_quantity' => $sourceQuantity,
-            'previously_returned_quantity' => '0.000000',
-            'remaining_quantity' => $math->sub($sourceQuantity, $returnedQuantity),
-            'unit_price' => $unitPrice,
-            'line_total' => $lineTotal,
-            'condition_status' => 'sellable',
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-
-        return $this->withTenantExecutionContext(
-            $tenantId,
-            fn (): SalesReturn => SalesReturn::query()->with('lines')->findOrFail($returnId),
         );
     }
 

@@ -24,9 +24,9 @@ const paymentViews = {
     },
     customer: {
         title: 'Customer Receipts',
-        description: 'Inbound receipts collected from sales customers.',
+        description: 'Inbound receipts collected from customers.',
         params: { payment_type: 'customer_receipt', direction: 'inbound' },
-        action: { to: '/sales/payments/prepare', label: 'Prepare customer receipt' },
+        action: { to: '/payments/create', label: 'Create customer receipt' },
     },
     service: {
         title: 'Customer Receipts',

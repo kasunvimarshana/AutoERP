@@ -27,7 +27,7 @@ const invoiceViews = {
         title: 'Customer Invoices',
         description: 'Sales invoices issued to customers.',
         params: { invoice_type: 'sales', direction: 'outbound' },
-        action: { to: '/sales/invoices/create', label: 'Create customer invoice' },
+        action: undefined,
     },
     service: {
         title: 'Service Invoices',

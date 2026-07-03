@@ -39,6 +39,5 @@ Use the canonical values from `AuditEventCategory`; feature modules must not inv
 ## Current event producers
 
 - Purchase: `purchase.fast_purchase.completed`
-- Sales: `sales.fast_sales.completed`
 
 Additional modules must emit events from their own application services at confirmed business transition points. Do not add generic model observers or Audit-owned business inference.

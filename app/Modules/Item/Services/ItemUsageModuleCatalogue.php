@@ -14,7 +14,6 @@ final class ItemUsageModuleCatalogue
     private const SUPPORTED = [
         'inventory' => [ItemType::Stock, ItemType::Consumable, ItemType::Asset],
         'purchase' => [ItemType::Stock, ItemType::NonStock, ItemType::Service, ItemType::Labour, ItemType::Asset, ItemType::Consumable],
-        'sales' => [ItemType::Stock, ItemType::NonStock, ItemType::Service, ItemType::Labour, ItemType::Asset, ItemType::Consumable, ItemType::Package, ItemType::Combo],
         'invoice' => [ItemType::Stock, ItemType::NonStock, ItemType::Service, ItemType::Labour, ItemType::Asset, ItemType::Consumable, ItemType::Package, ItemType::Combo],
         'vehicle-service' => [ItemType::Stock, ItemType::Service, ItemType::Labour, ItemType::Consumable, ItemType::Package, ItemType::Combo],
         'vehicle-rental' => [ItemType::Service, ItemType::Asset, ItemType::Package],

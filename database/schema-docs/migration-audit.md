@@ -111,10 +111,6 @@ Tables (10): `payments`, `payment_methods`, `payment_lines`, `payment_allocation
 
 Tables (11): `purchase_orders`, `purchase_order_lines`, `purchase_header_adjustments`, `goods_receipt_notes`, `goods_receipt_note_lines`, `purchase_invoice_links`, `purchase_returns`, `purchase_return_lines`, `purchase_return_adjustment_allocations`, `purchase_debit_notes`, `purchase_adjustment_allocations`.
 
-### Sales
-
-Tables (15): `sales_quotations`, `sales_quotation_lines`, `sales_orders`, `sales_order_lines`, `sales_header_adjustments`, `sales_deliveries`, `sales_delivery_lines`, `sales_invoice_links`, `sales_returns`, `sales_return_lines`, `sales_return_adjustment_allocations`, `sales_credit_notes`, `sales_status_histories`, `sales_allocations`, `sales_allocation_lines`.
-
 ### VehicleRental
 
 Tables (24): `rental_reservations`, `rental_agreements`, `rental_agreement_terms`, `rental_agreement_rate_versions`, `rental_agreement_rate_components`, `vehicle_finance_agreements`, `vehicle_finance_installments`, `vehicle_finance_status_histories`, `rental_vehicle_allocations`, `rental_driver_assignments`, `rental_vehicle_replacements`, `rental_custody_events`, `rental_custody_event_items`, `rental_usage_logs`, `rental_usage_events`, `rental_usage_contexts`, `rental_expenses`, `rental_expense_allocations`, `rental_billing_periods`, `rental_calculation_runs`, `rental_calculation_lines`, `rental_deposit_requirements`, `rental_deposit_links`, `rental_status_histories`.

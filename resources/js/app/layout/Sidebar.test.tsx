@@ -20,12 +20,12 @@ const sections: NavigationSection[] = [
                 ],
             },
             {
-                id: 'sales',
+                id: 'payment',
                 type: 'module',
-                label: 'Sales',
-                icon: 'sales',
+                label: 'Payments',
+                icon: 'payment',
                 children: [
-                    { id: 'sales-orders', type: 'link', label: 'Sales Orders', to: '/sales/orders' },
+                    { id: 'payments-list', type: 'link', label: 'Payments', to: '/payments' },
                 ],
             },
         ],
@@ -36,12 +36,12 @@ describe('Sidebar', () => {
         const user = userEvent.setup();
         render(<SidebarHarness />);
         expect(screen.getByRole('link', { name: 'Purchase Orders' })).toHaveAttribute('aria-current', 'page');
-        expect(screen.queryByRole('link', { name: 'Sales Orders' })).not.toBeInTheDocument();
-        await user.click(screen.getByRole('button', { name: 'Sales' }));
+        expect(screen.queryByRole('link', { name: 'Payments' })).not.toBeInTheDocument();
+        await user.click(screen.getByRole('button', { name: 'Payments' }));
         expect(screen.queryByRole('link', { name: 'Purchase Orders' })).not.toBeInTheDocument();
-        expect(screen.getByRole('link', { name: 'Sales Orders' })).toBeInTheDocument();
+        expect(screen.getByRole('link', { name: 'Payments' })).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Purchase' })).toHaveAttribute('aria-expanded', 'false');
-        expect(screen.getByRole('button', { name: 'Sales' })).toHaveAttribute('aria-expanded', 'true');
+        expect(screen.getByRole('button', { name: 'Payments' })).toHaveAttribute('aria-expanded', 'true');
     });
     it('uses drawer visibility classes and a close backdrop on mobile', async () => {
         const onClose = vi.fn();

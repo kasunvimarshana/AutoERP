@@ -211,46 +211,6 @@ const PurchaseDebitNoteCreatePage = lazy(
 const PurchaseDebitNoteDetailPage = lazy(
     () => import("@/modules/purchase/pages/PurchaseDebitNoteDetailPage"),
 );
-const SalesDocumentListPage = lazy(
-    () => import("@/modules/sales/pages/SalesDocumentListPage"),
-);
-const SalesDocumentFormPage = lazy(
-    () => import("@/modules/sales/pages/SalesDocumentFormPage"),
-);
-const SalesDocumentDetailPage = lazy(
-    () => import("@/modules/sales/pages/SalesDocumentDetailPage"),
-);
-const FastSalesPage = lazy(() => import("@/modules/sales/pages/FastSalesPage"));
-const SalesDeliveryListPage = lazy(
-    () => import("@/modules/sales/pages/SalesDeliveryListPage"),
-);
-const SalesDeliveryCreatePage = lazy(
-    () => import("@/modules/sales/pages/SalesDeliveryCreatePage"),
-);
-const SalesAllocationListPage = lazy(
-    () => import("@/modules/sales/pages/SalesAllocationListPage"),
-);
-const SalesAllocationCreatePage = lazy(
-    () => import("@/modules/sales/pages/SalesAllocationCreatePage"),
-);
-const SalesAllocationDetailPage = lazy(
-    () => import("@/modules/sales/pages/SalesAllocationDetailPage"),
-);
-const SalesInvoiceCreatePage = lazy(
-    () => import("@/modules/sales/pages/SalesInvoiceCreatePage"),
-);
-const SalesPaymentPreparePage = lazy(
-    () => import("@/modules/sales/pages/SalesPaymentPreparePage"),
-);
-const SalesReturnListPage = lazy(
-    () => import("@/modules/sales/pages/SalesReturnListPage"),
-);
-const SalesReturnCreatePage = lazy(
-    () => import("@/modules/sales/pages/SalesReturnCreatePage"),
-);
-const SalesCreditNotePage = lazy(
-    () => import("@/modules/sales/pages/SalesCreditNotePage"),
-);
 const InvoiceListPage = lazy(
     () => import("@/modules/invoice/pages/InvoiceListPage"),
 );
@@ -796,82 +756,6 @@ const appRouter = createBrowserRouter(
                         <Route
                             path="/purchase/debit-notes/:id"
                             element={<PurchaseDebitNoteDetailPage />}
-                        />
-                        <Route
-                            path="/sales/quotations"
-                            element={<SalesDocumentListPage kind="quotation" />}
-                        />
-                        <Route
-                            path="/sales/quotations/create"
-                            element={<SalesDocumentFormPage kind="quotation" />}
-                        />
-                        <Route
-                            path="/sales/quotations/:id/edit"
-                            element={<SalesDocumentFormPage kind="quotation" />}
-                        />
-                        <Route
-                            path="/sales/quotations/:id"
-                            element={<SalesDocumentDetailPage kind="quotation" />}
-                        />
-                        <Route
-                            path="/sales/fast-sales"
-                            element={<FastSalesPage />}
-                        />
-                        <Route
-                            path="/sales/orders"
-                            element={<SalesDocumentListPage kind="order" />}
-                        />
-                        <Route
-                            path="/sales/orders/create"
-                            element={<SalesDocumentFormPage kind="order" />}
-                        />
-                        <Route
-                            path="/sales/orders/:id/edit"
-                            element={<SalesDocumentFormPage kind="order" />}
-                        />
-                        <Route
-                            path="/sales/orders/:id"
-                            element={<SalesDocumentDetailPage kind="order" />}
-                        />
-                        <Route
-                            path="/sales/allocations"
-                            element={<SalesAllocationListPage />}
-                        />
-                        <Route
-                            path="/sales/allocations/create"
-                            element={<SalesAllocationCreatePage />}
-                        />
-                        <Route
-                            path="/sales/allocations/:id"
-                            element={<SalesAllocationDetailPage />}
-                        />
-                        <Route
-                            path="/sales/deliveries"
-                            element={<SalesDeliveryListPage />}
-                        />
-                        <Route
-                            path="/sales/deliveries/create"
-                            element={<SalesDeliveryCreatePage />}
-                        />
-                        <Route
-                            path="/sales/invoices/create"
-                            element={<SalesInvoiceCreatePage />}
-                        />
-                        <Route
-                            path="/sales/payments/prepare"
-                            element={<SalesPaymentPreparePage />}
-                        />
-                        <Route
-                            path="/sales/returns"
-                            element={<SalesReturnListPage />}
-                        />
-                        <Route
-                            path="/sales/returns/create"
-                            element={<SalesReturnCreatePage />}
-                        />
-                        <Route
-                            path="/sales/credit-notes"
-                            element={<SalesCreditNotePage />}
                         />
                         <Route path="/invoices" element={<InvoiceListPage />} />
                         <Route

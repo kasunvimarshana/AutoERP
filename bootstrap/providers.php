@@ -18,7 +18,6 @@ use Modules\PrivateObject\Providers\PrivateObjectServiceProvider;
 use Modules\Purchase\Providers\PurchaseServiceProvider;
 use Modules\ReferenceData\Providers\ReferenceDataServiceProvider;
 use Modules\Reporting\Providers\ReportingServiceProvider;
-use Modules\Sales\Providers\SalesServiceProvider;
 use Modules\Sequence\Providers\SequenceServiceProvider;
 use Modules\Supplier\Providers\SupplierServiceProvider;
 use Modules\Tax\Providers\TaxServiceProvider;
@@ -52,7 +51,6 @@ return [
     ItemServiceProvider::class,
     InventoryServiceProvider::class,
     PurchaseServiceProvider::class,
-    SalesServiceProvider::class,
     SupplierServiceProvider::class,
     TaxServiceProvider::class,
     CustomerServiceProvider::class,

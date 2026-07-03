@@ -36,13 +36,6 @@ final class ItemBaseUomUsageAuditService
                 'goods_receipts' => $this->count('goods_receipt_note_lines', $item),
                 'purchase_returns' => $this->count('purchase_return_lines', $item),
             ],
-            'sales' => [
-                'quotations' => $this->count('sales_quotation_lines', $item),
-                'sales_orders' => $this->count('sales_order_lines', $item),
-                'sales_allocations' => $this->count('sales_allocation_lines', $item),
-                'deliveries' => $this->count('sales_delivery_lines', $item),
-                'sales_returns' => $this->count('sales_return_lines', $item),
-            ],
             'vehicle_service' => [
                 'job_lines' => $this->count('vehicle_service_job_lines', $item),
             ],
@@ -71,7 +64,7 @@ final class ItemBaseUomUsageAuditService
 
         $usageCount = array_sum(array_map(
             static fn (array $counts): int => array_sum($counts),
-            array_intersect_key($references, array_flip(['inventory', 'purchase', 'sales', 'vehicle_service', 'invoice'])),
+            array_intersect_key($references, array_flip(['inventory', 'purchase', 'vehicle_service', 'invoice'])),
         ));
 
         $blockers = $this->operationalBlockers($item);
@@ -186,43 +179,6 @@ final class ItemBaseUomUsageAuditService
             ->whereNull('lines.uom_id')
             ->count();
         $this->addBlocker($blockers, 'unsafe_purchase_returns', 'Open purchase return lines without a UOM snapshot must be resolved.', $unsafePurchaseReturns);
-
-        $unsafeSalesOrders = $this->scopedJoin(
-            DB::table('sales_order_lines as lines')
-                ->join('sales_orders as parents', 'parents.id', '=', 'lines.sales_order_id'),
-            $item,
-            'lines',
-        )->whereNotIn('parents.status', ['closed', 'cancelled'])
-            ->where(function (Builder $query): void {
-                $query->where('lines.remaining_allocatable_quantity', '>', 0)
-                    ->orWhere('lines.remaining_deliverable_quantity', '>', 0);
-            })
-            ->where(function (Builder $query): void {
-                $query->whereNull('lines.ordered_uom_id')->orWhereNull('lines.base_uom_id');
-            })
-            ->count();
-        $this->addBlocker($blockers, 'unsafe_sales_orders', 'Open sales lines without UOM snapshots must be completed or cancelled.', $unsafeSalesOrders);
-
-        $unsafeDeliveries = $this->scopedJoin(
-            DB::table('sales_delivery_lines as lines')
-                ->join('sales_deliveries as parents', 'parents.id', '=', 'lines.sales_delivery_id'),
-            $item,
-            'lines',
-        )->whereNotIn('parents.status', ['returned', 'cancelled', 'reversed'])
-            ->where('lines.remaining_quantity', '>', 0)
-            ->whereNull('lines.uom_id')
-            ->count();
-        $this->addBlocker($blockers, 'unsafe_sales_deliveries', 'Sales delivery lines without a UOM snapshot must be resolved.', $unsafeDeliveries);
-
-        $unsafeSalesReturns = $this->scopedJoin(
-            DB::table('sales_return_lines as lines')
-                ->join('sales_returns as parents', 'parents.id', '=', 'lines.sales_return_id'),
-            $item,
-            'lines',
-        )->whereIn('parents.status', ['draft', 'approved'])
-            ->whereNull('lines.uom_id')
-            ->count();
-        $this->addBlocker($blockers, 'unsafe_sales_returns', 'Open sales return lines without a UOM snapshot must be resolved.', $unsafeSalesReturns);
 
         $unsafeServiceLines = $this->scopedJoin(
             DB::table('vehicle_service_job_lines as lines')

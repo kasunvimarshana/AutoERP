@@ -187,9 +187,9 @@ final class InventoryIntegrityTest extends TestCase
             itemId: (int) $item->getKey(),
             warehouseId: $warehouseId,
             quantityAllocated: '2.000000',
-            sourceType: 'sales_delivery',
+            sourceType: 'inventory_test_issue',
             sourceId: 100,
-            sourceLineType: 'sales_delivery_line',
+            sourceLineType: 'inventory_test_issue_line',
             sourceLineId: 200,
         );
 
