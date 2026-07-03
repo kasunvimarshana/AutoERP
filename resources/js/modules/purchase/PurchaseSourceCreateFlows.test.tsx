@@ -1,6 +1,7 @@
 import { StrictMode, type ReactElement } from 'react';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { Route, Routes, useLocation } from 'react-router-dom';
+import { ApiError } from '@/shared/api/apiError';
 import { TestRouter } from '@/test/TestRouter';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { NamedResource } from '@/shared/types/common';
@@ -219,6 +220,39 @@ describe('Purchase source create flows', () => {
                 reason: undefined,
             }],
         }));
+    });
+    it('maps return validation errors to the selected visible GRN line', async () => {
+        purchaseApiMocks.getReturnableGoodsReceiptLines.mockResolvedValueOnce([
+            returnableLine(601, 'Widget'),
+            returnableLine(602, 'Gadget'),
+        ]);
+        purchaseApiMocks.createPurchaseReturn.mockRejectedValueOnce(new ApiError(
+            'Please correct the highlighted fields and try again.',
+            422,
+            null,
+            null,
+            { 'lines.0.returned_quantity': ['Return quantity must be greater than zero.'] },
+        ));
+
+        renderReturn('/purchase/returns/create?goods_receipt_id=77');
+        await waitFor(() => expect(screen.getAllByText('Gadget')).toHaveLength(2));
+        fireEvent.click(screen.getAllByRole('checkbox')[1]);
+        fireEvent.click(screen.getByRole('button', { name: 'Save Draft' }));
+
+        await waitFor(() => expect(purchaseApiMocks.createPurchaseReturn).toHaveBeenCalledTimes(1));
+        expect(purchaseApiMocks.createPurchaseReturn).toHaveBeenCalledWith(expect.objectContaining({
+            lines: [expect.objectContaining({
+                source_line_id: 602,
+                returned_quantity: '0.000000',
+            })],
+        }));
+
+        const widgetCard = screen.getAllByText('Widget')[0].closest('article');
+        const gadgetCard = screen.getAllByText('Gadget')[0].closest('article');
+        expect(widgetCard).not.toBeNull();
+        expect(gadgetCard).not.toBeNull();
+        expect(within(gadgetCard as HTMLElement).getByText('Return quantity must be greater than zero.')).toBeInTheDocument();
+        expect(within(widgetCard as HTMLElement).queryByText('Return quantity must be greater than zero.')).not.toBeInTheDocument();
     });
 });
 function renderInvoice(initialEntry: string, strict = false) {

@@ -41,7 +41,7 @@ export function PurchaseReturnForm() {
     const mountedRef = useRef(true);
     const unmountCancelTimerRef = useRef<number | null>(null);
     const errorFor = (field: string) => fieldError(error, field);
-    const hasEnteredLines = lines.some((line) => isPositiveDecimal(line.returned_quantity));
+    const hasEnteredLines = lines.some((line) => line.include || isPositiveDecimal(line.returned_quantity));
 
     const setSource = useCallback((next: NamedResource | null) => {
         selectedKeyRef.current = next?.id ? sourceKey('goods_receipt_note', next.id) : null;
@@ -143,12 +143,19 @@ export function PurchaseReturnForm() {
         };
     }, [cancelSourceRequest]);
 
+    const selectedReturnLines = () => lines.filter((line) => line.include);
+    const payloadIndexForLine = (line: EditableReturnLine): number => selectedReturnLines()
+        .findIndex((selected) => selected.source.id === line.source.id);
+    const lineErrorFor = (line: EditableReturnLine, field: string): string | undefined => {
+        const payloadIndex = payloadIndexForLine(line);
+        return payloadIndex === -1 ? undefined : errorFor(`lines.${payloadIndex}.${field}`);
+    };
     const payload = (): ReferencedPurchaseReturnPayload => ({
         return_date: returnDate,
         reason: reason || undefined,
         return_type: 'referenced',
         source_id: source?.id,
-        lines: lines.filter((line) => line.include && isPositiveDecimal(line.returned_quantity)).map((line) => ({
+        lines: selectedReturnLines().map((line) => ({
             source_line_type: 'goods_receipt_note_line',
             source_line_id: line.source.id,
             returned_quantity: decimalOr(line.returned_quantity),
@@ -204,7 +211,7 @@ export function PurchaseReturnForm() {
                 </div>
             </Panel>
             <Panel title="Return lines">
-                {sourceLoading ? <div className="text-sm text-slate-500">Loading source lines...</div> : <PurchaseReturnLineEditor lines={lines} onChange={setLines} errorFor={errorFor} />}
+                {sourceLoading ? <div className="text-sm text-slate-500">Loading source lines...</div> : <PurchaseReturnLineEditor lines={lines} onChange={setLines} linesError={errorFor('lines')} errorForLine={lineErrorFor} />}
             </Panel>
             <Panel title="Reason">
                 <Textarea label="Reason" value={reason} error={errorFor('reason')} onChange={(event) => setReason(event.target.value)} />

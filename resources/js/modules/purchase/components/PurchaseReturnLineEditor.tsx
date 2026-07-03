@@ -15,10 +15,11 @@ export interface EditableReturnLine {
 
 type ReturnLineDialog = { index: number; line: EditableReturnLine };
 
-export function PurchaseReturnLineEditor({ lines, onChange, errorFor }: {
+export function PurchaseReturnLineEditor({ lines, onChange, linesError, errorForLine }: {
     lines: EditableReturnLine[];
     onChange: (lines: EditableReturnLine[]) => void;
-    errorFor: (field: string) => string | undefined;
+    linesError?: string;
+    errorForLine: (line: EditableReturnLine, field: string) => string | undefined;
 }) {
     const [dialog, setDialog] = useState<ReturnLineDialog | null>(null);
     const updateLine = (index: number, line: EditableReturnLine) => {
@@ -41,6 +42,7 @@ export function PurchaseReturnLineEditor({ lines, onChange, errorFor }: {
         { key: 'price', header: 'Unit price', render: (line) => line.source.unit_price, className: 'tabular-nums' },
         { key: 'returnable', header: 'Remaining quantity', render: (line) => line.source.remaining_returnable_quantity, className: 'tabular-nums' },
         { key: 'reason', header: 'Reason', render: (line) => line.reason || '-' },
+        { key: 'issue', header: 'Issue', render: (line) => <LineIssue line={line} errorForLine={errorForLine} /> },
         { key: 'actions', header: 'Actions', className: 'text-right', render: (line) => <button type="button" className="font-semibold text-sky-700" onClick={() => setDialog({ index: line.rowIndex, line })}>Edit line</button> },
     ];
     const rows = lines.map((line, index) => ({ ...line, rowIndex: index }));
@@ -52,13 +54,14 @@ export function PurchaseReturnLineEditor({ lines, onChange, errorFor }: {
                 <Button type="button" variant="ghost" onClick={clearQuantities}>Clear</Button>
                 <Button type="button" variant="secondary" onClick={returnSelected}>Return Selected</Button>
             </div>
-            <DataTable rows={rows} columns={columns} rowKey={(line) => line.source.id} emptyMessage="Select a GRN with returnable lines." mobileSummary={formatReturnItem} mobileDetails={(line) => <ReturnLineMobileDetails line={line} />} mobileActions={(line) => <button type="button" className="font-semibold text-sky-700" onClick={() => setDialog({ index: line.rowIndex, line })}>Edit line</button>} />
+            {linesError ? <p className="mb-3 text-sm font-medium text-rose-700">{linesError}</p> : null}
+            <DataTable rows={rows} columns={columns} rowKey={(line) => line.source.id} emptyMessage="Select a GRN with returnable lines." mobileSummary={formatReturnItem} mobileDetails={(line) => <ReturnLineMobileDetails line={line} errorForLine={errorForLine} />} mobileActions={(line) => <button type="button" className="font-semibold text-sky-700" onClick={() => setDialog({ index: line.rowIndex, line })}>Edit line</button>} />
             <FormDrawer open={Boolean(dialog)} title="Edit return line" onClose={() => setDialog(null)}>
                 {dialog && (
                     <PurchaseReturnLineForm
                         key={dialog.line.source.id}
                         line={dialog.line}
-                        errorFor={(field) => errorFor(`lines.${dialog.index}.${field}`)}
+                        errorFor={(field) => errorForLine(dialog.line, field)}
                         onCancel={() => setDialog(null)}
                         onSave={(line) => updateLine(dialog.index, line)}
                     />
@@ -119,10 +122,33 @@ function formatReturnItem(line: EditableReturnLine): string {
     return line.source.item?.name ?? '-';
 }
 
+function LineIssue({ line, errorForLine }: {
+    line: EditableReturnLine;
+    errorForLine: (line: EditableReturnLine, field: string) => string | undefined;
+}) {
+    const issue = firstLineIssue(line, errorForLine);
+    return issue ? <span className="font-medium text-rose-700">{issue}</span> : '-';
+}
+
+function firstLineIssue(
+    line: EditableReturnLine,
+    errorForLine: (line: EditableReturnLine, field: string) => string | undefined,
+): string | undefined {
+    return errorForLine(line, 'returned_quantity')
+        ?? errorForLine(line, 'reason')
+        ?? errorForLine(line, 'source_line_id')
+        ?? errorForLine(line, 'source_line_type');
+}
+
 function Summary({ label, value }: { label: string; value: string }) {
     return <div><span className="text-xs uppercase text-slate-500">{label}</span><strong className="block tabular-nums text-slate-900">{value}</strong></div>;
 }
 
-function ReturnLineMobileDetails({ line }: { line: EditableReturnLine }) {
-    return <div className="grid grid-cols-2 gap-2"><Summary label="Include" value={line.include ? 'Yes' : 'No'} /><Summary label="Quantity now" value={line.returned_quantity} /><Summary label="Remaining quantity" value={line.source.remaining_returnable_quantity} /><Summary label="UOM" value={line.source.uom?.code ?? '-'} /><Summary label="Unit price" value={line.source.unit_price} /></div>;
+function ReturnLineMobileDetails({ line, errorForLine }: {
+    line: EditableReturnLine;
+    errorForLine: (line: EditableReturnLine, field: string) => string | undefined;
+}) {
+    const issue = firstLineIssue(line, errorForLine);
+
+    return <div className="grid grid-cols-2 gap-2"><Summary label="Include" value={line.include ? 'Yes' : 'No'} /><Summary label="Quantity now" value={line.returned_quantity} /><Summary label="Remaining quantity" value={line.source.remaining_returnable_quantity} /><Summary label="UOM" value={line.source.uom?.code ?? '-'} /><Summary label="Unit price" value={line.source.unit_price} />{issue ? <Summary label="Issue" value={issue} /> : null}</div>;
 }
