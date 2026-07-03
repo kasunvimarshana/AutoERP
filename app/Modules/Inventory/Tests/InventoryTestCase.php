@@ -41,6 +41,7 @@ abstract class InventoryTestCase extends TestCase
         string $unitCost,
         ?int $batchId = null,
         ?int $serialId = null,
+        ?int $warehouseLocationId = null,
     ): InventoryMovement {
         return $this->withTenantExecutionContext($tenantId, fn (): InventoryMovement => app(StockMovementService::class)->record(new StockMovementData(
             tenantId: $tenantId,
@@ -50,6 +51,7 @@ abstract class InventoryTestCase extends TestCase
             itemId: (int) $item->getKey(),
             warehouseId: $warehouseId,
             quantity: $quantity,
+            warehouseLocationId: $warehouseLocationId,
             batchId: $batchId,
             serialNumberId: $serialId,
             unitCost: $unitCost,

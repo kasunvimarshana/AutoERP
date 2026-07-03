@@ -7,10 +7,24 @@ namespace Modules\Inventory\Services;
 use Modules\Core\Services\DecimalMath;
 use Modules\Inventory\DTOs\StockAvailabilityResult;
 use Modules\Inventory\DTOs\StockBalanceData;
+use Modules\Inventory\Models\InventoryStockBalance;
 use Modules\Inventory\Validators\InventoryValidationService;
 
 final class InventoryAvailabilityService
 {
+    private const QUANTITY_FIELDS = [
+        'quantity_on_hand',
+        'quantity_reserved',
+        'quantity_allocated',
+        'quantity_available',
+        'quantity_in_transit',
+        'quantity_returned',
+        'quantity_damaged',
+        'quantity_quarantine',
+        'quantity_expired',
+        'quantity_scrapped',
+    ];
+
     public function __construct(
         private readonly DecimalMath $math,
         private readonly StockBalanceService $balances,
@@ -28,31 +42,72 @@ final class InventoryAvailabilityService
             $this->validator->batch($item, $data->batchId, $data->itemVariantId);
         }
 
-        $balance = $this->balances->find($data);
-        if ($balance !== null) {
+        $totals = $this->emptyQuantities();
+        foreach ($this->matchingBalances($data) as $balance) {
             $this->balances->assertReconciled($balance);
+            foreach (self::QUANTITY_FIELDS as $field) {
+                $totals[$field] = $this->math->add($totals[$field], (string) ($balance->{$field} ?? '0.000000'));
+            }
         }
-        $quantityOnHand = (string) ($balance?->quantity_on_hand ?? '0.000000');
-        $quantityInTransit = (string) ($balance?->quantity_in_transit ?? '0.000000');
+
+        $quantityOnHand = $totals['quantity_on_hand'];
+        $quantityInTransit = $totals['quantity_in_transit'];
 
         return new StockAvailabilityResult(
             itemId: $data->itemId,
             warehouseId: $data->warehouseId,
             quantityOnHand: $quantityOnHand,
-            quantityReserved: (string) ($balance?->quantity_reserved ?? '0.000000'),
-            quantityAllocated: (string) ($balance?->quantity_allocated ?? '0.000000'),
-            quantityAvailable: (string) ($balance?->quantity_available ?? '0.000000'),
+            quantityReserved: $totals['quantity_reserved'],
+            quantityAllocated: $totals['quantity_allocated'],
+            quantityAvailable: $totals['quantity_available'],
             quantityInTransit: $quantityInTransit,
-            quantityReturned: (string) ($balance?->quantity_returned ?? '0.000000'),
-            quantityDamaged: (string) ($balance?->quantity_damaged ?? '0.000000'),
-            quantityQuarantine: (string) ($balance?->quantity_quarantine ?? '0.000000'),
-            quantityExpired: (string) ($balance?->quantity_expired ?? '0.000000'),
-            quantityScrapped: (string) ($balance?->quantity_scrapped ?? '0.000000'),
+            quantityReturned: $totals['quantity_returned'],
+            quantityDamaged: $totals['quantity_damaged'],
+            quantityQuarantine: $totals['quantity_quarantine'],
+            quantityExpired: $totals['quantity_expired'],
+            quantityScrapped: $totals['quantity_scrapped'],
             quantityTotal: $this->math->add($quantityOnHand, $quantityInTransit),
-            baseUomId: $balance?->base_uom_id ?? $item->base_uom_id,
+            baseUomId: $item->base_uom_id,
             itemVariantId: $data->itemVariantId,
             warehouseLocationId: $data->warehouseLocationId,
             batchId: $data->batchId,
         );
+    }
+
+    /**
+     * @return iterable<InventoryStockBalance>
+     */
+    private function matchingBalances(StockBalanceData $data): iterable
+    {
+        $query = InventoryStockBalance::query()
+            ->where('tenant_id', $data->tenantId)
+            ->where('item_id', $data->itemId)
+            ->where('warehouse_id', $data->warehouseId);
+
+        if ($data->organizationUnitId === null) {
+            $query->whereNull('organization_unit_id');
+        } else {
+            $query->where('organization_unit_id', $data->organizationUnitId);
+        }
+
+        foreach ([
+            'item_variant_id' => $data->itemVariantId,
+            'warehouse_location_id' => $data->warehouseLocationId,
+            'batch_id' => $data->batchId,
+        ] as $column => $value) {
+            if ($value !== null) {
+                $query->where($column, $value);
+            }
+        }
+
+        return $query->get();
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function emptyQuantities(): array
+    {
+        return array_fill_keys(self::QUANTITY_FIELDS, '0.000000');
     }
 }

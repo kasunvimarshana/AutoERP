@@ -56,6 +56,37 @@ final class InventoryMovementTest extends InventoryTestCase
         ]);
     }
 
+    public function test_availability_aggregates_location_balances_when_location_is_not_selected(): void
+    {
+        $tenantId = $this->createTenant();
+        $warehouseId = $this->createWarehouse($tenantId, 'WH-AGG');
+        $firstLocationId = $this->createWarehouseLocation($tenantId, $warehouseId, 'BIN-A');
+        $secondLocationId = $this->createWarehouseLocation($tenantId, $warehouseId, 'BIN-B');
+        $item = $this->createItem($tenantId, 'ITEM-AGG');
+
+        $this->receipt($tenantId, $warehouseId, $item, '5.000000', '2.000000', warehouseLocationId: $firstLocationId);
+        $this->receipt($tenantId, $warehouseId, $item, '7.000000', '2.000000', warehouseLocationId: $secondLocationId);
+
+        $warehouseAvailability = $this->withTenantExecutionContext(
+            $tenantId,
+            fn () => app(StockAvailabilityService::class)->availability(new StockBalanceData($tenantId, (int) $item->getKey(), $warehouseId)),
+        );
+        $locationAvailability = $this->withTenantExecutionContext(
+            $tenantId,
+            fn () => app(StockAvailabilityService::class)->availability(new StockBalanceData(
+                tenantId: $tenantId,
+                itemId: (int) $item->getKey(),
+                warehouseId: $warehouseId,
+                warehouseLocationId: $firstLocationId,
+            )),
+        );
+
+        $this->assertSame('12.000000', $warehouseAvailability->quantityOnHand);
+        $this->assertSame('12.000000', $warehouseAvailability->quantityAvailable);
+        $this->assertSame('5.000000', $locationAvailability->quantityOnHand);
+        $this->assertSame('5.000000', $locationAvailability->quantityAvailable);
+    }
+
     public function test_stock_issue_decreases_balance_and_cannot_exceed_available(): void
     {
         [$tenantId, $warehouseId, $item] = $this->stockContext();
