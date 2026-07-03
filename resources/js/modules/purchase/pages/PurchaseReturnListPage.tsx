@@ -49,9 +49,10 @@ export default function PurchaseReturnListPage() {
         setActionError(null);
         setBusyAction(`${action}:${row.id}`);
         try {
-            if (action === 'approve') await approvePurchaseReturn(row.id);
-            if (action === 'post') await postPurchaseReturn(row.id);
-            if (action === 'cancel') await cancelPurchaseReturn(row.id);
+            const payload = { expected_version: row.row_version };
+            if (action === 'approve') await approvePurchaseReturn(row.id, payload);
+            if (action === 'post') await postPurchaseReturn(row.id, payload);
+            if (action === 'cancel') await cancelPurchaseReturn(row.id, payload);
             result.reload();
         } catch (requestError) {
             setActionError(toApiError(requestError));

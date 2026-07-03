@@ -118,12 +118,49 @@ final class PurchaseOrderApiTest extends TestCase
         $context = $this->context();
         $created = $this->withAuth($context)->postJson('/api/v1/purchase/orders', $this->payload($context))->json('data');
 
-        $this->withAuth($context)->putJson('/api/v1/purchase/orders/'.$created['id'], $this->payload($context, ['notes' => 'Updated draft']))
+        $this->withAuth($context)->putJson('/api/v1/purchase/orders/'.$created['id'], array_merge(
+            $this->payload($context, ['notes' => 'Updated draft']),
+            ['expected_version' => $this->rowVersion('purchase_orders', (int) $created['id'])],
+        ))
             ->assertOk()
             ->assertJsonPath('data.notes', 'Updated draft');
 
-        $this->withAuth($context)->deleteJson('/api/v1/purchase/orders/'.$created['id'], ['tenant_id' => $context['tenant_id']])
+        $this->withAuth($context)->deleteJson('/api/v1/purchase/orders/'.$created['id'], $this->actionPayload($context, 'purchase_orders', (int) $created['id']))
             ->assertNoContent();
+    }
+
+    public function test_purchase_order_actions_reject_stale_expected_version(): void
+    {
+        $context = $this->context();
+        $order = $this->withAuth($context)->postJson('/api/v1/purchase/orders', $this->payload($context))
+            ->assertCreated()
+            ->json('data');
+
+        $this->withAuth($context)->patchJson('/api/v1/purchase/orders/'.$order['id'].'/submit', [
+            'tenant_id' => $context['tenant_id'],
+            'expected_version' => 999,
+        ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['expected_version']);
+    }
+
+    public function test_manual_purchase_debit_note_rejects_client_source_fields(): void
+    {
+        $context = $this->context();
+
+        $this->withAuth($context)->postJson('/api/v1/purchase/debit-notes', [
+            'tenant_id' => $context['tenant_id'],
+            'organization_unit_id' => $context['organization_unit_id'],
+            'debit_note_date' => '2026-06-10',
+            'supplier_type' => 'supplier',
+            'supplier_id' => $context['supplier_id'],
+            'amount' => '10.000000',
+            'reason' => 'Manual debit adjustment',
+            'source_type' => 'purchase_order',
+            'source_id' => 1,
+        ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['source_type', 'source_id']);
     }
 
     public function test_approve_cancel_and_close_purchase_orders(): void
@@ -133,25 +170,25 @@ final class PurchaseOrderApiTest extends TestCase
         $cancelId = $this->withAuth($context)->postJson('/api/v1/purchase/orders', $this->payload($context))->json('data.id');
         $closeId = $this->withAuth($context)->postJson('/api/v1/purchase/orders', $this->payload($context))->json('data.id');
 
-        $this->withAuth($context)->patchJson('/api/v1/purchase/orders/'.$approveId.'/submit', ['tenant_id' => $context['tenant_id']])
+        $this->withAuth($context)->patchJson('/api/v1/purchase/orders/'.$approveId.'/submit', $this->actionPayload($context, 'purchase_orders', (int) $approveId))
             ->assertOk()
             ->assertJsonPath('data.status', 'pending_approval');
-        $this->withAuth($context)->patchJson('/api/v1/purchase/orders/'.$approveId.'/approve', ['tenant_id' => $context['tenant_id']])
+        $this->withAuth($context)->patchJson('/api/v1/purchase/orders/'.$approveId.'/approve', $this->actionPayload($context, 'purchase_orders', (int) $approveId))
             ->assertOk()
             ->assertJsonPath('data.status', 'approved');
 
-        $this->withAuth($context)->patchJson('/api/v1/purchase/orders/'.$cancelId.'/cancel', ['tenant_id' => $context['tenant_id']])
+        $this->withAuth($context)->patchJson('/api/v1/purchase/orders/'.$cancelId.'/cancel', $this->actionPayload($context, 'purchase_orders', (int) $cancelId))
             ->assertOk()
             ->assertJsonPath('data.status', 'cancelled');
 
-        $this->withAuth($context)->patchJson('/api/v1/purchase/orders/'.$closeId.'/submit', ['tenant_id' => $context['tenant_id']])->assertOk();
-        $this->withAuth($context)->patchJson('/api/v1/purchase/orders/'.$closeId.'/approve', ['tenant_id' => $context['tenant_id']])->assertOk();
+        $this->withAuth($context)->patchJson('/api/v1/purchase/orders/'.$closeId.'/submit', $this->actionPayload($context, 'purchase_orders', (int) $closeId))->assertOk();
+        $this->withAuth($context)->patchJson('/api/v1/purchase/orders/'.$closeId.'/approve', $this->actionPayload($context, 'purchase_orders', (int) $closeId))->assertOk();
         $this->withTenantExecutionContext((int) $context['tenant_id'], function () use ($closeId): void {
             $closeOrder = PurchaseOrder::query()->with('lines')->findOrFail($closeId);
             app(PurchaseOrderService::class)->applyReceived($closeOrder->lines->first(), '2.000000');
             app(PurchaseOrderService::class)->applyInvoiced($closeOrder->lines->first(), '2.000000');
         });
-        $this->withAuth($context)->patchJson('/api/v1/purchase/orders/'.$closeId.'/close', ['tenant_id' => $context['tenant_id']])
+        $this->withAuth($context)->patchJson('/api/v1/purchase/orders/'.$closeId.'/close', $this->actionPayload($context, 'purchase_orders', (int) $closeId))
             ->assertOk()
             ->assertJsonPath('data.status', 'closed');
     }
@@ -161,7 +198,7 @@ final class PurchaseOrderApiTest extends TestCase
         $context = $this->context();
         $id = $this->withAuth($context)->postJson('/api/v1/purchase/orders', $this->payload($context))->json('data.id');
 
-        $this->withAuth($context)->patchJson('/api/v1/purchase/orders/'.$id.'/close', ['tenant_id' => $context['tenant_id']])
+        $this->withAuth($context)->patchJson('/api/v1/purchase/orders/'.$id.'/close', $this->actionPayload($context, 'purchase_orders', (int) $id))
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['purchase_order'])
             ->assertJsonPath('error.details.fields.purchase_order.0', 'Invalid purchase order status transition.');
@@ -178,7 +215,7 @@ final class PurchaseOrderApiTest extends TestCase
             $service->applyReceived($order->lines->first(), '1.000000');
         });
 
-        $this->withAuth($context)->patchJson('/api/v1/purchase/orders/'.$id.'/cancel', ['tenant_id' => $context['tenant_id']])
+        $this->withAuth($context)->patchJson('/api/v1/purchase/orders/'.$id.'/cancel', $this->actionPayload($context, 'purchase_orders', (int) $id))
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['purchase_order'])
             ->assertJsonPath('error.details.fields.purchase_order.0', 'Purchase orders with received or invoiced quantities cannot be cancelled.');
@@ -951,9 +988,9 @@ final class PurchaseOrderApiTest extends TestCase
             ]],
         ]))->assertCreated()->json('data');
 
-        $this->withAuth($context)->patchJson('/api/v1/purchase/orders/'.$order['id'].'/submit', ['tenant_id' => $context['tenant_id']])->assertOk();
+        $this->withAuth($context)->patchJson('/api/v1/purchase/orders/'.$order['id'].'/submit', $this->actionPayload($context, 'purchase_orders', (int) $order['id']))->assertOk();
 
-        return $this->withAuth($context)->patchJson('/api/v1/purchase/orders/'.$order['id'].'/approve', ['tenant_id' => $context['tenant_id']])
+        return $this->withAuth($context)->patchJson('/api/v1/purchase/orders/'.$order['id'].'/approve', $this->actionPayload($context, 'purchase_orders', (int) $order['id']))
             ->assertOk()
             ->json('data');
     }
@@ -977,7 +1014,7 @@ final class PurchaseOrderApiTest extends TestCase
             ]],
         ])->assertCreated()->json('data');
 
-        return $this->withAuth($context)->patchJson('/api/v1/purchase/goods-receipts/'.$grn['id'].'/post', ['tenant_id' => $context['tenant_id']])
+        return $this->withAuth($context)->patchJson('/api/v1/purchase/goods-receipts/'.$grn['id'].'/post', $this->actionPayload($context, 'goods_receipt_notes', (int) $grn['id']))
             ->assertOk()
             ->json('data');
     }
@@ -1014,8 +1051,21 @@ final class PurchaseOrderApiTest extends TestCase
             ]],
         ])->assertCreated()->json('data');
 
-        $this->withAuth($context)->patchJson('/api/v1/purchase/returns/'.$return['id'].'/post', ['tenant_id' => $context['tenant_id']])
+        $this->withAuth($context)->patchJson('/api/v1/purchase/returns/'.$return['id'].'/post', $this->actionPayload($context, 'purchase_returns', (int) $return['id']))
             ->assertOk();
+    }
+
+    private function actionPayload(array $context, string $table, int $id): array
+    {
+        return [
+            'tenant_id' => $context['tenant_id'],
+            'expected_version' => $this->rowVersion($table, $id),
+        ];
+    }
+
+    private function rowVersion(string $table, int $id): int
+    {
+        return (int) DB::table($table)->where('id', $id)->value('row_version');
     }
 
     private function payload(array $context, array $overrides = []): array

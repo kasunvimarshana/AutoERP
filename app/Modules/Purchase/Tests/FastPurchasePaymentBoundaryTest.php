@@ -30,6 +30,8 @@ final class FastPurchasePaymentBoundaryTest extends TestCase
         self::assertStringNotContainsString('requires_bank_account', $service);
         self::assertStringNotContainsString('payment_accounts', $service);
         self::assertStringNotContainsString('source_accounts', $service.$coordinator);
+        self::assertStringContainsString('PaymentInstrumentStatus::Issued->value', $service);
+        self::assertStringNotContainsString("instrumentDirection: 'outbound'", $service);
         self::assertStringContainsString("'payment.source_account_id'", $request);
         self::assertStringContainsString("'payment.lines.*.source_account_id'", $request);
     }

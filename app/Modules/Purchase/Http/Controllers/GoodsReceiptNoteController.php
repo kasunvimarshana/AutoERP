@@ -6,6 +6,7 @@ namespace Modules\Purchase\Http\Controllers;
 
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Database\Eloquent\Builder;
+use Modules\Purchase\Constants\PurchaseAuditEvent;
 use Modules\Purchase\Enums\GoodsReceiptNoteStatus;
 use Modules\Purchase\Http\Controllers\Concerns\ScopesPurchaseRequests;
 use Modules\Purchase\Http\Requests\ListPurchaseDocumentRequest;
@@ -14,6 +15,8 @@ use Modules\Purchase\Http\Requests\StoreGoodsReceiptNoteRequest;
 use Modules\Purchase\Http\Resources\GoodsReceiptNoteResource;
 use Modules\Purchase\Models\GoodsReceiptNote;
 use Modules\Purchase\Services\PurchaseAuthorizationService;
+use Modules\Purchase\Services\PurchaseAuditService;
+use Modules\Purchase\Services\PurchaseDocumentPresentationService;
 use Modules\Purchase\Services\GoodsReceiptNoteService;
 use Modules\Purchase\Services\PurchaseProcurementBalanceService;
 
@@ -21,7 +24,11 @@ final class GoodsReceiptNoteController
 {
     use ScopesPurchaseRequests;
 
-    public function __construct(private readonly PurchaseAuthorizationService $authorization) {}
+    public function __construct(
+        private readonly PurchaseAuthorizationService $authorization,
+        private readonly PurchaseDocumentPresentationService $presentation,
+        private readonly PurchaseAuditService $audit,
+    ) {}
 
     public function index(ListPurchaseDocumentRequest $request): AnonymousResourceCollection
     {
@@ -57,38 +64,64 @@ final class GoodsReceiptNoteController
             $query->whereDate('received_date', '<=', $request->input('date_to'));
         }
 
-        return GoodsReceiptNoteResource::collection($query->latest('received_date')->paginate($request->perPage()));
+        $goodsReceipts = $query->latest('received_date')->paginate($request->perPage());
+        $this->presentation->prepareGoodsReceipts($goodsReceipts->getCollection());
+
+        return GoodsReceiptNoteResource::collection($goodsReceipts);
     }
 
     public function store(StoreGoodsReceiptNoteRequest $request, GoodsReceiptNoteService $service): GoodsReceiptNoteResource
     {
         $this->authorization->assert($request->currentUserId(), $request->tenantId(), PurchaseAuthorizationService::GOODS_RECEIPTS_CREATE);
 
-        return new GoodsReceiptNoteResource($service->create($request->toData())->load($this->relations()));
+        $grn = $service->create($request->toData())->load($this->relations());
+        $this->audit->recordDocumentEvent(PurchaseAuditEvent::GOODS_RECEIPT_CREATED, 'goods_receipt_note', $grn);
+
+        return new GoodsReceiptNoteResource($this->presentation->prepareGoodsReceipt($grn));
     }
 
     public function show(ListPurchaseDocumentRequest $request, int $grn): GoodsReceiptNoteResource
     {
         $this->authorization->assert($request->currentUserId(), $request->tenantId(), PurchaseAuthorizationService::GOODS_RECEIPTS_VIEW);
 
-        return new GoodsReceiptNoteResource($this->scope(GoodsReceiptNote::query(), $request)
+        $grn = $this->scope(GoodsReceiptNote::query(), $request)
             ->with($this->relations())
-            ->findOrFail($grn));
+            ->findOrFail($grn);
+
+        return new GoodsReceiptNoteResource($this->presentation->prepareGoodsReceipt($grn));
     }
 
     public function post(PurchaseActionRequest $request, int $grn, GoodsReceiptNoteService $service): GoodsReceiptNoteResource
     {
         $this->authorization->assert($request->currentUserId(), $request->tenantId(), PurchaseAuthorizationService::GOODS_RECEIPTS_POST);
 
-        return new GoodsReceiptNoteResource($service->post($this->scope(GoodsReceiptNote::query(), $request)->with('lines')->findOrFail($grn), $request->currentUserId())
-            ->load($this->relations()));
+        $model = $this->scope(GoodsReceiptNote::query(), $request)->with('lines')->findOrFail($grn);
+        $before = $model->attributesToArray();
+        $updated = $service->post(
+            $model,
+            $request->currentUserId(),
+            $request->expectedVersion(),
+        )
+            ->load($this->relations());
+        $this->audit->recordDocumentEvent(PurchaseAuditEvent::GOODS_RECEIPT_POSTED, 'goods_receipt_note', $updated, $before);
+
+        return new GoodsReceiptNoteResource($this->presentation->prepareGoodsReceipt($updated));
     }
 
     public function reverse(PurchaseActionRequest $request, int $grn, GoodsReceiptNoteService $service): GoodsReceiptNoteResource
     {
         $this->authorization->assert($request->currentUserId(), $request->tenantId(), PurchaseAuthorizationService::GOODS_RECEIPTS_REVERSE);
 
-        return new GoodsReceiptNoteResource($service->reverse($this->scope(GoodsReceiptNote::query(), $request)->findOrFail($grn), $request->currentUserId()));
+        $model = $this->scope(GoodsReceiptNote::query(), $request)->findOrFail($grn);
+        $before = $model->attributesToArray();
+        $updated = $service->reverse(
+            $model,
+            $request->currentUserId(),
+            $request->expectedVersion(),
+        );
+        $this->audit->recordDocumentEvent(PurchaseAuditEvent::GOODS_RECEIPT_REVERSED, 'goods_receipt_note', $updated, $before);
+
+        return new GoodsReceiptNoteResource($this->presentation->prepareGoodsReceipt($updated));
     }
 
     private function relations(): array

@@ -58,6 +58,16 @@ abstract class PurchaseResource extends JsonResource
         return $this->math()->add($left, $right);
     }
 
+    /**
+     * @return array<string, mixed>
+     */
+    protected function arrayAttribute(string $key): array
+    {
+        $value = $this->resource->getAttribute($key);
+
+        return is_array($value) ? $value : [];
+    }
+
     private function math(): DecimalMath
     {
         return $this->decimalMath ??= new DecimalMath;

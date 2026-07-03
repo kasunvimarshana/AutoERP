@@ -65,10 +65,11 @@ export default function PurchaseOrderListPage() {
         setBusyId(order.id);
         setActionError(null);
         try {
-            if (action === 'submit') await submitPurchaseOrder(order.id);
-            if (action === 'approve') await approvePurchaseOrder(order.id);
-            if (action === 'cancel') await cancelPurchaseOrder(order.id);
-            if (action === 'close') await closePurchaseOrder(order.id);
+            const payload = { expected_version: order.row_version };
+            if (action === 'submit') await submitPurchaseOrder(order.id, payload);
+            if (action === 'approve') await approvePurchaseOrder(order.id, payload);
+            if (action === 'cancel') await cancelPurchaseOrder(order.id, payload);
+            if (action === 'close') await closePurchaseOrder(order.id, payload);
             result.reload();
         } catch (error) {
             setActionError(toApiError(error));

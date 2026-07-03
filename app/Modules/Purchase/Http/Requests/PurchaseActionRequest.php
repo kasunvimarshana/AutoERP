@@ -8,6 +8,13 @@ final class PurchaseActionRequest extends PurchaseRequest
 {
     public function rules(): array
     {
-        return $this->scopeRules();
+        return array_merge($this->scopeRules(), [
+            'expected_version' => ['required', 'integer', 'min:1'],
+        ]);
+    }
+
+    public function expectedVersion(): int
+    {
+        return (int) $this->input('expected_version');
     }
 }

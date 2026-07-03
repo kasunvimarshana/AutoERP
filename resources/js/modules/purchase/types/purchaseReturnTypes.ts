@@ -46,6 +46,7 @@ export interface PurchaseReturnLine {
 
 export interface PurchaseReturn {
     id: number;
+    row_version: number;
     return_number?: string;
     return_date?: string;
     return_type?: 'referenced' | 'manual_supplier_return' | string;
@@ -109,3 +110,11 @@ export interface ManualPurchaseReturnPayload {
 }
 
 export type PurchaseReturnPayload = ReferencedPurchaseReturnPayload | ManualPurchaseReturnPayload;
+
+export interface PurchasePostingResult {
+    purchase_return_id: number;
+    purchase_return_number: string;
+    status: string;
+    inventory_movement_ids: number[];
+    debit_note_id?: number | null;
+}

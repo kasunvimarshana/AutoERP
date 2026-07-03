@@ -35,7 +35,6 @@ export function PurchaseDebitNoteForm() {
                     supplier_id: supplier?.id ?? 0,
                     amount: amount || '0.000000',
                     reason,
-                    source_type: 'supplier_debit_note_only',
                 });
                 navigate(`/purchase/debit-notes/${saved.id}`);
             } catch (requestError) {

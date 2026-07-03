@@ -2,12 +2,13 @@ import { apiClient } from '@/shared/api/apiClient';
 import { endpoints } from '@/shared/api/endpoints';
 import type { ApiCollection, ApiResource, ListParams } from '@/shared/types/api';
 import type {
-    InventoryAdjustmentRequestPayload,
     ManualPurchaseReturnPayload,
+    PurchaseActionPayload,
     PurchaseDebitNote,
     PurchaseDebitNoteAllocationPayload,
     PurchaseDebitNotePayload,
     PurchaseReturn,
+    PurchasePostingResult,
     ReferencedPurchaseReturnPayload,
 } from '../purchaseTypes';
 
@@ -26,18 +27,18 @@ export async function createPurchaseReturn(payload: ReferencedPurchaseReturnPayl
     return response.data.data;
 }
 
-export async function approvePurchaseReturn(id: number) {
-    const response = await apiClient.patch<ApiResource<PurchaseReturn>>(`${endpoints.purchase}/returns/${id}/approve`);
+export async function approvePurchaseReturn(id: number, payload: PurchaseActionPayload) {
+    const response = await apiClient.patch<ApiResource<PurchaseReturn>>(`${endpoints.purchase}/returns/${id}/approve`, payload);
     return response.data.data;
 }
 
-export async function postPurchaseReturn(id: number) {
-    const response = await apiClient.patch<ApiResource<Record<string, unknown>>>(`${endpoints.purchase}/returns/${id}/post`);
+export async function postPurchaseReturn(id: number, payload: PurchaseActionPayload) {
+    const response = await apiClient.patch<ApiResource<PurchasePostingResult>>(`${endpoints.purchase}/returns/${id}/post`, payload);
     return response.data.data;
 }
 
-export async function cancelPurchaseReturn(id: number) {
-    const response = await apiClient.patch<ApiResource<PurchaseReturn>>(`${endpoints.purchase}/returns/${id}/cancel`);
+export async function cancelPurchaseReturn(id: number, payload: PurchaseActionPayload) {
+    const response = await apiClient.patch<ApiResource<PurchaseReturn>>(`${endpoints.purchase}/returns/${id}/cancel`, payload);
     return response.data.data;
 }
 
@@ -61,16 +62,18 @@ export async function createPurchaseDebitNote(payload: PurchaseDebitNotePayload)
     return response.data.data;
 }
 
-export async function approvePurchaseDebitNote(id: number) {
+export async function approvePurchaseDebitNote(id: number, payload: PurchaseActionPayload) {
     const response = await apiClient.patch<ApiResource<PurchaseDebitNote>>(
         `${endpoints.purchase}/debit-notes/${id}/approve`,
+        payload,
     );
     return response.data.data;
 }
 
-export async function postPurchaseDebitNote(id: number) {
+export async function postPurchaseDebitNote(id: number, payload: PurchaseActionPayload) {
     const response = await apiClient.patch<ApiResource<PurchaseDebitNote>>(
         `${endpoints.purchase}/debit-notes/${id}/post`,
+        payload,
     );
     return response.data.data;
 }
@@ -81,14 +84,6 @@ export async function allocatePurchaseDebitNote(
 ) {
     const response = await apiClient.post<ApiResource<PurchaseDebitNote>>(
         `${endpoints.purchase}/debit-notes/${id}/allocations`,
-        payload,
-    );
-    return response.data.data;
-}
-
-export async function createPurchaseInventoryAdjustmentRequest(payload: InventoryAdjustmentRequestPayload) {
-    const response = await apiClient.post<ApiResource<Record<string, unknown>>>(
-        `${endpoints.purchase}/inventory-adjustment-requests`,
         payload,
     );
     return response.data.data;

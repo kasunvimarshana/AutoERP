@@ -18,12 +18,15 @@ use Modules\Purchase\Models\GoodsReceiptNoteLine;
 use Modules\Purchase\Models\PurchaseHeaderAdjustment;
 use Modules\Purchase\Models\PurchaseOrder;
 use Modules\Purchase\Models\PurchaseOrderLine;
+use Modules\Purchase\Services\Concerns\AssertsPurchaseExpectedVersion;
 use Modules\Purchase\Services\Tax\GoodsReceiptNoteTaxDocumentMapper;
 use Modules\Purchase\Validators\PurchaseValidationService;
 use Modules\Tax\Services\TaxDocumentIntegrationService;
 
 final class GoodsReceiptNoteService
 {
+    use AssertsPurchaseExpectedVersion;
+
     public function __construct(
         private readonly DecimalMath $math,
         private readonly PurchaseValidationService $validator,
@@ -254,10 +257,11 @@ final class GoodsReceiptNoteService
         });
     }
 
-    public function post(GoodsReceiptNote $grn, ?int $postedBy = null): GoodsReceiptNote
+    public function post(GoodsReceiptNote $grn, ?int $postedBy = null, ?int $expectedVersion = null): GoodsReceiptNote
     {
-        return DB::transaction(function () use ($grn, $postedBy): GoodsReceiptNote {
+        return DB::transaction(function () use ($grn, $postedBy, $expectedVersion): GoodsReceiptNote {
             $locked = $this->lockGoodsReceiptForMutation($grn);
+            $this->assertExpectedVersion($locked, $expectedVersion);
 
             if ($locked->status === GoodsReceiptNoteStatus::Posted) {
                 return $locked->refresh()->load(['lines', 'adjustments']);
@@ -302,10 +306,11 @@ final class GoodsReceiptNoteService
         });
     }
 
-    public function reverse(GoodsReceiptNote $grn, ?int $reversedBy = null): GoodsReceiptNote
+    public function reverse(GoodsReceiptNote $grn, ?int $reversedBy = null, ?int $expectedVersion = null): GoodsReceiptNote
     {
-        return DB::transaction(function () use ($grn, $reversedBy): GoodsReceiptNote {
+        return DB::transaction(function () use ($grn, $reversedBy, $expectedVersion): GoodsReceiptNote {
             $locked = $this->lockGoodsReceiptForMutation($grn);
+            $this->assertExpectedVersion($locked, $expectedVersion);
 
             if ($locked->status === GoodsReceiptNoteStatus::Reversed) {
                 return $locked->refresh()->load(['purchaseOrder', 'supplier', 'warehouse', 'warehouseLocation', 'lines.item', 'lines.variant', 'lines.uom', 'adjustments']);

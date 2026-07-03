@@ -83,6 +83,7 @@ export default function PurchaseDebitNoteDetailPage() {
                         const updated = await allocatePurchaseDebitNote(note.id, {
                             invoice_id: invoice.id,
                             amount,
+                            expected_version: note.row_version,
                         });
                         result.setData(updated);
                         setAllocationOpen(false);
@@ -130,8 +131,8 @@ export default function PurchaseDebitNoteDetailPage() {
         setError(null);
         try {
             const updated = action === 'approve'
-                ? await approvePurchaseDebitNote(note.id)
-                : await postPurchaseDebitNote(note.id);
+                ? await approvePurchaseDebitNote(note.id, { expected_version: note.row_version })
+                : await postPurchaseDebitNote(note.id, { expected_version: note.row_version });
             result.setData(updated);
         } catch (requestError) {
             setError(toApiError(requestError));

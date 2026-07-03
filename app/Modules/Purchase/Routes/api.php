@@ -74,8 +74,6 @@ Route::prefix('api/v1/purchase')->middleware($middleware)->name('api.v1.purchase
     Route::patch('debit-notes/{debitNote}/approve', [PurchaseDebitNoteController::class, 'approve'])->whereNumber('debitNote')->name('debit-notes.approve');
     Route::patch('debit-notes/{debitNote}/post', [PurchaseDebitNoteController::class, 'post'])->whereNumber('debitNote')->name('debit-notes.post');
     Route::post('debit-notes/{debitNote}/allocations', [PurchaseDebitNoteController::class, 'allocate'])->whereNumber('debitNote')->name('debit-notes.allocations.store');
-    Route::post('inventory-adjustment-requests', [PurchaseIntegrationController::class, 'createInventoryAdjustmentRequest'])->name('inventory-adjustment-requests.store');
-
     Route::post('invoices/preview', [PurchaseIntegrationController::class, 'previewInvoice'])->name('invoices.preview');
     Route::post('invoices', [PurchaseIntegrationController::class, 'createInvoice'])->name('invoices.store');
     Route::get('payments/context', [PurchaseIntegrationController::class, 'paymentContext'])->name('payments.context');

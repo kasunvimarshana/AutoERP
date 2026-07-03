@@ -19,6 +19,7 @@ import {
     previewPurchaseInvoice,
     type GoodsReceiptLine,
     type PurchaseInvoicePayload,
+    type PurchaseInvoicePreviewResult,
     type PurchaseOrderLine,
 } from '../purchaseApi';
 import { decimalOr, todayDate } from '../purchaseFormUtils';
@@ -57,7 +58,7 @@ export default function PurchaseInvoiceCreatePage() {
     const [invoiceNumber, setInvoiceNumber] = useState('');
     const [exchangeRate, setExchangeRate] = useState('1.000000');
     const [notes, setNotes] = useState('');
-    const [preview, setPreview] = useState<Record<string, unknown> | null>(null);
+    const [preview, setPreview] = useState<PurchaseInvoicePreviewResult | null>(null);
     const [error, setError] = useState<ApiError | null>(null);
     const [busy, setBusy] = useState(false);
     const errorFor = (field: string) => fieldError(error, field);

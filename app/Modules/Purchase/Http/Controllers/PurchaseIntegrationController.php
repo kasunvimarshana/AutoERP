@@ -5,14 +5,12 @@ declare(strict_types=1);
 namespace Modules\Purchase\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
-use Modules\Inventory\Http\Resources\InventoryAdjustmentResource;
-use Modules\Inventory\Services\InventoryFacade;
+use Modules\Invoice\Http\Resources\InvoiceResource;
 use Modules\Payment\DTOs\PaymentAllocationData;
 use Modules\Payment\DTOs\PaymentLineData;
 use Modules\Payment\Http\Resources\PaymentResource;
 use Modules\Purchase\Http\Requests\ListPurchaseDocumentRequest;
 use Modules\Purchase\Http\Requests\PreparePurchasePaymentRequest;
-use Modules\Purchase\Http\Requests\StorePurchaseInventoryAdjustmentRequest;
 use Modules\Purchase\Http\Requests\StorePurchaseInvoiceRequest;
 use Modules\Purchase\Http\Resources\PurchasePaymentPreviewResource;
 use Modules\Purchase\Services\PurchaseAuthorizationService;
@@ -23,27 +21,38 @@ final class PurchaseIntegrationController
 {
     public function __construct(private readonly PurchaseAuthorizationService $authorization) {}
 
-    public function createInventoryAdjustmentRequest(StorePurchaseInventoryAdjustmentRequest $request, InventoryFacade $inventory): JsonResponse
-    {
-        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PurchaseAuthorizationService::RETURNS_POST);
-
-        return (new InventoryAdjustmentResource($inventory->adjust($request->toData())))
-            ->response()
-            ->setStatusCode(201);
-    }
-
     public function previewInvoice(StorePurchaseInvoiceRequest $request, PurchaseInvoiceIntegrationService $service): JsonResponse
     {
         $this->authorization->assert($request->currentUserId(), $request->tenantId(), PurchaseAuthorizationService::SUPPLIER_INVOICES_VIEW);
+        $preview = $service->previewSupplierInvoice($request->toData());
 
-        return response()->json(['data' => get_object_vars($service->previewSupplierInvoice($request->toData()))]);
+        return response()->json(['data' => [
+            'subtotal' => $preview->subtotal,
+            'discount_total' => $preview->discountTotal,
+            'tax_total' => $preview->taxTotal,
+            'charge_total' => $preview->chargeTotal,
+            'adjustment_total' => $preview->adjustmentTotal,
+            'grand_total' => $preview->grandTotal,
+            'line_totals' => $preview->lineTotals,
+            'header_increase_total' => $preview->headerIncreaseTotal,
+            'header_decrease_total' => $preview->headerDecreaseTotal,
+        ]]);
     }
 
     public function createInvoice(StorePurchaseInvoiceRequest $request, PurchaseInvoiceIntegrationService $service): JsonResponse
     {
         $this->authorization->assert($request->currentUserId(), $request->tenantId(), PurchaseAuthorizationService::SUPPLIER_INVOICES_CREATE);
 
-        return response()->json(['data' => $service->createSupplierInvoice($request->toData())], 201);
+        return (new InvoiceResource($service->createSupplierInvoice($request->toData())->load([
+            'lines',
+            'sources',
+            'sourceLines',
+            'adjustments',
+            'adjustmentAllocations',
+            'balance',
+        ])))
+            ->response()
+            ->setStatusCode(201);
     }
 
     public function paymentContext(ListPurchaseDocumentRequest $request, PurchasePaymentIntegrationService $service): JsonResponse

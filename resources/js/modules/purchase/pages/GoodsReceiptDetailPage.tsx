@@ -47,7 +47,10 @@ export default function GoodsReceiptDetailPage() {
         setBusy(true);
         setActionError(null);
         try {
-            result.setData(action === 'post' ? await postGoodsReceipt(grn.id) : await reverseGoodsReceipt(grn.id));
+            const payload = { expected_version: grn.row_version };
+            result.setData(action === 'post'
+                ? await postGoodsReceipt(grn.id, payload)
+                : await reverseGoodsReceipt(grn.id, payload));
         } catch (requestError) {
             setActionError(toApiError(requestError));
         } finally {

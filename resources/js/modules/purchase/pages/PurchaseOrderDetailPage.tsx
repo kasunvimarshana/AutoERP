@@ -41,12 +41,13 @@ export default function PurchaseOrderDetailPage() {
         setBusy(true);
         setActionError(null);
         try {
-            if (action === 'submit') result.setData(await submitPurchaseOrder(result.data.id));
-            if (action === 'approve') result.setData(await approvePurchaseOrder(result.data.id));
-            if (action === 'cancel') result.setData(await cancelPurchaseOrder(result.data.id));
-            if (action === 'close') result.setData(await closePurchaseOrder(result.data.id));
+            const payload = { expected_version: result.data.row_version };
+            if (action === 'submit') result.setData(await submitPurchaseOrder(result.data.id, payload));
+            if (action === 'approve') result.setData(await approvePurchaseOrder(result.data.id, payload));
+            if (action === 'cancel') result.setData(await cancelPurchaseOrder(result.data.id, payload));
+            if (action === 'close') result.setData(await closePurchaseOrder(result.data.id, payload));
             if (action === 'delete') {
-                await deletePurchaseOrder(result.data.id);
+                await deletePurchaseOrder(result.data.id, payload);
                 navigate('/purchase/orders');
             }
         } catch (error) {

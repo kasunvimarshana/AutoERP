@@ -5,11 +5,11 @@ import type { NamedResource } from '@/shared/types/common';
 import type { Invoice } from '@/modules/invoice/invoiceApi';
 import type { LookupLoadParams, LookupResult } from '@/shared/types/lookup';
 import type { Payment } from '@/modules/payment/paymentApi';
-import type { PurchaseInvoicePayload, PurchasePaymentCreatePayload, PurchasePaymentPreview } from '../purchaseTypes';
+import type { PurchaseInvoicePayload, PurchaseInvoicePreviewResult, PurchasePaymentCreatePayload, PurchasePaymentPreview } from '../purchaseTypes';
 import type { FastPurchaseOptionResource } from '../types/fastPurchaseTypes';
 
 export async function previewPurchaseInvoice(payload: PurchaseInvoicePayload) {
-    const response = await apiClient.post<ApiResource<Record<string, unknown>>>(
+    const response = await apiClient.post<ApiResource<PurchaseInvoicePreviewResult>>(
         `${endpoints.purchase}/invoices/preview`,
         payload,
     );
@@ -17,7 +17,7 @@ export async function previewPurchaseInvoice(payload: PurchaseInvoicePayload) {
 }
 
 export async function createPurchaseInvoice(payload: PurchaseInvoicePayload) {
-    const response = await apiClient.post<ApiResource<Record<string, unknown>>>(
+    const response = await apiClient.post<ApiResource<Invoice>>(
         `${endpoints.purchase}/invoices`,
         payload,
     );

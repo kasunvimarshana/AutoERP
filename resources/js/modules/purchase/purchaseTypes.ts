@@ -12,6 +12,10 @@ export type InvoiceProgressStatus = 'not_invoiced' | 'partially_invoiced' | 'inv
 export type ReturnProgressStatus = 'not_returned' | 'partially_returned' | 'returned';
 export type AllocationProgressStatus = 'unallocated' | 'partially_allocated' | 'allocated';
 
+export interface PurchaseActionPayload {
+    expected_version: number;
+}
+
 export interface PurchaseCapabilityDetail {
     allowed: boolean;
     code?: string | null;
@@ -81,6 +85,7 @@ export interface PurchaseHeaderAdjustment {
 
 export interface PurchaseOrder {
     id: number;
+    row_version: number;
     purchase_order_number?: string;
     purchase_order_date?: string;
     expected_delivery_date?: string | null;
@@ -280,6 +285,7 @@ export type {
     PurchaseReturn,
     PurchaseReturnLine,
     PurchaseReturnPayload,
+    PurchasePostingResult,
     PurchaseReturnStatus,
     ReferencedPurchaseReturnPayload,
     ReturnableLine,
@@ -315,6 +321,7 @@ export interface GoodsReceiptLine {
 
 export interface GoodsReceipt {
     id: number;
+    row_version: number;
     grn_number?: string;
     received_date?: string;
     status?: GoodsReceiptStatus | string;
@@ -373,6 +380,7 @@ export interface InvoiceableGoodsReceiptLine extends GoodsReceiptLine {
 
 export interface PurchaseDebitNote {
     id: number;
+    row_version: number;
     debit_note_number?: string;
     debit_note_date?: string;
     status?: string;
@@ -403,13 +411,12 @@ export interface PurchaseDebitNotePayload {
     supplier_id: number;
     amount: string;
     reason: string;
-    source_type?: string;
-    source_id?: number;
 }
 
 export interface PurchaseDebitNoteAllocationPayload {
     invoice_id: number;
     amount: string;
+    expected_version: number;
 }
 
 export interface PurchaseInvoicePayload {
@@ -428,6 +435,18 @@ export interface PurchaseInvoicePayload {
     }>;
 }
 
+export interface PurchaseInvoicePreviewResult {
+    subtotal: string;
+    discount_total: string;
+    tax_total: string;
+    charge_total: string;
+    adjustment_total: string;
+    grand_total: string;
+    header_increase_total: string;
+    header_decrease_total: string;
+    line_totals: string[];
+}
+
 export interface PurchasePaymentCreatePayload {
     payment_date: string;
     amount: string;
@@ -440,7 +459,7 @@ export interface PurchasePaymentCreatePayload {
         amount: string;
         payment_method_id?: number;
         reference?: string;
-        instrument_direction?: 'received' | 'issued' | 'outbound';
+        instrument_direction?: 'received' | 'issued';
         external_bank_name?: string;
         external_bank_branch?: string;
         instrument_number?: string;
@@ -483,23 +502,5 @@ export interface PurchasePaymentPreview {
         invoice_balance_after: string;
         allocation_date: string;
         allocation_method: string;
-    }>;
-}
-
-export interface InventoryAdjustmentRequestPayload {
-    adjustment_date: string;
-    adjustment_type: 'increase' | 'decrease' | 'recount' | 'damage' | 'expiry' | 'opening_balance';
-    warehouse_id: number;
-    warehouse_location_id?: number;
-    reason: string;
-    notes?: string;
-    lines: Array<{
-        item_id: number;
-        item_variant_id?: number;
-        system_quantity: string;
-        counted_quantity: string;
-        adjustment_quantity: string;
-        unit_cost?: string;
-        reason?: string;
     }>;
 }

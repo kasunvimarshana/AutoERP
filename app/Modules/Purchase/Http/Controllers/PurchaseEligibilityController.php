@@ -14,64 +14,80 @@ use Modules\Purchase\Http\Resources\PurchaseOrderResource;
 use Modules\Purchase\Models\GoodsReceiptNote;
 use Modules\Purchase\Models\PurchaseOrder;
 use Modules\Purchase\Services\PurchaseAuthorizationService;
+use Modules\Purchase\Services\PurchaseDocumentPresentationService;
 use Modules\Purchase\Services\PurchaseSourceEligibilityService;
 
 final class PurchaseEligibilityController
 {
     use ScopesPurchaseRequests;
 
-    public function __construct(private readonly PurchaseAuthorizationService $authorization) {}
+    public function __construct(
+        private readonly PurchaseAuthorizationService $authorization,
+        private readonly PurchaseDocumentPresentationService $presentation,
+    ) {}
 
     public function receivablePurchaseOrders(ListPurchaseDocumentRequest $request, PurchaseSourceEligibilityService $service): AnonymousResourceCollection
     {
         $this->authorization->assert($request->currentUserId(), $request->tenantId(), PurchaseAuthorizationService::GOODS_RECEIPTS_VIEW);
 
-        return PurchaseOrderResource::collection($service->receivablePurchaseOrders(
+        $orders = $service->receivablePurchaseOrders(
             $request->tenantId(),
             $request->organizationUnitId(),
             $request->filled('supplier_id') ? (int) $request->input('supplier_id') : null,
             trim((string) $request->input('search', '')),
             $request->perPage(),
-        ));
+        );
+        $this->presentation->preparePurchaseOrders($orders->getCollection());
+
+        return PurchaseOrderResource::collection($orders);
     }
 
     public function invoiceablePurchaseOrders(ListPurchaseDocumentRequest $request, PurchaseSourceEligibilityService $service): AnonymousResourceCollection
     {
         $this->authorization->assert($request->currentUserId(), $request->tenantId(), PurchaseAuthorizationService::SUPPLIER_INVOICES_VIEW);
 
-        return PurchaseOrderResource::collection($service->invoiceablePurchaseOrders(
+        $orders = $service->invoiceablePurchaseOrders(
             $request->tenantId(),
             $request->organizationUnitId(),
             $request->filled('supplier_id') ? (int) $request->input('supplier_id') : null,
             trim((string) $request->input('search', '')),
             $request->perPage(),
-        ));
+        );
+        $this->presentation->preparePurchaseOrders($orders->getCollection());
+
+        return PurchaseOrderResource::collection($orders);
     }
 
     public function invoiceableGoodsReceipts(ListPurchaseDocumentRequest $request, PurchaseSourceEligibilityService $service): AnonymousResourceCollection
     {
         $this->authorization->assert($request->currentUserId(), $request->tenantId(), PurchaseAuthorizationService::SUPPLIER_INVOICES_VIEW);
 
-        return GoodsReceiptNoteResource::collection($service->invoiceableGoodsReceipts(
+        $goodsReceipts = $service->invoiceableGoodsReceipts(
             $request->tenantId(),
             $request->organizationUnitId(),
             $request->filled('supplier_id') ? (int) $request->input('supplier_id') : null,
             trim((string) $request->input('search', '')),
             $request->perPage(),
-        ));
+        );
+        $this->presentation->prepareGoodsReceipts($goodsReceipts->getCollection());
+
+        return GoodsReceiptNoteResource::collection($goodsReceipts);
     }
 
     public function returnableGoodsReceipts(ListPurchaseDocumentRequest $request, PurchaseSourceEligibilityService $service): AnonymousResourceCollection
     {
         $this->authorization->assert($request->currentUserId(), $request->tenantId(), PurchaseAuthorizationService::RETURNS_VIEW);
 
-        return GoodsReceiptNoteResource::collection($service->returnableGoodsReceipts(
+        $goodsReceipts = $service->returnableGoodsReceipts(
             $request->tenantId(),
             $request->organizationUnitId(),
             $request->filled('supplier_id') ? (int) $request->input('supplier_id') : null,
             trim((string) $request->input('search', '')),
             $request->perPage(),
-        ));
+        );
+        $this->presentation->prepareGoodsReceipts($goodsReceipts->getCollection());
+
+        return GoodsReceiptNoteResource::collection($goodsReceipts);
     }
 
     public function outstandingSupplierInvoices(ListPurchaseDocumentRequest $request, PurchaseSourceEligibilityService $service): AnonymousResourceCollection

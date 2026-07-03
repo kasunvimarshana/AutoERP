@@ -8,10 +8,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\Purchase\Enums\PurchaseDebitNoteStatus;
+use Modules\Purchase\Models\Concerns\HasPurchaseRowVersion;
 use Modules\Supplier\Models\Supplier;
 
 final class PurchaseDebitNote extends TenantOwnedModel
 {
+    use HasPurchaseRowVersion;
     use SoftDeletes;
 
     protected $table = 'purchase_debit_notes';
@@ -22,6 +24,7 @@ final class PurchaseDebitNote extends TenantOwnedModel
     {
         return array_merge(parent::casts(), [
             'tenant_id' => 'integer',
+            'row_version' => 'integer',
             'organization_unit_id' => 'integer',
             'supplier_id' => 'integer',
             'purchase_return_id' => 'integer',

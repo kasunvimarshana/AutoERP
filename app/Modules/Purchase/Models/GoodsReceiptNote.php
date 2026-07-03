@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\Purchase\Enums\GoodsReceiptNoteStatus;
+use Modules\Purchase\Models\Concerns\HasPurchaseRowVersion;
 use Modules\Supplier\Models\Supplier;
 use Modules\User\Models\UserModel;
 use Modules\Warehouse\Models\WarehouseLocationModel;
@@ -16,6 +17,7 @@ use Modules\Warehouse\Models\WarehouseModel;
 
 final class GoodsReceiptNote extends TenantOwnedModel
 {
+    use HasPurchaseRowVersion;
     use SoftDeletes;
 
     protected $table = 'goods_receipt_notes';
@@ -26,6 +28,7 @@ final class GoodsReceiptNote extends TenantOwnedModel
     {
         return array_merge(parent::casts(), [
             'tenant_id' => 'integer',
+            'row_version' => 'integer',
             'organization_unit_id' => 'integer',
             'purchase_order_id' => 'integer',
             'supplier_id' => 'integer',

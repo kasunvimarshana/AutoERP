@@ -13,10 +13,16 @@ use Modules\Invoice\Services\InvoiceBalanceService;
 use Modules\Purchase\DTOs\CreatePurchaseDebitNoteData;
 use Modules\Purchase\Enums\PurchaseDebitNoteStatus;
 use Modules\Purchase\Models\PurchaseDebitNote;
+use Modules\Purchase\Models\PurchaseReturn;
+use Modules\Purchase\Services\Concerns\AssertsPurchaseExpectedVersion;
 use Modules\Purchase\Validators\PurchaseValidationService;
 
 final class PurchaseDebitNoteService
 {
+    use AssertsPurchaseExpectedVersion;
+
+    public const SOURCE_PURCHASE_RETURN = 'purchase_return';
+
     public function __construct(
         private readonly DecimalMath $math,
         private readonly PurchaseNumberService $numbers,
@@ -38,6 +44,7 @@ final class PurchaseDebitNoteService
         }
 
         $this->validator->supplier($data->tenantId, $data->organizationUnitId, $data->supplierId, 'supplier_id');
+        $this->assertSourceContract($data);
 
         return PurchaseDebitNote::query()->create([
             'tenant_id' => $data->tenantId,
@@ -57,12 +64,41 @@ final class PurchaseDebitNoteService
         ]);
     }
 
-    public function approve(PurchaseDebitNote $note, ?int $approvedBy = null): PurchaseDebitNote
+    private function assertSourceContract(CreatePurchaseDebitNoteData $data): void
     {
-        return DB::transaction(function () use ($note, $approvedBy): PurchaseDebitNote {
+        if ($data->purchaseReturnId === null) {
+            if ($data->sourceType !== null || $data->sourceId !== null) {
+                throw new InvalidArgumentException('Manual purchase debit notes cannot carry arbitrary source references.');
+            }
+
+            return;
+        }
+
+        if ($data->sourceType !== self::SOURCE_PURCHASE_RETURN || $data->sourceId !== $data->purchaseReturnId) {
+            throw new InvalidArgumentException('Purchase return debit notes must reference their owning purchase return.');
+        }
+
+        $purchaseReturn = PurchaseReturn::query()->findOrFail($data->purchaseReturnId);
+        $returnOrganizationUnitId = $purchaseReturn->organization_unit_id === null
+            ? null
+            : (int) $purchaseReturn->organization_unit_id;
+
+        if ((int) $purchaseReturn->tenant_id !== $data->tenantId
+            || $returnOrganizationUnitId !== $data->organizationUnitId
+            || (int) $purchaseReturn->supplier_id !== $data->supplierId
+            || (string) $purchaseReturn->supplier_type !== (string) ($data->supplierType ?? 'supplier')
+        ) {
+            throw new InvalidArgumentException('Purchase debit note source return is outside the debit note scope.');
+        }
+    }
+
+    public function approve(PurchaseDebitNote $note, ?int $approvedBy = null, ?int $expectedVersion = null): PurchaseDebitNote
+    {
+        return DB::transaction(function () use ($note, $approvedBy, $expectedVersion): PurchaseDebitNote {
             $lockedNote = PurchaseDebitNote::query()
                 ->lockForUpdate()
                 ->findOrFail($note->getKey());
+            $this->assertExpectedVersion($lockedNote, $expectedVersion);
 
             if ($lockedNote->status !== PurchaseDebitNoteStatus::Draft) {
                 throw new InvalidArgumentException('Only draft purchase debit notes can be approved.');
@@ -77,12 +113,13 @@ final class PurchaseDebitNoteService
         });
     }
 
-    public function post(PurchaseDebitNote $note): PurchaseDebitNote
+    public function post(PurchaseDebitNote $note, ?int $expectedVersion = null): PurchaseDebitNote
     {
-        return DB::transaction(function () use ($note): PurchaseDebitNote {
+        return DB::transaction(function () use ($note, $expectedVersion): PurchaseDebitNote {
             $lockedNote = PurchaseDebitNote::query()
                 ->lockForUpdate()
                 ->findOrFail($note->getKey());
+            $this->assertExpectedVersion($lockedNote, $expectedVersion);
 
             if ($lockedNote->status !== PurchaseDebitNoteStatus::Approved) {
                 throw new InvalidArgumentException('Only approved purchase debit notes can be posted.');
@@ -99,14 +136,16 @@ final class PurchaseDebitNoteService
         PurchaseDebitNote $note,
         Invoice $invoice,
         string $amount,
+        ?int $expectedVersion = null,
     ): PurchaseDebitNote {
-        return DB::transaction(function () use ($note, $invoice, $amount): PurchaseDebitNote {
+        return DB::transaction(function () use ($note, $invoice, $amount, $expectedVersion): PurchaseDebitNote {
             $lockedInvoice = Invoice::query()
                 ->lockForUpdate()
                 ->findOrFail($invoice->getKey());
             $lockedNote = PurchaseDebitNote::query()
                 ->lockForUpdate()
                 ->findOrFail($note->getKey());
+            $this->assertExpectedVersion($lockedNote, $expectedVersion);
             $this->assertAllocationScope($lockedNote, $lockedInvoice);
             if (! in_array($lockedNote->status, [
                 PurchaseDebitNoteStatus::Posted,

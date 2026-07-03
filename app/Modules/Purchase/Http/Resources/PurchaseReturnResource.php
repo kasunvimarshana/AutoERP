@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modules\Purchase\Http\Resources;
 
 use Illuminate\Http\Request;
-use Modules\Purchase\Services\PurchaseDocumentCapabilityService;
 
 final class PurchaseReturnResource extends PurchaseResource
 {
@@ -13,6 +12,7 @@ final class PurchaseReturnResource extends PurchaseResource
     {
         return [
             'id' => (int) $this->getKey(),
+            'row_version' => (int) $this->row_version,
             'return_number' => $this->return_number,
             'return_date' => $this->return_date?->toDateString(),
             'return_type' => $this->enumValue($this->return_type),
@@ -25,7 +25,7 @@ final class PurchaseReturnResource extends PurchaseResource
             'warehouse' => $this->whenLoaded('warehouse', fn () => $this->summary($this->warehouse, ['code', 'name'])),
             'warehouse_location' => $this->whenLoaded('warehouseLocation', fn () => $this->summary($this->warehouseLocation, ['code', 'name'])),
             'approval_required' => (bool) $this->approval_required,
-            'capabilities' => $this->capabilities(),
+            'capabilities' => $this->arrayAttribute('capabilities'),
             'affects_supplier_balance' => (bool) $this->affects_supplier_balance,
             'cost_basis' => $this->cost_basis === null ? null : (string) $this->cost_basis,
             'reason' => $this->reason,
@@ -93,11 +93,4 @@ final class PurchaseReturnResource extends PurchaseResource
         ];
     }
 
-    /**
-     * @return array<string, mixed>
-     */
-    private function capabilities(): array
-    {
-        return app(PurchaseDocumentCapabilityService::class)->forPurchaseReturn($this->resource);
-    }
 }

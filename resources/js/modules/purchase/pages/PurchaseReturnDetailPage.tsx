@@ -44,12 +44,13 @@ export default function PurchaseReturnDetailPage() {
         setBusy(true);
         setActionError(null);
         try {
-            if (action === 'approve') result.setData(await approvePurchaseReturn(row.id));
+            const payload = { expected_version: row.row_version };
+            if (action === 'approve') result.setData(await approvePurchaseReturn(row.id, payload));
             if (action === 'post') {
-                await postPurchaseReturn(row.id);
+                await postPurchaseReturn(row.id, payload);
                 result.reload();
             }
-            if (action === 'cancel') result.setData(await cancelPurchaseReturn(row.id));
+            if (action === 'cancel') result.setData(await cancelPurchaseReturn(row.id, payload));
         } catch (requestError) {
             setActionError(toApiError(requestError));
         } finally {

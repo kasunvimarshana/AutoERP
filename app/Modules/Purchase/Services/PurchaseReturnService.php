@@ -25,12 +25,15 @@ use Modules\Purchase\Models\PurchaseOrderLine;
 use Modules\Purchase\Models\PurchaseReturn;
 use Modules\Purchase\Models\PurchaseReturnAdjustmentAllocation;
 use Modules\Purchase\Models\PurchaseReturnLine;
+use Modules\Purchase\Services\Concerns\AssertsPurchaseExpectedVersion;
 use Modules\Purchase\Services\Tax\PurchaseReturnTaxDocumentMapper;
 use Modules\Purchase\Validators\PurchaseValidationService;
 use Modules\Tax\Services\TaxReturnAllocationService;
 
 final class PurchaseReturnService
 {
+    use AssertsPurchaseExpectedVersion;
+
     public function __construct(
         private readonly DecimalMath $math,
         private readonly PurchaseValidationService $validator,
@@ -153,10 +156,11 @@ final class PurchaseReturnService
         });
     }
 
-    public function approve(PurchaseReturn $return, ?int $approvedBy = null): PurchaseReturn
+    public function approve(PurchaseReturn $return, ?int $approvedBy = null, ?int $expectedVersion = null): PurchaseReturn
     {
-        return DB::transaction(function () use ($return, $approvedBy): PurchaseReturn {
+        return DB::transaction(function () use ($return, $approvedBy, $expectedVersion): PurchaseReturn {
             $return = PurchaseReturn::query()->lockForUpdate()->findOrFail($return->getKey());
+            $this->assertExpectedVersion($return, $expectedVersion);
 
             if (! (bool) $return->approval_required) {
                 throw new InvalidArgumentException('Purchase return does not require approval.');
@@ -174,13 +178,14 @@ final class PurchaseReturnService
         });
     }
 
-    public function post(PurchaseReturn $return, ?int $postedBy = null): PurchasePostingResult
+    public function post(PurchaseReturn $return, ?int $postedBy = null, ?int $expectedVersion = null): PurchasePostingResult
     {
-        return DB::transaction(function () use ($return, $postedBy): PurchasePostingResult {
+        return DB::transaction(function () use ($return, $postedBy, $expectedVersion): PurchasePostingResult {
             $returnId = (int) $return->getKey();
             $sourceLines = $this->lockReceiptSourcesByLineIds($this->sourceLineIdsForReturn($returnId));
             $returnContext = $this->lockReturnContextForPost($returnId, $sourceLines);
             $lockedReturn = $returnContext['return'];
+            $this->assertExpectedVersion($lockedReturn, $expectedVersion);
 
             if ($lockedReturn->status === PurchaseReturnStatus::Posted) {
                 return new PurchasePostingResult(
@@ -288,7 +293,7 @@ final class PurchaseReturnService
                     supplierType: $return->supplier_type,
                     supplierId: $return->supplier_id,
                     purchaseReturnId: (int) $return->getKey(),
-                    sourceType: $return->return_type?->value ?? 'purchase_return',
+                    sourceType: PurchaseDebitNoteService::SOURCE_PURCHASE_RETURN,
                     sourceId: (int) $return->getKey(),
                     reason: $return->reason ?: 'Purchase return '.$return->return_number,
                 ));
@@ -315,13 +320,14 @@ final class PurchaseReturnService
         });
     }
 
-    public function cancel(PurchaseReturn $return): PurchaseReturn
+    public function cancel(PurchaseReturn $return, ?int $expectedVersion = null): PurchaseReturn
     {
-        return DB::transaction(function () use ($return): PurchaseReturn {
+        return DB::transaction(function () use ($return, $expectedVersion): PurchaseReturn {
             $locked = $this->locks->purchaseReturns([(int) $return->getKey()])->first();
             if (! $locked instanceof PurchaseReturn) {
                 throw new InvalidArgumentException('Purchase return was not found.');
             }
+            $this->assertExpectedVersion($locked, $expectedVersion);
             $this->locks->purchaseReturnLinesForReturns([(int) $locked->getKey()]);
 
             if ($locked->status === PurchaseReturnStatus::Posted) {

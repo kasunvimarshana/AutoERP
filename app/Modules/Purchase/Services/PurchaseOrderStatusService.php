@@ -10,9 +10,12 @@ use Modules\Core\Services\DecimalMath;
 use Modules\Purchase\Enums\PurchaseOrderStatus;
 use Modules\Purchase\Models\PurchaseOrder;
 use Modules\Purchase\Models\PurchaseOrderLine;
+use Modules\Purchase\Services\Concerns\AssertsPurchaseExpectedVersion;
 
 final class PurchaseOrderStatusService
 {
+    use AssertsPurchaseExpectedVersion;
+
     public function __construct(
         private readonly DecimalMath $math,
         private readonly PurchaseStatusService $transitions,
@@ -20,10 +23,11 @@ final class PurchaseOrderStatusService
         private readonly PurchaseDocumentBlockerService $blockers,
     ) {}
 
-    public function submit(PurchaseOrder $order, ?int $submittedBy = null): PurchaseOrder
+    public function submit(PurchaseOrder $order, ?int $submittedBy = null, ?int $expectedVersion = null): PurchaseOrder
     {
-        return DB::transaction(function () use ($order, $submittedBy): PurchaseOrder {
+        return DB::transaction(function () use ($order, $submittedBy, $expectedVersion): PurchaseOrder {
             $locked = $this->lock($order);
+            $this->assertExpectedVersion($locked, $expectedVersion);
             $this->transitions->assertPurchaseOrderTransition(
                 $locked->status,
                 PurchaseOrderStatus::PendingApproval,
@@ -37,10 +41,11 @@ final class PurchaseOrderStatusService
         });
     }
 
-    public function approve(PurchaseOrder $order, ?int $approvedBy = null): PurchaseOrder
+    public function approve(PurchaseOrder $order, ?int $approvedBy = null, ?int $expectedVersion = null): PurchaseOrder
     {
-        return DB::transaction(function () use ($order, $approvedBy): PurchaseOrder {
+        return DB::transaction(function () use ($order, $approvedBy, $expectedVersion): PurchaseOrder {
             $locked = $this->lock($order);
+            $this->assertExpectedVersion($locked, $expectedVersion);
             $this->transitions->assertPurchaseOrderTransition($locked->status, PurchaseOrderStatus::Approved);
             $locked->status = PurchaseOrderStatus::Approved;
             $locked->approved_by = $approvedBy;
@@ -51,10 +56,11 @@ final class PurchaseOrderStatusService
         });
     }
 
-    public function cancel(PurchaseOrder $order): PurchaseOrder
+    public function cancel(PurchaseOrder $order, ?int $expectedVersion = null): PurchaseOrder
     {
-        return DB::transaction(function () use ($order): PurchaseOrder {
+        return DB::transaction(function () use ($order, $expectedVersion): PurchaseOrder {
             $locked = $this->lock($order, ['lines']);
+            $this->assertExpectedVersion($locked, $expectedVersion);
             $this->assertCancellable($locked);
             $this->transitions->assertPurchaseOrderTransition($locked->status, PurchaseOrderStatus::Cancelled);
             $locked->status = PurchaseOrderStatus::Cancelled;
@@ -64,10 +70,11 @@ final class PurchaseOrderStatusService
         });
     }
 
-    public function close(PurchaseOrder $order, ?int $closedBy = null): PurchaseOrder
+    public function close(PurchaseOrder $order, ?int $closedBy = null, ?int $expectedVersion = null): PurchaseOrder
     {
-        return DB::transaction(function () use ($order, $closedBy): PurchaseOrder {
+        return DB::transaction(function () use ($order, $closedBy, $expectedVersion): PurchaseOrder {
             $locked = $this->lock($order, ['lines']);
+            $this->assertExpectedVersion($locked, $expectedVersion);
             $this->transitions->assertPurchaseOrderTransition($locked->status, PurchaseOrderStatus::Closed);
             $this->assertClosable($locked);
             $locked->status = PurchaseOrderStatus::Closed;

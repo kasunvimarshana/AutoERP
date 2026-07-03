@@ -15,11 +15,14 @@ use Modules\Purchase\Enums\PurchaseAdjustmentCalculationType;
 use Modules\Purchase\Enums\PurchaseOrderLineStatus;
 use Modules\Purchase\Enums\PurchaseOrderStatus;
 use Modules\Purchase\Models\PurchaseOrder;
+use Modules\Purchase\Services\Concerns\AssertsPurchaseExpectedVersion;
 use Modules\Purchase\Validators\PurchaseValidationService;
 use Modules\Tenant\Models\TenantModel;
 
 final class PurchaseOrderWriteService
 {
+    use AssertsPurchaseExpectedVersion;
+
     public function __construct(
         private readonly DecimalMath $math,
         private readonly PurchaseValidationService $validator,
@@ -72,15 +75,16 @@ final class PurchaseOrderWriteService
         });
     }
 
-    public function update(PurchaseOrder $order, CreatePurchaseOrderData $data): PurchaseOrder
+    public function update(PurchaseOrder $order, CreatePurchaseOrderData $data, ?int $expectedVersion = null): PurchaseOrder
     {
         $this->validateOrderData($data);
 
         $number = $data->purchaseOrderNumber ?? (string) $order->purchase_order_number;
         $this->assertUniqueNumber($data->tenantId, $number, (int) $order->getKey());
 
-        return DB::transaction(function () use ($order, $data, $number): PurchaseOrder {
+        return DB::transaction(function () use ($order, $data, $number, $expectedVersion): PurchaseOrder {
             $order = PurchaseOrder::query()->lockForUpdate()->findOrFail($order->getKey());
+            $this->assertExpectedVersion($order, $expectedVersion);
             $this->assertEditable($order);
 
             $calculation = $this->calculator->calculate($data->lines, $data->adjustments);
@@ -114,10 +118,11 @@ final class PurchaseOrderWriteService
         });
     }
 
-    public function delete(PurchaseOrder $order): void
+    public function delete(PurchaseOrder $order, ?int $expectedVersion = null): void
     {
-        DB::transaction(function () use ($order): void {
+        DB::transaction(function () use ($order, $expectedVersion): void {
             $order = PurchaseOrder::query()->with('lines')->lockForUpdate()->findOrFail($order->getKey());
+            $this->assertExpectedVersion($order, $expectedVersion);
             $this->assertEditable($order);
 
             $order->lines()->delete();

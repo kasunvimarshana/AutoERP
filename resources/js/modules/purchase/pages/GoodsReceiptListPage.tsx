@@ -9,6 +9,7 @@ import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { Pagination } from '@/shared/components/Pagination';
+import { Select } from '@/shared/components/Select';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { useApi } from '@/shared/hooks/useApi';
 import { useDebounce } from '@/shared/hooks/useDebounce';
@@ -17,6 +18,12 @@ import { formatDate } from '@/shared/utils/formatDate';
 import { formatMoney } from '@/shared/utils/formatMoney';
 import { listGoodsReceipts, postGoodsReceipt, reverseGoodsReceipt, type GoodsReceipt } from '../purchaseApi';
 import { hasPurchasePermission, purchasePermissions } from '../purchasePermissions';
+
+const goodsReceiptStatusOptions = [
+    { value: 'draft', label: 'Draft' },
+    { value: 'posted', label: 'Posted' },
+    { value: 'reversed', label: 'Reversed' },
+];
 
 export default function GoodsReceiptListPage() {
     const { confirm, confirmDialog } = useConfirmDialog();
@@ -41,8 +48,9 @@ export default function GoodsReceiptListPage() {
         setBusyId(row.id);
         setActionError(null);
         try {
-            if (action === 'post') await postGoodsReceipt(row.id);
-            if (action === 'reverse') await reverseGoodsReceipt(row.id);
+            const payload = { expected_version: row.row_version };
+            if (action === 'post') await postGoodsReceipt(row.id, payload);
+            if (action === 'reverse') await reverseGoodsReceipt(row.id, payload);
             result.reload();
         } catch (requestError) {
             setActionError(toApiError(requestError));
@@ -73,7 +81,7 @@ export default function GoodsReceiptListPage() {
             <ErrorAlert error={result.error ?? actionError} />
             <div className="grid gap-3 md:grid-cols-3">
                 <Input label="Search" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} />
-                <Input label="Status" value={status} onChange={(event) => { setStatus(event.target.value); setPage(1); }} />
+                <Select label="Status" value={status} options={goodsReceiptStatusOptions} onChange={(event) => { setStatus(event.target.value); setPage(1); }} />
             </div>
             {result.loading ? <LoadingState /> : <DataTable rows={result.data?.data ?? []} columns={columns} rowKey={(row) => row.id} />}
             <Pagination meta={result.data?.meta} onPageChange={setPage} />

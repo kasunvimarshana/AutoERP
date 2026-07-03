@@ -18,6 +18,7 @@ use Modules\Item\Enums\ItemType;
 use Modules\Item\Models\Item;
 use Modules\Item\Models\ItemVariant;
 use Modules\Payment\DTOs\PaymentLineData;
+use Modules\Payment\Enums\PaymentInstrumentStatus;
 use Modules\Payment\Models\PaymentMethod;
 use Modules\Purchase\Constants\PurchaseAuditEvent;
 use Modules\Purchase\DTOs\PurchaseHeaderAdjustmentData;
@@ -565,7 +566,7 @@ final class FastPurchaseService
                 amount: $lineAmount,
                 paymentMethodId: $methodId,
                 referenceNumber: $reference,
-                instrumentDirection: 'outbound',
+                instrumentDirection: PaymentInstrumentStatus::Issued->value,
                 externalBankName: $externalBankName,
                 externalBankBranch: $externalBankBranch,
                 instrumentNumber: $instrumentNumber,

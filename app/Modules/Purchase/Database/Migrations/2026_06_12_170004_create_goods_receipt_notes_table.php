@@ -12,6 +12,7 @@ return new class extends Migration
     {
         Schema::create('goods_receipt_notes', function (Blueprint $table): void {
             $table->id();
+            $table->unsignedBigInteger('row_version')->default(1);
             $table->foreignId('tenant_id')->constrained('tenants', indexName: 'goods_receipt_notes_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('purchase_order_id')->nullable();

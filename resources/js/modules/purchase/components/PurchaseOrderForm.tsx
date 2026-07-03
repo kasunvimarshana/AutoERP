@@ -307,7 +307,9 @@ export function PurchaseOrderForm({ order }: { order?: PurchaseOrder }) {
         setSubmitting(true);
         setError(null);
         try {
-            const saved = order ? await updatePurchaseOrder(order.id, payload()) : await createPurchaseOrder(payload());
+            const saved = order
+                ? await updatePurchaseOrder(order.id, { ...payload(), expected_version: order.row_version })
+                : await createPurchaseOrder(payload());
             setDirty(false);
             navigate(`/purchase/orders/${saved.id}`);
         } catch (requestError) {

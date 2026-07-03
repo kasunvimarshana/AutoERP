@@ -24,34 +24,34 @@ final class PurchaseOrderService
         return $this->loadOrder($this->writes->create($data));
     }
 
-    public function update(PurchaseOrder $order, CreatePurchaseOrderData $data): PurchaseOrder
+    public function update(PurchaseOrder $order, CreatePurchaseOrderData $data, ?int $expectedVersion = null): PurchaseOrder
     {
-        return $this->loadOrder($this->writes->update($order, $data));
+        return $this->loadOrder($this->writes->update($order, $data, $expectedVersion));
     }
 
-    public function delete(PurchaseOrder $order): void
+    public function delete(PurchaseOrder $order, ?int $expectedVersion = null): void
     {
-        $this->writes->delete($order);
+        $this->writes->delete($order, $expectedVersion);
     }
 
-    public function submit(PurchaseOrder $order, ?int $submittedBy = null): PurchaseOrder
+    public function submit(PurchaseOrder $order, ?int $submittedBy = null, ?int $expectedVersion = null): PurchaseOrder
     {
-        return $this->loadOrder($this->statuses->submit($order, $submittedBy));
+        return $this->loadOrder($this->statuses->submit($order, $submittedBy, $expectedVersion));
     }
 
-    public function approve(PurchaseOrder $order, ?int $approvedBy = null): PurchaseOrder
+    public function approve(PurchaseOrder $order, ?int $approvedBy = null, ?int $expectedVersion = null): PurchaseOrder
     {
-        return $this->loadOrder($this->statuses->approve($order, $approvedBy));
+        return $this->loadOrder($this->statuses->approve($order, $approvedBy, $expectedVersion));
     }
 
-    public function cancel(PurchaseOrder $order): PurchaseOrder
+    public function cancel(PurchaseOrder $order, ?int $expectedVersion = null): PurchaseOrder
     {
-        return $this->loadOrder($this->statuses->cancel($order));
+        return $this->loadOrder($this->statuses->cancel($order, $expectedVersion));
     }
 
-    public function close(PurchaseOrder $order, ?int $closedBy = null): PurchaseOrder
+    public function close(PurchaseOrder $order, ?int $closedBy = null, ?int $expectedVersion = null): PurchaseOrder
     {
-        return $this->loadOrder($this->statuses->close($order, $closedBy));
+        return $this->loadOrder($this->statuses->close($order, $closedBy, $expectedVersion));
     }
 
     public function applyReceived(PurchaseOrderLine $line, string $quantity): void

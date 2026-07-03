@@ -5,6 +5,7 @@ import type { NamedResource } from '@/shared/types/common';
 import type { LookupLoadParams, LookupResult } from '@/shared/types/lookup';
 import type {
     PurchaseAdjustmentCatalogueEntry,
+    PurchaseActionPayload,
     PurchaseItemContext,
     PurchaseOrder,
     PurchaseOrderCreateContext,
@@ -76,32 +77,32 @@ export async function createPurchaseOrder(payload: PurchaseOrderPayload) {
     return response.data.data;
 }
 
-export async function updatePurchaseOrder(id: number, payload: PurchaseOrderPayload) {
+export async function updatePurchaseOrder(id: number, payload: PurchaseOrderPayload & PurchaseActionPayload) {
     const response = await apiClient.put<ApiResource<PurchaseOrder>>(`${endpoints.purchase}/orders/${id}`, payload);
     return response.data.data;
 }
 
-export async function deletePurchaseOrder(id: number) {
-    await apiClient.delete(`${endpoints.purchase}/orders/${id}`);
+export async function deletePurchaseOrder(id: number, payload: PurchaseActionPayload) {
+    await apiClient.delete(`${endpoints.purchase}/orders/${id}`, { data: payload });
 }
 
-export async function approvePurchaseOrder(id: number) {
-    const response = await apiClient.patch<ApiResource<PurchaseOrder>>(`${endpoints.purchase}/orders/${id}/approve`);
+export async function approvePurchaseOrder(id: number, payload: PurchaseActionPayload) {
+    const response = await apiClient.patch<ApiResource<PurchaseOrder>>(`${endpoints.purchase}/orders/${id}/approve`, payload);
     return response.data.data;
 }
 
-export async function cancelPurchaseOrder(id: number) {
-    const response = await apiClient.patch<ApiResource<PurchaseOrder>>(`${endpoints.purchase}/orders/${id}/cancel`);
+export async function cancelPurchaseOrder(id: number, payload: PurchaseActionPayload) {
+    const response = await apiClient.patch<ApiResource<PurchaseOrder>>(`${endpoints.purchase}/orders/${id}/cancel`, payload);
     return response.data.data;
 }
 
-export async function closePurchaseOrder(id: number) {
-    const response = await apiClient.patch<ApiResource<PurchaseOrder>>(`${endpoints.purchase}/orders/${id}/close`);
+export async function closePurchaseOrder(id: number, payload: PurchaseActionPayload) {
+    const response = await apiClient.patch<ApiResource<PurchaseOrder>>(`${endpoints.purchase}/orders/${id}/close`, payload);
     return response.data.data;
 }
 
-export async function submitPurchaseOrder(id: number) {
-    const response = await apiClient.patch<ApiResource<PurchaseOrder>>(`${endpoints.purchase}/orders/${id}/submit`);
+export async function submitPurchaseOrder(id: number, payload: PurchaseActionPayload) {
+    const response = await apiClient.patch<ApiResource<PurchaseOrder>>(`${endpoints.purchase}/orders/${id}/submit`, payload);
     return response.data.data;
 }
 

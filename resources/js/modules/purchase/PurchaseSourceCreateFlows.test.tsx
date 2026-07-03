@@ -281,6 +281,7 @@ function LocationProbe() {
 function purchaseOrder(id: number): PurchaseOrder {
     return {
         id,
+        row_version: 1,
         purchase_order_number: `PO-${id}`,
         status: 'approved',
         supplier: { id: 11, name: 'Supplier A' },
@@ -322,6 +323,7 @@ function purchaseOrderLine(id: number, itemName = 'Widget'): PurchaseOrderLine {
 function goodsReceipt(id: number): GoodsReceipt {
     return {
         id,
+        row_version: 1,
         grn_number: `GRN-${id}`,
         received_date: '2026-06-18',
         status: 'posted',

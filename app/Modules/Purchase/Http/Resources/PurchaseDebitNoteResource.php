@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modules\Purchase\Http\Resources;
 
 use Illuminate\Http\Request;
-use Modules\Purchase\Services\PurchaseDocumentCapabilityService;
 
 final class PurchaseDebitNoteResource extends PurchaseResource
 {
@@ -13,13 +12,14 @@ final class PurchaseDebitNoteResource extends PurchaseResource
     {
         return [
             'id' => (int) $this->getKey(),
+            'row_version' => (int) $this->row_version,
             'debit_note_number' => $this->debit_note_number,
             'debit_note_date' => $this->debit_note_date?->toDateString(),
             'status' => $this->enumValue($this->status),
             'status_label' => $this->statusLabel($this->status),
             'allocation_status' => $this->allocationStatus(),
             'allocation_status_label' => $this->statusLabel($this->allocationStatus()),
-            'capabilities' => $this->capabilities(),
+            'capabilities' => $this->arrayAttribute('capabilities'),
             'supplier_type' => $this->supplier_type,
             'supplier_id' => $this->supplier_id,
             'supplier' => $this->whenLoaded('supplier', fn () => $this->summary($this->supplier, ['supplier_number', 'code', 'name', 'display_name'])),
@@ -59,14 +59,6 @@ final class PurchaseDebitNoteResource extends PurchaseResource
             'number' => null,
             'date' => null,
         ];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function capabilities(): array
-    {
-        return app(PurchaseDocumentCapabilityService::class)->forDebitNote($this->resource);
     }
 
     private function allocationStatus(): string

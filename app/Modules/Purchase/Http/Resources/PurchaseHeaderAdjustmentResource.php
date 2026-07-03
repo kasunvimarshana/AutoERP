@@ -5,13 +5,12 @@ declare(strict_types=1);
 namespace Modules\Purchase\Http\Resources;
 
 use Illuminate\Http\Request;
-use Modules\Purchase\Services\PurchaseAdjustmentPolicyResolver;
 
 final class PurchaseHeaderAdjustmentResource extends PurchaseResource
 {
     public function toArray(Request $request): array
     {
-        $recognition = app(PurchaseAdjustmentPolicyResolver::class)->resolveForModel($this->resource);
+        $recognition = $this->arrayAttribute('recognition');
 
         return [
             'id' => (int) $this->getKey(),
@@ -28,9 +27,9 @@ final class PurchaseHeaderAdjustmentResource extends PurchaseResource
             'allocation_method' => $this->enumValue($this->allocation_method),
             'is_allocatable' => (bool) $this->is_allocatable,
             'recognition' => [
-                'cost_treatment' => $recognition['cost_treatment'],
-                'tax_treatment' => $recognition['tax_treatment'],
-                'final_treatment' => $recognition['final_treatment'],
+                'cost_treatment' => $recognition['cost_treatment'] ?? null,
+                'tax_treatment' => $recognition['tax_treatment'] ?? null,
+                'final_treatment' => $recognition['final_treatment'] ?? null,
             ],
             'sort_order' => (int) $this->sort_order,
             'description' => $this->description,

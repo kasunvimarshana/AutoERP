@@ -789,7 +789,6 @@ final class PurchaseEngineTest extends TestCase
             amount: '20.000000',
             supplierType: 'supplier',
             supplierId: $supplierId,
-            sourceType: 'price_dispute',
             reason: 'Price dispute',
         ));
         $note = $this->withTenantExecutionContext($tenantId, function () use ($note, $invoice): PurchaseDebitNote {
@@ -1194,7 +1193,6 @@ final class PurchaseEngineTest extends TestCase
             amount: '20.000000',
             supplierType: 'supplier',
             supplierId: $supplierId,
-            sourceType: 'price_dispute',
             reason: 'Price dispute',
         ));
         $this->assertSame('20.000000', (string) $note->amount);
