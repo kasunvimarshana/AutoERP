@@ -60,7 +60,7 @@ export const lookupApi = {
             name: String(resource.display_name ?? resource.name ?? ''),
         }),
     ),
-    serviceVehicles: (customerId: number, params: LookupLoadParams): Promise<LookupResult<VehicleLookupResource>> => mappedLookup(
+    serviceVehicles: (params: LookupLoadParams, customerId?: number | null): Promise<LookupResult<VehicleLookupResource>> => mappedLookup(
         `${endpoints.vehicles}/lookup/service-available`,
         params,
         (resource) => ({
@@ -76,7 +76,7 @@ export const lookupApi = {
             odometer_reading: typeof resource.odometer_reading === 'string' ? resource.odometer_reading : null,
             odometer_unit: typeof resource.odometer_unit === 'string' ? resource.odometer_unit : null,
         }),
-        { customer_id: customerId },
+        customerId ? { customer_id: customerId } : {},
     ),
 };
 

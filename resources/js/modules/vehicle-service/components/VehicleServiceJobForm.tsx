@@ -19,12 +19,24 @@ import type { CommissionType, VehicleServiceJob, VehicleServiceJobPayload } from
 
 const today = businessDateInputValue;
 const decimal = (value: string, fallback = '0.000000') => value.trim() || fallback;
+const customerLabel = (customer: NamedResource | null) => customer ? `${customer.code ?? ''} ${customer.name}`.trim() : '';
+const vehicleCustomer = (selectedVehicle: VehicleLookupResource | null, fallback: NamedResource | null): NamedResource | null => {
+    if (selectedVehicle?.current_customer) {
+        return {
+            id: selectedVehicle.current_customer.id,
+            code: selectedVehicle.current_customer.code,
+            name: selectedVehicle.current_customer.name,
+        };
+    }
+
+    return fallback;
+};
 const currentCustomerOwner = (vehicle: VehicleLookupResource | null, fallback: NamedResource | null) =>
     vehicle?.current_customer?.name ?? fallback?.name ?? '-';
 
 export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
     const navigate = useNavigate();
-    const [customer, setCustomer] = useState<NamedResource | null>(job?.customer ?? null);
+    const [customer, setCustomer] = useState<NamedResource | null>(vehicleCustomer(job?.vehicle ?? null, job?.customer ?? null));
     const [vehicle, setVehicle] = useState<VehicleLookupResource | null>(job?.vehicle ?? null);
     const [supervisor, setSupervisor] = useState<NamedResource | null>(job?.supervisor ?? null);
     const [form, setForm] = useState({
@@ -44,13 +56,9 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
     const updateForm: typeof setForm = (next) => { formGuard.markDirty(); setForm(next); };
     const errorFor = (key: string) => fieldError(error, key);
 
-    const searchCustomer = useCallback((params: LookupLoadParams) => {
-        return lookupApi.customers(params);
-    }, []);
     const searchVehicle = useCallback((params: LookupLoadParams) => {
-        if (!customer) return Promise.resolve({ data: [] });
-        return lookupApi.serviceVehicles(customer.id, params);
-    }, [customer]);
+        return lookupApi.serviceVehicles(params);
+    }, []);
     const searchSupervisor = useCallback((params: LookupLoadParams) => {
         return lookupApi.availableEmployees(params);
     }, []);
@@ -91,14 +99,15 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
             <ErrorAlert error={error} />
             <Panel title="Service job">
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                    <GenericLookupSelect label="Customer" value={customer} onChange={(value) => { formGuard.markDirty(); setCustomer(value); setVehicle(null); }} search={searchCustomer} formatLabel={(value) => `${value.code ?? ''} ${value.name}`.trim()} error={errorFor('customer_id')} />
                     <GenericLookupSelect label="Vehicle" value={vehicle} onChange={(value) => {
                         formGuard.markDirty();
                         setVehicle(value);
+                        setCustomer(vehicleCustomer(value, null));
                         if (value?.odometer_reading && !form.odometer_reading) {
                             updateForm((current) => ({ ...current, odometer_reading: value.odometer_reading ?? '' }));
                         }
-                    }} search={searchVehicle} formatLabel={(value) => `${value.code ?? ''} ${value.name}`.trim()} error={errorFor('vehicle_id')} placeholder={customer ? 'Search customer vehicles' : 'Select a customer first'} disabled={!customer} loadOnOpen={Boolean(customer)} minSearchLength={0} />
+                    }} search={searchVehicle} formatLabel={(value) => `${value.code ?? ''} ${value.name}`.trim()} error={errorFor('vehicle_id')} placeholder="Search by vehicle number or registration" loadOnOpen minSearchLength={0} />
+                    <Input label="Customer" value={customerLabel(customer)} error={errorFor('customer_id')} placeholder="Selected vehicle owner" readOnly />
                     <GenericLookupSelect label="Supervisor" value={supervisor} onChange={(value) => { formGuard.markDirty(); setSupervisor(value); }} search={searchSupervisor} formatLabel={(value) => `${value.code ?? ''} ${value.name}`.trim()} error={errorFor('supervisor_employee_id')} />
                     <Input label="Job date" type="date" value={form.job_date} error={errorFor('job_date')} onChange={(event) => updateForm({ ...form, job_date: event.target.value })} />
                     <Input label="Expected delivery" type="date" value={form.expected_delivery_date} error={errorFor('expected_delivery_date')} onChange={(event) => updateForm({ ...form, expected_delivery_date: event.target.value })} />
