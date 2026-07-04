@@ -16,6 +16,7 @@ interface GenericLookupSelectProps<T extends NamedResource> extends LookupBehavi
     onChange: (resource: T | null) => void | boolean;
     search: LookupLoader<T>;
     formatLabel: (resource: T) => string;
+    renderOption?: (resource: T, state: { active: boolean; selected: boolean }) => ReactNode;
     excludeId?: number | null;
     excludeIds?: Array<number | string>;
     error?: string;
@@ -31,6 +32,7 @@ export function GenericLookupSelect<T extends NamedResource>({
     onChange,
     search,
     formatLabel,
+    renderOption,
     excludeId,
     excludeIds,
     error,
@@ -325,21 +327,26 @@ export function GenericLookupSelect<T extends NamedResource>({
                         <LookupMessage>No matching {label.toLowerCase()} found.</LookupMessage>
                     )}
 
-                    {visibleOptions.map((option, index) => (
+                    {visibleOptions.map((option, index) => {
+                        const selected = Number(option.id) === Number(value?.id);
+                        const active = normalizedActiveIndex === index;
+
+                        return (
                         <button
                             key={option.id}
                             id={`${listboxId}-option-${option.id}`}
                             type="button"
                             role="option"
-                            aria-selected={Number(option.id) === Number(value?.id)}
-                            className={`block w-full rounded-md px-3 py-2 text-left text-sm ${normalizedActiveIndex === index ? 'bg-sky-50 text-sky-800' : 'hover:bg-sky-50'}`}
+                            aria-selected={selected}
+                            className={`block w-full rounded-md px-3 py-2 text-left text-sm ${active ? 'bg-sky-50 text-sky-800' : 'hover:bg-sky-50'}`}
                             onMouseDown={(event) => event.preventDefault()}
                             onMouseEnter={() => setActiveIndex(index)}
                             onClick={() => selectOption(option)}
                         >
-                            {formatLabel(option)}
+                            {renderOption ? renderOption(option, { active, selected }) : formatLabel(option)}
                         </button>
-                    ))}
+                        );
+                    })}
 
                     {visibleOptions.length > 0 && hasMore && !searchError && (
                         <div className="mt-1 border-t border-slate-100 pt-1">

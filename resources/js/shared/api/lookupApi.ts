@@ -20,7 +20,11 @@ export interface VehicleLookupResource extends NamedResource {
 }
 
 export interface ItemLookupResource extends NamedResource {
+    base_uom?: NamedResource | null;
+    is_stockable?: boolean;
     resolved_service_unit_price?: string | null;
+    resolved_purchase_unit_price?: string | null;
+    available_stock_quantity?: string | null;
 }
 
 const lookup = <T extends NamedResource = NamedResource>(

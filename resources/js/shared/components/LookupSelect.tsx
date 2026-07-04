@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, type ReactNode } from 'react';
 import type { NamedResource } from '@/shared/types/common';
 import type { LookupBehaviorOptions, LookupLoader } from '@/shared/types/lookup';
 import { GenericLookupSelect } from './GenericLookupSelect';
@@ -8,6 +8,7 @@ export interface LookupSelectProps<T extends NamedResource = NamedResource> exte
     value: T | null;
     onChange: (resource: T | null) => void;
     search: LookupLoader<T>;
+    renderOption?: (resource: T, state: { active: boolean; selected: boolean }) => ReactNode;
     placeholder?: string;
     error?: string;
     excludeId?: number | null;
@@ -22,6 +23,7 @@ export function LookupSelect<T extends NamedResource = NamedResource>({
     value,
     onChange,
     search,
+    renderOption,
     placeholder = 'Search...',
     error,
     excludeId,
@@ -45,6 +47,7 @@ export function LookupSelect<T extends NamedResource = NamedResource>({
             onChange={onChange}
             search={search}
             formatLabel={formatLabel}
+            renderOption={renderOption}
             placeholder={placeholder}
             error={error}
             excludeId={excludeId}

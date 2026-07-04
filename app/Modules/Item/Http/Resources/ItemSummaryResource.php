@@ -40,6 +40,14 @@ final class ItemSummaryResource extends JsonResource
                 array_key_exists('resolved_service_unit_price', $this->resource->getAttributes()),
                 fn () => $this->resource->getAttribute('resolved_service_unit_price'),
             ),
+            'resolved_purchase_unit_price' => $this->when(
+                array_key_exists('resolved_purchase_unit_price', $this->resource->getAttributes()),
+                fn () => $this->resource->getAttribute('resolved_purchase_unit_price'),
+            ),
+            'available_stock_quantity' => $this->when(
+                array_key_exists('available_stock_quantity', $this->resource->getAttributes()),
+                fn () => $this->resource->getAttribute('available_stock_quantity'),
+            ),
             'is_active' => (bool) $this->is_active,
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),

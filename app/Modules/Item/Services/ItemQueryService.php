@@ -12,11 +12,15 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use InvalidArgumentException;
+use Modules\Core\Services\DecimalMath;
 use Modules\Item\Models\Item;
 
 final class ItemQueryService
 {
-    public function __construct(private readonly ItemPriceResolutionService $prices) {}
+    public function __construct(
+        private readonly ItemPriceResolutionService $prices,
+        private readonly DecimalMath $math,
+    ) {}
 
     public function paginate(array $criteria, int $tenantId, ?int $organizationUnitId, int $perPage): LengthAwarePaginator
     {
@@ -126,18 +130,66 @@ final class ItemQueryService
     ): LengthAwarePaginator {
         /** @var Collection<int, Item> $items */
         $items = $paginator->getCollection();
+        $tenantId = $items->first()?->tenant_id;
+        $availableStockByItemId = $tenantId === null
+            ? []
+            : $this->availableStockByItemId($items, (int) $tenantId, $organizationUnitId);
 
-        $items->each(function (Item $item) use ($organizationUnitId): void {
-            $resolved = $this->prices->resolvePrice(
+        $items->each(function (Item $item) use ($organizationUnitId, $availableStockByItemId): void {
+            $resolvedServicePrice = $this->prices->resolvePrice(
                 item: $item,
                 context: ItemPriceResolutionService::CONTEXT_SERVICE,
                 organizationUnitId: $organizationUnitId,
             );
+            $resolvedPurchasePrice = $this->prices->resolvePrice(
+                item: $item,
+                context: ItemPriceResolutionService::CONTEXT_PURCHASE,
+                organizationUnitId: $organizationUnitId,
+            );
 
-            $item->setAttribute('resolved_service_unit_price', $resolved->amount);
+            $item->setAttribute('resolved_service_unit_price', $resolvedServicePrice->amount);
+            $item->setAttribute('resolved_purchase_unit_price', $resolvedPurchasePrice->amount);
+            $item->setAttribute(
+                'available_stock_quantity',
+                $item->is_stockable
+                    ? ($availableStockByItemId[(int) $item->getKey()] ?? '0.000000')
+                    : null,
+            );
         });
 
         return $paginator->setCollection($items);
+    }
+
+    /**
+     * @param  Collection<int, Item>  $items
+     * @return array<int, string>
+     */
+    private function availableStockByItemId(Collection $items, int $tenantId, ?int $organizationUnitId): array
+    {
+        $itemIds = $items->pluck('id')->map(static fn ($id): int => (int) $id)->all();
+        if ($itemIds === []) {
+            return [];
+        }
+
+        $query = DB::table('inventory_stock_balances')
+            ->selectRaw('item_id, SUM(quantity_available) as available_stock_quantity')
+            ->where('tenant_id', $tenantId)
+            ->whereIn('item_id', $itemIds)
+            ->groupBy('item_id');
+
+        if ($organizationUnitId === null) {
+            $query->whereNull('organization_unit_id');
+        } else {
+            $query->where(function ($scope) use ($organizationUnitId): void {
+                $scope->whereNull('organization_unit_id')
+                    ->orWhere('organization_unit_id', $organizationUnitId);
+            });
+        }
+
+        return $query
+            ->pluck('available_stock_quantity', 'item_id')
+            ->mapWithKeys(fn ($quantity, $itemId): array => [(int) $itemId => $this->math->normalize((string) $quantity)])
+            ->all();
     }
 
     private function assertUnused(Item $item): void
