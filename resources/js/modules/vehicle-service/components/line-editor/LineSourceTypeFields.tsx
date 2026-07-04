@@ -1,5 +1,5 @@
 import { fieldError, type ApiError } from '@/shared/api/apiError';
-import { lookupApi } from '@/shared/api/lookupApi';
+import { lookupApi, type ItemLookupResource } from '@/shared/api/lookupApi';
 import { LookupSelect } from '@/shared/components/LookupSelect';
 import { Select } from '@/shared/components/Select';
 import type { VehicleServiceLineSourceType } from '../../vehicleServiceTypes';
@@ -43,14 +43,22 @@ export function LineSourceTypeFields({ value, error, onChange }: {
                     label="Item"
                     value={value.item}
                     error={fieldError(error, 'item_id')}
-                    onChange={(item) => onChange({
-                        ...value,
-                        item,
-                        description: item?.name ?? value.description,
-                    })}
+                    onChange={(item) => onChange(nextLineValue(value, item))}
                     search={itemSearch}
                 />
             )}
         </>
     );
+}
+
+function nextLineValue(
+    value: VehicleServiceLineFormValue,
+    item: ItemLookupResource | null,
+): VehicleServiceLineFormValue {
+    return {
+        ...value,
+        item,
+        description: item?.name ?? value.description,
+        unit_price: item?.resolved_service_unit_price ?? value.unit_price,
+    };
 }

@@ -19,8 +19,18 @@ export interface VehicleLookupResource extends NamedResource {
     odometer_unit?: string | null;
 }
 
-const lookup = (url: string, params: LookupLoadParams): Promise<LookupResult<NamedResource>> =>
-    requestLookup<NamedResource>(url, params);
+export interface ItemLookupResource extends NamedResource {
+    resolved_service_unit_price?: string | null;
+}
+
+const lookup = <T extends NamedResource = NamedResource>(
+    url: string,
+    params: LookupLoadParams,
+): Promise<LookupResult<T>> =>
+    requestLookup<T>(url, params);
+
+const itemLookup = (url: string, params: LookupLoadParams): Promise<LookupResult<ItemLookupResource>> =>
+    requestLookup<ItemLookupResource>(url, params);
 
 async function mappedLookup<T extends NamedResource>(
     url: string,
@@ -33,14 +43,14 @@ async function mappedLookup<T extends NamedResource>(
 }
 
 export const lookupApi = {
-    items: (params: LookupLoadParams) => lookup(`${endpoints.items}/lookup`, params),
-    stockableItems: (params: LookupLoadParams) => lookup(`${endpoints.items}/lookup/stockable`, params),
-    serviceItems: (params: LookupLoadParams) => lookup(`${endpoints.items}/lookup/service`, params),
-    labourItems: (params: LookupLoadParams) => lookup(`${endpoints.items}/lookup/labour`, params),
-    comboItems: async (params: LookupLoadParams): Promise<LookupResult<NamedResource>> => {
+    items: (params: LookupLoadParams) => itemLookup(`${endpoints.items}/lookup`, params),
+    stockableItems: (params: LookupLoadParams) => itemLookup(`${endpoints.items}/lookup/stockable`, params),
+    serviceItems: (params: LookupLoadParams) => itemLookup(`${endpoints.items}/lookup/service`, params),
+    labourItems: (params: LookupLoadParams) => itemLookup(`${endpoints.items}/lookup/labour`, params),
+    comboItems: async (params: LookupLoadParams): Promise<LookupResult<ItemLookupResource>> => {
         const [combos, packages] = await Promise.all([
-            lookup(`${endpoints.items}/lookup/combo`, params),
-            lookup(`${endpoints.items}/lookup/package`, params),
+            itemLookup(`${endpoints.items}/lookup/combo`, params),
+            itemLookup(`${endpoints.items}/lookup/package`, params),
         ]);
         const data = dedupeById([...combos.data, ...packages.data]);
 

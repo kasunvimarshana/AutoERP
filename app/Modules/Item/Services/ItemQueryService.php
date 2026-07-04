@@ -6,6 +6,7 @@ namespace Modules\Item\Services;
 
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
@@ -15,6 +16,8 @@ use Modules\Item\Models\Item;
 
 final class ItemQueryService
 {
+    public function __construct(private readonly ItemPriceResolutionService $prices) {}
+
     public function paginate(array $criteria, int $tenantId, ?int $organizationUnitId, int $perPage): LengthAwarePaginator
     {
         $query = $this->baseQuery($tenantId, $organizationUnitId)->with($this->summaryRelations());
@@ -37,7 +40,9 @@ final class ItemQueryService
             default => null,
         };
 
-        return $this->paginate($criteria, $tenantId, $organizationUnitId, min($perPage, 50));
+        $paginator = $this->paginate($criteria, $tenantId, $organizationUnitId, min($perPage, 50));
+
+        return $this->resolveLookupServicePrices($paginator, $organizationUnitId);
     }
 
     public function find(int $id, int $tenantId, ?int $organizationUnitId): Item
@@ -113,6 +118,26 @@ final class ItemQueryService
                 ->where('module_code', (string) $criteria['module_code'])
                 ->where('is_enabled', true));
         }
+    }
+
+    private function resolveLookupServicePrices(
+        LengthAwarePaginator $paginator,
+        ?int $organizationUnitId,
+    ): LengthAwarePaginator {
+        /** @var Collection<int, Item> $items */
+        $items = $paginator->getCollection();
+
+        $items->each(function (Item $item) use ($organizationUnitId): void {
+            $resolved = $this->prices->resolvePrice(
+                item: $item,
+                context: ItemPriceResolutionService::CONTEXT_SERVICE,
+                organizationUnitId: $organizationUnitId,
+            );
+
+            $item->setAttribute('resolved_service_unit_price', $resolved->amount);
+        });
+
+        return $paginator->setCollection($items);
     }
 
     private function assertUnused(Item $item): void

@@ -1,3 +1,4 @@
+import type { ItemLookupResource } from '@/shared/api/lookupApi';
 import type { NamedResource } from '@/shared/types/common';
 import { addDecimal, multiplyDecimal, percentageOfDecimal, subtractDecimal } from '@/shared/utils/decimal';
 import type {
@@ -10,7 +11,7 @@ export type CalculationType = 'fixed' | 'percentage';
 
 export interface VehicleServiceLineFormValue {
     source: VehicleServiceLineSourceType;
-    item: NamedResource | null;
+    item: ItemLookupResource | null;
     uom: NamedResource | null;
     description: string;
     quantity: string;

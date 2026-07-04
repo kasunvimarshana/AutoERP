@@ -29,6 +29,7 @@ use Modules\Item\Models\ItemCategory;
 use Modules\Item\Services\ItemBundleService;
 use Modules\Item\Services\ItemCreationService;
 use Modules\Item\Services\ItemLookupService;
+use Modules\Item\Services\ItemQueryService;
 use Tests\TestCase;
 
 final class ItemEngineTest extends TestCase
@@ -208,6 +209,70 @@ final class ItemEngineTest extends TestCase
             $this->assertCount(1, $lookup->stockItems($tenantId));
             $this->assertCount(1, $lookup->serviceItems($tenantId));
             $this->assertCount(1, $lookup->labourItems($tenantId));
+        });
+    }
+
+    public function test_lookup_exposes_resolved_service_unit_price_for_service_context(): void
+    {
+        $tenantId = $this->createTenant();
+        $currencyId = $this->createCurrency('LKR');
+        DB::table('tenants')->where('id', $tenantId)->update(['base_currency_id' => $currencyId]);
+        $uomId = $this->createUom($tenantId, null, 'PCS');
+
+        $servicePriced = $this->createItem(new CreateItemData(
+            tenantId: $tenantId,
+            code: 'STOCK-SERVICE-PRICE',
+            name: 'Stock with service price',
+            itemType: ItemType::Stock,
+            baseUomId: $uomId,
+            isStockable: true,
+            prices: [
+                new ItemPriceData(
+                    priceType: ItemPriceType::Service,
+                    amount: '150.000000',
+                    currencyId: $currencyId,
+                    uomId: $uomId,
+                    organizationUnitId: null,
+                    effectiveFrom: '2026-01-01',
+                ),
+                new ItemPriceData(
+                    priceType: ItemPriceType::Sales,
+                    amount: '175.000000',
+                    currencyId: $currencyId,
+                    uomId: $uomId,
+                    organizationUnitId: null,
+                    effectiveFrom: '2026-01-01',
+                ),
+            ],
+        ));
+
+        $salesFallback = $this->createItem(new CreateItemData(
+            tenantId: $tenantId,
+            code: 'STOCK-SALES-FALLBACK',
+            name: 'Stock with sales fallback',
+            itemType: ItemType::Stock,
+            baseUomId: $uomId,
+            isStockable: true,
+            prices: [
+                new ItemPriceData(
+                    priceType: ItemPriceType::Sales,
+                    amount: '220.000000',
+                    currencyId: $currencyId,
+                    uomId: $uomId,
+                    organizationUnitId: null,
+                    effectiveFrom: '2026-01-01',
+                ),
+            ],
+        ));
+
+        $this->withTenantExecutionContext($tenantId, function () use ($tenantId, $servicePriced, $salesFallback): void {
+            $lookup = app(ItemQueryService::class)->lookup([], $tenantId, null, 50, 'stockable');
+
+            $servicePricedLookup = $lookup->getCollection()->firstWhere('id', $servicePriced->getKey());
+            $salesFallbackLookup = $lookup->getCollection()->firstWhere('id', $salesFallback->getKey());
+
+            $this->assertSame('150.000000', $servicePricedLookup?->getAttribute('resolved_service_unit_price'));
+            $this->assertSame('220.000000', $salesFallbackLookup?->getAttribute('resolved_service_unit_price'));
         });
     }
 
