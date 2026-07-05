@@ -113,8 +113,8 @@ export default function RentalAllocationDetailPage() {
                                     {readableRelation(driver.employee)}
                                 </div>
                                 <div className="text-sm text-slate-500">
-                                    {driver.assignment_role} ·{" "}
-                                    {formatDate(driver.assigned_from)} –{" "}
+                                    {driver.assignment_role} -{" "}
+                                    {formatDate(driver.assigned_from)} -{" "}
                                     {formatDate(driver.assigned_to)}
                                 </div>
                             </div>

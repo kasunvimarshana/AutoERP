@@ -149,7 +149,7 @@ export default function RentalAllocationPage() {
         {
             key: 'period',
             header: 'Period',
-            render: (row) => `${row.allocated_from.slice(0, 10)} – ${row.allocated_to?.slice(0, 10) ?? 'open'}`,
+            render: (row) => `${row.allocated_from.slice(0, 10)} - ${row.allocated_to?.slice(0, 10) ?? 'open'}`,
         },
         { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.status} /> },
         {

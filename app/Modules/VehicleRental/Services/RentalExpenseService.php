@@ -7,6 +7,7 @@ namespace Modules\VehicleRental\Services;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\VehicleRental\Enums\RentalAgreementKind;
@@ -83,10 +84,17 @@ final class RentalExpenseService
         });
     }
 
-    public function transition(RentalExpense $expense, RentalExpenseStatus $to, ?int $userId = null, ?string $reason = null): RentalExpense
+    public function transition(
+        RentalExpense $expense,
+        RentalExpenseStatus $to,
+        int $expectedVersion,
+        ?int $userId = null,
+        ?string $reason = null,
+    ): RentalExpense
     {
-        return DB::transaction(function () use ($expense, $to, $userId, $reason): RentalExpense {
+        return DB::transaction(function () use ($expense, $to, $expectedVersion, $userId, $reason): RentalExpense {
             $expense = RentalExpense::query()->with('allocations')->lockForUpdate()->findOrFail($expense->getKey());
+            $this->assertExpectedVersion($expense, $expectedVersion);
             $from = $expense->status;
             if ($from === $to) {
                 return $expense->load($this->relations());
@@ -111,6 +119,7 @@ final class RentalExpenseService
             $expense->rejected_at = $to === RentalExpenseStatus::Rejected ? now() : $expense->rejected_at;
             $expense->reversed_by = $to === RentalExpenseStatus::Reversed ? $userId : $expense->reversed_by;
             $expense->reversed_at = $to === RentalExpenseStatus::Reversed ? now() : $expense->reversed_at;
+            $expense->row_version = $expectedVersion + 1;
             $expense->updated_by = $userId;
             $expense->metadata = array_merge($expense->metadata ?? [], $reason === null ? [] : ['transition_reason' => $reason]);
             $expense->save();
@@ -289,6 +298,15 @@ final class RentalExpenseService
         }
         if ($requireFullAllocation && $comparison !== 0) {
             throw new InvalidArgumentException('Approved expense allocations must equal the source expense net amount.');
+        }
+    }
+
+    private function assertExpectedVersion(RentalExpense $expense, int $expectedVersion): void
+    {
+        if ((int) $expense->row_version !== $expectedVersion) {
+            throw ValidationException::withMessages([
+                'expected_version' => ['The rental expense changed after it was loaded. Reload and review the latest version.'],
+            ]);
         }
     }
 }

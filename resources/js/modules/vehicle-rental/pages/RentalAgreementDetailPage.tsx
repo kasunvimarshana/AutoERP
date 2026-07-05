@@ -207,7 +207,7 @@ export default function RentalAgreementDetailPage() {
                                 className="flex justify-between rounded-lg border p-3 hover:bg-slate-50"
                             >
                                 <span>
-                                    {allocation.allocation_number} —{" "}
+                                    {allocation.allocation_number} -{" "}
                                     {readableRelation(allocation.vehicle)}
                                 </span>
                                 <StatusBadge status={allocation.status} />

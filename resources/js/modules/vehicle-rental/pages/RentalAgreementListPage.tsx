@@ -66,7 +66,7 @@ export default function RentalAgreementListPage() {
             key: "period",
             header: "Period",
             render: (row) =>
-                `${formatDate(row.starts_at)} – ${formatDate(row.ends_at)}`,
+                `${formatDate(row.starts_at)} - ${formatDate(row.ends_at)}`,
         },
         {
             key: "mode",

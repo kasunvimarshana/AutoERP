@@ -21,8 +21,6 @@ import type {
     VehicleFinanceAgreement,
 } from "./vehicleRentalTypes";
 
-type VersionedRentalAgreement = RentalAgreement & { row_version: number };
-
 const base = endpoints.vehicleRental;
 const collection = <T>(
     path: string,
@@ -66,14 +64,23 @@ export const getRentalReservation = (id: number, signal?: AbortSignal) =>
     resource<RentalReservation>(`reservations/${id}`, signal);
 export const createRentalReservation = (payload: RentalPayload) =>
     post<RentalReservation>("reservations", payload);
-export const updateRentalReservation = (id: number, payload: RentalPayload) =>
-    put<RentalReservation>(`reservations/${id}`, payload);
+export const updateRentalReservation = (
+    id: number,
+    expectedVersion: number,
+    payload: RentalPayload,
+) =>
+    put<RentalReservation>(`reservations/${id}`, {
+        ...payload,
+        expected_version: expectedVersion,
+    });
 export const transitionRentalReservation = (
     id: number,
+    expectedVersion: number,
     status: string,
     reason?: string,
 ) =>
     patch<RentalReservation>(`reservations/${id}/transition`, {
+        expected_version: expectedVersion,
         status,
         reason,
     });
@@ -81,17 +88,17 @@ export const transitionRentalReservation = (
 export const listRentalAgreements = (
     params: ListParams,
     signal?: AbortSignal,
-) => collection<VersionedRentalAgreement>("agreements", params, signal);
+) => collection<RentalAgreement>("agreements", params, signal);
 export const getRentalAgreement = (id: number, signal?: AbortSignal) =>
-    resource<VersionedRentalAgreement>(`agreements/${id}`, signal);
+    resource<RentalAgreement>(`agreements/${id}`, signal);
 export const createRentalAgreement = (payload: RentalPayload) =>
-    post<VersionedRentalAgreement>("agreements", payload);
+    post<RentalAgreement>("agreements", payload);
 export const updateRentalAgreement = (
     id: number,
     expectedVersion: number,
     payload: RentalPayload,
 ) =>
-    put<VersionedRentalAgreement>(`agreements/${id}`, {
+    put<RentalAgreement>(`agreements/${id}`, {
         ...payload,
         expected_version: expectedVersion,
     });
@@ -101,7 +108,7 @@ export const transitionRentalAgreement = (
     status: string,
     reason?: string,
 ) =>
-    patch<VersionedRentalAgreement>(`agreements/${id}/transition`, {
+    patch<RentalAgreement>(`agreements/${id}/transition`, {
         expected_version: expectedVersion,
         status,
         reason,
@@ -143,10 +150,17 @@ export const createRentalCustodyEvent = (
         `allocations/${allocationId}/custody-events`,
         payload,
     );
-export const confirmRentalCustodyEvent = (id: number) =>
-    patch<RentalCustodyEvent>(`custody-events/${id}/confirm`);
-export const reverseRentalCustodyEvent = (id: number, reason: string) =>
+export const confirmRentalCustodyEvent = (id: number, expectedVersion: number) =>
+    patch<RentalCustodyEvent>(`custody-events/${id}/confirm`, {
+        expected_version: expectedVersion,
+    });
+export const reverseRentalCustodyEvent = (
+    id: number,
+    expectedVersion: number,
+    reason: string,
+) =>
     patch<RentalCustodyEvent>(`custody-events/${id}/reverse`, {
+        expected_version: expectedVersion,
         status: "reversed",
         reason,
     });
@@ -194,9 +208,15 @@ export const createRentalExpense = (payload: RentalPayload) =>
     post<RentalExpense>("expenses", payload);
 export const transitionRentalExpense = (
     id: number,
+    expectedVersion: number,
     status: string,
     reason?: string,
-) => patch<RentalExpense>(`expenses/${id}/transition`, { status, reason });
+) =>
+    patch<RentalExpense>(`expenses/${id}/transition`, {
+        expected_version: expectedVersion,
+        status,
+        reason,
+    });
 
 export const listRentalCalculationRuns = (
     params: ListParams,
@@ -217,10 +237,14 @@ export const transitionRentalCalculationRun = (
         status,
         reason,
     });
-export const createRentalInvoice = (id: number, payload: RentalPayload) =>
+export const createRentalInvoice = (
+    id: number,
+    expectedVersion: number,
+    payload: RentalPayload,
+) =>
     post<{ id: number; invoice_number: string; status: string }>(
         `calculation-runs/${id}/invoice`,
-        payload,
+        { ...payload, expected_version: expectedVersion },
     );
 
 export const listRentalDeposits = (params: ListParams, signal?: AbortSignal) =>
@@ -240,9 +264,19 @@ export const listVehicleFinanceAgreements = (
 ) => collection<VehicleFinanceAgreement>("finance-agreements", params, signal);
 export const createVehicleFinanceAgreement = (payload: RentalPayload) =>
     post<VehicleFinanceAgreement>("finance-agreements", payload);
-export const activateVehicleFinanceAgreement = (id: number) =>
-    patch<VehicleFinanceAgreement>(`finance-agreements/${id}/activate`);
+export const activateVehicleFinanceAgreement = (
+    id: number,
+    expectedVersion: number,
+) =>
+    patch<VehicleFinanceAgreement>(`finance-agreements/${id}/activate`, {
+        expected_version: expectedVersion,
+    });
 export const createVehicleFinancePayable = (
     installmentId: number,
+    expectedVersion: number,
     payload: RentalPayload,
-) => post(`finance-installments/${installmentId}/payable`, payload);
+) =>
+    post(`finance-installments/${installmentId}/payable`, {
+        ...payload,
+        expected_version: expectedVersion,
+    });

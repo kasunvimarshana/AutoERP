@@ -49,7 +49,10 @@ final class RentalExpenseController
         $this->authorization->assert($request->currentUserId(), $request->tenantId(), $permission);
         return new RentalExpenseResource($service->transition(
             $this->scope(RentalExpense::query(), $request)->findOrFail($expense),
-            $status, $request->currentUserId(), $request->input('reason'),
+            $status,
+            (int) $request->input('expected_version'),
+            $request->currentUserId(),
+            $request->input('reason'),
         ));
     }
 }

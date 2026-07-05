@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\VehicleRental\Services;
 
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Invoice\DTOs\CreateInvoiceData;
@@ -39,6 +40,7 @@ final class RentalInvoiceIntegrationService
     /** @param list<int>|null $lineIds */
     public function create(
         RentalCalculationRun $run,
+        int $expectedVersion,
         string $invoiceDate,
         ?string $dueDate,
         InvoiceStatus $status,
@@ -46,11 +48,12 @@ final class RentalInvoiceIntegrationService
         ?int $userId,
         ?string $notes = null,
     ): Invoice {
-        return DB::transaction(function () use ($run, $invoiceDate, $dueDate, $status, $lineIds, $userId, $notes): Invoice {
+        return DB::transaction(function () use ($run, $expectedVersion, $invoiceDate, $dueDate, $status, $lineIds, $userId, $notes): Invoice {
             $run = RentalCalculationRun::query()
                 ->with(['billingPeriod.agreement', 'lines'])
                 ->lockForUpdate()
                 ->findOrFail($run->getKey());
+            $this->assertExpectedVersion($run, $expectedVersion);
             if ($run->calculation_status !== RentalCalculationStatus::Approved) {
                 throw new InvalidArgumentException('Only an approved rental calculation can create an invoice or owner payable.');
             }
@@ -139,7 +142,7 @@ final class RentalInvoiceIntegrationService
                     && $this->math->compare((string) $line->withholding_amount, '0') > 0
                     && ! $this->hasActiveAdjustment($line, AdjustmentType::Withholding)) {
                     $adjustments[] = new InvoiceAdjustmentData(
-                        name: 'Withholding tax — '.$line->description,
+                        name: 'Withholding tax - '.$line->description,
                         adjustmentType: AdjustmentType::Withholding,
                         effect: AdjustmentEffect::Decrease,
                         amount: (string) $line->withholding_amount,
@@ -202,6 +205,7 @@ final class RentalInvoiceIntegrationService
             $run->document_status = $uninvoiced === 0
                 ? RentalDocumentStatus::Generated
                 : RentalDocumentStatus::PartiallyGenerated;
+            $run->row_version = $expectedVersion + 1;
             $run->updated_by = $userId;
             $run->save();
 
@@ -221,6 +225,15 @@ final class RentalInvoiceIntegrationService
                 InvoiceStatus::Void->value,
             ]))
             ->exists();
+    }
+
+    private function assertExpectedVersion(RentalCalculationRun $run, int $expectedVersion): void
+    {
+        if ((int) $run->row_version !== $expectedVersion) {
+            throw ValidationException::withMessages([
+                'expected_version' => ['The rental calculation changed after it was loaded. Reload and review the latest version.'],
+            ]);
+        }
     }
 
     private function isConsumed(

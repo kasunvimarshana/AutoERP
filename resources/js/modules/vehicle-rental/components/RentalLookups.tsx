@@ -68,11 +68,16 @@ async function searchAgreements(
     { search, page, perPage, signal }: LookupLoadParams,
     direction?: 'inbound' | 'outbound',
 ): Promise<LookupResult<NamedResource>> {
+    const agreementKind = direction === 'inbound'
+        ? 'customer_rental'
+        : direction === 'outbound'
+            ? 'owner_supply'
+            : undefined;
     const response = await listRentalAgreements({
         search,
         page,
         per_page: perPage,
-        agreement_kind: direction,
+        agreement_kind: agreementKind,
     }, signal);
 
     return {

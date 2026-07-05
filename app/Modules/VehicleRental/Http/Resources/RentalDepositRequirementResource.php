@@ -12,6 +12,7 @@ final class RentalDepositRequirementResource extends RentalResource
     {
         return [
             'id' => (int) $this->getKey(),
+            'row_version' => (int) $this->row_version,
             'agreement' => $this->whenLoaded('agreement', fn () => $this->summary($this->agreement, ['agreement_number', 'agreement_kind', 'status'])),
             'required_amount' => $this->decimal($this->required_amount),
             'currency' => $this->whenLoaded('currency', fn () => $this->summary($this->currency, ['code', 'symbol'])),
@@ -25,7 +26,12 @@ final class RentalDepositRequirementResource extends RentalResource
             'remarks' => $this->remarks,
             'links' => $this->loadedCollection('links', fn ($link): array => [
                 'id' => (int) $link->getKey(), 'link_type' => $this->enumValue($link->link_type),
-                'payment_id' => $link->payment_id, 'invoice_id' => $link->invoice_id,
+                'payment' => $link->relationLoaded('payment')
+                    ? $this->summary($link->payment, ['payment_number', 'row_version', 'document_status', 'posting_status', 'unapplied_amount'])
+                    : null,
+                'invoice' => $link->relationLoaded('invoice')
+                    ? $this->summary($link->invoice, ['invoice_number', 'row_version', 'status', 'balance_due'])
+                    : null,
                 'amount' => $this->decimal($link->amount), 'status' => $link->status,
                 'linked_at' => $link->linked_at?->toISOString(), 'reverses_link_id' => $link->reverses_link_id,
             ]),

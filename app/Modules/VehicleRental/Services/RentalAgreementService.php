@@ -49,6 +49,10 @@ final class RentalAgreementService
                 if ($reservation->status !== RentalReservationStatus::Confirmed) {
                     throw new InvalidArgumentException('Only a confirmed reservation can be converted.');
                 }
+                $this->assertReservationExpectedVersion(
+                    $reservation,
+                    (int) $data['expected_reservation_version'],
+                );
                 if ($kind !== RentalAgreementKind::CustomerRental
                     || (int) $reservation->customer_id !== (int) $data['customer_id']) {
                     throw new InvalidArgumentException('Reservation and agreement customer must match.');
@@ -114,9 +118,12 @@ final class RentalAgreementService
             }
 
             if ($reservation !== null) {
+                $previousReservationStatus = $reservation->status;
                 $reservation->status = RentalReservationStatus::Converted;
+                $reservation->row_version = (int) $reservation->row_version + 1;
                 $reservation->updated_by = $userId;
                 $reservation->save();
+                $this->history->record($reservation, $previousReservationStatus->value, RentalReservationStatus::Converted->value, $userId);
             }
             $this->history->record($agreement, null, RentalAgreementStatus::Draft->value, $userId);
 
@@ -172,8 +179,7 @@ final class RentalAgreementService
             $agreement->save();
 
             if (array_key_exists('terms', $data)) {
-                $agreement->terms()->delete();
-                $this->replaceTerms($agreement, $data['terms'] ?? [], $userId);
+                $this->syncTerms($agreement, $data['terms'] ?? [], $userId);
             }
 
             return $agreement->refresh()->load($this->relations());
@@ -283,7 +289,8 @@ final class RentalAgreementService
             'allocations.vehicle.model',
             'allocations.sourceAllocation.agreement.supplier',
             'driverAssignments.employee',
-            'depositRequirement.links',
+            'depositRequirement.links.payment',
+            'depositRequirement.links.invoice',
         ];
     }
 
@@ -327,6 +334,15 @@ final class RentalAgreementService
         }
     }
 
+    private function assertReservationExpectedVersion(RentalReservation $reservation, int $expectedVersion): void
+    {
+        if ((int) $reservation->row_version !== $expectedVersion) {
+            throw ValidationException::withMessages([
+                'expected_reservation_version' => ['The rental reservation changed after it was loaded. Reload and review the latest version.'],
+            ]);
+        }
+    }
+
     /** @param list<array<string, mixed>> $terms */
     private function replaceTerms(RentalAgreement $agreement, array $terms, ?int $userId): void
     {
@@ -343,6 +359,73 @@ final class RentalAgreementService
                 'created_by' => $userId,
                 'updated_by' => $userId,
             ]);
+        }
+    }
+
+    /** @param list<array<string, mixed>> $terms */
+    private function syncTerms(RentalAgreement $agreement, array $terms, ?int $userId): void
+    {
+        $existing = $agreement->terms()->lockForUpdate()->get();
+        $byId = $existing->keyBy(fn ($term): int => (int) $term->getKey());
+        $bySequence = $existing->keyBy(fn ($term): int => (int) $term->sequence);
+        $seen = [];
+
+        foreach (array_values($terms) as $index => $term) {
+            $sequence = (int) ($term['sequence'] ?? ($index + 1));
+            $target = ! empty($term['id'])
+                ? $byId->get((int) $term['id'])
+                : $bySequence->get($sequence);
+
+            if (! empty($term['id']) && $target === null) {
+                throw ValidationException::withMessages([
+                    'terms' => ['One or more agreement terms no longer exist. Reload and review the latest version.'],
+                ]);
+            }
+
+            $sequenceOwner = $bySequence->get($sequence);
+            if ($target !== null && $sequenceOwner !== null && (int) $sequenceOwner->getKey() !== (int) $target->getKey()) {
+                throw ValidationException::withMessages([
+                    'terms' => ['Two agreement terms cannot use the same sequence.'],
+                ]);
+            }
+
+            if ($target === null) {
+                $target = $agreement->terms()->create([
+                    'tenant_id' => $agreement->tenant_id,
+                    'organization_unit_id' => $agreement->organization_unit_id,
+                    'sequence' => $sequence,
+                    'term_code' => $term['term_code'] ?? null,
+                    'title' => $term['title'] ?? null,
+                    'content' => $term['content'],
+                    'is_printable' => $term['is_printable'] ?? true,
+                    'is_active' => true,
+                    'created_by' => $userId,
+                    'updated_by' => $userId,
+                ]);
+            } else {
+                $target->forceFill([
+                    'sequence' => $sequence,
+                    'term_code' => $term['term_code'] ?? null,
+                    'title' => $term['title'] ?? null,
+                    'content' => $term['content'],
+                    'is_printable' => $term['is_printable'] ?? true,
+                    'is_active' => true,
+                    'row_version' => (int) $target->row_version + 1,
+                    'updated_by' => $userId,
+                ])->save();
+            }
+
+            $seen[(int) $target->getKey()] = true;
+        }
+
+        foreach ($existing as $term) {
+            if (! ($seen[(int) $term->getKey()] ?? false) && (bool) $term->is_active) {
+                $term->forceFill([
+                    'is_active' => false,
+                    'row_version' => (int) $term->row_version + 1,
+                    'updated_by' => $userId,
+                ])->save();
+            }
         }
     }
 

@@ -96,7 +96,7 @@ final class RentalAllocationService
 
             $this->history->record($allocation, null, RentalAllocationStatus::Planned->value, $userId);
 
-            return $allocation->load($this->relations());
+            return $allocation->refresh()->load($this->relations());
         });
     }
 
@@ -140,7 +140,7 @@ final class RentalAllocationService
                     ->update(['is_primary' => false, 'updated_by' => $userId, 'updated_at' => now()]);
             }
 
-            return $allocation->driverAssignments()->create([
+            $assignment = $allocation->driverAssignments()->create([
                 'tenant_id' => $allocation->tenant_id,
                 'organization_unit_id' => $allocation->organization_unit_id,
                 'agreement_id' => $allocation->agreement_id,
@@ -156,6 +156,11 @@ final class RentalAllocationService
                 'created_by' => $userId,
                 'updated_by' => $userId,
             ]);
+            $allocation->row_version = (int) $allocation->row_version + 1;
+            $allocation->updated_by = $userId;
+            $allocation->save();
+
+            return $assignment;
         });
     }
 
@@ -182,6 +187,7 @@ final class RentalAllocationService
             $from = $allocation->status;
             $allocation->status = RentalAllocationStatus::Active;
             $allocation->activated_at = now();
+            $allocation->row_version = (int) $allocation->row_version + 1;
             $allocation->updated_by = $userId;
             $allocation->save();
             $allocation->driverAssignments()->where('status', RentalDriverAssignmentStatus::Planned->value)
@@ -227,6 +233,7 @@ final class RentalAllocationService
             $allocation->allocated_to = $returnTime->lessThan($currentEnd) ? $returnTime : $currentEnd;
             $allocation->end_odometer = $endOdometer;
             $allocation->closed_at = now();
+            $allocation->row_version = (int) $allocation->row_version + 1;
             $allocation->updated_by = $userId;
             $allocation->save();
             $allocation->driverAssignments()

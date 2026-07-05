@@ -41,7 +41,9 @@ export default function RentalDepositPage() {
     const [amount, setAmount] = useState("");
     const [invoice, setInvoice] = useState<NamedResource | null>(null);
     const [paymentMethod, setPaymentMethod] = useState<NamedResource | null>(null);
+    const [receiptLinkId, setReceiptLinkId] = useState("");
     const [reference, setReference] = useState("");
+    const [reason, setReason] = useState("");
     const [saving, setSaving] = useState(false);
     const [actionError, setActionError] = useState<ApiError | null>(null);
 
@@ -57,6 +59,16 @@ export default function RentalDepositPage() {
         auth,
         vehicleRentalPermissions.depositsManage,
     );
+    const receiptLinks = (selected?.links ?? []).filter((link) =>
+        link.link_type === "receipt"
+        && link.status === "active"
+        && link.payment?.id
+        && link.payment.row_version,
+    );
+    const selectedReceiptLink = receiptLinks.find((link) => String(link.id) === receiptLinkId)
+        ?? receiptLinks[0]
+        ?? null;
+    const receiptSelectValue = receiptLinkId || (receiptLinks[0] ? String(receiptLinks[0].id) : "");
 
     const submit = async (event: FormEvent) => {
         event.preventDefault();
@@ -66,25 +78,37 @@ export default function RentalDepositPage() {
         try {
             if (action === "receive") {
                 await receiveRentalDeposit(selected.id, {
+                    expected_requirement_version: selected.row_version,
                     amount,
                     payment_date: businessDateInputValue(),
                     payment_method_id: paymentMethod?.id,
                     reference_number: reference || null,
                 });
             } else if (action === "refund") {
+                if (!selectedReceiptLink?.payment) return;
                 await refundRentalDeposit(selected.id, {
+                    expected_requirement_version: selected.row_version,
+                    payment_id: selectedReceiptLink.payment.id,
+                    expected_payment_version: selectedReceiptLink.payment.row_version,
                     amount,
-                    payment_date: businessDateInputValue(),
+                    refund_date: businessDateInputValue(),
                     payment_method_id: paymentMethod?.id,
                     reference_number: reference || null,
+                    reason,
                 });
             } else if (action === "apply") {
+                if (!selectedReceiptLink?.payment) return;
                 await applyRentalDeposit(selected.id, {
+                    expected_requirement_version: selected.row_version,
+                    payment_id: selectedReceiptLink.payment.id,
+                    expected_payment_version: selectedReceiptLink.payment.row_version,
                     invoice_id: invoice?.id,
                     amount,
+                    allocation_date: businessDateInputValue(),
                 });
             } else {
                 await forfeitRentalDeposit(selected.id, {
+                    expected_requirement_version: selected.row_version,
                     invoice_id: invoice?.id,
                     amount,
                 });
@@ -92,7 +116,9 @@ export default function RentalDepositPage() {
             setAmount("");
             setInvoice(null);
             setPaymentMethod(null);
+            setReceiptLinkId("");
             setReference("");
+            setReason("");
             setSelected(null);
             result.reload();
         } catch (error) {
@@ -161,7 +187,15 @@ export default function RentalDepositPage() {
                 canManage ? (
                     <Button
                         variant="secondary"
-                        onClick={() => setSelected(row)}
+                        onClick={() => {
+                            setSelected(row);
+                            setAmount("");
+                            setInvoice(null);
+                            setPaymentMethod(null);
+                            setReceiptLinkId("");
+                            setReference("");
+                            setReason("");
+                        }}
                     >
                         Manage
                     </Button>
@@ -197,7 +231,7 @@ export default function RentalDepositPage() {
             </div>
             {selected && (
                 <Panel
-                    title={`Manage deposit — ${readableRelation(selected.agreement)}`}
+                    title={`Manage deposit - ${readableRelation(selected.agreement)}`}
                     className="mb-5"
                 >
                     <form
@@ -211,6 +245,8 @@ export default function RentalDepositPage() {
                                 setAction(event.target.value);
                                 setInvoice(null);
                                 setPaymentMethod(null);
+                                setReceiptLinkId("");
+                                setReason("");
                             }}
                             options={[
                                 { value: "receive", label: "Receive deposit" },
@@ -238,6 +274,22 @@ export default function RentalDepositPage() {
                                 required
                             />
                         )}
+                        {(action === "apply" || action === "refund") && (
+                            <Select
+                                label="Deposit receipt"
+                                value={receiptSelectValue}
+                                onChange={(event) => setReceiptLinkId(event.target.value)}
+                                required
+                                options={receiptLinks.map((link) => ({
+                                    value: String(link.id),
+                                    label: [
+                                        link.payment?.payment_number ?? link.payment?.name ?? `Payment ${link.payment?.id}`,
+                                        link.amount,
+                                        link.payment?.posting_status?.replaceAll("_", " "),
+                                    ].filter(Boolean).join(" - "),
+                                }))}
+                            />
+                        )}
                         {(action === "receive" || action === "refund") && (
                             <RentalPaymentMethodLookupSelect
                                 value={paymentMethod}
@@ -255,6 +307,16 @@ export default function RentalDepositPage() {
                                 }
                             />
                         )}
+                        {action === "refund" && (
+                            <Input
+                                label="Reason"
+                                required
+                                value={reason}
+                                onChange={(event) =>
+                                    setReason(event.target.value)
+                                }
+                            />
+                        )}
                         <div className="flex items-end gap-2">
                             <Button
                                 type="submit"
@@ -262,7 +324,9 @@ export default function RentalDepositPage() {
                                 disabled={
                                     !amount ||
                                     ((action === "apply" || action === "forfeit") && !invoice) ||
-                                    ((action === "receive" || action === "refund") && !paymentMethod)
+                                    ((action === "receive" || action === "refund") && !paymentMethod) ||
+                                    ((action === "apply" || action === "refund") && !selectedReceiptLink) ||
+                                    (action === "refund" && !reason.trim())
                                 }
                             >
                                 Save

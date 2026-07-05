@@ -29,8 +29,8 @@ final class RentalAgreementIntegrityContractTest extends TestCase
         self::assertStringContainsString('assertExpectedVersion', $service);
         self::assertStringContainsString("'row_version' =>", $resource);
         self::assertStringContainsString('$agreement->row_version = $expectedVersion + 1;', $service);
-        self::assertStringContainsString("'expected_version' => ['required', 'integer', 'min:1']", $updateRequest);
-        self::assertStringContainsString("'expected_version' => ['required', 'integer', 'min:1']", $transitionRequest);
+        self::assertMatchesRegularExpression("/(?:'expected_version'\\s*=>|\\\$rules\\['expected_version'\\]\\s*=)\\s*\\['required',\\s*'integer',\\s*'min:1'\\]/", $updateRequest);
+        self::assertMatchesRegularExpression("/'expected_version'\\s*=>\\s*\\['required',\\s*'integer',\\s*'min:1'\\]/", $transitionRequest);
         self::assertStringContainsString("validated('expected_version')", $controller);
     }
 
@@ -61,7 +61,7 @@ final class RentalAgreementIntegrityContractTest extends TestCase
         self::assertStringContainsString('$version->row_version = $expectedVersion + 1;', $service);
         self::assertStringNotContainsString('$active->effective_to =', $service);
         self::assertStringNotContainsString('$active->status = RentalRateVersionStatus::Superseded;', $service);
-        self::assertStringContainsString("'expected_version' => ['required', 'integer', 'min:1']", $request);
+        self::assertMatchesRegularExpression("/'expected_version'\\s*=>\\s*\\['required',\\s*'integer',\\s*'min:1'\\]/", $request);
         self::assertStringContainsString("validated('expected_version')", $controller);
         self::assertStringContainsString("'row_version' =>", $resource);
     }

@@ -93,7 +93,7 @@ export default function RentalBillingPage() {
         setActionError(null);
         try {
             const documentDate = businessDateInputValue();
-            await createRentalInvoice(run.id, {
+            await createRentalInvoice(run.id, run.row_version, {
                 invoice_date: documentDate,
                 due_date: documentDate,
                 status: 'draft',
@@ -123,7 +123,7 @@ export default function RentalBillingPage() {
         {
             key: 'period',
             header: 'Period',
-            render: (row) => `${formatDate(row.billing_period?.period_start)} – ${formatDate(row.billing_period?.period_end)}`,
+            render: (row) => `${formatDate(row.billing_period?.period_start)} - ${formatDate(row.billing_period?.period_end)}`,
         },
         { key: 'total', header: 'Grand total', render: (row) => row.grand_total },
         {

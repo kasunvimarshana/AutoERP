@@ -12,6 +12,7 @@ final class RentalExpenseResource extends RentalResource
     {
         return [
             'id' => (int) $this->getKey(),
+            'row_version' => (int) $this->row_version,
             'expense_number' => $this->expense_number,
             'agreement' => $this->whenLoaded('agreement', fn () => $this->summary($this->agreement, ['agreement_number', 'agreement_kind'])),
             'allocation' => $this->whenLoaded('allocation', fn () => $this->summary($this->allocation, ['allocation_number', 'status'])),

@@ -62,7 +62,7 @@ export default function RentalReservationListPage() {
             key: "period",
             header: "Period",
             render: (row) =>
-                `${formatDate(row.requested_start_at)} – ${formatDate(row.requested_end_at)}`,
+                `${formatDate(row.requested_start_at)} - ${formatDate(row.requested_end_at)}`,
         },
         {
             key: "mode",

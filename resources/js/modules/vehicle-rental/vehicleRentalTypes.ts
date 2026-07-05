@@ -20,6 +20,7 @@ export interface RentalCurrency extends NamedResource {
 }
 export interface RentalReservation {
     id: number;
+    row_version: number;
     reservation_number: string;
     customer?: RentalParty | null;
     requested_vehicle?: RentalVehicle | null;
@@ -65,6 +66,7 @@ export interface RentalRateVersion {
 }
 export interface RentalAgreement {
     id: number;
+    row_version: number;
     agreement_number: string;
     agreement_kind: string;
     customer?: RentalParty | null;
@@ -109,6 +111,7 @@ export interface RentalCustodyItem {
 }
 export interface RentalCustodyEvent {
     id: number;
+    row_version: number;
     event_number: string;
     vehicle?: RentalVehicle | null;
     allocation?: NamedResource | null;
@@ -126,6 +129,7 @@ export interface RentalCustodyEvent {
 }
 export interface RentalAllocation {
     id: number;
+    row_version: number;
     allocation_number: string;
     agreement?: NamedResource | null;
     vehicle?: RentalVehicle | null;
@@ -226,6 +230,7 @@ export interface RentalUsageLog {
 }
 export interface RentalExpense {
     id: number;
+    row_version: number;
     expense_number: string;
     vehicle?: RentalVehicle | null;
     expense_type: string;
@@ -297,8 +302,19 @@ export interface RentalCalculationRun {
 export interface RentalDepositLink {
     id: number;
     link_type: string;
-    payment_id?: number | null;
-    invoice_id?: number | null;
+    payment?: (NamedResource & {
+        payment_number?: string | null;
+        row_version?: number;
+        document_status?: string | null;
+        posting_status?: string | null;
+        unapplied_amount?: string | null;
+    }) | null;
+    invoice?: (NamedResource & {
+        invoice_number?: string | null;
+        row_version?: number;
+        status?: string | null;
+        balance_due?: string | null;
+    }) | null;
     amount: string;
     status: string;
     linked_at: string;
@@ -306,6 +322,7 @@ export interface RentalDepositLink {
 }
 export interface RentalDeposit {
     id: number;
+    row_version: number;
     agreement?: NamedResource | null;
     required_amount: string;
     received_amount: string;
@@ -319,6 +336,7 @@ export interface RentalDeposit {
 }
 export interface VehicleFinanceInstallment {
     id: number;
+    row_version: number;
     installment_number: number;
     due_date: string;
     principal_due: string;
@@ -329,10 +347,11 @@ export interface VehicleFinanceInstallment {
     paid_amount: string;
     balance_due: string;
     status: string;
-    invoice_id?: number | null;
+    invoice?: NamedResource | null;
 }
 export interface VehicleFinanceAgreement {
     id: number;
+    row_version: number;
     agreement_number: string;
     supplier?: RentalParty | null;
     vehicle?: RentalVehicle | null;

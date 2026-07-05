@@ -1,5 +1,5 @@
-import { useMemo, useState, type FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { CustomerLookupSelect } from "@/modules/customer/components/CustomerLookupSelect";
 import type { CustomerSummary } from "@/modules/customer/customerTypes";
 import { SupplierLookupSelect } from "@/modules/supplier/components/SupplierLookupSelect";
@@ -14,9 +14,12 @@ import { Select } from "@/shared/components/Select";
 import { Textarea } from "@/shared/components/Textarea";
 import type { NamedResource } from "@/shared/types/common";
 import { useMutationFormGuard } from "@/shared/hooks/useMutationFormGuard";
+import { businessDateInputValue } from "@/shared/utils/businessDate";
+import { parsePositiveInteger } from "@/shared/utils/routeParams";
 import { RentalPage } from "../components/RentalPage";
 import { RentalCurrencyLookupSelect } from "../components/RentalLookups";
-import { createRentalAgreement } from "../vehicleRentalApi";
+import { createRentalAgreement, getRentalReservation } from "../vehicleRentalApi";
+import type { RentalReservation } from "../vehicleRentalTypes";
 
 const componentDefaults = [
     ["base_rental", "month"],
@@ -28,11 +31,27 @@ const componentDefaults = [
     ["night_out", "count"],
 ] as const;
 
+function toDateTimeLocal(value: string | null | undefined): string {
+    if (!value) return "";
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value.slice(0, 16);
+
+    return [
+        date.getFullYear(),
+        String(date.getMonth() + 1).padStart(2, "0"),
+        String(date.getDate()).padStart(2, "0"),
+    ].join("-") + `T${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
 export default function RentalAgreementCreatePage() {
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    const reservationId = parsePositiveInteger(searchParams.get("reservation_id"));
     const [customer, setCustomer] = useState<CustomerSummary | null>(null);
     const [supplier, setSupplier] = useState<SupplierSummary | null>(null);
     const [currency, setCurrency] = useState<NamedResource | null>(null);
+    const [reservation, setReservation] = useState<RentalReservation | null>(null);
     const [form, setForm] = useState({
         agreement_kind: "customer_rental",
         agreement_date: "",
@@ -43,7 +62,6 @@ export default function RentalAgreementCreatePage() {
         billing_cycle: "monthly",
         billing_basis: "calendar_month",
         proration_rule: "exact_day_count",
-        billing_timezone: "Asia/Colombo",
         payment_term_days: "30",
         included_km: "0",
         excess_km_method: "period",
@@ -57,6 +75,33 @@ export default function RentalAgreementCreatePage() {
     const [error, setError] = useState<ApiError | null>(null);
     const formGuard = useMutationFormGuard(saving);
     const updateForm: typeof setForm = (next) => { formGuard.markDirty(); setForm(next); };
+    useEffect(() => {
+        if (!reservationId) return;
+
+        const controller = new AbortController();
+        setError(null);
+
+        void getRentalReservation(reservationId, controller.signal)
+            .then((resource) => {
+                setReservation(resource);
+                if (resource.customer) setCustomer(resource.customer as CustomerSummary);
+                if (resource.currency) setCurrency(resource.currency);
+                setForm((current) => ({
+                    ...current,
+                    agreement_kind: "customer_rental",
+                    agreement_date: current.agreement_date || businessDateInputValue(),
+                    starts_at: toDateTimeLocal(resource.requested_start_at),
+                    ends_at: toDateTimeLocal(resource.requested_end_at),
+                    rental_mode: resource.rental_mode,
+                    billing_cycle: resource.billing_cycle,
+                }));
+            })
+            .catch((requestError: unknown) => {
+                if (!controller.signal.aborted) setError(toApiError(requestError));
+            });
+
+        return () => controller.abort();
+    }, [reservationId]);
     const partyValid = useMemo(
         () =>
             form.agreement_kind === "customer_rental"
@@ -71,6 +116,8 @@ export default function RentalAgreementCreatePage() {
         try {
             const row = await createRentalAgreement({
                 ...form,
+                reservation_id: reservation?.id ?? undefined,
+                expected_reservation_version: reservation?.row_version ?? undefined,
                 customer_id:
                     form.agreement_kind === "customer_rental"
                         ? customer?.id
@@ -137,6 +184,7 @@ export default function RentalAgreementCreatePage() {
                         <Select
                             label="Agreement kind"
                             value={form.agreement_kind}
+                            disabled={reservation !== null}
                             onChange={(e) =>
                                 updateForm({
                                     ...form,

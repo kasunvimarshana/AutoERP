@@ -8,6 +8,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use Modules\VehicleRental\Enums\RentalReservationStatus;
 use Modules\VehicleRental\Models\RentalReservation;
@@ -72,10 +73,11 @@ final class RentalReservationService
         });
     }
 
-    public function update(RentalReservation $reservation, array $data, ?int $userId): RentalReservation
+    public function update(RentalReservation $reservation, array $data, int $expectedVersion, ?int $userId): RentalReservation
     {
-        return DB::transaction(function () use ($reservation, $data, $userId): RentalReservation {
+        return DB::transaction(function () use ($reservation, $data, $expectedVersion, $userId): RentalReservation {
             $reservation = RentalReservation::query()->lockForUpdate()->findOrFail($reservation->getKey());
+            $this->assertExpectedVersion($reservation, $expectedVersion);
             if (! in_array($reservation->status, [RentalReservationStatus::Draft, RentalReservationStatus::Pending], true)) {
                 throw new InvalidArgumentException('Only draft or pending reservations can be edited.');
             }
@@ -98,7 +100,7 @@ final class RentalReservationService
                 'requested_start_at', 'requested_end_at', 'currency_id', 'estimated_amount',
                 'estimated_deposit_amount', 'source', 'remarks',
             ])));
-            $reservation->row_version = ((int) $reservation->row_version) + 1;
+            $reservation->row_version = $expectedVersion + 1;
             $reservation->updated_by = $userId;
             $reservation->save();
 
@@ -106,10 +108,17 @@ final class RentalReservationService
         });
     }
 
-    public function transition(RentalReservation $reservation, RentalReservationStatus $to, ?int $userId = null, ?string $reason = null): RentalReservation
+    public function transition(
+        RentalReservation $reservation,
+        RentalReservationStatus $to,
+        int $expectedVersion,
+        ?int $userId = null,
+        ?string $reason = null,
+    ): RentalReservation
     {
-        return DB::transaction(function () use ($reservation, $to, $userId, $reason): RentalReservation {
+        return DB::transaction(function () use ($reservation, $to, $expectedVersion, $userId, $reason): RentalReservation {
             $reservation = RentalReservation::query()->lockForUpdate()->findOrFail($reservation->getKey());
+            $this->assertExpectedVersion($reservation, $expectedVersion);
             $from = $reservation->status;
             if ($from === $to) {
                 return $reservation->load($this->relations());
@@ -133,6 +142,7 @@ final class RentalReservationService
             $reservation->confirmed_at = $to === RentalReservationStatus::Confirmed ? now() : $reservation->confirmed_at;
             $reservation->cancelled_by = $to === RentalReservationStatus::Cancelled ? $userId : $reservation->cancelled_by;
             $reservation->cancelled_at = $to === RentalReservationStatus::Cancelled ? now() : $reservation->cancelled_at;
+            $reservation->row_version = $expectedVersion + 1;
             $reservation->updated_by = $userId;
             $reservation->save();
             $this->history->record($reservation, $from->value, $to->value, $userId, $reason);
@@ -188,5 +198,14 @@ final class RentalReservationService
             $tenantId,
             $organizationUnitId,
         );
+    }
+
+    private function assertExpectedVersion(RentalReservation $reservation, int $expectedVersion): void
+    {
+        if ((int) $reservation->row_version !== $expectedVersion) {
+            throw ValidationException::withMessages([
+                'expected_version' => ['The rental reservation changed after it was loaded. Reload and review the latest version.'],
+            ]);
+        }
     }
 }

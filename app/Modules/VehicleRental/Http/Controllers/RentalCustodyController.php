@@ -7,6 +7,7 @@ namespace Modules\VehicleRental\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Modules\VehicleRental\Http\Controllers\Concerns\ScopesVehicleRentalRequests;
+use Modules\VehicleRental\Http\Requests\ConfirmRentalCustodyEventRequest;
 use Modules\VehicleRental\Http\Requests\ListRentalRequest;
 use Modules\VehicleRental\Http\Requests\RentalTransitionRequest;
 use Modules\VehicleRental\Http\Requests\StoreRentalCustodyEventRequest;
@@ -41,10 +42,14 @@ final class RentalCustodyController
         return new RentalCustodyEventResource($this->scope(RentalCustodyEvent::query(), $request)->with($service->relations())->findOrFail($event));
     }
 
-    public function confirm(ListRentalRequest $request, int $event, RentalCustodyService $service): RentalCustodyEventResource
+    public function confirm(ConfirmRentalCustodyEventRequest $request, int $event, RentalCustodyService $service): RentalCustodyEventResource
     {
         $this->authorization->assert($request->currentUserId(), $request->tenantId(), VehicleRentalAuthorizationService::MANAGE_CUSTODY);
-        return new RentalCustodyEventResource($service->confirm($this->scope(RentalCustodyEvent::query(), $request)->findOrFail($event), $request->currentUserId()));
+        return new RentalCustodyEventResource($service->confirm(
+            $this->scope(RentalCustodyEvent::query(), $request)->findOrFail($event),
+            (int) $request->input('expected_version'),
+            $request->currentUserId(),
+        ));
     }
 
     public function reverse(RentalTransitionRequest $request, int $event, RentalCustodyService $service): RentalCustodyEventResource
@@ -52,6 +57,7 @@ final class RentalCustodyController
         $this->authorization->assert($request->currentUserId(), $request->tenantId(), VehicleRentalAuthorizationService::MANAGE_CUSTODY);
         return new RentalCustodyEventResource($service->reverse(
             $this->scope(RentalCustodyEvent::query(), $request)->findOrFail($event),
+            (int) $request->input('expected_version'),
             $request->currentUserId(), (string) $request->input('reason'),
         ));
     }

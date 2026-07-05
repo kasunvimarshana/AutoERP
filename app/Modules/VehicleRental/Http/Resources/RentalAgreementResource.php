@@ -34,14 +34,20 @@ final class RentalAgreementResource extends RentalResource
             'status' => $this->enumValue($this->status),
             'termination_reason' => $this->termination_reason,
             'remarks' => $this->remarks,
-            'terms' => $this->loadedCollection('terms', fn ($term): array => [
-                'id' => (int) $term->getKey(),
-                'sequence' => (int) $term->sequence,
-                'term_code' => $term->term_code,
-                'title' => $term->title,
-                'content' => $term->content,
-                'is_printable' => (bool) $term->is_printable,
-            ]),
+            'terms' => $this->resource->relationLoaded('terms')
+                ? $this->resource->getRelation('terms')
+                    ->where('is_active', true)
+                    ->map(fn ($term): array => [
+                        'id' => (int) $term->getKey(),
+                        'row_version' => (int) $term->row_version,
+                        'sequence' => (int) $term->sequence,
+                        'term_code' => $term->term_code,
+                        'title' => $term->title,
+                        'content' => $term->content,
+                        'is_printable' => (bool) $term->is_printable,
+                        'is_active' => (bool) $term->is_active,
+                    ])->values()->all()
+                : [],
             'active_rate_version' => $this->whenLoaded('activeRateVersion', fn () => $this->activeRateVersion === null
                 ? null
                 : (new RentalRateVersionResource($this->activeRateVersion))->resolve($request)),

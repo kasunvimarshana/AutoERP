@@ -1,4 +1,5 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/modules/auth/AuthProvider';
 import { hasPermission } from '@/modules/auth/accessControl';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
@@ -16,11 +17,13 @@ import { useApi } from '@/shared/hooks/useApi';
 import type { NamedResource } from '@/shared/types/common';
 import { businessDateTimeInputValue } from '@/shared/utils/businessDate';
 import { readableRelation } from '@/shared/utils/object';
+import { parsePositiveInteger } from '@/shared/utils/routeParams';
 import { RentalAllocationLookupSelect } from '../components/RentalLookups';
 import { RentalPage } from '../components/RentalPage';
 import {
     confirmRentalCustodyEvent,
     createRentalCustodyEvent,
+    getRentalAllocation,
     listRentalCustodyEvents,
 } from '../vehicleRentalApi';
 import { vehicleRentalPermissions } from '../vehicleRentalPermissions';
@@ -50,12 +53,39 @@ const emptyForm = () => ({
 
 export default function RentalCustodyPage() {
     const auth = useAuth();
+    const [params] = useSearchParams();
+    const initialAllocationId = parsePositiveInteger(params.get('allocation_id'));
     const canManage = hasPermission(auth, vehicleRentalPermissions.custodyManage);
     const [allocation, setAllocation] = useState<NamedResource | null>(null);
     const [refresh, setRefresh] = useState(0);
     const [error, setError] = useState<ApiError | null>(null);
     const [saving, setSaving] = useState(false);
     const [form, setForm] = useState(emptyForm);
+
+    useEffect(() => {
+        if (!initialAllocationId || allocation?.id === initialAllocationId) return;
+
+        const controller = new AbortController();
+        setError(null);
+
+        void getRentalAllocation(initialAllocationId, controller.signal)
+            .then((resource) => {
+                setAllocation({
+                    id: resource.id,
+                    code: resource.allocation_number,
+                    name: [
+                        resource.allocation_number,
+                        resource.vehicle?.registration_number ?? resource.vehicle?.name,
+                        resource.status,
+                    ].filter(Boolean).join(' - '),
+                });
+            })
+            .catch((requestError: unknown) => {
+                if (!controller.signal.aborted) setError(toApiError(requestError));
+            });
+
+        return () => controller.abort();
+    }, [allocation?.id, initialAllocationId]);
 
     const result = useApi(
         (signal) => listRentalCustodyEvents(
@@ -88,10 +118,10 @@ export default function RentalCustodyPage() {
         }
     };
 
-    const confirm = async (id: number) => {
+    const confirm = async (row: RentalCustodyEvent) => {
         setError(null);
         try {
-            await confirmRentalCustodyEvent(id);
+            await confirmRentalCustodyEvent(row.id, row.row_version);
             setRefresh((value) => value + 1);
         } catch (requestError: unknown) {
             setError(toApiError(requestError));
@@ -102,14 +132,14 @@ export default function RentalCustodyPage() {
         { key: 'event', header: 'Event', render: (row) => row.event_number },
         { key: 'vehicle', header: 'Vehicle', render: (row) => readableRelation(row.vehicle) },
         { key: 'type', header: 'Type', render: (row) => row.event_type.replaceAll('_', ' ') },
-        { key: 'roles', header: 'Custody', render: (row) => `${row.from_role} → ${row.to_role}` },
+        { key: 'roles', header: 'Custody', render: (row) => `${row.from_role} -> ${row.to_role}` },
         { key: 'odometer', header: 'Odometer', render: (row) => row.odometer },
         { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.status} /> },
         {
             key: 'actions',
             header: '',
             render: (row) => canManage && row.status === 'draft' ? (
-                <Button variant="secondary" onClick={() => void confirm(row.id)}>
+                <Button variant="secondary" onClick={() => void confirm(row)}>
                     Confirm
                 </Button>
             ) : null,

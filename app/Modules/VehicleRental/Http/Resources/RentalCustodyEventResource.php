@@ -12,6 +12,7 @@ final class RentalCustodyEventResource extends RentalResource
     {
         return [
             'id' => (int) $this->getKey(),
+            'row_version' => (int) $this->row_version,
             'event_number' => $this->event_number,
             'allocation' => $this->whenLoaded('allocation', fn () => $this->summary($this->allocation, ['allocation_number', 'status'])),
             'vehicle' => $this->whenLoaded('vehicle', fn () => $this->summary($this->vehicle, ['vehicle_number', 'registration_number', 'status'])),

@@ -24,9 +24,11 @@ export default function RentalReservationDetailPage() {
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
     const transition = async (status: string) => {
+        if (!result.data) return;
+
         setBusy(true);
         try {
-            await transitionRentalReservation(id, status);
+            await transitionRentalReservation(id, result.data.row_version, status);
             navigate(0);
         } catch (e) {
             setError(toApiError(e));
@@ -93,7 +95,7 @@ export default function RentalReservationDetailPage() {
                         },
                         {
                             label: "Period",
-                            value: `${formatDate(row.requested_start_at)} – ${formatDate(row.requested_end_at)}`,
+                            value: `${formatDate(row.requested_start_at)} - ${formatDate(row.requested_end_at)}`,
                         },
                         {
                             label: "Rental mode",

@@ -7,6 +7,7 @@ namespace Modules\VehicleRental\Services;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Invoice\DTOs\CreateInvoiceData;
@@ -90,10 +91,11 @@ final class VehicleFinanceService
         });
     }
 
-    public function activate(VehicleFinanceAgreement $agreement, ?int $userId): VehicleFinanceAgreement
+    public function activate(VehicleFinanceAgreement $agreement, int $expectedVersion, ?int $userId): VehicleFinanceAgreement
     {
-        return DB::transaction(function () use ($agreement, $userId): VehicleFinanceAgreement {
+        return DB::transaction(function () use ($agreement, $expectedVersion, $userId): VehicleFinanceAgreement {
             $agreement = VehicleFinanceAgreement::query()->with('installments')->lockForUpdate()->findOrFail($agreement->getKey());
+            $this->assertAgreementExpectedVersion($agreement, $expectedVersion);
             if ($agreement->status !== VehicleFinanceAgreementStatus::Draft) {
                 throw new InvalidArgumentException('Only a draft vehicle finance agreement can be activated.');
             }
@@ -103,6 +105,7 @@ final class VehicleFinanceService
             $agreement->status = VehicleFinanceAgreementStatus::Active;
             $agreement->approved_by = $userId;
             $agreement->approved_at = now();
+            $agreement->row_version = $expectedVersion + 1;
             $agreement->updated_by = $userId;
             $agreement->save();
             $this->history($agreement, VehicleFinanceAgreementStatus::Draft->value, VehicleFinanceAgreementStatus::Active->value, $userId);
@@ -142,6 +145,7 @@ final class VehicleFinanceService
                     $dirtyFinancials = $installment->isDirty(['invoice_id', 'paid_amount', 'balance_due']);
                     if ($old !== $new || $dirtyFinancials) {
                         $installment->status = $new;
+                        $installment->row_version = (int) $installment->row_version + 1;
                         $installment->save();
                     }
                     if ($old !== $new) {
@@ -154,10 +158,17 @@ final class VehicleFinanceService
         return $updated;
     }
 
-    public function createInstallmentPayable(VehicleFinanceInstallment $installment, string $invoiceDate, InvoiceStatus $status, ?int $userId): Invoice
+    public function createInstallmentPayable(
+        VehicleFinanceInstallment $installment,
+        int $expectedVersion,
+        string $invoiceDate,
+        InvoiceStatus $status,
+        ?int $userId,
+    ): Invoice
     {
-        return DB::transaction(function () use ($installment, $invoiceDate, $status, $userId): Invoice {
+        return DB::transaction(function () use ($installment, $expectedVersion, $invoiceDate, $status, $userId): Invoice {
             $installment = VehicleFinanceInstallment::query()->with('financeAgreement')->lockForUpdate()->findOrFail($installment->getKey());
+            $this->assertInstallmentExpectedVersion($installment, $expectedVersion);
             if ($installment->invoice_id !== null) {
                 $existing = Invoice::query()->findOrFail($installment->invoice_id);
                 if (! in_array($existing->status, [InvoiceStatus::Cancelled, InvoiceStatus::Void], true)) {
@@ -184,7 +195,7 @@ final class VehicleFinanceService
                 $sourceLineId = ((int) $installment->getKey() * 10) + $number;
                 $lines[] = new InvoiceLineData(
                     lineNumber: $number,
-                    description: $description.' — installment '.$installment->installment_number,
+                    description: $description.' - installment '.$installment->installment_number,
                     quantity: '1.000000',
                     unitPrice: $amount,
                     lineType: InvoiceLineType::Charge,
@@ -236,6 +247,7 @@ final class VehicleFinanceService
                 sourceLines: $sourceLines,
             ));
             $installment->invoice_id = $invoice->getKey();
+            $installment->row_version = $expectedVersion + 1;
             $installment->save();
 
             return $invoice;
@@ -354,6 +366,24 @@ final class VehicleFinanceService
             'created_by' => $userId,
             'updated_by' => $userId,
         ]);
+    }
+
+    private function assertAgreementExpectedVersion(VehicleFinanceAgreement $agreement, int $expectedVersion): void
+    {
+        if ((int) $agreement->row_version !== $expectedVersion) {
+            throw ValidationException::withMessages([
+                'expected_version' => ['The vehicle finance agreement changed after it was loaded. Reload and review the latest version.'],
+            ]);
+        }
+    }
+
+    private function assertInstallmentExpectedVersion(VehicleFinanceInstallment $installment, int $expectedVersion): void
+    {
+        if ((int) $installment->row_version !== $expectedVersion) {
+            throw ValidationException::withMessages([
+                'expected_version' => ['The vehicle finance installment changed after it was loaded. Reload and review the latest version.'],
+            ]);
+        }
     }
 
     private function installmentDueDate(CarbonImmutable $start, int $number, string $frequency): CarbonImmutable

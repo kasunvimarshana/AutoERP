@@ -106,11 +106,11 @@ const assignmentLabel = (
     assignment: NonNullable<RentalAllocation["drivers"]>[number],
 ) => {
     const employee = readableRelation(assignment.employee);
-    const period = `${formatDate(assignment.assigned_from)} – ${
+    const period = `${formatDate(assignment.assigned_from)} - ${
         assignment.assigned_to ? formatDate(assignment.assigned_to) : "Open"
     }`;
 
-    return `${employee} · ${optionLabel(assignment.assignment_role)} · ${period}`;
+    return `${employee} - ${optionLabel(assignment.assignment_role)} - ${period}`;
 };
 
 export default function RentalRunningChartPage() {
@@ -162,7 +162,7 @@ export default function RentalRunningChartPage() {
         () =>
             allocationRows.map((row) => ({
                 value: String(row.id),
-                label: `${row.allocation_number} · ${readableRelation(row.vehicle)}`,
+                label: `${row.allocation_number} - ${readableRelation(row.vehicle)}`,
             })),
         [allocationRows],
     );
@@ -757,14 +757,14 @@ export default function RentalRunningChartPage() {
 
             {selectedUsage && (
                 <div className="mt-5 space-y-5">
-                    <Panel title={`Physical usage · ${selectedUsage.usage_number}`}>
+                    <Panel title={`Physical usage - ${selectedUsage.usage_number}`}>
                         <div className="grid gap-3 md:grid-cols-3">
                             <div>
                                 <p className="text-xs font-semibold uppercase text-slate-500">
                                     Actual period
                                 </p>
                                 <p className="mt-1 text-sm">
-                                    {selectedUsage.started_at} – {selectedUsage.ended_at}
+                                    {selectedUsage.started_at} - {selectedUsage.ended_at}
                                 </p>
                             </div>
                             <div>
