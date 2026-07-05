@@ -12,6 +12,7 @@ final class AssignRentalDriverRequest extends TenantScopedRequest
     public function rules(): array
     {
         return [
+            'expected_version' => ['required', 'integer', 'min:1'],
             'employee_id' => ['required', 'integer', 'min:1'],
             'assignment_role' => ['nullable', Rule::in(['primary', 'relief'])],
             'assigned_from' => ['required', 'date'],

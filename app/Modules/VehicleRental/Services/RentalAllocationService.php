@@ -8,7 +8,9 @@ use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
+use Modules\Hr\Models\HrEmployee;
 use Modules\Vehicle\Enums\VehicleStatus;
 use Modules\Vehicle\Models\Vehicle;
 use Modules\Vehicle\Enums\VehicleOwnerType;
@@ -19,6 +21,7 @@ use Modules\VehicleRental\Enums\RentalAgreementStatus;
 use Modules\VehicleRental\Enums\RentalAllocationStatus;
 use Modules\VehicleRental\Enums\RentalDriverAssignmentStatus;
 use Modules\VehicleRental\Enums\RentalVehicleSourceType;
+use Modules\VehicleRental\Enums\VehicleFinanceAgreementStatus;
 use Modules\VehicleRental\Models\RentalAgreement;
 use Modules\VehicleRental\Models\RentalDriverAssignment;
 use Modules\VehicleRental\Models\RentalVehicleAllocation;
@@ -29,7 +32,6 @@ final class RentalAllocationService
     public function __construct(
         private readonly RentalNumberService $numbers,
         private readonly RentalAvailabilityService $availability,
-        private readonly RentalReferenceValidator $references,
         private readonly VehicleStatusService $vehicleStatuses,
         private readonly RentalStatusHistoryService $history,
     ) {}
@@ -37,7 +39,9 @@ final class RentalAllocationService
     public function create(RentalAgreement $agreement, array $data, ?int $userId): RentalVehicleAllocation
     {
         return DB::transaction(function () use ($agreement, $data, $userId): RentalVehicleAllocation {
+            $expectedAgreementVersion = $this->requiredExpectedVersion($data, 'expected_agreement_version');
             $agreement = RentalAgreement::query()->lockForUpdate()->findOrFail($agreement->getKey());
+            $this->assertAgreementExpectedVersion($agreement, $expectedAgreementVersion);
             if (! in_array($agreement->status, [RentalAgreementStatus::Draft, RentalAgreementStatus::Active], true)) {
                 throw new InvalidArgumentException('Vehicle allocation requires a draft or active agreement.');
             }
@@ -54,7 +58,11 @@ final class RentalAllocationService
             }
 
             $sourceType = RentalVehicleSourceType::from((string) $data['vehicle_source_type']);
+            $this->assertSourceContract($agreement, $data, $sourceType);
             $sourceAllocation = $this->validateSource($agreement, $data, $sourceType, $from, $to);
+            $financeAgreementId = $sourceType === RentalVehicleSourceType::Financed
+                ? (int) $data['vehicle_finance_agreement_id']
+                : null;
             $vehicle = $this->availability->assertVehicle(
                 (int) $agreement->tenant_id,
                 $agreement->organization_unit_id,
@@ -79,7 +87,7 @@ final class RentalAllocationService
                 'vehicle_ownership_id' => $ownershipId,
                 'vehicle_source_type' => $sourceType->value,
                 'source_allocation_id' => $sourceAllocation?->getKey(),
-                'vehicle_finance_agreement_id' => $data['vehicle_finance_agreement_id'] ?? null,
+                'vehicle_finance_agreement_id' => $financeAgreementId,
                 'replaces_allocation_id' => $data['replaces_allocation_id'] ?? null,
                 'allocated_from' => $from,
                 'allocated_to' => $to,
@@ -91,7 +99,7 @@ final class RentalAllocationService
             ]);
 
             foreach ($data['drivers'] ?? [] as $driver) {
-                $this->assignDriver($allocation, $driver, $userId);
+                $this->createDriverAssignment($allocation, $driver, $userId);
             }
 
             $this->history->record($allocation, null, RentalAllocationStatus::Planned->value, $userId);
@@ -100,67 +108,58 @@ final class RentalAllocationService
         });
     }
 
-    public function assignDriver(RentalVehicleAllocation $allocation, array $data, ?int $userId): RentalDriverAssignment
+    public function assignDriver(
+        RentalVehicleAllocation $allocation,
+        int $expectedVersion,
+        array $data,
+        ?int $userId,
+    ): RentalDriverAssignment
     {
-        return DB::transaction(function () use ($allocation, $data, $userId): RentalDriverAssignment {
+        return DB::transaction(function () use ($allocation, $expectedVersion, $data, $userId): RentalDriverAssignment {
             $allocation = RentalVehicleAllocation::query()->lockForUpdate()->findOrFail($allocation->getKey());
-            $from = CarbonImmutable::parse((string) ($data['assigned_from'] ?? $allocation->allocated_from));
-            $to = isset($data['assigned_to']) && $data['assigned_to'] !== null
-                ? CarbonImmutable::parse((string) $data['assigned_to'])
-                : CarbonImmutable::parse($allocation->allocated_to);
-            if (! $to->greaterThan($from)) {
-                throw new InvalidArgumentException('Driver assignment end must be after its start.');
-            }
-            if ($from->lessThan(CarbonImmutable::parse($allocation->allocated_from)) || $to->greaterThan(CarbonImmutable::parse($allocation->allocated_to))) {
-                throw new InvalidArgumentException('Driver assignment must be inside the vehicle allocation period.');
-            }
+            $this->assertAllocationExpectedVersion($allocation, $expectedVersion);
 
-            $this->references->employee(
-                (int) $data['employee_id'],
-                (int) $allocation->tenant_id,
-                $allocation->organization_unit_id,
-            );
+            return $this->createDriverAssignment($allocation, $data, $userId);
+        });
+    }
 
-            $conflict = RentalDriverAssignment::query()
-                ->forContext((int) $allocation->tenant_id, $allocation->organization_unit_id)
-                ->where('employee_id', $data['employee_id'])
-                ->whereIn('status', [RentalDriverAssignmentStatus::Planned->value, RentalDriverAssignmentStatus::Active->value])
-                ->where('assigned_from', '<', $to)
-                ->where(fn (Builder $query) => $query->whereNull('assigned_to')->orWhere('assigned_to', '>', $from))
+    public function cancel(
+        RentalVehicleAllocation $allocation,
+        int $expectedVersion,
+        ?int $userId,
+        ?string $reason = null,
+    ): RentalVehicleAllocation {
+        return DB::transaction(function () use ($allocation, $expectedVersion, $userId, $reason): RentalVehicleAllocation {
+            $allocation = RentalVehicleAllocation::query()
+                ->with('agreement')
                 ->lockForUpdate()
-                ->exists();
-            if ($conflict) {
-                throw new InvalidArgumentException('Driver is assigned to another rental during this period.');
+                ->findOrFail($allocation->getKey());
+            $this->assertAllocationExpectedVersion($allocation, $expectedVersion);
+
+            if ($allocation->status === RentalAllocationStatus::Cancelled) {
+                return $allocation->load($this->relations());
+            }
+            if ($allocation->status !== RentalAllocationStatus::Planned) {
+                throw new InvalidArgumentException('Only a planned allocation can be cancelled.');
             }
 
-            if (($data['is_primary'] ?? true) === true) {
-                $allocation->driverAssignments()
-                    ->whereIn('status', [RentalDriverAssignmentStatus::Planned->value, RentalDriverAssignmentStatus::Active->value])
-                    ->where('is_primary', true)
-                    ->update(['is_primary' => false, 'updated_by' => $userId, 'updated_at' => now()]);
-            }
-
-            $assignment = $allocation->driverAssignments()->create([
-                'tenant_id' => $allocation->tenant_id,
-                'organization_unit_id' => $allocation->organization_unit_id,
-                'agreement_id' => $allocation->agreement_id,
-                'employee_id' => $data['employee_id'],
-                'assignment_role' => $data['assignment_role'] ?? 'primary',
-                'assigned_from' => $from,
-                'assigned_to' => $to,
-                'is_primary' => $data['is_primary'] ?? true,
-                'status' => $allocation->status === RentalAllocationStatus::Active
-                    ? RentalDriverAssignmentStatus::Active->value
-                    : RentalDriverAssignmentStatus::Planned->value,
-                'remarks' => $data['remarks'] ?? null,
-                'created_by' => $userId,
-                'updated_by' => $userId,
-            ]);
-            $allocation->row_version = (int) $allocation->row_version + 1;
+            $from = $allocation->status;
+            $allocation->status = RentalAllocationStatus::Cancelled;
+            $allocation->closed_by = $userId;
+            $allocation->closed_at = now();
+            $allocation->row_version = $expectedVersion + 1;
             $allocation->updated_by = $userId;
             $allocation->save();
+            $allocation->driverAssignments()
+                ->where('status', RentalDriverAssignmentStatus::Planned->value)
+                ->update([
+                    'status' => RentalDriverAssignmentStatus::Cancelled->value,
+                    'updated_by' => $userId,
+                    'updated_at' => now(),
+                ]);
+            $this->history->record($allocation, $from->value, RentalAllocationStatus::Cancelled->value, $userId, $reason);
 
-            return $assignment;
+            return $allocation->refresh()->load($this->relations());
         });
     }
 
@@ -186,6 +185,7 @@ final class RentalAllocationService
 
             $from = $allocation->status;
             $allocation->status = RentalAllocationStatus::Active;
+            $allocation->activated_by = $userId;
             $allocation->activated_at = now();
             $allocation->row_version = (int) $allocation->row_version + 1;
             $allocation->updated_by = $userId;
@@ -228,10 +228,9 @@ final class RentalAllocationService
             $from = $allocation->status;
             $allocation->status = $status;
             $allocation->actual_returned_at = $returnedAt;
-            $currentEnd = CarbonImmutable::parse($allocation->allocated_to);
             $returnTime = CarbonImmutable::parse($returnedAt);
-            $allocation->allocated_to = $returnTime->lessThan($currentEnd) ? $returnTime : $currentEnd;
             $allocation->end_odometer = $endOdometer;
+            $allocation->closed_by = $userId;
             $allocation->closed_at = now();
             $allocation->row_version = (int) $allocation->row_version + 1;
             $allocation->updated_by = $userId;
@@ -253,6 +252,7 @@ final class RentalAllocationService
 
             if ($allocation->agreement->agreement_kind === RentalAgreementKind::CustomerRental) {
                 $otherActive = RentalVehicleAllocation::query()
+                    ->forContext((int) $allocation->tenant_id, $allocation->organization_unit_id)
                     ->where('vehicle_id', $allocation->vehicle_id)
                     ->whereKeyNot($allocation->getKey())
                     ->where('status', RentalAllocationStatus::Active->value)
@@ -277,6 +277,20 @@ final class RentalAllocationService
             if (isset($filters[$key]) && $filters[$key] !== '') {
                 $query->where($key, $filters[$key]);
             }
+        }
+        if (! empty($filters['agreement_kind'])) {
+            $query->whereHas('agreement', fn (Builder $agreement) => $agreement->where('agreement_kind', $filters['agreement_kind']));
+        }
+        if (! empty($filters['open_only'])) {
+            $query->whereIn('status', [RentalAllocationStatus::Planned->value, RentalAllocationStatus::Active->value]);
+        }
+        if (! empty($filters['covers_start_at'])) {
+            $query->where('allocated_from', '<=', $filters['covers_start_at']);
+        }
+        if (! empty($filters['covers_end_at'])) {
+            $query->where(fn (Builder $period) => $period
+                ->whereNull('allocated_to')
+                ->orWhere('allocated_to', '>=', $filters['covers_end_at']));
         }
         if (! empty($filters['search'])) {
             $search = trim((string) $filters['search']);
@@ -344,6 +358,119 @@ final class RentalAllocationService
         return (int) $ownership->getKey();
     }
 
+    private function createDriverAssignment(RentalVehicleAllocation $allocation, array $data, ?int $userId): RentalDriverAssignment
+    {
+        if (! in_array($allocation->status, [RentalAllocationStatus::Planned, RentalAllocationStatus::Active], true)) {
+            throw new InvalidArgumentException('Driver assignment requires a planned or active vehicle allocation.');
+        }
+
+        $from = CarbonImmutable::parse((string) ($data['assigned_from'] ?? $allocation->allocated_from));
+        $to = isset($data['assigned_to']) && $data['assigned_to'] !== null
+            ? CarbonImmutable::parse((string) $data['assigned_to'])
+            : CarbonImmutable::parse($allocation->allocated_to);
+        if (! $to->greaterThan($from)) {
+            throw new InvalidArgumentException('Driver assignment end must be after its start.');
+        }
+        if ($from->lessThan(CarbonImmutable::parse($allocation->allocated_from)) || $to->greaterThan(CarbonImmutable::parse($allocation->allocated_to))) {
+            throw new InvalidArgumentException('Driver assignment must be inside the vehicle allocation period.');
+        }
+
+        $this->lockEmployee(
+            (int) $data['employee_id'],
+            (int) $allocation->tenant_id,
+            $allocation->organization_unit_id,
+        );
+
+        $conflict = RentalDriverAssignment::query()
+            ->forContext((int) $allocation->tenant_id, $allocation->organization_unit_id)
+            ->where('employee_id', $data['employee_id'])
+            ->whereIn('status', [RentalDriverAssignmentStatus::Planned->value, RentalDriverAssignmentStatus::Active->value])
+            ->where('assigned_from', '<', $to)
+            ->where(fn (Builder $query) => $query->whereNull('assigned_to')->orWhere('assigned_to', '>', $from))
+            ->lockForUpdate()
+            ->exists();
+        if ($conflict) {
+            throw new InvalidArgumentException('Driver is assigned to another rental during this period.');
+        }
+
+        if (($data['is_primary'] ?? true) === true) {
+            $allocation->driverAssignments()
+                ->whereIn('status', [RentalDriverAssignmentStatus::Planned->value, RentalDriverAssignmentStatus::Active->value])
+                ->where('is_primary', true)
+                ->update(['is_primary' => false, 'updated_by' => $userId, 'updated_at' => now()]);
+        }
+
+        $assignment = $allocation->driverAssignments()->create([
+            'tenant_id' => $allocation->tenant_id,
+            'organization_unit_id' => $allocation->organization_unit_id,
+            'agreement_id' => $allocation->agreement_id,
+            'employee_id' => $data['employee_id'],
+            'assignment_role' => $data['assignment_role'] ?? 'primary',
+            'assigned_from' => $from,
+            'assigned_to' => $to,
+            'is_primary' => $data['is_primary'] ?? true,
+            'status' => $allocation->status === RentalAllocationStatus::Active
+                ? RentalDriverAssignmentStatus::Active->value
+                : RentalDriverAssignmentStatus::Planned->value,
+            'remarks' => $data['remarks'] ?? null,
+            'created_by' => $userId,
+            'updated_by' => $userId,
+        ]);
+        $allocation->row_version = (int) $allocation->row_version + 1;
+        $allocation->updated_by = $userId;
+        $allocation->save();
+
+        return $assignment;
+    }
+
+    private function assertSourceContract(RentalAgreement $agreement, array $data, RentalVehicleSourceType $sourceType): void
+    {
+        $hasOwnership = ! empty($data['vehicle_ownership_id']);
+        $hasSourceAllocation = ! empty($data['source_allocation_id']);
+        $hasFinanceAgreement = ! empty($data['vehicle_finance_agreement_id']);
+
+        if ($agreement->agreement_kind === RentalAgreementKind::OwnerSupply) {
+            if ($sourceType !== RentalVehicleSourceType::OwnerSupplied) {
+                throw new InvalidArgumentException('Owner supply agreements must use the owner-supplied vehicle source.');
+            }
+            if ($hasSourceAllocation || $hasFinanceAgreement) {
+                throw new InvalidArgumentException('Owner supply allocations cannot reference another source allocation or finance agreement.');
+            }
+
+            return;
+        }
+
+        if ($agreement->agreement_kind !== RentalAgreementKind::CustomerRental) {
+            throw new InvalidArgumentException('Unsupported rental agreement kind.');
+        }
+
+        if ($sourceType === RentalVehicleSourceType::CompanyOwned) {
+            if ($hasSourceAllocation || $hasFinanceAgreement) {
+                throw new InvalidArgumentException('Company-owned allocations cannot reference owner source or finance agreements.');
+            }
+
+            return;
+        }
+
+        if ($sourceType === RentalVehicleSourceType::OwnerSupplied) {
+            if (! $hasSourceAllocation) {
+                throw new InvalidArgumentException('Owner-supplied customer allocations require a source owner allocation.');
+            }
+            if ($hasOwnership || $hasFinanceAgreement) {
+                throw new InvalidArgumentException('Owner-supplied customer allocations inherit ownership from the source allocation only.');
+            }
+
+            return;
+        }
+
+        if (! $hasFinanceAgreement) {
+            throw new InvalidArgumentException('Financed allocations require a vehicle finance agreement.');
+        }
+        if ($hasOwnership || $hasSourceAllocation) {
+            throw new InvalidArgumentException('Financed allocations cannot reference ownership or owner source allocations.');
+        }
+    }
+
     private function validateSource(
         RentalAgreement $agreement,
         array $data,
@@ -383,7 +510,7 @@ final class RentalAllocationService
                 ->forContext((int) $agreement->tenant_id, $agreement->organization_unit_id)
                 ->where('vehicle_id', $data['vehicle_id'])
                 ->whereKey($data['vehicle_finance_agreement_id'] ?? 0)
-                ->where('status', 'active')
+                ->where('status', VehicleFinanceAgreementStatus::Active->value)
                 ->firstOrFail();
             if (CarbonImmutable::parse($finance->starts_at)->greaterThan($from) || CarbonImmutable::parse($finance->matures_at)->lessThan($to)) {
                 throw new InvalidArgumentException('Vehicle finance agreement does not cover the customer allocation.');
@@ -391,5 +518,43 @@ final class RentalAllocationService
         }
 
         return null;
+    }
+
+    private function lockEmployee(int $employeeId, int $tenantId, ?int $organizationUnitId): HrEmployee
+    {
+        return HrEmployee::query()
+            ->forTenant($tenantId, $organizationUnitId)
+            ->where('status', 'active')
+            ->lockForUpdate()
+            ->findOrFail($employeeId);
+    }
+
+    private function requiredExpectedVersion(array $data, string $field): int
+    {
+        if (! isset($data[$field])) {
+            throw ValidationException::withMessages([
+                $field => ['The current row version is required for this rental allocation write.'],
+            ]);
+        }
+
+        return (int) $data[$field];
+    }
+
+    private function assertAgreementExpectedVersion(RentalAgreement $agreement, int $expectedVersion): void
+    {
+        if ((int) $agreement->row_version !== $expectedVersion) {
+            throw ValidationException::withMessages([
+                'expected_agreement_version' => ['The rental agreement changed after it was loaded. Reload and review the latest version.'],
+            ]);
+        }
+    }
+
+    private function assertAllocationExpectedVersion(RentalVehicleAllocation $allocation, int $expectedVersion): void
+    {
+        if ((int) $allocation->row_version !== $expectedVersion) {
+            throw ValidationException::withMessages([
+                'expected_version' => ['The vehicle allocation changed after it was loaded. Reload and review the latest version.'],
+            ]);
+        }
     }
 }

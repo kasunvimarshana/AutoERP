@@ -13,6 +13,7 @@ final class StoreRentalAllocationRequest extends TenantScopedRequest
     public function rules(): array
     {
         return [
+            'expected_agreement_version' => ['required', 'integer', 'min:1'],
             'vehicle_id' => ['required', 'integer', 'min:1'],
             'vehicle_ownership_id' => ['nullable', 'integer', 'min:1'],
             'vehicle_source_type' => ['required', Rule::enum(RentalVehicleSourceType::class)],

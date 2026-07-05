@@ -1,5 +1,7 @@
+import { useState } from "react";
 import { useParams } from "react-router-dom";
-import { LinkButton } from "@/shared/components/Button";
+import { Button, LinkButton } from "@/shared/components/Button";
+import { toApiError, type ApiError } from "@/shared/api/apiError";
 import { ContentHeader } from "@/shared/components/ContentHeader";
 import { DetailGrid } from "@/shared/components/DetailGrid";
 import { ErrorAlert } from "@/shared/components/ErrorAlert";
@@ -10,11 +12,26 @@ import { useApi } from "@/shared/hooks/useApi";
 import { formatDate } from "@/shared/utils/formatDate";
 import { readableRelation } from "@/shared/utils/object";
 import { RentalPage } from "../components/RentalPage";
-import { getRentalAllocation } from "../vehicleRentalApi";
+import { cancelRentalAllocation, getRentalAllocation } from "../vehicleRentalApi";
+
+function ownershipLabel(value: unknown): string {
+    if (!value || typeof value !== "object") return "-";
+    const ownership = value as Record<string, unknown>;
+
+    return [
+        ownership.owner_name_snapshot,
+        typeof ownership.ownership_type === "string"
+            ? ownership.ownership_type.replaceAll("_", " ")
+            : null,
+    ].filter(Boolean).join(" - ") || "-";
+}
 
 export default function RentalAllocationDetailPage() {
     const id = Number(useParams().id);
-    const result = useApi((signal) => getRentalAllocation(id, signal), [id]);
+    const [refresh, setRefresh] = useState(0);
+    const [actionError, setActionError] = useState<ApiError | null>(null);
+    const [cancelling, setCancelling] = useState(false);
+    const result = useApi((signal) => getRentalAllocation(id, signal), [id, refresh]);
     if (result.loading)
         return (
             <RentalPage>
@@ -28,6 +45,20 @@ export default function RentalAllocationDetailPage() {
             </RentalPage>
         );
     const row = result.data;
+    const cancel = async () => {
+        if (!window.confirm("Cancel this planned allocation?")) return;
+
+        setCancelling(true);
+        setActionError(null);
+        try {
+            await cancelRentalAllocation(row.id, row.row_version);
+            setRefresh((value) => value + 1);
+        } catch (error) {
+            setActionError(toApiError(error));
+        } finally {
+            setCancelling(false);
+        }
+    };
 
     return (
         <RentalPage>
@@ -56,10 +87,19 @@ export default function RentalAllocationDetailPage() {
                                 Replace vehicle
                             </LinkButton>
                         )}
+                        {row.status === "planned" && (
+                            <Button
+                                variant="secondary"
+                                loading={cancelling}
+                                onClick={cancel}
+                            >
+                                Cancel allocation
+                            </Button>
+                        )}
                     </>
                 }
             />
-            <ErrorAlert error={result.error} />
+            <ErrorAlert error={actionError ?? result.error} />
             <div className="grid gap-5 lg:grid-cols-2">
                 <Panel title="Allocation">
                     <DetailGrid
@@ -80,6 +120,18 @@ export default function RentalAllocationDetailPage() {
                                 ),
                             },
                             {
+                                label: "Ownership",
+                                value: ownershipLabel(row.ownership),
+                            },
+                            {
+                                label: "Source allocation",
+                                value: readableRelation(row.source_allocation),
+                            },
+                            {
+                                label: "Finance agreement",
+                                value: readableRelation(row.finance_agreement),
+                            },
+                            {
                                 label: "Status",
                                 value: <StatusBadge status={row.status} />,
                             },
@@ -90,6 +142,10 @@ export default function RentalAllocationDetailPage() {
                             {
                                 label: "To",
                                 value: formatDate(row.allocated_to),
+                            },
+                            {
+                                label: "Actual return",
+                                value: formatDate(row.actual_returned_at),
                             },
                             {
                                 label: "Start odometer",

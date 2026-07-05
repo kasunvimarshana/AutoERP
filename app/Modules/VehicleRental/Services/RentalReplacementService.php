@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace Modules\VehicleRental\Services;
 
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use Modules\VehicleRental\Enums\RentalAgreementKind;
 use Modules\VehicleRental\Enums\RentalAllocationStatus;
+use Modules\VehicleRental\Enums\RentalDriverAssignmentStatus;
 use Modules\VehicleRental\Enums\RentalCustodyEventType;
 use Modules\VehicleRental\Enums\RentalReplacementStatus;
 use Modules\VehicleRental\Models\RentalVehicleAllocation;
@@ -29,6 +31,7 @@ final class RentalReplacementService
                 ->with(['agreement', 'driverAssignments'])
                 ->lockForUpdate()
                 ->findOrFail($oldAllocation->getKey());
+            $this->assertAllocationExpectedVersion($oldAllocation, (int) $data['expected_allocation_version']);
             if ($oldAllocation->agreement->agreement_kind !== RentalAgreementKind::CustomerRental
                 || $oldAllocation->status !== RentalAllocationStatus::Active) {
                 throw new InvalidArgumentException('Only an active customer allocation can be replaced.');
@@ -66,9 +69,10 @@ final class RentalReplacementService
                 'to_role' => 'company',
             ]);
             $returnEvent = $this->custody->create($oldAllocation, $returnData, $userId);
-            $this->custody->confirm($returnEvent, $userId);
+            $this->custody->confirm($returnEvent, (int) $returnEvent->row_version, $userId);
 
             $newAllocation = $this->allocations->create($oldAllocation->agreement, [
+                'expected_agreement_version' => $data['expected_agreement_version'],
                 'vehicle_id' => $data['new_vehicle_id'],
                 'vehicle_ownership_id' => $data['vehicle_ownership_id'] ?? null,
                 'vehicle_source_type' => $data['vehicle_source_type'],
@@ -77,13 +81,7 @@ final class RentalReplacementService
                 'replaces_allocation_id' => $oldAllocation->getKey(),
                 'allocated_from' => $data['replacement_at'],
                 'allocated_to' => $data['allocated_to'] ?? $oldAllocation->agreement->ends_at->toDateTimeString(),
-                'drivers' => $data['drivers'] ?? $oldAllocation->driverAssignments->map(fn ($assignment) => [
-                    'employee_id' => $assignment->employee_id,
-                    'assignment_role' => $assignment->assignment_role,
-                    'is_primary' => $assignment->is_primary,
-                    'assigned_from' => $data['replacement_at'],
-                    'assigned_to' => $data['allocated_to'] ?? $oldAllocation->agreement->ends_at->toDateTimeString(),
-                ])->all(),
+                'drivers' => $data['drivers'] ?? $this->replacementDrivers($oldAllocation, $data),
                 'remarks' => $data['remarks'] ?? null,
             ], $userId);
 
@@ -98,7 +96,7 @@ final class RentalReplacementService
                 'to_role' => 'customer',
             ]);
             $handoverEvent = $this->custody->create($newAllocation, $handoverData, $userId);
-            $this->custody->confirm($handoverEvent, $userId);
+            $this->custody->confirm($handoverEvent, (int) $handoverEvent->row_version, $userId);
 
             $replacement->status = RentalReplacementStatus::Completed;
             $replacement->completed_by = $userId;
@@ -112,5 +110,30 @@ final class RentalReplacementService
                 'oldAllocation.custodyEvents.items', 'newAllocation.custodyEvents.items',
             ]);
         });
+    }
+
+    private function assertAllocationExpectedVersion(RentalVehicleAllocation $allocation, int $expectedVersion): void
+    {
+        if ((int) $allocation->row_version !== $expectedVersion) {
+            throw ValidationException::withMessages([
+                'expected_allocation_version' => ['The vehicle allocation changed after it was loaded. Reload and review the latest version.'],
+            ]);
+        }
+    }
+
+    private function replacementDrivers(RentalVehicleAllocation $oldAllocation, array $data): array
+    {
+        return $oldAllocation->driverAssignments
+            ->filter(fn ($assignment): bool => in_array($assignment->status, [
+                RentalDriverAssignmentStatus::Planned,
+                RentalDriverAssignmentStatus::Active,
+            ], true))
+            ->map(fn ($assignment): array => [
+                'employee_id' => $assignment->employee_id,
+                'assignment_role' => $assignment->assignment_role,
+                'is_primary' => $assignment->is_primary,
+                'assigned_from' => $data['replacement_at'],
+                'assigned_to' => $data['allocated_to'] ?? $oldAllocation->agreement->ends_at->toDateTimeString(),
+            ])->values()->all();
     }
 }

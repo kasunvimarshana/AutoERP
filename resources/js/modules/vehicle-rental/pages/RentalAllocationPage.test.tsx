@@ -35,6 +35,12 @@ vi.mock('@/modules/vehicle/components/VehicleLookupSelect', () => ({
     ),
 }));
 vi.mock('../components/RentalLookups', () => ({
+    RentalAvailableVehicleLookupSelect: ({ value }: { value: NamedResource | null }) => (
+        <div>
+            <label htmlFor="vehicle-lookup">Vehicle</label>
+            <input id="vehicle-lookup" readOnly value={value?.name ?? ''} />
+        </div>
+    ),
     RentalAgreementLookupSelect: ({ value }: { value: NamedResource | null }) => (
         <div>
             <label htmlFor="agreement-lookup">Rental agreement</label>
@@ -89,7 +95,7 @@ describe('RentalAllocationPage', () => {
 
         await user.click(screen.getByRole('button', { name: 'Create allocation' }));
 
-        await waitFor(() => expect(apiMocks.createRentalAllocation).toHaveBeenCalledWith(7, expect.objectContaining({
+        await waitFor(() => expect(apiMocks.createRentalAllocation).toHaveBeenCalledWith(7, 1, expect.objectContaining({
             vehicle_id: 12,
             vehicle_source_type: 'company_owned',
             allocated_from: new Date(expectedFrom).toISOString(),
@@ -119,7 +125,7 @@ describe('RentalAllocationPage', () => {
             status: 'active',
             per_page: 100,
         }), expect.any(AbortSignal)));
-        await waitFor(() => expect(apiMocks.createRentalAllocation).toHaveBeenCalledWith(8, expect.objectContaining({
+        await waitFor(() => expect(apiMocks.createRentalAllocation).toHaveBeenCalledWith(8, 1, expect.objectContaining({
             vehicle_id: 12,
             vehicle_ownership_id: 31,
             vehicle_source_type: 'owner_supplied',

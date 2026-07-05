@@ -1,7 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { getVehicle } from '@/modules/vehicle/vehicleApi';
-import { VehicleLookupSelect } from '@/modules/vehicle/components/VehicleLookupSelect';
 import { listVehicleOwnerships as listPartyVehicleOwnerships } from '@/modules/vehicle/vehicleOwnershipApi';
 import type { VehicleSummary } from '@/modules/vehicle/vehicleTypes';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
@@ -21,6 +20,7 @@ import { readableRelation } from '@/shared/utils/object';
 import { parsePositiveInteger } from '@/shared/utils/routeParams';
 import type { PartyVehicleRelationship } from '@/shared/types/partyVehicle';
 import {
+    RentalAvailableVehicleLookupSelect,
     RentalAgreementLookupSelect,
     RentalAllocationLookupSelect,
     RentalFinanceAgreementLookupSelect,
@@ -86,23 +86,23 @@ function sourceTypeForAgreement(agreement: RentalAgreement | null): string {
         : SOURCE_TYPE_COMPANY_OWNED;
 }
 
-function ownershipCoversAgreement(ownership: PartyVehicleRelationship, agreement: RentalAgreement): boolean {
+function ownershipCoversPeriod(ownership: PartyVehicleRelationship, startsAtValue: string, endsAtValue: string): boolean {
     const startedAt = new Date(ownership.started_at);
     const endedAt = ownership.ended_at ? new Date(ownership.ended_at) : null;
-    const agreementStartsAt = new Date(agreement.starts_at);
-    const agreementEndsAt = new Date(agreement.ends_at);
+    const periodStartsAt = new Date(startsAtValue);
+    const periodEndsAt = new Date(endsAtValue);
 
     if (
         Number.isNaN(startedAt.getTime()) ||
-        Number.isNaN(agreementStartsAt.getTime()) ||
-        Number.isNaN(agreementEndsAt.getTime()) ||
+        Number.isNaN(periodStartsAt.getTime()) ||
+        Number.isNaN(periodEndsAt.getTime()) ||
         (endedAt !== null && Number.isNaN(endedAt.getTime()))
     ) {
         return false;
     }
 
-    return startedAt.getTime() <= agreementStartsAt.getTime()
-        && (endedAt === null || endedAt.getTime() >= agreementEndsAt.getTime());
+    return startedAt.getTime() <= periodStartsAt.getTime()
+        && (endedAt === null || endedAt.getTime() >= periodEndsAt.getTime());
 }
 
 function ownershipLabel(ownership: PartyVehicleRelationship | null): string {
@@ -191,14 +191,15 @@ export default function RentalAllocationPage() {
         setOwnerSupplyOwnership(null);
         setOwnershipHint(null);
 
-        if (!isOwnerSupplyAgreement || !agreementDetails || !ownerSupplySupplierId || !vehicle) {
+        if (!isOwnerSupplyAgreement || !agreementDetails || !ownerSupplySupplierId || !vehicle || !form.allocatedFrom || !form.allocatedTo) {
             setOwnershipLoading(false);
 
             return;
         }
 
-        const selectedAgreement = agreementDetails;
         const selectedVehicle = vehicle;
+        const selectedStartAt = toIsoDateTime(form.allocatedFrom);
+        const selectedEndAt = toIsoDateTime(form.allocatedTo);
         const controller = new AbortController();
         setOwnershipLoading(true);
 
@@ -210,8 +211,8 @@ export default function RentalAllocationPage() {
         }, controller.signal).then((response) => {
             if (controller.signal.aborted) return;
 
-            const ownership = response.data.find((row) => row.is_current && ownershipCoversAgreement(row, selectedAgreement))
-                ?? response.data.find((row) => ownershipCoversAgreement(row, selectedAgreement))
+            const ownership = response.data.find((row) => row.is_current && ownershipCoversPeriod(row, selectedStartAt, selectedEndAt))
+                ?? response.data.find((row) => ownershipCoversPeriod(row, selectedStartAt, selectedEndAt))
                 ?? null;
 
             setOwnerSupplyOwnership(ownership);
@@ -229,6 +230,8 @@ export default function RentalAllocationPage() {
         agreementDetails,
         isOwnerSupplyAgreement,
         ownerSupplySupplierId,
+        form.allocatedFrom,
+        form.allocatedTo,
         vehicle,
         vehicle?.id,
     ]);
@@ -247,9 +250,16 @@ export default function RentalAllocationPage() {
         setFinanceAgreement(null);
     };
 
+    const clearVehicleAndSources = () => {
+        setVehicle(null);
+        setSourceAllocation(null);
+        setFinanceAgreement(null);
+        setOwnerSupplyOwnership(null);
+    };
+
     const submit = async (event: FormEvent) => {
         event.preventDefault();
-        if (!agreement || !vehicle) return;
+        if (!agreement || !agreementDetails || !vehicle) return;
 
         const vehicleSourceType = isOwnerSupplyAgreement
             ? SOURCE_TYPE_OWNER_SUPPLIED
@@ -263,7 +273,7 @@ export default function RentalAllocationPage() {
         setSaving(true);
         setError(null);
         try {
-            await createRentalAllocation(agreement.id, {
+            await createRentalAllocation(agreement.id, agreementDetails.row_version, {
                 vehicle_id: vehicle.id,
                 vehicle_ownership_id: isOwnerSupplyAgreement ? ownerSupplyOwnership?.id ?? null : null,
                 vehicle_source_type: vehicleSourceType,
@@ -332,6 +342,8 @@ export default function RentalAllocationPage() {
     const agreementStartsAt = agreementDetails ? toDateTimeLocal(agreementDetails.starts_at) : '';
     const agreementEndsAt = agreementDetails ? toDateTimeLocal(agreementDetails.ends_at) : '';
     const vehicleSourceType = isOwnerSupplyAgreement ? SOURCE_TYPE_OWNER_SUPPLIED : form.vehicleSourceType;
+    const allocationStartAt = form.allocatedFrom ? toIsoDateTime(form.allocatedFrom) : null;
+    const allocationEndAt = form.allocatedTo ? toIsoDateTime(form.allocatedTo) : null;
 
     return (
         <RentalPage>
@@ -349,6 +361,7 @@ export default function RentalAllocationPage() {
                                 setAgreement(value);
                                 setAgreementDetails(null);
                                 setAgreementIdToLoad(value?.id ?? null);
+                                setVehicle(null);
                                 setSourceAllocation(null);
                                 setFinanceAgreement(null);
                                 setOwnerSupplyOwnership(null);
@@ -357,12 +370,16 @@ export default function RentalAllocationPage() {
                             }}
                             required
                         />
-                        <VehicleLookupSelect
+                        <RentalAvailableVehicleLookupSelect
                             value={vehicle}
                             onChange={(value) => {
                                 setVehicle(value);
+                                setSourceAllocation(null);
+                                setFinanceAgreement(null);
                                 setOwnerSupplyOwnership(null);
                             }}
+                            startAt={allocationStartAt}
+                            endAt={allocationEndAt}
                             required
                         />
                         <Select
@@ -391,6 +408,12 @@ export default function RentalAllocationPage() {
                             <RentalAllocationLookupSelect
                                 value={sourceAllocation}
                                 onChange={setSourceAllocation}
+                                vehicleId={vehicle?.id}
+                                agreementKind={AGREEMENT_KIND_OWNER_SUPPLY}
+                                coversStartAt={allocationStartAt}
+                                coversEndAt={allocationEndAt}
+                                openOnly
+                                disabled={!vehicle}
                                 required
                                 excludeId={null}
                             />
@@ -399,6 +422,11 @@ export default function RentalAllocationPage() {
                             <RentalFinanceAgreementLookupSelect
                                 value={financeAgreement}
                                 onChange={setFinanceAgreement}
+                                vehicleId={vehicle?.id}
+                                coversStartAt={allocationStartAt}
+                                coversEndAt={allocationEndAt}
+                                activeOnly
+                                disabled={!vehicle}
                                 required
                             />
                         )}
@@ -409,7 +437,10 @@ export default function RentalAllocationPage() {
                             value={form.allocatedFrom}
                             min={agreementStartsAt || undefined}
                             max={form.allocatedTo || agreementEndsAt || undefined}
-                            onChange={(event) => setForm({ ...form, allocatedFrom: event.target.value })}
+                            onChange={(event) => {
+                                setForm({ ...form, allocatedFrom: event.target.value });
+                                clearVehicleAndSources();
+                            }}
                         />
                         <Input
                             label="To"
@@ -417,7 +448,10 @@ export default function RentalAllocationPage() {
                             value={form.allocatedTo}
                             min={form.allocatedFrom || agreementStartsAt || undefined}
                             max={agreementEndsAt || undefined}
-                            onChange={(event) => setForm({ ...form, allocatedTo: event.target.value })}
+                            onChange={(event) => {
+                                setForm({ ...form, allocatedTo: event.target.value });
+                                clearVehicleAndSources();
+                            }}
                         />
                         <Input
                             label="Start odometer"
@@ -433,7 +467,7 @@ export default function RentalAllocationPage() {
                         <Button
                             type="submit"
                             loading={saving}
-                            disabled={!agreement || !vehicle || !form.allocatedFrom || ownershipLoading || !sourceSelectionValid}
+                            disabled={!agreement || !agreementDetails || !vehicle || !form.allocatedFrom || ownershipLoading || !sourceSelectionValid}
                         >
                             Create allocation
                         </Button>

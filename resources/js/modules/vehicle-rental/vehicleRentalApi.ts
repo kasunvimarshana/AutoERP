@@ -133,10 +133,31 @@ export const getRentalAllocation = (id: number, signal?: AbortSignal) =>
     resource<RentalAllocation>(`allocations/${id}`, signal);
 export const createRentalAllocation = (
     agreementId: number,
+    expectedAgreementVersion: number,
     payload: RentalPayload,
-) => post<RentalAllocation>(`agreements/${agreementId}/allocations`, payload);
-export const assignRentalDriver = (id: number, payload: RentalPayload) =>
-    post<RentalAllocation>(`allocations/${id}/drivers`, payload);
+) =>
+    post<RentalAllocation>(`agreements/${agreementId}/allocations`, {
+        ...payload,
+        expected_agreement_version: expectedAgreementVersion,
+    });
+export const assignRentalDriver = (
+    id: number,
+    expectedVersion: number,
+    payload: RentalPayload,
+) =>
+    post<RentalAllocation>(`allocations/${id}/drivers`, {
+        ...payload,
+        expected_version: expectedVersion,
+    });
+export const cancelRentalAllocation = (
+    id: number,
+    expectedVersion: number,
+    reason?: string,
+) =>
+    patch<RentalAllocation>(`allocations/${id}/cancel`, {
+        expected_version: expectedVersion,
+        reason,
+    });
 
 export const listRentalCustodyEvents = (
     params: ListParams,
@@ -166,8 +187,15 @@ export const reverseRentalCustodyEvent = (
     });
 export const replaceRentalVehicle = (
     allocationId: number,
+    expectedAllocationVersion: number,
+    expectedAgreementVersion: number,
     payload: RentalPayload,
-) => post(`allocations/${allocationId}/replacement`, payload);
+) =>
+    post(`allocations/${allocationId}/replacement`, {
+        ...payload,
+        expected_allocation_version: expectedAllocationVersion,
+        expected_agreement_version: expectedAgreementVersion,
+    });
 
 export const listRentalUsageLogs = (params: ListParams, signal?: AbortSignal) =>
     collection<RentalUsageLog>("usage-logs", params, signal);

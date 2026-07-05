@@ -54,6 +54,7 @@ final class RentalAvailabilityService
                 VehicleStatus::Blocked->value,
                 VehicleStatus::Scrapped->value,
             ])
+            ->lockForUpdate()
             ->findOrFail($vehicleId);
 
         $allocationConflict = RentalVehicleAllocation::query()

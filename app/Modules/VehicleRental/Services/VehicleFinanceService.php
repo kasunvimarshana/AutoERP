@@ -262,6 +262,12 @@ final class VehicleFinanceService
                 $query->where($key, $filters[$key]);
             }
         }
+        if (! empty($filters['covers_start_at'])) {
+            $query->where('starts_at', '<=', $filters['covers_start_at']);
+        }
+        if (! empty($filters['covers_end_at'])) {
+            $query->where('matures_at', '>=', $filters['covers_end_at']);
+        }
 
         return $query->latest('agreement_date')->latest('id')->paginate($perPage);
     }

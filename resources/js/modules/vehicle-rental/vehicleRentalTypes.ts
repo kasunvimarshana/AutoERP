@@ -99,6 +99,48 @@ export interface RentalDriverAssignment {
     is_primary: boolean;
     status: string;
 }
+export interface RentalAllocationAgreementSummary {
+    id: number;
+    code?: string | null;
+    name?: string;
+    row_version?: number;
+    agreement_number?: string;
+    agreement_kind?: string;
+    status?: string;
+    starts_at?: string;
+    ends_at?: string;
+}
+
+export interface RentalAllocationOwnershipSummary {
+    id: number;
+    code?: string | null;
+    name?: string;
+    owner_type?: string;
+    owner_code_snapshot?: string | null;
+    owner_name_snapshot?: string | null;
+    ownership_type?: string | null;
+}
+
+export interface RentalAllocationSourceSummary {
+    id: number;
+    code?: string | null;
+    name?: string;
+    allocation_number?: string;
+    status?: string;
+    allocated_from?: string;
+    allocated_to?: string | null;
+}
+
+export interface RentalAllocationFinanceSummary {
+    id: number;
+    code?: string | null;
+    name?: string;
+    agreement_number?: string;
+    status?: string;
+    starts_at?: string;
+    matures_at?: string;
+}
+
 export interface RentalCustodyItem {
     id?: number;
     item_type: string;
@@ -131,10 +173,12 @@ export interface RentalAllocation {
     id: number;
     row_version: number;
     allocation_number: string;
-    agreement?: NamedResource | null;
+    agreement?: RentalAllocationAgreementSummary | null;
     vehicle?: RentalVehicle | null;
+    ownership?: RentalAllocationOwnershipSummary | null;
     vehicle_source_type: string;
-    source_allocation?: NamedResource | null;
+    source_allocation?: RentalAllocationSourceSummary | null;
+    finance_agreement?: RentalAllocationFinanceSummary | null;
     allocated_from: string;
     allocated_to?: string | null;
     actual_returned_at?: string | null;

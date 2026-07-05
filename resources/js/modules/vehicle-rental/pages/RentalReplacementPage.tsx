@@ -1,7 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import type { VehicleSummary } from "@/modules/vehicle/vehicleTypes";
-import { VehicleLookupSelect } from "@/modules/vehicle/components/VehicleLookupSelect";
 import { Button } from "@/shared/components/Button";
 import { ContentHeader } from "@/shared/components/ContentHeader";
 import { DetailGrid } from "@/shared/components/DetailGrid";
@@ -18,6 +17,7 @@ import { businessDateTimeInputValue } from "@/shared/utils/businessDate";
 import { readableRelation } from "@/shared/utils/object";
 import { parsePositiveInteger } from "@/shared/utils/routeParams";
 import {
+    RentalAvailableVehicleLookupSelect,
     RentalAllocationLookupSelect,
     RentalFinanceAgreementLookupSelect,
 } from "../components/RentalLookups";
@@ -39,6 +39,22 @@ const emptyInspection = (): InspectionForm => ({
     condition_summary: "",
     damage_summary: "",
 });
+
+function toDateTimeLocal(value: string | null | undefined): string {
+    if (!value) return "";
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+
+    const offset = date.getTimezoneOffset() * 60_000;
+    return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+}
+
+function toIsoDateTime(value: string): string {
+    const date = new Date(value);
+
+    return Number.isNaN(date.getTime()) ? value : date.toISOString();
+}
 
 export default function RentalReplacementPage() {
     const allocationId = parsePositiveInteger(useParams().id);
@@ -67,11 +83,12 @@ export default function RentalReplacementPage() {
 
     const submit = async (event: FormEvent) => {
         event.preventDefault();
-        if (!allocationId || !vehicle) return;
+        const agreementVersion = allocation.data?.agreement?.row_version;
+        if (!allocationId || !vehicle || !allocation.data || !agreementVersion) return;
         setSaving(true);
         setActionError(null);
         try {
-            await replaceRentalVehicle(allocationId, {
+            await replaceRentalVehicle(allocationId, allocation.data.row_version, agreementVersion, {
                 new_vehicle_id: vehicle.id,
                 vehicle_source_type: form.vehicle_source_type,
                 source_allocation_id: form.vehicle_source_type === "owner_supplied"
@@ -80,8 +97,8 @@ export default function RentalReplacementPage() {
                 vehicle_finance_agreement_id: form.vehicle_source_type === "financed"
                     ? financeAgreement?.id ?? null
                     : null,
-                replacement_at: form.replacement_at,
-                allocated_to: form.allocated_to || null,
+                replacement_at: toIsoDateTime(form.replacement_at),
+                allocated_to: form.allocated_to ? toIsoDateTime(form.allocated_to) : null,
                 reason_code: form.reason_code || null,
                 reason: form.reason || null,
                 billing_continuity_rule: form.billing_continuity_rule,
@@ -128,6 +145,13 @@ export default function RentalReplacementPage() {
             </RentalPage>
         );
 
+    const replacementEnd = form.allocated_to || toDateTimeLocal(allocation.data.agreement?.ends_at ?? allocation.data.allocated_to);
+    const replacementStartAt = form.replacement_at ? toIsoDateTime(form.replacement_at) : null;
+    const replacementEndAt = replacementEnd ? toIsoDateTime(replacementEnd) : null;
+    const agreementVersion = allocation.data.agreement?.row_version;
+    const allocationStart = toDateTimeLocal(allocation.data.allocated_from);
+    const allocationEnd = toDateTimeLocal(allocation.data.agreement?.ends_at ?? allocation.data.allocated_to);
+
     return (
         <RentalPage>
             <ContentHeader
@@ -157,9 +181,16 @@ export default function RentalReplacementPage() {
             <form onSubmit={submit} className="mt-5 space-y-5">
                 <Panel title="Replacement">
                     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                        <VehicleLookupSelect
+                        <RentalAvailableVehicleLookupSelect
                             value={vehicle}
-                            onChange={setVehicle}
+                            onChange={(value) => {
+                                setVehicle(value);
+                                setSourceAllocation(null);
+                                setFinanceAgreement(null);
+                            }}
+                            startAt={replacementStartAt}
+                            endAt={replacementEndAt}
+                            required
                         />
                         <Select
                             label="Vehicle source"
@@ -188,6 +219,12 @@ export default function RentalReplacementPage() {
                             <RentalAllocationLookupSelect
                                 value={sourceAllocation}
                                 onChange={setSourceAllocation}
+                                vehicleId={vehicle?.id}
+                                agreementKind="owner_supply"
+                                coversStartAt={replacementStartAt}
+                                coversEndAt={replacementEndAt}
+                                openOnly
+                                disabled={!vehicle}
                                 excludeId={allocationId}
                                 required
                             />
@@ -196,6 +233,11 @@ export default function RentalReplacementPage() {
                             <RentalFinanceAgreementLookupSelect
                                 value={financeAgreement}
                                 onChange={setFinanceAgreement}
+                                vehicleId={vehicle?.id}
+                                coversStartAt={replacementStartAt}
+                                coversEndAt={replacementEndAt}
+                                activeOnly
+                                disabled={!vehicle}
                                 required
                             />
                         )}
@@ -204,23 +246,33 @@ export default function RentalReplacementPage() {
                             type="datetime-local"
                             required
                             value={form.replacement_at}
-                            onChange={(event) =>
+                            min={allocationStart || undefined}
+                            max={replacementEnd || allocationEnd || undefined}
+                            onChange={(event) => {
                                 setForm({
                                     ...form,
                                     replacement_at: event.target.value,
-                                })
-                            }
+                                });
+                                setVehicle(null);
+                                setSourceAllocation(null);
+                                setFinanceAgreement(null);
+                            }}
                         />
                         <Input
                             label="New allocation end"
                             type="datetime-local"
                             value={form.allocated_to}
-                            onChange={(event) =>
+                            min={form.replacement_at || allocationStart || undefined}
+                            max={allocationEnd || undefined}
+                            onChange={(event) => {
                                 setForm({
                                     ...form,
                                     allocated_to: event.target.value,
-                                })
-                            }
+                                });
+                                setVehicle(null);
+                                setSourceAllocation(null);
+                                setFinanceAgreement(null);
+                            }}
                         />
                         <Select
                             label="Continuity"
@@ -279,6 +331,7 @@ export default function RentalReplacementPage() {
                         loading={saving}
                         disabled={
                             !vehicle ||
+                            !agreementVersion ||
                             !form.replacement_at ||
                             !oldReturn.odometer ||
                             !newHandover.odometer ||
