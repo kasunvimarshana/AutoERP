@@ -59,6 +59,7 @@ final class RentalAgreementIntegrityContractTest extends TestCase
         self::assertStringContainsString('assertExpectedVersion', $service);
         self::assertStringContainsString('active immutable rate version', $service);
         self::assertStringContainsString('$version->row_version = $expectedVersion + 1;', $service);
+        self::assertStringContainsString("return \$version->refresh()->load('components');", $service);
         self::assertStringNotContainsString('$active->effective_to =', $service);
         self::assertStringNotContainsString('$active->status = RentalRateVersionStatus::Superseded;', $service);
         self::assertMatchesRegularExpression("/'expected_version'\\s*=>\\s*\\['required',\\s*'integer',\\s*'min:1'\\]/", $request);

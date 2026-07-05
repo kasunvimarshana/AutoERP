@@ -121,7 +121,7 @@ final class RentalRateVersionService
                 ]);
             }
 
-            return $version->load('components');
+            return $version->refresh()->load('components');
         }, 3);
     }
 
