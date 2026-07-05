@@ -27,29 +27,93 @@ import {
     listRentalCustodyEvents,
 } from '../vehicleRentalApi';
 import { vehicleRentalPermissions } from '../vehicleRentalPermissions';
-import type { RentalCustodyEvent } from '../vehicleRentalTypes';
+import type { RentalAllocation, RentalCustodyEvent } from '../vehicleRentalTypes';
 
-const eventOptions = [
-    'owner_to_company',
-    'company_to_customer',
-    'customer_to_company',
-    'company_to_owner',
-    'replacement_out',
-    'replacement_in',
-    'internal_transfer',
-];
+const AGREEMENT_KIND_OWNER_SUPPLY = 'owner_supply';
+const EVENT_OWNER_TO_COMPANY = 'owner_to_company';
+const EVENT_COMPANY_TO_CUSTOMER = 'company_to_customer';
+const EVENT_CUSTOMER_TO_COMPANY = 'customer_to_company';
+const EVENT_COMPANY_TO_OWNER = 'company_to_owner';
+const EVENT_REPLACEMENT_OUT = 'replacement_out';
+const EVENT_REPLACEMENT_IN = 'replacement_in';
+const EVENT_INTERNAL_TRANSFER = 'internal_transfer';
 
-const emptyForm = () => ({
-    event_type: 'company_to_customer',
+const customerRentalEventOptions = [
+    EVENT_COMPANY_TO_CUSTOMER,
+    EVENT_CUSTOMER_TO_COMPANY,
+    EVENT_REPLACEMENT_OUT,
+    EVENT_REPLACEMENT_IN,
+    EVENT_INTERNAL_TRANSFER,
+] as const;
+
+const ownerSupplyEventOptions = [
+    EVENT_OWNER_TO_COMPANY,
+    EVENT_COMPANY_TO_OWNER,
+    EVENT_INTERNAL_TRANSFER,
+] as const;
+
+const eventRoles: Record<string, { from: string; to: string }> = {
+    [EVENT_OWNER_TO_COMPANY]: { from: 'owner', to: 'company' },
+    [EVENT_COMPANY_TO_CUSTOMER]: { from: 'company', to: 'customer' },
+    [EVENT_CUSTOMER_TO_COMPANY]: { from: 'customer', to: 'company' },
+    [EVENT_COMPANY_TO_OWNER]: { from: 'company', to: 'owner' },
+    [EVENT_REPLACEMENT_OUT]: { from: 'customer', to: 'company' },
+    [EVENT_REPLACEMENT_IN]: { from: 'company', to: 'customer' },
+    [EVENT_INTERNAL_TRANSFER]: { from: 'company', to: 'company' },
+};
+
+const emptyForm = (eventType = EVENT_COMPANY_TO_CUSTOMER) => ({
+    event_type: eventType,
     occurred_at: businessDateTimeInputValue(),
     odometer: '0',
     fuel_level_percent: '',
     location: '',
-    from_role: 'company',
-    to_role: 'customer',
+    from_role: eventRoles[eventType].from,
+    to_role: eventRoles[eventType].to,
     condition_summary: '',
     damage_summary: '',
 });
+
+function allocationAgreementKind(allocation: RentalAllocation | null): string | null {
+    const agreement = allocation?.agreement;
+
+    return agreement && 'agreement_kind' in agreement && typeof agreement.agreement_kind === 'string'
+        ? agreement.agreement_kind
+        : null;
+}
+
+function allowedEventOptions(allocation: RentalAllocation | null): readonly string[] {
+    return allocationAgreementKind(allocation) === AGREEMENT_KIND_OWNER_SUPPLY
+        ? ownerSupplyEventOptions
+        : customerRentalEventOptions;
+}
+
+function defaultEventType(allocation: RentalAllocation | null): string {
+    return allocationAgreementKind(allocation) === AGREEMENT_KIND_OWNER_SUPPLY
+        ? EVENT_OWNER_TO_COMPANY
+        : EVENT_COMPANY_TO_CUSTOMER;
+}
+
+function setEventType<T extends ReturnType<typeof emptyForm>>(form: T, eventType: string): T {
+    return {
+        ...form,
+        event_type: eventType,
+        from_role: eventRoles[eventType].from,
+        to_role: eventRoles[eventType].to,
+    };
+}
+
+function allocationLookupValue(allocation: RentalAllocation): NamedResource {
+    return {
+        id: allocation.id,
+        code: allocation.allocation_number,
+        name: [
+            allocation.allocation_number,
+            allocation.vehicle?.registration_number ?? allocation.vehicle?.name,
+            allocation.status,
+        ].filter(Boolean).join(' - '),
+    };
+}
 
 export default function RentalCustodyPage() {
     const auth = useAuth();
@@ -57,27 +121,40 @@ export default function RentalCustodyPage() {
     const initialAllocationId = parsePositiveInteger(params.get('allocation_id'));
     const canManage = hasPermission(auth, vehicleRentalPermissions.custodyManage);
     const [allocation, setAllocation] = useState<NamedResource | null>(null);
+    const [allocationDetails, setAllocationDetails] = useState<RentalAllocation | null>(null);
+    const [allocationIdToLoad, setAllocationIdToLoad] = useState<number | null>(initialAllocationId);
     const [refresh, setRefresh] = useState(0);
     const [error, setError] = useState<ApiError | null>(null);
     const [saving, setSaving] = useState(false);
     const [form, setForm] = useState(emptyForm);
 
     useEffect(() => {
-        if (!initialAllocationId || allocation?.id === initialAllocationId) return;
+        setAllocationIdToLoad(initialAllocationId);
+    }, [initialAllocationId]);
+
+    useEffect(() => {
+        if (!allocationIdToLoad) {
+            setAllocationDetails(null);
+            setAllocation(null);
+            setForm(emptyForm());
+
+            return;
+        }
 
         const controller = new AbortController();
         setError(null);
 
-        void getRentalAllocation(initialAllocationId, controller.signal)
+        void getRentalAllocation(allocationIdToLoad, controller.signal)
             .then((resource) => {
-                setAllocation({
-                    id: resource.id,
-                    code: resource.allocation_number,
-                    name: [
-                        resource.allocation_number,
-                        resource.vehicle?.registration_number ?? resource.vehicle?.name,
-                        resource.status,
-                    ].filter(Boolean).join(' - '),
+                setAllocation(allocationLookupValue(resource));
+                setAllocationDetails(resource);
+                setForm((current) => {
+                    const allowed = allowedEventOptions(resource);
+                    const eventType = allowed.includes(current.event_type)
+                        ? current.event_type
+                        : defaultEventType(resource);
+
+                    return setEventType(current, eventType);
                 });
             })
             .catch((requestError: unknown) => {
@@ -85,19 +162,27 @@ export default function RentalCustodyPage() {
             });
 
         return () => controller.abort();
-    }, [allocation?.id, initialAllocationId]);
+    }, [allocationIdToLoad]);
 
+    const selectedAllocationId = allocation?.id ?? allocationIdToLoad;
     const result = useApi(
         (signal) => listRentalCustodyEvents(
-            { vehicle_allocation_id: allocation?.id, per_page: 50 },
+            { vehicle_allocation_id: selectedAllocationId ?? undefined, per_page: 50 },
             signal,
         ),
-        [allocation?.id, refresh],
+        [selectedAllocationId, refresh],
     );
 
     const submit = async (event: FormEvent) => {
         event.preventDefault();
-        if (!allocation) return;
+        if (!allocation || !allocationDetails) return;
+
+        const allowed = allowedEventOptions(allocationDetails);
+        if (!allowed.includes(form.event_type)) {
+            setForm((current) => setEventType(current, defaultEventType(allocationDetails)));
+
+            return;
+        }
 
         setSaving(true);
         setError(null);
@@ -109,7 +194,7 @@ export default function RentalCustodyPage() {
                 condition_summary: form.condition_summary || null,
                 damage_summary: form.damage_summary || null,
             });
-            setForm(emptyForm());
+            setForm(emptyForm(defaultEventType(allocationDetails)));
             setRefresh((value) => value + 1);
         } catch (requestError: unknown) {
             setError(toApiError(requestError));
@@ -145,6 +230,7 @@ export default function RentalCustodyPage() {
             ) : null,
         },
     ];
+    const eventOptions = allowedEventOptions(allocationDetails);
 
     return (
         <RentalPage>
@@ -156,7 +242,12 @@ export default function RentalCustodyPage() {
             <Panel title="Context">
                 <RentalAllocationLookupSelect
                     value={allocation}
-                    onChange={setAllocation}
+                    onChange={(value) => {
+                        setAllocation(value);
+                        setAllocationDetails(null);
+                        setAllocationIdToLoad(value?.id ?? null);
+                        if (value === null) setForm(emptyForm());
+                    }}
                     required={canManage}
                 />
             </Panel>
@@ -167,7 +258,7 @@ export default function RentalCustodyPage() {
                             <Select
                                 label="Event type"
                                 value={form.event_type}
-                                onChange={(event) => setForm({ ...form, event_type: event.target.value })}
+                                onChange={(event) => setForm((current) => setEventType(current, event.target.value))}
                                 options={eventOptions.map((value) => ({
                                     value,
                                     label: value.replaceAll('_', ' '),
@@ -201,13 +292,13 @@ export default function RentalCustodyPage() {
                             <Select
                                 label="From"
                                 value={form.from_role}
-                                onChange={(event) => setForm({ ...form, from_role: event.target.value })}
+                                disabled
                                 options={['owner', 'company', 'customer'].map((value) => ({ value, label: value }))}
                             />
                             <Select
                                 label="To"
                                 value={form.to_role}
-                                onChange={(event) => setForm({ ...form, to_role: event.target.value })}
+                                disabled
                                 options={['owner', 'company', 'customer'].map((value) => ({ value, label: value }))}
                             />
                             <Input
@@ -229,7 +320,7 @@ export default function RentalCustodyPage() {
                             />
                         </div>
                         <div className="mt-4 flex justify-end">
-                            <Button type="submit" loading={saving} disabled={!allocation || !form.occurred_at}>
+                            <Button type="submit" loading={saving} disabled={!allocationDetails || !form.occurred_at}>
                                 Save custody event
                             </Button>
                         </div>
