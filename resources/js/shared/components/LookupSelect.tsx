@@ -16,6 +16,7 @@ export interface LookupSelectProps<T extends NamedResource = NamedResource> exte
     disabled?: boolean;
     required?: boolean;
     id?: string;
+    recentResultsKey?: string;
 }
 
 export function LookupSelect<T extends NamedResource = NamedResource>({
@@ -31,6 +32,7 @@ export function LookupSelect<T extends NamedResource = NamedResource>({
     disabled,
     required,
     id,
+    recentResultsKey,
     minSearchLength,
     loadOnOpen,
     perPage,
@@ -54,6 +56,7 @@ export function LookupSelect<T extends NamedResource = NamedResource>({
             excludeIds={excludeIds}
             disabled={disabled}
             required={required}
+            recentResultsKey={recentResultsKey}
             minSearchLength={minSearchLength}
             loadOnOpen={loadOnOpen}
             perPage={perPage}

@@ -1,5 +1,6 @@
 import { apiClient } from '@/shared/api/apiClient';
 import { endpoints } from '@/shared/api/endpoints';
+import { createLocallyFilteredLookupLoader, createQueryCachedLookupLoader } from '@/shared/api/lookupCache';
 import { requestLookup } from '@/shared/api/lookupRequest';
 import type { ApiCollection, ApiResource, ListParams } from '@/shared/types/api';
 import type { LookupLoadParams, LookupResult } from '@/shared/types/lookup';
@@ -67,15 +68,30 @@ export async function setItemActive(id: number, active: boolean): Promise<Item> 
 
 export function searchItems(params: LookupLoadParams, kind = ''): Promise<LookupResult<ItemSummary>> {
     const path = kind ? `${endpoints.items}/lookup/${kind}` : `${endpoints.items}/lookup`;
-    return requestLookup<ItemSummary>(path, params);
+    const loader = createQueryCachedLookupLoader<ItemSummary>({
+        key: `lookup:items:${kind || 'active'}`,
+        load: (lookupParams) => requestLookup<ItemSummary>(path, lookupParams),
+    });
+
+    return loader(params);
 }
 
 export function searchItemCategories(params: LookupLoadParams): Promise<LookupResult<ItemCategory>> {
-    return requestLookup<ItemCategory>(`${endpoints.itemCategories}/lookup`, params);
+    const loader = createLocallyFilteredLookupLoader<ItemCategory>({
+        key: 'lookup:item-categories',
+        load: (lookupParams) => requestLookup<ItemCategory>(`${endpoints.itemCategories}/lookup`, lookupParams),
+    });
+
+    return loader(params);
 }
 
 export function searchItemBrands(params: LookupLoadParams): Promise<LookupResult<ItemBrand>> {
-    return requestLookup<ItemBrand>(`${endpoints.itemBrands}/lookup`, params);
+    const loader = createLocallyFilteredLookupLoader<ItemBrand>({
+        key: 'lookup:item-brands',
+        load: (lookupParams) => requestLookup<ItemBrand>(`${endpoints.itemBrands}/lookup`, lookupParams),
+    });
+
+    return loader(params);
 }
 
 export async function listItemCategories(params: ListParams, signal?: AbortSignal) {

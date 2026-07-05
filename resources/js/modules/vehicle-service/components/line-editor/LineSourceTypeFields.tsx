@@ -4,6 +4,7 @@ import { LookupSelect } from '@/shared/components/LookupSelect';
 import { Select } from '@/shared/components/Select';
 import type { VehicleServiceLineSourceType } from '../../vehicleServiceTypes';
 import {
+    lineTypeLabel,
     lineTypeOptions,
     type VehicleServiceLineFormValue,
 } from './lineForm';
@@ -35,18 +36,22 @@ export function LineSourceTypeFields({ value, error, onChange }: {
                     ...value,
                     source: event.target.value as VehicleServiceLineSourceType,
                     item: null,
+                    description: lineTypeLabel(event.target.value as VehicleServiceLineSourceType),
                     customer_supplied: false,
                 })}
             />
             {!external && (
-                <LookupSelect
-                    label="Item"
-                    value={value.item}
-                    error={fieldError(error, 'item_id')}
-                    onChange={(item) => onChange(nextLineValue(value, item))}
-                    search={itemSearch}
-                    renderOption={(item, state) => <ItemOption option={item} active={state.active} />}
-                />
+                <div className="sm:col-span-2">
+                    <LookupSelect
+                        label="Item"
+                        value={value.item}
+                        error={fieldError(error, 'item_id')}
+                        onChange={(item) => onChange(nextLineValue(value, item))}
+                        search={itemSearch}
+                        renderOption={(item, state) => <ItemOption option={item} active={state.active} />}
+                        recentResultsKey={`vehicle-service:job-line-items:${value.source}`}
+                    />
+                </div>
             )}
         </>
     );
@@ -59,7 +64,8 @@ function nextLineValue(
     return {
         ...value,
         item,
-        description: item?.name ?? value.description,
+        description: item?.name ?? lineTypeLabel(value.source),
+        uom: item?.base_uom ?? value.uom,
         unit_cost: item?.resolved_purchase_unit_price ?? value.unit_cost,
         unit_price: item?.resolved_service_unit_price ?? value.unit_price,
     };

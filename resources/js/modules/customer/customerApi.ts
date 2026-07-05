@@ -1,5 +1,6 @@
 import { apiClient } from '@/shared/api/apiClient';
 import { endpoints } from '@/shared/api/endpoints';
+import { createLocallyFilteredLookupLoader, createQueryCachedLookupLoader } from '@/shared/api/lookupCache';
 import { requestLookup } from '@/shared/api/lookupRequest';
 import type { ApiCollection, ApiResource, ListParams } from '@/shared/types/api';
 import type { NamedResource } from '@/shared/types/common';
@@ -50,15 +51,30 @@ export const changeCustomerStatus = (id: number, status: string, reason?: string
         .then((response) => response.data.data);
 
 export function searchCustomers(params: LookupLoadParams, kind = 'active'): Promise<LookupResult<CustomerSummary>> {
-    return requestLookup<CustomerSummary>(`${endpoints.customers}/lookup/${kind}`, params);
+    const loader = createQueryCachedLookupLoader<CustomerSummary>({
+        key: `lookup:customers:${kind}`,
+        load: (lookupParams) => requestLookup<CustomerSummary>(`${endpoints.customers}/lookup/${kind}`, lookupParams),
+    });
+
+    return loader(params);
 }
 
 export function searchCustomerCategories(params: LookupLoadParams): Promise<LookupResult<CustomerCategory>> {
-    return requestLookup<CustomerCategory>(`${endpoints.customerCategories}/lookup`, params);
+    const loader = createLocallyFilteredLookupLoader<CustomerCategory>({
+        key: 'lookup:customer-categories',
+        load: (lookupParams) => requestLookup<CustomerCategory>(`${endpoints.customerCategories}/lookup`, lookupParams),
+    });
+
+    return loader(params);
 }
 
 export function searchCurrencies(params: LookupLoadParams): Promise<LookupResult<NamedResource>> {
-    return requestLookup<NamedResource>(endpoints.currencies, params);
+    const loader = createLocallyFilteredLookupLoader<NamedResource>({
+        key: 'lookup:currencies',
+        load: (lookupParams) => requestLookup<NamedResource>(endpoints.currencies, lookupParams),
+    });
+
+    return loader(params);
 }
 
 const relationPath = (customerId: number, relation: string) => `${endpoints.customers}/${customerId}/${relation}`;
