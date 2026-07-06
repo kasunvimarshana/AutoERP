@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
@@ -28,33 +28,43 @@ import { VehicleServiceLineForm } from './line-editor/VehicleServiceLineForm';
 export default function VehicleServiceLineEditor({
     jobId,
     expectedVersion,
-    onChanged,
 }: {
     jobId: number;
     expectedVersion: number;
-    onChanged?: () => void;
 }) {
-    const result = useApi((signal) => listVehicleServiceLines(jobId, signal), [jobId]);
+    const result = useApi((signal) => listVehicleServiceLines(jobId, signal), [jobId], true, false);
     const [dialog, setDialog] = useState<LineDialog | null>(null);
     const [removeTarget, setRemoveTarget] = useState<VehicleServiceJobLine | null>(null);
     const [saving, setSaving] = useState(false);
     const [removing, setRemoving] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
+    const [toast, setToast] = useState('');
+    const [localExpectedVersion, setLocalExpectedVersion] = useState(expectedVersion);
+
+    useEffect(() => {
+        if (toast === '') return;
+
+        const timeout = window.setTimeout(() => setToast(''), 2500);
+        return () => window.clearTimeout(timeout);
+    }, [toast]);
 
     const saveLine = async (value: VehicleServiceLineFormValue) => {
         if (!dialog || saving) return;
         setSaving(true);
         setError(null);
         try {
-            const payload = { ...lineFormToPayload(value), expected_version: expectedVersion };
+            const payload = { ...lineFormToPayload(value), expected_version: localExpectedVersion };
             if (dialog.mode === 'edit') {
-                await updateVehicleServiceLine(jobId, dialog.lineId, payload);
+                const saved = await updateVehicleServiceLine(jobId, dialog.lineId, payload);
+                result.setData(replaceLine(result.data ?? [], saved));
+                setToast('Job line updated.');
             } else {
-                await createVehicleServiceLine(jobId, payload);
+                const saved = await createVehicleServiceLine(jobId, payload);
+                result.setData(appendLine(result.data ?? [], saved));
+                setToast('Job line added.');
             }
             setDialog(null);
-            result.reload();
-            onChanged?.();
+            setLocalExpectedVersion((current) => current + 1);
         } catch (requestError) {
             setError(toApiError(requestError));
         } finally {
@@ -67,10 +77,11 @@ export default function VehicleServiceLineEditor({
         setRemoving(true);
         setError(null);
         try {
-            await deleteVehicleServiceLine(jobId, line.id, expectedVersion);
+            await deleteVehicleServiceLine(jobId, line.id, localExpectedVersion);
+            result.setData(removeLineFromList(result.data ?? [], line.id));
+            setToast('Job line removed.');
             setRemoveTarget(null);
-            result.reload();
-            onChanged?.();
+            setLocalExpectedVersion((current) => current + 1);
         } catch (requestError) {
             setError(toApiError(requestError));
         } finally {
@@ -81,6 +92,7 @@ export default function VehicleServiceLineEditor({
     return (
         <div className="space-y-5">
             <ErrorAlert error={error ?? result.error} />
+            <ToastNotice message={toast} />
             <VehicleServiceLineTable
                 lines={result.data ?? []}
                 loading={result.loading}
@@ -122,6 +134,21 @@ export default function VehicleServiceLineEditor({
             />
         </div>
     );
+}
+
+function appendLine(lines: VehicleServiceJobLine[], line: VehicleServiceJobLine): VehicleServiceJobLine[] {
+    return [...lines, line].sort((left, right) => left.line_number - right.line_number);
+}
+
+function replaceLine(lines: VehicleServiceJobLine[], line: VehicleServiceJobLine): VehicleServiceJobLine[] {
+    return lines
+        .map((current) => current.id === line.id ? line : current)
+        .sort((left, right) => left.line_number - right.line_number);
+}
+
+function removeLineFromList(lines: VehicleServiceJobLine[], lineId: number): VehicleServiceJobLine[] {
+    return lines.filter((line) => line.id !== lineId)
+        .map((line, index) => ({ ...line, line_number: index + 1 }));
 }
 
 function VehicleServiceLineTable({ lines, loading, onAdd, onEdit, onRemove }: {
@@ -194,6 +221,16 @@ function LineMobileDetails({ line }: { line: VehicleServiceJobLine }) {
             <SummaryValue label="UOM" value={line.uom?.code ?? '-'} />
             <SummaryValue label="Price" value={line.unit_price} />
             <SummaryValue label="Total" value={line.line_total} />
+        </div>
+    );
+}
+
+function ToastNotice({ message }: { message: string }) {
+    if (message === '') return null;
+
+    return (
+        <div className="fixed bottom-4 right-4 z-40 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-900 shadow-lg">
+            {message}
         </div>
     );
 }
