@@ -11,6 +11,8 @@ use Database\Seeders\Concerns\ResolvesSeedContext;
 use Modules\Customer\Models\Customer;
 use Modules\Customer\Models\CustomerCategory;
 use Modules\Customer\Models\CustomerCategoryAssignment;
+use Modules\Sequence\Models\SequenceModel;
+use Modules\Sequence\Services\Contracts\SequenceDomainServiceInterface;
 
 final class CustomerSeeder extends Seeder
 {
@@ -73,6 +75,29 @@ final class CustomerSeeder extends Seeder
                     [
                         'tenant_id' => $tenant->getKey(),
                         'organization_unit_id' => $organizationUnit?->getKey(),
+                    ],
+                );
+            }
+
+            if (Schema::hasTable('sequences')) {
+                $scopeKey = app(SequenceDomainServiceInterface::class)->scopeKey(null, null);
+
+                SequenceModel::query()->updateOrCreate(
+                    [
+                        'tenant_id' => $tenant->getKey(),
+                        'document_type' => 'customer',
+                        'scope_key' => $scopeKey,
+                    ],
+                    [
+                        'organization_unit_id' => null,
+                        'prefix' => 'CUS-',
+                        'suffix' => '',
+                        'padding' => 6,
+                        'next_number' => 2,
+                        'period_type' => 'infinite',
+                        'period_value' => null,
+                        'row_version' => 1,
+                        'metadata' => ['seed_source' => 'customer_module'],
                     ],
                 );
             }

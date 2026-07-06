@@ -35,7 +35,7 @@ type Tab = 'summary' | 'inspection' | 'lines' | 'workforce' | 'inventory' | 'inv
 export default function VehicleServiceJobDetailPage() {
     const id = Number(useParams().id);
     const navigate = useNavigate();
-    const result = useApi((signal) => getVehicleServiceJob(id, signal), [id]);
+    const result = useApi((signal) => getVehicleServiceJob(id, signal), [id], true, false);
     const tabs = useOnDemandTab<Tab>('summary');
     const [busy, setBusy] = useState(false);
     const [actionError, setActionError] = useState<ApiError | null>(null);
@@ -141,7 +141,7 @@ export default function VehicleServiceJobDetailPage() {
                         <Suspense fallback={<LoadingState />}>
                             <TabPanel tabsId="service-job-tabs" tabId="summary" active={tabs.activeTab}><VehicleServiceSummaryPanel job={job} /></TabPanel>
                             {tabs.openedTabs.has('inspection') && <TabPanel tabsId="service-job-tabs" tabId="inspection" active={tabs.activeTab}><InspectionTab jobId={job.id} expectedVersion={expectedVersion} onChanged={result.reload} /></TabPanel>}
-                            {tabs.openedTabs.has('lines') && <TabPanel tabsId="service-job-tabs" tabId="lines" active={tabs.activeTab}><LinesTab jobId={job.id} expectedVersion={expectedVersion} onChanged={result.reload} /></TabPanel>}
+                            {tabs.openedTabs.has('lines') && <TabPanel tabsId="service-job-tabs" tabId="lines" active={tabs.activeTab}><LinesTab key={`lines-${job.id}-${expectedVersion}`} jobId={job.id} expectedVersion={expectedVersion} /></TabPanel>}
                             {tabs.openedTabs.has('workforce') && <TabPanel tabsId="service-job-tabs" tabId="workforce" active={tabs.activeTab}><WorkforceTab jobId={job.id} expectedVersion={expectedVersion} onChanged={result.reload} /></TabPanel>}
                             {tabs.openedTabs.has('inventory') && <TabPanel tabsId="service-job-tabs" tabId="inventory" active={tabs.activeTab}><InventoryTab jobId={job.id} expectedVersion={expectedVersion} onChanged={result.reload} /></TabPanel>}
                             {tabs.openedTabs.has('invoice') && <TabPanel tabsId="service-job-tabs" tabId="invoice" active={tabs.activeTab}><InvoiceTab job={job} /></TabPanel>}

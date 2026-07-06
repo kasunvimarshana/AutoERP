@@ -36,6 +36,18 @@ final class ItemSummaryResource extends JsonResource
             'default_tax_group_id' => $this->default_tax_group_id,
             'purchase_tax_group_id' => $this->purchase_tax_group_id,
             'sales_tax_group_id' => $this->sales_tax_group_id,
+            'resolved_service_unit_price' => $this->when(
+                array_key_exists('resolved_service_unit_price', $this->resource->getAttributes()),
+                fn () => $this->resource->getAttribute('resolved_service_unit_price'),
+            ),
+            'resolved_purchase_unit_price' => $this->when(
+                array_key_exists('resolved_purchase_unit_price', $this->resource->getAttributes()),
+                fn () => $this->resource->getAttribute('resolved_purchase_unit_price'),
+            ),
+            'available_stock_quantity' => $this->when(
+                array_key_exists('available_stock_quantity', $this->resource->getAttributes()),
+                fn () => $this->resource->getAttribute('available_stock_quantity'),
+            ),
             'is_active' => (bool) $this->is_active,
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),

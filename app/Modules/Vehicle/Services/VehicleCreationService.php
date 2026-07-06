@@ -6,9 +6,11 @@ namespace Modules\Vehicle\Services;
 
 use Illuminate\Support\Facades\DB;
 use Modules\Core\Services\DecimalMath;
+use Modules\Vehicle\Data\CreateVehicleOwnershipData;
 use Modules\Vehicle\DTOs\CreateVehicleData;
 use Modules\Vehicle\Models\Vehicle;
 use Modules\Vehicle\Validators\VehicleValidationService;
+use Modules\Vehicle\Services\Ownership\VehicleOwnershipCommandService;
 use Throwable;
 
 final class VehicleCreationService
@@ -19,6 +21,7 @@ final class VehicleCreationService
         private readonly VehicleNumberService $numbers,
         private readonly VehicleDocumentService $documents,
         private readonly VehicleAttributeService $attributes,
+        private readonly VehicleOwnershipCommandService $ownerships,
         private readonly VehicleStatusService $statuses,
     ) {}
 
@@ -62,8 +65,24 @@ final class VehicleCreationService
                         $storedDocumentPaths[] = $path;
                     });
                 }
-                    foreach ($data->attributes as $attribute) {
+                foreach ($data->attributes as $attribute) {
                     $this->attributes->create($vehicle, $attribute);
+                }
+                foreach ($data->ownerships as $ownership) {
+                    $this->ownerships->create(
+                        new CreateVehicleOwnershipData(
+                            vehicleId: (int) $vehicle->getKey(),
+                            ownerType: $ownership->ownerType,
+                            ownerId: $ownership->ownerId,
+                            ownershipType: $ownership->ownershipType,
+                            startedAt: $ownership->startedAt,
+                            endedAt: $ownership->endedAt,
+                            isCurrent: $ownership->isCurrent,
+                            notes: $ownership->notes,
+                        ),
+                        $data->tenantId,
+                        $data->organizationUnitId,
+                    );
                 }
                 $this->statuses->recordInitial($vehicle, $data->createdBy);
 
