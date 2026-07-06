@@ -34,8 +34,11 @@ use Modules\Customer\Services\CustomerCreationService;
 use Modules\Customer\Services\CustomerCreditProfileService;
 use Modules\Customer\Services\CustomerDocumentService;
 use Modules\Customer\Services\CustomerLookupService;
+use Modules\Customer\Services\CustomerNumberService;
 use Modules\Customer\Services\CustomerStatusService;
 use Modules\User\Models\UserModel;
+use Modules\Sequence\Models\SequenceModel;
+use Modules\Sequence\Services\Contracts\SequenceDomainServiceInterface;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 use Tests\TestCase;
 
@@ -120,6 +123,43 @@ final class CustomerEngineTest extends TestCase
         $this->expectException(ConflictHttpException::class);
         $this->expectExceptionMessage('Customer number already exists for this tenant.');
         $this->createCustomer($tenantId, 'UNIQUE', 'CUS-CUSTOM-1');
+    }
+
+    public function test_customer_number_service_recovers_from_stale_sequence(): void
+    {
+        [$tenantId] = $this->scopeContext();
+        $this->createCustomer($tenantId, 'SEEDED', 'CUS-000001');
+        $this->withTenantExecutionContext($tenantId, function () use ($tenantId): void {
+            $scopeKey = app(SequenceDomainServiceInterface::class)->scopeKey(null, null);
+
+            SequenceModel::query()->updateOrCreate(
+                [
+                    'tenant_id' => $tenantId,
+                    'document_type' => 'customer',
+                    'scope_key' => $scopeKey,
+                ],
+                [
+                    'organization_unit_id' => null,
+                    'prefix' => 'CUS-',
+                    'suffix' => '',
+                    'padding' => 6,
+                    'next_number' => 1,
+                    'period_type' => 'infinite',
+                    'period_value' => null,
+                    'row_version' => 1,
+                    'metadata' => ['test' => 'stale-sequence'],
+                ],
+            );
+        });
+
+        $number = $this->withTenantExecutionContext($tenantId, fn (): string => app(CustomerNumberService::class)->next($tenantId));
+
+        $this->assertSame('CUS-000002', $number);
+        $this->assertDatabaseHas('sequences', [
+            'tenant_id' => $tenantId,
+            'document_type' => 'customer',
+            'next_number' => 3,
+        ]);
     }
 
     public function test_primary_contact_address_and_bank_account_constraints_are_enforced(): void

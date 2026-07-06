@@ -10,6 +10,8 @@ use Modules\Vehicle\DTOs\CreateVehicleData;
 use Modules\Vehicle\Enums\VehicleAttributeDataType;
 use Modules\Vehicle\Enums\VehicleDocumentStatus;
 use Modules\Vehicle\Enums\VehicleDocumentType;
+use Modules\Vehicle\Enums\VehicleOwnerType;
+use Modules\Vehicle\Enums\VehicleOwnershipType;
 use Modules\Vehicle\Http\Requests\Concerns\MapsVehicleData;
 
 final class StoreVehicleWithRelationsRequest extends TenantScopedRequest
@@ -37,6 +39,14 @@ final class StoreVehicleWithRelationsRequest extends TenantScopedRequest
             'attributes.*.attribute_value' => ['nullable', 'string'],
             'attributes.*.data_type' => ['nullable', Rule::enum(VehicleAttributeDataType::class)],
             'attributes.*.sort_order' => ['nullable', 'integer', 'min:0'],
+            'ownerships' => ['nullable', 'array'],
+            'ownerships.*.owner_type' => ['required', Rule::enum(VehicleOwnerType::class)],
+            'ownerships.*.owner_id' => ['nullable', 'integer', 'min:1', 'required_unless:ownerships.*.owner_type,company', 'prohibited_if:ownerships.*.owner_type,company'],
+            'ownerships.*.ownership_type' => ['required', Rule::enum(VehicleOwnershipType::class)],
+            'ownerships.*.started_at' => ['required', 'date'],
+            'ownerships.*.ended_at' => ['nullable', 'date', 'after:ownerships.*.started_at'],
+            'ownerships.*.is_current' => ['nullable', 'boolean'],
+            'ownerships.*.notes' => ['nullable', 'string', 'max:5000'],
         ];
     }
 

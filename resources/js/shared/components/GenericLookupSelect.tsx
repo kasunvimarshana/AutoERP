@@ -18,6 +18,7 @@ interface GenericLookupSelectProps<T extends NamedResource> extends LookupBehavi
     search: LookupLoader<T>;
     formatLabel: (resource: T) => string;
     renderOption?: (resource: T, state: { active: boolean; selected: boolean }) => ReactNode;
+    renderEmptyState?: (state: { searchText: string }) => ReactNode;
     excludeId?: number | null;
     excludeIds?: Array<number | string>;
     error?: string;
@@ -35,6 +36,7 @@ export function GenericLookupSelect<T extends NamedResource>({
     search,
     formatLabel,
     renderOption,
+    renderEmptyState,
     excludeId,
     excludeIds,
     error,
@@ -352,7 +354,7 @@ export function GenericLookupSelect<T extends NamedResource>({
                         </div>
                     )}
                     {!loading && !waitingForDebounce && hasLoaded && visibleOptions.length === 0 && !searchError && (
-                        <LookupMessage>No matching {label.toLowerCase()} found.</LookupMessage>
+                        renderEmptyState?.({ searchText }) ?? <LookupMessage>No matching {label.toLowerCase()} found.</LookupMessage>
                     )}
 
                     {visibleOptions.map((option, index) => {

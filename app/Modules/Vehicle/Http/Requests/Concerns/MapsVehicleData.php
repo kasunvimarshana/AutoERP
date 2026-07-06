@@ -16,6 +16,8 @@ use Modules\Vehicle\Enums\VehicleTransmissionType;
 
 trait MapsVehicleData
 {
+    use MapsVehicleOwnershipData;
+
     private function mapVehicleData(array $vehicle, array $relations = []): CreateVehicleData
     {
         return new CreateVehicleData(
@@ -45,6 +47,7 @@ trait MapsVehicleData
             createdBy: $this->currentUserId(),
             documents: array_map(fn (array $row): VehicleDocumentData => $this->mapDocument($row), $relations['documents'] ?? []),
             attributes: array_map(fn (array $row): VehicleAttributeData => $this->mapAttribute($row), $relations['attributes'] ?? []),
+            ownerships: array_map(fn (array $row) => $this->mapOwnership($row), $relations['ownerships'] ?? []),
         );
     }
 
