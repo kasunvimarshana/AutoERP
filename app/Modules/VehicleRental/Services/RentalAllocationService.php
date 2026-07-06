@@ -167,6 +167,9 @@ final class RentalAllocationService
     {
         return DB::transaction(function () use ($allocation, $userId): RentalVehicleAllocation {
             $allocation = RentalVehicleAllocation::query()->with('agreement')->lockForUpdate()->findOrFail($allocation->getKey());
+            if ($allocation->agreement->status !== RentalAgreementStatus::Active) {
+                throw new InvalidArgumentException('Only allocations under an active rental agreement can be activated.');
+            }
             if ($allocation->status === RentalAllocationStatus::Active) {
                 return $allocation->load($this->relations());
             }

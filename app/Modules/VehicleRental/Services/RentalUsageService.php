@@ -12,6 +12,7 @@ use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\VehicleRental\Enums\RentalAgreementKind;
+use Modules\VehicleRental\Enums\RentalAgreementStatus;
 use Modules\VehicleRental\Enums\RentalAllocationStatus;
 use Modules\VehicleRental\Enums\RentalCalculationStatus;
 use Modules\VehicleRental\Enums\RentalCustodyEventType;
@@ -396,6 +397,11 @@ final class RentalUsageService
                 'Daily running chart must be recorded against a customer rental allocation.',
             );
         }
+        if ($allocation->agreement->status !== RentalAgreementStatus::Active) {
+            throw new InvalidArgumentException(
+                'Running chart requires an active rental agreement.',
+            );
+        }
         if ($allocation->status !== RentalAllocationStatus::Active) {
             throw new InvalidArgumentException(
                 'Running chart requires an active vehicle allocation.',
@@ -478,6 +484,11 @@ final class RentalUsageService
         if ($sourceAllocation->agreement->agreement_kind !== RentalAgreementKind::OwnerSupply) {
             throw new InvalidArgumentException(
                 'Running chart owner payable context requires an owner supply allocation.',
+            );
+        }
+        if ($sourceAllocation->agreement->status !== RentalAgreementStatus::Active) {
+            throw new InvalidArgumentException(
+                'Running chart owner payable context requires an active owner supply agreement.',
             );
         }
         if ((int) $sourceAllocation->vehicle_id !== (int) $allocation->vehicle_id) {

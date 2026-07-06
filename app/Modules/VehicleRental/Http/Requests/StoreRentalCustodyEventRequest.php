@@ -6,17 +6,24 @@ namespace Modules\VehicleRental\Http\Requests;
 
 use Illuminate\Validation\Rule;
 use Modules\Core\Http\Requests\TenantScopedRequest;
-use Modules\VehicleRental\Enums\RentalCustodyEventType;
 use Modules\VehicleRental\Enums\RentalCustodyItemType;
 
 final class StoreRentalCustodyEventRequest extends TenantScopedRequest
 {
+    private const PUBLIC_EVENT_TYPES = [
+        'owner_to_company',
+        'company_to_customer',
+        'customer_to_company',
+        'company_to_owner',
+        'internal_transfer',
+    ];
+
     public function rules(): array
     {
         return [
             'expected_allocation_version' => ['required', 'integer', 'min:1'],
-            'event_type' => ['required', Rule::enum(RentalCustodyEventType::class)],
-            'replacement_id' => ['nullable', 'integer', 'min:1'],
+            'event_type' => ['required', Rule::in(self::PUBLIC_EVENT_TYPES)],
+            'replacement_id' => ['prohibited'],
             'occurred_at' => ['required', 'date'],
             'odometer' => ['required', 'decimal:0,6', 'gte:0'],
             'fuel_level_percent' => ['nullable', 'decimal:0,4', 'between:0,100'],

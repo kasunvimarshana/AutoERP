@@ -16,6 +16,7 @@ use Modules\VehicleRental\Enums\RentalCustodyEventType;
 use Modules\VehicleRental\Enums\RentalCustodyStatus;
 use Modules\VehicleRental\Models\RentalCustodyEvent;
 use Modules\VehicleRental\Models\RentalVehicleAllocation;
+use Modules\VehicleRental\Models\RentalVehicleReplacement;
 
 final class RentalCustodyService
 {
@@ -271,6 +272,9 @@ final class RentalCustodyService
         if (! $replacementEvent && $replacementId !== null) {
             throw new InvalidArgumentException('Only replacement custody events may reference a replacement.');
         }
+        if ($replacementEvent && $replacementId !== null) {
+            $this->assertReplacementEventMatchesAllocation($allocation, $eventType, $replacementId);
+        }
 
         $lastOperational = $confirmed->last(
             fn (RentalCustodyEvent $item) => $item->event_type !== RentalCustodyEventType::InternalTransfer,
@@ -325,6 +329,31 @@ final class RentalCustodyService
         }
     }
 
+    private function assertReplacementEventMatchesAllocation(
+        RentalVehicleAllocation $allocation,
+        RentalCustodyEventType $eventType,
+        int $replacementId,
+    ): void {
+        $replacement = RentalVehicleReplacement::query()
+            ->where('tenant_id', $allocation->tenant_id)
+            ->lockForUpdate()
+            ->findOrFail($replacementId);
+
+        if ((int) $replacement->agreement_id !== (int) $allocation->agreement_id) {
+            throw new InvalidArgumentException('Replacement custody event does not belong to this rental agreement.');
+        }
+
+        if ($eventType === RentalCustodyEventType::ReplacementOut
+            && (int) $replacement->old_allocation_id !== (int) $allocation->getKey()) {
+            throw new InvalidArgumentException('Replacement return event does not belong to this allocation.');
+        }
+
+        if ($eventType === RentalCustodyEventType::ReplacementIn
+            && (int) $replacement->new_allocation_id !== (int) $allocation->getKey()) {
+            throw new InvalidArgumentException('Replacement handover event does not belong to this allocation.');
+        }
+    }
+
     /** @return array{0:string,1:string} */
     private function defaultRoles(RentalCustodyEventType $eventType): array
     {
@@ -339,10 +368,7 @@ final class RentalCustodyService
 
     private function activateOwnerAllocation(RentalCustodyEvent $event, ?int $userId): void
     {
-        $allocation = $event->allocation;
-        if ($allocation->status === RentalAllocationStatus::Planned) {
-            $allocation = $this->allocations->activate($allocation, $userId);
-        }
+        $allocation = $this->allocations->activate($event->allocation, $userId);
         if ($allocation->start_odometer === null) {
             $allocation->forceFill([
                 'start_odometer' => $event->odometer,
@@ -365,10 +391,7 @@ final class RentalCustodyService
                 throw new InvalidArgumentException('Owner-supplied vehicle must be received by the company before customer handover.');
             }
         }
-        $allocation = $event->allocation;
-        if ($allocation->status === RentalAllocationStatus::Planned) {
-            $allocation = $this->allocations->activate($allocation, $userId);
-        }
+        $allocation = $this->allocations->activate($event->allocation, $userId);
         if ($allocation->start_odometer === null) {
             $allocation->forceFill([
                 'start_odometer' => $event->odometer,

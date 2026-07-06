@@ -117,6 +117,7 @@ export default function RentalCustodyPage() {
     const [allocation, setAllocation] = useState<NamedResource | null>(null);
     const [allocationDetails, setAllocationDetails] = useState<RentalAllocation | null>(null);
     const [allocationIdToLoad, setAllocationIdToLoad] = useState<number | null>(initialAllocationId);
+    const [allocationRefresh, setAllocationRefresh] = useState(0);
     const [refresh, setRefresh] = useState(0);
     const [error, setError] = useState<ApiError | null>(null);
     const [saving, setSaving] = useState(false);
@@ -156,7 +157,7 @@ export default function RentalCustodyPage() {
             });
 
         return () => controller.abort();
-    }, [allocationIdToLoad]);
+    }, [allocationIdToLoad, allocationRefresh]);
 
     const selectedAllocationId = allocation?.id ?? allocationIdToLoad;
     const result = useApi(
@@ -189,6 +190,7 @@ export default function RentalCustodyPage() {
                 damage_summary: form.damage_summary || null,
             });
             setForm(emptyForm(defaultEventType(allocationDetails)));
+            setAllocationRefresh((value) => value + 1);
             setRefresh((value) => value + 1);
         } catch (requestError: unknown) {
             setError(toApiError(requestError));
@@ -201,6 +203,7 @@ export default function RentalCustodyPage() {
         setError(null);
         try {
             await confirmRentalCustodyEvent(row.id, row.row_version);
+            setAllocationRefresh((value) => value + 1);
             setRefresh((value) => value + 1);
         } catch (requestError: unknown) {
             setError(toApiError(requestError));

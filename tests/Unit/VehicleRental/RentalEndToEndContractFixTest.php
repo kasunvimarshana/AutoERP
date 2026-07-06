@@ -128,6 +128,8 @@ final class RentalEndToEndContractFixTest extends TestCase
         $replacementPage = $this->source('resources/js/modules/vehicle-rental/pages/RentalReplacementPage.tsx');
         $detailPage = $this->source('resources/js/modules/vehicle-rental/pages/RentalAllocationDetailPage.tsx');
         $custodyResource = $this->source('app/Modules/VehicleRental/Http/Resources/RentalCustodyEventResource.php');
+        $custodyRequest = $this->source('app/Modules/VehicleRental/Http/Requests/StoreRentalCustodyEventRequest.php');
+        $custodyPage = $this->source('resources/js/modules/vehicle-rental/pages/RentalCustodyPage.tsx');
 
         self::assertStringContainsString("allocations/{allocation}/cancel", $routes);
         self::assertStringContainsString('->lockForUpdate()', $availability);
@@ -137,7 +139,14 @@ final class RentalEndToEndContractFixTest extends TestCase
         self::assertStringContainsString('Driver assignment requires a planned or active vehicle allocation.', $allocationService);
         self::assertStringContainsString('closed_by = $userId', $allocationService);
         self::assertStringContainsString('activated_by = $userId', $allocationService);
+        self::assertStringContainsString('Only allocations under an active rental agreement can be activated.', $allocationService);
         self::assertStringContainsString('lockCustodyTimeline', $custodyService);
+        self::assertStringContainsString('assertReplacementEventMatchesAllocation', $custodyService);
+        self::assertGreaterThanOrEqual(2, substr_count($custodyService, '$this->allocations->activate($event->allocation, $userId)'));
+        self::assertStringContainsString('PUBLIC_EVENT_TYPES', $custodyRequest);
+        self::assertStringContainsString("'replacement_id' => ['prohibited']", $custodyRequest);
+        self::assertStringNotContainsString('Rule::enum(RentalCustodyEventType::class)', $custodyRequest);
+        self::assertStringContainsString('allocationRefresh', $custodyPage);
         self::assertStringContainsString('rental_vehicle_allocations_activated_by_tenant_fk', $migration);
         self::assertStringContainsString('$this->custody->confirm($returnEvent, (int) $returnEvent->row_version, $userId);', $replacementService);
         self::assertStringContainsString('$this->custody->confirm($handoverEvent, (int) $handoverEvent->row_version, $userId);', $replacementService);
@@ -221,9 +230,15 @@ final class RentalEndToEndContractFixTest extends TestCase
         $usageFactService = $this->source('app/Modules/VehicleRental/Services/RentalUsageFactService.php');
         $allocationResource = $this->source('app/Modules/VehicleRental/Http/Resources/RentalAllocationResource.php');
         $runningChartPage = $this->source('resources/js/modules/vehicle-rental/pages/RentalRunningChartPage.tsx');
+        $lookups = $this->source('resources/js/modules/vehicle-rental/components/RentalLookups.tsx');
 
         self::assertStringContainsString('AGREEMENT_KIND_CUSTOMER_RENTAL', $runningChartPage);
-        self::assertStringContainsString('agreement_kind: AGREEMENT_KIND_CUSTOMER_RENTAL', $runningChartPage);
+        self::assertStringContainsString('agreementKind={AGREEMENT_KIND_CUSTOMER_RENTAL}', $runningChartPage);
+        self::assertStringContainsString('RentalAllocationLookupSelect', $runningChartPage);
+        self::assertStringContainsString('getRentalAllocation', $runningChartPage);
+        self::assertStringContainsString('status="active"', $runningChartPage);
+        self::assertStringNotContainsString('per_page: 100', $runningChartPage);
+        self::assertStringContainsString('status: filters.status ?? undefined', $lookups);
         self::assertStringContainsString('RENTAL_MODE_WITH_DRIVER', $runningChartPage);
         self::assertStringContainsString('required={requiresDriverAssignment}', $runningChartPage);
         self::assertStringContainsString('selectedAllocation.source_allocation?.row_version', $runningChartPage);
@@ -232,7 +247,9 @@ final class RentalEndToEndContractFixTest extends TestCase
         self::assertStringContainsString("'rental_mode'", $allocationResource);
 
         self::assertStringContainsString('assertSourceAllocation', $usageService);
+        self::assertStringContainsString('Running chart requires an active rental agreement.', $usageService);
         self::assertStringContainsString('Running chart owner payable context requires an active owner supply allocation.', $usageService);
+        self::assertStringContainsString('Running chart owner payable context requires an active owner supply agreement.', $usageService);
         self::assertStringContainsString('Usage time must be inside the owner supply allocation period.', $usageService);
         self::assertStringContainsString("'source_allocation_id' => \$sourceAllocation?->getKey()", $usageService);
         self::assertStringContainsString("'events' => \$events", $usageService);

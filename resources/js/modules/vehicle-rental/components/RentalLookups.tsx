@@ -16,6 +16,7 @@ import {
 import type { RentalVehicle } from '../vehicleRentalTypes';
 
 interface LookupProps<T extends NamedResource = NamedResource> extends LookupBehaviorOptions {
+    label?: string;
     value: T | null;
     onChange: (value: T | null) => void;
     error?: string;
@@ -31,6 +32,7 @@ interface AllocationLookupFilters {
     coversStartAt?: string | null;
     coversEndAt?: string | null;
     openOnly?: boolean;
+    status?: string | null;
 }
 
 interface FinanceLookupFilters {
@@ -62,6 +64,8 @@ export function RentalAllocationLookupSelect({
     coversStartAt,
     coversEndAt,
     openOnly,
+    status,
+    label = 'Vehicle allocation',
     ...props
 }: LookupProps & AllocationLookupFilters) {
     const search = useCallback(
@@ -72,11 +76,12 @@ export function RentalAllocationLookupSelect({
             coversStartAt,
             coversEndAt,
             openOnly,
+            status,
         }),
-        [agreementId, vehicleId, agreementKind, coversStartAt, coversEndAt, openOnly],
+        [agreementId, vehicleId, agreementKind, coversStartAt, coversEndAt, openOnly, status],
     );
 
-    return <LookupSelect label="Vehicle allocation" search={search} placeholder="Search allocation number or vehicle..." {...props} />;
+    return <LookupSelect label={label} search={search} placeholder="Search allocation number or vehicle..." {...props} />;
 }
 
 export function RentalFinanceAgreementLookupSelect({
@@ -194,6 +199,7 @@ async function searchAllocations(
         covers_start_at: filters.coversStartAt ?? undefined,
         covers_end_at: filters.coversEndAt ?? undefined,
         open_only: filters.openOnly,
+        status: filters.status ?? undefined,
     }, signal);
 
     return {
