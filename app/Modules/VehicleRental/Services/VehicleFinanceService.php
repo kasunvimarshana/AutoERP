@@ -28,6 +28,17 @@ use Modules\VehicleRental\Models\VehicleFinanceStatusHistory;
 
 final class VehicleFinanceService
 {
+    private const INTEREST_METHOD_CUSTOM = 'custom';
+    private const INTEREST_METHOD_REDUCING_BALANCE = 'reducing_balance';
+    private const DAYS_PER_YEAR = '365';
+    private const PERCENT_DIVISOR = '100';
+    private const INSTALLMENT_PERIODS_PER_YEAR = [
+        'weekly' => '52',
+        'monthly' => '12',
+        'quarterly' => '4',
+        'yearly' => '1',
+    ];
+
     public function __construct(
         private readonly DecimalMath $math,
         private readonly RentalNumberService $numbers,
@@ -281,6 +292,13 @@ final class VehicleFinanceService
     private function validateCustomSchedule(array $data, CarbonImmutable $startsAt, CarbonImmutable $maturesAt): void
     {
         $schedule = $data['schedule'] ?? null;
+        $interestMethod = (string) ($data['interest_method'] ?? 'flat');
+        if ($interestMethod === self::INTEREST_METHOD_CUSTOM && ($schedule === null || $schedule === [])) {
+            throw new InvalidArgumentException('Custom finance schedules require explicit installment rows.');
+        }
+        if ($interestMethod !== self::INTEREST_METHOD_CUSTOM && $schedule !== null && $schedule !== []) {
+            throw new InvalidArgumentException('Explicit installment rows require the custom interest method.');
+        }
         if ($schedule === null || $schedule === []) {
             return;
         }
@@ -321,13 +339,24 @@ final class VehicleFinanceService
             return;
         }
 
+        if ((string) $agreement->interest_method === self::INTEREST_METHOD_REDUCING_BALANCE) {
+            $this->generateReducingBalanceSchedule($agreement, $userId);
+
+            return;
+        }
+
+        $this->generateFlatSchedule($agreement, $userId);
+    }
+
+    private function generateFlatSchedule(VehicleFinanceAgreement $agreement, ?int $userId): void
+    {
         $count = (int) $agreement->installment_count;
         $principalAfterDeposit = $this->math->sub((string) $agreement->principal_amount, (string) $agreement->initial_deposit_amount);
         $principalPer = $this->math->div($principalAfterDeposit, (string) $count);
-        $years = $this->math->div((string) CarbonImmutable::parse($agreement->starts_at)->diffInDays(CarbonImmutable::parse($agreement->matures_at)), '365');
+        $years = $this->math->div((string) CarbonImmutable::parse($agreement->starts_at)->diffInDays(CarbonImmutable::parse($agreement->matures_at)), self::DAYS_PER_YEAR);
         $totalInterest = $this->math->div(
             $this->math->mul($this->math->mul($principalAfterDeposit, (string) $agreement->annual_interest_rate), $years),
-            '100',
+            self::PERCENT_DIVISOR,
         );
         $interestPer = $this->math->div($totalInterest, (string) $count);
         $allocatedPrincipal = '0.000000';
@@ -345,6 +374,37 @@ final class VehicleFinanceService
             ], $userId);
             $allocatedPrincipal = $this->math->add($allocatedPrincipal, $principal);
             $allocatedInterest = $this->math->add($allocatedInterest, $interest);
+        }
+    }
+
+    private function generateReducingBalanceSchedule(VehicleFinanceAgreement $agreement, ?int $userId): void
+    {
+        $count = (int) $agreement->installment_count;
+        $principalAfterDeposit = $this->math->sub((string) $agreement->principal_amount, (string) $agreement->initial_deposit_amount);
+        $principalPer = $this->math->div($principalAfterDeposit, (string) $count);
+        $periodsPerYear = self::INSTALLMENT_PERIODS_PER_YEAR[(string) $agreement->installment_frequency];
+        $periodRate = $this->math->div(
+            $this->math->div((string) $agreement->annual_interest_rate, self::PERCENT_DIVISOR),
+            $periodsPerYear,
+        );
+        $allocatedPrincipal = '0.000000';
+        $outstandingPrincipal = $principalAfterDeposit;
+
+        for ($number = 1; $number <= $count; $number++) {
+            $principal = $number === $count
+                ? $this->math->sub($principalAfterDeposit, $allocatedPrincipal)
+                : $principalPer;
+            $interest = $this->math->mul($outstandingPrincipal, $periodRate);
+            $dueDate = $this->installmentDueDate(CarbonImmutable::parse($agreement->starts_at), $number, (string) $agreement->installment_frequency);
+            $this->createInstallment($agreement, $number, [
+                'due_date' => $dueDate->toDateString(),
+                'principal_due' => $principal,
+                'interest_due' => $interest,
+                'fee_due' => '0.000000',
+                'tax_due' => '0.000000',
+            ], $userId);
+            $allocatedPrincipal = $this->math->add($allocatedPrincipal, $principal);
+            $outstandingPrincipal = $this->math->sub($outstandingPrincipal, $principal);
         }
     }
 

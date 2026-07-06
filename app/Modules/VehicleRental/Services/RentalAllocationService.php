@@ -498,6 +498,11 @@ final class RentalAllocationService
                 ->forContext((int) $agreement->tenant_id, $agreement->organization_unit_id)
                 ->lockForUpdate()
                 ->findOrFail((int) ($data['source_allocation_id'] ?? 0));
+            if ((int) $source->row_version !== $this->requiredExpectedVersion($data, 'expected_source_allocation_version')) {
+                throw ValidationException::withMessages([
+                    'expected_source_allocation_version' => ['The owner source allocation changed after it was loaded. Reload and review the latest version.'],
+                ]);
+            }
             if ($source->agreement->agreement_kind !== RentalAgreementKind::OwnerSupply
                 || (int) $source->vehicle_id !== (int) $data['vehicle_id']
                 || ! in_array($source->status, [RentalAllocationStatus::Planned, RentalAllocationStatus::Active], true)
@@ -514,7 +519,13 @@ final class RentalAllocationService
                 ->where('vehicle_id', $data['vehicle_id'])
                 ->whereKey($data['vehicle_finance_agreement_id'] ?? 0)
                 ->where('status', VehicleFinanceAgreementStatus::Active->value)
+                ->lockForUpdate()
                 ->firstOrFail();
+            if ((int) $finance->row_version !== $this->requiredExpectedVersion($data, 'expected_finance_agreement_version')) {
+                throw ValidationException::withMessages([
+                    'expected_finance_agreement_version' => ['The vehicle finance agreement changed after it was loaded. Reload and review the latest version.'],
+                ]);
+            }
             if (CarbonImmutable::parse($finance->starts_at)->greaterThan($from) || CarbonImmutable::parse($finance->matures_at)->lessThan($to)) {
                 throw new InvalidArgumentException('Vehicle finance agreement does not cover the customer allocation.');
             }

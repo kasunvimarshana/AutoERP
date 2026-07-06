@@ -11,10 +11,12 @@ use InvalidArgumentException;
 use Modules\VehicleRental\Enums\RentalCalculationSourceKind;
 use Modules\VehicleRental\Enums\RentalCalculationSourceStatus;
 use Modules\VehicleRental\Enums\RentalCalculationStatus;
+use Modules\VehicleRental\Enums\RentalUsageFactStatus;
 use Modules\VehicleRental\Models\RentalCalculationRun;
 use Modules\VehicleRental\Models\RentalCalculationSource;
 use Modules\VehicleRental\Models\RentalExpenseAllocation;
 use Modules\VehicleRental\Models\RentalUsageContext;
+use Modules\VehicleRental\Models\RentalUsageFact;
 
 final class RentalCalculationSourceService
 {
@@ -46,7 +48,18 @@ final class RentalCalculationSourceService
             ]);
         }
 
+        $expenseAllocations = RentalExpenseAllocation::query()
+            ->where('tenant_id', $run->tenant_id)
+            ->whereIn('id', $expenseAllocationIds)
+            ->get()
+            ->keyBy(fn (RentalExpenseAllocation $allocation): int => (int) $allocation->getKey());
+
         foreach ($expenseAllocationIds as $expenseAllocationId) {
+            $allocation = $expenseAllocations->get((int) $expenseAllocationId);
+            if ($allocation === null) {
+                throw new InvalidArgumentException('Calculation source expense allocation no longer exists.');
+            }
+
             $run->sources()->create([
                 'tenant_id' => $run->tenant_id,
                 'organization_unit_id' => $run->organization_unit_id,
@@ -54,6 +67,10 @@ final class RentalCalculationSourceService
                 'usage_context_id' => null,
                 'expense_allocation_id' => $expenseAllocationId,
                 'status' => RentalCalculationSourceStatus::Draft->value,
+                'metadata' => [
+                    'expense_allocation_version' => (int) $allocation->row_version,
+                    'expense_allocation_status' => (string) $allocation->status,
+                ],
                 'created_by' => $userId,
                 'updated_by' => $userId,
             ]);
@@ -92,11 +109,36 @@ final class RentalCalculationSourceService
 
         $usageContextIds = $sources->pluck('usage_context_id')->filter()->unique()->values();
         if ($usageContextIds->isNotEmpty()) {
-            RentalUsageContext::query()
+            $contexts = RentalUsageContext::query()
+                ->where('tenant_id', $run->tenant_id)
                 ->whereIn('id', $usageContextIds)
                 ->orderBy('id')
                 ->lockForUpdate()
-                ->get(['id']);
+                ->get(['id', 'context_fingerprint'])
+                ->keyBy(fn (RentalUsageContext $context): int => (int) $context->getKey());
+            $facts = RentalUsageFact::query()
+                ->where('tenant_id', $run->tenant_id)
+                ->whereIn('usage_context_id', $usageContextIds)
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get()
+                ->keyBy(fn (RentalUsageFact $fact): int => (int) $fact->usage_context_id);
+
+            foreach ($sources->whereNotNull('usage_context_id') as $source) {
+                $context = $contexts->get((int) $source->usage_context_id);
+                $fact = $facts->get((int) $source->usage_context_id);
+                $metadata = $source->metadata ?? [];
+                if ($context === null
+                    || $fact === null
+                    || $fact->status !== RentalUsageFactStatus::Approved
+                    || (int) ($metadata['usage_fact_id'] ?? 0) !== (int) $fact->getKey()
+                    || (int) ($metadata['usage_fact_version'] ?? 0) !== (int) $fact->row_version
+                    || (string) ($metadata['context_fingerprint'] ?? '') !== (string) $context->context_fingerprint) {
+                    throw new InvalidArgumentException(
+                        'One or more commercial usage facts changed after this calculation was prepared.',
+                    );
+                }
+            }
 
             $usageConflict = RentalCalculationSource::query()
                 ->where('calculation_run_id', '!=', $run->getKey())
@@ -114,11 +156,26 @@ final class RentalCalculationSourceService
 
         $expenseAllocationIds = $sources->pluck('expense_allocation_id')->filter()->unique()->values();
         if ($expenseAllocationIds->isNotEmpty()) {
-            RentalExpenseAllocation::query()
+            $expenseAllocations = RentalExpenseAllocation::query()
+                ->where('tenant_id', $run->tenant_id)
                 ->whereIn('id', $expenseAllocationIds)
                 ->orderBy('id')
                 ->lockForUpdate()
-                ->get(['id']);
+                ->get()
+                ->keyBy(fn (RentalExpenseAllocation $allocation): int => (int) $allocation->getKey());
+
+            foreach ($sources->whereNotNull('expense_allocation_id') as $source) {
+                $allocation = $expenseAllocations->get((int) $source->expense_allocation_id);
+                $metadata = $source->metadata ?? [];
+                if ($allocation === null
+                    || (string) $allocation->status !== 'approved'
+                    || (int) ($metadata['expense_allocation_version'] ?? 0) !== (int) $allocation->row_version
+                    || (string) ($metadata['expense_allocation_status'] ?? '') !== (string) $allocation->status) {
+                    throw new InvalidArgumentException(
+                        'One or more expense allocations changed after this calculation was prepared.',
+                    );
+                }
+            }
 
             $expenseConflict = RentalCalculationSource::query()
                 ->where('calculation_run_id', '!=', $run->getKey())

@@ -27,10 +27,11 @@ import {
     forfeitRentalDeposit,
     listRentalDeposits,
     receiveRentalDeposit,
+    reverseRentalDepositLink,
     refundRentalDeposit,
 } from "../vehicleRentalApi";
 import { vehicleRentalPermissions } from "../vehicleRentalPermissions";
-import type { RentalDeposit } from "../vehicleRentalTypes";
+import type { RentalDeposit, RentalDepositLink } from "../vehicleRentalTypes";
 
 
 export default function RentalDepositPage() {
@@ -128,6 +129,21 @@ export default function RentalDepositPage() {
         }
     };
 
+    const reverseLink = async (link: RentalDepositLink) => {
+        if (!selected) return;
+        setSaving(true);
+        setActionError(null);
+        try {
+            const updated = await reverseRentalDepositLink(link.id, selected.row_version);
+            setSelected(updated);
+            result.reload();
+        } catch (error) {
+            setActionError(toApiError(error));
+        } finally {
+            setSaving(false);
+        }
+    };
+
     const columns: DataColumn<RentalDeposit>[] = [
         {
             key: "agreement",
@@ -198,6 +214,49 @@ export default function RentalDepositPage() {
                         }}
                     >
                         Manage
+                    </Button>
+                ) : null,
+        },
+    ];
+    const linkColumns: DataColumn<RentalDepositLink>[] = [
+        {
+            key: "type",
+            header: "Movement",
+            render: (row) => row.link_type.replaceAll("_", " "),
+        },
+        {
+            key: "reference",
+            header: "Reference",
+            render: (row) =>
+                depositLinkReference(row),
+        },
+        {
+            key: "amount",
+            header: "Amount",
+            render: (row) => row.amount,
+        },
+        {
+            key: "status",
+            header: "Status",
+            render: (row) => <StatusBadge status={row.status} />,
+        },
+        {
+            key: "linked",
+            header: "Linked",
+            render: (row) => formatDate(row.linked_at),
+        },
+        {
+            key: "action",
+            header: "",
+            className: "text-right",
+            render: (row) =>
+                canManage && row.status === "active" && row.link_type !== "reversal" ? (
+                    <Button
+                        variant="secondary"
+                        loading={saving}
+                        onClick={() => void reverseLink(row)}
+                    >
+                        Reverse
                     </Button>
                 ) : null,
         },
@@ -339,6 +398,15 @@ export default function RentalDepositPage() {
                             </Button>
                         </div>
                     </form>
+                    {(selected.links?.length ?? 0) > 0 && (
+                        <div className="mt-4">
+                            <DataTable
+                                rows={selected.links ?? []}
+                                columns={linkColumns}
+                                rowKey={(row) => row.id}
+                            />
+                        </div>
+                    )}
                 </Panel>
             )}
             {result.loading ? (
@@ -353,4 +421,18 @@ export default function RentalDepositPage() {
             )}
         </RentalPage>
     );
+}
+
+function depositLinkReference(link: RentalDepositLink): string {
+    if (link.payment) return readableRelation(link.payment);
+    if (link.invoice) return readableRelation(link.invoice);
+    if (link.reverses_link) {
+        return [
+            "Reverses",
+            link.reverses_link.link_type?.replaceAll("_", " "),
+            link.reverses_link.amount,
+        ].filter(Boolean).join(" ");
+    }
+
+    return "-";
 }

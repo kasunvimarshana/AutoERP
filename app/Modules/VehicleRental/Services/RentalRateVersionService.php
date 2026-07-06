@@ -26,6 +26,9 @@ final class RentalRateVersionService
                 ->where('tenant_id', $agreement->tenant_id)
                 ->lockForUpdate()
                 ->findOrFail($agreement->getKey());
+            if (array_key_exists('expected_agreement_version', $data)) {
+                $this->assertAgreementExpectedVersion($agreement, (int) $data['expected_agreement_version']);
+            }
             $this->assertAgreementAllowsRateChanges($agreement);
 
             $versionNumber = ((int) $agreement->rateVersions()->max('version_number')) + 1;
@@ -201,6 +204,15 @@ final class RentalRateVersionService
         if ((int) $version->row_version !== $expectedVersion) {
             throw ValidationException::withMessages([
                 'expected_version' => ['The rental rate version changed after it was loaded. Reload and review the latest version.'],
+            ]);
+        }
+    }
+
+    private function assertAgreementExpectedVersion(RentalAgreement $agreement, int $expectedVersion): void
+    {
+        if ((int) $agreement->row_version !== $expectedVersion) {
+            throw ValidationException::withMessages([
+                'expected_agreement_version' => ['The rental agreement changed after it was loaded. Reload and review the latest version.'],
             ]);
         }
     }

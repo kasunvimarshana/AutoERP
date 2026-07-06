@@ -113,6 +113,12 @@ final class RentalCustodyService
             if ($event->status !== RentalCustodyStatus::Draft) {
                 throw new InvalidArgumentException('Only a draft custody event can be confirmed.');
             }
+            $allocation = RentalVehicleAllocation::query()
+                ->with('agreement')
+                ->lockForUpdate()
+                ->findOrFail($event->vehicle_allocation_id);
+            $this->lockCustodyTimeline($allocation);
+            $event->setRelation('allocation', $allocation);
             $this->assertEventAllowed(
                 $event->allocation,
                 $event->event_type,
@@ -193,6 +199,16 @@ final class RentalCustodyService
             'allocation.agreement.customer', 'allocation.agreement.supplier', 'vehicle.make', 'vehicle.model',
             'items', 'handedOverByEmployee', 'receivedByEmployee', 'replacement',
         ];
+    }
+
+    private function lockCustodyTimeline(RentalVehicleAllocation $allocation): void
+    {
+        RentalCustodyEvent::query()
+            ->where('tenant_id', $allocation->tenant_id)
+            ->where('vehicle_allocation_id', $allocation->getKey())
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get(['id']);
     }
 
     private function assertEventAllowed(

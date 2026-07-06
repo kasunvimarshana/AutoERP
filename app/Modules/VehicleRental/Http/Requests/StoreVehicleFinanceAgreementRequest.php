@@ -29,7 +29,7 @@ final class StoreVehicleFinanceAgreementRequest extends TenantScopedRequest
             'payment_term_days' => ['nullable', 'integer', 'between:0,3650'],
             'tax_group_id' => ['nullable', 'integer', 'min:1'],
             'remarks' => ['nullable', 'string'],
-            'schedule' => ['nullable', 'array', 'min:1'],
+            'schedule' => ['required_if:interest_method,custom', 'prohibited_unless:interest_method,custom', 'array', 'min:1'],
             'schedule.*.installment_number' => ['nullable', 'integer', 'min:1'],
             'schedule.*.due_date' => ['required_with:schedule', 'date'],
             'schedule.*.principal_due' => ['required_with:schedule', 'decimal:0,6', 'gte:0'],

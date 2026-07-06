@@ -250,7 +250,7 @@ final class RentalAgreementService
     {
         $query = RentalAgreement::query()
             ->forContext($tenantId, $organizationUnitId)
-            ->with(['customer', 'supplier', 'currency', 'activeRateVersion', 'allocations.vehicle']);
+            ->with(['reservation', 'customer', 'supplier', 'currency', 'activeRateVersion', 'allocations.vehicle']);
         if (! empty($filters['search'])) {
             $search = trim((string) $filters['search']);
             $query->where(function (Builder $query) use ($search): void {
@@ -291,6 +291,7 @@ final class RentalAgreementService
             'driverAssignments.employee',
             'depositRequirement.links.payment',
             'depositRequirement.links.invoice',
+            'depositRequirement.links.reversesLink',
         ];
     }
 

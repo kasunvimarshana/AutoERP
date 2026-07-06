@@ -48,6 +48,7 @@ export interface RentalRateComponent {
 }
 export interface RentalRateVersion {
     id: number;
+    row_version: number;
     version_number: number;
     effective_from: string;
     effective_to?: string | null;
@@ -69,6 +70,13 @@ export interface RentalAgreement {
     row_version: number;
     agreement_number: string;
     agreement_kind: string;
+    reservation?: {
+        id: number;
+        reservation_number?: string;
+        status?: string;
+        requested_start_at?: string;
+        requested_end_at?: string;
+    } | null;
     customer?: RentalParty | null;
     supplier?: RentalParty | null;
     agreement_date: string;
@@ -137,6 +145,7 @@ export interface RentalAllocationFinanceSummary {
     id: number;
     code?: string | null;
     name?: string;
+    row_version?: number;
     agreement_number?: string;
     status?: string;
     starts_at?: string;
@@ -293,7 +302,52 @@ export interface RentalCalculationLine {
     id: number;
     line_number: number;
     source_type: string;
-    source_id: number;
+    source: {
+        type: string;
+        usage_context?: {
+            id: number;
+            financial_side: "revenue" | "cost";
+            usage?: {
+                id: number;
+                name?: string;
+                usage_number?: string;
+                usage_date?: string;
+                status?: string;
+            } | null;
+            usage_fact?: {
+                id: number;
+                row_version: number;
+                status: string;
+            } | null;
+        } | null;
+        expense_allocation?: {
+            id: number;
+            name?: string;
+            allocation_type?: string;
+            status?: string;
+            total_amount?: string;
+            expense?: {
+                id: number;
+                name?: string;
+                expense_number?: string;
+                expense_type?: string;
+                expense_date?: string;
+            } | null;
+        } | null;
+        custody_event_item?: {
+            id: number;
+            name?: string;
+            item_type?: string;
+            description?: string;
+            custody_event?: {
+                id: number;
+                name?: string;
+                event_number?: string;
+                event_type?: string;
+                status?: string;
+            } | null;
+        } | null;
+    };
     component_code: string;
     description: string;
     measured_quantity: string;
@@ -348,6 +402,7 @@ export interface RentalCalculationRun {
 }
 export interface RentalDepositLink {
     id: number;
+    row_version: number;
     link_type: string;
     payment?: (NamedResource & {
         payment_number?: string | null;
@@ -365,7 +420,15 @@ export interface RentalDepositLink {
     amount: string;
     status: string;
     linked_at: string;
-    reverses_link_id?: number | null;
+    reverses_link?: {
+        id: number;
+        row_version?: number;
+        name?: string;
+        link_type?: string;
+        amount?: string;
+        status?: string;
+        linked_at?: string;
+    } | null;
 }
 export interface RentalDeposit {
     id: number;
@@ -408,6 +471,7 @@ export interface VehicleFinanceAgreement {
     principal_amount: string;
     initial_deposit_amount: string;
     residual_value: string;
+    interest_method: string;
     annual_interest_rate: string;
     installment_frequency: string;
     installment_count: number;

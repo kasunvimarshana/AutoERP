@@ -361,7 +361,6 @@ export default function VehicleFinancePage() {
                                 options={[
                                     "flat",
                                     "reducing_balance",
-                                    "custom",
                                 ].map((value) => ({
                                     value,
                                     label: value.replaceAll("_", " "),

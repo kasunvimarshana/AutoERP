@@ -26,6 +26,7 @@ final class RentalCalculationIntegrityContractTest extends TestCase
         $api = $this->source('resources/js/modules/vehicle-rental/vehicleRentalApi.ts');
         $page = $this->source('resources/js/modules/vehicle-rental/pages/RentalBillingPage.tsx');
         $types = $this->source('resources/js/modules/vehicle-rental/vehicleRentalTypes.ts');
+        $calculationService = $this->source('app/Modules/VehicleRental/Services/RentalCalculationService.php');
 
         self::assertStringContainsString("'expected_version' => ['required', 'integer', 'min:1']", $request);
         self::assertStringContainsString("'expected_agreement_version' => ['required', 'integer', 'min:1']", $calculateRequest);
@@ -40,6 +41,11 @@ final class RentalCalculationIntegrityContractTest extends TestCase
         self::assertStringContainsString('run.id, run.row_version, status', $page);
         self::assertStringContainsString('agreement.id, agreement.row_version', $page);
         self::assertStringContainsString('row_version: number;', $types);
+        self::assertStringContainsString('source: {', $types);
+        self::assertStringNotContainsString('source_id: number;', $types);
+        self::assertStringContainsString('RentalExpenseType::Repair', $calculationService);
+        self::assertStringContainsString("'expense_allocation_version' => (int) \$allocation->row_version", $calculationService);
+        self::assertStringContainsString("'row_version' => DB::raw('row_version + 1')", $calculationService);
     }
 
     public function test_schema_enforces_calculation_source_and_usage_fact_identity(): void
@@ -55,6 +61,10 @@ final class RentalCalculationIntegrityContractTest extends TestCase
         self::assertStringContainsString("'source_kind' => RentalCalculationSourceKind::ExpenseAllocation->value", $sourceService);
         self::assertStringContainsString("'usage_context_id' => null", $sourceService);
         self::assertStringContainsString("'expense_allocation_id' => \$expenseAllocationId", $sourceService);
+        self::assertStringContainsString("'expense_allocation_version' => (int) \$allocation->row_version", $sourceService);
+        self::assertStringContainsString('RentalUsageFactStatus::Approved', $sourceService);
+        self::assertStringContainsString('context_fingerprint', $sourceService);
+        self::assertStringContainsString('One or more expense allocations changed after this calculation was prepared.', $sourceService);
         self::assertStringContainsString(
             "['id', 'tenant_id', 'financial_side', 'usage_log_id']",
             $contexts,

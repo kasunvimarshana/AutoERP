@@ -104,10 +104,20 @@ final class RentalExpenseService
             }
             if ($to === RentalExpenseStatus::Approved) {
                 $this->assertAllocationTotal($expense, true);
-                $expense->allocations()->update(['status' => 'approved', 'updated_by' => $userId, 'updated_at' => now()]);
+                $expense->allocations()->update([
+                    'status' => 'approved',
+                    'row_version' => DB::raw('row_version + 1'),
+                    'updated_by' => $userId,
+                    'updated_at' => now(),
+                ]);
             }
             if ($to === RentalExpenseStatus::Reversed) {
-                $expense->allocations()->where('status', '!=', 'reversed')->update(['status' => 'reversed', 'updated_by' => $userId, 'updated_at' => now()]);
+                $expense->allocations()->where('status', '!=', 'reversed')->update([
+                    'status' => 'reversed',
+                    'row_version' => DB::raw('row_version + 1'),
+                    'updated_by' => $userId,
+                    'updated_at' => now(),
+                ]);
             }
 
             $expense->status = $to;

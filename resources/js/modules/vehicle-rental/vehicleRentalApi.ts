@@ -115,8 +115,12 @@ export const transitionRentalAgreement = (
     });
 export const createRentalRateVersion = (
     agreementId: number,
+    expectedAgreementVersion: number,
     payload: RentalPayload,
-) => post(`agreements/${agreementId}/rate-versions`, payload);
+) => post(`agreements/${agreementId}/rate-versions`, {
+    ...payload,
+    expected_agreement_version: expectedAgreementVersion,
+});
 export const activateRentalRateVersion = (
     versionId: number,
     expectedVersion: number,
@@ -294,6 +298,13 @@ export const refundRentalDeposit = (id: number, payload: RentalPayload) =>
     post<RentalDeposit>(`deposits/${id}/refund`, payload);
 export const forfeitRentalDeposit = (id: number, payload: RentalPayload) =>
     post<RentalDeposit>(`deposits/${id}/forfeit`, payload);
+export const reverseRentalDepositLink = (
+    linkId: number,
+    expectedRequirementVersion: number,
+) =>
+    patch<RentalDeposit>(`deposit-links/${linkId}/reverse`, {
+        expected_requirement_version: expectedRequirementVersion,
+    });
 
 export const listVehicleFinanceAgreements = (
     params: ListParams,

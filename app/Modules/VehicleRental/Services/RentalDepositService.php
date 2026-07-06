@@ -6,6 +6,7 @@ namespace Modules\VehicleRental\Services;
 
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
+use DateTimeInterface;
 use Modules\Core\Services\DecimalMath;
 use Modules\Invoice\Contracts\InvoiceBalanceProviderInterface;
 use Modules\Payment\DTOs\CreatePaymentData;
@@ -235,8 +236,11 @@ final class RentalDepositService
             if ($link->status !== 'active') {
                 throw new InvalidArgumentException('Only an active deposit link can be reversed.');
             }
+            if ($link->link_type === RentalDepositLinkType::Reversal) {
+                throw new InvalidArgumentException('A deposit reversal link cannot be reversed again.');
+            }
             if ($link->payment_id !== null) {
-                $payment = Payment::query()->findOrFail($link->payment_id);
+                $payment = Payment::query()->lockForUpdate()->findOrFail($link->payment_id);
                 $document = $payment->document_status instanceof PaymentDocumentStatus
                     ? $payment->document_status
                     : PaymentDocumentStatus::from((string) $payment->document_status);
@@ -256,7 +260,11 @@ final class RentalDepositService
                 }
             }
 
-            $link->forceFill(['status' => 'reversed', 'updated_by' => $userId])->save();
+            $link->forceFill([
+                'status' => 'reversed',
+                'row_version' => (int) $link->row_version + 1,
+                'updated_by' => $userId,
+            ])->save();
             $this->link($requirement, RentalDepositLinkType::Reversal, (string) $link->amount, $userId, reversesLinkId: (int) $link->getKey());
             $this->sync($requirement);
 
@@ -319,6 +327,8 @@ final class RentalDepositService
         ?int $invoiceId = null,
         ?int $reversesLinkId = null,
     ): RentalDepositLink {
+        $linkedAt = now();
+
         return $requirement->links()->create([
             'tenant_id' => $requirement->tenant_id,
             'organization_unit_id' => $requirement->organization_unit_id,
@@ -327,12 +337,34 @@ final class RentalDepositService
             'invoice_id' => $invoiceId,
             'amount' => $amount,
             'status' => 'active',
-            'linked_at' => now(),
+            'linked_at' => $linkedAt,
             'linked_by' => $userId,
             'reverses_link_id' => $reversesLinkId,
+            'fingerprint' => $this->linkFingerprint($requirement, $type, $amount, $paymentId, $invoiceId, $reversesLinkId, $linkedAt),
             'created_by' => $userId,
             'updated_by' => $userId,
         ]);
+    }
+
+    private function linkFingerprint(
+        RentalDepositRequirement $requirement,
+        RentalDepositLinkType $type,
+        string $amount,
+        ?int $paymentId,
+        ?int $invoiceId,
+        ?int $reversesLinkId,
+        DateTimeInterface $linkedAt,
+    ): string {
+        return hash('sha256', implode('|', [
+            (int) $requirement->tenant_id,
+            (int) $requirement->getKey(),
+            $type->value,
+            $this->math->normalize($amount),
+            $paymentId ?? '',
+            $invoiceId ?? '',
+            $reversesLinkId ?? '',
+            $linkedAt->format('Y-m-d H:i:s.u'),
+        ]));
     }
 
     private function sync(RentalDepositRequirement $requirement): void
@@ -369,7 +401,7 @@ final class RentalDepositService
 
     private function reload(RentalDepositRequirement $requirement): RentalDepositRequirement
     {
-        return $requirement->refresh()->load(['agreement.customer', 'currency', 'links.payment', 'links.invoice']);
+        return $requirement->refresh()->load(['agreement.customer', 'currency', 'links.payment', 'links.invoice', 'links.reversesLink']);
     }
 
     private function availableToApply(RentalDepositRequirement $requirement): string

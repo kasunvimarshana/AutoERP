@@ -40,7 +40,8 @@ interface AllocationForm {
     startOdometer: string;
 }
 
-type AllocationLookupValue = NamedResource & { vehicle?: VehicleSummary | null };
+type VersionedNamedResource = NamedResource & { row_version?: number };
+type AllocationLookupValue = VersionedNamedResource & { vehicle?: VehicleSummary | null };
 
 const AGREEMENT_KIND_OWNER_SUPPLY = 'owner_supply';
 const SOURCE_TYPE_COMPANY_OWNED = 'company_owned';
@@ -126,7 +127,7 @@ export default function RentalAllocationPage() {
     const [agreementIdToLoad, setAgreementIdToLoad] = useState<number | null>(initialAgreementId);
     const [vehicle, setVehicle] = useState<VehicleSummary | null>(null);
     const [sourceAllocation, setSourceAllocation] = useState<AllocationLookupValue | null>(null);
-    const [financeAgreement, setFinanceAgreement] = useState<NamedResource | null>(null);
+    const [financeAgreement, setFinanceAgreement] = useState<VersionedNamedResource | null>(null);
     const [ownerSupplyOwnership, setOwnerSupplyOwnership] = useState<PartyVehicleRelationship | null>(null);
     const [companyOwnership, setCompanyOwnership] = useState<PartyVehicleRelationship | null>(null);
     const [ownershipLoading, setOwnershipLoading] = useState(false);
@@ -351,8 +352,14 @@ export default function RentalAllocationPage() {
                 source_allocation_id: !isOwnerSupplyAgreement && vehicleSourceType === SOURCE_TYPE_OWNER_SUPPLIED
                     ? sourceAllocation?.id ?? null
                     : null,
+                expected_source_allocation_version: !isOwnerSupplyAgreement && vehicleSourceType === SOURCE_TYPE_OWNER_SUPPLIED
+                    ? sourceAllocation?.row_version ?? null
+                    : null,
                 vehicle_finance_agreement_id: !isOwnerSupplyAgreement && vehicleSourceType === SOURCE_TYPE_FINANCED
                     ? financeAgreement?.id ?? null
+                    : null,
+                expected_finance_agreement_version: !isOwnerSupplyAgreement && vehicleSourceType === SOURCE_TYPE_FINANCED
+                    ? financeAgreement?.row_version ?? null
                     : null,
                 allocated_from: toIsoDateTime(form.allocatedFrom),
                 allocated_to: form.allocatedTo ? toIsoDateTime(form.allocatedTo) : null,
@@ -525,7 +532,7 @@ export default function RentalAllocationPage() {
                         {!isOwnerSupplyAgreement && form.vehicleSourceType === SOURCE_TYPE_FINANCED && (
                             <RentalFinanceAgreementLookupSelect
                                 value={financeAgreement}
-                                onChange={setFinanceAgreement}
+                                onChange={(value) => setFinanceAgreement(value as VersionedNamedResource | null)}
                                 vehicleId={vehicle?.id}
                                 coversStartAt={allocationStartAt}
                                 coversEndAt={allocationEndAt}

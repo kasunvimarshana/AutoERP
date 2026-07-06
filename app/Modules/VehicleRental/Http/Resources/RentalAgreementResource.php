@@ -15,7 +15,7 @@ final class RentalAgreementResource extends RentalResource
             'row_version' => (int) $this->row_version,
             'agreement_number' => $this->agreement_number,
             'agreement_kind' => $this->enumValue($this->agreement_kind),
-            'reservation_id' => $this->reservation_id,
+            'reservation' => $this->whenLoaded('reservation', fn () => $this->summary($this->reservation, ['reservation_number', 'status', 'requested_start_at', 'requested_end_at'])),
             'customer' => $this->whenLoaded('customer', fn () => $this->summary($this->customer, ['customer_number', 'code', 'name', 'display_name'])),
             'supplier' => $this->whenLoaded('supplier', fn () => $this->summary($this->supplier, ['supplier_number', 'code', 'name', 'display_name'])),
             'agreement_date' => $this->agreement_date?->toDateString(),

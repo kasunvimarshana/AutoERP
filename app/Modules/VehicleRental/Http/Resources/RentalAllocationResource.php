@@ -19,7 +19,7 @@ final class RentalAllocationResource extends RentalResource
             'ownership' => $this->whenLoaded('ownership', fn () => $this->summary($this->ownership, ['owner_type', 'owner_code_snapshot', 'owner_name_snapshot', 'ownership_type'])),
             'vehicle_source_type' => $this->enumValue($this->vehicle_source_type),
             'source_allocation' => $this->whenLoaded('sourceAllocation', fn () => $this->summary($this->sourceAllocation, ['row_version', 'allocation_number', 'status', 'allocated_from', 'allocated_to'])),
-            'finance_agreement' => $this->whenLoaded('financeAgreement', fn () => $this->summary($this->financeAgreement, ['agreement_number', 'status', 'starts_at', 'matures_at'])),
+            'finance_agreement' => $this->whenLoaded('financeAgreement', fn () => $this->summary($this->financeAgreement, ['row_version', 'agreement_number', 'status', 'starts_at', 'matures_at'])),
             'replaces_allocation' => $this->whenLoaded('replacesAllocation', fn () => $this->summary($this->replacesAllocation, ['allocation_number', 'status'])),
             'allocated_from' => $this->allocated_from?->toISOString(),
             'allocated_to' => $this->allocated_to?->toISOString(),

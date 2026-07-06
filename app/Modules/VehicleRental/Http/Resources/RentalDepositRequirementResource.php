@@ -25,15 +25,25 @@ final class RentalDepositRequirementResource extends RentalResource
             'status' => $this->enumValue($this->status),
             'remarks' => $this->remarks,
             'links' => $this->loadedCollection('links', fn ($link): array => [
-                'id' => (int) $link->getKey(), 'link_type' => $this->enumValue($link->link_type),
+                'id' => (int) $link->getKey(), 'row_version' => (int) $link->row_version, 'link_type' => $this->enumValue($link->link_type),
                 'payment' => $link->relationLoaded('payment')
                     ? $this->summary($link->payment, ['payment_number', 'row_version', 'document_status', 'posting_status', 'unapplied_amount'])
                     : null,
                 'invoice' => $link->relationLoaded('invoice')
                     ? $this->summary($link->invoice, ['invoice_number', 'row_version', 'status', 'balance_due'])
                     : null,
+                'reverses_link' => $link->relationLoaded('reversesLink') && $link->reversesLink !== null
+                    ? [
+                        'id' => (int) $link->reversesLink->getKey(),
+                        'row_version' => (int) $link->reversesLink->row_version,
+                        'link_type' => $this->enumValue($link->reversesLink->link_type),
+                        'amount' => $this->decimal($link->reversesLink->amount),
+                        'status' => $link->reversesLink->status,
+                        'linked_at' => $link->reversesLink->linked_at?->toISOString(),
+                    ]
+                    : null,
                 'amount' => $this->decimal($link->amount), 'status' => $link->status,
-                'linked_at' => $link->linked_at?->toISOString(), 'reverses_link_id' => $link->reverses_link_id,
+                'linked_at' => $link->linked_at?->toISOString(),
             ]),
             'created_at' => $this->created_at?->toISOString(),
         ];
