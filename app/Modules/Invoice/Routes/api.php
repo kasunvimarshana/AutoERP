@@ -56,4 +56,8 @@ Route::prefix('api/v1/invoices')->middleware($middleware)->name('api.v1.invoices
         ->whereNumber('invoice')
         ->middleware($requires(InvoicePermission::VIEW_SOURCES))
         ->name('adjustments');
+    Route::post('{invoice}/signed-print', [InvoiceController::class, 'signedPrintLink'])
+        ->whereNumber('invoice')
+        ->middleware($requires(InvoicePermission::VIEW))
+        ->name('signed-print');
 });

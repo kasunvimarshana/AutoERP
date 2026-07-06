@@ -21,6 +21,10 @@ use Modules\Invoice\Services\InvoiceBalanceService;
 use Modules\Invoice\Services\InvoiceStatusService;
 use Modules\Invoice\Services\ManualInvoiceService;
 
+use Illuminate\View\View;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\URL;
+
 final class InvoiceController
 {
     public function index(ListInvoiceRequest $request): AnonymousResourceCollection
@@ -159,5 +163,45 @@ final class InvoiceController
         return $request->organizationUnitId() === null
             ? $query->whereNull('organization_unit_id')
             : $query->where('organization_unit_id', $request->organizationUnitId());
+    }
+
+    public function printView(int $invoice): View
+    {
+        $model = Invoice::with('lines')->find($invoice);
+
+        if ($model === null) {
+            return view('invoice.notfound', ['id' => $invoice]);
+        }
+
+        return view('invoice.print', ['invoice' => $model]);
+    }
+
+    // API: generate a temporary signed public print URL (called from SPA)
+    public function signedPrintLink(Request $request, int $invoice): JsonResponse
+    {
+        $tenantId = $request->attributes->get(config('core.current_tenant.id_attribute', 'current_tenant_id'));
+        $printUrl = URL::temporarySignedRoute(
+            'invoices.public.print',
+            now()->addMinutes(15),
+            ['invoice' => $invoice, 'tenant' => $tenantId],
+        );
+        $pdfUrl = URL::temporarySignedRoute(
+            'invoices.public.pdf',
+            now()->addMinutes(15),
+            ['invoice' => $invoice, 'tenant' => $tenantId],
+        );
+
+        return response()->json(['data' => ['print_url' => $printUrl, 'pdf_url' => $pdfUrl]]);
+    }
+
+    // Public signed route: render print view when valid signed URL is provided
+    public function publicPrint(Request $request, int $invoice, int $tenant): View
+    {
+        $model = Invoice::withoutGlobalScopes()->where('id', $invoice)->where('tenant_id', $tenant)->with('lines')->first();
+        if ($model === null) {
+            return view('invoice.notfound', ['id' => $invoice]);
+        }
+
+        return view('invoice.print', ['invoice' => $model]);
     }
 }
