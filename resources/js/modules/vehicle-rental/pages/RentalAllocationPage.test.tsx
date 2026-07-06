@@ -74,7 +74,7 @@ describe('RentalAllocationPage', () => {
             name: 'CAR-1000',
             registration_number: 'CAR-1000',
         });
-        vehicleOwnershipApiMocks.listVehicleOwnerships.mockResolvedValue(collection([]));
+        vehicleOwnershipApiMocks.listVehicleOwnerships.mockResolvedValue(collection([companyOwnership()]));
     });
 
     it('prefills and submits allocation dates from the loaded agreement period', async () => {
@@ -92,11 +92,18 @@ describe('RentalAllocationPage', () => {
         expect(to).toHaveValue(expectedTo);
         expect(to).toHaveAttribute('min', expectedFrom);
         expect(to).toHaveAttribute('max', expectedTo);
+        await waitFor(() => expect(screen.getByLabelText('Company vehicle ownership')).toHaveValue('CAR-1000 - AutoERP Company - company owned'));
 
         await user.click(screen.getByRole('button', { name: 'Create allocation' }));
 
+        await waitFor(() => expect(vehicleOwnershipApiMocks.listVehicleOwnerships).toHaveBeenCalledWith('company', expect.objectContaining({
+            vehicle_id: 12,
+            status: 'active',
+            per_page: 100,
+        }), expect.any(AbortSignal)));
         await waitFor(() => expect(apiMocks.createRentalAllocation).toHaveBeenCalledWith(7, 1, expect.objectContaining({
             vehicle_id: 12,
+            vehicle_ownership_id: 41,
             vehicle_source_type: 'company_owned',
             allocated_from: new Date(expectedFrom).toISOString(),
             allocated_to: new Date(expectedTo).toISOString(),
@@ -212,6 +219,32 @@ function supplierOwnership() {
         organization: null,
         relationship_type: 'owned',
         ownership_type: 'owned',
+        started_at: '2026-07-01T00:00:00.000Z',
+        ended_at: '2026-09-01T00:00:00.000Z',
+        is_current: true,
+        notes: null,
+    };
+}
+
+function companyOwnership() {
+    return {
+        id: 41,
+        row_version: 1,
+        owner_type: 'company',
+        owner: { id: null, code: 'COMPANY', name: 'AutoERP Company' },
+        customer: null,
+        supplier: null,
+        vehicle: {
+            id: 12,
+            number: 'VEH-12',
+            registration_number: 'CAR-1000',
+            chassis_number: null,
+            make: null,
+            model: null,
+        },
+        organization: null,
+        relationship_type: 'company_owned',
+        ownership_type: 'company_owned',
         started_at: '2026-07-01T00:00:00.000Z',
         ended_at: '2026-09-01T00:00:00.000Z',
         is_current: true,

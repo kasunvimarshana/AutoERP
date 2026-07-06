@@ -106,6 +106,7 @@ export interface RentalAllocationAgreementSummary {
     row_version?: number;
     agreement_number?: string;
     agreement_kind?: string;
+    rental_mode?: string;
     status?: string;
     starts_at?: string;
     ends_at?: string;
@@ -125,6 +126,7 @@ export interface RentalAllocationSourceSummary {
     id: number;
     code?: string | null;
     name?: string;
+    row_version?: number;
     allocation_number?: string;
     status?: string;
     allocated_from?: string;
@@ -157,6 +159,7 @@ export interface RentalCustodyEvent {
     event_number: string;
     vehicle?: RentalVehicle | null;
     allocation?: NamedResource | null;
+    replacement?: NamedResource | null;
     event_type: string;
     occurred_at: string;
     odometer: string;
@@ -208,8 +211,8 @@ export interface RentalUsageFact {
     id: number;
     row_version: number;
     financial_side: "revenue" | "cost";
-    context_id: number;
-    usage_log_id: number;
+    context?: NamedResource | null;
+    usage_log?: NamedResource | null;
     agreement?: NamedResource | null;
     started_at: string;
     ended_at: string;
@@ -235,7 +238,7 @@ export interface RentalUsageContext {
     id: number;
     financial_side: "revenue" | "cost";
     agreement?: NamedResource | null;
-    rate_version_id: number;
+    rate_version?: NamedResource | null;
     customer?: RentalParty | null;
     supplier?: RentalParty | null;
     usage_fact?: RentalUsageFact | null;

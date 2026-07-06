@@ -39,7 +39,8 @@ final class RentalCalculationController
         $agreementModel = $this->scope(RentalAgreement::query(), $request)->findOrFail($agreement);
         return (new RentalCalculationRunResource($service->calculate(
             $agreementModel, RentalFinancialSide::from((string) $request->input('financial_side')),
-            (string) $request->input('period_start'), (string) $request->input('period_end'), $request->currentUserId(),
+            (string) $request->input('period_start'), (string) $request->input('period_end'),
+            (int) $request->input('expected_agreement_version'), $request->currentUserId(),
         )))->response()->setStatusCode(201);
     }
 

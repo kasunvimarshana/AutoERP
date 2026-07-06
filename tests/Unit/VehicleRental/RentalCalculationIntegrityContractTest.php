@@ -21,19 +21,24 @@ final class RentalCalculationIntegrityContractTest extends TestCase
         $request = $this->source('app/Modules/VehicleRental/Http/Requests/RentalTransitionRequest.php');
         $controller = $this->source('app/Modules/VehicleRental/Http/Controllers/RentalCalculationController.php');
         $service = $this->source('app/Modules/VehicleRental/Services/RentalCalculationTransitionService.php');
+        $calculateRequest = $this->source('app/Modules/VehicleRental/Http/Requests/CalculateRentalRequest.php');
         $resource = $this->source('app/Modules/VehicleRental/Http/Resources/RentalCalculationRunResource.php');
         $api = $this->source('resources/js/modules/vehicle-rental/vehicleRentalApi.ts');
         $page = $this->source('resources/js/modules/vehicle-rental/pages/RentalBillingPage.tsx');
         $types = $this->source('resources/js/modules/vehicle-rental/vehicleRentalTypes.ts');
 
         self::assertStringContainsString("'expected_version' => ['required', 'integer', 'min:1']", $request);
+        self::assertStringContainsString("'expected_agreement_version' => ['required', 'integer', 'min:1']", $calculateRequest);
         self::assertStringContainsString('RentalCalculationTransitionService $service', $controller);
         self::assertStringContainsString("(int) \$request->input('expected_version')", $controller);
+        self::assertStringContainsString("(int) \$request->input('expected_agreement_version')", $controller);
         self::assertStringContainsString('->lockForUpdate()', $service);
         self::assertStringContainsString("'row_version' => \$expectedVersion + 1", $service);
         self::assertStringContainsString("'row_version' => (int) \$this->row_version", $resource);
         self::assertStringContainsString('expected_version: expectedVersion', $api);
+        self::assertStringContainsString('expected_agreement_version: expectedAgreementVersion', $api);
         self::assertStringContainsString('run.id, run.row_version, status', $page);
+        self::assertStringContainsString('agreement.id, agreement.row_version', $page);
         self::assertStringContainsString('row_version: number;', $types);
     }
 

@@ -168,6 +168,7 @@ async function searchAgreements(
         data: response.data.map((agreement) => ({
             id: agreement.id,
             code: agreement.agreement_number,
+            row_version: agreement.row_version,
             name: [
                 agreement.agreement_number,
                 agreement.customer?.name ?? agreement.supplier?.name,
@@ -199,6 +200,7 @@ async function searchAllocations(
         data: response.data.map((allocation) => ({
             id: allocation.id,
             code: allocation.allocation_number,
+            vehicle: allocation.vehicle ?? null,
             name: [
                 allocation.allocation_number,
                 allocation.vehicle?.registration_number ?? allocation.vehicle?.name,

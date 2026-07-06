@@ -14,6 +14,7 @@ final class StoreRentalCustodyEventRequest extends TenantScopedRequest
     public function rules(): array
     {
         return [
+            'expected_allocation_version' => ['required', 'integer', 'min:1'],
             'event_type' => ['required', Rule::enum(RentalCustodyEventType::class)],
             'replacement_id' => ['nullable', 'integer', 'min:1'],
             'occurred_at' => ['required', 'date'],

@@ -34,15 +34,11 @@ const EVENT_OWNER_TO_COMPANY = 'owner_to_company';
 const EVENT_COMPANY_TO_CUSTOMER = 'company_to_customer';
 const EVENT_CUSTOMER_TO_COMPANY = 'customer_to_company';
 const EVENT_COMPANY_TO_OWNER = 'company_to_owner';
-const EVENT_REPLACEMENT_OUT = 'replacement_out';
-const EVENT_REPLACEMENT_IN = 'replacement_in';
 const EVENT_INTERNAL_TRANSFER = 'internal_transfer';
 
 const customerRentalEventOptions = [
     EVENT_COMPANY_TO_CUSTOMER,
     EVENT_CUSTOMER_TO_COMPANY,
-    EVENT_REPLACEMENT_OUT,
-    EVENT_REPLACEMENT_IN,
     EVENT_INTERNAL_TRANSFER,
 ] as const;
 
@@ -57,8 +53,6 @@ const eventRoles: Record<string, { from: string; to: string }> = {
     [EVENT_COMPANY_TO_CUSTOMER]: { from: 'company', to: 'customer' },
     [EVENT_CUSTOMER_TO_COMPANY]: { from: 'customer', to: 'company' },
     [EVENT_COMPANY_TO_OWNER]: { from: 'company', to: 'owner' },
-    [EVENT_REPLACEMENT_OUT]: { from: 'customer', to: 'company' },
-    [EVENT_REPLACEMENT_IN]: { from: 'company', to: 'customer' },
     [EVENT_INTERNAL_TRANSFER]: { from: 'company', to: 'company' },
 };
 
@@ -187,7 +181,7 @@ export default function RentalCustodyPage() {
         setSaving(true);
         setError(null);
         try {
-            await createRentalCustodyEvent(allocation.id, {
+            await createRentalCustodyEvent(allocation.id, allocationDetails.row_version, {
                 ...form,
                 fuel_level_percent: form.fuel_level_percent || null,
                 location: form.location || null,

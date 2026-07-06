@@ -165,11 +165,12 @@ export const listRentalCustodyEvents = (
 ) => collection<RentalCustodyEvent>("custody-events", params, signal);
 export const createRentalCustodyEvent = (
     allocationId: number,
+    expectedAllocationVersion: number,
     payload: RentalPayload,
 ) =>
     post<RentalCustodyEvent>(
         `allocations/${allocationId}/custody-events`,
-        payload,
+        { ...payload, expected_allocation_version: expectedAllocationVersion },
     );
 export const confirmRentalCustodyEvent = (id: number, expectedVersion: number) =>
     patch<RentalCustodyEvent>(`custody-events/${id}/confirm`, {
@@ -203,8 +204,12 @@ export const getRentalUsageLog = (id: number, signal?: AbortSignal) =>
     resource<RentalUsageLog>(`usage-logs/${id}`, signal);
 export const createRentalUsageLog = (
     allocationId: number,
+    expectedAllocationVersion: number,
     payload: RentalPayload,
-) => post<RentalUsageLog>(`allocations/${allocationId}/usage-logs`, payload);
+) => post<RentalUsageLog>(`allocations/${allocationId}/usage-logs`, {
+    ...payload,
+    expected_allocation_version: expectedAllocationVersion,
+});
 export const transitionRentalUsageLog = (
     id: number,
     expectedVersion: number,
@@ -252,8 +257,12 @@ export const listRentalCalculationRuns = (
 ) => collection<RentalCalculationRun>("calculation-runs", params, signal);
 export const calculateRentalAgreement = (
     agreementId: number,
+    expectedAgreementVersion: number,
     payload: RentalPayload,
-) => post<RentalCalculationRun>(`agreements/${agreementId}/calculate`, payload);
+) => post<RentalCalculationRun>(`agreements/${agreementId}/calculate`, {
+    ...payload,
+    expected_agreement_version: expectedAgreementVersion,
+});
 export const transitionRentalCalculationRun = (
     id: number,
     expectedVersion: number,

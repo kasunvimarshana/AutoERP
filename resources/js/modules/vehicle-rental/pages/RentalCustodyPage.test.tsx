@@ -50,10 +50,12 @@ describe('RentalCustodyPage', () => {
         expect(screen.getByLabelText('From')).toHaveValue('owner');
         expect(screen.getByLabelText('To')).toHaveValue('company');
         expect(screen.queryByRole('option', { name: 'company to customer' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('option', { name: 'replacement out' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('option', { name: 'replacement in' })).not.toBeInTheDocument();
 
         await user.click(screen.getByRole('button', { name: 'Save custody event' }));
 
-        await waitFor(() => expect(apiMocks.createRentalCustodyEvent).toHaveBeenCalledWith(31, expect.objectContaining({
+        await waitFor(() => expect(apiMocks.createRentalCustodyEvent).toHaveBeenCalledWith(31, 1, expect.objectContaining({
             event_type: 'owner_to_company',
             from_role: 'owner',
             to_role: 'company',

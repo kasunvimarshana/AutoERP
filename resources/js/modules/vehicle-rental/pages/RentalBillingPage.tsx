@@ -28,6 +28,8 @@ import {
 import { vehicleRentalPermissions } from '../vehicleRentalPermissions';
 import type { RentalCalculationRun } from '../vehicleRentalTypes';
 
+type VersionedNamedResource = NamedResource & { row_version?: number };
+
 function defaultBillingPeriod() {
     const today = businessDateInputValue();
     return { start: `${today.slice(0, 7)}-01`, end: today };
@@ -36,7 +38,7 @@ function defaultBillingPeriod() {
 export default function RentalBillingPage() {
     const auth = useAuth();
     const initialPeriod = defaultBillingPeriod();
-    const [agreement, setAgreement] = useState<NamedResource | null>(null);
+    const [agreement, setAgreement] = useState<VersionedNamedResource | null>(null);
     const [financialSide, setFinancialSide] = useState<'revenue' | 'cost'>('revenue');
     const [periodStart, setPeriodStart] = useState(initialPeriod.start);
     const [periodEnd, setPeriodEnd] = useState(initialPeriod.end);
@@ -61,12 +63,12 @@ export default function RentalBillingPage() {
 
     const calculate = async (event: FormEvent) => {
         event.preventDefault();
-        if (!agreement) return;
+        if (!agreement?.row_version) return;
 
         setSaving(true);
         setActionError(null);
         try {
-            await calculateRentalAgreement(agreement.id, {
+            await calculateRentalAgreement(agreement.id, agreement.row_version, {
                 financial_side: financialSide,
                 period_start: periodStart,
                 period_end: periodEnd,
@@ -212,7 +214,7 @@ export default function RentalBillingPage() {
                             <Button
                                 type="submit"
                                 loading={saving}
-                                disabled={!agreement || !periodStart || !periodEnd || periodStart > periodEnd}
+                                disabled={!agreement?.row_version || !periodStart || !periodEnd || periodStart > periodEnd}
                             >
                                 Calculate
                             </Button>

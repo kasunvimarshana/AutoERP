@@ -24,6 +24,8 @@ export function readableRelation(value: unknown): string {
         ?? resource.registration_number
         ?? resource.invoice_number
         ?? resource.payment_number
+        ?? resource.replacement_number
+        ?? resource.usage_number
         ?? resource.purchase_order_number
         ?? resource.journal_number
         ?? '-',

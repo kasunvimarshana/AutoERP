@@ -40,6 +40,8 @@ interface AllocationForm {
     startOdometer: string;
 }
 
+type AllocationLookupValue = NamedResource & { vehicle?: VehicleSummary | null };
+
 const AGREEMENT_KIND_OWNER_SUPPLY = 'owner_supply';
 const SOURCE_TYPE_COMPANY_OWNED = 'company_owned';
 const SOURCE_TYPE_OWNER_SUPPLIED = 'owner_supplied';
@@ -123,11 +125,14 @@ export default function RentalAllocationPage() {
     const [agreementDetails, setAgreementDetails] = useState<RentalAgreement | null>(null);
     const [agreementIdToLoad, setAgreementIdToLoad] = useState<number | null>(initialAgreementId);
     const [vehicle, setVehicle] = useState<VehicleSummary | null>(null);
-    const [sourceAllocation, setSourceAllocation] = useState<NamedResource | null>(null);
+    const [sourceAllocation, setSourceAllocation] = useState<AllocationLookupValue | null>(null);
     const [financeAgreement, setFinanceAgreement] = useState<NamedResource | null>(null);
     const [ownerSupplyOwnership, setOwnerSupplyOwnership] = useState<PartyVehicleRelationship | null>(null);
+    const [companyOwnership, setCompanyOwnership] = useState<PartyVehicleRelationship | null>(null);
     const [ownershipLoading, setOwnershipLoading] = useState(false);
+    const [companyOwnershipLoading, setCompanyOwnershipLoading] = useState(false);
     const [ownershipHint, setOwnershipHint] = useState<string | null>(null);
+    const [companyOwnershipHint, setCompanyOwnershipHint] = useState<string | null>(null);
     const [form, setForm] = useState<AllocationForm>(emptyForm);
     const [page, setPage] = useState(1);
     const [refresh, setRefresh] = useState(0);
@@ -236,6 +241,59 @@ export default function RentalAllocationPage() {
         vehicle?.id,
     ]);
 
+    useEffect(() => {
+        setCompanyOwnership(null);
+        setCompanyOwnershipHint(null);
+
+        if (isOwnerSupplyAgreement
+            || form.vehicleSourceType !== SOURCE_TYPE_COMPANY_OWNED
+            || !agreementDetails
+            || !vehicle
+            || !form.allocatedFrom
+            || !form.allocatedTo) {
+            setCompanyOwnershipLoading(false);
+
+            return;
+        }
+
+        const selectedVehicle = vehicle;
+        const selectedStartAt = toIsoDateTime(form.allocatedFrom);
+        const selectedEndAt = toIsoDateTime(form.allocatedTo);
+        const controller = new AbortController();
+        setCompanyOwnershipLoading(true);
+
+        void listPartyVehicleOwnerships('company', {
+            vehicle_id: selectedVehicle.id,
+            status: 'active',
+            per_page: OWNERSHIP_LOOKUP_PAGE_SIZE,
+        }, controller.signal).then((response) => {
+            if (controller.signal.aborted) return;
+
+            const ownership = response.data.find((row) => row.is_current && ownershipCoversPeriod(row, selectedStartAt, selectedEndAt))
+                ?? response.data.find((row) => ownershipCoversPeriod(row, selectedStartAt, selectedEndAt))
+                ?? null;
+
+            setCompanyOwnership(ownership);
+            setCompanyOwnershipHint(ownership === null
+                ? 'No active company ownership covers this allocation period.'
+                : null);
+        }).catch((requestError: unknown) => {
+            if (!controller.signal.aborted) setError(toApiError(requestError));
+        }).finally(() => {
+            if (!controller.signal.aborted) setCompanyOwnershipLoading(false);
+        });
+
+        return () => controller.abort();
+    }, [
+        agreementDetails,
+        isOwnerSupplyAgreement,
+        form.vehicleSourceType,
+        form.allocatedFrom,
+        form.allocatedTo,
+        vehicle,
+        vehicle?.id,
+    ]);
+
     const result = useApi(
         (signal) => listRentalAllocations(
             { agreement_id: agreement?.id, page, per_page: 25 },
@@ -248,6 +306,8 @@ export default function RentalAllocationPage() {
         setForm((current) => ({ ...current, vehicleSourceType }));
         setSourceAllocation(null);
         setFinanceAgreement(null);
+        setCompanyOwnership(null);
+        setCompanyOwnershipHint(null);
     };
 
     const clearVehicleAndSources = () => {
@@ -255,6 +315,8 @@ export default function RentalAllocationPage() {
         setSourceAllocation(null);
         setFinanceAgreement(null);
         setOwnerSupplyOwnership(null);
+        setCompanyOwnership(null);
+        setCompanyOwnershipHint(null);
     };
 
     const submit = async (event: FormEvent) => {
@@ -269,13 +331,22 @@ export default function RentalAllocationPage() {
 
             return;
         }
+        if (!isOwnerSupplyAgreement && vehicleSourceType === SOURCE_TYPE_COMPANY_OWNED && companyOwnership === null) {
+            setCompanyOwnershipHint('No active company ownership covers this allocation period.');
+
+            return;
+        }
 
         setSaving(true);
         setError(null);
         try {
             await createRentalAllocation(agreement.id, agreementDetails.row_version, {
                 vehicle_id: vehicle.id,
-                vehicle_ownership_id: isOwnerSupplyAgreement ? ownerSupplyOwnership?.id ?? null : null,
+                vehicle_ownership_id: isOwnerSupplyAgreement
+                    ? ownerSupplyOwnership?.id ?? null
+                    : vehicleSourceType === SOURCE_TYPE_COMPANY_OWNED
+                        ? companyOwnership?.id ?? null
+                        : null,
                 vehicle_source_type: vehicleSourceType,
                 source_allocation_id: !isOwnerSupplyAgreement && vehicleSourceType === SOURCE_TYPE_OWNER_SUPPLIED
                     ? sourceAllocation?.id ?? null
@@ -291,6 +362,8 @@ export default function RentalAllocationPage() {
             setSourceAllocation(null);
             setFinanceAgreement(null);
             setOwnerSupplyOwnership(null);
+            setCompanyOwnership(null);
+            setCompanyOwnershipHint(null);
             setForm({
                 ...emptyForm(),
                 vehicleSourceType: sourceTypeForAgreement(agreementDetails),
@@ -334,6 +407,7 @@ export default function RentalAllocationPage() {
 
     const sourceSelectionValid = (() => {
         if (isOwnerSupplyAgreement) return ownerSupplyOwnership !== null;
+        if (form.vehicleSourceType === SOURCE_TYPE_COMPANY_OWNED) return companyOwnership !== null;
         if (form.vehicleSourceType === SOURCE_TYPE_OWNER_SUPPLIED) return sourceAllocation !== null;
         if (form.vehicleSourceType === SOURCE_TYPE_FINANCED) return financeAgreement !== null;
 
@@ -344,6 +418,7 @@ export default function RentalAllocationPage() {
     const vehicleSourceType = isOwnerSupplyAgreement ? SOURCE_TYPE_OWNER_SUPPLIED : form.vehicleSourceType;
     const allocationStartAt = form.allocatedFrom ? toIsoDateTime(form.allocatedFrom) : null;
     const allocationEndAt = form.allocatedTo ? toIsoDateTime(form.allocatedTo) : null;
+    const usesOwnerSourceAllocation = !isOwnerSupplyAgreement && vehicleSourceType === SOURCE_TYPE_OWNER_SUPPLIED;
 
     return (
         <RentalPage>
@@ -365,23 +440,37 @@ export default function RentalAllocationPage() {
                                 setSourceAllocation(null);
                                 setFinanceAgreement(null);
                                 setOwnerSupplyOwnership(null);
+                                setCompanyOwnership(null);
+                                setCompanyOwnershipHint(null);
                                 setPage(1);
                                 if (value === null) setForm(emptyForm());
                             }}
                             required
                         />
-                        <RentalAvailableVehicleLookupSelect
-                            value={vehicle}
-                            onChange={(value) => {
-                                setVehicle(value);
-                                setSourceAllocation(null);
-                                setFinanceAgreement(null);
-                                setOwnerSupplyOwnership(null);
-                            }}
-                            startAt={allocationStartAt}
-                            endAt={allocationEndAt}
-                            required
-                        />
+                        {usesOwnerSourceAllocation ? (
+                            <Input
+                                label="Vehicle"
+                                value={readableRelation(vehicle)}
+                                readOnly
+                                required
+                                hint="Selected from the owner source allocation."
+                            />
+                        ) : (
+                            <RentalAvailableVehicleLookupSelect
+                                value={vehicle}
+                                onChange={(value) => {
+                                    setVehicle(value);
+                                    setSourceAllocation(null);
+                                    setFinanceAgreement(null);
+                                    setOwnerSupplyOwnership(null);
+                                    setCompanyOwnership(null);
+                                    setCompanyOwnershipHint(null);
+                                }}
+                                startAt={allocationStartAt}
+                                endAt={allocationEndAt}
+                                required
+                            />
+                        )}
                         <Select
                             label="Vehicle source"
                             value={vehicleSourceType}
@@ -404,16 +493,31 @@ export default function RentalAllocationPage() {
                                 hint={ownershipHint ?? undefined}
                             />
                         )}
-                        {!isOwnerSupplyAgreement && form.vehicleSourceType === SOURCE_TYPE_OWNER_SUPPLIED && (
+                        {!isOwnerSupplyAgreement && form.vehicleSourceType === SOURCE_TYPE_COMPANY_OWNED && (
+                            <Input
+                                label="Company vehicle ownership"
+                                value={companyOwnershipLoading ? 'Checking ownership...' : ownershipLabel(companyOwnership)}
+                                readOnly
+                                required
+                                hint={companyOwnershipHint ?? undefined}
+                            />
+                        )}
+                        {usesOwnerSourceAllocation && (
                             <RentalAllocationLookupSelect
                                 value={sourceAllocation}
-                                onChange={setSourceAllocation}
-                                vehicleId={vehicle?.id}
+                                onChange={(value) => {
+                                    const selected = value as AllocationLookupValue | null;
+                                    setSourceAllocation(selected);
+                                    setVehicle(selected?.vehicle ?? null);
+                                    setFinanceAgreement(null);
+                                    setCompanyOwnership(null);
+                                    setCompanyOwnershipHint(null);
+                                }}
                                 agreementKind={AGREEMENT_KIND_OWNER_SUPPLY}
                                 coversStartAt={allocationStartAt}
                                 coversEndAt={allocationEndAt}
                                 openOnly
-                                disabled={!vehicle}
+                                disabled={!allocationStartAt || !allocationEndAt}
                                 required
                                 excludeId={null}
                             />
@@ -467,7 +571,7 @@ export default function RentalAllocationPage() {
                         <Button
                             type="submit"
                             loading={saving}
-                            disabled={!agreement || !agreementDetails || !vehicle || !form.allocatedFrom || ownershipLoading || !sourceSelectionValid}
+                            disabled={!agreement || !agreementDetails || !vehicle || !form.allocatedFrom || ownershipLoading || companyOwnershipLoading || !sourceSelectionValid}
                         >
                             Create allocation
                         </Button>

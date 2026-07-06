@@ -14,8 +14,24 @@ final class RentalUsageFactResource extends RentalResource
             'id' => (int) $this->getKey(),
             'row_version' => (int) $this->row_version,
             'financial_side' => $this->enumValue($this->financial_side),
-            'context_id' => (int) $this->usage_context_id,
-            'usage_log_id' => (int) $this->usage_log_id,
+            'context' => $this->whenLoaded('context', function (): array {
+                return [
+                    'id' => (int) $this->context->getKey(),
+                    'financial_side' => $this->enumValue($this->context->financial_side),
+                    'agreement' => $this->context->relationLoaded('agreement')
+                        ? $this->summary($this->context->agreement, ['agreement_number', 'agreement_kind'])
+                        : null,
+                    'rate_version' => $this->context->relationLoaded('rateVersion')
+                        ? $this->summary($this->context->rateVersion, ['version_number', 'status', 'effective_from', 'effective_to'])
+                        : null,
+                ];
+            }),
+            'usage_log' => $this->whenLoaded('usageLog', fn (): array => [
+                'id' => (int) $this->usageLog->getKey(),
+                'usage_number' => $this->usageLog->usage_number,
+                'usage_date' => $this->usageLog->usage_date?->toDateString(),
+                'status' => $this->enumValue($this->usageLog->status),
+            ]),
             'agreement' => $this->whenLoaded('context', fn () => $this->context->relationLoaded('agreement')
                 ? $this->summary($this->context->agreement, ['agreement_number', 'agreement_kind'])
                 : null),

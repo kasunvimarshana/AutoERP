@@ -30,7 +30,12 @@ final class RentalUsageFactController
 
         return new RentalUsageFactResource(
             $this->scope(RentalUsageFact::query(), $request)
-                ->with(['context.agreement.customer', 'context.agreement.supplier'])
+                ->with([
+                    'context.agreement.customer',
+                    'context.agreement.supplier',
+                    'context.rateVersion',
+                    'usageLog',
+                ])
                 ->findOrFail($fact),
         );
     }

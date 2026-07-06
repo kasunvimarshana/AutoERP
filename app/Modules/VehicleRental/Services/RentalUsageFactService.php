@@ -93,6 +93,9 @@ final class RentalUsageFactService
             if ($this->math->compare($commercialDistance, $commercialOdometerDistance) > 0) {
                 throw new InvalidArgumentException('Commercial distance cannot exceed the selected commercial odometer range.');
             }
+            if ($this->math->compare($commercialDistance, (string) $usage->net_operational_distance_km) > 0) {
+                throw new InvalidArgumentException('Commercial distance cannot exceed the physical net operational distance.');
+            }
             $workingMinutes = (int) $startedAt->diffInMinutes($endedAt);
             $normalOvertime = (int) ($data['normal_overtime_minutes'] ?? 0);
             $doubleOvertime = (int) ($data['double_overtime_minutes'] ?? 0);
@@ -134,7 +137,12 @@ final class RentalUsageFactService
                 'updated_by' => $userId,
             ])->save();
 
-            return $fact->refresh()->load(['context.agreement.customer', 'context.agreement.supplier']);
+            return $fact->refresh()->load([
+                'usageLog',
+                'context.agreement.customer',
+                'context.agreement.supplier',
+                'context.rateVersion',
+            ]);
         });
     }
 
@@ -181,7 +189,12 @@ final class RentalUsageFactService
                 'updated_by' => $userId,
             ])->save();
 
-            return $fact->refresh()->load(['context.agreement.customer', 'context.agreement.supplier']);
+            return $fact->refresh()->load([
+                'usageLog',
+                'context.agreement.customer',
+                'context.agreement.supplier',
+                'context.rateVersion',
+            ]);
         });
     }
 

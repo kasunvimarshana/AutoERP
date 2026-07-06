@@ -29,6 +29,7 @@ final class RentalCustodyService
     {
         return DB::transaction(function () use ($allocation, $data, $userId): RentalCustodyEvent {
             $allocation = RentalVehicleAllocation::query()->with('agreement')->lockForUpdate()->findOrFail($allocation->getKey());
+            $this->assertAllocationExpectedVersion($allocation, (int) ($data['expected_allocation_version'] ?? 0));
             $eventType = RentalCustodyEventType::from((string) $data['event_type']);
             [$fromRole, $toRole] = $this->defaultRoles($eventType);
             if (isset($data['from_role']) && $data['from_role'] !== $fromRole) {
@@ -190,7 +191,7 @@ final class RentalCustodyService
     {
         return [
             'allocation.agreement.customer', 'allocation.agreement.supplier', 'vehicle.make', 'vehicle.model',
-            'items', 'handedOverByEmployee', 'receivedByEmployee', 'attachments', 'replacement',
+            'items', 'handedOverByEmployee', 'receivedByEmployee', 'replacement',
         ];
     }
 
@@ -379,6 +380,15 @@ final class RentalCustodyService
         if ((int) $event->row_version !== $expectedVersion) {
             throw ValidationException::withMessages([
                 'expected_version' => ['The rental custody event changed after it was loaded. Reload and review the latest version.'],
+            ]);
+        }
+    }
+
+    private function assertAllocationExpectedVersion(RentalVehicleAllocation $allocation, int $expectedVersion): void
+    {
+        if ((int) $allocation->row_version !== $expectedVersion) {
+            throw ValidationException::withMessages([
+                'expected_allocation_version' => ['The vehicle allocation changed after it was loaded. Reload and review the latest version.'],
             ]);
         }
     }

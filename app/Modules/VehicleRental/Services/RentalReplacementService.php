@@ -65,6 +65,7 @@ final class RentalReplacementService
                 'event_type' => RentalCustodyEventType::ReplacementOut->value,
                 'occurred_at' => $data['replacement_at'],
                 'replacement_id' => $replacement->getKey(),
+                'expected_allocation_version' => (int) $oldAllocation->row_version,
                 'from_role' => 'customer',
                 'to_role' => 'company',
             ]);
@@ -92,6 +93,7 @@ final class RentalReplacementService
                 'event_type' => RentalCustodyEventType::ReplacementIn->value,
                 'occurred_at' => $data['replacement_at'],
                 'replacement_id' => $replacement->getKey(),
+                'expected_allocation_version' => (int) $newAllocation->row_version,
                 'from_role' => 'company',
                 'to_role' => 'customer',
             ]);

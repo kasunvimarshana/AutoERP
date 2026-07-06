@@ -9,6 +9,7 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Invoice\Enums\InvoiceStatus;
@@ -55,10 +56,12 @@ final class RentalCalculationService
         RentalFinancialSide $side,
         string $periodStart,
         string $periodEnd,
+        int $expectedAgreementVersion,
         ?int $userId,
     ): RentalCalculationRun {
-        return DB::transaction(function () use ($agreement, $side, $periodStart, $periodEnd, $userId): RentalCalculationRun {
+        return DB::transaction(function () use ($agreement, $side, $periodStart, $periodEnd, $expectedAgreementVersion, $userId): RentalCalculationRun {
             $agreement = RentalAgreement::query()->lockForUpdate()->findOrFail($agreement->getKey());
+            $this->assertAgreementExpectedVersion($agreement, $expectedAgreementVersion);
             $this->assertSide($agreement, $side);
             $start = CarbonImmutable::parse($periodStart);
             $end = CarbonImmutable::parse($periodEnd);
@@ -916,6 +919,15 @@ final class RentalCalculationService
         if ($side === RentalFinancialSide::Cost
             && $agreement->agreement_kind !== RentalAgreementKind::OwnerSupply) {
             throw new InvalidArgumentException('Cost calculations require an owner supply agreement.');
+        }
+    }
+
+    private function assertAgreementExpectedVersion(RentalAgreement $agreement, int $expectedVersion): void
+    {
+        if ((int) $agreement->row_version !== $expectedVersion) {
+            throw ValidationException::withMessages([
+                'expected_agreement_version' => ['The rental agreement changed after it was loaded. Reload and review the latest version.'],
+            ]);
         }
     }
 }

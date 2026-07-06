@@ -13,6 +13,7 @@ final class CalculateRentalRequest extends TenantScopedRequest
     public function rules(): array
     {
         return [
+            'expected_agreement_version' => ['required', 'integer', 'min:1'],
             'financial_side' => ['required', Rule::enum(RentalFinancialSide::class)],
             'period_start' => ['required', 'date'],
             'period_end' => ['required', 'date', 'after:period_start'],

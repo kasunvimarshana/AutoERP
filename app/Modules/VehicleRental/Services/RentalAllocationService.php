@@ -445,6 +445,9 @@ final class RentalAllocationService
         }
 
         if ($sourceType === RentalVehicleSourceType::CompanyOwned) {
+            if (! $hasOwnership) {
+                throw new InvalidArgumentException('Company-owned allocations require a company vehicle ownership record.');
+            }
             if ($hasSourceAllocation || $hasFinanceAgreement) {
                 throw new InvalidArgumentException('Company-owned allocations cannot reference owner source or finance agreements.');
             }

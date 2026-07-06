@@ -34,6 +34,13 @@ import type {
     RentalUsageLog,
 } from "../vehicleRentalTypes";
 
+const AGREEMENT_KIND_CUSTOMER_RENTAL = "customer_rental";
+const APPLICABILITY_CUSTOMER = "customer";
+const APPLICABILITY_OWNER = "owner";
+const APPLICABILITY_BOTH = "both";
+const APPLICABILITY_INTERNAL = "internal";
+const RENTAL_MODE_WITH_DRIVER = "with_driver";
+
 interface UsageForm {
     usage_date: string;
     started_at: string;
@@ -128,7 +135,14 @@ export default function RentalRunningChartPage() {
     const metadata = useApi((signal) => getRentalMetadata(signal), []);
     const allocations = useApi(
         (signal) =>
-            listRentalAllocations({ status: "active", per_page: 100 }, signal),
+            listRentalAllocations(
+                {
+                    status: "active",
+                    agreement_kind: AGREEMENT_KIND_CUSTOMER_RENTAL,
+                    per_page: 100,
+                },
+                signal,
+            ),
         [],
     );
     const logs = useApi(
@@ -145,7 +159,12 @@ export default function RentalRunningChartPage() {
     );
 
     const allocationRows = useMemo(
-        () => allocations.data?.data ?? [],
+        () =>
+            (allocations.data?.data ?? []).filter(
+                (row) =>
+                    row.agreement?.agreement_kind ===
+                    AGREEMENT_KIND_CUSTOMER_RENTAL,
+            ),
         [allocations.data],
     );
     const selectedAllocation = useMemo(
@@ -166,16 +185,16 @@ export default function RentalRunningChartPage() {
             })),
         [allocationRows],
     );
+    const requiresDriverAssignment =
+        selectedAllocation?.agreement?.rental_mode === RENTAL_MODE_WITH_DRIVER;
     const driverAssignmentOptions = useMemo(
-        () => [
-            { value: "", label: "No company driver" },
-            ...(selectedAllocation?.drivers ?? [])
+        () =>
+            (selectedAllocation?.drivers ?? [])
                 .filter((assignment) => assignment.status === "active")
                 .map((assignment) => ({
                     value: String(assignment.id),
                     label: assignmentLabel(assignment),
                 })),
-        ],
         [selectedAllocation],
     );
     const eventTypeOptions = useMemo(
@@ -189,19 +208,29 @@ export default function RentalRunningChartPage() {
         [metadata.data],
     );
     const eventApplicabilityOptions = useMemo(
-        () =>
-            (metadata.data?.usage_event_applicabilities ?? []).map((value) => ({
+        () => {
+            const hasOwnerContext = selectedAllocation?.source_allocation !== null
+                && selectedAllocation?.source_allocation !== undefined;
+            const values = (metadata.data?.usage_event_applicabilities ?? []).filter(
+                (value) =>
+                    hasOwnerContext ||
+                    value === APPLICABILITY_CUSTOMER ||
+                    value === APPLICABILITY_INTERNAL,
+            );
+
+            return values.map((value) => ({
                 value,
                 label:
-                    value === "customer"
+                    value === APPLICABILITY_CUSTOMER
                         ? "Customer / lessee only"
-                        : value === "owner"
+                        : value === APPLICABILITY_OWNER
                           ? "Vehicle owner / lessor only"
-                          : value === "both"
+                          : value === APPLICABILITY_BOTH
                             ? "Both commercial sides"
                             : "Internal only",
-            })),
-        [metadata.data],
+            }));
+        },
+        [metadata.data, selectedAllocation],
     );
 
     const canRecord = hasPermission(auth, vehicleRentalPermissions.usageRecord);
@@ -220,11 +249,11 @@ export default function RentalRunningChartPage() {
 
     const save = async (event: FormEvent) => {
         event.preventDefault();
-        if (allocationId === null) return;
+        if (allocationId === null || selectedAllocation === null) return;
         setSaving(true);
         setActionError(null);
         try {
-            await createRentalUsageLog(allocationId, {
+            await createRentalUsageLog(allocationId, selectedAllocation.row_version, {
                 usage_date: form.usage_date,
                 started_at: form.started_at,
                 ended_at: form.ended_at,
@@ -252,6 +281,8 @@ export default function RentalRunningChartPage() {
                     reference_number: row.reference_number || null,
                     remarks: row.remarks || null,
                 })),
+                expected_source_allocation_version:
+                    selectedAllocation.source_allocation?.row_version ?? null,
             });
             setForm(emptyForm());
             setEvents([]);
@@ -451,6 +482,17 @@ export default function RentalRunningChartPage() {
                             />
                             <Select
                                 label="Valid driver assignment"
+                                required={requiresDriverAssignment}
+                                placeholder={
+                                    requiresDriverAssignment
+                                        ? "Select company driver"
+                                        : "No company driver"
+                                }
+                                hint={
+                                    requiresDriverAssignment
+                                        ? "Required for with-driver agreements."
+                                        : undefined
+                                }
                                 value={form.driver_assignment_id}
                                 onChange={(event) =>
                                     setForm({
@@ -728,7 +770,7 @@ export default function RentalRunningChartPage() {
                             </div>
                         )}
                         <div className="mt-4 flex justify-end">
-                            <Button type="submit" loading={saving}>
+                            <Button type="submit" loading={saving} disabled={selectedAllocation === null}>
                                 Save physical usage
                             </Button>
                         </div>
