@@ -247,6 +247,7 @@ export interface RentalUsageContext {
     id: number;
     financial_side: "revenue" | "cost";
     agreement?: NamedResource | null;
+    allocation?: NamedResource | null;
     rate_version?: NamedResource | null;
     customer?: RentalParty | null;
     supplier?: RentalParty | null;

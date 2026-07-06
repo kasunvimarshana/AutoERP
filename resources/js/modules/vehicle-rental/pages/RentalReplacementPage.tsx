@@ -124,21 +124,28 @@ export default function RentalReplacementPage() {
     const [actionError, setActionError] = useState<ApiError | null>(null);
 
     useEffect(() => {
-        setCompanyOwnership(null);
-        setCompanyOwnershipHint(null);
+        const controller = new AbortController();
+        queueMicrotask(() => {
+            if (controller.signal.aborted) return;
+            setCompanyOwnership(null);
+            setCompanyOwnershipHint(null);
+        });
 
         const allocationEnd = form.allocated_to || toDateTimeLocal(allocation.data?.agreement?.ends_at ?? allocation.data?.allocated_to);
         if (form.vehicle_source_type !== SOURCE_TYPE_COMPANY_OWNED || !vehicle || !form.replacement_at || !allocationEnd) {
-            setCompanyOwnershipLoading(false);
+            queueMicrotask(() => {
+                if (!controller.signal.aborted) setCompanyOwnershipLoading(false);
+            });
 
-            return;
+            return () => controller.abort();
         }
 
         const selectedVehicle = vehicle;
         const selectedStartAt = toIsoDateTime(form.replacement_at);
         const selectedEndAt = toIsoDateTime(allocationEnd);
-        const controller = new AbortController();
-        setCompanyOwnershipLoading(true);
+        queueMicrotask(() => {
+            if (!controller.signal.aborted) setCompanyOwnershipLoading(true);
+        });
 
         void listVehicleOwnerships("company", {
             vehicle_id: selectedVehicle.id,

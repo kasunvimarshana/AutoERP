@@ -19,6 +19,7 @@ import { formatDate } from '@/shared/utils/formatDate';
 import { readableRelation } from '@/shared/utils/object';
 import { RentalAgreementLookupSelect } from '../components/RentalLookups';
 import { RentalPage } from '../components/RentalPage';
+import { agreementDetailPath } from '../rentalAgreementPresentation';
 import {
     calculateRentalAgreement,
     createRentalInvoice,
@@ -99,7 +100,7 @@ export default function RentalBillingPage() {
                 invoice_date: documentDate,
                 due_date: documentDate,
                 status: 'draft',
-                notes: `${run.billing_period?.financial_side === 'cost' ? 'Owner rental payable' : 'Customer rental invoice'} from approved rental calculation`,
+                notes: `${run.billing_period?.financial_side === 'cost' ? 'Owner rental payable' : 'Lessee rental invoice'} from approved rental calculation`,
             });
             runs.reload();
         } catch (error: unknown) {
@@ -115,7 +116,10 @@ export default function RentalBillingPage() {
             render: (row) => row.billing_period?.agreement ? (
                 <Link
                     className="font-semibold text-blue-700"
-                    to={`/vehicle-rental/agreements/${row.billing_period.agreement.id}`}
+                    to={agreementDetailPath(
+                        row.billing_period.financial_side === 'cost' ? 'lessor' : 'lessee',
+                        row.billing_period.agreement.id,
+                    )}
                 >
                     {readableRelation(row.billing_period.agreement)}
                 </Link>
@@ -190,7 +194,7 @@ export default function RentalBillingPage() {
                                 setAgreement(null);
                             }}
                             options={[
-                                { value: 'revenue', label: 'Customer revenue' },
+                                { value: 'revenue', label: 'Lessee revenue' },
                                 { value: 'cost', label: 'Owner cost' },
                             ]}
                         />

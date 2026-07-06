@@ -34,16 +34,22 @@ final class RentalAgreementIntegrityContractTest extends TestCase
         self::assertStringContainsString("validated('expected_version')", $controller);
     }
 
-    public function test_database_and_configuration_own_agreement_party_and_timezone_invariants(): void
+    public function test_database_service_and_configuration_own_agreement_party_deposit_and_timezone_invariants(): void
     {
         $migration = $this->source('app/Modules/VehicleRental/Database/Migrations/2026_06_12_200002_create_rental_agreements_table.php');
+        $depositMigration = $this->source('app/Modules/VehicleRental/Database/Migrations/2026_06_12_200022_create_rental_deposit_requirements_table.php');
         $service = $this->source('app/Modules/VehicleRental/Services/RentalAgreementService.php');
         $configuration = $this->source('config/vehicle_rental.php');
 
-        self::assertStringContainsString('rental_agreements_party_ck', $migration);
-        self::assertStringContainsString('customer_id IS NOT NULL AND supplier_id IS NULL', $migration);
-        self::assertStringContainsString('supplier_id IS NOT NULL AND customer_id IS NULL', $migration);
+        self::assertStringContainsString('rental_agreements_customer_id_tenant_fk', $migration);
+        self::assertStringContainsString('rental_agreements_supplier_id_tenant_fk', $migration);
+        self::assertStringContainsString('rental_agreements_id_tenant_customer_uk', $migration);
         self::assertStringContainsString('rental_agreements_terminated_by_tenant_fk', $migration);
+        self::assertStringContainsString('Customer rental agreement requires only a customer.', $service);
+        self::assertStringContainsString('Owner supply agreement requires only a supplier/vehicle owner.', $service);
+        self::assertStringContainsString('Security deposits are supported only for customer rental agreements.', $service);
+        self::assertStringContainsString('rental_deposit_requirements_customer_id_tenant_fk', $depositMigration);
+        self::assertStringContainsString('rental_deposit_requirements_agreement_id_tenant_customer_fk', $depositMigration);
         self::assertStringNotContainsString('Asia/Colombo', $migration.$service.$configuration);
         self::assertStringContainsString("'vehicle_rental.billing_timezone'", $service);
         self::assertStringContainsString('VEHICLE_RENTAL_BILLING_TIMEZONE', $configuration);

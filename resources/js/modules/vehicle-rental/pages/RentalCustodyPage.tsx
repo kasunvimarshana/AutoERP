@@ -124,20 +124,35 @@ export default function RentalCustodyPage() {
     const [form, setForm] = useState(emptyForm);
 
     useEffect(() => {
-        setAllocationIdToLoad(initialAllocationId);
+        let cancelled = false;
+        queueMicrotask(() => {
+            if (!cancelled) setAllocationIdToLoad(initialAllocationId);
+        });
+
+        return () => {
+            cancelled = true;
+        };
     }, [initialAllocationId]);
 
     useEffect(() => {
         if (!allocationIdToLoad) {
-            setAllocationDetails(null);
-            setAllocation(null);
-            setForm(emptyForm());
+            let cancelled = false;
+            queueMicrotask(() => {
+                if (cancelled) return;
+                setAllocationDetails(null);
+                setAllocation(null);
+                setForm(emptyForm());
+            });
 
-            return;
+            return () => {
+                cancelled = true;
+            };
         }
 
         const controller = new AbortController();
-        setError(null);
+        queueMicrotask(() => {
+            if (!controller.signal.aborted) setError(null);
+        });
 
         void getRentalAllocation(allocationIdToLoad, controller.signal)
             .then((resource) => {

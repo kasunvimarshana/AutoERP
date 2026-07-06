@@ -643,6 +643,8 @@ export const tenantNavigationSections: NavigationSection[] = [
                         exclude: [
                             "/vehicle-rental/reservations",
                             "/vehicle-rental/agreements",
+                            "/vehicle-rental/lessee-agreements",
+                            "/vehicle-rental/lessor-agreements",
                             "/vehicle-rental/allocations",
                             "/vehicle-rental/custody",
                             "/vehicle-rental/running-chart",
@@ -678,6 +680,34 @@ export const tenantNavigationSections: NavigationSection[] = [
                         label: "Agreements",
                         to: "/vehicle-rental/agreements",
                         match: ["/vehicle-rental/agreements"],
+                        access: {
+                            ...operationalAccess(["vehicle-rental"]),
+                            permissions: [
+                                vehicleRentalPermissions.view,
+                                vehicleRentalPermissions.agreementsManage,
+                            ],
+                        },
+                    },
+                    {
+                        id: "rental-lessee-agreements",
+                        type: "link",
+                        label: "Lessee Agreements",
+                        to: "/vehicle-rental/lessee-agreements",
+                        match: ["/vehicle-rental/lessee-agreements"],
+                        access: {
+                            ...operationalAccess(["vehicle-rental"]),
+                            permissions: [
+                                vehicleRentalPermissions.view,
+                                vehicleRentalPermissions.agreementsManage,
+                            ],
+                        },
+                    },
+                    {
+                        id: "rental-lessor-agreements",
+                        type: "link",
+                        label: "Lessor Agreements",
+                        to: "/vehicle-rental/lessor-agreements",
+                        match: ["/vehicle-rental/lessor-agreements"],
                         access: {
                             ...operationalAccess(["vehicle-rental"]),
                             permissions: [

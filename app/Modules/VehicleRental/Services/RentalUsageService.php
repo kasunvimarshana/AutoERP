@@ -340,14 +340,20 @@ final class RentalUsageService
                 $query->where($key, $filters[$key]);
             }
         }
-        if (! empty($filters['agreement_id'])) {
+        if (! empty($filters['agreement_id']) && ! empty($filters['financial_side'])) {
+            $query->whereHas(
+                'contexts',
+                fn (Builder $context) => $context
+                    ->where('agreement_id', $filters['agreement_id'])
+                    ->where('financial_side', $filters['financial_side']),
+            );
+        } elseif (! empty($filters['agreement_id'])) {
             $query->whereHas(
                 'contexts',
                 fn (Builder $context) => $context
                     ->where('agreement_id', $filters['agreement_id']),
             );
-        }
-        if (! empty($filters['financial_side'])) {
+        } elseif (! empty($filters['financial_side'])) {
             $query->whereHas(
                 'contexts',
                 fn (Builder $context) => $context
@@ -382,6 +388,7 @@ final class RentalUsageService
             'contexts.agreement.supplier',
             'contexts.customer',
             'contexts.supplier',
+            'contexts.allocation',
             'contexts.rateVersion.components',
             'contexts.usageFact',
         ];

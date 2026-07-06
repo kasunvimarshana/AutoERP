@@ -233,6 +233,17 @@ describe('navigation access and matching', () => {
         expect(match?.item.id).toBe('rental-agreements');
     });
 
+    it('selects the lessee agreement workflow', () => {
+        const match = findNavigationMatch(
+            '/vehicle-rental/lessee-agreements',
+            '',
+            tenantNavigationSections,
+        );
+
+        expect(match?.parent?.id).toBe('vehicle-rental');
+        expect(match?.item.id).toBe('rental-lessee-agreements');
+    });
+
     it('selects the requested running chart mode', () => {
         const match = findNavigationMatch(
             '/vehicle-rental/running-chart',

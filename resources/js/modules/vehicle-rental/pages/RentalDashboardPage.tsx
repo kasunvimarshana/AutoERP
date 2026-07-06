@@ -19,7 +19,7 @@ export default function RentalDashboardPage() {
         <RentalPage>
             <ContentHeader
                 title="Vehicle Rental"
-                description="Customer rentals, vehicle-owner costs, custody, running charts, deposits, and vehicle finance."
+                description="Lessee rentals, vehicle-owner costs, custody, running charts, deposits, and vehicle finance."
             />
             <ErrorAlert error={result.error} />
             {result.loading ? (

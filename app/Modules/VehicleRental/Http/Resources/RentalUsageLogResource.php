@@ -82,6 +82,9 @@ final class RentalUsageLogResource extends RentalResource
                     'agreement' => $agreement === null
                         ? null
                         : $this->summary($agreement, ['agreement_number', 'agreement_kind']),
+                    'allocation' => $context->relationLoaded('allocation')
+                        ? $this->summary($context->allocation, ['allocation_number', 'status'])
+                        : null,
                     'rate_version' => $context->relationLoaded('rateVersion')
                         ? $this->summary($context->rateVersion, ['version_number', 'status', 'effective_from', 'effective_to'])
                         : null,

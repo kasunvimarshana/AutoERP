@@ -53,7 +53,7 @@ export default function RentalReservationDetailPage() {
         <RentalPage>
             <ContentHeader
                 title={row.reservation_number}
-                description="Customer rental request and conversion readiness."
+                description="Lessee rental request and conversion readiness."
                 actions={
                     <>
                         {row.status === "draft" && (
@@ -74,9 +74,9 @@ export default function RentalReservationDetailPage() {
                         )}
                         <LinkButton
                             variant="secondary"
-                            to={`/vehicle-rental/agreements/create?reservation_id=${row.id}`}
+                            to={`/vehicle-rental/lessee-agreements/create?reservation_id=${row.id}`}
                         >
-                            Create agreement
+                            Create lessee agreement
                         </LinkButton>
                     </>
                 }

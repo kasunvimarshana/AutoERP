@@ -53,7 +53,7 @@ const emptyForm = (): AllocationForm => ({
     vehicleSourceType: SOURCE_TYPE_COMPANY_OWNED,
     allocatedFrom: '',
     allocatedTo: '',
-    startOdometer: '0',
+    startOdometer: '',
 });
 
 function toDateTimeLocal(value: string | null | undefined): string {
@@ -143,14 +143,26 @@ export default function RentalAllocationPage() {
     const ownerSupplySupplierId = agreementDetails?.supplier?.id ?? null;
 
     useEffect(() => {
-        setAgreementIdToLoad(initialAgreementId);
+        let cancelled = false;
+        queueMicrotask(() => {
+            if (!cancelled) setAgreementIdToLoad(initialAgreementId);
+        });
+
+        return () => {
+            cancelled = true;
+        };
     }, [initialAgreementId]);
 
     useEffect(() => {
         if (!agreementIdToLoad) {
-            setAgreementDetails(null);
+            let cancelled = false;
+            queueMicrotask(() => {
+                if (!cancelled) setAgreementDetails(null);
+            });
 
-            return;
+            return () => {
+                cancelled = true;
+            };
         }
 
         const controller = new AbortController();
@@ -194,20 +206,27 @@ export default function RentalAllocationPage() {
     }, [initialVehicleId]);
 
     useEffect(() => {
-        setOwnerSupplyOwnership(null);
-        setOwnershipHint(null);
+        const controller = new AbortController();
+        queueMicrotask(() => {
+            if (controller.signal.aborted) return;
+            setOwnerSupplyOwnership(null);
+            setOwnershipHint(null);
+        });
 
         if (!isOwnerSupplyAgreement || !agreementDetails || !ownerSupplySupplierId || !vehicle || !form.allocatedFrom || !form.allocatedTo) {
-            setOwnershipLoading(false);
+            queueMicrotask(() => {
+                if (!controller.signal.aborted) setOwnershipLoading(false);
+            });
 
-            return;
+            return () => controller.abort();
         }
 
         const selectedVehicle = vehicle;
         const selectedStartAt = toIsoDateTime(form.allocatedFrom);
         const selectedEndAt = toIsoDateTime(form.allocatedTo);
-        const controller = new AbortController();
-        setOwnershipLoading(true);
+        queueMicrotask(() => {
+            if (!controller.signal.aborted) setOwnershipLoading(true);
+        });
 
         void listPartyVehicleOwnerships('supplier', {
             supplier_id: ownerSupplySupplierId,
@@ -243,8 +262,12 @@ export default function RentalAllocationPage() {
     ]);
 
     useEffect(() => {
-        setCompanyOwnership(null);
-        setCompanyOwnershipHint(null);
+        const controller = new AbortController();
+        queueMicrotask(() => {
+            if (controller.signal.aborted) return;
+            setCompanyOwnership(null);
+            setCompanyOwnershipHint(null);
+        });
 
         if (isOwnerSupplyAgreement
             || form.vehicleSourceType !== SOURCE_TYPE_COMPANY_OWNED
@@ -252,16 +275,19 @@ export default function RentalAllocationPage() {
             || !vehicle
             || !form.allocatedFrom
             || !form.allocatedTo) {
-            setCompanyOwnershipLoading(false);
+            queueMicrotask(() => {
+                if (!controller.signal.aborted) setCompanyOwnershipLoading(false);
+            });
 
-            return;
+            return () => controller.abort();
         }
 
         const selectedVehicle = vehicle;
         const selectedStartAt = toIsoDateTime(form.allocatedFrom);
         const selectedEndAt = toIsoDateTime(form.allocatedTo);
-        const controller = new AbortController();
-        setCompanyOwnershipLoading(true);
+        queueMicrotask(() => {
+            if (!controller.signal.aborted) setCompanyOwnershipLoading(true);
+        });
 
         void listPartyVehicleOwnerships('company', {
             vehicle_id: selectedVehicle.id,
@@ -363,7 +389,7 @@ export default function RentalAllocationPage() {
                     : null,
                 allocated_from: toIsoDateTime(form.allocatedFrom),
                 allocated_to: form.allocatedTo ? toIsoDateTime(form.allocatedTo) : null,
-                start_odometer: form.startOdometer,
+                start_odometer: form.startOdometer || null,
             });
             setVehicle(null);
             setSourceAllocation(null);
@@ -565,11 +591,10 @@ export default function RentalAllocationPage() {
                             }}
                         />
                         <Input
-                            label="Start odometer"
+                            label="Known start odometer"
                             type="number"
                             min="0"
                             step="0.000001"
-                            required
                             value={form.startOdometer}
                             onChange={(event) => setForm({ ...form, startOdometer: event.target.value })}
                         />

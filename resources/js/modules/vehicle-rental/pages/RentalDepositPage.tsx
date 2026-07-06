@@ -22,6 +22,7 @@ import {
     RentalPaymentMethodLookupSelect,
 } from "../components/RentalLookups";
 import { RentalPage } from "../components/RentalPage";
+import { agreementDetailPath } from "../rentalAgreementPresentation";
 import {
     applyRentalDeposit,
     forfeitRentalDeposit,
@@ -152,7 +153,7 @@ export default function RentalDepositPage() {
                 row.agreement ? (
                     <Link
                         className="font-semibold text-blue-700"
-                        to={`/vehicle-rental/agreements/${row.agreement.id}`}
+                        to={agreementDetailPath("lessee", row.agreement.id)}
                     >
                         {readableRelation(row.agreement)}
                     </Link>

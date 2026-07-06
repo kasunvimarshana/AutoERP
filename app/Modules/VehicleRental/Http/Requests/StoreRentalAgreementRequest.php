@@ -77,7 +77,7 @@ class StoreRentalAgreementRequest extends TenantScopedRequest
             'rate_version.components.*.tax_group_override_id' => ['nullable', 'integer', 'min:1'],
             'rate_version.components.*.is_taxable' => ['nullable', 'boolean'],
             'rate_version.components.*.calculation_order' => ['nullable', 'integer', 'min:1'],
-            'deposit' => ['nullable', 'array'],
+            'deposit' => ['nullable', 'prohibited_unless:agreement_kind,'.RentalAgreementKind::CustomerRental->value, 'array'],
             'deposit.required_amount' => ['required_with:deposit', 'decimal:0,6', 'gte:0'],
             'deposit.currency_id' => ['nullable', 'integer', 'min:1'],
             'deposit.due_date' => ['nullable', 'date'],

@@ -166,21 +166,37 @@ export default function RentalRunningChartPage() {
     );
 
     useEffect(() => {
-        setAllocationIdToLoad(allocationId);
+        let cancelled = false;
+        queueMicrotask(() => {
+            if (!cancelled) setAllocationIdToLoad(allocationId);
+        });
+
+        return () => {
+            cancelled = true;
+        };
     }, [allocationId]);
 
     useEffect(() => {
         if (!allocationIdToLoad) {
-            setAllocation(null);
-            setAllocationDetails(null);
-            setLoadingAllocation(false);
+            let cancelled = false;
+            queueMicrotask(() => {
+                if (cancelled) return;
+                setAllocation(null);
+                setAllocationDetails(null);
+                setLoadingAllocation(false);
+            });
 
-            return;
+            return () => {
+                cancelled = true;
+            };
         }
 
         const controller = new AbortController();
-        setLoadingAllocation(true);
-        setActionError(null);
+        queueMicrotask(() => {
+            if (controller.signal.aborted) return;
+            setLoadingAllocation(true);
+            setActionError(null);
+        });
 
         void getRentalAllocation(allocationIdToLoad, controller.signal)
             .then((resource) => {
@@ -458,7 +474,7 @@ export default function RentalRunningChartPage() {
                     required={canRecord}
                 />
                 <p className="mt-2 text-sm text-slate-500">
-                    The selected allocation controls the vehicle, customer agreement,
+                    The selected allocation controls the vehicle, lessee agreement,
                     owner agreement and valid driver assignments.
                 </p>
             </Panel>

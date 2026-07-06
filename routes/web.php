@@ -63,8 +63,11 @@ Route::get('/public/invoices/{invoice}/print/{tenant}', [\Modules\Invoice\Http\C
     ->name('invoices.public.print')
     ->middleware('signed');
 
-Route::get('/public/invoices/{invoice}/pdf/{tenant}', function ($invoice, $tenant) {
-    $model = \Modules\Invoice\Models\Invoice::withoutGlobalScopes()->where('id', $invoice)->where('tenant_id', $tenant)->with('lines')->first();
+Route::get('/public/invoices/{invoice}/pdf/{tenant}', function (int $invoice, int $tenant, \Modules\Core\Contracts\TenantExecutionContextInterface $executionContext) {
+    $model = $executionContext->runForTenant(
+        $tenant,
+        fn (): ?\Modules\Invoice\Models\Invoice => \Modules\Invoice\Models\Invoice::query()->with('lines')->find($invoice),
+    );
     if ($model === null) {
         return response(view('invoice.notfound', ['id' => $invoice]), 404);
     }
@@ -82,13 +85,17 @@ Route::get('/public/invoices/{invoice}/pdf/{tenant}', function ($invoice, $tenan
 
 // Development-only debug helpers to diagnose route/invoice issues
 if (config('app.debug')) {
-    Route::get('/_debug/invoices/first', function () {
-        $id = \Modules\Invoice\Models\Invoice::withoutGlobalScopes()->value('id');
+    Route::get('/_debug/invoices/first', function (\Modules\Core\Contracts\TenantExecutionContextInterface $executionContext) {
+        $id = $executionContext->runAsControlPlane(
+            fn () => \Modules\Invoice\Models\Invoice::query()->value('id'),
+        );
         return response()->json(['first_id' => $id]);
     });
 
-    Route::get('/_debug/invoices/{id}', function ($id) {
-        $exists = \Modules\Invoice\Models\Invoice::withoutGlobalScopes()->where('id', $id)->exists();
+    Route::get('/_debug/invoices/{id}', function ($id, \Modules\Core\Contracts\TenantExecutionContextInterface $executionContext) {
+        $exists = $executionContext->runAsControlPlane(
+            fn (): bool => \Modules\Invoice\Models\Invoice::query()->where('id', $id)->exists(),
+        );
         $routes = collect(\Route::getRoutes())->filter(function ($r) {
             $uri = method_exists($r, 'uri') ? $r->uri() : (property_exists($r, 'uri') ? $r->uri : null);
             $name = method_exists($r, 'getName') ? $r->getName() : null;
@@ -103,8 +110,10 @@ if (config('app.debug')) {
         return response()->json(['exists' => $exists, 'routes' => $routes]);
     });
 
-    Route::get('/_debug/invoices/{id}/signed-print', function ($id) {
-        $invoice = \Modules\Invoice\Models\Invoice::withoutGlobalScopes()->where('id', $id)->first();
+    Route::get('/_debug/invoices/{id}/signed-print', function ($id, \Modules\Core\Contracts\TenantExecutionContextInterface $executionContext) {
+        $invoice = $executionContext->runAsControlPlane(
+            fn (): ?\Modules\Invoice\Models\Invoice => \Modules\Invoice\Models\Invoice::query()->where('id', $id)->first(),
+        );
         if (! $invoice) return response()->json(['error' => 'not_found'], 404);
         $tenant = $invoice->tenant_id;
         $url = \Illuminate\Support\Facades\URL::temporarySignedRoute('invoices.public.print', now()->addMinutes(60), ['invoice' => $id, 'tenant' => $tenant]);

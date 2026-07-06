@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\VehicleRental\Services;
 
+use BackedEnum;
+use Carbon\CarbonImmutable;
+use DateTimeInterface;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
@@ -18,6 +21,20 @@ use RuntimeException;
 
 final class RentalAgreementService
 {
+    private const STRUCTURAL_DRAFT_FIELDS = [
+        'customer_id',
+        'supplier_id',
+        'starts_at',
+        'ends_at',
+        'rental_mode',
+        'billing_cycle',
+        'billing_basis',
+        'proration_rule',
+        'billing_timezone',
+        'payment_term_days',
+        'currency_id',
+    ];
+
     private const TRANSITIONS = [
         'draft' => ['active', 'cancelled'],
         'active' => ['suspended', 'completed', 'terminated'],
@@ -39,6 +56,7 @@ final class RentalAgreementService
         return DB::transaction(function () use ($data, $tenantId, $organizationUnitId, $userId): RentalAgreement {
             $kind = RentalAgreementKind::from((string) $data['agreement_kind']);
             $this->assertParty($kind, $data);
+            $this->assertDepositAllowed($kind, $data);
             $this->validateReferences($kind, $data, $tenantId, $organizationUnitId);
             $reservation = null;
             if (! empty($data['reservation_id'])) {
@@ -105,6 +123,7 @@ final class RentalAgreementService
                 $agreement->depositRequirement()->create([
                     'tenant_id' => $tenantId,
                     'organization_unit_id' => $organizationUnitId,
+                    'customer_id' => $agreement->customer_id,
                     'required_amount' => $required,
                     'currency_id' => $deposit['currency_id'] ?? $agreement->currency_id,
                     'due_date' => $deposit['due_date'] ?? null,
@@ -150,6 +169,7 @@ final class RentalAgreementService
             $kind = $agreement->agreement_kind;
             $merged = array_merge($agreement->toArray(), $data);
             $this->assertParty($kind, $merged);
+            $this->assertStructuralDraftChangesAllowed($agreement, $data);
             $this->validateReferences(
                 $kind,
                 $merged,
@@ -314,6 +334,19 @@ final class RentalAgreementService
         }
     }
 
+    private function assertDepositAllowed(RentalAgreementKind $kind, array $data): void
+    {
+        if ($kind === RentalAgreementKind::CustomerRental
+            || ! array_key_exists('deposit', $data)
+            || $data['deposit'] === null) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'deposit' => ['Security deposits are supported only for customer rental agreements.'],
+        ]);
+    }
+
     private function assertParty(RentalAgreementKind $kind, array $data): void
     {
         if ($kind === RentalAgreementKind::CustomerRental
@@ -324,6 +357,53 @@ final class RentalAgreementService
             && (empty($data['supplier_id']) || ! empty($data['customer_id']))) {
             throw new InvalidArgumentException('Owner supply agreement requires only a supplier/vehicle owner.');
         }
+    }
+
+    private function assertStructuralDraftChangesAllowed(RentalAgreement $agreement, array $data): void
+    {
+        $changedFields = array_values(array_filter(
+            self::STRUCTURAL_DRAFT_FIELDS,
+            fn (string $field): bool => array_key_exists($field, $data)
+                && ! $this->fieldValueMatches($agreement->{$field}, $data[$field]),
+        ));
+
+        if ($changedFields === []) {
+            return;
+        }
+
+        $hasDependentRecords = $agreement->allocations()->exists()
+            || $agreement->rateVersions()->exists()
+            || $agreement->depositRequirement()->exists();
+        if (! $hasDependentRecords) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'agreement' => [
+                'Agreement party, period, billing, payment term, and currency fields cannot be changed after allocations, rate versions, or deposit requirements exist.',
+            ],
+        ]);
+    }
+
+    private function fieldValueMatches(mixed $current, mixed $next): bool
+    {
+        if ($current instanceof BackedEnum) {
+            $current = $current->value;
+        }
+
+        if ($current instanceof DateTimeInterface) {
+            if ($next === null || $next === '') {
+                return false;
+            }
+
+            return CarbonImmutable::parse($next)->equalTo(CarbonImmutable::instance($current));
+        }
+
+        if ($current === null || $next === null) {
+            return $current === $next;
+        }
+
+        return (string) $current === (string) $next;
     }
 
     private function assertExpectedVersion(RentalAgreement $agreement, int $expectedVersion): void

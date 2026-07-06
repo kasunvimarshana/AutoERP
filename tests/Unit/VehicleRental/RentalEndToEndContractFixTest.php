@@ -140,8 +140,11 @@ final class RentalEndToEndContractFixTest extends TestCase
         self::assertStringContainsString('closed_by = $userId', $allocationService);
         self::assertStringContainsString('activated_by = $userId', $allocationService);
         self::assertStringContainsString('Only allocations under an active rental agreement can be activated.', $allocationService);
+        self::assertStringContainsString('assertActiveSourceAllocationForActivation', $allocationService);
+        self::assertStringContainsString('Customer allocation requires an active owner source allocation covering the full allocation period.', $allocationService);
         self::assertStringContainsString('lockCustodyTimeline', $custodyService);
         self::assertStringContainsString('assertReplacementEventMatchesAllocation', $custodyService);
+        self::assertStringContainsString('Vehicle cannot be returned to its owner while a customer allocation is planned or active.', $custodyService);
         self::assertGreaterThanOrEqual(2, substr_count($custodyService, '$this->allocations->activate($event->allocation, $userId)'));
         self::assertStringContainsString('PUBLIC_EVENT_TYPES', $custodyRequest);
         self::assertStringContainsString("'replacement_id' => ['prohibited']", $custodyRequest);
@@ -166,6 +169,9 @@ final class RentalEndToEndContractFixTest extends TestCase
         self::assertStringContainsString('expected_source_allocation_version:', $allocationPage);
         self::assertStringContainsString('expected_finance_agreement_version:', $allocationPage);
         self::assertStringContainsString('Company vehicle ownership', $allocationPage);
+        self::assertStringContainsString("startOdometer: ''", $allocationPage);
+        self::assertStringContainsString('start_odometer: form.startOdometer || null', $allocationPage);
+        self::assertStringNotContainsString("startOdometer: '0'", $allocationPage);
         self::assertStringContainsString('RentalAvailableVehicleLookupSelect', $replacementPage);
         self::assertStringContainsString('allocation.data.row_version', $replacementPage);
         self::assertStringContainsString('expected_source_allocation_version:', $replacementPage);
@@ -230,6 +236,8 @@ final class RentalEndToEndContractFixTest extends TestCase
         $usageFactService = $this->source('app/Modules/VehicleRental/Services/RentalUsageFactService.php');
         $allocationResource = $this->source('app/Modules/VehicleRental/Http/Resources/RentalAllocationResource.php');
         $runningChartPage = $this->source('resources/js/modules/vehicle-rental/pages/RentalRunningChartPage.tsx');
+        $agreementDetailPage = $this->source('resources/js/modules/vehicle-rental/pages/RentalAgreementDetailPage.tsx');
+        $usageLogResource = $this->source('app/Modules/VehicleRental/Http/Resources/RentalUsageLogResource.php');
         $lookups = $this->source('resources/js/modules/vehicle-rental/components/RentalLookups.tsx');
 
         self::assertStringContainsString('AGREEMENT_KIND_CUSTOMER_RENTAL', $runningChartPage);
@@ -251,11 +259,24 @@ final class RentalEndToEndContractFixTest extends TestCase
         self::assertStringContainsString('Running chart owner payable context requires an active owner supply allocation.', $usageService);
         self::assertStringContainsString('Running chart owner payable context requires an active owner supply agreement.', $usageService);
         self::assertStringContainsString('Usage time must be inside the owner supply allocation period.', $usageService);
+        self::assertStringContainsString("'agreement_id'", $this->source('app/Modules/VehicleRental/Http/Requests/ListRentalRequest.php'));
+        self::assertStringContainsString("'financial_side'", $this->source('app/Modules/VehicleRental/Http/Requests/ListRentalRequest.php'));
+        self::assertStringContainsString("! empty(\$filters['agreement_id']) && ! empty(\$filters['financial_side'])", $usageService);
+        self::assertStringContainsString("->where('agreement_id', \$filters['agreement_id'])", $usageService);
+        self::assertStringContainsString("->where('financial_side', \$filters['financial_side'])", $usageService);
+        self::assertStringContainsString("'contexts.allocation'", $usageService);
+        self::assertStringContainsString("'allocation' =>", $usageLogResource);
         self::assertStringContainsString("'source_allocation_id' => \$sourceAllocation?->getKey()", $usageService);
         self::assertStringContainsString("'events' => \$events", $usageService);
         self::assertStringContainsString("'garage_distance_km' => \$garage", $usageService);
         self::assertStringContainsString('Commercial distance cannot exceed the physical net operational distance.', $usageFactService);
         self::assertStringContainsString("'context.rateVersion'", $usageFactService);
+        self::assertStringContainsString('AgreementRunningChartPanel', $agreementDetailPage);
+        self::assertStringContainsString('listRentalUsageLogs', $agreementDetailPage);
+        self::assertStringContainsString('agreement_id: agreementId', $agreementDetailPage);
+        self::assertStringContainsString('financial_side: side', $agreementDetailPage);
+        self::assertStringContainsString('rentalAgreementFinancialSide(row.agreement_kind)', $agreementDetailPage);
+        self::assertStringContainsString('usageContextForSide(row, side)?.allocation', $agreementDetailPage);
     }
 
     private function source(string $relativePath): string

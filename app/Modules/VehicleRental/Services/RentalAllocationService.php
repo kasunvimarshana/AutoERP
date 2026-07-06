@@ -166,7 +166,10 @@ final class RentalAllocationService
     public function activate(RentalVehicleAllocation $allocation, ?int $userId): RentalVehicleAllocation
     {
         return DB::transaction(function () use ($allocation, $userId): RentalVehicleAllocation {
-            $allocation = RentalVehicleAllocation::query()->with('agreement')->lockForUpdate()->findOrFail($allocation->getKey());
+            $allocation = RentalVehicleAllocation::query()
+                ->with('agreement')
+                ->lockForUpdate()
+                ->findOrFail($allocation->getKey());
             if ($allocation->agreement->status !== RentalAgreementStatus::Active) {
                 throw new InvalidArgumentException('Only allocations under an active rental agreement can be activated.');
             }
@@ -176,6 +179,7 @@ final class RentalAllocationService
             if ($allocation->status !== RentalAllocationStatus::Planned) {
                 throw new InvalidArgumentException('Only a planned allocation can be activated.');
             }
+            $this->assertActiveSourceAllocationForActivation($allocation);
             $this->availability->assertVehicle(
                 (int) $allocation->tenant_id,
                 $allocation->organization_unit_id,
@@ -535,6 +539,40 @@ final class RentalAllocationService
         }
 
         return null;
+    }
+
+    private function assertActiveSourceAllocationForActivation(RentalVehicleAllocation $allocation): void
+    {
+        if ($allocation->agreement->agreement_kind !== RentalAgreementKind::CustomerRental
+            || $allocation->source_allocation_id === null) {
+            return;
+        }
+
+        $source = RentalVehicleAllocation::query()
+            ->with('agreement')
+            ->where('tenant_id', $allocation->tenant_id)
+            ->lockForUpdate()
+            ->findOrFail($allocation->source_allocation_id);
+        $allocationTo = $allocation->allocated_to === null
+            ? null
+            : CarbonImmutable::parse($allocation->allocated_to);
+        $sourceTo = $source->allocated_to === null
+            ? null
+            : CarbonImmutable::parse($source->allocated_to);
+        $sourceDoesNotCoverEnd = $allocationTo === null
+            ? $sourceTo !== null
+            : ($sourceTo !== null && $sourceTo->lessThan($allocationTo));
+
+        if ($source->agreement->agreement_kind !== RentalAgreementKind::OwnerSupply
+            || $source->agreement->status !== RentalAgreementStatus::Active
+            || $source->status !== RentalAllocationStatus::Active
+            || (int) $source->vehicle_id !== (int) $allocation->vehicle_id
+            || CarbonImmutable::parse($source->allocated_from)->greaterThan(CarbonImmutable::parse($allocation->allocated_from))
+            || $sourceDoesNotCoverEnd) {
+            throw new InvalidArgumentException('Customer allocation requires an active owner source allocation covering the full allocation period.');
+        }
+
+        $allocation->setRelation('sourceAllocation', $source);
     }
 
     private function lockEmployee(int $employeeId, int $tenantId, ?int $organizationUnitId): HrEmployee

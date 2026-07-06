@@ -107,7 +107,7 @@ describe('RentalAllocationPage', () => {
             vehicle_source_type: 'company_owned',
             allocated_from: new Date(expectedFrom).toISOString(),
             allocated_to: new Date(expectedTo).toISOString(),
-            start_odometer: '0',
+            start_odometer: null,
         })));
     });
 
@@ -139,7 +139,7 @@ describe('RentalAllocationPage', () => {
             source_allocation_id: null,
             allocated_from: new Date(expectedFrom).toISOString(),
             allocated_to: new Date(expectedTo).toISOString(),
-            start_odometer: '0',
+            start_odometer: null,
         })));
     });
 });

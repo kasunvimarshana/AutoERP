@@ -24,6 +24,7 @@ use Modules\Invoice\Services\ManualInvoiceService;
 use Illuminate\View\View;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\URL;
+use Modules\Core\Contracts\TenantExecutionContextInterface;
 
 final class InvoiceController
 {
@@ -195,9 +196,12 @@ final class InvoiceController
     }
 
     // Public signed route: render print view when valid signed URL is provided
-    public function publicPrint(Request $request, int $invoice, int $tenant): View
+    public function publicPrint(Request $request, int $invoice, int $tenant, TenantExecutionContextInterface $executionContext): View
     {
-        $model = Invoice::withoutGlobalScopes()->where('id', $invoice)->where('tenant_id', $tenant)->with('lines')->first();
+        $model = $executionContext->runForTenant(
+            $tenant,
+            fn (): ?Invoice => Invoice::query()->with('lines')->find($invoice),
+        );
         if ($model === null) {
             return view('invoice.notfound', ['id' => $invoice]);
         }

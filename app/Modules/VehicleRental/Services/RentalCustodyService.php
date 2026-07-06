@@ -317,10 +317,9 @@ final class RentalCustodyService
             }
             if ($eventType === RentalCustodyEventType::CompanyToOwner) {
                 $openCustomerAllocation = RentalVehicleAllocation::query()
+                    ->forContext((int) $allocation->tenant_id, $allocation->organization_unit_id)
                     ->where('source_allocation_id', $allocation->getKey())
                     ->whereIn('status', [RentalAllocationStatus::Planned->value, RentalAllocationStatus::Active->value])
-                    ->where('allocated_from', '<=', $occurred)
-                    ->where(fn (Builder $query) => $query->whereNull('allocated_to')->orWhere('allocated_to', '>', $occurred))
                     ->exists();
                 if ($openCustomerAllocation) {
                     throw new InvalidArgumentException('Vehicle cannot be returned to its owner while a customer allocation is planned or active.');
