@@ -1,12 +1,8 @@
 import { useState, type FormEvent } from 'react';
 import { useAuth } from '@/modules/auth/AuthProvider';
 import { hasPermission } from '@/modules/auth/accessControl';
-import { CustomerLookupSelect } from '@/modules/customer/components/CustomerLookupSelect';
-import type { CustomerSummary } from '@/modules/customer/customerTypes';
 import { searchEmployees } from '@/modules/hr/hrApi';
 import type { EmployeeSummary } from '@/modules/hr/hrTypes';
-import { SupplierLookupSelect } from '@/modules/supplier/components/SupplierLookupSelect';
-import type { SupplierSummary } from '@/modules/supplier/supplierTypes';
 import { VehicleLookupSelect } from '@/modules/vehicle/components/VehicleLookupSelect';
 import type { VehicleSummary } from '@/modules/vehicle/vehicleTypes';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
@@ -31,6 +27,7 @@ import {
     RentalAllocationLookupSelect,
     RentalCurrencyLookupSelect,
     RentalTaxGroupLookupSelect,
+    type RentalAgreementLookupOption,
 } from '../components/RentalLookups';
 import { RentalPage } from '../components/RentalPage';
 import {
@@ -71,14 +68,23 @@ export default function RentalExpensePage() {
     const [vehicle, setVehicle] = useState<VehicleSummary | null>(null);
     const [currency, setCurrency] = useState<NamedResource | null>(null);
     const [taxGroup, setTaxGroup] = useState<NamedResource | null>(null);
-    const [targetAgreement, setTargetAgreement] = useState<NamedResource | null>(null);
+    const [targetAgreement, setTargetAgreement] = useState<RentalAgreementLookupOption | null>(null);
     const [targetAllocation, setTargetAllocation] = useState<NamedResource | null>(null);
-    const [customer, setCustomer] = useState<CustomerSummary | null>(null);
-    const [supplier, setSupplier] = useState<SupplierSummary | null>(null);
+    const [customer, setCustomer] = useState<NamedResource | null>(null);
+    const [supplier, setSupplier] = useState<NamedResource | null>(null);
     const [employee, setEmployee] = useState<EmployeeSummary | null>(null);
     const [saving, setSaving] = useState(false);
     const [actionError, setActionError] = useState<ApiError | null>(null);
     const [status, setStatus] = useState('');
+    const agreementBackedAllocation = form.allocationType === 'customer_recovery'
+        || form.allocationType === 'owner_deduction';
+    const partySelectionValid = form.allocationType === 'customer_recovery'
+        ? targetAgreement !== null && customer !== null
+        : form.allocationType === 'owner_deduction'
+            ? targetAgreement !== null && supplier !== null
+            : form.allocationType === 'employee_reimbursement'
+                ? employee !== null
+                : true;
 
     const result = useApi(
         (signal) => listRentalExpenses({ status: status || undefined, per_page: 50 }, signal),
@@ -96,15 +102,20 @@ export default function RentalExpensePage() {
         setEmployee(null);
     };
 
+    const changeTargetAgreement = (agreement: RentalAgreementLookupOption | null) => {
+        setTargetAgreement(agreement);
+        setTargetAllocation(null);
+        setCustomer(form.allocationType === 'customer_recovery' ? agreement?.customer ?? null : null);
+        setSupplier(form.allocationType === 'owner_deduction' ? agreement?.supplier ?? null : null);
+    };
+
     const save = async (event: FormEvent) => {
         event.preventDefault();
-        if (!vehicle || !currency) return;
+        if (!vehicle || !currency || !form.netAmount || !partySelectionValid) return;
 
         setSaving(true);
         setActionError(null);
         try {
-            const agreementBacked = form.allocationType === 'customer_recovery'
-                || form.allocationType === 'owner_deduction';
             await createRentalExpense({
                 vehicle_id: vehicle.id,
                 expense_type: form.expenseType,
@@ -118,8 +129,8 @@ export default function RentalExpensePage() {
                 allocations: [
                     {
                         allocation_type: form.allocationType,
-                        target_agreement_id: agreementBacked ? targetAgreement?.id ?? null : null,
-                        target_vehicle_allocation_id: agreementBacked ? targetAllocation?.id ?? null : null,
+                        target_agreement_id: agreementBackedAllocation ? targetAgreement?.id ?? null : null,
+                        target_vehicle_allocation_id: agreementBackedAllocation ? targetAllocation?.id ?? null : null,
                         customer_id: form.allocationType === 'customer_recovery' ? customer?.id ?? null : null,
                         supplier_id: form.allocationType === 'owner_deduction' ? supplier?.id ?? null : null,
                         employee_id: form.allocationType === 'employee_reimbursement' ? employee?.id ?? null : null,
@@ -190,16 +201,6 @@ export default function RentalExpensePage() {
             ),
         },
     ];
-
-    const partySelectionValid = form.allocationType === 'customer_recovery'
-        ? customer !== null
-        : form.allocationType === 'owner_deduction'
-            ? supplier !== null
-            : form.allocationType === 'employee_reimbursement'
-                ? employee !== null
-                : true;
-    const agreementBackedAllocation = form.allocationType === 'customer_recovery'
-        || form.allocationType === 'owner_deduction';
 
     return (
         <RentalPage>
@@ -274,12 +275,10 @@ export default function RentalExpensePage() {
                             />
                             <RentalAgreementLookupSelect
                                 value={targetAgreement}
-                                onChange={(value) => {
-                                    setTargetAgreement(value);
-                                    setTargetAllocation(null);
-                                }}
+                                onChange={changeTargetAgreement}
                                 direction={form.allocationType === 'owner_deduction' ? 'outbound' : 'inbound'}
                                 disabled={!agreementBackedAllocation}
+                                required={agreementBackedAllocation}
                             />
                             <RentalAllocationLookupSelect
                                 value={targetAllocation}
@@ -304,10 +303,10 @@ export default function RentalExpensePage() {
                                 onChange={(event) => setForm({ ...form, markupAmount: event.target.value })}
                             />
                             {form.allocationType === 'customer_recovery' && (
-                                <CustomerLookupSelect value={customer} onChange={setCustomer} />
+                                <Input label="Customer" value={customer?.name ?? ''} readOnly disabled />
                             )}
                             {form.allocationType === 'owner_deduction' && (
-                                <SupplierLookupSelect value={supplier} onChange={setSupplier} />
+                                <Input label="Supplier" value={supplier?.name ?? ''} readOnly disabled />
                             )}
                             {form.allocationType === 'employee_reimbursement' && (
                                 <LookupSelect

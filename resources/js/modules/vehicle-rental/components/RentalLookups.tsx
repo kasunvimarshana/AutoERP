@@ -13,7 +13,7 @@ import {
     listRentalAllocations,
     listVehicleFinanceAgreements,
 } from '../vehicleRentalApi';
-import type { RentalVehicle } from '../vehicleRentalTypes';
+import type { RentalParty, RentalVehicle } from '../vehicleRentalTypes';
 
 interface LookupProps<T extends NamedResource = NamedResource> extends LookupBehaviorOptions {
     label?: string;
@@ -43,12 +43,22 @@ interface FinanceLookupFilters {
 }
 
 type AvailableVehicleOption = VehicleSummary & NamedResource;
+export type RentalAgreementLookupOption = NamedResource & {
+    row_version?: number;
+    agreement_kind?: string;
+    status?: string;
+    customer?: RentalParty | null;
+    supplier?: RentalParty | null;
+};
 
 export function RentalCurrencyLookupSelect(props: LookupProps) {
     return <LookupSelect label="Currency" search={searchCurrencies} loadOnOpen minSearchLength={0} {...props} />;
 }
 
-export function RentalAgreementLookupSelect({ direction, ...props }: LookupProps & { direction?: 'inbound' | 'outbound' }) {
+export function RentalAgreementLookupSelect({
+    direction,
+    ...props
+}: LookupProps<RentalAgreementLookupOption> & { direction?: 'inbound' | 'outbound' }) {
     const search = useCallback(
         (params: LookupLoadParams) => searchAgreements(params, direction),
         [direction],
@@ -156,7 +166,7 @@ export function RentalTaxGroupLookupSelect(props: LookupProps) {
 async function searchAgreements(
     { search, page, perPage, signal }: LookupLoadParams,
     direction?: 'inbound' | 'outbound',
-): Promise<LookupResult<NamedResource>> {
+): Promise<LookupResult<RentalAgreementLookupOption>> {
     const agreementKind = direction === 'inbound'
         ? 'customer_rental'
         : direction === 'outbound'
@@ -174,6 +184,10 @@ async function searchAgreements(
             id: agreement.id,
             code: agreement.agreement_number,
             row_version: agreement.row_version,
+            agreement_kind: agreement.agreement_kind,
+            status: agreement.status,
+            customer: agreement.customer ?? null,
+            supplier: agreement.supplier ?? null,
             name: [
                 agreement.agreement_number,
                 agreement.customer?.name ?? agreement.supplier?.name,

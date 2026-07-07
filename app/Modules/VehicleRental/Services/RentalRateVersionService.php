@@ -10,6 +10,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use Modules\VehicleRental\Enums\RentalAgreementStatus;
+use Modules\VehicleRental\Enums\RentalRateComponentCode;
+use Modules\VehicleRental\Enums\RentalRateUnit;
 use Modules\VehicleRental\Enums\RentalRateVersionStatus;
 use Modules\VehicleRental\Enums\RentalUsageStatus;
 use Modules\VehicleRental\Models\RentalAgreement;
@@ -60,6 +62,10 @@ final class RentalRateVersionService
                 $agreement->organization_unit_id,
             );
             foreach ($data['components'] ?? [] as $component) {
+                $this->assertSupportedComponentUnit(
+                    RentalRateComponentCode::from((string) $component['component_code']),
+                    RentalRateUnit::from((string) $component['unit']),
+                );
                 $this->references->vehicleCategory(
                     isset($component['vehicle_category_id']) ? (int) $component['vehicle_category_id'] : null,
                     (int) $agreement->tenant_id,
@@ -293,6 +299,37 @@ final class RentalRateVersionService
                     $field => ['Rate activation would split existing running-chart usage. Reverse or split those entries before activating this rate version.'],
                 ]);
             }
+        }
+    }
+
+    private function assertSupportedComponentUnit(RentalRateComponentCode $component, RentalRateUnit $unit): void
+    {
+        $supported = match ($component) {
+            RentalRateComponentCode::DriverSalary => [
+                RentalRateUnit::Fixed,
+                RentalRateUnit::Month,
+                RentalRateUnit::Week,
+                RentalRateUnit::Day,
+                RentalRateUnit::Hour,
+                RentalRateUnit::Minute,
+                RentalRateUnit::Trip,
+                RentalRateUnit::Count,
+            ],
+            RentalRateComponentCode::NormalOvertime,
+            RentalRateComponentCode::DoubleOvertime,
+            RentalRateComponentCode::TripleOvertime => [
+                RentalRateUnit::Hour,
+                RentalRateUnit::Minute,
+            ],
+            default => null,
+        };
+
+        if ($supported !== null && ! in_array($unit, $supported, true)) {
+            throw new InvalidArgumentException(sprintf(
+                '%s does not support %s rates.',
+                ucwords(str_replace('_', ' ', $component->value)),
+                $unit->value,
+            ));
         }
     }
 }

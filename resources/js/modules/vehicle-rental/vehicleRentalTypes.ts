@@ -301,6 +301,7 @@ export interface RentalExpense {
 }
 export interface RentalCalculationLine {
     id: number;
+    row_version: number;
     line_number: number;
     source_type: string;
     source: {
@@ -383,6 +384,7 @@ export interface RentalCalculationRun {
     row_version: number;
     billing_period?: {
         id: number;
+        row_version: number;
         agreement?: NamedResource | null;
         financial_side: string;
         period_start: string;

@@ -15,6 +15,7 @@ final class RentalCalculationRunResource extends RentalResource
             'row_version' => (int) $this->row_version,
             'billing_period' => $this->whenLoaded('billingPeriod', fn () => [
                 'id' => (int) $this->billingPeriod->getKey(),
+                'row_version' => (int) $this->billingPeriod->row_version,
                 'agreement' => $this->billingPeriod->relationLoaded('agreement')
                     ? $this->summary($this->billingPeriod->agreement, ['agreement_number', 'agreement_kind'])
                     : null,
@@ -67,6 +68,7 @@ final class RentalCalculationRunResource extends RentalResource
             }),
             'lines' => $this->loadedCollection('lines', fn ($line): array => [
                 'id' => (int) $line->getKey(),
+                'row_version' => (int) $line->row_version,
                 'line_number' => (int) $line->line_number,
                 'source_type' => $line->source_type,
                 'source' => $this->lineSource($line),
