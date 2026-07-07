@@ -54,6 +54,10 @@ final class InvoicePrintServiceTest extends TestCase
         $this->assertSame('5.000000', $data['document']['amounts']['discount_total']['raw']);
         $this->assertSame('95.000000', $data['document']['amounts']['grand_total']['raw']);
         $this->assertSame($originalName, $data['document']['purchaser']['name']);
+        $this->assertStringContainsString('Tax Invoice', $html);
+        $this->assertStringContainsString('Tax Invoice No.', $html);
+        $this->assertStringContainsString('Total Value of Supply', $html);
+        $this->assertStringContainsString('Total Amount including Tax', $html);
         $this->assertStringContainsString($originalName, $html);
         $this->assertStringContainsString('95.00', $html);
         $this->assertStringNotContainsString('118.00', $html);

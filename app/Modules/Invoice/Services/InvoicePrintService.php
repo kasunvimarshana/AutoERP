@@ -13,6 +13,10 @@ use Modules\Invoice\Models\InvoiceLine;
 
 final class InvoicePrintService
 {
+    private const DOCUMENT_TITLE = 'Tax Invoice';
+
+    private const DEFAULT_TAX_LABEL = 'Tax';
+
     public const SIGNED_URL_TTL_MINUTES = 15;
 
     public const PDF_PAPER_SIZE = 'A4';
@@ -61,23 +65,26 @@ final class InvoicePrintService
         $supplier = $this->supplier($invoice);
         $purchaser = $this->purchaser($invoice);
 
+        $taxLabel = $this->taxLabel($invoice->lines);
+
         return [
             'mode' => $mode,
             'pdf_url' => $pdfUrl,
             'document' => [
-                'title' => 'Invoice',
+                'title' => self::DOCUMENT_TITLE,
                 'invoice_number' => $this->nullableString($invoice->invoice_number) ?? 'Unnumbered invoice',
                 'invoice_date' => $this->dateString($invoice->invoice_date),
                 'due_date' => $this->dateString($invoice->due_date),
                 'invoice_type' => $this->label($this->enumValue($invoice->invoice_type)),
                 'direction' => $this->label($this->enumValue($invoice->direction)),
                 'status' => $this->label($this->enumValue($invoice->status)),
+                'tax_label' => $taxLabel,
                 'currency' => $currency,
                 'supplier' => $supplier,
                 'purchaser' => $purchaser,
                 'notes' => $this->nullableString($invoice->notes),
                 'lines' => $this->lines($invoice->lines, $currency),
-                'amounts' => $this->amounts($invoice, $currency),
+                'amounts' => $this->amounts($invoice, $currency, $taxLabel),
             ],
         ];
     }
@@ -102,6 +109,7 @@ final class InvoicePrintService
             ->values()
             ->map(fn (InvoiceLine $line): array => [
                 'line_number' => (int) $line->line_number,
+                'reference' => $this->lineReference($line),
                 'item' => $this->lineItemLabel($line),
                 'description' => (string) $line->description,
                 'quantity' => [
@@ -122,19 +130,51 @@ final class InvoicePrintService
     /**
      * @return array<string, array{label:string, raw:string, display:string}>
      */
-    private function amounts(Invoice $invoice, array $currency): array
+    private function amounts(Invoice $invoice, array $currency, string $taxLabel): array
     {
         return [
-            'subtotal' => $this->labeledMoney('Subtotal', $invoice->subtotal, $currency),
+            'subtotal' => $this->labeledMoney('Total Value of Supply', $invoice->subtotal, $currency),
             'discount_total' => $this->labeledMoney('Discounts', $invoice->discount_total, $currency),
-            'tax_total' => $this->labeledMoney('Tax', $invoice->tax_total, $currency),
+            'tax_total' => $this->labeledMoney($taxLabel.' Amount', $invoice->tax_total, $currency),
             'charge_total' => $this->labeledMoney('Charges', $invoice->charge_total, $currency),
             'adjustment_total' => $this->labeledMoney('Other adjustments', $invoice->adjustment_total, $currency),
-            'grand_total' => $this->labeledMoney('Grand total', $invoice->grand_total, $currency),
+            'grand_total' => $this->labeledMoney('Total Amount including '.$taxLabel, $invoice->grand_total, $currency),
             'paid_total' => $this->labeledMoney('Paid', $invoice->paid_total, $currency),
             'credit_total' => $this->labeledMoney('Credits', $invoice->credit_total, $currency),
             'balance_due' => $this->labeledMoney('Balance due', $invoice->balance_due, $currency),
         ];
+    }
+
+    /**
+     * @param  Collection<int, InvoiceLine>  $lines
+     */
+    private function taxLabel(Collection $lines): string
+    {
+        $taxNames = [];
+        foreach ($lines as $line) {
+            if (! is_array($line->tax_snapshot)) {
+                continue;
+            }
+
+            foreach ($line->tax_snapshot as $tax) {
+                if (! is_array($tax) || (bool) ($tax['is_withholding'] ?? false)) {
+                    continue;
+                }
+
+                $name = $this->nullableString($tax['tax_code'] ?? null)
+                    ?? $this->nullableString($tax['tax_name'] ?? null)
+                    ?? $this->nullableString($tax['tax_type'] ?? null);
+                if ($name !== null) {
+                    $taxNames[] = mb_strtolower($name);
+                }
+            }
+        }
+
+        if ($taxNames !== [] && collect($taxNames)->every(static fn (string $name): bool => str_contains($name, 'vat'))) {
+            return 'VAT';
+        }
+
+        return self::DEFAULT_TAX_LABEL;
     }
 
     /**
@@ -250,6 +290,13 @@ final class InvoicePrintService
         }
 
         return $name ?? $code;
+    }
+
+    private function lineReference(InvoiceLine $line): string
+    {
+        return $this->nullableString($line->item_code_snapshot)
+            ?? $this->nullableString($line->item_name_snapshot)
+            ?? (string) $line->line_number;
     }
 
     private function isOutbound(Invoice $invoice): bool

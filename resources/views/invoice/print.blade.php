@@ -3,30 +3,23 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>{{ $document['invoice_number'] }} - Invoice</title>
+    <title>{{ $document['invoice_number'] }} - Tax Invoice</title>
     <style>
-        @page { margin: 12mm; }
+        @page { size: A4; margin: 10mm; }
         * { box-sizing: border-box; }
         body {
             margin: 0;
-            background: #f3f4f6;
-            color: #111827;
-            font-family: Arial, Helvetica, sans-serif;
+            background: #e5e7eb;
+            color: #111;
+            font-family: "Times New Roman", Times, serif;
             font-size: 12px;
-            line-height: 1.4;
-        }
-        .sheet {
-            width: 210mm;
-            min-height: 297mm;
-            margin: 0 auto;
-            background: #fff;
-            padding: 16mm;
+            line-height: 1.25;
         }
         .controls {
-            display: flex;
-            justify-content: flex-end;
-            gap: 8px;
-            margin-bottom: 12px;
+            width: 210mm;
+            margin: 12px auto;
+            text-align: right;
+            font-family: Arial, Helvetica, sans-serif;
         }
         .btn {
             display: inline-block;
@@ -42,240 +35,239 @@
             background: #fff;
             color: #111827;
         }
-        .document-header {
-            display: table;
-            width: 100%;
-            margin-bottom: 18px;
+        .sheet {
+            width: 210mm;
+            min-height: 297mm;
+            margin: 0 auto 18px;
+            background: #fff;
+            padding: 22mm 18mm 16mm;
         }
-        .document-title,
-        .document-meta {
-            display: table-cell;
-            width: 50%;
-            vertical-align: top;
+        .document-title {
+            margin-bottom: 8px;
+            text-align: center;
         }
-        h1 {
-            margin: 0 0 6px;
-            font-size: 24px;
+        .title-box {
+            display: inline-block;
+            min-width: 30mm;
+            border: 2px solid #222;
+            padding: 7px 22px;
+            font-size: 13px;
             font-weight: 700;
-            letter-spacing: 0;
+            text-align: center;
         }
-        .muted { color: #4b5563; }
-        .meta-table {
+        table {
             width: 100%;
             border-collapse: collapse;
-        }
-        .meta-table th,
-        .meta-table td {
-            padding: 2px 0 2px 10px;
-            text-align: left;
-            vertical-align: top;
-        }
-        .meta-table th {
-            width: 42%;
-            color: #4b5563;
-            font-weight: 600;
-        }
-        .party-grid {
-            display: table;
-            width: 100%;
-            margin-bottom: 16px;
             table-layout: fixed;
         }
-        .party-card {
-            display: table-cell;
-            width: 50%;
-            border: 1px solid #d1d5db;
-            padding: 10px;
-            vertical-align: top;
-        }
-        .party-card + .party-card { border-left: 0; }
-        .section-title {
+        .field-table {
             margin-bottom: 6px;
-            color: #374151;
-            font-size: 11px;
-            font-weight: 700;
-            text-transform: uppercase;
         }
-        .party-name {
-            margin-bottom: 5px;
-            font-size: 14px;
-            font-weight: 700;
-        }
-        .kv {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        .kv th,
-        .kv td {
-            padding: 1px 0;
-            text-align: left;
+        .field-table td {
+            border: 1px solid #222;
+            padding: 6px 8px;
             vertical-align: top;
         }
-        .kv th {
-            width: 32%;
-            color: #6b7280;
-            font-weight: 600;
+        .field-table .gap {
+            width: 14px;
+            border: 0;
+            padding: 0;
         }
-        .lines,
-        .totals {
-            width: 100%;
-            border-collapse: collapse;
+        .field-cell {
+            min-height: 28px;
         }
-        .lines th,
-        .lines td {
-            border: 1px solid #d1d5db;
+        .party-cell {
+            height: 40mm;
+        }
+        .label {
+            font-weight: 700;
+        }
+        .party-line {
+            min-height: 17px;
+        }
+        .party-address {
+            min-height: 34px;
+        }
+        .party-phone {
+            margin-top: 8px;
+        }
+        .additional-field {
+            min-height: 18mm;
+        }
+        .additional-content {
+            margin-top: 5px;
+        }
+        .invoice-lines {
+            margin-top: 14px;
+        }
+        .invoice-lines th,
+        .invoice-lines td {
+            border: 1px solid #222;
             padding: 6px;
             vertical-align: top;
         }
-        .lines th {
-            background: #f9fafb;
-            color: #374151;
-            font-size: 11px;
+        .invoice-lines th {
+            height: 16mm;
             font-weight: 700;
+            text-align: center;
+            vertical-align: middle;
         }
-        .number { text-align: right; white-space: nowrap; }
-        .totals-wrap {
-            width: 42%;
-            margin: 14px 0 0 auto;
+        .invoice-lines tbody td {
+            height: 9mm;
         }
-        .totals td {
-            border-bottom: 1px solid #e5e7eb;
-            padding: 5px 0 5px 8px;
-        }
-        .totals td:first-child {
-            color: #374151;
-        }
-        .totals tr.grand td {
-            border-bottom: 2px solid #111827;
-            font-size: 13px;
+        .summary-label {
             font-weight: 700;
+            text-align: left;
         }
-        .notes {
-            margin-top: 16px;
-            border-top: 1px solid #d1d5db;
-            padding-top: 10px;
+        .number {
+            text-align: right;
+            white-space: nowrap;
+        }
+        .muted {
+            color: #444;
+            font-size: 10px;
+        }
+        .footer-fields {
+            margin-top: 14px;
+        }
+        .footer-fields td {
+            border: 1px solid #222;
+            height: 9mm;
+            padding: 6px 8px;
+            vertical-align: top;
         }
         @media print {
             body { background: #fff; }
+            .controls { display: none !important; }
             .sheet {
                 width: auto;
                 min-height: 0;
                 margin: 0;
                 padding: 0;
             }
-            .no-print { display: none !important; }
         }
     </style>
 </head>
 <body>
 @php
     $isPdf = ($mode ?? 'print') === 'pdf';
-    $currency = $document['currency']['code'] ?? $document['currency']['symbol'] ?? null;
     $amounts = $document['amounts'];
+    $lines = $document['lines'] ?? [];
+    $minimumPrintableLineRows = 5;
+    $blankLineRows = max(0, $minimumPrintableLineRows - count($lines));
+    $zeroMoney = static fn (array $amount): bool => bccomp((string) ($amount['raw'] ?? '0.000000'), '0', 6) === 0;
+    $settlementRowsVisible = ! $zeroMoney($amounts['paid_total'])
+        || ! $zeroMoney($amounts['credit_total'])
+        || bccomp((string) $amounts['balance_due']['raw'], (string) $amounts['grand_total']['raw'], 6) !== 0;
 @endphp
-<div class="sheet">
-    @if (! $isPdf)
-        <div class="controls no-print">
-            <a href="#" id="printBtn" class="btn secondary">Print</a>
-            @if (! empty($pdf_url))
-                <a href="{{ $pdf_url }}" class="btn" target="_blank" rel="noopener">Download PDF</a>
-            @endif
-        </div>
-    @endif
 
-    <div class="document-header">
-        <div class="document-title">
-            <h1>{{ $document['title'] }}</h1>
-            <div class="muted">{{ $document['invoice_type'] }} / {{ $document['direction'] }}</div>
-        </div>
-        <div class="document-meta">
-            <table class="meta-table">
-                <tr>
-                    <th>Invoice no.</th>
-                    <td>{{ $document['invoice_number'] }}</td>
-                </tr>
-                <tr>
-                    <th>Invoice date</th>
-                    <td>{{ $document['invoice_date'] ?? '-' }}</td>
-                </tr>
-                <tr>
-                    <th>Due date</th>
-                    <td>{{ $document['due_date'] ?? '-' }}</td>
-                </tr>
-                <tr>
-                    <th>Status</th>
-                    <td>{{ $document['status'] }}</td>
-                </tr>
-                <tr>
-                    <th>Currency</th>
-                    <td>{{ $currency ?? '-' }}</td>
-                </tr>
-            </table>
-        </div>
+@if (! $isPdf)
+    <div class="controls">
+        <a href="#" id="printBtn" class="btn secondary">Print</a>
+        @if (! empty($pdf_url))
+            <a href="{{ $pdf_url }}" class="btn" target="_blank" rel="noopener">Download PDF</a>
+        @endif
+    </div>
+@endif
+
+<main class="sheet">
+    <div class="document-title">
+        <div class="title-box">{{ $document['title'] }}</div>
     </div>
 
-    <div class="party-grid">
-        @foreach (['supplier' => 'Supplier', 'purchaser' => 'Purchaser'] as $key => $label)
-            @php($party = $document[$key])
-            <div class="party-card">
-                <div class="section-title">{{ $label }}</div>
-                <div class="party-name">{{ $party['name'] }}</div>
-                <table class="kv">
-                    @if (! empty($party['number']))
-                        <tr>
-                            <th>Number</th>
-                            <td>{{ $party['number'] }}</td>
-                        </tr>
-                    @endif
-                    @if (! empty($party['code']) && $party['code'] !== ($party['number'] ?? null))
-                        <tr>
-                            <th>Code</th>
-                            <td>{{ $party['code'] }}</td>
-                        </tr>
-                    @endif
-                    @if (! empty($party['tax_registration_number']))
-                        <tr>
-                            <th>Tax no.</th>
-                            <td>{{ $party['tax_registration_number'] }}</td>
-                        </tr>
-                    @endif
-                    @if (! empty($party['phone']))
-                        <tr>
-                            <th>Phone</th>
-                            <td>{{ $party['phone'] }}</td>
-                        </tr>
-                    @endif
-                    @if (! empty($party['email']))
-                        <tr>
-                            <th>Email</th>
-                            <td>{{ $party['email'] }}</td>
-                        </tr>
-                    @endif
-                </table>
-            </div>
-        @endforeach
-    </div>
+    <table class="field-table">
+        <tr>
+            <td class="field-cell">
+                <span class="label">Date of Invoice:</span>
+                {{ $document['invoice_date'] ?? '' }}
+            </td>
+            <td class="gap"></td>
+            <td class="field-cell">
+                <span class="label">Tax Invoice No.:</span>
+                {{ $document['invoice_number'] }}
+            </td>
+        </tr>
+    </table>
 
-    <table class="lines">
+    <table class="field-table">
+        <tr>
+            @foreach (['supplier' => 'Supplier', 'purchaser' => 'Purchaser'] as $key => $label)
+                @php($party = $document[$key])
+                <td class="party-cell">
+                    <div class="party-line">
+                        <span class="label">{{ $label }}'s TIN:</span>
+                        {{ $party['tax_registration_number'] ?? '' }}
+                    </div>
+                    <div class="party-line">
+                        <span class="label">{{ $label }}'s Name:</span>
+                        {{ $party['name'] }}
+                    </div>
+                    <div class="party-address">
+                        <span class="label">Address:</span>
+                        {{ $party['address'] ?? '' }}
+                    </div>
+                    <div class="party-phone">
+                        <span class="label">Telephone No:</span>
+                        {{ $party['phone'] ?? '' }}
+                    </div>
+                </td>
+                @if ($key === 'supplier')
+                    <td class="gap"></td>
+                @endif
+            @endforeach
+        </tr>
+    </table>
+
+    <table class="field-table">
+        <tr>
+            <td class="field-cell">
+                <span class="label">Date of Delivery:</span>
+            </td>
+            <td class="gap"></td>
+            <td class="field-cell">
+                <span class="label">Place of Supply:</span>
+            </td>
+        </tr>
+    </table>
+
+    <table class="field-table">
+        <tr>
+            <td class="additional-field">
+                <span class="label">Additional Information if any:</span>
+                @if (! empty($document['due_date']) || ! empty($document['notes']))
+                    <div class="additional-content">
+                        @if (! empty($document['due_date']))
+                            <div>Due date: {{ $document['due_date'] }}</div>
+                        @endif
+                        @if (! empty($document['notes']))
+                            <div>{{ $document['notes'] }}</div>
+                        @endif
+                    </div>
+                @endif
+            </td>
+        </tr>
+    </table>
+
+    <table class="invoice-lines">
         <thead>
         <tr>
-            <th style="width:6%">#</th>
-            <th style="width:18%">Item</th>
-            <th>Description</th>
-            <th style="width:10%">Qty</th>
-            <th style="width:12%">Unit price</th>
-            <th style="width:10%">Discount</th>
-            <th style="width:10%">Tax</th>
-            <th style="width:10%">Charges</th>
-            <th style="width:12%">Line total</th>
+            <th style="width: 13%;">Reference</th>
+            <th>Description of Goods or Services</th>
+            <th style="width: 12%;">Quantity</th>
+            <th style="width: 14%;">Unit Price</th>
+            <th style="width: 17%;">Amount</th>
         </tr>
         </thead>
         <tbody>
-        @forelse ($document['lines'] as $line)
+        @foreach ($lines as $line)
             <tr>
-                <td class="number">{{ $line['line_number'] }}</td>
-                <td>{{ $line['item'] ?? '-' }}</td>
-                <td>{{ $line['description'] }}</td>
+                <td>{{ $line['reference'] }}</td>
+                <td>
+                    {{ $line['description'] }}
+                    @if (! empty($line['item']))
+                        <div class="muted">{{ $line['item'] }}</div>
+                    @endif
+                </td>
                 <td class="number">
                     {{ $line['quantity']['display'] }}
                     @if (! empty($line['uom']))
@@ -283,53 +275,70 @@
                     @endif
                 </td>
                 <td class="number">{{ $line['unit_price']['display'] }}</td>
-                <td class="number">{{ $line['discount_amount']['display'] }}</td>
-                <td class="number">{{ $line['tax_amount']['display'] }}</td>
-                <td class="number">{{ $line['charge_amount']['display'] }}</td>
                 <td class="number">{{ $line['line_total']['display'] }}</td>
             </tr>
-        @empty
+        @endforeach
+        @for ($row = 0; $row < $blankLineRows; $row++)
             <tr>
-                <td colspan="9">No invoice lines were recorded.</td>
+                <td>&nbsp;</td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
             </tr>
-        @endforelse
-        </tbody>
-    </table>
+        @endfor
 
-    <div class="totals-wrap">
-        <table class="totals">
-            @foreach (['subtotal', 'discount_total', 'tax_total', 'charge_total', 'adjustment_total'] as $key)
+        <tr>
+            <td colspan="4" class="summary-label">{{ $amounts['subtotal']['label'] }}:</td>
+            <td class="number">{{ $amounts['subtotal']['display'] }}</td>
+        </tr>
+        @foreach (['discount_total', 'charge_total', 'adjustment_total'] as $amountKey)
+            @if (! $zeroMoney($amounts[$amountKey]))
                 <tr>
-                    <td>{{ $amounts[$key]['label'] }}</td>
-                    <td class="number">{{ $amounts[$key]['display'] }}</td>
+                    <td colspan="4" class="summary-label">{{ $amounts[$amountKey]['label'] }}:</td>
+                    <td class="number">{{ $amounts[$amountKey]['display'] }}</td>
                 </tr>
-            @endforeach
-            <tr class="grand">
-                <td>{{ $amounts['grand_total']['label'] }}</td>
-                <td class="number">{{ $amounts['grand_total']['display'] }}</td>
-            </tr>
+            @endif
+        @endforeach
+        <tr>
+            <td colspan="4" class="summary-label">{{ $amounts['tax_total']['label'] }}:</td>
+            <td class="number">{{ $amounts['tax_total']['display'] }}</td>
+        </tr>
+        <tr>
+            <td colspan="4" class="summary-label">{{ $amounts['grand_total']['label'] }}:</td>
+            <td class="number">{{ $amounts['grand_total']['display'] }}</td>
+        </tr>
+        @if ($settlementRowsVisible)
             <tr>
-                <td>{{ $amounts['paid_total']['label'] }}</td>
+                <td colspan="4" class="summary-label">{{ $amounts['paid_total']['label'] }}:</td>
                 <td class="number">{{ $amounts['paid_total']['display'] }}</td>
             </tr>
             <tr>
-                <td>{{ $amounts['credit_total']['label'] }}</td>
+                <td colspan="4" class="summary-label">{{ $amounts['credit_total']['label'] }}:</td>
                 <td class="number">{{ $amounts['credit_total']['display'] }}</td>
             </tr>
             <tr>
-                <td>{{ $amounts['balance_due']['label'] }}</td>
+                <td colspan="4" class="summary-label">{{ $amounts['balance_due']['label'] }}:</td>
                 <td class="number">{{ $amounts['balance_due']['display'] }}</td>
             </tr>
-        </table>
-    </div>
+        @endif
+        </tbody>
+    </table>
 
-    @if (! empty($document['notes']))
-        <div class="notes">
-            <div class="section-title">Notes</div>
-            <div>{{ $document['notes'] }}</div>
-        </div>
-    @endif
-</div>
+    <table class="footer-fields">
+        <tr>
+            <td>
+                <span class="label">Total Amount in words:</span>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <span class="label">Mode of Payment:</span>
+            </td>
+        </tr>
+    </table>
+</main>
+
 @if (! $isPdf)
     <script>
         document.addEventListener('DOMContentLoaded', function () {
