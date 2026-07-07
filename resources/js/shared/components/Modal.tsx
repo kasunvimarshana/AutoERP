@@ -10,9 +10,18 @@ interface ModalProps {
     children: ReactNode;
     canClose?: () => boolean;
     closeDisabled?: boolean;
+    closeOnBackdrop?: boolean;
 }
 
-export function Modal({ open, title, onClose, children, canClose, closeDisabled = false }: ModalProps) {
+export function Modal({
+    open,
+    title,
+    onClose,
+    children,
+    canClose,
+    closeDisabled = false,
+    closeOnBackdrop = true,
+}: ModalProps) {
     const titleId = useId();
     const dialogRef = useRef<HTMLDivElement>(null);
     const requestClose = useCallback(() => {
@@ -25,7 +34,10 @@ export function Modal({ open, title, onClose, children, canClose, closeDisabled 
     return createPortal(
         <div
             className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4"
-            onMouseDown={(event) => event.target === event.currentTarget && requestClose()}
+            onMouseDown={(event) => {
+                if (!closeOnBackdrop) return;
+                if (event.target === event.currentTarget) requestClose();
+            }}
         >
             <div ref={dialogRef} tabIndex={-1} className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-lg bg-white shadow-xl" role="dialog" aria-modal="true" aria-labelledby={titleId} onSubmit={(event) => event.stopPropagation()}>
                 <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
