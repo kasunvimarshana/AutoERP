@@ -212,7 +212,7 @@ final class ItemEngineTest extends TestCase
         });
     }
 
-    public function test_lookup_exposes_resolved_service_and_purchase_unit_prices_for_service_context(): void
+    public function test_lookup_exposes_service_only_unit_price_and_purchase_price_for_service_context(): void
     {
         $tenantId = $this->createTenant();
         $currencyId = $this->createCurrency('LKR');
@@ -255,10 +255,10 @@ final class ItemEngineTest extends TestCase
             ],
         ));
 
-        $salesFallback = $this->createItem(new CreateItemData(
+        $salesOnly = $this->createItem(new CreateItemData(
             tenantId: $tenantId,
-            code: 'STOCK-SALES-FALLBACK',
-            name: 'Stock with sales fallback',
+            code: 'STOCK-SALES-ONLY',
+            name: 'Stock with sales price only',
             itemType: ItemType::Stock,
             baseUomId: $uomId,
             isStockable: true,
@@ -282,7 +282,7 @@ final class ItemEngineTest extends TestCase
             ],
         ));
 
-        $this->withTenantExecutionContext($tenantId, function () use ($tenantId, $warehouseId, $servicePriced, $salesFallback): void {
+        $this->withTenantExecutionContext($tenantId, function () use ($tenantId, $warehouseId, $servicePriced, $salesOnly): void {
             DB::table('inventory_stock_balances')->insert([
                 'tenant_id' => $tenantId,
                 'organization_unit_id' => null,
@@ -312,14 +312,14 @@ final class ItemEngineTest extends TestCase
             $lookup = app(ItemQueryService::class)->lookup([], $tenantId, null, 50, 'stockable');
 
             $servicePricedLookup = $lookup->getCollection()->firstWhere('id', $servicePriced->getKey());
-            $salesFallbackLookup = $lookup->getCollection()->firstWhere('id', $salesFallback->getKey());
+            $salesOnlyLookup = $lookup->getCollection()->firstWhere('id', $salesOnly->getKey());
 
             $this->assertSame('150.000000', $servicePricedLookup?->getAttribute('resolved_service_unit_price'));
             $this->assertSame('90.000000', $servicePricedLookup?->getAttribute('resolved_purchase_unit_price'));
             $this->assertSame('15.000000', $servicePricedLookup?->getAttribute('available_stock_quantity'));
-            $this->assertSame('220.000000', $salesFallbackLookup?->getAttribute('resolved_service_unit_price'));
-            $this->assertSame('130.000000', $salesFallbackLookup?->getAttribute('resolved_purchase_unit_price'));
-            $this->assertSame('0.000000', $salesFallbackLookup?->getAttribute('available_stock_quantity'));
+            $this->assertSame('0.000000', $salesOnlyLookup?->getAttribute('resolved_service_unit_price'));
+            $this->assertSame('130.000000', $salesOnlyLookup?->getAttribute('resolved_purchase_unit_price'));
+            $this->assertSame('0.000000', $salesOnlyLookup?->getAttribute('available_stock_quantity'));
         });
     }
 

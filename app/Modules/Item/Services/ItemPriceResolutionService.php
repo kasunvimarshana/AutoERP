@@ -82,7 +82,7 @@ final class ItemPriceResolutionService
     {
         return match ($context) {
             self::CONTEXT_SALES => [ItemPriceType::Sales],
-            self::CONTEXT_SERVICE => [ItemPriceType::Service, ItemPriceType::Sales],
+            self::CONTEXT_SERVICE => [ItemPriceType::Service],
             self::CONTEXT_INVOICE => [ItemPriceType::Sales, ItemPriceType::Service],
             self::CONTEXT_PURCHASE => [ItemPriceType::Purchase],
             self::CONTEXT_RENTAL => [ItemPriceType::Rental],
