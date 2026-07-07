@@ -1,4 +1,5 @@
 import { endpoints } from './endpoints';
+import { createQueryCachedLookupLoader } from './lookupCache';
 import { mapLookupResult, requestLookup } from './lookupRequest';
 import type { NamedResource } from '@/shared/types/common';
 import type { LookupLoadParams, LookupResult } from '@/shared/types/lookup';
@@ -19,8 +20,22 @@ export interface VehicleLookupResource extends NamedResource {
     odometer_unit?: string | null;
 }
 
-const lookup = (url: string, params: LookupLoadParams): Promise<LookupResult<NamedResource>> =>
-    requestLookup<NamedResource>(url, params);
+export interface ItemLookupResource extends NamedResource {
+    base_uom?: NamedResource | null;
+    is_stockable?: boolean;
+    resolved_service_unit_price?: string | null;
+    resolved_purchase_unit_price?: string | null;
+    available_stock_quantity?: string | null;
+}
+
+const lookup = <T extends NamedResource = NamedResource>(
+    url: string,
+    params: LookupLoadParams,
+): Promise<LookupResult<T>> =>
+    requestLookup<T>(url, params);
+
+const itemLookup = (url: string, params: LookupLoadParams): Promise<LookupResult<ItemLookupResource>> =>
+    requestLookup<ItemLookupResource>(url, params);
 
 async function mappedLookup<T extends NamedResource>(
     url: string,
@@ -33,14 +48,34 @@ async function mappedLookup<T extends NamedResource>(
 }
 
 export const lookupApi = {
-    items: (params: LookupLoadParams) => lookup(`${endpoints.items}/lookup`, params),
-    stockableItems: (params: LookupLoadParams) => lookup(`${endpoints.items}/lookup/stockable`, params),
-    serviceItems: (params: LookupLoadParams) => lookup(`${endpoints.items}/lookup/service`, params),
-    labourItems: (params: LookupLoadParams) => lookup(`${endpoints.items}/lookup/labour`, params),
-    comboItems: async (params: LookupLoadParams): Promise<LookupResult<NamedResource>> => {
+    items: createQueryCachedLookupLoader<ItemLookupResource>({
+        key: 'lookup:items:active',
+        load: (params) => itemLookup(`${endpoints.items}/lookup`, params),
+    }),
+    stockableItems: createQueryCachedLookupLoader<ItemLookupResource>({
+        key: 'lookup:items:stockable',
+        load: (params) => itemLookup(`${endpoints.items}/lookup/stockable`, params),
+    }),
+    serviceItems: createQueryCachedLookupLoader<ItemLookupResource>({
+        key: 'lookup:items:service',
+        load: (params) => itemLookup(`${endpoints.items}/lookup/service`, params),
+    }),
+    labourItems: createQueryCachedLookupLoader<ItemLookupResource>({
+        key: 'lookup:items:labour',
+        load: (params) => itemLookup(`${endpoints.items}/lookup/labour`, params),
+    }),
+    comboItems: async (params: LookupLoadParams): Promise<LookupResult<ItemLookupResource>> => {
+        const comboLookup = createQueryCachedLookupLoader<ItemLookupResource>({
+            key: 'lookup:items:combo',
+            load: (lookupParams) => itemLookup(`${endpoints.items}/lookup/combo`, lookupParams),
+        });
+        const packageLookup = createQueryCachedLookupLoader<ItemLookupResource>({
+            key: 'lookup:items:package',
+            load: (lookupParams) => itemLookup(`${endpoints.items}/lookup/package`, lookupParams),
+        });
         const [combos, packages] = await Promise.all([
-            lookup(`${endpoints.items}/lookup/combo`, params),
-            lookup(`${endpoints.items}/lookup/package`, params),
+            comboLookup(params),
+            packageLookup(params),
         ]);
         const data = dedupeById([...combos.data, ...packages.data]);
 
@@ -49,35 +84,51 @@ export const lookupApi = {
             meta: combineMeta(params, data.length, combos.meta, packages.meta),
         };
     },
-    suppliers: (params: LookupLoadParams) => lookup(`${endpoints.suppliers}/lookup`, params),
-    customers: (params: LookupLoadParams) => lookup(`${endpoints.customers}/lookup/active`, params),
-    availableEmployees: (params: LookupLoadParams) => mappedLookup(
-        `${endpoints.hrEmployees}/lookup/available`,
-        params,
-        (resource) => ({
-            id: Number(resource.id),
-            code: String(resource.employee_number ?? resource.code ?? ''),
-            name: String(resource.display_name ?? resource.name ?? ''),
-        }),
-    ),
-    serviceVehicles: (customerId: number, params: LookupLoadParams): Promise<LookupResult<VehicleLookupResource>> => mappedLookup(
-        `${endpoints.vehicles}/lookup/service-available`,
-        params,
-        (resource) => ({
-            id: Number(resource.id),
-            code: String(resource.vehicle_number ?? resource.code ?? ''),
-            name: String(resource.registration_number ?? resource.vehicle_number ?? resource.name ?? ''),
-            registration_number: typeof resource.registration_number === 'string' ? resource.registration_number : null,
-            make: resource.make as NamedResource | null | undefined,
-            model: resource.model as NamedResource | null | undefined,
-            current_ownerships: resource.current_ownerships as VehicleLookupResource['current_ownerships'],
-            current_customer: resource.current_customer as VehicleLookupResource['current_customer'],
-            current_supplier: resource.current_supplier as VehicleLookupResource['current_supplier'],
-            odometer_reading: typeof resource.odometer_reading === 'string' ? resource.odometer_reading : null,
-            odometer_unit: typeof resource.odometer_unit === 'string' ? resource.odometer_unit : null,
-        }),
-        { customer_id: customerId },
-    ),
+    suppliers: createQueryCachedLookupLoader<NamedResource>({
+        key: 'lookup:suppliers',
+        load: (params) => lookup(`${endpoints.suppliers}/lookup`, params),
+    }),
+    customers: createQueryCachedLookupLoader<NamedResource>({
+        key: 'lookup:customers:active',
+        load: (params) => lookup(`${endpoints.customers}/lookup/active`, params),
+    }),
+    availableEmployees: createQueryCachedLookupLoader<NamedResource>({
+        key: 'lookup:employees:available',
+        load: (params) => mappedLookup(
+            `${endpoints.hrEmployees}/lookup/available`,
+            params,
+            (resource) => ({
+                id: Number(resource.id),
+                code: String(resource.employee_number ?? resource.code ?? ''),
+                name: String(resource.display_name ?? resource.name ?? ''),
+            }),
+        ),
+    }),
+    serviceVehicles: (params: LookupLoadParams, customerId?: number | null): Promise<LookupResult<VehicleLookupResource>> => {
+        const loader = createQueryCachedLookupLoader<VehicleLookupResource>({
+            key: `lookup:vehicles:service-available:${customerId ?? 'all'}`,
+            load: (lookupParams) => mappedLookup(
+                `${endpoints.vehicles}/lookup/service-available`,
+                lookupParams,
+                (resource) => ({
+                    id: Number(resource.id),
+                    code: String(resource.vehicle_number ?? resource.code ?? ''),
+                    name: String(resource.registration_number ?? resource.vehicle_number ?? resource.name ?? ''),
+                    registration_number: typeof resource.registration_number === 'string' ? resource.registration_number : null,
+                    make: resource.make as NamedResource | null | undefined,
+                    model: resource.model as NamedResource | null | undefined,
+                    current_ownerships: resource.current_ownerships as VehicleLookupResource['current_ownerships'],
+                    current_customer: resource.current_customer as VehicleLookupResource['current_customer'],
+                    current_supplier: resource.current_supplier as VehicleLookupResource['current_supplier'],
+                    odometer_reading: typeof resource.odometer_reading === 'string' ? resource.odometer_reading : null,
+                    odometer_unit: typeof resource.odometer_unit === 'string' ? resource.odometer_unit : null,
+                }),
+                customerId ? { customer_id: customerId } : {},
+            ),
+        });
+
+        return loader(params);
+    },
 };
 
 function dedupeById<T extends NamedResource>(options: T[]): T[] {

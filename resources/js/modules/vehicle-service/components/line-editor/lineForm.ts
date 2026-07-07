@@ -1,3 +1,4 @@
+import type { ItemLookupResource } from '@/shared/api/lookupApi';
 import type { NamedResource } from '@/shared/types/common';
 import { addDecimal, multiplyDecimal, percentageOfDecimal, subtractDecimal } from '@/shared/utils/decimal';
 import type {
@@ -10,7 +11,7 @@ export type CalculationType = 'fixed' | 'percentage';
 
 export interface VehicleServiceLineFormValue {
     source: VehicleServiceLineSourceType;
-    item: NamedResource | null;
+    item: ItemLookupResource | null;
     uom: NamedResource | null;
     description: string;
     quantity: string;
@@ -48,7 +49,7 @@ export function emptyLineForm(): VehicleServiceLineFormValue {
         source: 'inventory_item',
         item: null,
         uom: null,
-        description: '',
+        description: lineTypeLabel('inventory_item'),
         quantity: '1.000000',
         unit_cost: '0.000000',
         unit_price: '0.000000',
@@ -94,12 +95,13 @@ export function lineFormToPayload(form: VehicleServiceLineFormValue): VehicleSer
     const tax = valueByType(form.tax_type, form.tax_value);
     const charge = valueByType(form.charge_type, form.charge_value);
     const external = form.source === 'external_item';
+    const description = form.description.trim() || form.item?.name || lineTypeLabel(form.source);
 
     return {
         line_source_type: form.source,
         item_id: external ? undefined : form.item?.id,
         uom_id: form.uom?.id,
-        description: form.description || form.item?.name || '',
+        description,
         quantity: form.quantity,
         unit_cost: form.unit_cost,
         unit_price: form.unit_price,
@@ -143,6 +145,10 @@ export function formatLineItem(line: VehicleServiceJobLine): string {
     return line.item
         ? [line.item.code, line.item.name].filter(Boolean).join(' - ')
         : line.description || line.line_source_type.replaceAll('_', ' ');
+}
+
+export function lineTypeLabel(source: VehicleServiceLineSourceType): string {
+    return lineTypeOptions.find((option) => option.value === source)?.label ?? source.replaceAll('_', ' ');
 }
 
 function valueByType(type: CalculationType, value: string): { rate: string; amount: string } {

@@ -1,5 +1,6 @@
 import { apiClient } from '@/shared/api/apiClient';
 import { endpoints } from '@/shared/api/endpoints';
+import { createLocallyFilteredLookupLoader, createQueryCachedLookupLoader } from '@/shared/api/lookupCache';
 import { requestLookup } from '@/shared/api/lookupRequest';
 import type { ApiCollection, ApiResource, ListParams } from '@/shared/types/api';
 import type { LookupLoadParams, LookupResult } from '@/shared/types/lookup';
@@ -52,28 +53,53 @@ export const changeVehicleStatus = (id: number, status: string, reason?: string)
     apiClient.patch<ApiResource<Vehicle>>(`${endpoints.vehicles}/${id}/status`, { status, reason }).then((response) => response.data.data);
 
 export function searchVehicles(params: LookupLoadParams, kind = 'active'): Promise<LookupResult<VehicleSummary>> {
-    return requestLookup<VehicleSummary>(`${endpoints.vehicles}/lookup/${kind}`, params);
+    const loader = createQueryCachedLookupLoader<VehicleSummary>({
+        key: `lookup:vehicles:${kind}`,
+        load: (lookupParams) => requestLookup<VehicleSummary>(`${endpoints.vehicles}/lookup/${kind}`, lookupParams),
+    });
+
+    return loader(params);
 }
 
 export function searchVehicleMakes(params: LookupLoadParams): Promise<LookupResult<VehicleMake>> {
-    return requestLookup<VehicleMake>(`${endpoints.vehicleMakes}/lookup`, params);
+    const loader = createLocallyFilteredLookupLoader<VehicleMake>({
+        key: 'lookup:vehicle-makes',
+        load: (lookupParams) => requestLookup<VehicleMake>(`${endpoints.vehicleMakes}/lookup`, lookupParams),
+    });
+
+    return loader(params);
 }
 
 export function searchVehicleModels(
     params: LookupLoadParams,
     vehicleMakeId?: number | null,
 ): Promise<LookupResult<VehicleModel>> {
-    return requestLookup<VehicleModel>(`${endpoints.vehicleModels}/lookup`, params, {
-        vehicle_make_id: vehicleMakeId ?? undefined,
+    const loader = createQueryCachedLookupLoader<VehicleModel>({
+        key: `lookup:vehicle-models:${vehicleMakeId ?? 'all'}`,
+        load: (lookupParams) => requestLookup<VehicleModel>(`${endpoints.vehicleModels}/lookup`, lookupParams, {
+            vehicle_make_id: vehicleMakeId ?? undefined,
+        }),
     });
+
+    return loader(params);
 }
 
 export function searchVehicleTypes(params: LookupLoadParams): Promise<LookupResult<VehicleType>> {
-    return requestLookup<VehicleType>(`${endpoints.vehicleTypes}/lookup`, params);
+    const loader = createLocallyFilteredLookupLoader<VehicleType>({
+        key: 'lookup:vehicle-types',
+        load: (lookupParams) => requestLookup<VehicleType>(`${endpoints.vehicleTypes}/lookup`, lookupParams),
+    });
+
+    return loader(params);
 }
 
 export function searchVehicleCategories(params: LookupLoadParams): Promise<LookupResult<VehicleCategory>> {
-    return requestLookup<VehicleCategory>(`${endpoints.vehicleCategories}/lookup`, params);
+    const loader = createLocallyFilteredLookupLoader<VehicleCategory>({
+        key: 'lookup:vehicle-categories',
+        load: (lookupParams) => requestLookup<VehicleCategory>(`${endpoints.vehicleCategories}/lookup`, lookupParams),
+    });
+
+    return loader(params);
 }
 
 export const listVehicleMakes = (params: ListParams, signal?: AbortSignal) =>

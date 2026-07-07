@@ -248,6 +248,13 @@ final class VehicleEngineTest extends TestCase
             ],
             'documents' => [['document_type' => 'insurance', 'document_number' => 'INS-API']],
             'attributes' => [['attribute_key' => 'trim', 'attribute_value' => 'G', 'data_type' => 'text']],
+            'ownerships' => [[
+                'owner_type' => 'customer',
+                'owner_id' => (int) $customer->getKey(),
+                'ownership_type' => 'customer_owned',
+                'started_at' => now()->toDateString(),
+                'is_current' => true,
+            ]],
         ]);
 
         $create->assertCreated()
@@ -255,12 +262,11 @@ final class VehicleEngineTest extends TestCase
             ->assertJsonPath('data.make.name', $make->name)
             ->assertJsonPath('data.model.name', $model->name)
             ->assertJsonPath('data.documents.0.document_type', 'insurance')
+            ->assertJsonPath('data.current_customer.name', $customer->name)
+            ->assertJsonPath('data.current_ownerships.0.owner.name', $customer->name)
             ->assertJsonStructure(['data' => ['id', 'vehicle_number', 'make', 'model', 'current_ownerships', 'documents', 'ownerships', 'attributes']]);
 
         $id = (int) $create->json('data.id');
-        $vehicle = $this->runInTenant($tenantId, fn (): Vehicle => Vehicle::query()->findOrFail($id));
-        $this->ownership($vehicle, VehicleOwnerType::Customer, (int) $customer->getKey(), VehicleOwnershipType::CustomerOwned, now()->toDateString(), $tenantId, $organizationUnitId);
-
         $this->tenantGetJson($tenantId, "/api/v1/vehicles/{$id}?tenant_id={$tenantId}&organization_unit_id={$organizationUnitId}")
             ->assertOk()
             ->assertJsonPath('data.current_customer.name', $customer->name)
