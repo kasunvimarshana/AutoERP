@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Modules\VehicleService\Services;
 
+use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Item\Enums\ItemType;
 use Modules\Item\Models\Item;
+use Modules\Item\Models\ItemUnit;
 use Modules\Item\Models\ItemVariant;
 use Modules\UOM\Models\UnitOfMeasureModel;
 use Modules\VehicleService\DTOs\VehicleServiceLineData;
@@ -109,7 +111,30 @@ final class VehicleServiceLineValidator
             if (! $uom->is_active) {
                 throw new InvalidArgumentException('Line unit of measure must be active.');
             }
+            if ($item !== null) {
+                $this->assertItemUomIsActive($item, $data->uomId);
+            }
         }
+    }
+
+    private function assertItemUomIsActive(Item $item, int $uomId): void
+    {
+        if ($item->base_uom_id !== null && (int) $item->base_uom_id === $uomId) {
+            return;
+        }
+
+        if (ItemUnit::query()
+            ->where('tenant_id', $item->tenant_id)
+            ->where('item_id', $item->getKey())
+            ->where('uom_id', $uomId)
+            ->where('is_active', true)
+            ->exists()) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'uom_id' => ['Line unit of measure must be active for the selected item.'],
+        ]);
     }
 
     private function assertInventoryItem(Item $item): void

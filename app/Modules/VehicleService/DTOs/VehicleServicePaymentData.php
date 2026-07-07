@@ -7,7 +7,7 @@ namespace Modules\VehicleService\DTOs;
 final readonly class VehicleServicePaymentData
 {
     public function __construct(
-        public int $expectedJobVersion,
+        public int $expectedVersion,
         public int $invoiceId,
         public string $paymentDate,
         public string $amount,

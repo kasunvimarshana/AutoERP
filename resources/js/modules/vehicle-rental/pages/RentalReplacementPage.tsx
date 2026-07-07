@@ -1,7 +1,7 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { listVehicleOwnerships } from "@/modules/vehicle/vehicleOwnershipApi";
 import type { VehicleSummary } from "@/modules/vehicle/vehicleTypes";
-import { VehicleLookupSelect } from "@/modules/vehicle/components/VehicleLookupSelect";
 import { Button } from "@/shared/components/Button";
 import { ContentHeader } from "@/shared/components/ContentHeader";
 import { DetailGrid } from "@/shared/components/DetailGrid";
@@ -17,7 +17,9 @@ import type { NamedResource } from "@/shared/types/common";
 import { businessDateTimeInputValue } from "@/shared/utils/businessDate";
 import { readableRelation } from "@/shared/utils/object";
 import { parsePositiveInteger } from "@/shared/utils/routeParams";
+import type { PartyVehicleRelationship } from "@/shared/types/partyVehicle";
 import {
+    RentalAvailableVehicleLookupSelect,
     RentalAllocationLookupSelect,
     RentalFinanceAgreementLookupSelect,
 } from "../components/RentalLookups";
@@ -32,6 +34,14 @@ interface InspectionForm {
     damage_summary: string;
 }
 
+type VersionedNamedResource = NamedResource & { row_version?: number };
+type AllocationLookupValue = VersionedNamedResource & { vehicle?: VehicleSummary | null };
+
+const SOURCE_TYPE_COMPANY_OWNED = "company_owned";
+const SOURCE_TYPE_OWNER_SUPPLIED = "owner_supplied";
+const SOURCE_TYPE_FINANCED = "financed";
+const OWNERSHIP_LOOKUP_PAGE_SIZE = 100;
+
 const emptyInspection = (): InspectionForm => ({
     odometer: "",
     fuel_level_percent: "",
@@ -39,6 +49,51 @@ const emptyInspection = (): InspectionForm => ({
     condition_summary: "",
     damage_summary: "",
 });
+
+function toDateTimeLocal(value: string | null | undefined): string {
+    if (!value) return "";
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+
+    const offset = date.getTimezoneOffset() * 60_000;
+    return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+}
+
+function toIsoDateTime(value: string): string {
+    const date = new Date(value);
+
+    return Number.isNaN(date.getTime()) ? value : date.toISOString();
+}
+
+function ownershipCoversPeriod(ownership: PartyVehicleRelationship, startsAtValue: string, endsAtValue: string): boolean {
+    const startedAt = new Date(ownership.started_at);
+    const endedAt = ownership.ended_at ? new Date(ownership.ended_at) : null;
+    const periodStartsAt = new Date(startsAtValue);
+    const periodEndsAt = new Date(endsAtValue);
+
+    if (
+        Number.isNaN(startedAt.getTime()) ||
+        Number.isNaN(periodStartsAt.getTime()) ||
+        Number.isNaN(periodEndsAt.getTime()) ||
+        (endedAt !== null && Number.isNaN(endedAt.getTime()))
+    ) {
+        return false;
+    }
+
+    return startedAt.getTime() <= periodStartsAt.getTime()
+        && (endedAt === null || endedAt.getTime() >= periodEndsAt.getTime());
+}
+
+function ownershipLabel(ownership: PartyVehicleRelationship | null): string {
+    if (ownership === null) return "";
+
+    return [
+        ownership.vehicle.registration_number ?? ownership.vehicle.number,
+        ownership.owner.name,
+        ownership.ownership_type?.replaceAll("_", " "),
+    ].filter(Boolean).join(" - ");
+}
 
 export default function RentalReplacementPage() {
     const allocationId = parsePositiveInteger(useParams().id);
@@ -49,8 +104,11 @@ export default function RentalReplacementPage() {
         allocationId !== null,
     );
     const [vehicle, setVehicle] = useState<VehicleSummary | null>(null);
-    const [sourceAllocation, setSourceAllocation] = useState<NamedResource | null>(null);
-    const [financeAgreement, setFinanceAgreement] = useState<NamedResource | null>(null);
+    const [sourceAllocation, setSourceAllocation] = useState<AllocationLookupValue | null>(null);
+    const [financeAgreement, setFinanceAgreement] = useState<VersionedNamedResource | null>(null);
+    const [companyOwnership, setCompanyOwnership] = useState<PartyVehicleRelationship | null>(null);
+    const [companyOwnershipLoading, setCompanyOwnershipLoading] = useState(false);
+    const [companyOwnershipHint, setCompanyOwnershipHint] = useState<string | null>(null);
     const [form, setForm] = useState({
         vehicle_source_type: "company_owned",
         replacement_at: businessDateTimeInputValue(),
@@ -65,23 +123,94 @@ export default function RentalReplacementPage() {
     const [saving, setSaving] = useState(false);
     const [actionError, setActionError] = useState<ApiError | null>(null);
 
+    useEffect(() => {
+        const controller = new AbortController();
+        queueMicrotask(() => {
+            if (controller.signal.aborted) return;
+            setCompanyOwnership(null);
+            setCompanyOwnershipHint(null);
+        });
+
+        const allocationEnd = form.allocated_to || toDateTimeLocal(allocation.data?.agreement?.ends_at ?? allocation.data?.allocated_to);
+        if (form.vehicle_source_type !== SOURCE_TYPE_COMPANY_OWNED || !vehicle || !form.replacement_at || !allocationEnd) {
+            queueMicrotask(() => {
+                if (!controller.signal.aborted) setCompanyOwnershipLoading(false);
+            });
+
+            return () => controller.abort();
+        }
+
+        const selectedVehicle = vehicle;
+        const selectedStartAt = toIsoDateTime(form.replacement_at);
+        const selectedEndAt = toIsoDateTime(allocationEnd);
+        queueMicrotask(() => {
+            if (!controller.signal.aborted) setCompanyOwnershipLoading(true);
+        });
+
+        void listVehicleOwnerships("company", {
+            vehicle_id: selectedVehicle.id,
+            status: "active",
+            per_page: OWNERSHIP_LOOKUP_PAGE_SIZE,
+        }, controller.signal).then((response) => {
+            if (controller.signal.aborted) return;
+
+            const ownership = response.data.find((row) => row.is_current && ownershipCoversPeriod(row, selectedStartAt, selectedEndAt))
+                ?? response.data.find((row) => ownershipCoversPeriod(row, selectedStartAt, selectedEndAt))
+                ?? null;
+
+            setCompanyOwnership(ownership);
+            setCompanyOwnershipHint(ownership === null
+                ? "No active company ownership covers this replacement period."
+                : null);
+        }).catch((error: unknown) => {
+            if (!controller.signal.aborted) setActionError(toApiError(error));
+        }).finally(() => {
+            if (!controller.signal.aborted) setCompanyOwnershipLoading(false);
+        });
+
+        return () => controller.abort();
+    }, [
+        allocation.data?.agreement?.ends_at,
+        allocation.data?.allocated_to,
+        form.allocated_to,
+        form.replacement_at,
+        form.vehicle_source_type,
+        vehicle,
+        vehicle?.id,
+    ]);
+
     const submit = async (event: FormEvent) => {
         event.preventDefault();
-        if (!allocationId || !vehicle) return;
+        const agreementVersion = allocation.data?.agreement?.row_version;
+        if (!allocationId || !vehicle || !allocation.data || !agreementVersion) return;
+        if (form.vehicle_source_type === SOURCE_TYPE_COMPANY_OWNED && companyOwnership === null) {
+            setCompanyOwnershipHint("No active company ownership covers this replacement period.");
+
+            return;
+        }
         setSaving(true);
         setActionError(null);
         try {
-            await replaceRentalVehicle(allocationId, {
+            await replaceRentalVehicle(allocationId, allocation.data.row_version, agreementVersion, {
                 new_vehicle_id: vehicle.id,
                 vehicle_source_type: form.vehicle_source_type,
-                source_allocation_id: form.vehicle_source_type === "owner_supplied"
+                vehicle_ownership_id: form.vehicle_source_type === SOURCE_TYPE_COMPANY_OWNED
+                    ? companyOwnership?.id ?? null
+                    : null,
+                source_allocation_id: form.vehicle_source_type === SOURCE_TYPE_OWNER_SUPPLIED
                     ? sourceAllocation?.id ?? null
                     : null,
-                vehicle_finance_agreement_id: form.vehicle_source_type === "financed"
+                expected_source_allocation_version: form.vehicle_source_type === SOURCE_TYPE_OWNER_SUPPLIED
+                    ? sourceAllocation?.row_version ?? null
+                    : null,
+                vehicle_finance_agreement_id: form.vehicle_source_type === SOURCE_TYPE_FINANCED
                     ? financeAgreement?.id ?? null
                     : null,
-                replacement_at: form.replacement_at,
-                allocated_to: form.allocated_to || null,
+                expected_finance_agreement_version: form.vehicle_source_type === SOURCE_TYPE_FINANCED
+                    ? financeAgreement?.row_version ?? null
+                    : null,
+                replacement_at: toIsoDateTime(form.replacement_at),
+                allocated_to: form.allocated_to ? toIsoDateTime(form.allocated_to) : null,
                 reason_code: form.reason_code || null,
                 reason: form.reason || null,
                 billing_continuity_rule: form.billing_continuity_rule,
@@ -128,6 +257,14 @@ export default function RentalReplacementPage() {
             </RentalPage>
         );
 
+    const replacementEnd = form.allocated_to || toDateTimeLocal(allocation.data.agreement?.ends_at ?? allocation.data.allocated_to);
+    const replacementStartAt = form.replacement_at ? toIsoDateTime(form.replacement_at) : null;
+    const replacementEndAt = replacementEnd ? toIsoDateTime(replacementEnd) : null;
+    const agreementVersion = allocation.data.agreement?.row_version;
+    const allocationStart = toDateTimeLocal(allocation.data.allocated_from);
+    const allocationEnd = toDateTimeLocal(allocation.data.agreement?.ends_at ?? allocation.data.allocated_to);
+    const usesOwnerSourceAllocation = form.vehicle_source_type === SOURCE_TYPE_OWNER_SUPPLIED;
+
     return (
         <RentalPage>
             <ContentHeader
@@ -157,10 +294,29 @@ export default function RentalReplacementPage() {
             <form onSubmit={submit} className="mt-5 space-y-5">
                 <Panel title="Replacement">
                     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                        <VehicleLookupSelect
-                            value={vehicle}
-                            onChange={setVehicle}
-                        />
+                        {usesOwnerSourceAllocation ? (
+                            <Input
+                                label="Vehicle"
+                                value={readableRelation(vehicle)}
+                                readOnly
+                                required
+                                hint="Selected from the owner source allocation."
+                            />
+                        ) : (
+                            <RentalAvailableVehicleLookupSelect
+                                value={vehicle}
+                                onChange={(value) => {
+                                    setVehicle(value);
+                                    setSourceAllocation(null);
+                                    setFinanceAgreement(null);
+                                    setCompanyOwnership(null);
+                                    setCompanyOwnershipHint(null);
+                                }}
+                                startAt={replacementStartAt}
+                                endAt={replacementEndAt}
+                                required
+                            />
+                        )}
                         <Select
                             label="Vehicle source"
                             value={form.vehicle_source_type}
@@ -171,6 +327,8 @@ export default function RentalReplacementPage() {
                                 });
                                 setSourceAllocation(null);
                                 setFinanceAgreement(null);
+                                setCompanyOwnership(null);
+                                setCompanyOwnershipHint(null);
                             }}
                             options={[
                                 {
@@ -184,18 +342,44 @@ export default function RentalReplacementPage() {
                                 { value: "financed", label: "Financed" },
                             ]}
                         />
-                        {form.vehicle_source_type === "owner_supplied" && (
+                        {form.vehicle_source_type === SOURCE_TYPE_COMPANY_OWNED && (
+                            <Input
+                                label="Company vehicle ownership"
+                                value={companyOwnershipLoading ? "Checking ownership..." : ownershipLabel(companyOwnership)}
+                                readOnly
+                                required
+                                hint={companyOwnershipHint ?? undefined}
+                            />
+                        )}
+                        {usesOwnerSourceAllocation && (
                             <RentalAllocationLookupSelect
                                 value={sourceAllocation}
-                                onChange={setSourceAllocation}
+                                onChange={(value) => {
+                                    const selected = value as AllocationLookupValue | null;
+                                    setSourceAllocation(selected);
+                                    setVehicle(selected?.vehicle ?? null);
+                                    setFinanceAgreement(null);
+                                    setCompanyOwnership(null);
+                                    setCompanyOwnershipHint(null);
+                                }}
+                                agreementKind="owner_supply"
+                                coversStartAt={replacementStartAt}
+                                coversEndAt={replacementEndAt}
+                                openOnly
+                                disabled={!replacementStartAt || !replacementEndAt}
                                 excludeId={allocationId}
                                 required
                             />
                         )}
-                        {form.vehicle_source_type === "financed" && (
+                        {form.vehicle_source_type === SOURCE_TYPE_FINANCED && (
                             <RentalFinanceAgreementLookupSelect
                                 value={financeAgreement}
-                                onChange={setFinanceAgreement}
+                                onChange={(value) => setFinanceAgreement(value as VersionedNamedResource | null)}
+                                vehicleId={vehicle?.id}
+                                coversStartAt={replacementStartAt}
+                                coversEndAt={replacementEndAt}
+                                activeOnly
+                                disabled={!vehicle}
                                 required
                             />
                         )}
@@ -204,23 +388,37 @@ export default function RentalReplacementPage() {
                             type="datetime-local"
                             required
                             value={form.replacement_at}
-                            onChange={(event) =>
+                            min={allocationStart || undefined}
+                            max={replacementEnd || allocationEnd || undefined}
+                            onChange={(event) => {
                                 setForm({
                                     ...form,
                                     replacement_at: event.target.value,
-                                })
-                            }
+                                });
+                                setVehicle(null);
+                                setSourceAllocation(null);
+                                setFinanceAgreement(null);
+                                setCompanyOwnership(null);
+                                setCompanyOwnershipHint(null);
+                            }}
                         />
                         <Input
                             label="New allocation end"
                             type="datetime-local"
                             value={form.allocated_to}
-                            onChange={(event) =>
+                            min={form.replacement_at || allocationStart || undefined}
+                            max={allocationEnd || undefined}
+                            onChange={(event) => {
                                 setForm({
                                     ...form,
                                     allocated_to: event.target.value,
-                                })
-                            }
+                                });
+                                setVehicle(null);
+                                setSourceAllocation(null);
+                                setFinanceAgreement(null);
+                                setCompanyOwnership(null);
+                                setCompanyOwnershipHint(null);
+                            }}
                         />
                         <Select
                             label="Continuity"
@@ -279,11 +477,14 @@ export default function RentalReplacementPage() {
                         loading={saving}
                         disabled={
                             !vehicle ||
+                            !agreementVersion ||
                             !form.replacement_at ||
                             !oldReturn.odometer ||
                             !newHandover.odometer ||
-                            (form.vehicle_source_type === "owner_supplied" && !sourceAllocation) ||
-                            (form.vehicle_source_type === "financed" && !financeAgreement)
+                            companyOwnershipLoading ||
+                            (form.vehicle_source_type === SOURCE_TYPE_COMPANY_OWNED && !companyOwnership) ||
+                            (form.vehicle_source_type === SOURCE_TYPE_OWNER_SUPPLIED && !sourceAllocation) ||
+                            (form.vehicle_source_type === SOURCE_TYPE_FINANCED && !financeAgreement)
                         }
                     >
                         Complete replacement

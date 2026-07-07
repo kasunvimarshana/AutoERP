@@ -14,6 +14,8 @@ final class StoreRentalUsageRequest extends TenantScopedRequest
     public function rules(): array
     {
         return [
+            'expected_allocation_version' => ['required', 'integer', 'min:1'],
+            'expected_source_allocation_version' => ['nullable', 'integer', 'min:1'],
             'usage_date' => ['required', 'date'],
             'started_at' => ['required', 'date'],
             'ended_at' => ['required', 'date', 'after:started_at'],

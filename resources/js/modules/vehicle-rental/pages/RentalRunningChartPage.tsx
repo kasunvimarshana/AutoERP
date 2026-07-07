@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useAuth } from "@/modules/auth/AuthProvider";
 import { hasPermission } from "@/modules/auth/accessControl";
@@ -14,16 +14,18 @@ import { Select } from "@/shared/components/Select";
 import { StatusBadge } from "@/shared/components/StatusBadge";
 import { Textarea } from "@/shared/components/Textarea";
 import { useApi } from "@/shared/hooks/useApi";
+import type { NamedResource } from "@/shared/types/common";
 import { businessDateInputValue } from "@/shared/utils/businessDate";
 import { formatDate } from "@/shared/utils/formatDate";
 import { readableRelation } from "@/shared/utils/object";
 import { parsePositiveInteger } from "@/shared/utils/routeParams";
+import { RentalAllocationLookupSelect } from "../components/RentalLookups";
 import { RentalPage } from "../components/RentalPage";
 import { RentalUsageFactEditor } from "../components/RentalUsageFactEditor";
 import {
     createRentalUsageLog,
+    getRentalAllocation,
     getRentalMetadata,
-    listRentalAllocations,
     listRentalUsageLogs,
     transitionRentalUsageLog,
 } from "../vehicleRentalApi";
@@ -33,6 +35,13 @@ import type {
     RentalUsageEventApplicability,
     RentalUsageLog,
 } from "../vehicleRentalTypes";
+
+const AGREEMENT_KIND_CUSTOMER_RENTAL = "customer_rental";
+const APPLICABILITY_CUSTOMER = "customer";
+const APPLICABILITY_OWNER = "owner";
+const APPLICABILITY_BOTH = "both";
+const APPLICABILITY_INTERNAL = "internal";
+const RENTAL_MODE_WITH_DRIVER = "with_driver";
 
 interface UsageForm {
     usage_date: string;
@@ -106,17 +115,32 @@ const assignmentLabel = (
     assignment: NonNullable<RentalAllocation["drivers"]>[number],
 ) => {
     const employee = readableRelation(assignment.employee);
-    const period = `${formatDate(assignment.assigned_from)} – ${
+    const period = `${formatDate(assignment.assigned_from)} - ${
         assignment.assigned_to ? formatDate(assignment.assigned_to) : "Open"
     }`;
 
-    return `${employee} · ${optionLabel(assignment.assignment_role)} · ${period}`;
+    return `${employee} - ${optionLabel(assignment.assignment_role)} - ${period}`;
 };
+
+function allocationLookupValue(allocation: RentalAllocation): NamedResource {
+    return {
+        id: allocation.id,
+        code: allocation.allocation_number,
+        name: [
+            readableRelation(allocation.vehicle),
+            allocation.status,
+        ].filter(Boolean).join(" - "),
+    };
+}
 
 export default function RentalRunningChartPage() {
     const auth = useAuth();
     const [searchParams, setSearchParams] = useSearchParams();
     const allocationId = parsePositiveInteger(searchParams.get("allocation_id"));
+    const [allocation, setAllocation] = useState<NamedResource | null>(null);
+    const [allocationDetails, setAllocationDetails] = useState<RentalAllocation | null>(null);
+    const [allocationIdToLoad, setAllocationIdToLoad] = useState<number | null>(allocationId);
+    const [loadingAllocation, setLoadingAllocation] = useState(false);
     const [form, setForm] = useState<UsageForm>(emptyForm);
     const [events, setEvents] = useState<EventDraft[]>([]);
     const [nextEventKey, setNextEventKey] = useState(1);
@@ -126,56 +150,94 @@ export default function RentalRunningChartPage() {
     const [actionError, setActionError] = useState<ApiError | null>(null);
 
     const metadata = useApi((signal) => getRentalMetadata(signal), []);
-    const allocations = useApi(
-        (signal) =>
-            listRentalAllocations({ status: "active", per_page: 100 }, signal),
-        [],
-    );
+    const selectedAllocation = allocationDetails;
+    const selectedAllocationId = selectedAllocation?.id ?? null;
     const logs = useApi(
         (signal) =>
             listRentalUsageLogs(
                 {
-                    vehicle_allocation_id: allocationId ?? undefined,
+                    vehicle_allocation_id: selectedAllocationId ?? undefined,
                     per_page: 50,
                 },
                 signal,
             ),
-        [allocationId],
-        allocationId !== null,
+        [selectedAllocationId],
+        selectedAllocationId !== null,
     );
 
-    const allocationRows = useMemo(
-        () => allocations.data?.data ?? [],
-        [allocations.data],
-    );
-    const selectedAllocation = useMemo(
-        () => allocationRows.find((row) => row.id === allocationId) ?? null,
-        [allocationId, allocationRows],
-    );
+    useEffect(() => {
+        let cancelled = false;
+        queueMicrotask(() => {
+            if (!cancelled) setAllocationIdToLoad(allocationId);
+        });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [allocationId]);
+
+    useEffect(() => {
+        if (!allocationIdToLoad) {
+            let cancelled = false;
+            queueMicrotask(() => {
+                if (cancelled) return;
+                setAllocation(null);
+                setAllocationDetails(null);
+                setLoadingAllocation(false);
+            });
+
+            return () => {
+                cancelled = true;
+            };
+        }
+
+        const controller = new AbortController();
+        queueMicrotask(() => {
+            if (controller.signal.aborted) return;
+            setLoadingAllocation(true);
+            setActionError(null);
+        });
+
+        void getRentalAllocation(allocationIdToLoad, controller.signal)
+            .then((resource) => {
+                setAllocation(allocationLookupValue(resource));
+                setAllocationDetails(
+                    resource.status === "active"
+                    && resource.agreement?.agreement_kind === AGREEMENT_KIND_CUSTOMER_RENTAL
+                        ? resource
+                        : null,
+                );
+            })
+            .catch((error: unknown) => {
+                if (!controller.signal.aborted) {
+                    setAllocation(null);
+                    setAllocationDetails(null);
+                    setActionError(toApiError(error));
+                }
+            })
+            .finally(() => {
+                if (!controller.signal.aborted) setLoadingAllocation(false);
+            });
+
+        return () => controller.abort();
+    }, [allocationIdToLoad]);
+
     const selectedUsage = useMemo(
         () =>
             (logs.data?.data ?? []).find((row) => row.id === selectedUsageId) ??
             null,
         [logs.data, selectedUsageId],
     );
-    const allocationOptions = useMemo(
-        () =>
-            allocationRows.map((row) => ({
-                value: String(row.id),
-                label: `${row.allocation_number} · ${readableRelation(row.vehicle)}`,
-            })),
-        [allocationRows],
-    );
+    const requiresDriverAssignment =
+        selectedAllocation?.agreement?.rental_mode === RENTAL_MODE_WITH_DRIVER;
     const driverAssignmentOptions = useMemo(
-        () => [
-            { value: "", label: "No company driver" },
-            ...(selectedAllocation?.drivers ?? [])
+        () =>
+            (selectedAllocation?.drivers ?? [])
                 .filter((assignment) => assignment.status === "active")
                 .map((assignment) => ({
                     value: String(assignment.id),
                     label: assignmentLabel(assignment),
                 })),
-        ],
         [selectedAllocation],
     );
     const eventTypeOptions = useMemo(
@@ -189,19 +251,29 @@ export default function RentalRunningChartPage() {
         [metadata.data],
     );
     const eventApplicabilityOptions = useMemo(
-        () =>
-            (metadata.data?.usage_event_applicabilities ?? []).map((value) => ({
+        () => {
+            const hasOwnerContext = selectedAllocation?.source_allocation !== null
+                && selectedAllocation?.source_allocation !== undefined;
+            const values = (metadata.data?.usage_event_applicabilities ?? []).filter(
+                (value) =>
+                    hasOwnerContext ||
+                    value === APPLICABILITY_CUSTOMER ||
+                    value === APPLICABILITY_INTERNAL,
+            );
+
+            return values.map((value) => ({
                 value,
                 label:
-                    value === "customer"
+                    value === APPLICABILITY_CUSTOMER
                         ? "Customer / lessee only"
-                        : value === "owner"
+                        : value === APPLICABILITY_OWNER
                           ? "Vehicle owner / lessor only"
-                          : value === "both"
+                          : value === APPLICABILITY_BOTH
                             ? "Both commercial sides"
                             : "Internal only",
-            })),
-        [metadata.data],
+            }));
+        },
+        [metadata.data, selectedAllocation],
     );
 
     const canRecord = hasPermission(auth, vehicleRentalPermissions.usageRecord);
@@ -220,11 +292,11 @@ export default function RentalRunningChartPage() {
 
     const save = async (event: FormEvent) => {
         event.preventDefault();
-        if (allocationId === null) return;
+        if (selectedAllocation === null) return;
         setSaving(true);
         setActionError(null);
         try {
-            await createRentalUsageLog(allocationId, {
+            await createRentalUsageLog(selectedAllocation.id, selectedAllocation.row_version, {
                 usage_date: form.usage_date,
                 started_at: form.started_at,
                 ended_at: form.ended_at,
@@ -252,6 +324,8 @@ export default function RentalRunningChartPage() {
                     reference_number: row.reference_number || null,
                     remarks: row.remarks || null,
                 })),
+                expected_source_allocation_version:
+                    selectedAllocation.source_allocation?.row_version ?? null,
             });
             setForm(emptyForm());
             setEvents([]);
@@ -379,33 +453,33 @@ export default function RentalRunningChartPage() {
                 error={
                     actionError ??
                     metadata.error ??
-                    allocations.error ??
                     logs.error
                 }
             />
             <Panel title="Rental allocation">
-                <Select
+                <RentalAllocationLookupSelect
                     label="Active vehicle allocation"
-                    value={allocationId !== null ? String(allocationId) : ""}
-                    onChange={(event) => {
-                        setSearchParams(
-                            event.target.value
-                                ? { allocation_id: event.target.value }
-                                : {},
-                        );
+                    value={allocation}
+                    onChange={(value) => {
+                        setAllocation(value);
+                        setAllocationDetails(null);
+                        setAllocationIdToLoad(value?.id ?? null);
+                        setSearchParams(value ? { allocation_id: String(value.id) } : {});
                         setForm(emptyForm());
                         setEvents([]);
                         setSelectedUsageId(null);
                     }}
-                    options={allocationOptions}
+                    agreementKind={AGREEMENT_KIND_CUSTOMER_RENTAL}
+                    status="active"
+                    required={canRecord}
                 />
                 <p className="mt-2 text-sm text-slate-500">
-                    The selected allocation controls the vehicle, customer agreement,
+                    The selected allocation controls the vehicle, lessee agreement,
                     owner agreement and valid driver assignments.
                 </p>
             </Panel>
 
-            {canRecord && allocationId !== null && (
+            {canRecord && selectedAllocation !== null && (
                 <form onSubmit={save} className="mt-5 space-y-5">
                     <Panel title="Physical usage">
                         <p className="mb-4 text-sm text-slate-600">
@@ -451,6 +525,17 @@ export default function RentalRunningChartPage() {
                             />
                             <Select
                                 label="Valid driver assignment"
+                                required={requiresDriverAssignment}
+                                placeholder={
+                                    requiresDriverAssignment
+                                        ? "Select company driver"
+                                        : "No company driver"
+                                }
+                                hint={
+                                    requiresDriverAssignment
+                                        ? "Required for with-driver agreements."
+                                        : undefined
+                                }
                                 value={form.driver_assignment_id}
                                 onChange={(event) =>
                                     setForm({
@@ -728,7 +813,7 @@ export default function RentalRunningChartPage() {
                             </div>
                         )}
                         <div className="mt-4 flex justify-end">
-                            <Button type="submit" loading={saving}>
+                            <Button type="submit" loading={saving} disabled={selectedAllocation === null}>
                                 Save physical usage
                             </Button>
                         </div>
@@ -737,7 +822,9 @@ export default function RentalRunningChartPage() {
             )}
 
             <div className="mt-5">
-                {!allocationId ? (
+                {loadingAllocation ? (
+                    <LoadingState />
+                ) : selectedAllocation === null ? (
                     <Panel>
                         <p className="text-sm text-slate-500">
                             Select an active allocation to view its running chart.
@@ -757,14 +844,14 @@ export default function RentalRunningChartPage() {
 
             {selectedUsage && (
                 <div className="mt-5 space-y-5">
-                    <Panel title={`Physical usage · ${selectedUsage.usage_number}`}>
+                    <Panel title={`Physical usage - ${selectedUsage.usage_number}`}>
                         <div className="grid gap-3 md:grid-cols-3">
                             <div>
                                 <p className="text-xs font-semibold uppercase text-slate-500">
                                     Actual period
                                 </p>
                                 <p className="mt-1 text-sm">
-                                    {selectedUsage.started_at} – {selectedUsage.ended_at}
+                                    {selectedUsage.started_at} - {selectedUsage.ended_at}
                                 </p>
                             </div>
                             <div>

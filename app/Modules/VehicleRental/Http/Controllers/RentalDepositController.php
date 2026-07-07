@@ -28,7 +28,7 @@ final class RentalDepositController
     public function index(ListRentalRequest $request): AnonymousResourceCollection
     {
         $this->authorization->assert($request->currentUserId(), $request->tenantId(), VehicleRentalAuthorizationService::VIEW_FINANCIAL);
-        $query = $this->scope(RentalDepositRequirement::query(), $request)->with(['agreement.customer', 'currency', 'links.payment', 'links.invoice']);
+        $query = $this->scope(RentalDepositRequirement::query(), $request)->with(['agreement.customer', 'currency', 'links.payment', 'links.invoice', 'links.reversesLink']);
         if ($request->filled('status')) {
             $query->where('status', $request->input('status'));
         }
@@ -45,7 +45,7 @@ final class RentalDepositController
 
         return new RentalDepositRequirementResource(
             $this->scope(RentalDepositRequirement::query(), $request)
-                ->with(['agreement.customer', 'currency', 'links.payment', 'links.invoice'])
+                ->with(['agreement.customer', 'currency', 'links.payment', 'links.invoice', 'links.reversesLink'])
                 ->findOrFail($deposit),
         );
     }

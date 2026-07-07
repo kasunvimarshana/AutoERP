@@ -69,7 +69,7 @@ final class RentalCalculationRunResource extends RentalResource
                 'id' => (int) $line->getKey(),
                 'line_number' => (int) $line->line_number,
                 'source_type' => $line->source_type,
-                'source_id' => (int) $line->source_id,
+                'source' => $this->lineSource($line),
                 'component_code' => $this->enumValue($line->component_code),
                 'description' => $line->description,
                 'measured_quantity' => $this->decimal($line->measured_quantity),
@@ -90,5 +90,60 @@ final class RentalCalculationRunResource extends RentalResource
             'approved_at' => $this->approved_at?->toISOString(),
             'created_at' => $this->created_at?->toISOString(),
         ];
+    }
+
+    private function lineSource(mixed $line): array
+    {
+        $source = [
+            'type' => $line->source_type,
+        ];
+        $context = $line->relationLoaded('usageContext') ? $line->usageContext : null;
+        if ($context !== null) {
+            $usage = $context->relationLoaded('usageLog') ? $context->usageLog : null;
+            $fact = $context->relationLoaded('usageFact') ? $context->usageFact : null;
+            $source['usage_context'] = [
+                'id' => (int) $context->getKey(),
+                'financial_side' => $this->enumValue($context->financial_side),
+                'usage' => $usage === null
+                    ? null
+                    : $this->summary($usage, ['usage_number', 'usage_date', 'status']),
+                'usage_fact' => $fact === null
+                    ? null
+                    : [
+                        'id' => (int) $fact->getKey(),
+                        'row_version' => (int) $fact->row_version,
+                        'status' => $this->enumValue($fact->status),
+                    ],
+            ];
+        }
+
+        $expenseAllocation = $line->relationLoaded('expenseAllocation') ? $line->expenseAllocation : null;
+        if ($expenseAllocation !== null) {
+            $expense = $expenseAllocation->relationLoaded('expense') ? $expenseAllocation->expense : null;
+            $source['expense_allocation'] = [
+                'id' => (int) $expenseAllocation->getKey(),
+                'allocation_type' => $this->enumValue($expenseAllocation->allocation_type),
+                'status' => (string) $expenseAllocation->status,
+                'total_amount' => $this->decimal($expenseAllocation->total_amount),
+                'expense' => $expense === null
+                    ? null
+                    : $this->summary($expense, ['expense_number', 'expense_type', 'expense_date']),
+            ];
+        }
+
+        $custodyItem = $line->relationLoaded('custodyEventItem') ? $line->custodyEventItem : null;
+        if ($custodyItem !== null) {
+            $custodyEvent = $custodyItem->relationLoaded('custodyEvent') ? $custodyItem->custodyEvent : null;
+            $source['custody_event_item'] = [
+                'id' => (int) $custodyItem->getKey(),
+                'item_type' => $this->enumValue($custodyItem->item_type),
+                'description' => $custodyItem->description,
+                'custody_event' => $custodyEvent === null
+                    ? null
+                    : $this->summary($custodyEvent, ['event_number', 'event_type', 'status']),
+            ];
+        }
+
+        return $source;
     }
 }

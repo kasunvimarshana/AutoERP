@@ -23,8 +23,6 @@ return new class extends Migration
             $table->string('mime_type', 100);
             $table->unsignedBigInteger('size_bytes');
             $table->char('checksum_sha256', 64);
-            $table->string('scan_engine', 100);
-            $table->dateTime('scanned_at');
             $table->unsignedBigInteger('uploaded_by_user_id');
             $table->unsignedBigInteger('updated_by_user_id')->nullable();
             $table->timestamps();

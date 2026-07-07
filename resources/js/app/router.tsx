@@ -997,6 +997,30 @@ const appRouter = createBrowserRouter(
                             element={<RentalAgreementDetailPage />}
                         />
                         <Route
+                            path="/vehicle-rental/lessee-agreements"
+                            element={<RentalAgreementListPage mode="lessee" />}
+                        />
+                        <Route
+                            path="/vehicle-rental/lessee-agreements/create"
+                            element={<RentalAgreementCreatePage mode="lessee" />}
+                        />
+                        <Route
+                            path="/vehicle-rental/lessee-agreements/:id"
+                            element={<RentalAgreementDetailPage mode="lessee" />}
+                        />
+                        <Route
+                            path="/vehicle-rental/lessor-agreements"
+                            element={<RentalAgreementListPage mode="lessor" />}
+                        />
+                        <Route
+                            path="/vehicle-rental/lessor-agreements/create"
+                            element={<RentalAgreementCreatePage mode="lessor" />}
+                        />
+                        <Route
+                            path="/vehicle-rental/lessor-agreements/:id"
+                            element={<RentalAgreementDetailPage mode="lessor" />}
+                        />
+                        <Route
                             path="/vehicle-rental/allocations"
                             element={<RentalAllocationPage />}
                         />

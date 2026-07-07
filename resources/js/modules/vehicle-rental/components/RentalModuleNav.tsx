@@ -26,6 +26,22 @@ const items = [
         ],
     },
     {
+        to: "/vehicle-rental/lessee-agreements",
+        label: "Lessee Agreements",
+        permissions: [
+            vehicleRentalPermissions.view,
+            vehicleRentalPermissions.agreementsManage,
+        ],
+    },
+    {
+        to: "/vehicle-rental/lessor-agreements",
+        label: "Lessor Agreements",
+        permissions: [
+            vehicleRentalPermissions.view,
+            vehicleRentalPermissions.agreementsManage,
+        ],
+    },
+    {
         to: "/vehicle-rental/allocations",
         label: "Allocations",
         permissions: [

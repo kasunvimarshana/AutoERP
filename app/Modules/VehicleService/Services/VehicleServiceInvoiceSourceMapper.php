@@ -161,7 +161,7 @@ final class VehicleServiceInvoiceSourceMapper
             invoiceDate: $invoiceDate,
             organizationUnitId: $job->organization_unit_id,
             partyType: 'customer',
-            partyId: (int) $job->customer_id,
+            partyId: (int) ($job->bill_to_customer_id ?? $job->customer_id),
             dueDate: $dueDate,
             currencyId: $currencyId,
             exchangeRate: $exchangeRate,

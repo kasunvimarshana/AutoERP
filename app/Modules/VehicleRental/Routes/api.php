@@ -50,6 +50,7 @@ Route::prefix('api/v1/vehicle-rental')->middleware($middleware)->name('api.v1.ve
     Route::post('agreements/{agreement}/allocations', [RentalAllocationController::class, 'store'])->whereNumber('agreement')->name('allocations.store');
     Route::get('allocations/{allocation}', [RentalAllocationController::class, 'show'])->whereNumber('allocation')->name('allocations.show');
     Route::post('allocations/{allocation}/drivers', [RentalAllocationController::class, 'assignDriver'])->whereNumber('allocation')->name('allocations.drivers.store');
+    Route::patch('allocations/{allocation}/cancel', [RentalAllocationController::class, 'cancel'])->whereNumber('allocation')->name('allocations.cancel');
 
     Route::get('custody-events', [RentalCustodyController::class, 'index'])->name('custody.index');
     Route::post('allocations/{allocation}/custody-events', [RentalCustodyController::class, 'store'])->whereNumber('allocation')->name('custody.store');

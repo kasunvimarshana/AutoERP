@@ -11,6 +11,7 @@ use Modules\VehicleRental\Http\Controllers\Concerns\ScopesVehicleRentalRequests;
 use Modules\VehicleRental\Http\Requests\ListRentalRequest;
 use Modules\VehicleRental\Http\Requests\RentalTransitionRequest;
 use Modules\VehicleRental\Http\Requests\StoreRentalReservationRequest;
+use Modules\VehicleRental\Http\Requests\UpdateRentalReservationRequest;
 use Modules\VehicleRental\Http\Resources\RentalReservationResource;
 use Modules\VehicleRental\Models\RentalReservation;
 use Modules\VehicleRental\Services\RentalReservationService;
@@ -40,10 +41,15 @@ final class RentalReservationController
         return new RentalReservationResource($this->scope(RentalReservation::query(), $request)->with($service->relations())->findOrFail($reservation));
     }
 
-    public function update(StoreRentalReservationRequest $request, int $reservation, RentalReservationService $service): RentalReservationResource
+    public function update(UpdateRentalReservationRequest $request, int $reservation, RentalReservationService $service): RentalReservationResource
     {
         $this->authorization->assert($request->currentUserId(), $request->tenantId(), VehicleRentalAuthorizationService::MANAGE_RESERVATIONS);
-        return new RentalReservationResource($service->update($this->scope(RentalReservation::query(), $request)->findOrFail($reservation), $request->validated(), $request->currentUserId()));
+        return new RentalReservationResource($service->update(
+            $this->scope(RentalReservation::query(), $request)->findOrFail($reservation),
+            $request->validated(),
+            (int) $request->input('expected_version'),
+            $request->currentUserId(),
+        ));
     }
 
     public function transition(RentalTransitionRequest $request, int $reservation, RentalReservationService $service): RentalReservationResource
@@ -52,6 +58,7 @@ final class RentalReservationController
         return new RentalReservationResource($service->transition(
             $this->scope(RentalReservation::query(), $request)->findOrFail($reservation),
             RentalReservationStatus::from((string) $request->input('status')),
+            (int) $request->input('expected_version'),
             $request->currentUserId(), $request->input('reason'),
         ));
     }

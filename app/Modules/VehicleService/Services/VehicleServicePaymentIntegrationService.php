@@ -24,9 +24,12 @@ use Modules\VehicleService\DTOs\VehicleServicePaymentData;
 use Modules\VehicleService\Enums\VehicleServiceJobStatus;
 use Modules\VehicleService\Models\VehicleServiceJob;
 use Modules\VehicleService\Models\VehicleServicePaymentLink;
+use Modules\VehicleService\Services\Concerns\AssertsVehicleServiceExpectedVersion;
 
 final class VehicleServicePaymentIntegrationService
 {
+    use AssertsVehicleServiceExpectedVersion;
+
     public function __construct(
         private readonly DecimalMath $math,
         private readonly InvoiceBalanceProviderInterface $invoiceBalances,
@@ -38,7 +41,8 @@ final class VehicleServicePaymentIntegrationService
 
     public function prepare(VehicleServiceJob $job, VehicleServicePaymentData $data): CreatePaymentData
     {
-        $this->assertJobVersion($job, $data->expectedJobVersion);
+        $this->assertExpectedVersion($job, $data->expectedVersion);
+        $billToCustomerId = $this->billToCustomerId($job);
         if ($this->math->compare($data->amount, '0.000000') <= 0) {
             throw new InvalidArgumentException('Payment amount must be greater than zero.');
         }
@@ -56,8 +60,8 @@ final class VehicleServicePaymentIntegrationService
         if ($balance->tenantId !== (int) $job->tenant_id
             || $balance->organizationUnitId !== $job->organization_unit_id
             || $balance->partyType !== 'customer'
-            || $balance->partyId !== (int) $job->customer_id) {
-            throw new InvalidArgumentException('Payment invoice does not match the service job customer and scope.');
+            || $balance->partyId !== $billToCustomerId) {
+            throw new InvalidArgumentException('Payment invoice does not match the service job bill-to customer and scope.');
         }
         if ($data->currencyId !== null && $balance->currencyId !== null && $data->currencyId !== $balance->currencyId) {
             throw new InvalidArgumentException('Payment currency must match the invoice currency.');
@@ -76,7 +80,7 @@ final class VehicleServicePaymentIntegrationService
             paymentDate: $data->paymentDate,
             organizationUnitId: $job->organization_unit_id,
             partyType: 'customer',
-            partyId: (int) $job->customer_id,
+            partyId: $billToCustomerId,
             sourceType: 'vehicle_service_job',
             sourceId: (int) $job->getKey(),
             currencyId: $data->currencyId ?? $balance->currencyId,
@@ -119,7 +123,7 @@ final class VehicleServicePaymentIntegrationService
     {
         return DB::transaction(function () use ($job, $data): Payment {
             $job = VehicleServiceJob::query()->lockForUpdate()->findOrFail($job->getKey());
-            $this->assertJobVersion($job, $data->expectedJobVersion);
+            $this->assertExpectedVersion($job, $data->expectedVersion);
 
             $payment = $this->payments->create($this->prepare($job, $data));
             $payment = $this->paymentLifecycle->submit($payment, (int) $payment->row_version, $data->createdBy);
@@ -198,10 +202,8 @@ final class VehicleServicePaymentIntegrationService
         return $job;
     }
 
-    private function assertJobVersion(VehicleServiceJob $job, int $expectedVersion): void
+    private function billToCustomerId(VehicleServiceJob $job): int
     {
-        if ($expectedVersion < 1 || (int) $job->row_version !== $expectedVersion) {
-            throw new InvalidArgumentException('Vehicle service job was changed by another request. Reload it before receiving payment.');
-        }
+        return (int) ($job->bill_to_customer_id ?? $job->customer_id);
     }
 }

@@ -10,6 +10,7 @@ use Modules\Core\Services\DecimalMath;
 use Modules\VehicleService\DTOs\VehicleServiceInspectionData;
 use Modules\VehicleService\DTOs\VehicleServiceJobData;
 use Modules\VehicleService\Enums\VehicleServiceJobStatus;
+use Modules\VehicleService\Models\VehicleServiceInspection;
 use Modules\VehicleService\Models\VehicleServiceJob;
 use Modules\VehicleService\Services\Concerns\AssertsVehicleServiceExpectedVersion;
 
@@ -30,6 +31,7 @@ final class VehicleServiceJobService
     {
         return DB::transaction(function () use ($data): VehicleServiceJob {
             $this->validator->customer($data->tenantId, $data->organizationUnitId, $data->customerId);
+            $this->validator->customer($data->tenantId, $data->organizationUnitId, $this->billToCustomerId($data));
             $this->validator->vehicle($data->tenantId, $data->organizationUnitId, $data->vehicleId, $data->customerId);
             if ($data->supervisorEmployeeId !== null) {
                 $this->validator->employee($data->tenantId, $data->organizationUnitId, $data->supervisorEmployeeId);
@@ -63,6 +65,7 @@ final class VehicleServiceJobService
                 throw new InvalidArgumentException('Service job scope cannot be changed.');
             }
             $this->validator->customer($data->tenantId, $data->organizationUnitId, $data->customerId);
+            $this->validator->customer($data->tenantId, $data->organizationUnitId, $this->billToCustomerId($data));
             $this->validator->vehicle($data->tenantId, $data->organizationUnitId, $data->vehicleId, $data->customerId);
             if ($data->supervisorEmployeeId !== null) {
                 $this->validator->employee($data->tenantId, $data->organizationUnitId, $data->supervisorEmployeeId);
@@ -71,7 +74,13 @@ final class VehicleServiceJobService
                 $this->validator->nonNegative($data->odometerReading, 'Odometer reading cannot be negative.');
             }
 
+            $versionBefore = (int) $job->row_version;
             $job->fill($this->attributes($data, false, (string) $job->grand_total))->save();
+            $job->refresh()->load('inspection');
+            $complaintChanged = $this->syncCustomerComplaint($job, $data);
+            if ($complaintChanged && (int) $job->row_version === $versionBefore) {
+                $job = $this->bumpJobVersion($job);
+            }
 
             return $job->refresh()->load($this->relations());
         });
@@ -101,6 +110,7 @@ final class VehicleServiceJobService
             'job_date' => $data->jobDate,
             'expected_delivery_date' => $data->expectedDeliveryDate,
             'customer_id' => $data->customerId,
+            'bill_to_customer_id' => $this->billToCustomerId($data),
             'vehicle_id' => $data->vehicleId,
             'supervisor_employee_id' => $data->supervisorEmployeeId,
             'supervisor_commission_type' => $data->supervisorCommissionType->value,
@@ -132,11 +142,49 @@ final class VehicleServiceJobService
         return $attributes;
     }
 
+    private function billToCustomerId(VehicleServiceJobData $data): int
+    {
+        return $data->billToCustomerId ?? $data->customerId;
+    }
+
+    private function syncCustomerComplaint(VehicleServiceJob $job, VehicleServiceJobData $data): bool
+    {
+        if (! $data->customerComplaintProvided) {
+            return false;
+        }
+
+        $current = $job->inspection?->customer_complaint;
+        if ($current === $data->customerComplaint) {
+            return false;
+        }
+
+        if ($job->inspection instanceof VehicleServiceInspection) {
+            $job->inspection->forceFill([
+                'customer_complaint' => $data->customerComplaint,
+            ])->save();
+
+            return true;
+        }
+
+        if ($data->customerComplaint === null) {
+            return false;
+        }
+
+        VehicleServiceInspection::query()->create([
+            'tenant_id' => $job->tenant_id,
+            'organization_unit_id' => $job->organization_unit_id,
+            'vehicle_service_job_id' => $job->getKey(),
+            'customer_complaint' => $data->customerComplaint,
+        ]);
+
+        return true;
+    }
+
     /** @return list<string> */
     public function relations(): array
     {
         return [
-            'customer', 'vehicle.make', 'vehicle.model', 'vehicle.currentOwnerships', 'supervisor', 'inspection.inspector',
+            'customer', 'billToCustomer', 'vehicle.make', 'vehicle.model', 'vehicle.currentOwnerships', 'supervisor', 'inspection.inspector',
             'invoiceLinks.invoice.balance', 'paymentLinks.payment.lines.paymentMethod', 'paymentLinks.payment.allocations', 'paymentLinks.invoice',
         ];
     }

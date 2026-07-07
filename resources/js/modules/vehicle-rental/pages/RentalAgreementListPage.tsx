@@ -14,14 +14,31 @@ import { useDebounce } from "@/shared/hooks/useDebounce";
 import { formatDate } from "@/shared/utils/formatDate";
 import { readableRelation } from "@/shared/utils/object";
 import { RentalPage } from "../components/RentalPage";
+import {
+    RENTAL_AGREEMENT_KIND_OPTIONS,
+    agreementDetailPath,
+    defaultAgreementKindForMode,
+    isRentalAgreementKind,
+    rentalAgreementKindLabel,
+    type RentalAgreementPageMode,
+} from "../rentalAgreementPresentation";
 import { listRentalAgreements } from "../vehicleRentalApi";
 import type { RentalAgreement } from "../vehicleRentalTypes";
 
-export default function RentalAgreementListPage() {
+interface RentalAgreementListPageProps {
+    mode?: RentalAgreementPageMode;
+}
+
+export default function RentalAgreementListPage({
+    mode = "standard",
+}: RentalAgreementListPageProps) {
     const [params] = useSearchParams();
-    const initialKind = params.get("kind") ?? "";
+    const requestedKind = params.get("kind");
+    const initialKind =
+        defaultAgreementKindForMode(mode) ||
+        (isRentalAgreementKind(requestedKind) ? requestedKind : "");
     const [search, setSearch] = useState("");
-    const [kind, setKind] = useState(initialKind);
+    const [kind, setKind] = useState<string>(initialKind);
     const [status, setStatus] = useState("");
     const [page, setPage] = useState(1);
     const debounced = useDebounce(search);
@@ -46,7 +63,7 @@ export default function RentalAgreementListPage() {
             render: (row) => (
                 <Link
                     className="font-semibold text-blue-700 hover:underline"
-                    to={`/vehicle-rental/agreements/${row.id}`}
+                    to={agreementDetailPath(mode, row.id)}
                 >
                     {row.agreement_number}
                 </Link>
@@ -55,18 +72,23 @@ export default function RentalAgreementListPage() {
         {
             key: "kind",
             header: "Kind",
-            render: (row) => row.agreement_kind.replaceAll("_", " "),
+            render: (row) => rentalAgreementKindLabel(row.agreement_kind),
         },
         {
             key: "party",
-            header: "Customer / Owner",
+            header:
+                mode === "lessee"
+                    ? "Lessee"
+                    : mode === "lessor"
+                        ? "Lessor"
+                        : "Lessee / Lessor",
             render: (row) => readableRelation(row.customer ?? row.supplier),
         },
         {
             key: "period",
             header: "Period",
             render: (row) =>
-                `${formatDate(row.starts_at)} – ${formatDate(row.ends_at)}`,
+                `${formatDate(row.starts_at)} - ${formatDate(row.ends_at)}`,
         },
         {
             key: "mode",
@@ -82,11 +104,35 @@ export default function RentalAgreementListPage() {
     return (
         <RentalPage>
             <ContentHeader
-                title="Rental agreements"
-                description="Independent customer-revenue and vehicle-owner payable agreements with immutable rate versions."
+                title={
+                    mode === "lessee"
+                        ? "Lessee agreements"
+                        : mode === "lessor"
+                        ? "Lessor agreements"
+                        : "Rental agreements"
+                }
+                description={
+                    mode === "lessee"
+                        ? "Customer-side vehicle rental agreements used for lessee billing and deposits."
+                        : mode === "lessor"
+                        ? "Supplier-side vehicle rental agreements used for owner payable calculations."
+                        : "Independent lessee revenue and lessor payable agreements with immutable rate versions."
+                }
                 actions={
-                    <LinkButton to="/vehicle-rental/agreements/create">
-                        New agreement
+                    <LinkButton
+                        to={
+                            mode === "lessee"
+                                ? "/vehicle-rental/lessee-agreements/create"
+                                : mode === "lessor"
+                                ? "/vehicle-rental/lessor-agreements/create"
+                                : "/vehicle-rental/agreements/create"
+                        }
+                    >
+                        {mode === "lessee"
+                            ? "New lessee agreement"
+                            : mode === "lessor"
+                            ? "New lessor agreement"
+                            : "New agreement"}
                     </LinkButton>
                 }
             />
@@ -99,21 +145,17 @@ export default function RentalAgreementListPage() {
                         setPage(1);
                     }}
                 />
-                <Select
-                    label="Agreement kind"
-                    value={kind}
-                    onChange={(e) => {
-                        setKind(e.target.value);
-                        setPage(1);
-                    }}
-                    options={[
-                        { value: "customer_rental", label: "Customer rental" },
-                        {
-                            value: "owner_supply",
-                            label: "Vehicle owner supply",
-                        },
-                    ]}
-                />
+                {mode === "standard" && (
+                    <Select
+                        label="Agreement kind"
+                        value={kind}
+                        onChange={(e) => {
+                            setKind(e.target.value);
+                            setPage(1);
+                        }}
+                        options={[...RENTAL_AGREEMENT_KIND_OPTIONS]}
+                    />
+                )}
                 <Select
                     label="Status"
                     value={status}

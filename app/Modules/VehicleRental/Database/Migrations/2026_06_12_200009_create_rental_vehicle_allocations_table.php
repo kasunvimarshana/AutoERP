@@ -74,6 +74,10 @@ return new class extends Migration
                 ->on('rental_vehicle_allocations')
                 ->restrictOnDelete();
 
+            $table->foreign(['activated_by', 'tenant_id'], 'rental_vehicle_allocations_activated_by_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('users')
+                ->restrictOnDelete();
             $table->foreign(['closed_by', 'tenant_id'], 'rental_vehicle_allocations_closed_by_tenant_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('users')

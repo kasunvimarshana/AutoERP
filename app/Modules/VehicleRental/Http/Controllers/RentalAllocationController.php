@@ -8,6 +8,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Modules\VehicleRental\Http\Controllers\Concerns\ScopesVehicleRentalRequests;
 use Modules\VehicleRental\Http\Requests\AssignRentalDriverRequest;
+use Modules\VehicleRental\Http\Requests\CancelRentalAllocationRequest;
 use Modules\VehicleRental\Http\Requests\ListRentalRequest;
 use Modules\VehicleRental\Http\Requests\StoreRentalAllocationRequest;
 use Modules\VehicleRental\Http\Resources\RentalAllocationResource;
@@ -45,7 +46,25 @@ final class RentalAllocationController
     {
         $this->authorization->assert($request->currentUserId(), $request->tenantId(), VehicleRentalAuthorizationService::MANAGE_ALLOCATIONS);
         $allocationModel = $this->scope(RentalVehicleAllocation::query(), $request)->findOrFail($allocation);
-        $service->assignDriver($allocationModel, $request->validated(), $request->currentUserId());
+        $service->assignDriver(
+            $allocationModel,
+            (int) $request->input('expected_version'),
+            $request->validated(),
+            $request->currentUserId(),
+        );
         return new RentalAllocationResource($allocationModel->refresh()->load($service->relations()));
+    }
+
+    public function cancel(CancelRentalAllocationRequest $request, int $allocation, RentalAllocationService $service): RentalAllocationResource
+    {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), VehicleRentalAuthorizationService::MANAGE_ALLOCATIONS);
+        $allocationModel = $this->scope(RentalVehicleAllocation::query(), $request)->findOrFail($allocation);
+
+        return new RentalAllocationResource($service->cancel(
+            $allocationModel,
+            (int) $request->input('expected_version'),
+            $request->currentUserId(),
+            $request->input('reason'),
+        ));
     }
 }

@@ -13,6 +13,7 @@ final readonly class VehicleServiceJobData
         public string $jobDate,
         public int $customerId,
         public int $vehicleId,
+        public ?int $billToCustomerId = null,
         public ?int $organizationUnitId = null,
         public ?string $jobNumber = null,
         public ?string $expectedDeliveryDate = null,
@@ -24,6 +25,7 @@ final readonly class VehicleServiceJobData
         public ?string $priority = null,
         public ?string $notes = null,
         public ?string $customerComplaint = null,
+        public bool $customerComplaintProvided = false,
         public ?int $createdBy = null,
     ) {}
 }

@@ -6,15 +6,18 @@ namespace Modules\VehicleService\Http\Requests;
 
 use Modules\Core\Http\Requests\TenantScopedRequest;
 use Modules\VehicleService\DTOs\VehicleServicePaymentData;
+use Modules\VehicleService\Http\Requests\Concerns\HasExpectedVehicleServiceJobVersion;
 
 final class PrepareVehicleServicePaymentRequest extends TenantScopedRequest
 {
+    use HasExpectedVehicleServiceJobVersion;
+
     public function rules(): array
     {
         return [
             'tenant_id' => ['required', 'integer', 'min:1'],
             'organization_unit_id' => ['nullable', 'integer', 'min:1'],
-            'expected_job_version' => ['required', 'integer', 'min:1'],
+            'expected_version' => $this->expectedVersionRules(),
             'invoice_id' => ['required', 'integer', 'min:1'],
             'payment_date' => ['required', 'date'],
             'amount' => ['required', 'decimal:0,6', 'gt:0'],
@@ -37,7 +40,7 @@ final class PrepareVehicleServicePaymentRequest extends TenantScopedRequest
     public function toData(): VehicleServicePaymentData
     {
         return new VehicleServicePaymentData(
-            expectedJobVersion: (int) $this->input('expected_job_version'),
+            expectedVersion: (int) $this->input('expected_version'),
             invoiceId: (int) $this->input('invoice_id'),
             paymentDate: (string) $this->input('payment_date'),
             amount: (string) $this->input('amount'),

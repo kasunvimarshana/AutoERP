@@ -24,6 +24,7 @@ final class UpdateRentalAgreementRequest extends StoreRentalAgreementRequest
             'agreement_number',
             'agreement_kind',
             'reservation_id',
+            'expected_reservation_version',
             'activate_rate_version',
             'rate_version',
             'deposit',

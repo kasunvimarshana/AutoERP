@@ -117,7 +117,7 @@ export default function VehicleFinancePage() {
     const activate = async (row: VehicleFinanceAgreement) => {
         setActionError(null);
         try {
-            await activateVehicleFinanceAgreement(row.id);
+            await activateVehicleFinanceAgreement(row.id, row.row_version);
             result.reload();
         } catch (error) {
             setActionError(toApiError(error));
@@ -127,7 +127,7 @@ export default function VehicleFinancePage() {
     const createPayable = async (installment: VehicleFinanceInstallment) => {
         setActionError(null);
         try {
-            await createVehicleFinancePayable(installment.id, {
+            await createVehicleFinancePayable(installment.id, installment.row_version, {
                 invoice_date: installment.due_date,
                 status: "draft",
             });
@@ -157,7 +157,7 @@ export default function VehicleFinancePage() {
             key: "period",
             header: "Period",
             render: (row) =>
-                `${formatDate(row.starts_at)} – ${formatDate(row.matures_at)}`,
+                `${formatDate(row.starts_at)} - ${formatDate(row.matures_at)}`,
         },
         {
             key: "principal",
@@ -225,15 +225,15 @@ export default function VehicleFinancePage() {
             header: "",
             className: "text-right",
             render: (row) =>
-                canManage && !row.invoice_id ? (
+                canManage && !row.invoice ? (
                     <Button
                         variant="secondary"
                         onClick={() => void createPayable(row)}
                     >
                         Create payable
                     </Button>
-                ) : row.invoice_id ? (
-                    'Invoice number unavailable'
+                ) : row.invoice ? (
+                    row.invoice.name ?? row.invoice.code ?? 'Invoice created'
                 ) : null,
         },
     ];
@@ -361,7 +361,6 @@ export default function VehicleFinancePage() {
                                 options={[
                                     "flat",
                                     "reducing_balance",
-                                    "custom",
                                 ].map((value) => ({
                                     value,
                                     label: value.replaceAll("_", " "),
@@ -451,7 +450,7 @@ export default function VehicleFinancePage() {
             )}
             {selected && (
                 <Panel
-                    title={`Installment schedule — ${selected.agreement_number}`}
+                    title={`Installment schedule - ${selected.agreement_number}`}
                     className="mb-5"
                 >
                     <div className="mb-3 flex justify-end">

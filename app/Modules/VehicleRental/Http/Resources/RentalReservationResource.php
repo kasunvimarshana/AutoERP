@@ -12,6 +12,7 @@ final class RentalReservationResource extends RentalResource
     {
         return [
             'id' => (int) $this->getKey(),
+            'row_version' => (int) $this->row_version,
             'reservation_number' => $this->reservation_number,
             'customer' => $this->whenLoaded('customer', fn () => $this->summary($this->customer, ['customer_number', 'code', 'name', 'display_name'])),
             'requested_vehicle' => $this->whenLoaded('requestedVehicle', fn () => $this->summary($this->requestedVehicle, ['vehicle_number', 'registration_number', 'status'])),

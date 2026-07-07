@@ -33,6 +33,9 @@ final class ListRentalRequest extends TenantScopedRequest
             'calculation_status' => ['nullable', 'string', 'max:40'],
             'document_status' => ['nullable', 'string', 'max:40'],
             'vehicle_source_type' => ['nullable', 'string', 'max:40'],
+            'open_only' => ['nullable', 'boolean'],
+            'covers_start_at' => ['nullable', 'date'],
+            'covers_end_at' => ['nullable', 'date', 'after_or_equal:covers_start_at'],
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
         ];

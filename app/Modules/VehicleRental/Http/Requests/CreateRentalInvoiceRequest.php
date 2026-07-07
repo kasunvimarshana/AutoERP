@@ -13,6 +13,7 @@ final class CreateRentalInvoiceRequest extends TenantScopedRequest
     public function rules(): array
     {
         return [
+            'expected_version' => ['required', 'integer', 'min:1'],
             'invoice_date' => ['required', 'date'],
             'due_date' => ['nullable', 'date', 'after_or_equal:invoice_date'],
             'status' => ['required', Rule::enum(InvoiceStatus::class)],

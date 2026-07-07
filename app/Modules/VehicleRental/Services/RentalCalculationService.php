@@ -9,6 +9,7 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Invoice\Enums\InvoiceStatus;
@@ -25,6 +26,7 @@ use Modules\VehicleRental\Enums\RentalCalculationStatus;
 use Modules\VehicleRental\Enums\RentalDocumentStatus;
 use Modules\VehicleRental\Enums\RentalExcessKmMethod;
 use Modules\VehicleRental\Enums\RentalExpenseAllocationType;
+use Modules\VehicleRental\Enums\RentalExpenseType;
 use Modules\VehicleRental\Enums\RentalFinancialSide;
 use Modules\VehicleRental\Enums\RentalRateComponentCode;
 use Modules\VehicleRental\Enums\RentalRateUnit;
@@ -55,10 +57,12 @@ final class RentalCalculationService
         RentalFinancialSide $side,
         string $periodStart,
         string $periodEnd,
+        int $expectedAgreementVersion,
         ?int $userId,
     ): RentalCalculationRun {
-        return DB::transaction(function () use ($agreement, $side, $periodStart, $periodEnd, $userId): RentalCalculationRun {
+        return DB::transaction(function () use ($agreement, $side, $periodStart, $periodEnd, $expectedAgreementVersion, $userId): RentalCalculationRun {
             $agreement = RentalAgreement::query()->lockForUpdate()->findOrFail($agreement->getKey());
+            $this->assertAgreementExpectedVersion($agreement, $expectedAgreementVersion);
             $this->assertSide($agreement, $side);
             $start = CarbonImmutable::parse($periodStart);
             $end = CarbonImmutable::parse($periodEnd);
@@ -327,6 +331,7 @@ final class RentalCalculationService
             'lines.usageContext.usageLog.vehicle',
             'lines.usageContext.usageFact',
             'lines.expenseAllocation.expense',
+            'lines.custodyEventItem.custodyEvent',
             'lines.taxGroup',
         ];
     }
@@ -467,6 +472,8 @@ final class RentalCalculationService
                 ->whereDate('expense_date', '>=', $start->toDateString())
                 ->whereDate('expense_date', '<=', $end->toDateString()))
             ->with('expense')
+            ->orderBy('id')
+            ->lockForUpdate()
             ->get();
         foreach ($expenseAllocations as $allocation) {
             $baseAmount = $this->math->add(
@@ -491,7 +498,7 @@ final class RentalCalculationService
                 'custody_event_item_id' => null,
                 'source_type' => 'rental_expense_allocation',
                 'source_id' => $allocation->getKey(),
-                'component_code' => $allocation->expense->expense_type === 'repair'
+                'component_code' => $allocation->expense->expense_type === RentalExpenseType::Repair
                     ? RentalRateComponentCode::Repair->value
                     : RentalRateComponentCode::OtherRecovery->value,
                 'description' => ($negative ? 'Owner deduction: ' : 'Customer recovery: ')
@@ -511,6 +518,7 @@ final class RentalCalculationService
                 'applied_rule' => $allocationType->value,
                 'rule_snapshot' => [
                     'expense_id' => $allocation->expense_id,
+                    'expense_allocation_version' => (int) $allocation->row_version,
                     'allocation_type' => $allocationType->value,
                 ],
             ];
@@ -853,6 +861,7 @@ final class RentalCalculationService
                 ->whereIn('status', ['approved', 'consumed'])
                 ->update([
                     'status' => $consumed ? 'consumed' : 'approved',
+                    'row_version' => DB::raw('row_version + 1'),
                     'updated_by' => $userId,
                     'updated_at' => now(),
                 ]);
@@ -916,6 +925,15 @@ final class RentalCalculationService
         if ($side === RentalFinancialSide::Cost
             && $agreement->agreement_kind !== RentalAgreementKind::OwnerSupply) {
             throw new InvalidArgumentException('Cost calculations require an owner supply agreement.');
+        }
+    }
+
+    private function assertAgreementExpectedVersion(RentalAgreement $agreement, int $expectedVersion): void
+    {
+        if ((int) $agreement->row_version !== $expectedVersion) {
+            throw ValidationException::withMessages([
+                'expected_agreement_version' => ['The rental agreement changed after it was loaded. Reload and review the latest version.'],
+            ]);
         }
     }
 }

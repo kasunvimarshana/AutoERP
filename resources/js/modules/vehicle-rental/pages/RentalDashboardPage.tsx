@@ -19,7 +19,7 @@ export default function RentalDashboardPage() {
         <RentalPage>
             <ContentHeader
                 title="Vehicle Rental"
-                description="Customer rentals, vehicle-owner costs, custody, running charts, deposits, and vehicle finance."
+                description="Lessee rentals, vehicle-owner costs, custody, running charts, deposits, and vehicle finance."
             />
             <ErrorAlert error={result.error} />
             {result.loading ? (
@@ -45,8 +45,8 @@ export default function RentalDashboardPage() {
                             Customer revenue
                         </strong>
                         <p className="mt-1">
-                            Customer agreement → allocation → custody → running
-                            chart → revenue calculation → invoice → receipt.
+                            Customer agreement to allocation to custody to running
+                            chart to revenue calculation to invoice to receipt.
                         </p>
                     </div>
                     <div>
@@ -54,8 +54,8 @@ export default function RentalDashboardPage() {
                             Vehicle-owner cost
                         </strong>
                         <p className="mt-1">
-                            Owner agreement → source allocation → same running
-                            chart → cost calculation → payable → deductions →
+                            Owner agreement to source allocation to same running
+                            chart to cost calculation to payable to deductions to
                             payment.
                         </p>
                     </div>

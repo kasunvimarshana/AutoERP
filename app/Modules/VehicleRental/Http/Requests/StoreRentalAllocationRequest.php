@@ -13,12 +13,14 @@ final class StoreRentalAllocationRequest extends TenantScopedRequest
     public function rules(): array
     {
         return [
+            'expected_agreement_version' => ['required', 'integer', 'min:1'],
             'vehicle_id' => ['required', 'integer', 'min:1'],
             'vehicle_ownership_id' => ['nullable', 'integer', 'min:1'],
             'vehicle_source_type' => ['required', Rule::enum(RentalVehicleSourceType::class)],
             'source_allocation_id' => ['nullable', 'integer', 'min:1'],
+            'expected_source_allocation_version' => ['nullable', 'required_with:source_allocation_id', 'integer', 'min:1'],
             'vehicle_finance_agreement_id' => ['nullable', 'integer', 'min:1'],
-            'replaces_allocation_id' => ['nullable', 'integer', 'min:1'],
+            'expected_finance_agreement_version' => ['nullable', 'required_with:vehicle_finance_agreement_id', 'integer', 'min:1'],
             'allocated_from' => ['required', 'date'],
             'allocated_to' => ['nullable', 'date', 'after:allocated_from'],
             'start_odometer' => ['nullable', 'decimal:0,6', 'gte:0'],

@@ -7,6 +7,7 @@ namespace Modules\VehicleRental\Services;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Invoice\DTOs\CreateInvoiceData;
@@ -27,6 +28,17 @@ use Modules\VehicleRental\Models\VehicleFinanceStatusHistory;
 
 final class VehicleFinanceService
 {
+    private const INTEREST_METHOD_CUSTOM = 'custom';
+    private const INTEREST_METHOD_REDUCING_BALANCE = 'reducing_balance';
+    private const DAYS_PER_YEAR = '365';
+    private const PERCENT_DIVISOR = '100';
+    private const INSTALLMENT_PERIODS_PER_YEAR = [
+        'weekly' => '52',
+        'monthly' => '12',
+        'quarterly' => '4',
+        'yearly' => '1',
+    ];
+
     public function __construct(
         private readonly DecimalMath $math,
         private readonly RentalNumberService $numbers,
@@ -90,10 +102,11 @@ final class VehicleFinanceService
         });
     }
 
-    public function activate(VehicleFinanceAgreement $agreement, ?int $userId): VehicleFinanceAgreement
+    public function activate(VehicleFinanceAgreement $agreement, int $expectedVersion, ?int $userId): VehicleFinanceAgreement
     {
-        return DB::transaction(function () use ($agreement, $userId): VehicleFinanceAgreement {
+        return DB::transaction(function () use ($agreement, $expectedVersion, $userId): VehicleFinanceAgreement {
             $agreement = VehicleFinanceAgreement::query()->with('installments')->lockForUpdate()->findOrFail($agreement->getKey());
+            $this->assertAgreementExpectedVersion($agreement, $expectedVersion);
             if ($agreement->status !== VehicleFinanceAgreementStatus::Draft) {
                 throw new InvalidArgumentException('Only a draft vehicle finance agreement can be activated.');
             }
@@ -103,6 +116,7 @@ final class VehicleFinanceService
             $agreement->status = VehicleFinanceAgreementStatus::Active;
             $agreement->approved_by = $userId;
             $agreement->approved_at = now();
+            $agreement->row_version = $expectedVersion + 1;
             $agreement->updated_by = $userId;
             $agreement->save();
             $this->history($agreement, VehicleFinanceAgreementStatus::Draft->value, VehicleFinanceAgreementStatus::Active->value, $userId);
@@ -142,6 +156,7 @@ final class VehicleFinanceService
                     $dirtyFinancials = $installment->isDirty(['invoice_id', 'paid_amount', 'balance_due']);
                     if ($old !== $new || $dirtyFinancials) {
                         $installment->status = $new;
+                        $installment->row_version = (int) $installment->row_version + 1;
                         $installment->save();
                     }
                     if ($old !== $new) {
@@ -154,10 +169,17 @@ final class VehicleFinanceService
         return $updated;
     }
 
-    public function createInstallmentPayable(VehicleFinanceInstallment $installment, string $invoiceDate, InvoiceStatus $status, ?int $userId): Invoice
+    public function createInstallmentPayable(
+        VehicleFinanceInstallment $installment,
+        int $expectedVersion,
+        string $invoiceDate,
+        InvoiceStatus $status,
+        ?int $userId,
+    ): Invoice
     {
-        return DB::transaction(function () use ($installment, $invoiceDate, $status, $userId): Invoice {
+        return DB::transaction(function () use ($installment, $expectedVersion, $invoiceDate, $status, $userId): Invoice {
             $installment = VehicleFinanceInstallment::query()->with('financeAgreement')->lockForUpdate()->findOrFail($installment->getKey());
+            $this->assertInstallmentExpectedVersion($installment, $expectedVersion);
             if ($installment->invoice_id !== null) {
                 $existing = Invoice::query()->findOrFail($installment->invoice_id);
                 if (! in_array($existing->status, [InvoiceStatus::Cancelled, InvoiceStatus::Void], true)) {
@@ -184,7 +206,7 @@ final class VehicleFinanceService
                 $sourceLineId = ((int) $installment->getKey() * 10) + $number;
                 $lines[] = new InvoiceLineData(
                     lineNumber: $number,
-                    description: $description.' — installment '.$installment->installment_number,
+                    description: $description.' - installment '.$installment->installment_number,
                     quantity: '1.000000',
                     unitPrice: $amount,
                     lineType: InvoiceLineType::Charge,
@@ -236,6 +258,7 @@ final class VehicleFinanceService
                 sourceLines: $sourceLines,
             ));
             $installment->invoice_id = $invoice->getKey();
+            $installment->row_version = $expectedVersion + 1;
             $installment->save();
 
             return $invoice;
@@ -250,6 +273,12 @@ final class VehicleFinanceService
                 $query->where($key, $filters[$key]);
             }
         }
+        if (! empty($filters['covers_start_at'])) {
+            $query->where('starts_at', '<=', $filters['covers_start_at']);
+        }
+        if (! empty($filters['covers_end_at'])) {
+            $query->where('matures_at', '>=', $filters['covers_end_at']);
+        }
 
         return $query->latest('agreement_date')->latest('id')->paginate($perPage);
     }
@@ -263,6 +292,13 @@ final class VehicleFinanceService
     private function validateCustomSchedule(array $data, CarbonImmutable $startsAt, CarbonImmutable $maturesAt): void
     {
         $schedule = $data['schedule'] ?? null;
+        $interestMethod = (string) ($data['interest_method'] ?? 'flat');
+        if ($interestMethod === self::INTEREST_METHOD_CUSTOM && ($schedule === null || $schedule === [])) {
+            throw new InvalidArgumentException('Custom finance schedules require explicit installment rows.');
+        }
+        if ($interestMethod !== self::INTEREST_METHOD_CUSTOM && $schedule !== null && $schedule !== []) {
+            throw new InvalidArgumentException('Explicit installment rows require the custom interest method.');
+        }
         if ($schedule === null || $schedule === []) {
             return;
         }
@@ -303,13 +339,24 @@ final class VehicleFinanceService
             return;
         }
 
+        if ((string) $agreement->interest_method === self::INTEREST_METHOD_REDUCING_BALANCE) {
+            $this->generateReducingBalanceSchedule($agreement, $userId);
+
+            return;
+        }
+
+        $this->generateFlatSchedule($agreement, $userId);
+    }
+
+    private function generateFlatSchedule(VehicleFinanceAgreement $agreement, ?int $userId): void
+    {
         $count = (int) $agreement->installment_count;
         $principalAfterDeposit = $this->math->sub((string) $agreement->principal_amount, (string) $agreement->initial_deposit_amount);
         $principalPer = $this->math->div($principalAfterDeposit, (string) $count);
-        $years = $this->math->div((string) CarbonImmutable::parse($agreement->starts_at)->diffInDays(CarbonImmutable::parse($agreement->matures_at)), '365');
+        $years = $this->math->div((string) CarbonImmutable::parse($agreement->starts_at)->diffInDays(CarbonImmutable::parse($agreement->matures_at)), self::DAYS_PER_YEAR);
         $totalInterest = $this->math->div(
             $this->math->mul($this->math->mul($principalAfterDeposit, (string) $agreement->annual_interest_rate), $years),
-            '100',
+            self::PERCENT_DIVISOR,
         );
         $interestPer = $this->math->div($totalInterest, (string) $count);
         $allocatedPrincipal = '0.000000';
@@ -327,6 +374,37 @@ final class VehicleFinanceService
             ], $userId);
             $allocatedPrincipal = $this->math->add($allocatedPrincipal, $principal);
             $allocatedInterest = $this->math->add($allocatedInterest, $interest);
+        }
+    }
+
+    private function generateReducingBalanceSchedule(VehicleFinanceAgreement $agreement, ?int $userId): void
+    {
+        $count = (int) $agreement->installment_count;
+        $principalAfterDeposit = $this->math->sub((string) $agreement->principal_amount, (string) $agreement->initial_deposit_amount);
+        $principalPer = $this->math->div($principalAfterDeposit, (string) $count);
+        $periodsPerYear = self::INSTALLMENT_PERIODS_PER_YEAR[(string) $agreement->installment_frequency];
+        $periodRate = $this->math->div(
+            $this->math->div((string) $agreement->annual_interest_rate, self::PERCENT_DIVISOR),
+            $periodsPerYear,
+        );
+        $allocatedPrincipal = '0.000000';
+        $outstandingPrincipal = $principalAfterDeposit;
+
+        for ($number = 1; $number <= $count; $number++) {
+            $principal = $number === $count
+                ? $this->math->sub($principalAfterDeposit, $allocatedPrincipal)
+                : $principalPer;
+            $interest = $this->math->mul($outstandingPrincipal, $periodRate);
+            $dueDate = $this->installmentDueDate(CarbonImmutable::parse($agreement->starts_at), $number, (string) $agreement->installment_frequency);
+            $this->createInstallment($agreement, $number, [
+                'due_date' => $dueDate->toDateString(),
+                'principal_due' => $principal,
+                'interest_due' => $interest,
+                'fee_due' => '0.000000',
+                'tax_due' => '0.000000',
+            ], $userId);
+            $allocatedPrincipal = $this->math->add($allocatedPrincipal, $principal);
+            $outstandingPrincipal = $this->math->sub($outstandingPrincipal, $principal);
         }
     }
 
@@ -354,6 +432,24 @@ final class VehicleFinanceService
             'created_by' => $userId,
             'updated_by' => $userId,
         ]);
+    }
+
+    private function assertAgreementExpectedVersion(VehicleFinanceAgreement $agreement, int $expectedVersion): void
+    {
+        if ((int) $agreement->row_version !== $expectedVersion) {
+            throw ValidationException::withMessages([
+                'expected_version' => ['The vehicle finance agreement changed after it was loaded. Reload and review the latest version.'],
+            ]);
+        }
+    }
+
+    private function assertInstallmentExpectedVersion(VehicleFinanceInstallment $installment, int $expectedVersion): void
+    {
+        if ((int) $installment->row_version !== $expectedVersion) {
+            throw ValidationException::withMessages([
+                'expected_version' => ['The vehicle finance installment changed after it was loaded. Reload and review the latest version.'],
+            ]);
+        }
     }
 
     private function installmentDueDate(CarbonImmutable $start, int $number, string $frequency): CarbonImmutable

@@ -21,6 +21,7 @@ final class StoreRentalRateVersionRequest extends TenantScopedRequest
         return [
             'tenant_id' => ['required', 'integer', 'min:1'],
             'organization_unit_id' => ['nullable', 'integer', 'min:1'],
+            'expected_agreement_version' => ['required', 'integer', 'min:1'],
             'effective_from' => ['required', 'date'],
             'effective_to' => ['nullable', 'date', 'after:effective_from'],
             'driver_mode' => ['nullable', Rule::enum(RentalMode::class)],

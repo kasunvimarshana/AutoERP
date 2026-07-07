@@ -8,15 +8,18 @@ use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\VehicleRental\Enums\RentalAgreementKind;
+use Modules\VehicleRental\Enums\RentalAgreementStatus;
 use Modules\VehicleRental\Enums\RentalAllocationStatus;
 use Modules\VehicleRental\Enums\RentalCalculationStatus;
 use Modules\VehicleRental\Enums\RentalCustodyEventType;
 use Modules\VehicleRental\Enums\RentalCustodyStatus;
 use Modules\VehicleRental\Enums\RentalFinancialSide;
 use Modules\VehicleRental\Enums\RentalMode;
+use Modules\VehicleRental\Enums\RentalUsageEventApplicability;
 use Modules\VehicleRental\Enums\RentalUsageStatus;
 use Modules\VehicleRental\Models\RentalDriverAssignment;
 use Modules\VehicleRental\Models\RentalUsageContext;
@@ -52,10 +55,18 @@ final class RentalUsageService
                 ->with(['agreement', 'sourceAllocation.agreement'])
                 ->lockForUpdate()
                 ->findOrFail($allocation->getKey());
+            $this->assertAllocationExpectedVersion($allocation, (int) ($data['expected_allocation_version'] ?? 0));
+            $sourceAllocation = $this->lockSourceAllocation(
+                $allocation,
+                isset($data['expected_source_allocation_version'])
+                    ? (int) $data['expected_source_allocation_version']
+                    : null,
+            );
 
             $startedAt = CarbonImmutable::parse((string) $data['started_at']);
             $endedAt = CarbonImmutable::parse((string) $data['ended_at']);
             $this->assertAllocation($allocation, $startedAt, $endedAt);
+            $this->assertSourceAllocation($allocation, $sourceAllocation, $startedAt, $endedAt);
             $driverAssignment = $this->resolveDriverAssignment(
                 $allocation,
                 $data,
@@ -65,13 +76,36 @@ final class RentalUsageService
 
             [$startOdometer, $endOdometer, $distance, $netOperationalDistance, $garage, $internal]
                 = $this->distanceFacts($data);
+            $workingMinutes = $this->minutesBetween($startedAt, $endedAt);
+            $normalOvertime = (int) ($data['normal_overtime_minutes'] ?? 0);
+            $doubleOvertime = (int) ($data['double_overtime_minutes'] ?? 0);
+            $tripleOvertime = (int) ($data['triple_overtime_minutes'] ?? 0);
+            if ($normalOvertime + $doubleOvertime + $tripleOvertime > $workingMinutes) {
+                throw new InvalidArgumentException(
+                    'Combined overtime cannot exceed total working minutes.',
+                );
+            }
+            $nightOutCount = $this->math->normalize((string) ($data['night_out_count'] ?? '0'));
             $usageDate = $this->assertUsageDate($allocation, $data, $startedAt);
             $fingerprint = $this->fingerprint(
                 $allocation,
+                $sourceAllocation,
+                $driverAssignment,
+                $data,
+                $usageDate,
                 $startedAt,
                 $endedAt,
                 $startOdometer,
                 $endOdometer,
+                $distance,
+                $netOperationalDistance,
+                $garage,
+                $internal,
+                $workingMinutes,
+                $normalOvertime,
+                $doubleOvertime,
+                $tripleOvertime,
+                $nightOutCount,
             );
 
             $existing = RentalUsageLog::query()
@@ -108,16 +142,6 @@ final class RentalUsageService
                 $data['odometer_variance_reason'] ?? null,
             );
 
-            $workingMinutes = $this->minutesBetween($startedAt, $endedAt);
-            $normalOvertime = (int) ($data['normal_overtime_minutes'] ?? 0);
-            $doubleOvertime = (int) ($data['double_overtime_minutes'] ?? 0);
-            $tripleOvertime = (int) ($data['triple_overtime_minutes'] ?? 0);
-            if ($normalOvertime + $doubleOvertime + $tripleOvertime > $workingMinutes) {
-                throw new InvalidArgumentException(
-                    'Combined overtime cannot exceed total working minutes.',
-                );
-            }
-
             $sequence = ((int) RentalUsageLog::query()
                 ->where('vehicle_allocation_id', $allocation->getKey())
                 ->whereDate('usage_date', $usageDate)
@@ -150,7 +174,7 @@ final class RentalUsageService
                 'normal_overtime_minutes' => $normalOvertime,
                 'double_overtime_minutes' => $doubleOvertime,
                 'triple_overtime_minutes' => $tripleOvertime,
-                'night_out_count' => $data['night_out_count'] ?? '0.000000',
+                'night_out_count' => $nightOutCount,
                 'trip_from' => $data['trip_from'] ?? null,
                 'trip_to' => $data['trip_to'] ?? null,
                 'trip_purpose' => $data['trip_purpose'] ?? null,
@@ -167,6 +191,7 @@ final class RentalUsageService
                 $log,
                 $allocation,
                 $data['events'] ?? [],
+                $sourceAllocation !== null,
                 $startedAt,
                 $endedAt,
                 $userId,
@@ -181,10 +206,10 @@ final class RentalUsageService
             );
             $this->facts->createInitial($revenueContext, $log, $userId);
 
-            if ($allocation->sourceAllocation !== null) {
+            if ($sourceAllocation !== null) {
                 $costContext = $this->createContext(
                     $log,
-                    $allocation->sourceAllocation,
+                    $sourceAllocation,
                     RentalFinancialSide::Cost,
                     $startedAt,
                     $userId,
@@ -315,14 +340,20 @@ final class RentalUsageService
                 $query->where($key, $filters[$key]);
             }
         }
-        if (! empty($filters['agreement_id'])) {
+        if (! empty($filters['agreement_id']) && ! empty($filters['financial_side'])) {
+            $query->whereHas(
+                'contexts',
+                fn (Builder $context) => $context
+                    ->where('agreement_id', $filters['agreement_id'])
+                    ->where('financial_side', $filters['financial_side']),
+            );
+        } elseif (! empty($filters['agreement_id'])) {
             $query->whereHas(
                 'contexts',
                 fn (Builder $context) => $context
                     ->where('agreement_id', $filters['agreement_id']),
             );
-        }
-        if (! empty($filters['financial_side'])) {
+        } elseif (! empty($filters['financial_side'])) {
             $query->whereHas(
                 'contexts',
                 fn (Builder $context) => $context
@@ -357,6 +388,7 @@ final class RentalUsageService
             'contexts.agreement.supplier',
             'contexts.customer',
             'contexts.supplier',
+            'contexts.allocation',
             'contexts.rateVersion.components',
             'contexts.usageFact',
         ];
@@ -370,6 +402,11 @@ final class RentalUsageService
         if ($allocation->agreement->agreement_kind !== RentalAgreementKind::CustomerRental) {
             throw new InvalidArgumentException(
                 'Daily running chart must be recorded against a customer rental allocation.',
+            );
+        }
+        if ($allocation->agreement->status !== RentalAgreementStatus::Active) {
+            throw new InvalidArgumentException(
+                'Running chart requires an active rental agreement.',
             );
         }
         if ($allocation->status !== RentalAllocationStatus::Active) {
@@ -414,6 +451,72 @@ final class RentalUsageService
         if ($returned) {
             throw new InvalidArgumentException(
                 'Usage cannot be recorded after the vehicle return.',
+            );
+        }
+    }
+
+    private function lockSourceAllocation(
+        RentalVehicleAllocation $allocation,
+        ?int $expectedVersion,
+    ): ?RentalVehicleAllocation {
+        if ($allocation->source_allocation_id === null) {
+            return null;
+        }
+
+        $sourceAllocation = RentalVehicleAllocation::query()
+            ->with('agreement')
+            ->where('tenant_id', $allocation->tenant_id)
+            ->lockForUpdate()
+            ->findOrFail($allocation->source_allocation_id);
+        if ($expectedVersion === null || (int) $sourceAllocation->row_version !== $expectedVersion) {
+            throw ValidationException::withMessages([
+                'expected_source_allocation_version' => ['The owner supply allocation changed after it was loaded. Reload and review the latest version.'],
+            ]);
+        }
+
+        $allocation->setRelation('sourceAllocation', $sourceAllocation);
+
+        return $sourceAllocation;
+    }
+
+    private function assertSourceAllocation(
+        RentalVehicleAllocation $allocation,
+        ?RentalVehicleAllocation $sourceAllocation,
+        CarbonImmutable $startedAt,
+        CarbonImmutable $endedAt,
+    ): void {
+        if ($sourceAllocation === null) {
+            return;
+        }
+        if ($sourceAllocation->agreement->agreement_kind !== RentalAgreementKind::OwnerSupply) {
+            throw new InvalidArgumentException(
+                'Running chart owner payable context requires an owner supply allocation.',
+            );
+        }
+        if ($sourceAllocation->agreement->status !== RentalAgreementStatus::Active) {
+            throw new InvalidArgumentException(
+                'Running chart owner payable context requires an active owner supply agreement.',
+            );
+        }
+        if ((int) $sourceAllocation->vehicle_id !== (int) $allocation->vehicle_id) {
+            throw new InvalidArgumentException(
+                'Running chart owner supply allocation must use the same vehicle as the customer allocation.',
+            );
+        }
+        if ($sourceAllocation->status !== RentalAllocationStatus::Active) {
+            throw new InvalidArgumentException(
+                'Running chart owner payable context requires an active owner supply allocation.',
+            );
+        }
+        if (
+            $startedAt->lessThan(CarbonImmutable::parse($sourceAllocation->allocated_from))
+            || (
+                $sourceAllocation->allocated_to !== null
+                && $endedAt->greaterThan(CarbonImmutable::parse($sourceAllocation->allocated_to))
+            )
+        ) {
+            throw new InvalidArgumentException(
+                'Usage time must be inside the owner supply allocation period.',
             );
         }
     }
@@ -513,19 +616,64 @@ final class RentalUsageService
 
     private function fingerprint(
         RentalVehicleAllocation $allocation,
+        ?RentalVehicleAllocation $sourceAllocation,
+        ?RentalDriverAssignment $driverAssignment,
+        array $data,
+        string $usageDate,
         CarbonImmutable $startedAt,
         CarbonImmutable $endedAt,
         string $startOdometer,
         string $endOdometer,
+        string $distance,
+        string $netOperationalDistance,
+        string $garage,
+        string $internal,
+        int $workingMinutes,
+        int $normalOvertime,
+        int $doubleOvertime,
+        int $tripleOvertime,
+        string $nightOutCount,
     ): string {
-        return hash('sha256', implode('|', [
-            $allocation->tenant_id,
-            $allocation->getKey(),
-            $startedAt->toIso8601String(),
-            $endedAt->toIso8601String(),
-            $startOdometer,
-            $endOdometer,
-        ]));
+        $events = array_map(function (array $event): array {
+            return [
+                'event_type' => (string) ($event['event_type'] ?? ''),
+                'applicability' => (string) ($event['applicability'] ?? ''),
+                'occurred_at' => empty($event['occurred_at'])
+                    ? null
+                    : CarbonImmutable::parse((string) $event['occurred_at'])->toIso8601String(),
+                'quantity' => $this->math->normalize((string) ($event['quantity'] ?? '0')),
+                'unit' => $event['unit'] ?? null,
+                'reference_number' => $event['reference_number'] ?? null,
+                'remarks' => $event['remarks'] ?? null,
+            ];
+        }, array_values($data['events'] ?? []));
+
+        return hash('sha256', json_encode([
+            'tenant_id' => (int) $allocation->tenant_id,
+            'allocation_id' => (int) $allocation->getKey(),
+            'source_allocation_id' => $sourceAllocation?->getKey(),
+            'driver_assignment_id' => $driverAssignment?->getKey(),
+            'usage_date' => $usageDate,
+            'started_at' => $startedAt->toIso8601String(),
+            'ended_at' => $endedAt->toIso8601String(),
+            'start_odometer' => $startOdometer,
+            'end_odometer' => $endOdometer,
+            'distance_km' => $distance,
+            'net_operational_distance_km' => $netOperationalDistance,
+            'garage_distance_km' => $garage,
+            'internal_distance_km' => $internal,
+            'working_minutes' => $workingMinutes,
+            'normal_overtime_minutes' => $normalOvertime,
+            'double_overtime_minutes' => $doubleOvertime,
+            'triple_overtime_minutes' => $tripleOvertime,
+            'night_out_count' => $nightOutCount,
+            'trip_from' => $data['trip_from'] ?? null,
+            'trip_to' => $data['trip_to'] ?? null,
+            'trip_purpose' => $data['trip_purpose'] ?? null,
+            'odometer_variance_reason' => $data['odometer_variance_reason'] ?? null,
+            'remarks' => $data['remarks'] ?? null,
+            'events' => $events,
+        ], JSON_THROW_ON_ERROR));
     }
 
     private function lockVehicleTimeline(RentalVehicleAllocation $allocation): void
@@ -536,6 +684,15 @@ final class RentalUsageService
             ->orderBy('id')
             ->lockForUpdate()
             ->get(['id']);
+    }
+
+    private function assertAllocationExpectedVersion(RentalVehicleAllocation $allocation, int $expectedVersion): void
+    {
+        if ((int) $allocation->row_version !== $expectedVersion) {
+            throw ValidationException::withMessages([
+                'expected_allocation_version' => ['The vehicle allocation changed after it was loaded. Reload and review the latest version.'],
+            ]);
+        }
     }
 
     private function lockDriverTimeline(int $tenantId, int $employeeId): void
@@ -647,11 +804,21 @@ final class RentalUsageService
         RentalUsageLog $log,
         RentalVehicleAllocation $allocation,
         array $events,
+        bool $hasOwnerContext,
         CarbonImmutable $startedAt,
         CarbonImmutable $endedAt,
         ?int $userId,
     ): void {
         foreach (array_values($events) as $index => $event) {
+            $applicability = RentalUsageEventApplicability::from((string) $event['applicability']);
+            if (
+                ! $hasOwnerContext
+                && in_array($applicability, [RentalUsageEventApplicability::Owner, RentalUsageEventApplicability::Both], true)
+            ) {
+                throw new InvalidArgumentException(
+                    'Owner-applicable usage events require a linked owner supply allocation.',
+                );
+            }
             if (! empty($event['occurred_at'])) {
                 $occurredAt = CarbonImmutable::parse(
                     (string) $event['occurred_at'],
@@ -671,7 +838,7 @@ final class RentalUsageService
                 'organization_unit_id' => $allocation->organization_unit_id,
                 'sequence' => $index + 1,
                 'event_type' => $event['event_type'],
-                'applicability' => $event['applicability'],
+                'applicability' => $applicability->value,
                 'occurred_at' => $event['occurred_at'] ?? null,
                 'quantity' => $event['quantity'],
                 'unit' => $event['unit'] ?? null,

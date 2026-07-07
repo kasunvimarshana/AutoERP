@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\VehicleRental\Services;
 
+use BackedEnum;
+use Carbon\CarbonImmutable;
+use DateTimeInterface;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
@@ -18,6 +21,20 @@ use RuntimeException;
 
 final class RentalAgreementService
 {
+    private const STRUCTURAL_DRAFT_FIELDS = [
+        'customer_id',
+        'supplier_id',
+        'starts_at',
+        'ends_at',
+        'rental_mode',
+        'billing_cycle',
+        'billing_basis',
+        'proration_rule',
+        'billing_timezone',
+        'payment_term_days',
+        'currency_id',
+    ];
+
     private const TRANSITIONS = [
         'draft' => ['active', 'cancelled'],
         'active' => ['suspended', 'completed', 'terminated'],
@@ -39,6 +56,7 @@ final class RentalAgreementService
         return DB::transaction(function () use ($data, $tenantId, $organizationUnitId, $userId): RentalAgreement {
             $kind = RentalAgreementKind::from((string) $data['agreement_kind']);
             $this->assertParty($kind, $data);
+            $this->assertDepositAllowed($kind, $data);
             $this->validateReferences($kind, $data, $tenantId, $organizationUnitId);
             $reservation = null;
             if (! empty($data['reservation_id'])) {
@@ -49,6 +67,10 @@ final class RentalAgreementService
                 if ($reservation->status !== RentalReservationStatus::Confirmed) {
                     throw new InvalidArgumentException('Only a confirmed reservation can be converted.');
                 }
+                $this->assertReservationExpectedVersion(
+                    $reservation,
+                    (int) $data['expected_reservation_version'],
+                );
                 if ($kind !== RentalAgreementKind::CustomerRental
                     || (int) $reservation->customer_id !== (int) $data['customer_id']) {
                     throw new InvalidArgumentException('Reservation and agreement customer must match.');
@@ -101,6 +123,7 @@ final class RentalAgreementService
                 $agreement->depositRequirement()->create([
                     'tenant_id' => $tenantId,
                     'organization_unit_id' => $organizationUnitId,
+                    'customer_id' => $agreement->customer_id,
                     'required_amount' => $required,
                     'currency_id' => $deposit['currency_id'] ?? $agreement->currency_id,
                     'due_date' => $deposit['due_date'] ?? null,
@@ -114,9 +137,12 @@ final class RentalAgreementService
             }
 
             if ($reservation !== null) {
+                $previousReservationStatus = $reservation->status;
                 $reservation->status = RentalReservationStatus::Converted;
+                $reservation->row_version = (int) $reservation->row_version + 1;
                 $reservation->updated_by = $userId;
                 $reservation->save();
+                $this->history->record($reservation, $previousReservationStatus->value, RentalReservationStatus::Converted->value, $userId);
             }
             $this->history->record($agreement, null, RentalAgreementStatus::Draft->value, $userId);
 
@@ -143,6 +169,7 @@ final class RentalAgreementService
             $kind = $agreement->agreement_kind;
             $merged = array_merge($agreement->toArray(), $data);
             $this->assertParty($kind, $merged);
+            $this->assertStructuralDraftChangesAllowed($agreement, $data);
             $this->validateReferences(
                 $kind,
                 $merged,
@@ -172,8 +199,7 @@ final class RentalAgreementService
             $agreement->save();
 
             if (array_key_exists('terms', $data)) {
-                $agreement->terms()->delete();
-                $this->replaceTerms($agreement, $data['terms'] ?? [], $userId);
+                $this->syncTerms($agreement, $data['terms'] ?? [], $userId);
             }
 
             return $agreement->refresh()->load($this->relations());
@@ -244,7 +270,7 @@ final class RentalAgreementService
     {
         $query = RentalAgreement::query()
             ->forContext($tenantId, $organizationUnitId)
-            ->with(['customer', 'supplier', 'currency', 'activeRateVersion', 'allocations.vehicle']);
+            ->with(['reservation', 'customer', 'supplier', 'currency', 'activeRateVersion', 'allocations.vehicle']);
         if (! empty($filters['search'])) {
             $search = trim((string) $filters['search']);
             $query->where(function (Builder $query) use ($search): void {
@@ -283,7 +309,9 @@ final class RentalAgreementService
             'allocations.vehicle.model',
             'allocations.sourceAllocation.agreement.supplier',
             'driverAssignments.employee',
-            'depositRequirement.links',
+            'depositRequirement.links.payment',
+            'depositRequirement.links.invoice',
+            'depositRequirement.links.reversesLink',
         ];
     }
 
@@ -306,6 +334,19 @@ final class RentalAgreementService
         }
     }
 
+    private function assertDepositAllowed(RentalAgreementKind $kind, array $data): void
+    {
+        if ($kind === RentalAgreementKind::CustomerRental
+            || ! array_key_exists('deposit', $data)
+            || $data['deposit'] === null) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'deposit' => ['Security deposits are supported only for customer rental agreements.'],
+        ]);
+    }
+
     private function assertParty(RentalAgreementKind $kind, array $data): void
     {
         if ($kind === RentalAgreementKind::CustomerRental
@@ -318,11 +359,67 @@ final class RentalAgreementService
         }
     }
 
+    private function assertStructuralDraftChangesAllowed(RentalAgreement $agreement, array $data): void
+    {
+        $changedFields = array_values(array_filter(
+            self::STRUCTURAL_DRAFT_FIELDS,
+            fn (string $field): bool => array_key_exists($field, $data)
+                && ! $this->fieldValueMatches($agreement->{$field}, $data[$field]),
+        ));
+
+        if ($changedFields === []) {
+            return;
+        }
+
+        $hasDependentRecords = $agreement->allocations()->exists()
+            || $agreement->rateVersions()->exists()
+            || $agreement->depositRequirement()->exists();
+        if (! $hasDependentRecords) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'agreement' => [
+                'Agreement party, period, billing, payment term, and currency fields cannot be changed after allocations, rate versions, or deposit requirements exist.',
+            ],
+        ]);
+    }
+
+    private function fieldValueMatches(mixed $current, mixed $next): bool
+    {
+        if ($current instanceof BackedEnum) {
+            $current = $current->value;
+        }
+
+        if ($current instanceof DateTimeInterface) {
+            if ($next === null || $next === '') {
+                return false;
+            }
+
+            return CarbonImmutable::parse($next)->equalTo(CarbonImmutable::instance($current));
+        }
+
+        if ($current === null || $next === null) {
+            return $current === $next;
+        }
+
+        return (string) $current === (string) $next;
+    }
+
     private function assertExpectedVersion(RentalAgreement $agreement, int $expectedVersion): void
     {
         if ((int) $agreement->row_version !== $expectedVersion) {
             throw ValidationException::withMessages([
                 'expected_version' => ['The rental agreement changed after it was loaded. Reload and review the latest version.'],
+            ]);
+        }
+    }
+
+    private function assertReservationExpectedVersion(RentalReservation $reservation, int $expectedVersion): void
+    {
+        if ((int) $reservation->row_version !== $expectedVersion) {
+            throw ValidationException::withMessages([
+                'expected_reservation_version' => ['The rental reservation changed after it was loaded. Reload and review the latest version.'],
             ]);
         }
     }
@@ -343,6 +440,73 @@ final class RentalAgreementService
                 'created_by' => $userId,
                 'updated_by' => $userId,
             ]);
+        }
+    }
+
+    /** @param list<array<string, mixed>> $terms */
+    private function syncTerms(RentalAgreement $agreement, array $terms, ?int $userId): void
+    {
+        $existing = $agreement->terms()->lockForUpdate()->get();
+        $byId = $existing->keyBy(fn ($term): int => (int) $term->getKey());
+        $bySequence = $existing->keyBy(fn ($term): int => (int) $term->sequence);
+        $seen = [];
+
+        foreach (array_values($terms) as $index => $term) {
+            $sequence = (int) ($term['sequence'] ?? ($index + 1));
+            $target = ! empty($term['id'])
+                ? $byId->get((int) $term['id'])
+                : $bySequence->get($sequence);
+
+            if (! empty($term['id']) && $target === null) {
+                throw ValidationException::withMessages([
+                    'terms' => ['One or more agreement terms no longer exist. Reload and review the latest version.'],
+                ]);
+            }
+
+            $sequenceOwner = $bySequence->get($sequence);
+            if ($target !== null && $sequenceOwner !== null && (int) $sequenceOwner->getKey() !== (int) $target->getKey()) {
+                throw ValidationException::withMessages([
+                    'terms' => ['Two agreement terms cannot use the same sequence.'],
+                ]);
+            }
+
+            if ($target === null) {
+                $target = $agreement->terms()->create([
+                    'tenant_id' => $agreement->tenant_id,
+                    'organization_unit_id' => $agreement->organization_unit_id,
+                    'sequence' => $sequence,
+                    'term_code' => $term['term_code'] ?? null,
+                    'title' => $term['title'] ?? null,
+                    'content' => $term['content'],
+                    'is_printable' => $term['is_printable'] ?? true,
+                    'is_active' => true,
+                    'created_by' => $userId,
+                    'updated_by' => $userId,
+                ]);
+            } else {
+                $target->forceFill([
+                    'sequence' => $sequence,
+                    'term_code' => $term['term_code'] ?? null,
+                    'title' => $term['title'] ?? null,
+                    'content' => $term['content'],
+                    'is_printable' => $term['is_printable'] ?? true,
+                    'is_active' => true,
+                    'row_version' => (int) $target->row_version + 1,
+                    'updated_by' => $userId,
+                ])->save();
+            }
+
+            $seen[(int) $target->getKey()] = true;
+        }
+
+        foreach ($existing as $term) {
+            if (! ($seen[(int) $term->getKey()] ?? false) && (bool) $term->is_active) {
+                $term->forceFill([
+                    'is_active' => false,
+                    'row_version' => (int) $term->row_version + 1,
+                    'updated_by' => $userId,
+                ])->save();
+            }
         }
     }
 

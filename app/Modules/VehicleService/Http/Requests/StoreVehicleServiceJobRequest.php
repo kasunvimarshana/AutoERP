@@ -25,6 +25,7 @@ final class StoreVehicleServiceJobRequest extends TenantScopedRequest
             'expected_delivery_date' => ['nullable', 'date', 'after_or_equal:job_date'],
             'customer_id' => ['required', 'integer', 'min:1'],
             'vehicle_id' => ['required', 'integer', 'min:1'],
+            'bill_to_customer_id' => ['nullable', 'integer', 'min:1'],
             'supervisor_employee_id' => ['nullable', 'integer', 'min:1'],
             'supervisor_commission_type' => ['nullable', Rule::enum(VehicleServiceCommissionType::class)],
             'supervisor_commission_value' => ['nullable', 'decimal:0,6', 'min:0'],
@@ -43,6 +44,7 @@ final class StoreVehicleServiceJobRequest extends TenantScopedRequest
             jobDate: (string) $this->input('job_date'),
             customerId: (int) $this->input('customer_id'),
             vehicleId: (int) $this->input('vehicle_id'),
+            billToCustomerId: $this->intOrNull('bill_to_customer_id'),
             organizationUnitId: $this->organizationUnitId(),
             jobNumber: $this->stringOrNull('job_number'),
             expectedDeliveryDate: $this->stringOrNull('expected_delivery_date'),
@@ -54,6 +56,7 @@ final class StoreVehicleServiceJobRequest extends TenantScopedRequest
             priority: $this->stringOrNull('priority'),
             notes: $this->stringOrNull('notes'),
             customerComplaint: $this->stringOrNull('customer_complaint'),
+            customerComplaintProvided: $this->has('customer_complaint'),
             createdBy: $this->currentUserId(),
         );
     }

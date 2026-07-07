@@ -39,3 +39,12 @@ export async function getInvoiceAdjustments(id: number, signal?: AbortSignal) {
     const response = await apiClient.get<ApiResource<InvoiceAdjustment[]>>(`${endpoints.invoices}/${id}/adjustments`, { signal });
     return response.data.data;
 }
+
+export async function getInvoiceSignedPrintLink(id: number, signal?: AbortSignal) {
+    const response = await apiClient.post<ApiResource<{ print_url: string; pdf_url: string }>>(
+        `${endpoints.invoices}/${id}/signed-print`,
+        null,
+        { signal },
+    );
+    return response.data.data;
+}

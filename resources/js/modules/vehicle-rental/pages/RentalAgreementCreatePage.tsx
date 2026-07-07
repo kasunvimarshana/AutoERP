@@ -1,5 +1,5 @@
-import { useMemo, useState, type FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { CustomerLookupSelect } from "@/modules/customer/components/CustomerLookupSelect";
 import type { CustomerSummary } from "@/modules/customer/customerTypes";
 import { SupplierLookupSelect } from "@/modules/supplier/components/SupplierLookupSelect";
@@ -14,9 +14,19 @@ import { Select } from "@/shared/components/Select";
 import { Textarea } from "@/shared/components/Textarea";
 import type { NamedResource } from "@/shared/types/common";
 import { useMutationFormGuard } from "@/shared/hooks/useMutationFormGuard";
+import { businessDateInputValue } from "@/shared/utils/businessDate";
+import { parsePositiveInteger } from "@/shared/utils/routeParams";
 import { RentalPage } from "../components/RentalPage";
 import { RentalCurrencyLookupSelect } from "../components/RentalLookups";
-import { createRentalAgreement } from "../vehicleRentalApi";
+import {
+    RENTAL_AGREEMENT_KIND,
+    RENTAL_AGREEMENT_KIND_OPTIONS,
+    agreementDetailPath,
+    isRentalAgreementKind,
+    type RentalAgreementPageMode,
+} from "../rentalAgreementPresentation";
+import { createRentalAgreement, getRentalReservation } from "../vehicleRentalApi";
+import type { RentalReservation } from "../vehicleRentalTypes";
 
 const componentDefaults = [
     ["base_rental", "month"],
@@ -28,13 +38,47 @@ const componentDefaults = [
     ["night_out", "count"],
 ] as const;
 
-export default function RentalAgreementCreatePage() {
+function toDateTimeLocal(value: string | null | undefined): string {
+    if (!value) return "";
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value.slice(0, 16);
+
+    return [
+        date.getFullYear(),
+        String(date.getMonth() + 1).padStart(2, "0"),
+        String(date.getDate()).padStart(2, "0"),
+    ].join("-") + `T${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
+interface RentalAgreementCreatePageProps {
+    mode?: RentalAgreementPageMode;
+}
+
+export default function RentalAgreementCreatePage({
+    mode = "standard",
+}: RentalAgreementCreatePageProps) {
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    const reservationId =
+        mode === "lessor"
+            ? null
+            : parsePositiveInteger(searchParams.get("reservation_id"));
+    const requestedKind = searchParams.get("kind");
+    const initialAgreementKind =
+        mode === "lessee"
+            ? RENTAL_AGREEMENT_KIND.customerRental
+            : mode === "lessor"
+            ? RENTAL_AGREEMENT_KIND.ownerSupply
+            : isRentalAgreementKind(requestedKind)
+                ? requestedKind
+                : RENTAL_AGREEMENT_KIND.customerRental;
     const [customer, setCustomer] = useState<CustomerSummary | null>(null);
     const [supplier, setSupplier] = useState<SupplierSummary | null>(null);
     const [currency, setCurrency] = useState<NamedResource | null>(null);
+    const [reservation, setReservation] = useState<RentalReservation | null>(null);
     const [form, setForm] = useState({
-        agreement_kind: "customer_rental",
+        agreement_kind: initialAgreementKind as string,
         agreement_date: "",
         starts_at: "",
         ends_at: "",
@@ -43,7 +87,6 @@ export default function RentalAgreementCreatePage() {
         billing_cycle: "monthly",
         billing_basis: "calendar_month",
         proration_rule: "exact_day_count",
-        billing_timezone: "Asia/Colombo",
         payment_term_days: "30",
         included_km: "0",
         excess_km_method: "period",
@@ -57,9 +100,38 @@ export default function RentalAgreementCreatePage() {
     const [error, setError] = useState<ApiError | null>(null);
     const formGuard = useMutationFormGuard(saving);
     const updateForm: typeof setForm = (next) => { formGuard.markDirty(); setForm(next); };
+    useEffect(() => {
+        if (!reservationId) return;
+
+        const controller = new AbortController();
+        queueMicrotask(() => {
+            if (!controller.signal.aborted) setError(null);
+        });
+
+        void getRentalReservation(reservationId, controller.signal)
+            .then((resource) => {
+                setReservation(resource);
+                if (resource.customer) setCustomer(resource.customer as CustomerSummary);
+                if (resource.currency) setCurrency(resource.currency);
+                setForm((current) => ({
+                    ...current,
+                    agreement_kind: RENTAL_AGREEMENT_KIND.customerRental,
+                    agreement_date: current.agreement_date || businessDateInputValue(),
+                    starts_at: toDateTimeLocal(resource.requested_start_at),
+                    ends_at: toDateTimeLocal(resource.requested_end_at),
+                    rental_mode: resource.rental_mode,
+                    billing_cycle: resource.billing_cycle,
+                }));
+            })
+            .catch((requestError: unknown) => {
+                if (!controller.signal.aborted) setError(toApiError(requestError));
+            });
+
+        return () => controller.abort();
+    }, [reservationId]);
     const partyValid = useMemo(
         () =>
-            form.agreement_kind === "customer_rental"
+            form.agreement_kind === RENTAL_AGREEMENT_KIND.customerRental
                 ? Boolean(customer)
                 : Boolean(supplier),
         [form.agreement_kind, customer, supplier],
@@ -71,12 +143,14 @@ export default function RentalAgreementCreatePage() {
         try {
             const row = await createRentalAgreement({
                 ...form,
+                reservation_id: reservation?.id ?? undefined,
+                expected_reservation_version: reservation?.row_version ?? undefined,
                 customer_id:
-                    form.agreement_kind === "customer_rental"
+                    form.agreement_kind === RENTAL_AGREEMENT_KIND.customerRental
                         ? customer?.id
                         : null,
                 supplier_id:
-                    form.agreement_kind === "owner_supply"
+                    form.agreement_kind === RENTAL_AGREEMENT_KIND.ownerSupply
                         ? supplier?.id
                         : null,
                 currency_id: Number(currency?.id),
@@ -107,7 +181,7 @@ export default function RentalAgreementCreatePage() {
                 },
                 activate_rate_version: true,
                 deposit:
-                    form.agreement_kind === "customer_rental" &&
+                    form.agreement_kind === RENTAL_AGREEMENT_KIND.customerRental &&
                     Number(form.deposit_amount) > 0
                         ? {
                               required_amount: form.deposit_amount,
@@ -117,7 +191,7 @@ export default function RentalAgreementCreatePage() {
                         : undefined,
             });
             formGuard.markSaved();
-            navigate(`/vehicle-rental/agreements/${row.id}`);
+            navigate(agreementDetailPath(mode, row.id));
         } catch (e) {
             setError(toApiError(e));
         } finally {
@@ -127,34 +201,41 @@ export default function RentalAgreementCreatePage() {
     return (
         <RentalPage>
             <ContentHeader
-                title="New rental agreement"
-                description="Create the customer or owner agreement and its first immutable rate version."
+                title={
+                    mode === "lessee"
+                        ? "New lessee agreement"
+                        : mode === "lessor"
+                        ? "New lessor agreement"
+                        : "New rental agreement"
+                }
+                description={
+                    mode === "lessee"
+                        ? "Create the customer-side rental agreement and its first immutable rate version."
+                        : mode === "lessor"
+                        ? "Create the supplier-side payable agreement and its first immutable rate version."
+                        : "Create the lessee or lessor agreement and its first immutable rate version."
+                }
             />
             <ErrorAlert error={error} />
             <form onSubmit={submit} className="space-y-5">
                 <Panel title="Agreement">
                     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                        <Select
-                            label="Agreement kind"
-                            value={form.agreement_kind}
-                            onChange={(e) =>
-                                updateForm({
-                                    ...form,
-                                    agreement_kind: e.target.value,
-                                })
-                            }
-                            options={[
-                                {
-                                    value: "customer_rental",
-                                    label: "Customer rental",
-                                },
-                                {
-                                    value: "owner_supply",
-                                    label: "Vehicle owner supply",
-                                },
-                            ]}
-                        />
-                        {form.agreement_kind === "customer_rental" ? (
+                        {mode === "standard" && (
+                            <Select
+                                label="Agreement kind"
+                                value={form.agreement_kind}
+                                disabled={reservation !== null}
+                                onChange={(e) =>
+                                    updateForm({
+                                        ...form,
+                                        agreement_kind: e.target.value,
+                                    })
+                                }
+                                options={[...RENTAL_AGREEMENT_KIND_OPTIONS]}
+                            />
+                        )}
+                        {form.agreement_kind ===
+                        RENTAL_AGREEMENT_KIND.customerRental ? (
                             <CustomerLookupSelect
                                 value={customer}
                                 onChange={(next) => { formGuard.markDirty(); setCustomer(next); }}
@@ -301,7 +382,8 @@ export default function RentalAgreementCreatePage() {
                                 label: value.replaceAll("_", " "),
                             }))}
                         />
-                        {form.agreement_kind === "customer_rental" && (
+                        {form.agreement_kind ===
+                            RENTAL_AGREEMENT_KIND.customerRental && (
                             <Input
                                 label="Security deposit"
                                 type="number"
@@ -354,7 +436,11 @@ export default function RentalAgreementCreatePage() {
                         loading={saving}
                         disabled={!partyValid || !currency}
                     >
-                        Create agreement
+                        {mode === "lessee"
+                            ? "Create lessee agreement"
+                            : mode === "lessor"
+                            ? "Create lessor agreement"
+                            : "Create agreement"}
                     </Button>
                 </div>
             </form>

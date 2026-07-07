@@ -166,6 +166,8 @@ export interface VehicleServiceJob {
     expected_delivery_date?: string | null;
     customer_id: number;
     customer?: NamedResource | null;
+    bill_to_customer_id?: number | null;
+    bill_to_customer?: NamedResource | null;
     vehicle_id: number;
     vehicle?: VehicleServiceVehicle | null;
     supervisor_employee_id?: number | null;
@@ -196,6 +198,7 @@ export interface VehicleServiceJobPayload {
     job_date: string;
     expected_delivery_date?: string;
     customer_id: number;
+    bill_to_customer_id?: number;
     vehicle_id: number;
     supervisor_employee_id?: number;
     supervisor_commission_type?: CommissionType;
@@ -258,7 +261,7 @@ export interface VehicleServiceInvoiceCreated {
 export interface VehicleServiceInventoryIssuePayload {
     expected_version?: number;
     warehouse_id: number;
-    warehouse_location_id?: number;
+    warehouse_location_id: number;
     line_ids?: number[];
 }
 
@@ -285,7 +288,7 @@ export interface VehicleServicePaymentOptions {
 }
 
 export interface VehicleServicePaymentPayload {
-    expected_job_version: number;
+    expected_version: number;
     invoice_id: number;
     payment_date: string;
     amount: string;

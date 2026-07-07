@@ -1,9 +1,11 @@
 import { useParams, useSearchParams } from 'react-router-dom';
-import { getInvoice, getInvoiceAdjustments, getInvoiceBalance, getInvoiceSources } from '../invoiceApi';
+import { getInvoice, getInvoiceAdjustments, getInvoiceBalance, getInvoiceSignedPrintLink, getInvoiceSources } from '../invoiceApi';
 import { hasInvoicePermission, invoicePermissions } from '../invoicePermissions';
 import { useApi } from '@/shared/hooks/useApi';
 import { useOnDemandTab } from '@/shared/hooks/useOnDemandTab';
 import { ContentHeader } from '@/shared/components/ContentHeader';
+import { Button } from '@/shared/components/Button';
+import { openSameOriginUrl } from '@/shared/utils/safeNavigation';
 import { Tabs, type TabItem } from '@/shared/components/Tabs';
 import { Panel } from '@/shared/components/Panel';
 import { DetailGrid } from '@/shared/components/DetailGrid';
@@ -59,17 +61,49 @@ export default function InvoiceDetailPage() {
     const value = invoice.data;
     const fromPurchase = searchParams.get('from') === 'purchase';
     const isSupplierInvoice = value.invoice_type === 'purchase' && value.direction === 'inbound';
+    const printUrl = `/invoices/${id}/print`;
+
     return (
         <>
             <ContentHeader
                 title={value.invoice_number ?? 'Invoice'}
                 description={formatDate(value.invoice_date)}
-                actions={fromPurchase && isSupplierInvoice ? (
+                actions={(
                     <div className="flex flex-wrap justify-end gap-2">
-                        <LinkButton to="/purchase/invoices" variant="secondary">Back to Purchase</LinkButton>
-                        <LinkButton to={`/purchase/payments/create?invoice_id=${id}`}>Create Payment</LinkButton>
+                        {fromPurchase && isSupplierInvoice ? (
+                            <>
+                                <LinkButton to="/purchase/invoices" variant="secondary">Back to Purchase</LinkButton>
+                                <LinkButton to={`/purchase/payments/create?invoice_id=${id}`}>Create Payment</LinkButton>
+                            </>
+                        ) : null}
+                        <Button variant="secondary" onClick={async () => {
+                            try {
+                                const json = await getInvoiceSignedPrintLink(id);
+                                if (json.print_url) {
+                                    openSameOriginUrl(json.print_url);
+                                    return;
+                                }
+                            } catch {
+                                // fallback to direct print URL
+                            }
+
+                            openSameOriginUrl(printUrl);
+                        }}>Print</Button>
+                        <Button variant="secondary" onClick={async () => {
+                            try {
+                                const json = await getInvoiceSignedPrintLink(id);
+                                if (json.pdf_url) {
+                                    window.open(json.pdf_url, '_blank', 'noopener');
+                                    return;
+                                }
+                            } catch {
+                                // fallback
+                            }
+
+                            window.open(`/invoices/${id}/pdf`, '_blank');
+                        }}>Download PDF</Button>
                     </div>
-                ) : undefined}
+                )}
             />
             <Panel className="p-0">
                 <Tabs tabs={tabs} active={tabState.activeTab} onChange={tabState.openTab} />

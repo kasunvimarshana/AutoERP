@@ -39,7 +39,8 @@ final class RentalCalculationController
         $agreementModel = $this->scope(RentalAgreement::query(), $request)->findOrFail($agreement);
         return (new RentalCalculationRunResource($service->calculate(
             $agreementModel, RentalFinancialSide::from((string) $request->input('financial_side')),
-            (string) $request->input('period_start'), (string) $request->input('period_end'), $request->currentUserId(),
+            (string) $request->input('period_start'), (string) $request->input('period_end'),
+            (int) $request->input('expected_agreement_version'), $request->currentUserId(),
         )))->response()->setStatusCode(201);
     }
 
@@ -74,7 +75,7 @@ final class RentalCalculationController
         $this->authorization->assert($request->currentUserId(), $request->tenantId(), VehicleRentalAuthorizationService::CREATE_FINANCIAL_DOCUMENTS);
         $model = $this->scope(RentalCalculationRun::query(), $request)->findOrFail($run);
         $invoice = $service->create(
-            $model, (string) $request->input('invoice_date'), $request->input('due_date'),
+            $model, (int) $request->input('expected_version'), (string) $request->input('invoice_date'), $request->input('due_date'),
             \Modules\Invoice\Enums\InvoiceStatus::from((string) $request->input('status')),
             $request->input('line_ids'), $request->currentUserId(), $request->input('notes'),
         );

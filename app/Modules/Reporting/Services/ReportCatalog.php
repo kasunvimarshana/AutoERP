@@ -57,7 +57,6 @@ use Modules\VehicleRental\Models\RentalVehicleReplacement;
 use Modules\VehicleRental\Models\VehicleFinanceInstallment;
 use Modules\VehicleRental\Models\RentalExpense;
 use Modules\VehicleRental\Models\RentalUsageEvent;
-use Modules\VehicleRental\Models\RentalUsageLog;
 use Modules\VehicleService\Models\VehicleServiceJob;
 use Modules\VehicleService\Models\VehicleServiceJobLine;
 use Modules\VehicleService\Models\VehicleServiceLineEmployee;
@@ -521,57 +520,6 @@ final class ReportCatalog
                 filters: [$this->filter('status', 'Status', 'status')],
                 dateColumn: 'replacement_at',
                 defaultSort: 'replacement_at',
-            ),
-            new ReportDefinition(
-                key: 'vehicle-rental.running-chart',
-                title: 'Daily Running Chart',
-                group: 'Vehicle Rental',
-                model: RentalUsageLog::class,
-                columns: [
-                    $this->col('usage_date', 'Date', format: 'date', sort: 'usage_date'),
-                    $this->col('usage_number', 'Running Chart', sort: 'usage_number'),
-                    $this->col('vehicle', 'Vehicle', 'vehicle.registration_number'),
-                    $this->col('allocation', 'Allocation', 'allocation.allocation_number'),
-                    $this->col('driver', 'Driver', 'driver.display_name'),
-                    $this->qty('start_odometer', 'Start KM', false),
-                    $this->qty('end_odometer', 'Finish KM', false),
-                    $this->qty('distance_km', 'Distance'),
-                    $this->qty('chargeable_distance_km', 'Chargeable KM'),
-                    $this->qty('garage_distance_km', 'Garage KM'),
-                    $this->col('status', 'Status', format: 'enum', sort: 'status'),
-                ],
-                search: ['usage_number', 'vehicle.registration_number', 'allocation.allocation_number', 'driver.display_name'],
-                relations: ['vehicle', 'allocation', 'driver'],
-                filters: [$this->filter('status', 'Status', 'status')],
-                dateColumn: 'usage_date',
-                defaultSort: 'usage_date',
-                orientation: 'landscape',
-            ),
-            new ReportDefinition(
-                key: 'vehicle-rental.driver-overtime',
-                title: 'Driver Overtime and Night-Out',
-                group: 'Vehicle Rental',
-                model: RentalUsageLog::class,
-                columns: [
-                    $this->col('usage_date', 'Date', format: 'date', sort: 'usage_date'),
-                    $this->col('driver', 'Driver', 'driver.display_name'),
-                    $this->col('vehicle', 'Vehicle', 'vehicle.registration_number'),
-                    $this->col('allocation', 'Allocation', 'allocation.allocation_number'),
-                    new ReportColumn('normal_ot_hours', 'Normal OT Hours', format: 'decimal', summarize: true, value: fn (RentalUsageLog $log): string => $this->math->div((string) $log->normal_overtime_minutes, '60')),
-                    new ReportColumn('double_ot_hours', 'Double OT Hours', format: 'decimal', summarize: true, value: fn (RentalUsageLog $log): string => $this->math->div((string) $log->double_overtime_minutes, '60')),
-                    new ReportColumn('triple_ot_hours', 'Triple OT Hours', format: 'decimal', summarize: true, value: fn (RentalUsageLog $log): string => $this->math->div((string) $log->triple_overtime_minutes, '60')),
-                    $this->qty('night_out_count', 'Night-Outs'),
-                ],
-                search: ['driver.display_name', 'vehicle.registration_number', 'allocation.allocation_number'],
-                relations: ['driver', 'vehicle', 'allocation'],
-                dateColumn: 'usage_date',
-                defaultSort: 'usage_date',
-                scope: static fn ($query) => $query->whereIn('status', ['approved', 'consumed'])
-                    ->where(static fn ($hours) => $hours
-                        ->where('normal_overtime_minutes', '>', 0)
-                        ->orWhere('double_overtime_minutes', '>', 0)
-                        ->orWhere('triple_overtime_minutes', '>', 0)
-                        ->orWhere('night_out_count', '>', 0)),
             ),
             $this->rentalCalculationReport('vehicle-rental.customer-revenue', 'Customer Rental Revenue Calculations', 'revenue'),
             $this->rentalCalculationReport('vehicle-rental.owner-cost', 'Vehicle Owner Cost Calculations', 'cost'),

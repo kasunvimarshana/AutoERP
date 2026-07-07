@@ -17,6 +17,7 @@ return new class extends Migration
             $table->foreignId('organization_unit_id')->nullable();
             $table->json('metadata')->nullable();
             $table->foreignId('agreement_id');
+            $table->foreignId('customer_id');
             $table->decimal('required_amount', 20, 6);
             $table->foreignId('currency_id')->constrained('currencies', indexName: 'rental_deposit_requirements_currency_fk')->restrictOnDelete();
             $table->date('due_date')->nullable();
@@ -36,12 +37,16 @@ return new class extends Migration
             $table->index(['status', 'due_date'], 'rental_deposit_requirements_status_due_ix');
 
             $table->unique(['id', 'tenant_id'], 'rental_deposit_requirements_id_tenant_uk');
+            $table->foreign(['customer_id', 'tenant_id'], 'rental_deposit_requirements_customer_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('customers')
+                ->restrictOnDelete();
             $table->foreign(['organization_unit_id', 'tenant_id'], 'rental_deposit_requirements_organization_unit_id_tenant_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('organization_units')
                 ->restrictOnDelete();
-            $table->foreign(['agreement_id', 'tenant_id'], 'rental_deposit_requirements_agreement_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
+            $table->foreign(['agreement_id', 'tenant_id', 'customer_id'], 'rental_deposit_requirements_agreement_id_tenant_customer_fk')
+                ->references(['id', 'tenant_id', 'customer_id'])
                 ->on('rental_agreements')
                 ->cascadeOnDelete();
 

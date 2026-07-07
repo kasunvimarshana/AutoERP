@@ -38,6 +38,7 @@ const currentCustomerOwner = (vehicle: VehicleLookupResource | null, fallback: N
 export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
     const navigate = useNavigate();
     const [customer, setCustomer] = useState<NamedResource | null>(vehicleCustomer(job?.vehicle ?? null, job?.customer ?? null));
+    const [billToCustomer, setBillToCustomer] = useState<NamedResource | null>(job?.bill_to_customer ?? vehicleCustomer(job?.vehicle ?? null, job?.customer ?? null));
     const [vehicle, setVehicle] = useState<VehicleLookupResource | null>(job?.vehicle ?? null);
     const [supervisor, setSupervisor] = useState<NamedResource | null>(job?.supervisor ?? null);
     const [quickVehicleNumber, setQuickVehicleNumber] = useState('');
@@ -62,6 +63,9 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
     }, [formGuard]);
     const errorFor = (key: string) => fieldError(error, key);
 
+    const searchCustomer = useCallback((params: LookupLoadParams) => {
+        return lookupApi.customers(params);
+    }, []);
     const searchVehicle = useCallback((params: LookupLoadParams) => {
         return lookupApi.serviceVehicles(params);
     }, []);
@@ -74,6 +78,7 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
         job_date: form.job_date,
         expected_delivery_date: form.expected_delivery_date || undefined,
         customer_id: customer?.id ?? 0,
+        bill_to_customer_id: billToCustomer?.id ?? customer?.id ?? 0,
         vehicle_id: vehicle?.id ?? 0,
         supervisor_employee_id: supervisor?.id,
         supervisor_commission_type: form.supervisor_commission_type,
@@ -81,14 +86,16 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
         odometer_reading: form.odometer_reading || undefined,
         fuel_level: form.fuel_level || undefined,
         priority: form.priority || undefined,
-        customer_complaint: form.customer_complaint || undefined,
+        customer_complaint: form.customer_complaint,
         notes: form.notes || undefined,
     });
 
     const applyVehicle = useCallback((value: VehicleLookupResource | null) => {
         formGuard.markDirty();
+        const nextCustomer = vehicleCustomer(value, null);
         setVehicle(value);
-        setCustomer(vehicleCustomer(value, null));
+        setCustomer(nextCustomer);
+        setBillToCustomer(nextCustomer);
         if (value?.odometer_reading && !form.odometer_reading) {
             updateForm((current) => ({ ...current, odometer_reading: value.odometer_reading ?? '' }));
         }
@@ -168,6 +175,7 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
                             }}
                         />
                         <Input label="Customer" value={customerLabel(customer)} error={errorFor('customer_id')} placeholder="Selected vehicle owner" readOnly />
+                        <GenericLookupSelect label="Bill-to customer" value={billToCustomer} onChange={(value) => { formGuard.markDirty(); setBillToCustomer(value); }} search={searchCustomer} formatLabel={(value) => `${value.code ?? ''} ${value.name}`.trim()} error={errorFor('bill_to_customer_id')} placeholder="Defaults to vehicle owner" loadOnOpen minSearchLength={0} />
                         <GenericLookupSelect label="Supervisor" value={supervisor} onChange={(value) => { formGuard.markDirty(); setSupervisor(value); }} search={searchSupervisor} formatLabel={(value) => `${value.code ?? ''} ${value.name}`.trim()} error={errorFor('supervisor_employee_id')} />
                         <Input label="Job date" type="date" value={form.job_date} error={errorFor('job_date')} onChange={(event) => updateForm({ ...form, job_date: event.target.value })} />
                         <Input label="Expected delivery" type="date" value={form.expected_delivery_date} error={errorFor('expected_delivery_date')} onChange={(event) => updateForm({ ...form, expected_delivery_date: event.target.value })} />

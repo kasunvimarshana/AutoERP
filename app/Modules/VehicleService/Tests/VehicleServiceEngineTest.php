@@ -235,7 +235,7 @@ final class VehicleServiceEngineTest extends TestCase
         $this->line($job, VehicleServiceLineSourceType::ExternalItem, null, '1.000000', '10.000000');
         $this->line($job, VehicleServiceLineSourceType::ServiceItem, $context['service'], '1.000000', '100.000000');
 
-        $issued = $this->issueInventory($job, $context['warehouse_id']);
+        $issued = $this->issueInventory($job, $context['warehouse_id'], $context['warehouse_location_id']);
         $this->assertCount(1, $issued);
         $this->assertSame($inventory->getKey(), $issued[0]->source_line_id);
         $movementCount = $this->withTenantExecutionContext(
@@ -257,7 +257,7 @@ final class VehicleServiceEngineTest extends TestCase
         $tooMuch = $this->line($secondJob, VehicleServiceLineSourceType::InventoryItem, $context['stock'], '4.000000', '20.000000');
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Inventory issue quantity cannot exceed available stock.');
-        $this->issueInventory($secondJob, $context['warehouse_id'], lineIds: [(int) $tooMuch->getKey()]);
+        $this->issueInventory($secondJob, $context['warehouse_id'], $context['warehouse_location_id'], lineIds: [(int) $tooMuch->getKey()]);
     }
 
     public function test_invoice_contains_only_billable_lines_and_prevents_duplicate_full_invoice(): void
@@ -299,7 +299,7 @@ final class VehicleServiceEngineTest extends TestCase
         $payment = $this->prepareServicePayment(
             $paymentJob,
             new VehicleServicePaymentData(
-                expectedJobVersion: $this->currentJobVersion($paymentJob),
+                expectedVersion: $this->currentJobVersion($paymentJob),
                 invoiceId: (int) $invoice->getKey(),
                 paymentDate: '2026-06-07',
                 amount: '100.000000',
@@ -353,6 +353,101 @@ final class VehicleServiceEngineTest extends TestCase
         ));
     }
 
+    public function test_job_update_persists_and_clears_customer_complaint_on_inspection(): void
+    {
+        $context = $this->context();
+        $job = $this->createJob($context);
+        $this->saveInspection($job, new VehicleServiceInspectionData(
+            customerComplaint: 'Old complaint',
+            inspectionNotes: 'Keep this note',
+            diagnosis: 'Keep diagnosis',
+        ));
+
+        $updated = $this->withTenantExecutionContext(
+            (int) $context['tenant_id'],
+            fn (): VehicleServiceJob => app(VehicleServiceJobService::class)->update(
+                $this->refreshJob($job),
+                new VehicleServiceJobData(
+                    tenantId: $context['tenant_id'],
+                    jobDate: '2026-06-07',
+                    customerId: $context['customer_id'],
+                    vehicleId: $context['vehicle_id'],
+                    supervisorEmployeeId: $context['employee_id'],
+                    odometerReading: '12000.000000',
+                    fuelLevel: 'half',
+                    customerComplaint: 'New complaint',
+                    customerComplaintProvided: true,
+                ),
+                $this->currentJobVersion($job),
+            ),
+        );
+
+        $this->assertSame('New complaint', $updated->inspection?->customer_complaint);
+        $this->assertSame('Keep this note', $updated->inspection?->inspection_notes);
+        $this->assertSame('Keep diagnosis', $updated->inspection?->diagnosis);
+
+        $cleared = $this->withTenantExecutionContext(
+            (int) $context['tenant_id'],
+            fn (): VehicleServiceJob => app(VehicleServiceJobService::class)->update(
+                $this->refreshJob($updated),
+                new VehicleServiceJobData(
+                    tenantId: $context['tenant_id'],
+                    jobDate: '2026-06-07',
+                    customerId: $context['customer_id'],
+                    vehicleId: $context['vehicle_id'],
+                    supervisorEmployeeId: $context['employee_id'],
+                    odometerReading: '12000.000000',
+                    fuelLevel: 'half',
+                    customerComplaint: null,
+                    customerComplaintProvided: true,
+                ),
+                $this->currentJobVersion($updated),
+            ),
+        );
+
+        $this->assertNull($cleared->inspection?->customer_complaint);
+        $this->assertSame('Keep this note', $cleared->inspection?->inspection_notes);
+    }
+
+    public function test_bill_to_customer_drives_service_invoice_and_payment_party(): void
+    {
+        $context = $this->context();
+        $billToCustomerId = $this->customer($context['tenant_id'], 'BILL-'.$context['tenant_id']);
+        $job = $this->withTenantExecutionContext(
+            (int) $context['tenant_id'],
+            fn (): VehicleServiceJob => app(VehicleServiceJobService::class)->create(new VehicleServiceJobData(
+                tenantId: $context['tenant_id'],
+                jobDate: '2026-06-07',
+                customerId: $context['customer_id'],
+                vehicleId: $context['vehicle_id'],
+                billToCustomerId: $billToCustomerId,
+                supervisorEmployeeId: $context['employee_id'],
+            )),
+        );
+        $this->line($job, VehicleServiceLineSourceType::ServiceItem, $context['service'], '1.000000', '150.000000');
+        $this->changeStatus($job, VehicleServiceJobStatus::InProgress);
+        $this->changeStatus($this->refreshJob($job), VehicleServiceJobStatus::Completed);
+
+        $invoice = $this->createServiceInvoice($this->refreshJob($job), '2026-06-07');
+        $this->assertSame('customer', $invoice->party_type);
+        $this->assertSame($billToCustomerId, (int) $invoice->party_id);
+
+        $method = $this->paymentMethod($context);
+        $paymentJob = $this->refreshJob($job);
+        $payment = $this->prepareServicePayment(
+            $paymentJob,
+            new VehicleServicePaymentData(
+                expectedVersion: $this->currentJobVersion($paymentJob),
+                invoiceId: (int) $invoice->getKey(),
+                paymentDate: '2026-06-07',
+                amount: '50.000000',
+                paymentMethodId: (int) $method->getKey(),
+            ),
+        );
+
+        $this->assertSame($billToCustomerId, $payment->partyId);
+    }
+
     public function test_job_resource_keeps_decimals_readable_and_relations_compact(): void
     {
         $context = $this->context();
@@ -369,6 +464,7 @@ final class VehicleServiceEngineTest extends TestCase
 
         $this->assertSame('125.500000', $resource['grand_total']);
         $this->assertSame($context['customer_id'], $resource['customer']['id']);
+        $this->assertSame($context['customer_id'], $resource['bill_to_customer']['id']);
         $this->assertSame($context['vehicle_id'], $resource['vehicle']['id']);
         $this->assertSame('125.500000', $resource['lines'][0]['line_total']);
         $this->assertSame($this->currentJobVersion($job), $resource['row_version']);
@@ -425,6 +521,27 @@ final class VehicleServiceEngineTest extends TestCase
 
         $eligible = $this->issueLines($job);
         $this->assertSame([(int) $inventory->getKey()], $eligible->pluck('id')->map(fn ($id) => (int) $id)->all());
+    }
+
+    public function test_line_uom_must_belong_to_selected_item(): void
+    {
+        $this->withoutMiddleware();
+        $context = $this->context();
+        $otherUomId = $this->uom($context['tenant_id'], 'ALT-'.$context['tenant_id']);
+        $this->actingAsTenantUser($context['tenant_id']);
+        $job = $this->createJob($context);
+
+        $this->tenantPostJson($context['tenant_id'], "/api/v1/vehicle-service/jobs/{$job->getKey()}/lines", [
+            'tenant_id' => $context['tenant_id'],
+            'expected_version' => $this->currentJobVersion($job),
+            'line_source_type' => 'service_item',
+            'item_id' => $context['service']->getKey(),
+            'uom_id' => $otherUomId,
+            'description' => 'Wrong UOM service line',
+            'quantity' => '1.000000',
+            'unit_price' => '10.000000',
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors('uom_id');
     }
 
     public function test_invalid_combo_child_relationships_are_rejected(): void
@@ -509,7 +626,7 @@ final class VehicleServiceEngineTest extends TestCase
         try {
             $paymentJob = $this->refreshJob($job);
             $this->prepareServicePayment($paymentJob, new VehicleServicePaymentData(
-                expectedJobVersion: $this->currentJobVersion($paymentJob),
+                expectedVersion: $this->currentJobVersion($paymentJob),
                 invoiceId: (int) $invoice->getKey(),
                 paymentDate: '2026-06-07',
                 amount: '251.000000',
@@ -522,7 +639,7 @@ final class VehicleServiceEngineTest extends TestCase
 
         $paymentJob = $this->refreshJob($job);
         $first = $this->createServicePayment($paymentJob, new VehicleServicePaymentData(
-            expectedJobVersion: $this->currentJobVersion($paymentJob),
+            expectedVersion: $this->currentJobVersion($paymentJob),
             invoiceId: (int) $invoice->getKey(),
             paymentDate: '2026-06-07',
             amount: '100.000000',
@@ -546,7 +663,7 @@ final class VehicleServiceEngineTest extends TestCase
 
         $paymentJob = $this->refreshJob($job);
         $second = $this->createServicePayment($paymentJob, new VehicleServicePaymentData(
-            expectedJobVersion: $this->currentJobVersion($paymentJob),
+            expectedVersion: $this->currentJobVersion($paymentJob),
             invoiceId: (int) $invoice->getKey(),
             paymentDate: '2026-06-07',
             amount: '150.000000',
@@ -576,6 +693,7 @@ final class VehicleServiceEngineTest extends TestCase
         $this->issueInventory(
             $job,
             $context['warehouse_id'],
+            $context['warehouse_location_id'],
             lineIds: [(int) $otherLine->getKey()],
         );
     }
@@ -609,10 +727,29 @@ final class VehicleServiceEngineTest extends TestCase
             'tenant_id' => $context['tenant_id'],
             'expected_version' => $this->currentJobVersion($job),
             'warehouse_id' => $context['warehouse_id'],
+            'warehouse_location_id' => $context['warehouse_location_id'],
             'line_ids' => [(int) $line->getKey()],
         ])->assertUnprocessable()
             ->assertJsonPath('error.code', 'DOMAIN_RULE_FAILED')
             ->assertJsonPath('error.message', 'Inventory issue quantity cannot exceed available stock.');
+    }
+
+    public function test_inventory_issue_api_requires_exact_warehouse_location(): void
+    {
+        $this->withoutMiddleware();
+        $context = $this->context();
+        $this->actingAsTenantUser($context['tenant_id']);
+        $this->receiveStock($context, '2.000000');
+        $job = $this->createJob($context);
+        $line = $this->line($job, VehicleServiceLineSourceType::InventoryItem, $context['stock'], '1.000000', '20.000000');
+
+        $this->tenantPostJson($context['tenant_id'], "/api/v1/vehicle-service/jobs/{$job->getKey()}/issue-inventory", [
+            'tenant_id' => $context['tenant_id'],
+            'expected_version' => $this->currentJobVersion($job),
+            'warehouse_id' => $context['warehouse_id'],
+            'line_ids' => [(int) $line->getKey()],
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors('warehouse_location_id');
     }
 
     public function test_tracked_inventory_lines_are_blocked_before_issue(): void
@@ -629,7 +766,7 @@ final class VehicleServiceEngineTest extends TestCase
         $job = $this->createJob($context);
         $line = $this->line($job, VehicleServiceLineSourceType::InventoryItem, $tracked, '1.000000', '10.000000');
 
-        $readiness = $this->issueLines($job, $context['warehouse_id'])
+        $readiness = $this->issueLines($job, $context['warehouse_id'], $context['warehouse_location_id'])
             ->firstWhere('id', $line->getKey());
 
         $this->assertFalse((bool) $readiness?->issue_eligible);
@@ -678,6 +815,7 @@ final class VehicleServiceEngineTest extends TestCase
         $tenantId = $this->tenant($suffix);
         $uomId = $this->uom($tenantId, 'PCS-'.$suffix);
         $warehouseId = $this->warehouse($tenantId, 'WH-'.$suffix);
+        $warehouseLocationId = $this->warehouseLocation($tenantId, $warehouseId, 'BIN-'.$suffix);
         $customerId = $this->customer($tenantId, 'CUS-'.$suffix);
         $vehicleId = $this->vehicle($tenantId, $customerId, 'VEH-'.$suffix);
         $employeeId = $this->employee($tenantId, 'EMP-'.$suffix);
@@ -686,6 +824,7 @@ final class VehicleServiceEngineTest extends TestCase
             'tenant_id' => $tenantId,
             'uom_id' => $uomId,
             'warehouse_id' => $warehouseId,
+            'warehouse_location_id' => $warehouseLocationId,
             'customer_id' => $customerId,
             'vehicle_id' => $vehicleId,
             'employee_id' => $employeeId,
@@ -799,19 +938,19 @@ final class VehicleServiceEngineTest extends TestCase
         );
     }
 
-    private function issueInventory(VehicleServiceJob $job, int $warehouseId, array $lineIds = [])
+    private function issueInventory(VehicleServiceJob $job, int $warehouseId, int $warehouseLocationId, array $lineIds = [])
     {
         return $this->withTenantExecutionContext(
             (int) $job->tenant_id,
-            fn () => app(VehicleServiceInventoryIntegrationService::class)->issue($job, $warehouseId, lineIds: $lineIds),
+            fn () => app(VehicleServiceInventoryIntegrationService::class)->issue($job, $warehouseId, $warehouseLocationId, lineIds: $lineIds),
         );
     }
 
-    private function issueLines(VehicleServiceJob $job, ?int $warehouseId = null)
+    private function issueLines(VehicleServiceJob $job, ?int $warehouseId = null, ?int $warehouseLocationId = null)
     {
         return $this->withTenantExecutionContext(
             (int) $job->tenant_id,
-            fn () => app(VehicleServiceInventoryIntegrationService::class)->issueLines($job, $warehouseId),
+            fn () => app(VehicleServiceInventoryIntegrationService::class)->issueLines($job, $warehouseId, $warehouseLocationId),
         );
     }
 
@@ -983,6 +1122,7 @@ final class VehicleServiceEngineTest extends TestCase
                 direction: InventoryDirection::In,
                 itemId: (int) $context['stock']->getKey(),
                 warehouseId: $context['warehouse_id'],
+                warehouseLocationId: $context['warehouse_location_id'],
                 quantity: $quantity,
                 unitCost: '10.000000',
             ));
@@ -1053,6 +1193,24 @@ final class VehicleServiceEngineTest extends TestCase
             'code' => $code,
             'type' => 'standard',
             'is_active' => true,
+            'is_default' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    private function warehouseLocation(int $tenantId, int $warehouseId, string $code): int
+    {
+        return (int) DB::table('warehouse_locations')->insertGetId([
+            'tenant_id' => $tenantId,
+            'row_version' => 1,
+            'warehouse_id' => $warehouseId,
+            'name' => 'Location '.$code,
+            'code' => $code,
+            'type' => 'bin',
+            'is_active' => true,
+            'is_pickable' => true,
+            'is_receivable' => true,
             'is_default' => true,
             'created_at' => now(),
             'updated_at' => now(),
