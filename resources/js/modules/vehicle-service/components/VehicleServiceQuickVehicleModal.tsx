@@ -64,7 +64,13 @@ export function VehicleServiceQuickVehicleModal({
     if (!open) return null;
 
     return (
-        <Modal open={open} title="Register vehicle for this job" onClose={onClose} closeDisabled={saving}>
+        <Modal
+            open={open}
+            title="Register vehicle for this job"
+            onClose={onClose}
+            closeDisabled={saving}
+            closeOnBackdrop={false}
+        >
             <form
                 className="space-y-5"
                 onSubmit={async (event) => {
@@ -192,6 +198,7 @@ export function VehicleServiceQuickVehicleModal({
                             placeholder="Search customer by code or name"
                             loadOnOpen
                             minSearchLength={0}
+                            dropdownPlacement="top"
                             required
                         />
                     ) : (

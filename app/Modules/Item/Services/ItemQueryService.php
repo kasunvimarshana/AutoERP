@@ -147,7 +147,7 @@ final class ItemQueryService
                 organizationUnitId: $organizationUnitId,
             );
 
-            $item->setAttribute('resolved_service_unit_price', $resolvedServicePrice->amount);
+            $item->setAttribute('resolved_service_unit_price', $resolvedServicePrice->amount ?? $this->math->normalize('0'));
             $item->setAttribute('resolved_purchase_unit_price', $resolvedPurchasePrice->amount);
             $item->setAttribute(
                 'available_stock_quantity',

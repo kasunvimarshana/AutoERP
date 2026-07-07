@@ -27,6 +27,7 @@ interface GenericLookupSelectProps<T extends NamedResource> extends LookupBehavi
     required?: boolean;
     id?: string;
     recentResultsKey?: string;
+    dropdownPlacement?: 'top' | 'bottom';
 }
 
 export function GenericLookupSelect<T extends NamedResource>({
@@ -45,6 +46,7 @@ export function GenericLookupSelect<T extends NamedResource>({
     required = false,
     id,
     recentResultsKey,
+    dropdownPlacement = 'bottom',
     minSearchLength = DEFAULT_MIN_SEARCH_LENGTH,
     loadOnOpen = false,
     perPage = DEFAULT_PER_PAGE,
@@ -334,7 +336,7 @@ export function GenericLookupSelect<T extends NamedResource>({
                     id={listboxId}
                     role="listbox"
                     aria-label={`${label} options`}
-                    className="absolute z-30 mt-1 max-h-64 w-full overflow-auto rounded-lg border border-slate-200 bg-white p-1 shadow-lg"
+                    className={`absolute z-30 max-h-64 w-full overflow-auto rounded-lg border border-slate-200 bg-white p-1 shadow-lg ${dropdownPlacement === 'top' ? 'bottom-full mb-1' : 'mt-1'}`}
                 >
                     {minimumMessage && <LookupMessage>{minimumMessage}</LookupMessage>}
                     {(loading || waitingForDebounce) && visibleOptions.length === 0 && (
