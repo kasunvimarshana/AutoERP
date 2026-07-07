@@ -31,6 +31,7 @@ use Modules\VehicleRental\Enums\RentalFinancialSide;
 use Modules\VehicleRental\Enums\RentalRateComponentCode;
 use Modules\VehicleRental\Enums\RentalRateUnit;
 use Modules\VehicleRental\Enums\RentalUsageFactStatus;
+use Modules\VehicleRental\Enums\RentalUsageEventType;
 use Modules\VehicleRental\Enums\RentalUsageStatus;
 use Modules\VehicleRental\Models\RentalAgreement;
 use Modules\VehicleRental\Models\RentalAgreementRateComponent;
@@ -645,14 +646,15 @@ final class RentalCalculationService
             RentalRateComponentCode::DoubleOvertime => $this->quantityByUnit($component->unit, $contexts, 'double_overtime_minutes'),
             RentalRateComponentCode::TripleOvertime => $this->quantityByUnit($component->unit, $contexts, 'triple_overtime_minutes'),
             RentalRateComponentCode::NightOut => $this->sumFactField($contexts, 'night_out_count'),
-            RentalRateComponentCode::Parking => $this->eventQuantity($contexts, 'parking'),
-            RentalRateComponentCode::Toll => $this->eventQuantity($contexts, 'toll'),
-            RentalRateComponentCode::Waiting => $this->eventQuantity($contexts, 'waiting'),
-            RentalRateComponentCode::Outstation => $this->eventQuantity($contexts, 'outstation'),
-            RentalRateComponentCode::Fuel => $this->eventQuantity($contexts, 'fuel'),
-            RentalRateComponentCode::Damage => $this->eventQuantity($contexts, 'damage'),
-            RentalRateComponentCode::Repair => $this->eventQuantity($contexts, 'repair'),
-            RentalRateComponentCode::OtherRecovery => $this->eventQuantity($contexts, 'other'),
+            RentalRateComponentCode::Parking => $this->eventQuantity($contexts, RentalUsageEventType::Parking->value),
+            RentalRateComponentCode::Toll => $this->eventQuantity($contexts, RentalUsageEventType::Toll->value),
+            RentalRateComponentCode::Waiting => $this->eventQuantity($contexts, RentalUsageEventType::Waiting->value),
+            RentalRateComponentCode::Outstation => $this->eventQuantity($contexts, RentalUsageEventType::Outstation->value),
+            RentalRateComponentCode::Pass => $this->eventQuantity($contexts, RentalUsageEventType::Pass->value),
+            RentalRateComponentCode::Fuel => $this->eventQuantity($contexts, RentalUsageEventType::Fuel->value),
+            RentalRateComponentCode::Damage => $this->eventQuantity($contexts, RentalUsageEventType::Damage->value),
+            RentalRateComponentCode::Repair => $this->eventQuantity($contexts, RentalUsageEventType::Repair->value),
+            RentalRateComponentCode::OtherRecovery => $this->eventQuantity($contexts, RentalUsageEventType::Other->value),
             RentalRateComponentCode::WithholdingTax => '0.000000',
         };
     }

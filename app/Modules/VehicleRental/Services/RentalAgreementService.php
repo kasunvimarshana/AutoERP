@@ -123,6 +123,7 @@ final class RentalAgreementService
                 $agreement->depositRequirement()->create([
                     'tenant_id' => $tenantId,
                     'organization_unit_id' => $organizationUnitId,
+                    'agreement_kind' => RentalAgreementKind::CustomerRental->value,
                     'customer_id' => $agreement->customer_id,
                     'required_amount' => $required,
                     'currency_id' => $deposit['currency_id'] ?? $agreement->currency_id,

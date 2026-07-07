@@ -180,6 +180,11 @@ final class RentalEndToEndContractFixTest extends TestCase
         self::assertStringContainsString("'row_version', 'allocation_number', 'status', 'allocated_from', 'allocated_to'", $this->source('app/Modules/VehicleRental/Http/Resources/RentalAllocationResource.php'));
         self::assertStringContainsString("'row_version', 'agreement_number', 'status', 'starts_at', 'matures_at'", $this->source('app/Modules/VehicleRental/Http/Resources/RentalAllocationResource.php'));
         self::assertStringContainsString('cancelRentalAllocation', $detailPage);
+        self::assertStringContainsString('assignRentalDriver(row.id, row.row_version', $detailPage);
+        self::assertStringContainsString('GenericLookupSelect<EmployeeSummary>', $detailPage);
+        self::assertStringContainsString('searchEmployees', $detailPage);
+        self::assertStringContainsString('employee_id: selectedDriver.id', $detailPage);
+        self::assertStringContainsString('assigned_from: driverForm.assignedFrom', $detailPage);
         self::assertStringContainsString('Source allocation', $detailPage);
         self::assertStringContainsString('Finance agreement', $detailPage);
         self::assertStringContainsString("'replacement' =>", $custodyResource);
@@ -234,6 +239,9 @@ final class RentalEndToEndContractFixTest extends TestCase
     {
         $usageService = $this->source('app/Modules/VehicleRental/Services/RentalUsageService.php');
         $usageFactService = $this->source('app/Modules/VehicleRental/Services/RentalUsageFactService.php');
+        $rateVersionService = $this->source('app/Modules/VehicleRental/Services/RentalRateVersionService.php');
+        $usageLogMigration = $this->source('app/Modules/VehicleRental/Database/Migrations/2026_06_12_200014_create_rental_usage_logs_table.php');
+        $usageLogModel = $this->source('app/Modules/VehicleRental/Models/RentalUsageLog.php');
         $allocationResource = $this->source('app/Modules/VehicleRental/Http/Resources/RentalAllocationResource.php');
         $runningChartPage = $this->source('resources/js/modules/vehicle-rental/pages/RentalRunningChartPage.tsx');
         $agreementDetailPage = $this->source('resources/js/modules/vehicle-rental/pages/RentalAgreementDetailPage.tsx');
@@ -259,6 +267,20 @@ final class RentalEndToEndContractFixTest extends TestCase
         self::assertStringContainsString('Running chart owner payable context requires an active owner supply allocation.', $usageService);
         self::assertStringContainsString('Running chart owner payable context requires an active owner supply agreement.', $usageService);
         self::assertStringContainsString('Usage time must be inside the owner supply allocation period.', $usageService);
+        self::assertStringContainsString('RentalDriverAssignmentStatus::Active->value', $usageService);
+        self::assertStringContainsString('Driver assignment is not active for the complete usage period.', $usageService);
+        self::assertStringContainsString('$this->rates->assertSingleVersionCoversPeriod', $usageService);
+        self::assertStringContainsString('$this->rates->assertSingleVersionCoversPeriod', $usageFactService);
+        self::assertStringContainsString("'context.agreement'", $usageFactService);
+        self::assertStringContainsString('assertSingleVersionCoversPeriod', $rateVersionService);
+        self::assertStringContainsString('Usage period must stay inside one active rental rate version.', $rateVersionService);
+        self::assertStringContainsString('assertNoUsageCrossesRateBoundaries', $rateVersionService);
+        self::assertStringContainsString('Rate activation would split existing running-chart usage.', $rateVersionService);
+        self::assertStringContainsString('fingerprint_sequence', $usageService);
+        self::assertStringContainsString('fingerprint_sequence', $usageLogMigration);
+        self::assertStringContainsString('fingerprint_sequence', $usageLogModel);
+        self::assertStringContainsString("where('fingerprint', \$fingerprint)", $usageService);
+        self::assertStringContainsString('RentalUsageStatus::Reversed', $usageService);
         self::assertStringContainsString("'agreement_id'", $this->source('app/Modules/VehicleRental/Http/Requests/ListRentalRequest.php'));
         self::assertStringContainsString("'financial_side'", $this->source('app/Modules/VehicleRental/Http/Requests/ListRentalRequest.php'));
         self::assertStringContainsString("! empty(\$filters['agreement_id']) && ! empty(\$filters['financial_side'])", $usageService);
@@ -277,6 +299,15 @@ final class RentalEndToEndContractFixTest extends TestCase
         self::assertStringContainsString('financial_side: side', $agreementDetailPage);
         self::assertStringContainsString('rentalAgreementFinancialSide(row.agreement_kind)', $agreementDetailPage);
         self::assertStringContainsString('usageContextForSide(row, side)?.allocation', $agreementDetailPage);
+
+        $calculationService = $this->source('app/Modules/VehicleRental/Services/RentalCalculationService.php');
+        $rateComponentCode = $this->source('app/Modules/VehicleRental/Enums/RentalRateComponentCode.php');
+        $agreementCreatePage = $this->source('resources/js/modules/vehicle-rental/pages/RentalAgreementCreatePage.tsx');
+
+        self::assertStringContainsString("case Pass = 'pass';", $rateComponentCode);
+        self::assertStringContainsString('RentalRateComponentCode::Pass => $this->eventQuantity($contexts, RentalUsageEventType::Pass->value)', $calculationService);
+        self::assertStringContainsString('eventComponentDefaults', $agreementCreatePage);
+        self::assertStringContainsString('["pass", "count"]', $agreementCreatePage);
     }
 
     private function source(string $relativePath): string

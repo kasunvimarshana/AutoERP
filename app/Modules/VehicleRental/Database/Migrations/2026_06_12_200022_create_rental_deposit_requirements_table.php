@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Modules\VehicleRental\Enums\RentalAgreementKind;
 
 return new class extends Migration
 {
@@ -17,6 +18,8 @@ return new class extends Migration
             $table->foreignId('organization_unit_id')->nullable();
             $table->json('metadata')->nullable();
             $table->foreignId('agreement_id');
+            $table->enum('agreement_kind', [RentalAgreementKind::CustomerRental->value])
+                ->default(RentalAgreementKind::CustomerRental->value);
             $table->foreignId('customer_id');
             $table->decimal('required_amount', 20, 6);
             $table->foreignId('currency_id')->constrained('currencies', indexName: 'rental_deposit_requirements_currency_fk')->restrictOnDelete();
@@ -45,8 +48,8 @@ return new class extends Migration
                 ->references(['id', 'tenant_id'])
                 ->on('organization_units')
                 ->restrictOnDelete();
-            $table->foreign(['agreement_id', 'tenant_id', 'customer_id'], 'rental_deposit_requirements_agreement_id_tenant_customer_fk')
-                ->references(['id', 'tenant_id', 'customer_id'])
+            $table->foreign(['agreement_id', 'tenant_id', 'agreement_kind', 'customer_id'], 'rental_deposit_req_agreement_kind_customer_fk')
+                ->references(['id', 'tenant_id', 'agreement_kind', 'customer_id'])
                 ->on('rental_agreements')
                 ->cascadeOnDelete();
 

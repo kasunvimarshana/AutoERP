@@ -28,7 +28,7 @@ import {
 import { createRentalAgreement, getRentalReservation } from "../vehicleRentalApi";
 import type { RentalReservation } from "../vehicleRentalTypes";
 
-const componentDefaults = [
+const coreComponentDefaults = [
     ["base_rental", "month"],
     ["excess_km", "km"],
     ["driver_salary", "month"],
@@ -36,6 +36,23 @@ const componentDefaults = [
     ["double_overtime", "hour"],
     ["triple_overtime", "hour"],
     ["night_out", "count"],
+] as const;
+
+const eventComponentDefaults = [
+    ["parking", "count"],
+    ["toll", "count"],
+    ["waiting", "hour"],
+    ["outstation", "trip"],
+    ["pass", "count"],
+    ["fuel", "litre"],
+    ["damage", "fixed"],
+    ["repair", "fixed"],
+    ["other_recovery", "fixed"],
+] as const;
+
+const componentDefaults = [
+    ...coreComponentDefaults,
+    ...eventComponentDefaults,
 ] as const;
 
 function toDateTimeLocal(value: string | null | undefined): string {
@@ -409,9 +426,30 @@ export default function RentalAgreementCreatePage({
                         />
                     </div>
                 </Panel>
-                <Panel title="Rate components">
+                <Panel title="Core rates">
                     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                        {componentDefaults.map(([code, unit]) => (
+                        {coreComponentDefaults.map(([code, unit]) => (
+                            <Input
+                                key={code}
+                                label={`${code.replaceAll("_", " ")} (${unit})`}
+                                type="number"
+                                min="0"
+                                step="0.000001"
+                                value={rates[code]}
+                                onChange={(e) => {
+                                    formGuard.markDirty();
+                                    setRates({
+                                        ...rates,
+                                        [code]: e.target.value,
+                                    });
+                                }}
+                            />
+                        ))}
+                    </div>
+                </Panel>
+                <Panel title="Event and recovery rates">
+                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                        {eventComponentDefaults.map(([code, unit]) => (
                             <Input
                                 key={code}
                                 label={`${code.replaceAll("_", " ")} (${unit})`}

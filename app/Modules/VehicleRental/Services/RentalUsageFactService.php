@@ -28,7 +28,10 @@ final class RentalUsageFactService
         'reversed' => [],
     ];
 
-    public function __construct(private readonly DecimalMath $math) {}
+    public function __construct(
+        private readonly DecimalMath $math,
+        private readonly RentalRateVersionService $rates,
+    ) {}
 
     public function createInitial(
         RentalUsageContext $context,
@@ -79,6 +82,11 @@ final class RentalUsageFactService
                 || $endedAt->greaterThan(CarbonImmutable::parse($usage->ended_at))) {
                 throw new InvalidArgumentException('Commercial time must stay inside the physical usage period.');
             }
+            $this->rates->assertSingleVersionCoversPeriod(
+                $fact->context->agreement,
+                $startedAt,
+                $endedAt,
+            );
 
             $startOdometer = $this->math->normalize((string) $data['start_odometer']);
             $endOdometer = $this->math->normalize((string) $data['end_odometer']);
@@ -240,7 +248,7 @@ final class RentalUsageFactService
             ->findOrFail($fact->usage_context_id);
 
         return RentalUsageFact::query()
-            ->with(['usageLog', 'context'])
+            ->with(['usageLog', 'context.agreement'])
             ->lockForUpdate()
             ->findOrFail($fact->getKey());
     }

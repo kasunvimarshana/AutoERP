@@ -5,13 +5,16 @@ declare(strict_types=1);
 namespace Modules\VehicleRental\Services;
 
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use Modules\VehicleRental\Enums\RentalAgreementStatus;
 use Modules\VehicleRental\Enums\RentalRateVersionStatus;
+use Modules\VehicleRental\Enums\RentalUsageStatus;
 use Modules\VehicleRental\Models\RentalAgreement;
 use Modules\VehicleRental\Models\RentalAgreementRateVersion;
+use Modules\VehicleRental\Models\RentalUsageContext;
 
 final class RentalRateVersionService
 {
@@ -171,6 +174,7 @@ final class RentalRateVersionService
                     'effective_to' => ['Choose a non-overlapping period; active rate history is never rewritten during activation.'],
                 ]);
             }
+            $this->assertNoUsageCrossesRateBoundaries($version);
 
             $version->status = RentalRateVersionStatus::Active;
             $version->approved_by = $userId;
@@ -199,6 +203,41 @@ final class RentalRateVersionService
             ->firstOrFail();
     }
 
+    public function assertSingleVersionCoversPeriod(
+        RentalAgreement $agreement,
+        CarbonImmutable $start,
+        CarbonImmutable $end,
+    ): void {
+        if (! $end->greaterThan($start)) {
+            throw new InvalidArgumentException('Usage finish time must be after start time.');
+        }
+
+        $versions = $agreement->rateVersions()
+            ->whereIn('status', [
+                RentalRateVersionStatus::Active->value,
+                RentalRateVersionStatus::Superseded->value,
+            ])
+            ->where('effective_from', '<', $end->toDateTimeString())
+            ->where(fn (Builder $query) => $query
+                ->whereNull('effective_to')
+                ->orWhere('effective_to', '>', $start->toDateTimeString()))
+            ->lockForUpdate()
+            ->get();
+        $coveringVersions = $versions->filter(fn (RentalAgreementRateVersion $version): bool => (
+            CarbonImmutable::parse($version->effective_from)->lessThanOrEqualTo($start)
+            && (
+                $version->effective_to === null
+                || CarbonImmutable::parse($version->effective_to)->greaterThanOrEqualTo($end)
+            )
+        ));
+
+        if ($versions->count() !== 1 || $coveringVersions->count() !== 1) {
+            throw new InvalidArgumentException(
+                'Usage period must stay inside one active rental rate version. Split the running-chart entry at the rate effective time.',
+            );
+        }
+    }
+
     private function assertExpectedVersion(RentalAgreementRateVersion $version, int $expectedVersion): void
     {
         if ((int) $version->row_version !== $expectedVersion) {
@@ -225,6 +264,35 @@ final class RentalRateVersionService
             RentalAgreementStatus::Cancelled,
         ], true)) {
             throw new InvalidArgumentException('Terminal rental agreements cannot receive or activate rate versions.');
+        }
+    }
+
+    private function assertNoUsageCrossesRateBoundaries(RentalAgreementRateVersion $version): void
+    {
+        foreach ([
+            'effective_from' => $version->effective_from,
+            'effective_to' => $version->effective_to,
+        ] as $field => $boundary) {
+            if ($boundary === null) {
+                continue;
+            }
+
+            $boundaryAt = CarbonImmutable::parse($boundary)->toDateTimeString();
+            $usageCrossesBoundary = RentalUsageContext::query()
+                ->where('tenant_id', $version->tenant_id)
+                ->where('agreement_id', $version->agreement_id)
+                ->whereHas('usageLog', fn (Builder $query): Builder => $query
+                    ->whereNot('status', RentalUsageStatus::Reversed->value)
+                    ->where('started_at', '<', $boundaryAt)
+                    ->where('ended_at', '>', $boundaryAt))
+                ->lockForUpdate()
+                ->exists();
+
+            if ($usageCrossesBoundary) {
+                throw ValidationException::withMessages([
+                    $field => ['Rate activation would split existing running-chart usage. Reverse or split those entries before activating this rate version.'],
+                ]);
+            }
         }
     }
 }

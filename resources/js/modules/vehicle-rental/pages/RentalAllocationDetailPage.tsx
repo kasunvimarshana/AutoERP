@@ -1,18 +1,46 @@
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import { useParams } from "react-router-dom";
+import { searchEmployees } from "@/modules/hr/hrApi";
+import type { EmployeeSummary } from "@/modules/hr/hrTypes";
 import { Button, LinkButton } from "@/shared/components/Button";
 import { toApiError, type ApiError } from "@/shared/api/apiError";
 import { ContentHeader } from "@/shared/components/ContentHeader";
 import { DetailGrid } from "@/shared/components/DetailGrid";
 import { ErrorAlert } from "@/shared/components/ErrorAlert";
+import { GenericLookupSelect } from "@/shared/components/GenericLookupSelect";
+import { Input } from "@/shared/components/Input";
 import { LoadingState } from "@/shared/components/LoadingState";
 import { Panel } from "@/shared/components/Panel";
+import { Select } from "@/shared/components/Select";
 import { StatusBadge } from "@/shared/components/StatusBadge";
 import { useApi } from "@/shared/hooks/useApi";
 import { formatDate } from "@/shared/utils/formatDate";
 import { readableRelation } from "@/shared/utils/object";
 import { RentalPage } from "../components/RentalPage";
-import { cancelRentalAllocation, getRentalAllocation } from "../vehicleRentalApi";
+import {
+    assignRentalDriver,
+    cancelRentalAllocation,
+    getRentalAllocation,
+} from "../vehicleRentalApi";
+import type { RentalAllocation } from "../vehicleRentalTypes";
+
+const DRIVER_ASSIGNABLE_STATUSES = new Set(["planned", "active"]);
+const DRIVER_ROLE_OPTIONS = [
+    { value: "primary", label: "Primary" },
+    { value: "relief", label: "Relief" },
+];
+const PRIMARY_ASSIGNMENT_OPTIONS = [
+    { value: "yes", label: "Yes" },
+    { value: "no", label: "No" },
+];
+
+interface DriverForm {
+    assignmentRole: string;
+    assignedFrom: string;
+    assignedTo: string;
+    primary: string;
+    remarks: string;
+}
 
 function ownershipLabel(value: unknown): string {
     if (!value || typeof value !== "object") return "-";
@@ -26,12 +54,158 @@ function ownershipLabel(value: unknown): string {
     ].filter(Boolean).join(" - ") || "-";
 }
 
+function toDateTimeLocal(value?: string | null): string {
+    if (!value) return "";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+
+    const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+
+    return local.toISOString().slice(0, 16);
+}
+
+function employeeLabel(employee: EmployeeSummary): string {
+    return [
+        employee.employee_number,
+        employee.display_name || employee.name,
+    ].filter(Boolean).join(" - ");
+}
+
+function driverFormDefaults(
+    allocatedFrom?: string | null,
+    allocatedTo?: string | null,
+): DriverForm {
+    return {
+        assignmentRole: "primary",
+        assignedFrom: toDateTimeLocal(allocatedFrom),
+        assignedTo: toDateTimeLocal(allocatedTo),
+        primary: "yes",
+        remarks: "",
+    };
+}
+
+function DriverAssignmentForm({
+    row,
+    onAssigned,
+    onActionError,
+}: {
+    row: RentalAllocation;
+    onAssigned: () => void;
+    onActionError: (error: ApiError | null) => void;
+}) {
+    const driverDefaults = driverFormDefaults(row.allocated_from, row.allocated_to);
+    const [selectedDriver, setSelectedDriver] = useState<EmployeeSummary | null>(null);
+    const [assigningDriver, setAssigningDriver] = useState(false);
+    const [driverForm, setDriverForm] = useState<DriverForm>(driverDefaults);
+
+    const assignDriver = async (event: FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+        if (!selectedDriver) return;
+
+        setAssigningDriver(true);
+        onActionError(null);
+        try {
+            await assignRentalDriver(row.id, row.row_version, {
+                employee_id: selectedDriver.id,
+                assignment_role: driverForm.assignmentRole,
+                assigned_from: driverForm.assignedFrom,
+                assigned_to: driverForm.assignedTo || null,
+                is_primary: driverForm.primary === "yes",
+                remarks: driverForm.remarks || null,
+            });
+            setSelectedDriver(null);
+            setDriverForm(driverDefaults);
+            onAssigned();
+        } catch (error) {
+            onActionError(toApiError(error));
+        } finally {
+            setAssigningDriver(false);
+        }
+    };
+
+    return (
+        <form
+            className="space-y-3 border-t border-slate-200 pt-4"
+            onSubmit={assignDriver}
+        >
+            <GenericLookupSelect<EmployeeSummary>
+                label="Driver"
+                value={selectedDriver}
+                onChange={setSelectedDriver}
+                search={searchEmployees}
+                formatLabel={employeeLabel}
+                placeholder="Search active employee"
+                required
+            />
+            <div className="grid gap-3 sm:grid-cols-2">
+                <Select
+                    label="Role"
+                    value={driverForm.assignmentRole}
+                    options={DRIVER_ROLE_OPTIONS}
+                    onChange={(event) => setDriverForm({
+                        ...driverForm,
+                        assignmentRole: event.target.value,
+                    })}
+                    required
+                />
+                <Select
+                    label="Primary"
+                    value={driverForm.primary}
+                    options={PRIMARY_ASSIGNMENT_OPTIONS}
+                    onChange={(event) => setDriverForm({
+                        ...driverForm,
+                        primary: event.target.value,
+                    })}
+                    required
+                />
+                <Input
+                    label="From"
+                    type="datetime-local"
+                    value={driverForm.assignedFrom}
+                    onChange={(event) => setDriverForm({
+                        ...driverForm,
+                        assignedFrom: event.target.value,
+                    })}
+                    required
+                />
+                <Input
+                    label="To"
+                    type="datetime-local"
+                    value={driverForm.assignedTo}
+                    onChange={(event) => setDriverForm({
+                        ...driverForm,
+                        assignedTo: event.target.value,
+                    })}
+                />
+            </div>
+            <Input
+                label="Remarks"
+                value={driverForm.remarks}
+                onChange={(event) => setDriverForm({
+                    ...driverForm,
+                    remarks: event.target.value,
+                })}
+            />
+            <div className="flex justify-end">
+                <Button
+                    type="submit"
+                    loading={assigningDriver}
+                    disabled={!selectedDriver}
+                >
+                    Assign driver
+                </Button>
+            </div>
+        </form>
+    );
+}
+
 export default function RentalAllocationDetailPage() {
     const id = Number(useParams().id);
     const [refresh, setRefresh] = useState(0);
     const [actionError, setActionError] = useState<ApiError | null>(null);
     const [cancelling, setCancelling] = useState(false);
     const result = useApi((signal) => getRentalAllocation(id, signal), [id, refresh]);
+
     if (result.loading)
         return (
             <RentalPage>
@@ -45,6 +219,7 @@ export default function RentalAllocationDetailPage() {
             </RentalPage>
         );
     const row = result.data;
+    const canAssignDriver = DRIVER_ASSIGNABLE_STATUSES.has(row.status);
     const cancel = async () => {
         if (!window.confirm("Cancel this planned allocation?")) return;
 
@@ -179,6 +354,14 @@ export default function RentalAllocationDetailPage() {
                             <p className="text-sm text-slate-500">
                                 No driver is assigned.
                             </p>
+                        )}
+                        {canAssignDriver && (
+                            <DriverAssignmentForm
+                                key={`${row.id}-${row.row_version}`}
+                                row={row}
+                                onAssigned={() => setRefresh((value) => value + 1)}
+                                onActionError={setActionError}
+                            />
                         )}
                     </div>
                 </Panel>

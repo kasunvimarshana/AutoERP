@@ -9,9 +9,12 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Carbon\CarbonImmutable;
+use InvalidArgumentException;
 use Modules\VehicleRental\Enums\RentalRateVersionStatus;
 use Modules\VehicleRental\Models\RentalAgreement;
 use Modules\VehicleRental\Services\RentalAgreementService;
+use Modules\VehicleRental\Services\RentalRateVersionService;
 use Tests\TestCase;
 
 final class RentalAgreementCreateTest extends TestCase
@@ -68,6 +71,84 @@ final class RentalAgreementCreateTest extends TestCase
             'status' => RentalRateVersionStatus::Active->value,
             'row_version' => 2,
         ]);
+    }
+
+    public function test_usage_period_crossing_rate_version_boundary_is_rejected(): void
+    {
+        $currencyId = $this->createCurrency('VRB');
+        $tenantId = $this->createTenant($currencyId);
+        $customerId = $this->createCustomer($tenantId, $currencyId);
+
+        $agreement = $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): RentalAgreement => app(RentalAgreementService::class)->create([
+                'agreement_number' => 'RA-RATE-BOUNDARY-001',
+                'agreement_kind' => 'customer_rental',
+                'customer_id' => $customerId,
+                'agreement_date' => '2026-07-07',
+                'starts_at' => '2026-07-07 08:00:00',
+                'ends_at' => '2026-08-07 08:00:00',
+                'legal_context' => 'company',
+                'rental_mode' => 'with_driver',
+                'billing_cycle' => 'monthly',
+                'billing_basis' => 'calendar_month',
+                'proration_rule' => 'exact_day_count',
+                'payment_term_days' => 30,
+                'currency_id' => $currencyId,
+                'rate_version' => [
+                    'effective_from' => '2026-07-07 08:00:00',
+                    'effective_to' => '2026-07-15 08:00:00',
+                    'excess_km_method' => 'period',
+                    'included_km' => '0.000000',
+                    'currency_id' => $currencyId,
+                    'components' => [[
+                        'component_code' => 'base_rental',
+                        'unit' => 'month',
+                        'rate' => '1000.000000',
+                        'multiplier' => '1.000000',
+                        'calculation_order' => 1,
+                        'is_taxable' => true,
+                    ]],
+                ],
+                'activate_rate_version' => true,
+            ], $tenantId, null, null),
+        );
+
+        $service = app(RentalRateVersionService::class);
+        $secondVersion = $this->withTenantExecutionContext(
+            $tenantId,
+            fn () => $service->createDraft($agreement->refresh(), [
+                'effective_from' => '2026-07-15 08:00:00',
+                'effective_to' => '2026-08-07 08:00:00',
+                'excess_km_method' => 'period',
+                'included_km' => '0.000000',
+                'currency_id' => $currencyId,
+                'components' => [[
+                    'component_code' => 'base_rental',
+                    'unit' => 'month',
+                    'rate' => '1200.000000',
+                    'multiplier' => '1.000000',
+                    'calculation_order' => 1,
+                    'is_taxable' => true,
+                ]],
+            ]),
+        );
+        $this->withTenantExecutionContext(
+            $tenantId,
+            fn () => $service->activate($secondVersion, (int) $secondVersion->row_version),
+        );
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Usage period must stay inside one active rental rate version.');
+
+        $this->withTenantExecutionContext(
+            $tenantId,
+            fn () => $service->assertSingleVersionCoversPeriod(
+                $agreement->refresh(),
+                CarbonImmutable::parse('2026-07-14 08:00:00'),
+                CarbonImmutable::parse('2026-07-16 08:00:00'),
+            ),
+        );
     }
 
     public function test_lessor_agreement_is_created_as_supplier_side_owner_supply(): void
@@ -167,6 +248,7 @@ final class RentalAgreementCreateTest extends TestCase
         self::assertSame($customerId, (int) $agreement->customer_id);
         self::assertNull($agreement->supplier_id);
         self::assertNotNull($agreement->depositRequirement);
+        self::assertSame('customer_rental', $agreement->depositRequirement->agreement_kind->value);
         self::assertSame($customerId, (int) $agreement->depositRequirement->customer_id);
         self::assertSame('1000.000000', (string) $agreement->depositRequirement->required_amount);
         self::assertNotNull($agreement->activeRateVersion);

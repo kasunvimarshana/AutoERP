@@ -17,6 +17,7 @@ use Modules\VehicleRental\Enums\RentalAllocationStatus;
 use Modules\VehicleRental\Enums\RentalCalculationStatus;
 use Modules\VehicleRental\Enums\RentalCustodyEventType;
 use Modules\VehicleRental\Enums\RentalCustodyStatus;
+use Modules\VehicleRental\Enums\RentalDriverAssignmentStatus;
 use Modules\VehicleRental\Enums\RentalFinancialSide;
 use Modules\VehicleRental\Enums\RentalMode;
 use Modules\VehicleRental\Enums\RentalUsageEventApplicability;
@@ -67,6 +68,18 @@ final class RentalUsageService
             $endedAt = CarbonImmutable::parse((string) $data['ended_at']);
             $this->assertAllocation($allocation, $startedAt, $endedAt);
             $this->assertSourceAllocation($allocation, $sourceAllocation, $startedAt, $endedAt);
+            $this->rates->assertSingleVersionCoversPeriod(
+                $allocation->agreement,
+                $startedAt,
+                $endedAt,
+            );
+            if ($sourceAllocation !== null) {
+                $this->rates->assertSingleVersionCoversPeriod(
+                    $sourceAllocation->agreement,
+                    $startedAt,
+                    $endedAt,
+                );
+            }
             $driverAssignment = $this->resolveDriverAssignment(
                 $allocation,
                 $data,
@@ -108,13 +121,18 @@ final class RentalUsageService
                 $nightOutCount,
             );
 
-            $existing = RentalUsageLog::query()
+            $fingerprintLogs = RentalUsageLog::query()
                 ->where('tenant_id', $allocation->tenant_id)
                 ->where('fingerprint', $fingerprint)
-                ->first();
+                ->lockForUpdate()
+                ->get();
+            $existing = $fingerprintLogs->first(
+                fn (RentalUsageLog $log): bool => $log->status !== RentalUsageStatus::Reversed,
+            );
             if ($existing !== null) {
                 return $existing->load($this->relations());
             }
+            $fingerprintSequence = ((int) $fingerprintLogs->max('fingerprint_sequence')) + 1;
 
             $this->lockVehicleTimeline($allocation);
             $this->assertNoVehicleOverlap(
@@ -182,6 +200,7 @@ final class RentalUsageService
                 'operational_sequence' => $sequence,
                 'status' => RentalUsageStatus::Draft->value,
                 'fingerprint' => $fingerprint,
+                'fingerprint_sequence' => $fingerprintSequence,
                 'remarks' => $data['remarks'] ?? null,
                 'created_by' => $userId,
                 'updated_by' => $userId,
@@ -545,6 +564,7 @@ final class RentalUsageService
 
         $assignment = $allocation->driverAssignments()
             ->whereKey($assignmentId)
+            ->where('status', RentalDriverAssignmentStatus::Active->value)
             ->where('assigned_from', '<=', $startedAt)
             ->where(fn (Builder $query) => $query
                 ->whereNull('assigned_to')
@@ -554,7 +574,7 @@ final class RentalUsageService
 
         if ($assignment === null) {
             throw new InvalidArgumentException(
-                'Driver assignment is not valid for the complete usage period.',
+                'Driver assignment is not active for the complete usage period.',
             );
         }
 

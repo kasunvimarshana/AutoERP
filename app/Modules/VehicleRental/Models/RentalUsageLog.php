@@ -45,6 +45,7 @@ final class RentalUsageLog extends TenantOwnedModel
             'night_out_count' => 'decimal:6',
             'operational_sequence' => 'integer',
             'status' => RentalUsageStatus::class,
+            'fingerprint_sequence' => 'integer',
             'metadata' => 'array',
             'submitted_at' => 'datetime',
             'approved_at' => 'datetime',
