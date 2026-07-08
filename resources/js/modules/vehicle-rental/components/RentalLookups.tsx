@@ -42,6 +42,14 @@ interface FinanceLookupFilters {
     activeOnly?: boolean;
 }
 
+interface InvoiceLookupFilters {
+    invoiceType?: string | null;
+    direction?: 'inbound' | 'outbound' | null;
+    status?: string | null;
+    partyId?: number | null;
+    balanceStatus?: string | null;
+}
+
 type AvailableVehicleOption = VehicleSummary & NamedResource;
 export type RentalAgreementLookupOption = NamedResource & {
     row_version?: number;
@@ -155,8 +163,26 @@ export function RentalPaymentMethodLookupSelect({ direction = 'inbound', ...prop
     return <LookupSelect label="Payment method" search={search} loadOnOpen minSearchLength={0} {...props} />;
 }
 
-export function RentalInvoiceLookupSelect(props: LookupProps) {
-    return <LookupSelect label="Invoice" search={searchInvoices} placeholder="Search invoice number or party..." {...props} />;
+export function RentalInvoiceLookupSelect({
+    invoiceType,
+    direction,
+    status,
+    partyId,
+    balanceStatus,
+    ...props
+}: LookupProps & InvoiceLookupFilters) {
+    const search = useCallback(
+        (params: LookupLoadParams) => searchInvoices(params, {
+            invoiceType,
+            direction,
+            status,
+            partyId,
+            balanceStatus,
+        }),
+        [invoiceType, direction, status, partyId, balanceStatus],
+    );
+
+    return <LookupSelect label="Invoice" search={search} placeholder="Search invoice number or party..." {...props} />;
 }
 
 export function RentalTaxGroupLookupSelect(props: LookupProps) {
@@ -335,8 +361,18 @@ async function searchPaymentMethods(
 
 async function searchInvoices(
     { search, page, perPage, signal }: LookupLoadParams,
+    filters: InvoiceLookupFilters = {},
 ): Promise<LookupResult<NamedResource>> {
-    const response = await listInvoices({ search, page, per_page: perPage }, signal);
+    const response = await listInvoices({
+        search,
+        page,
+        per_page: perPage,
+        invoice_type: filters.invoiceType ?? undefined,
+        direction: filters.direction ?? undefined,
+        status: filters.status ?? undefined,
+        party_id: filters.partyId ?? undefined,
+        balance_status: filters.balanceStatus ?? undefined,
+    }, signal);
 
     return {
         data: response.data.map((invoice) => ({

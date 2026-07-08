@@ -27,6 +27,7 @@ final class RentalCalculationIntegrityContractTest extends TestCase
         $page = $this->source('resources/js/modules/vehicle-rental/pages/RentalBillingPage.tsx');
         $types = $this->source('resources/js/modules/vehicle-rental/vehicleRentalTypes.ts');
         $calculationService = $this->source('app/Modules/VehicleRental/Services/RentalCalculationService.php');
+        $invoiceIntegration = $this->source('app/Modules/VehicleRental/Services/RentalInvoiceIntegrationService.php');
 
         self::assertStringContainsString("'expected_version' => ['required', 'integer', 'min:1']", $request);
         self::assertStringContainsString("'expected_agreement_version' => ['required', 'integer', 'min:1']", $calculateRequest);
@@ -46,6 +47,9 @@ final class RentalCalculationIntegrityContractTest extends TestCase
         self::assertStringContainsString('RentalExpenseType::Repair', $calculationService);
         self::assertStringContainsString("'expense_allocation_version' => (int) \$allocation->row_version", $calculationService);
         self::assertStringContainsString("'row_version' => DB::raw('row_version + 1')", $calculationService);
+        self::assertStringContainsString('dueDateFromPaymentTerms', $invoiceIntegration);
+        self::assertStringContainsString('payment_term_days', $invoiceIntegration);
+        self::assertStringNotContainsString('due_date: documentDate', $page);
     }
 
     public function test_schema_enforces_calculation_source_and_usage_fact_identity(): void

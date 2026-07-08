@@ -8,6 +8,9 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
+use Modules\Invoice\Enums\AdjustmentType;
+use Modules\Invoice\Enums\InvoiceDirection;
+use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\VehicleRental\Enums\RentalCalculationStatus;
 use Modules\VehicleRental\Enums\RentalExpenseStatus;
 use Modules\VehicleRental\Enums\RentalFinancialSide;
@@ -18,6 +21,7 @@ use Modules\VehicleRental\Services\RentalAgreementService;
 use Modules\VehicleRental\Services\RentalCalculationService;
 use Modules\VehicleRental\Services\RentalCalculationTransitionService;
 use Modules\VehicleRental\Services\RentalExpenseService;
+use Modules\VehicleRental\Services\RentalInvoiceIntegrationService;
 use Tests\TestCase;
 
 final class RentalCalculationEndToEndFixTest extends TestCase
@@ -231,6 +235,189 @@ final class RentalCalculationEndToEndFixTest extends TestCase
         ]);
     }
 
+    public function test_rental_invoice_defaults_due_date_from_agreement_payment_terms(): void
+    {
+        $fixture = $this->calculationFixture();
+
+        $run = $this->withTenantExecutionContext(
+            $fixture['tenant_id'],
+            fn (): RentalCalculationRun => app(RentalCalculationService::class)->calculate(
+                $fixture['agreement']->refresh(),
+                RentalFinancialSide::Revenue,
+                '2026-07-01 00:00:00',
+                '2026-07-15 23:59:59',
+                (int) $fixture['agreement']->row_version,
+                null,
+            ),
+        );
+        $submitted = $this->withTenantExecutionContext(
+            $fixture['tenant_id'],
+            fn (): RentalCalculationRun => app(RentalCalculationTransitionService::class)->transition(
+                $run,
+                RentalCalculationStatus::Submitted,
+                (int) $run->row_version,
+                null,
+            ),
+        );
+        $approved = $this->withTenantExecutionContext(
+            $fixture['tenant_id'],
+            fn (): RentalCalculationRun => app(RentalCalculationTransitionService::class)->transition(
+                $submitted,
+                RentalCalculationStatus::Approved,
+                (int) $submitted->row_version,
+                null,
+            ),
+        );
+
+        $invoice = $this->withTenantExecutionContext(
+            $fixture['tenant_id'],
+            fn () => app(RentalInvoiceIntegrationService::class)->create(
+                $approved,
+                (int) $approved->row_version,
+                '2026-07-16',
+                null,
+                InvoiceStatus::Draft,
+                null,
+                null,
+            ),
+        );
+
+        self::assertSame('2026-08-15', $invoice->due_date->toDateString());
+    }
+
+    public function test_owner_cost_calculation_creates_inbound_payable_with_owner_deduction(): void
+    {
+        $currencyId = $this->createCurrency('VRO');
+        $tenantId = $this->createTenant($currencyId);
+        $supplierId = $this->createSupplier($tenantId, $currencyId);
+        $vehicleId = $this->createVehicle($tenantId);
+
+        $agreement = $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): RentalAgreement => app(RentalAgreementService::class)->create(
+                $this->ownerAgreementPayload($supplierId, $currencyId),
+                $tenantId,
+                null,
+                null,
+            ),
+        );
+        $allocationId = $this->createOwnerSupplyAllocation($tenantId, (int) $agreement->getKey(), $vehicleId);
+        $this->createApprovedOwnerUsageContext(
+            $tenantId,
+            $supplierId,
+            $currencyId,
+            $vehicleId,
+            $allocationId,
+            (int) $agreement->getKey(),
+            (int) $agreement->activeRateVersion->getKey(),
+        );
+
+        $expense = $this->withTenantExecutionContext(
+            $tenantId,
+            fn () => app(RentalExpenseService::class)->create([
+                'vehicle_id' => $vehicleId,
+                'expense_type' => 'repair',
+                'expense_date' => '2026-07-10',
+                'currency_id' => $currencyId,
+                'net_amount' => '100.000000',
+                'tax_amount' => '0.000000',
+                'reference_number' => 'EXP-OWNER-001',
+                'allocations' => [[
+                    'allocation_type' => 'owner_deduction',
+                    'target_agreement_id' => $agreement->getKey(),
+                    'target_vehicle_allocation_id' => $allocationId,
+                    'supplier_id' => $supplierId,
+                    'net_amount' => '100.000000',
+                    'tax_amount' => '0.000000',
+                    'withholding_amount' => '10.000000',
+                    'markup_amount' => '0.000000',
+                ]],
+            ], $tenantId, null, null),
+        );
+        $expenseVersion = (int) DB::table('rental_expenses')
+            ->where('id', $expense->getKey())
+            ->value('row_version');
+        $submittedExpense = $this->withTenantExecutionContext(
+            $tenantId,
+            fn () => app(RentalExpenseService::class)->transition(
+                $expense,
+                RentalExpenseStatus::Submitted,
+                $expenseVersion,
+            ),
+        );
+        $submittedExpenseVersion = (int) DB::table('rental_expenses')
+            ->where('id', $submittedExpense->getKey())
+            ->value('row_version');
+        $this->withTenantExecutionContext(
+            $tenantId,
+            fn () => app(RentalExpenseService::class)->transition(
+                $submittedExpense,
+                RentalExpenseStatus::Approved,
+                $submittedExpenseVersion,
+            ),
+        );
+
+        $run = $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): RentalCalculationRun => app(RentalCalculationService::class)->calculate(
+                $agreement->refresh(),
+                RentalFinancialSide::Cost,
+                '2026-07-01 00:00:00',
+                '2026-07-15 23:59:59',
+                (int) $agreement->row_version,
+                null,
+            ),
+        );
+
+        $ownerDeduction = $run->lines->first(fn ($line): bool => $line->source_type === 'rental_expense_allocation');
+        self::assertNotNull($ownerDeduction);
+        self::assertSame('-100.000000', (string) $ownerDeduction->net_amount);
+        self::assertSame('10.000000', (string) $ownerDeduction->withholding_amount);
+        self::assertSame('-110.000000', (string) $ownerDeduction->total_amount);
+
+        $submitted = $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): RentalCalculationRun => app(RentalCalculationTransitionService::class)->transition(
+                $run,
+                RentalCalculationStatus::Submitted,
+                (int) $run->row_version,
+                null,
+            ),
+        );
+        $approved = $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): RentalCalculationRun => app(RentalCalculationTransitionService::class)->transition(
+                $submitted,
+                RentalCalculationStatus::Approved,
+                (int) $submitted->row_version,
+                null,
+            ),
+        );
+
+        $invoice = $this->withTenantExecutionContext(
+            $tenantId,
+            fn () => app(RentalInvoiceIntegrationService::class)->create(
+                $approved,
+                (int) $approved->row_version,
+                '2026-07-16',
+                null,
+                InvoiceStatus::Draft,
+                null,
+                null,
+            ),
+        );
+
+        self::assertSame(InvoiceDirection::Inbound, $invoice->direction);
+        self::assertSame('supplier', $invoice->party_type);
+        self::assertSame($supplierId, (int) $invoice->party_id);
+        self::assertSame('2026-08-15', $invoice->due_date->toDateString());
+        self::assertSame('1390.000000', (string) $invoice->grand_total);
+        $adjustment = $invoice->adjustments->first();
+        self::assertNotNull($adjustment);
+        self::assertSame(AdjustmentType::CreditNote, $adjustment->adjustment_type);
+        self::assertSame('110.000000', (string) $adjustment->amount);
+    }
+
     /**
      * @return array{
      *     tenant_id:int,
@@ -377,6 +564,45 @@ final class RentalCalculationEndToEndFixTest extends TestCase
         ];
     }
 
+    private function ownerAgreementPayload(int $supplierId, int $currencyId): array
+    {
+        return [
+            'agreement_number' => 'RA-OWNER-CALC-001',
+            'agreement_kind' => 'owner_supply',
+            'supplier_id' => $supplierId,
+            'agreement_date' => '2026-07-01',
+            'starts_at' => '2026-07-01 00:00:00',
+            'ends_at' => '2026-07-31 23:59:59',
+            'legal_context' => 'company',
+            'rental_mode' => 'vehicle_only',
+            'billing_cycle' => 'monthly',
+            'billing_basis' => 'calendar_month',
+            'proration_rule' => 'exact_day_count',
+            'payment_term_days' => 30,
+            'currency_id' => $currencyId,
+            'rate_version' => [
+                'effective_from' => '2026-07-01 00:00:00',
+                'effective_to' => '2026-07-31 23:59:59',
+                'driver_mode' => 'vehicle_only',
+                'billing_cycle' => 'monthly',
+                'billing_basis' => 'calendar_month',
+                'proration_rule' => 'exact_day_count',
+                'excess_km_method' => 'period',
+                'included_km' => '0.000000',
+                'currency_id' => $currencyId,
+                'components' => [[
+                    'component_code' => 'base_rental',
+                    'unit' => 'month',
+                    'rate' => '3100.000000',
+                    'multiplier' => '1.000000',
+                    'calculation_order' => 1,
+                    'is_taxable' => true,
+                ]],
+            ],
+            'activate_rate_version' => true,
+        ];
+    }
+
     private function createApprovedUsageContext(
         int $tenantId,
         int $customerId,
@@ -442,6 +668,71 @@ final class RentalCalculationEndToEndFixTest extends TestCase
         ]);
     }
 
+    private function createApprovedOwnerUsageContext(
+        int $tenantId,
+        int $supplierId,
+        int $currencyId,
+        int $vehicleId,
+        int $allocationId,
+        int $agreementId,
+        int $rateVersionId,
+    ): void {
+        $usageId = (int) DB::table('rental_usage_logs')->insertGetId([
+            'tenant_id' => $tenantId,
+            'usage_number' => 'RUL-OWNER-CALC-001',
+            'vehicle_allocation_id' => $allocationId,
+            'vehicle_id' => $vehicleId,
+            'usage_date' => '2026-07-10',
+            'started_at' => '2026-07-10 08:00:00',
+            'ended_at' => '2026-07-10 16:00:00',
+            'start_odometer' => '1000.000000',
+            'end_odometer' => '1120.000000',
+            'distance_km' => '120.000000',
+            'net_operational_distance_km' => '120.000000',
+            'working_minutes' => 480,
+            'normal_overtime_minutes' => 0,
+            'double_overtime_minutes' => 0,
+            'triple_overtime_minutes' => 0,
+            'night_out_count' => '0.000000',
+            'status' => 'approved',
+            'fingerprint' => hash('sha256', 'owner-usage-'.$tenantId),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $contextId = (int) DB::table('rental_usage_contexts')->insertGetId([
+            'tenant_id' => $tenantId,
+            'usage_log_id' => $usageId,
+            'financial_side' => 'cost',
+            'agreement_id' => $agreementId,
+            'vehicle_allocation_id' => $allocationId,
+            'rate_version_id' => $rateVersionId,
+            'supplier_id' => $supplierId,
+            'currency_id' => $currencyId,
+            'context_fingerprint' => hash('sha256', 'owner-context-'.$tenantId),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('rental_usage_facts')->insert([
+            'tenant_id' => $tenantId,
+            'usage_context_id' => $contextId,
+            'usage_log_id' => $usageId,
+            'financial_side' => 'cost',
+            'started_at' => '2026-07-10 08:00:00',
+            'ended_at' => '2026-07-10 16:00:00',
+            'start_odometer' => '1000.000000',
+            'end_odometer' => '1120.000000',
+            'commercial_distance_km' => '120.000000',
+            'working_minutes' => 480,
+            'normal_overtime_minutes' => 0,
+            'double_overtime_minutes' => 0,
+            'triple_overtime_minutes' => 0,
+            'night_out_count' => '0.000000',
+            'status' => 'approved',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
     private function createCurrency(string $code): int
     {
         return (int) DB::table('currencies')->insertGetId([
@@ -485,6 +776,21 @@ final class RentalCalculationEndToEndFixTest extends TestCase
         ]);
     }
 
+    private function createSupplier(int $tenantId, int $currencyId): int
+    {
+        return (int) DB::table('suppliers')->insertGetId([
+            'tenant_id' => $tenantId,
+            'supplier_number' => 'SUP-CALC-001',
+            'code' => 'SUP-CALC',
+            'name' => 'Calculation Supplier',
+            'supplier_type' => 'company',
+            'status' => 'active',
+            'default_currency_id' => $currencyId,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
     private function createVehicle(int $tenantId): int
     {
         return (int) DB::table('vehicles')->insertGetId([
@@ -506,6 +812,22 @@ final class RentalCalculationEndToEndFixTest extends TestCase
             'agreement_id' => $agreementId,
             'vehicle_id' => $vehicleId,
             'vehicle_source_type' => 'company_owned',
+            'allocated_from' => '2026-07-01 00:00:00',
+            'allocated_to' => '2026-07-31 23:59:59',
+            'status' => 'active',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    private function createOwnerSupplyAllocation(int $tenantId, int $agreementId, int $vehicleId): int
+    {
+        return (int) DB::table('rental_vehicle_allocations')->insertGetId([
+            'tenant_id' => $tenantId,
+            'allocation_number' => 'RVA-OWNER-CALC-001',
+            'agreement_id' => $agreementId,
+            'vehicle_id' => $vehicleId,
+            'vehicle_source_type' => 'owner_supplied',
             'allocated_from' => '2026-07-01 00:00:00',
             'allocated_to' => '2026-07-31 23:59:59',
             'status' => 'active',

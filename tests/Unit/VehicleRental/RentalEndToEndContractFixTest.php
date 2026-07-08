@@ -37,6 +37,8 @@ final class RentalEndToEndContractFixTest extends TestCase
         $runningChartPage = $this->source('resources/js/modules/vehicle-rental/pages/RentalRunningChartPage.tsx');
         $usageLogResource = $this->source('app/Modules/VehicleRental/Http/Resources/RentalUsageLogResource.php');
         $usageFactResource = $this->source('app/Modules/VehicleRental/Http/Resources/RentalUsageFactResource.php');
+        $lookups = $this->source('resources/js/modules/vehicle-rental/components/RentalLookups.tsx');
+        $types = $this->source('resources/js/modules/vehicle-rental/vehicleRentalTypes.ts');
 
         self::assertStringContainsString('transitionRentalReservation', $api);
         self::assertStringContainsString('createRentalAllocation = (', $api);
@@ -87,9 +89,16 @@ final class RentalEndToEndContractFixTest extends TestCase
         self::assertStringContainsString("'payment' =>", $depositResource);
         self::assertStringContainsString("'invoice' =>", $depositResource);
         self::assertStringContainsString("'reverses_link' =>", $depositResource);
+        self::assertStringContainsString("'customer' =>", $depositResource);
+        self::assertStringContainsString('customer?: RentalParty | null;', $types);
+        self::assertStringContainsString('currency?: RentalCurrency | null;', $types);
         self::assertStringNotContainsString("'payment_id' =>", $depositResource);
         self::assertStringNotContainsString("'invoice_id' =>", $depositResource);
         self::assertStringNotContainsString("'reverses_link_id' =>", $depositResource);
+        self::assertStringContainsString('InvoiceLookupFilters', $lookups);
+        self::assertStringContainsString('party_id: filters.partyId ?? undefined', $lookups);
+        self::assertStringContainsString('invoiceType="rental"', $depositPage);
+        self::assertStringContainsString('partyId={selected.customer?.id ?? null}', $depositPage);
         self::assertStringContainsString("'fingerprint' => \$this->linkFingerprint", $depositService);
         self::assertStringContainsString('linkFingerprint', $depositService);
         self::assertStringContainsString('A deposit reversal link cannot be reversed again.', $depositService);

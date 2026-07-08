@@ -437,7 +437,9 @@ export interface RentalDeposit {
     id: number;
     row_version: number;
     agreement?: NamedResource | null;
+    customer?: RentalParty | null;
     required_amount: string;
+    currency?: RentalCurrency | null;
     received_amount: string;
     applied_amount: string;
     refunded_amount: string;

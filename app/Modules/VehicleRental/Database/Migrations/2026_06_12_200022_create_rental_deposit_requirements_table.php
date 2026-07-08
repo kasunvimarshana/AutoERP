@@ -18,7 +18,7 @@ return new class extends Migration
             $table->foreignId('organization_unit_id')->nullable();
             $table->json('metadata')->nullable();
             $table->foreignId('agreement_id');
-            $table->enum('agreement_kind', [RentalAgreementKind::CustomerRental->value])
+            $table->string('agreement_kind', 30)
                 ->default(RentalAgreementKind::CustomerRental->value);
             $table->foreignId('customer_id');
             $table->decimal('required_amount', 20, 6);

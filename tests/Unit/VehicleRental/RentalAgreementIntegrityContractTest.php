@@ -49,6 +49,8 @@ final class RentalAgreementIntegrityContractTest extends TestCase
         self::assertStringContainsString('Owner supply agreement requires only a supplier/vehicle owner.', $service);
         self::assertStringContainsString('Security deposits are supported only for customer rental agreements.', $service);
         self::assertStringContainsString('agreement_kind', $depositMigration);
+        self::assertStringContainsString("\$table->string('agreement_kind', 30)", $depositMigration);
+        self::assertStringNotContainsString("\$table->enum('agreement_kind'", $depositMigration);
         self::assertStringContainsString('RentalAgreementKind::CustomerRental->value', $depositMigration);
         self::assertStringContainsString('rental_deposit_requirements_customer_id_tenant_fk', $depositMigration);
         self::assertStringContainsString('rental_deposit_req_agreement_kind_customer_fk', $depositMigration);

@@ -98,7 +98,6 @@ export default function RentalBillingPage() {
             const documentDate = businessDateInputValue();
             await createRentalInvoice(run.id, run.row_version, {
                 invoice_date: documentDate,
-                due_date: documentDate,
                 status: 'draft',
                 notes: `${run.billing_period?.financial_side === 'cost' ? 'Owner rental payable' : 'Lessee rental invoice'} from approved rental calculation`,
             });

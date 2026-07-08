@@ -14,6 +14,9 @@ final class StoreVehicleServiceEmployeeRequest extends TenantScopedRequest
 {
     use HasExpectedVehicleServiceJobVersion;
 
+    private const DEFAULT_DECIMAL_VALUE = '0.000000';
+    private const DEFAULT_STATUS = 'assigned';
+
     public function rules(): array
     {
         return [
@@ -35,11 +38,18 @@ final class StoreVehicleServiceEmployeeRequest extends TenantScopedRequest
         return new VehicleServiceEmployeeAssignmentData(
             employeeId: (int) $this->input('employee_id'),
             roleType: (string) $this->input('role_type'),
-            assignedHours: (string) $this->input('assigned_hours', '0.000000'),
-            rate: (string) $this->input('rate', '0.000000'),
-            commissionType: VehicleServiceCommissionType::from((string) $this->input('commission_type', 'none')),
-            commissionValue: (string) $this->input('commission_value', '0.000000'),
-            status: (string) $this->input('status', 'assigned'),
+            assignedHours: $this->stringOrNull('assigned_hours') ?? self::DEFAULT_DECIMAL_VALUE,
+            rate: $this->stringOrNull('rate') ?? self::DEFAULT_DECIMAL_VALUE,
+            commissionType: VehicleServiceCommissionType::from(
+                $this->stringOrNull('commission_type') ?? VehicleServiceCommissionType::None->value,
+            ),
+            commissionValue: $this->stringOrNull('commission_value') ?? self::DEFAULT_DECIMAL_VALUE,
+            status: $this->stringOrNull('status') ?? self::DEFAULT_STATUS,
         );
+    }
+
+    private function stringOrNull(string $key): ?string
+    {
+        return $this->filled($key) ? (string) $this->input($key) : null;
     }
 }

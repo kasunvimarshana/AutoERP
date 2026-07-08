@@ -14,6 +14,9 @@ final class RentalDepositRequirementResource extends RentalResource
             'id' => (int) $this->getKey(),
             'row_version' => (int) $this->row_version,
             'agreement' => $this->whenLoaded('agreement', fn () => $this->summary($this->agreement, ['agreement_number', 'agreement_kind', 'status'])),
+            'customer' => $this->whenLoaded('agreement', fn () => $this->agreement->relationLoaded('customer')
+                ? $this->summary($this->agreement->customer, ['customer_number', 'name', 'display_name'])
+                : null),
             'required_amount' => $this->decimal($this->required_amount),
             'currency' => $this->whenLoaded('currency', fn () => $this->summary($this->currency, ['code', 'symbol'])),
             'due_date' => $this->due_date?->toDateString(),

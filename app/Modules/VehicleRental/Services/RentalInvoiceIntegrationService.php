@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\VehicleRental\Services;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
@@ -32,6 +33,8 @@ use Modules\VehicleRental\Models\RentalCalculationRun;
 
 final class RentalInvoiceIntegrationService
 {
+    private const DEFAULT_PAYMENT_TERM_DAYS = 0;
+
     public function __construct(
         private readonly DecimalMath $math,
         private readonly InvoiceCreationService $invoices,
@@ -59,6 +62,10 @@ final class RentalInvoiceIntegrationService
             }
 
             $agreement = $run->billingPeriod->agreement;
+            $resolvedDueDate = $dueDate ?? $this->dueDateFromPaymentTerms(
+                $invoiceDate,
+                (int) ($agreement->payment_term_days ?? self::DEFAULT_PAYMENT_TERM_DAYS),
+            );
             $selected = $run->lines
                 ->when($lineIds !== null && $lineIds !== [], fn ($lines) => $lines->whereIn('id', $lineIds))
                 ->values();
@@ -82,9 +89,7 @@ final class RentalInvoiceIntegrationService
                 $net = (string) $line->net_amount;
                 $isPositive = $this->math->compare($net, '0') > 0;
                 $isNegative = $this->math->compare($net, '0') < 0;
-                $negativeAdjustmentType = $agreement->agreement_kind === RentalAgreementKind::OwnerSupply
-                    ? AdjustmentType::DebitNote
-                    : AdjustmentType::CreditNote;
+                $negativeAdjustmentType = AdjustmentType::CreditNote;
                 $negativeConsumed = $isNegative && $this->hasActiveAdjustment($line, $negativeAdjustmentType);
                 if (($isPositive && $this->math->compare($previouslyInvoiced, '1.000000') >= 0) || $negativeConsumed) {
                     continue;
@@ -180,7 +185,7 @@ final class RentalInvoiceIntegrationService
                 organizationUnitId: $run->organization_unit_id,
                 partyType: $partyType,
                 partyId: (int) $partyId,
-                dueDate: $dueDate,
+                dueDate: $resolvedDueDate,
                 currencyId: $run->currency_id,
                 status: $status,
                 notes: $notes ?? 'Rental calculation '.$run->billingPeriod->billing_cycle_key,
@@ -211,6 +216,11 @@ final class RentalInvoiceIntegrationService
 
             return $invoice;
         });
+    }
+
+    private function dueDateFromPaymentTerms(string $invoiceDate, int $paymentTermDays): string
+    {
+        return CarbonImmutable::parse($invoiceDate)->addDays($paymentTermDays)->toDateString();
     }
 
     private function hasActiveAdjustment(RentalCalculationLine $line, AdjustmentType $type): bool
@@ -258,9 +268,7 @@ final class RentalInvoiceIntegrationService
         if ($this->math->compare($net, '0') < 0) {
             return $this->hasActiveAdjustment(
                 $line,
-                $agreementKind === RentalAgreementKind::OwnerSupply
-                    ? AdjustmentType::DebitNote
-                    : AdjustmentType::CreditNote,
+                AdjustmentType::CreditNote,
             );
         }
 

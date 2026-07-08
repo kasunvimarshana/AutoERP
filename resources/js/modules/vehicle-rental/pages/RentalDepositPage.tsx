@@ -331,6 +331,10 @@ export default function RentalDepositPage() {
                             <RentalInvoiceLookupSelect
                                 value={invoice}
                                 onChange={setInvoice}
+                                invoiceType="rental"
+                                direction="outbound"
+                                partyId={selected.customer?.id ?? null}
+                                disabled={!selected.customer?.id}
                                 required
                             />
                         )}
