@@ -21,6 +21,7 @@ use Modules\VehicleRental\Enums\RentalDriverAssignmentStatus;
 use Modules\VehicleRental\Enums\RentalFinancialSide;
 use Modules\VehicleRental\Enums\RentalMode;
 use Modules\VehicleRental\Enums\RentalUsageEventApplicability;
+use Modules\VehicleRental\Enums\RentalUsageEventType;
 use Modules\VehicleRental\Enums\RentalUsageStatus;
 use Modules\VehicleRental\Models\RentalDriverAssignment;
 use Modules\VehicleRental\Models\RentalUsageContext;
@@ -53,7 +54,7 @@ final class RentalUsageService
     ): RentalUsageLog {
         return DB::transaction(function () use ($allocation, $data, $userId): RentalUsageLog {
             $allocation = RentalVehicleAllocation::query()
-                ->with(['agreement', 'sourceAllocation.agreement'])
+                ->with(['agreement', 'vehicle', 'sourceAllocation.agreement', 'sourceAllocation.vehicle'])
                 ->lockForUpdate()
                 ->findOrFail($allocation->getKey());
             $this->assertAllocationExpectedVersion($allocation, (int) ($data['expected_allocation_version'] ?? 0));
@@ -210,7 +211,7 @@ final class RentalUsageService
                 $log,
                 $allocation,
                 $data['events'] ?? [],
-                $sourceAllocation !== null,
+                $sourceAllocation,
                 $startedAt,
                 $endedAt,
                 $userId,
@@ -824,15 +825,16 @@ final class RentalUsageService
         RentalUsageLog $log,
         RentalVehicleAllocation $allocation,
         array $events,
-        bool $hasOwnerContext,
+        ?RentalVehicleAllocation $sourceAllocation,
         CarbonImmutable $startedAt,
         CarbonImmutable $endedAt,
         ?int $userId,
     ): void {
         foreach (array_values($events) as $index => $event) {
+            $eventType = RentalUsageEventType::from((string) $event['event_type']);
             $applicability = RentalUsageEventApplicability::from((string) $event['applicability']);
             if (
-                ! $hasOwnerContext
+                $sourceAllocation === null
                 && in_array($applicability, [RentalUsageEventApplicability::Owner, RentalUsageEventApplicability::Both], true)
             ) {
                 throw new InvalidArgumentException(
@@ -852,22 +854,92 @@ final class RentalUsageService
                     );
                 }
             }
+            $unit = $this->resolveEventUnit(
+                $allocation,
+                $sourceAllocation,
+                $eventType,
+                $applicability,
+                $startedAt,
+            );
 
             $log->events()->create([
                 'tenant_id' => $allocation->tenant_id,
                 'organization_unit_id' => $allocation->organization_unit_id,
                 'sequence' => $index + 1,
-                'event_type' => $event['event_type'],
+                'event_type' => $eventType->value,
                 'applicability' => $applicability->value,
                 'occurred_at' => $event['occurred_at'] ?? null,
                 'quantity' => $event['quantity'],
-                'unit' => $event['unit'] ?? null,
+                'unit' => $unit,
                 'reference_number' => $event['reference_number'] ?? null,
                 'remarks' => $event['remarks'] ?? null,
                 'created_by' => $userId,
                 'updated_by' => $userId,
             ]);
         }
+    }
+
+    private function resolveEventUnit(
+        RentalVehicleAllocation $allocation,
+        ?RentalVehicleAllocation $sourceAllocation,
+        RentalUsageEventType $eventType,
+        RentalUsageEventApplicability $applicability,
+        CarbonImmutable $at,
+    ): ?string {
+        if ($applicability === RentalUsageEventApplicability::Internal) {
+            return null;
+        }
+
+        $units = [];
+        if ($applicability->appliesTo(RentalFinancialSide::Revenue)) {
+            $unit = $this->rateComponentUnit($allocation, $eventType, $at);
+            if ($unit !== null) {
+                $units[] = $unit;
+            }
+        }
+        if ($applicability->appliesTo(RentalFinancialSide::Cost) && $sourceAllocation !== null) {
+            $unit = $this->rateComponentUnit($sourceAllocation, $eventType, $at);
+            if ($unit !== null) {
+                $units[] = $unit;
+            }
+        }
+
+        $units = array_values(array_unique($units));
+        if (count($units) > 1) {
+            throw new InvalidArgumentException(
+                'Usage event unit is ambiguous because customer and owner rate components use different units.',
+            );
+        }
+
+        return $units[0] ?? null;
+    }
+
+    private function rateComponentUnit(
+        RentalVehicleAllocation $allocation,
+        RentalUsageEventType $eventType,
+        CarbonImmutable $at,
+    ): ?string {
+        $rate = $this->rates->resolve(
+            $allocation->agreement,
+            $at->toDateTimeString(),
+        );
+        $componentCode = RentalUsageEventBillingMap::componentForEvent($eventType);
+        $components = $rate->components
+            ->where('status', 'active')
+            ->filter(fn ($component): bool => $component->component_code === $componentCode);
+        $categoryId = $allocation->vehicle?->vehicle_category_id;
+        if ($categoryId !== null) {
+            $specific = $components->first(
+                fn ($component): bool => (int) $component->vehicle_category_id === (int) $categoryId,
+            );
+            if ($specific !== null) {
+                return $specific->unit->value;
+            }
+        }
+
+        $global = $components->first(fn ($component): bool => $component->vehicle_category_id === null);
+
+        return $global?->unit->value;
     }
 
     private function createContext(

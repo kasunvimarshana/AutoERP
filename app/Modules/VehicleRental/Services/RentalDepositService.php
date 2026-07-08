@@ -201,14 +201,28 @@ final class RentalDepositService
 
     public function forfeit(
         RentalDepositRequirement $requirement,
+        Payment $depositPayment,
         int $invoiceId,
         string $amount,
+        string $allocationDate,
         int $expectedRequirementVersion,
+        int $expectedPaymentVersion,
         ?int $userId,
     ): RentalDepositRequirement {
-        return DB::transaction(function () use ($requirement, $invoiceId, $amount, $expectedRequirementVersion, $userId): RentalDepositRequirement {
+        return DB::transaction(function () use (
+            $requirement,
+            $depositPayment,
+            $invoiceId,
+            $amount,
+            $allocationDate,
+            $expectedRequirementVersion,
+            $expectedPaymentVersion,
+            $userId,
+        ): RentalDepositRequirement {
             $requirement = $this->locked($requirement, $expectedRequirementVersion);
             $this->assertCustomerRequirement($requirement);
+            $depositPayment = Payment::query()->lockForUpdate()->findOrFail($depositPayment->getKey());
+            $this->assertReceiptForRequirement($requirement, $depositPayment, $expectedPaymentVersion);
             $amount = $this->positive($amount);
             if ($this->math->compare($amount, $this->availableToRefund($requirement)) > 0) {
                 throw new InvalidArgumentException('Deposit forfeiture exceeds the uncommitted deposit balance.');
@@ -221,7 +235,29 @@ final class RentalDepositService
                 || ($invoice->currencyId !== null && $invoice->currencyId !== (int) $requirement->currency_id)) {
                 throw new InvalidArgumentException('Forfeiture invoice must belong to the rental customer and currency.');
             }
-            $this->link($requirement, RentalDepositLinkType::Forfeiture, $amount, $userId, invoiceId: $invoiceId);
+            $depositPayment = $this->allocations->allocate(
+                $depositPayment,
+                [new PaymentAllocationData(
+                    invoiceId: $invoiceId,
+                    allocatedAmount: $amount,
+                    allocationDate: $allocationDate,
+                    allocationMethod: 'specific_invoice',
+                    metadata: [
+                        'deposit_requirement_id' => (int) $requirement->getKey(),
+                        'deposit_movement' => RentalDepositLinkType::Forfeiture->value,
+                    ],
+                )],
+                $expectedPaymentVersion,
+                $userId,
+            );
+            $this->link(
+                $requirement,
+                RentalDepositLinkType::Forfeiture,
+                $amount,
+                $userId,
+                paymentId: (int) $depositPayment->getKey(),
+                invoiceId: $invoiceId,
+            );
             $this->sync($requirement);
 
             return $this->reload($requirement);

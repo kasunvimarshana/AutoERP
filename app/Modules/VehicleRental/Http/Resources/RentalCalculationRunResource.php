@@ -17,7 +17,7 @@ final class RentalCalculationRunResource extends RentalResource
                 'id' => (int) $this->billingPeriod->getKey(),
                 'row_version' => (int) $this->billingPeriod->row_version,
                 'agreement' => $this->billingPeriod->relationLoaded('agreement')
-                    ? $this->summary($this->billingPeriod->agreement, ['agreement_number', 'agreement_kind'])
+                    ? $this->summary($this->billingPeriod->agreement, ['row_version', 'agreement_number', 'agreement_kind'])
                     : null,
                 'financial_side' => $this->enumValue($this->billingPeriod->financial_side),
                 'period_start' => $this->billingPeriod->period_start?->toISOString(),

@@ -69,11 +69,17 @@ export default function RentalBillingPage() {
         setSaving(true);
         setActionError(null);
         try {
-            await calculateRentalAgreement(agreement.id, agreement.row_version, {
+            const run = await calculateRentalAgreement(agreement.id, agreement.row_version, {
                 financial_side: financialSide,
                 period_start: periodStart,
                 period_end: periodEnd,
             });
+            const nextAgreementVersion = run.billing_period?.agreement?.row_version;
+            if (nextAgreementVersion) {
+                setAgreement((current) => current === null
+                    ? current
+                    : { ...current, row_version: nextAgreementVersion });
+            }
             runs.reload();
         } catch (error: unknown) {
             setActionError(toApiError(error));

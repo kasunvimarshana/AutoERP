@@ -21,6 +21,7 @@ use Modules\VehicleRental\Models\RentalUsageContext;
 final class RentalRateVersionService
 {
     private const OPEN_ENDED_EFFECTIVE_AT = '9999-12-31 23:59:59';
+    private const GLOBAL_COMPONENT_SCOPE = 'global';
 
     public function __construct(private readonly RentalReferenceValidator $references) {}
 
@@ -35,6 +36,7 @@ final class RentalRateVersionService
                 $this->assertAgreementExpectedVersion($agreement, (int) $data['expected_agreement_version']);
             }
             $this->assertAgreementAllowsRateChanges($agreement);
+            $this->assertUniqueComponentKeys($data['components'] ?? []);
 
             $versionNumber = ((int) $agreement->rateVersions()->max('version_number')) + 1;
             $effectiveFrom = CarbonImmutable::parse((string) ($data['effective_from'] ?? $agreement->starts_at));
@@ -132,6 +134,9 @@ final class RentalRateVersionService
                     'updated_by' => $userId,
                 ]);
             }
+            if (array_key_exists('expected_agreement_version', $data)) {
+                $this->bumpAgreementVersion($agreement, $userId);
+            }
 
             return $version->refresh()->load('components');
         }, 3);
@@ -188,6 +193,7 @@ final class RentalRateVersionService
             $version->row_version = $expectedVersion + 1;
             $version->updated_by = $userId;
             $version->save();
+            $this->bumpAgreementVersion($agreement, $userId);
 
             return $version->refresh()->load('components');
         }, 3);
@@ -260,6 +266,32 @@ final class RentalRateVersionService
                 'expected_agreement_version' => ['The rental agreement changed after it was loaded. Reload and review the latest version.'],
             ]);
         }
+    }
+
+    private function assertUniqueComponentKeys(array $components): void
+    {
+        $seen = [];
+        foreach (array_values($components) as $index => $component) {
+            $categoryScope = isset($component['vehicle_category_id']) && $component['vehicle_category_id'] !== null
+                ? (string) (int) $component['vehicle_category_id']
+                : self::GLOBAL_COMPONENT_SCOPE;
+            $key = ((string) $component['component_code']).'|'.$categoryScope;
+            if (isset($seen[$key])) {
+                throw ValidationException::withMessages([
+                    "components.{$index}.component_code" => ['Duplicate rate component for the same vehicle category is not allowed.'],
+                ]);
+            }
+
+            $seen[$key] = true;
+        }
+    }
+
+    private function bumpAgreementVersion(RentalAgreement $agreement, ?int $userId): void
+    {
+        $agreement->forceFill([
+            'row_version' => (int) $agreement->row_version + 1,
+            'updated_by' => $userId,
+        ])->save();
     }
 
     private function assertAgreementAllowsRateChanges(RentalAgreement $agreement): void

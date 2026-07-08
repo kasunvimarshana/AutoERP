@@ -97,12 +97,16 @@ final class RentalDepositController
     {
         $this->authorization->assert($request->currentUserId(), $request->tenantId(), VehicleRentalAuthorizationService::MANAGE_DEPOSITS);
         $requirement = $this->scope(RentalDepositRequirement::query(), $request)->findOrFail($deposit);
+        $payment = $this->scope(Payment::query(), $request)->findOrFail((int) $request->input('payment_id'));
 
         return new RentalDepositRequirementResource($service->forfeit(
             $requirement,
+            $payment,
             (int) $request->input('invoice_id'),
             (string) $request->input('amount'),
+            (string) $request->input('allocation_date'),
             (int) $request->input('expected_requirement_version'),
+            (int) $request->input('expected_payment_version'),
             $request->currentUserId(),
         ));
     }

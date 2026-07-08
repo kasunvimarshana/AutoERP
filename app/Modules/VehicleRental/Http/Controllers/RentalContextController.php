@@ -29,6 +29,7 @@ use Modules\VehicleRental\Models\RentalAgreement;
 use Modules\VehicleRental\Models\RentalCalculationRun;
 use Modules\VehicleRental\Models\RentalUsageLog;
 use Modules\VehicleRental\Models\RentalVehicleAllocation;
+use Modules\VehicleRental\Services\RentalUsageEventBillingMap;
 use Modules\VehicleRental\Services\VehicleRentalAuthorizationService;
 
 final class RentalContextController
@@ -60,6 +61,7 @@ final class RentalContextController
             'vehicle_source_types' => $values(RentalVehicleSourceType::cases()),
             'custody_event_types' => $values(RentalCustodyEventType::cases()),
             'usage_event_types' => $values(RentalUsageEventType::cases()),
+            'usage_event_rate_components' => RentalUsageEventBillingMap::eventComponentCodes(),
             'usage_event_applicabilities' => $values(RentalUsageEventApplicability::cases()),
             'expense_types' => $values(RentalExpenseType::cases()),
             'expense_allocation_types' => $values(RentalExpenseAllocationType::cases()),

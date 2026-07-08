@@ -69,6 +69,8 @@ final class RentalAgreementIntegrityContractTest extends TestCase
         self::assertStringContainsString('assertExpectedVersion', $service);
         self::assertStringContainsString('active immutable rate version', $service);
         self::assertStringContainsString('$version->row_version = $expectedVersion + 1;', $service);
+        self::assertStringContainsString('$this->bumpAgreementVersion($agreement, $userId);', $service);
+        self::assertStringContainsString('Duplicate rate component for the same vehicle category is not allowed.', $service);
         self::assertStringContainsString("return \$version->refresh()->load('components');", $service);
         self::assertStringNotContainsString('$active->effective_to =', $service);
         self::assertStringNotContainsString('$active->status = RentalRateVersionStatus::Superseded;', $service);

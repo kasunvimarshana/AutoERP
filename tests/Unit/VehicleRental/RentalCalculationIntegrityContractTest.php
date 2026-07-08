@@ -31,6 +31,7 @@ final class RentalCalculationIntegrityContractTest extends TestCase
 
         self::assertStringContainsString("'expected_version' => ['required', 'integer', 'min:1']", $request);
         self::assertStringContainsString("'expected_agreement_version' => ['required', 'integer', 'min:1']", $calculateRequest);
+        self::assertStringContainsString("'period_end' => ['required', 'date', 'after_or_equal:period_start']", $calculateRequest);
         self::assertStringContainsString('RentalCalculationTransitionService $service', $controller);
         self::assertStringContainsString("(int) \$request->input('expected_version')", $controller);
         self::assertStringContainsString("(int) \$request->input('expected_agreement_version')", $controller);
@@ -47,6 +48,10 @@ final class RentalCalculationIntegrityContractTest extends TestCase
         self::assertStringContainsString('RentalExpenseType::Repair', $calculationService);
         self::assertStringContainsString("'expense_allocation_version' => (int) \$allocation->row_version", $calculationService);
         self::assertStringContainsString("'row_version' => DB::raw('row_version + 1')", $calculationService);
+        self::assertStringContainsString('Billing period end cannot be before its start.', $calculationService);
+        self::assertStringContainsString('$this->bumpAgreementVersion($agreement, $userId);', $calculationService);
+        self::assertStringContainsString("'row_version', 'agreement_number', 'agreement_kind'", $resource);
+        self::assertStringContainsString('setAgreement((current) => current === null', $page);
         self::assertStringContainsString('dueDateFromPaymentTerms', $invoiceIntegration);
         self::assertStringContainsString('payment_term_days', $invoiceIntegration);
         self::assertStringNotContainsString('due_date: documentDate', $page);

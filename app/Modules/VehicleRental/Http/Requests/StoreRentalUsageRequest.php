@@ -38,7 +38,7 @@ final class StoreRentalUsageRequest extends TenantScopedRequest
             'events.*.applicability' => ['required', Rule::enum(RentalUsageEventApplicability::class)],
             'events.*.occurred_at' => ['nullable', 'date'],
             'events.*.quantity' => ['required', 'decimal:0,6', 'gte:0'],
-            'events.*.unit' => ['nullable', 'string', 'max:30'],
+            'events.*.unit' => ['prohibited'],
             'events.*.reference_number' => ['nullable', 'string', 'max:100'],
             'events.*.remarks' => ['nullable', 'string'],
         ];

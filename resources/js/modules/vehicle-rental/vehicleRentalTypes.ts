@@ -385,7 +385,7 @@ export interface RentalCalculationRun {
     billing_period?: {
         id: number;
         row_version: number;
-        agreement?: NamedResource | null;
+        agreement?: (NamedResource & { row_version?: number }) | null;
         financial_side: string;
         period_start: string;
         period_end: string;
@@ -495,6 +495,7 @@ export interface RentalMetadata {
     vehicle_source_types: string[];
     custody_event_types: string[];
     usage_event_types: string[];
+    usage_event_rate_components: Record<string, string>;
     usage_event_applicabilities: RentalUsageEventApplicability[];
     expense_types: string[];
     expense_allocation_types: string[];

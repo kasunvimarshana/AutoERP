@@ -16,7 +16,7 @@ final class CalculateRentalRequest extends TenantScopedRequest
             'expected_agreement_version' => ['required', 'integer', 'min:1'],
             'financial_side' => ['required', Rule::enum(RentalFinancialSide::class)],
             'period_start' => ['required', 'date'],
-            'period_end' => ['required', 'date', 'after:period_start'],
+            'period_end' => ['required', 'date', 'after_or_equal:period_start'],
         ];
     }
 }

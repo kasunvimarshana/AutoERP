@@ -31,6 +31,7 @@ final class RentalEndToEndContractFixTest extends TestCase
         $replacementRequest = $this->source('app/Modules/VehicleRental/Http/Requests/StoreRentalReplacementRequest.php');
         $storeCustodyRequest = $this->source('app/Modules/VehicleRental/Http/Requests/StoreRentalCustodyEventRequest.php');
         $storeUsageRequest = $this->source('app/Modules/VehicleRental/Http/Requests/StoreRentalUsageRequest.php');
+        $forfeitRequest = $this->source('app/Modules/VehicleRental/Http/Requests/ForfeitRentalDepositRequest.php');
         $depositService = $this->source('app/Modules/VehicleRental/Services/RentalDepositService.php');
         $depositPage = $this->source('resources/js/modules/vehicle-rental/pages/RentalDepositPage.tsx');
         $usageService = $this->source('app/Modules/VehicleRental/Services/RentalUsageService.php');
@@ -76,9 +77,15 @@ final class RentalEndToEndContractFixTest extends TestCase
         self::assertStringContainsString("'expected_allocation_version' => ['required'", $storeCustodyRequest);
         self::assertStringContainsString("'expected_allocation_version' => ['required'", $storeUsageRequest);
         self::assertStringContainsString("'expected_source_allocation_version' => ['nullable'", $storeUsageRequest);
+        self::assertStringContainsString("'events.*.unit' => ['prohibited']", $storeUsageRequest);
         self::assertStringContainsString('expected_source_allocation_version:', $runningChartPage);
         self::assertStringContainsString('lockSourceAllocation', $usageService);
         self::assertStringContainsString('Owner-applicable usage events require a linked owner supply allocation.', $usageService);
+        self::assertStringContainsString('resolveEventUnit', $usageService);
+        self::assertStringContainsString('rateComponentUnit', $usageService);
+        self::assertStringContainsString('Usage event unit is ambiguous because customer and owner rate components use different units.', $usageService);
+        self::assertStringNotContainsString('unit: row.unit || null', $runningChartPage);
+        self::assertStringNotContainsString('label="Unit"', $runningChartPage);
         self::assertStringContainsString("'rate_version' =>", $usageLogResource);
         self::assertStringNotContainsString("'rate_version_id' =>", $usageLogResource);
         self::assertStringContainsString("'context' =>", $usageFactResource);
@@ -99,6 +106,12 @@ final class RentalEndToEndContractFixTest extends TestCase
         self::assertStringContainsString('party_id: filters.partyId ?? undefined', $lookups);
         self::assertStringContainsString('invoiceType="rental"', $depositPage);
         self::assertStringContainsString('partyId={selected.customer?.id ?? null}', $depositPage);
+        self::assertStringContainsString("'expected_payment_version' => ['required', 'integer', 'min:1']", $forfeitRequest);
+        self::assertStringContainsString("'allocation_date' => ['required', 'date']", $forfeitRequest);
+        self::assertStringContainsString('RentalDepositLinkType::Forfeiture->value', $depositService);
+        self::assertStringContainsString('payment_id: selectedReceiptLink.payment.id', $depositPage);
+        self::assertStringContainsString('expected_payment_version: selectedReceiptLink.payment.row_version', $depositPage);
+        self::assertStringContainsString('allocation_date: businessDateInputValue()', $depositPage);
         self::assertStringContainsString("'fingerprint' => \$this->linkFingerprint", $depositService);
         self::assertStringContainsString('linkFingerprint', $depositService);
         self::assertStringContainsString('A deposit reversal link cannot be reversed again.', $depositService);
@@ -310,11 +323,13 @@ final class RentalEndToEndContractFixTest extends TestCase
         self::assertStringContainsString('usageContextForSide(row, side)?.allocation', $agreementDetailPage);
 
         $calculationService = $this->source('app/Modules/VehicleRental/Services/RentalCalculationService.php');
+        $usageEventBillingMap = $this->source('app/Modules/VehicleRental/Services/RentalUsageEventBillingMap.php');
         $rateComponentCode = $this->source('app/Modules/VehicleRental/Enums/RentalRateComponentCode.php');
         $agreementCreatePage = $this->source('resources/js/modules/vehicle-rental/pages/RentalAgreementCreatePage.tsx');
 
         self::assertStringContainsString("case Pass = 'pass';", $rateComponentCode);
-        self::assertStringContainsString('RentalRateComponentCode::Pass => $this->eventQuantity($contexts, RentalUsageEventType::Pass->value)', $calculationService);
+        self::assertStringContainsString('RentalRateComponentCode::Pass => RentalUsageEventType::Pass', $usageEventBillingMap);
+        self::assertStringContainsString('eventQuantityForComponent($contexts, $component->component_code)', $calculationService);
         self::assertStringContainsString('eventComponentDefaults', $agreementCreatePage);
         self::assertStringContainsString('["pass", "count"]', $agreementCreatePage);
     }

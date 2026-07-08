@@ -103,6 +103,7 @@ final class RentalAllocationService
             }
 
             $this->history->record($allocation, null, RentalAllocationStatus::Planned->value, $userId);
+            $this->bumpAgreementVersion($agreement, $userId);
 
             return $allocation->refresh()->load($this->relations());
         });
@@ -611,5 +612,13 @@ final class RentalAllocationService
                 'expected_version' => ['The vehicle allocation changed after it was loaded. Reload and review the latest version.'],
             ]);
         }
+    }
+
+    private function bumpAgreementVersion(RentalAgreement $agreement, ?int $userId): void
+    {
+        $agreement->forceFill([
+            'row_version' => (int) $agreement->row_version + 1,
+            'updated_by' => $userId,
+        ])->save();
     }
 }
