@@ -55,6 +55,16 @@ const componentDefaults = [
     ...eventComponentDefaults,
 ] as const;
 
+interface AgreementTermForm {
+    title: string;
+    content: string;
+}
+
+const emptyAgreementTerm = (): AgreementTermForm => ({
+    title: "",
+    content: "",
+});
+
 function toDateTimeLocal(value: string | null | undefined): string {
     if (!value) return "";
 
@@ -97,6 +107,7 @@ export default function RentalAgreementCreatePage({
     const [form, setForm] = useState({
         agreement_kind: initialAgreementKind as string,
         agreement_date: "",
+        executed_at: "",
         starts_at: "",
         ends_at: "",
         legal_context: "company",
@@ -113,6 +124,9 @@ export default function RentalAgreementCreatePage({
     const [rates, setRates] = useState<Record<string, string>>(() =>
         Object.fromEntries(componentDefaults.map(([code]) => [code, "0"])),
     );
+    const [terms, setTerms] = useState<AgreementTermForm[]>([
+        emptyAgreementTerm(),
+    ]);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
     const formGuard = useMutationFormGuard(saving);
@@ -172,6 +186,12 @@ export default function RentalAgreementCreatePage({
                         : null,
                 currency_id: Number(currency?.id),
                 payment_term_days: Number(form.payment_term_days),
+                terms: terms.map((term, index) => ({
+                    sequence: index + 1,
+                    title: term.title.trim() || null,
+                    content: term.content.trim(),
+                    is_printable: true,
+                })),
                 rate_version: {
                     effective_from: form.starts_at,
                     driver_mode: form.rental_mode,
@@ -215,6 +235,13 @@ export default function RentalAgreementCreatePage({
             setSaving(false);
         }
     };
+    const isLesseeAgreement =
+        form.agreement_kind === RENTAL_AGREEMENT_KIND.customerRental;
+    const commercialSideLabel = isLesseeAgreement
+        ? "Lessee billable"
+        : "Lessor payable";
+    const termsComplete = terms.every((term) => term.content.trim() !== "");
+
     return (
         <RentalPage>
             <ContentHeader
@@ -242,12 +269,15 @@ export default function RentalAgreementCreatePage({
                                 label="Agreement kind"
                                 value={form.agreement_kind}
                                 disabled={reservation !== null}
-                                onChange={(e) =>
+                                onChange={(e) => {
+                                    setCustomer(null);
+                                    setSupplier(null);
+                                    setTerms([emptyAgreementTerm()]);
                                     updateForm({
                                         ...form,
                                         agreement_kind: e.target.value,
-                                    })
-                                }
+                                    });
+                                }}
                                 options={[...RENTAL_AGREEMENT_KIND_OPTIONS]}
                             />
                         )}
@@ -274,6 +304,38 @@ export default function RentalAgreementCreatePage({
                                     agreement_date: e.target.value,
                                 })
                             }
+                        />
+                        <Input
+                            label="Executed at"
+                            type="datetime-local"
+                            required
+                            min={
+                                form.agreement_date
+                                    ? `${form.agreement_date}T00:00`
+                                    : undefined
+                            }
+                            value={form.executed_at}
+                            onChange={(e) =>
+                                updateForm({
+                                    ...form,
+                                    executed_at: e.target.value,
+                                })
+                            }
+                            hint="Date and time the parties signed this agreement."
+                        />
+                        <Select
+                            label="Legal context"
+                            value={form.legal_context}
+                            onChange={(e) =>
+                                updateForm({
+                                    ...form,
+                                    legal_context: e.target.value,
+                                })
+                            }
+                            options={[
+                                { value: "company", label: "Company" },
+                                { value: "personal", label: "Personal" },
+                            ]}
                         />
                         <Input
                             label="Start"
@@ -426,7 +488,106 @@ export default function RentalAgreementCreatePage({
                         />
                     </div>
                 </Panel>
-                <Panel title="Core rates">
+                <Panel
+                    title={
+                        isLesseeAgreement
+                            ? "Lessee agreement terms"
+                            : "Lessor agreement terms"
+                    }
+                >
+                    <p className="mb-4 text-sm text-slate-600">
+                        Record the clauses accepted by both parties. These terms
+                        become immutable when the agreement is activated.
+                    </p>
+                    <div className="space-y-4">
+                        {terms.map((term, index) => (
+                            <div
+                                key={index}
+                                className="rounded-lg border border-slate-200 p-4"
+                            >
+                                <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto]">
+                                    <Input
+                                        label={`Clause ${index + 1} title`}
+                                        value={term.title}
+                                        onChange={(event) => {
+                                            formGuard.markDirty();
+                                            setTerms((current) =>
+                                                current.map((row, rowIndex) =>
+                                                    rowIndex === index
+                                                        ? {
+                                                              ...row,
+                                                              title: event.target.value,
+                                                          }
+                                                        : row,
+                                                ),
+                                            );
+                                        }}
+                                    />
+                                    {terms.length > 1 && (
+                                        <div className="flex items-end">
+                                            <Button
+                                                variant="ghost"
+                                                onClick={() => {
+                                                    formGuard.markDirty();
+                                                    setTerms((current) =>
+                                                        current.filter(
+                                                            (_, rowIndex) =>
+                                                                rowIndex !== index,
+                                                        ),
+                                                    );
+                                                }}
+                                            >
+                                                Remove clause
+                                            </Button>
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="mt-4">
+                                    <Textarea
+                                        label={`Clause ${index + 1} content`}
+                                        required
+                                        maxLength={20000}
+                                        value={term.content}
+                                        onChange={(event) => {
+                                            formGuard.markDirty();
+                                            setTerms((current) =>
+                                                current.map((row, rowIndex) =>
+                                                    rowIndex === index
+                                                        ? {
+                                                              ...row,
+                                                              content:
+                                                                  event.target.value,
+                                                          }
+                                                        : row,
+                                                ),
+                                            );
+                                        }}
+                                    />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                    <div className="mt-4">
+                        <Button
+                            variant="secondary"
+                            onClick={() => {
+                                formGuard.markDirty();
+                                setTerms((current) => [
+                                    ...current,
+                                    emptyAgreementTerm(),
+                                ]);
+                            }}
+                        >
+                            Add clause
+                        </Button>
+                    </div>
+                </Panel>
+                <Panel title={`${commercialSideLabel} core rates`}>
+                    <p className="mb-4 text-sm text-slate-600">
+                        {isLesseeAgreement
+                            ? "These rates calculate amounts billed to the lessee customer."
+                            : "These rates calculate amounts payable to the lessor vehicle owner."}
+                    </p>
                     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                         {coreComponentDefaults.map(([code, unit]) => (
                             <Input
@@ -447,7 +608,7 @@ export default function RentalAgreementCreatePage({
                         ))}
                     </div>
                 </Panel>
-                <Panel title="Event and recovery rates">
+                <Panel title={`${commercialSideLabel} event rates`}>
                     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                         {eventComponentDefaults.map(([code, unit]) => (
                             <Input
@@ -472,7 +633,12 @@ export default function RentalAgreementCreatePage({
                     <Button
                         type="submit"
                         loading={saving}
-                        disabled={!partyValid || !currency}
+                        disabled={
+                            !partyValid ||
+                            !currency ||
+                            !form.executed_at ||
+                            !termsComplete
+                        }
                     >
                         {mode === "lessee"
                             ? "Create lessee agreement"

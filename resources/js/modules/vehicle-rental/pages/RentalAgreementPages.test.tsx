@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { RouterProvider, createMemoryRouter } from "react-router-dom";
@@ -86,6 +86,90 @@ vi.mock("../components/RentalLookups", () => ({
     ),
 }));
 
+describe("RentalAgreement list route changes", () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        apiMocks.listRentalUsageLogs.mockResolvedValue(collection([]));
+        apiMocks.listRentalAgreements.mockImplementation(
+            ({
+                agreement_kind,
+                page = 1,
+            }: {
+                agreement_kind?: string;
+                page?: number;
+            }) => {
+                const response = collection([
+                        agreement(
+                            agreement_kind ===
+                                RENTAL_AGREEMENT_KIND.ownerSupply
+                                ? "owner_supply"
+                                : "customer_rental",
+                        ),
+                    ]);
+                response.meta.current_page = page;
+                response.meta.last_page = 2;
+                response.meta.total = 2;
+
+                return Promise.resolve(response);
+            },
+        );
+    });
+
+    it("reloads owner-supply records when navigating from lessee to lessor", async () => {
+        const user = userEvent.setup();
+        const router = createMemoryRouter(
+            [
+                {
+                    path: "/vehicle-rental/lessee-agreements",
+                    element: <RentalAgreementListPage mode="lessee" />,
+                },
+                {
+                    path: "/vehicle-rental/lessor-agreements",
+                    element: <RentalAgreementListPage mode="lessor" />,
+                },
+            ],
+            {
+                initialEntries: ["/vehicle-rental/lessee-agreements"],
+            },
+        );
+        render(<RouterProvider router={router} />);
+
+        expect(await screen.findAllByText("Lessee Customer")).not.toHaveLength(
+            0,
+        );
+        await user.click(
+            screen.getByRole("button", { name: "Go to page 2" }),
+        );
+        await waitFor(() =>
+            expect(apiMocks.listRentalAgreements).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    agreement_kind: RENTAL_AGREEMENT_KIND.customerRental,
+                    page: 2,
+                }),
+                expect.any(AbortSignal),
+            ),
+        );
+
+        await act(async () => {
+            await router.navigate("/vehicle-rental/lessor-agreements");
+        });
+
+        await waitFor(() =>
+            expect(apiMocks.listRentalAgreements).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    agreement_kind: RENTAL_AGREEMENT_KIND.ownerSupply,
+                    page: 1,
+                }),
+                expect.any(AbortSignal),
+            ),
+        );
+        expect(await screen.findAllByText("Lessor Supplier")).not.toHaveLength(
+            0,
+        );
+        expect(screen.queryAllByText("Lessee Customer")).toHaveLength(0);
+    });
+});
+
 describe("RentalAgreement lessor flow", () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -128,8 +212,16 @@ describe("RentalAgreement lessor flow", () => {
         );
         await user.click(screen.getByRole("button", { name: "Choose currency" }));
         await user.type(screen.getByLabelText("Agreement date"), "2026-07-06");
+        await user.type(
+            screen.getByLabelText(/Executed at/),
+            "2026-07-06T09:00",
+        );
         await user.type(screen.getByLabelText("Start"), "2026-07-06T08:00");
         await user.type(screen.getByLabelText("End"), "2026-08-06T08:00");
+        await user.type(
+            screen.getByLabelText("Clause 1 content"),
+            "The lessor supplies the vehicle under the payable rates shown.",
+        );
         await user.click(
             screen.getByRole("button", { name: "Create lessor agreement" }),
         );
@@ -142,9 +234,21 @@ describe("RentalAgreement lessor flow", () => {
                     customer_id: null,
                     currency_id: 1,
                     deposit: undefined,
+                    terms: [
+                        expect.objectContaining({
+                            sequence: 1,
+                            content:
+                                "The lessor supplies the vehicle under the payable rates shown.",
+                        }),
+                    ],
                 }),
             ),
         );
+        expect(
+            screen.getByRole("heading", {
+                name: "Lessor payable core rates",
+            }),
+        ).toBeInTheDocument();
     });
 });
 
@@ -190,8 +294,16 @@ describe("RentalAgreement lessee flow", () => {
         );
         await user.click(screen.getByRole("button", { name: "Choose currency" }));
         await user.type(screen.getByLabelText("Agreement date"), "2026-07-06");
+        await user.type(
+            screen.getByLabelText(/Executed at/),
+            "2026-07-06T09:00",
+        );
         await user.type(screen.getByLabelText("Start"), "2026-07-06T08:00");
         await user.type(screen.getByLabelText("End"), "2026-08-06T08:00");
+        await user.type(
+            screen.getByLabelText("Clause 1 content"),
+            "The lessee hires the vehicle under the billable rates shown.",
+        );
         await user.clear(screen.getByLabelText("Security deposit"));
         await user.type(screen.getByLabelText("Security deposit"), "1000");
         await user.click(
@@ -210,9 +322,21 @@ describe("RentalAgreement lessee flow", () => {
                         currency_id: 1,
                         is_refundable: true,
                     }),
+                    terms: [
+                        expect.objectContaining({
+                            sequence: 1,
+                            content:
+                                "The lessee hires the vehicle under the billable rates shown.",
+                        }),
+                    ],
                 }),
             ),
         );
+        expect(
+            screen.getByRole("heading", {
+                name: "Lessee billable core rates",
+            }),
+        ).toBeInTheDocument();
     });
 });
 
@@ -299,6 +423,29 @@ describe("RentalAgreement running chart data", () => {
         expect(screen.queryByText("Lessor running chart")).not.toBeInTheDocument();
         expect(apiMocks.listRentalUsageLogs).not.toHaveBeenCalled();
     });
+
+    it("renders the activated agreement from its immutable document snapshot", async () => {
+        apiMocks.getRentalAgreement.mockResolvedValue({
+            ...agreement("customer_rental"),
+            document_snapshot: documentSnapshot(),
+        });
+
+        renderRoute(
+            "/vehicle-rental/lessee-agreements/:id",
+            <RentalAgreementDetailPage mode="lessee" />,
+            "/vehicle-rental/lessee-agreements/55?print=1",
+        );
+
+        expect(
+            await screen.findByRole("heading", { name: "LE-55" }),
+        ).toBeInTheDocument();
+        expect(screen.getByText("Lessee Customer Snapshot")).toBeInTheDocument();
+        expect(screen.getByText("Accepted lessee clause.")).toBeInTheDocument();
+        expect(
+            screen.getByRole("button", { name: "Print agreement" }),
+        ).toBeInTheDocument();
+        expect(apiMocks.listRentalUsageLogs).not.toHaveBeenCalled();
+    });
 });
 
 function renderPage(page: ReactNode, path: string) {
@@ -332,6 +479,7 @@ function agreement(kind: "customer_rental" | "owner_supply") {
                 ? { id: 33, name: "Lessor Supplier" }
                 : null,
         agreement_date: "2026-07-06",
+        executed_at: "2026-07-06T09:00:00.000Z",
         starts_at: "2026-07-06T08:00:00.000Z",
         ends_at: "2026-08-06T08:00:00.000Z",
         legal_context: "company",
@@ -344,6 +492,19 @@ function agreement(kind: "customer_rental" | "owner_supply") {
         currency: { id: 1, code: "LKR", name: "LKR" },
         status: "active",
         remarks: null,
+        terms: [
+            {
+                id: 501,
+                row_version: 1,
+                sequence: 1,
+                term_code: "GENERAL",
+                title: "General terms",
+                content: "The accepted agreement terms.",
+                is_printable: true,
+                is_active: true,
+            },
+        ],
+        document_snapshot: null,
         active_rate_version: null,
         rate_versions: [],
         allocations: [],
@@ -406,6 +567,60 @@ function usageLog(side: "revenue" | "cost") {
                 },
             },
         ],
+    };
+}
+
+function documentSnapshot() {
+    return {
+        version: 1,
+        captured_at: "2026-07-06T09:01:00.000Z",
+        agreement_number: "LE-55",
+        agreement_kind: "customer_rental",
+        agreement_date: "2026-07-06",
+        executed_at: "2026-07-06T09:00:00.000Z",
+        legal_context: "company",
+        organization: { name: "AutoERP Rentals", code: "AUTOERP" },
+        party: {
+            type: "customer",
+            id: 22,
+            code: "CUS-22",
+            name: "Lessee Customer Snapshot",
+        },
+        period: {
+            starts_at: "2026-07-06T08:00:00.000Z",
+            ends_at: "2026-08-06T08:00:00.000Z",
+        },
+        commercial_terms: {
+            rental_mode: "with_driver",
+            billing_cycle: "monthly",
+            billing_basis: "calendar_month",
+            proration_rule: "exact_day_count",
+            payment_term_days: 30,
+            currency: { code: "LKR", name: "Sri Lankan Rupee", symbol: "Rs" },
+            remarks: null,
+        },
+        terms: [
+            {
+                sequence: 1,
+                term_code: "GENERAL",
+                title: "General terms",
+                content: "Accepted lessee clause.",
+            },
+        ],
+        rate_version: {
+            version_number: 1,
+            effective_from: "2026-07-06T08:00:00.000Z",
+            effective_to: null,
+            components: [
+                {
+                    component_code: "base_rental",
+                    unit: "month",
+                    rate: "1250.000000",
+                    included_quantity: "0.000000",
+                    multiplier: "1.000000",
+                },
+            ],
+        },
     };
 }
 

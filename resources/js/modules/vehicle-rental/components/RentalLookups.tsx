@@ -64,12 +64,14 @@ export function RentalCurrencyLookupSelect(props: LookupProps) {
 }
 
 export function RentalAgreementLookupSelect({
-    direction,
+    agreementKind,
     ...props
-}: LookupProps<RentalAgreementLookupOption> & { direction?: 'inbound' | 'outbound' }) {
+}: LookupProps<RentalAgreementLookupOption> & {
+    agreementKind?: 'customer_rental' | 'owner_supply';
+}) {
     const search = useCallback(
-        (params: LookupLoadParams) => searchAgreements(params, direction),
-        [direction],
+        (params: LookupLoadParams) => searchAgreements(params, agreementKind),
+        [agreementKind],
     );
 
     return <LookupSelect label="Rental agreement" search={search} placeholder="Search agreement number or party..." {...props} />;
@@ -191,13 +193,8 @@ export function RentalTaxGroupLookupSelect(props: LookupProps) {
 
 async function searchAgreements(
     { search, page, perPage, signal }: LookupLoadParams,
-    direction?: 'inbound' | 'outbound',
+    agreementKind?: 'customer_rental' | 'owner_supply',
 ): Promise<LookupResult<RentalAgreementLookupOption>> {
-    const agreementKind = direction === 'inbound'
-        ? 'customer_rental'
-        : direction === 'outbound'
-            ? 'owner_supply'
-            : undefined;
     const response = await listRentalAgreements({
         search,
         page,

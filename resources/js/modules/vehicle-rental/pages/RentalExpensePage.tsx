@@ -276,7 +276,7 @@ export default function RentalExpensePage() {
                             <RentalAgreementLookupSelect
                                 value={targetAgreement}
                                 onChange={changeTargetAgreement}
-                                direction={form.allocationType === 'owner_deduction' ? 'outbound' : 'inbound'}
+                                agreementKind={form.allocationType === 'owner_deduction' ? 'owner_supply' : 'customer_rental'}
                                 disabled={!agreementBackedAllocation}
                                 required={agreementBackedAllocation}
                             />

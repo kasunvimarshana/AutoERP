@@ -188,7 +188,7 @@ export default function RentalBillingPage() {
                         <RentalAgreementLookupSelect
                             value={agreement}
                             onChange={setAgreement}
-                            direction={financialSide === 'revenue' ? 'inbound' : 'outbound'}
+                            agreementKind={financialSide === 'revenue' ? 'customer_rental' : 'owner_supply'}
                             required
                         />
                         <Select

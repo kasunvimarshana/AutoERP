@@ -48,10 +48,10 @@ vi.mock('../components/RentalLookups', () => ({
             <input id="tax-group" readOnly />
         </div>
     ),
-    RentalAgreementLookupSelect: ({ value, onChange, direction, disabled }: {
+    RentalAgreementLookupSelect: ({ value, onChange, agreementKind, disabled }: {
         value: RentalAgreementLookupOption | null;
         onChange: (value: RentalAgreementLookupOption | null) => void;
-        direction?: 'inbound' | 'outbound';
+        agreementKind?: 'customer_rental' | 'owner_supply';
         disabled?: boolean;
     }) => (
         <div>
@@ -60,7 +60,7 @@ vi.mock('../components/RentalLookups', () => ({
             <button
                 type="button"
                 disabled={disabled}
-                onClick={() => onChange(direction === 'outbound' ? ownerAgreement() : customerAgreement())}
+                onClick={() => onChange(agreementKind === 'owner_supply' ? ownerAgreement() : customerAgreement())}
             >
                 Choose agreement
             </button>

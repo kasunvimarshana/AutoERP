@@ -34,6 +34,9 @@ final class RentalAgreementResource extends RentalResource
             'status' => $this->enumValue($this->status),
             'termination_reason' => $this->termination_reason,
             'remarks' => $this->remarks,
+            'document_snapshot' => $this->resource->relationLoaded('terms')
+                ? data_get($this->metadata, 'document_snapshot')
+                : null,
             'terms' => $this->resource->relationLoaded('terms')
                 ? $this->resource->getRelation('terms')
                     ->where('is_active', true)

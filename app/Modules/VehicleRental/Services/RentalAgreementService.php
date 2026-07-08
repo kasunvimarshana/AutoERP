@@ -21,6 +21,10 @@ use RuntimeException;
 
 final class RentalAgreementService
 {
+    private const DOCUMENT_SNAPSHOT_METADATA_KEY = 'document_snapshot';
+
+    private const DOCUMENT_SNAPSHOT_VERSION = 1;
+
     private const STRUCTURAL_DRAFT_FIELDS = [
         'customer_id',
         'supplier_id',
@@ -147,7 +151,7 @@ final class RentalAgreementService
             }
             $this->history->record($agreement, null, RentalAgreementStatus::Draft->value, $userId);
 
-            return $agreement->load($this->relations());
+            return $agreement->refresh()->load($this->relations());
         }, 3);
     }
 
@@ -231,6 +235,21 @@ final class RentalAgreementService
                 && ! $agreement->rateVersions()->where('status', 'active')->exists()) {
                 throw new InvalidArgumentException('An active rate version is required before agreement activation.');
             }
+            if ($to === RentalAgreementStatus::Active && $from === RentalAgreementStatus::Draft) {
+                $this->assertReadyForActivation($agreement);
+                $agreement->load([
+                    'tenant',
+                    'organizationUnit',
+                    'customer',
+                    'supplier',
+                    'currency',
+                    'terms',
+                    'activeRateVersion.components',
+                ]);
+                $metadata = is_array($agreement->metadata) ? $agreement->metadata : [];
+                $metadata[self::DOCUMENT_SNAPSHOT_METADATA_KEY] = $this->documentSnapshot($agreement);
+                $agreement->metadata = $metadata;
+            }
             if (in_array($to, [
                 RentalAgreementStatus::Completed,
                 RentalAgreementStatus::Terminated,
@@ -300,6 +319,8 @@ final class RentalAgreementService
     {
         return [
             'reservation',
+            'tenant',
+            'organizationUnit',
             'customer',
             'supplier',
             'currency',
@@ -358,6 +379,114 @@ final class RentalAgreementService
             && (empty($data['supplier_id']) || ! empty($data['customer_id']))) {
             throw new InvalidArgumentException('Owner supply agreement requires only a supplier/vehicle owner.');
         }
+    }
+
+    private function assertReadyForActivation(RentalAgreement $agreement): void
+    {
+        if ($agreement->executed_at === null || empty($agreement->legal_context)) {
+            throw ValidationException::withMessages([
+                'agreement' => ['Execution date and legal context are required before agreement activation.'],
+            ]);
+        }
+        $executedAt = CarbonImmutable::instance($agreement->executed_at);
+        if ($executedAt->lessThan(CarbonImmutable::parse($agreement->agreement_date)->startOfDay())
+            || $executedAt->isFuture()) {
+            throw ValidationException::withMessages([
+                'executed_at' => ['Execution date must be on or after the agreement date and cannot be in the future.'],
+            ]);
+        }
+
+        if (! $agreement->terms()
+            ->where('is_active', true)
+            ->where('is_printable', true)
+            ->whereNotNull('content')
+            ->where('content', '!=', '')
+            ->exists()) {
+            throw ValidationException::withMessages([
+                'terms' => ['At least one active printable agreement term is required before activation.'],
+            ]);
+        }
+    }
+
+    /** @return array<string, mixed> */
+    private function documentSnapshot(RentalAgreement $agreement): array
+    {
+        $party = $agreement->agreement_kind === RentalAgreementKind::CustomerRental
+            ? $agreement->customer
+            : $agreement->supplier;
+        $partyType = $agreement->agreement_kind === RentalAgreementKind::CustomerRental
+            ? 'customer'
+            : 'supplier';
+        $rateVersion = $agreement->activeRateVersion;
+
+        return [
+            'version' => self::DOCUMENT_SNAPSHOT_VERSION,
+            'captured_at' => now()->toISOString(),
+            'agreement_number' => (string) $agreement->agreement_number,
+            'agreement_kind' => $agreement->agreement_kind->value,
+            'agreement_date' => $agreement->agreement_date?->toDateString(),
+            'executed_at' => $agreement->executed_at?->toISOString(),
+            'legal_context' => $agreement->legal_context,
+            'organization' => [
+                'name' => $agreement->organizationUnit?->name ?? $agreement->tenant?->name,
+                'code' => $agreement->organizationUnit?->code ?? $agreement->tenant?->code,
+            ],
+            'party' => [
+                'type' => $partyType,
+                'id' => $party?->getKey(),
+                'code' => $party?->code
+                    ?? $party?->customer_number
+                    ?? $party?->supplier_number,
+                'name' => $party?->display_name ?? $party?->name,
+            ],
+            'period' => [
+                'starts_at' => $agreement->starts_at?->toISOString(),
+                'ends_at' => $agreement->ends_at?->toISOString(),
+            ],
+            'commercial_terms' => [
+                'rental_mode' => $agreement->rental_mode->value,
+                'billing_cycle' => $agreement->billing_cycle->value,
+                'billing_basis' => $agreement->billing_basis->value,
+                'proration_rule' => $agreement->proration_rule->value,
+                'payment_term_days' => $agreement->payment_term_days,
+                'currency' => [
+                    'code' => $agreement->currency?->code,
+                    'name' => $agreement->currency?->name,
+                    'symbol' => $agreement->currency?->symbol,
+                ],
+                'remarks' => $agreement->remarks,
+            ],
+            'terms' => $agreement->terms
+                ->where('is_active', true)
+                ->where('is_printable', true)
+                ->sortBy('sequence')
+                ->values()
+                ->map(static fn ($term): array => [
+                    'sequence' => (int) $term->sequence,
+                    'term_code' => $term->term_code,
+                    'title' => $term->title,
+                    'content' => (string) $term->content,
+                ])
+                ->all(),
+            'rate_version' => $rateVersion === null
+                ? null
+                : [
+                    'version_number' => (int) $rateVersion->version_number,
+                    'effective_from' => $rateVersion->effective_from?->toISOString(),
+                    'effective_to' => $rateVersion->effective_to?->toISOString(),
+                    'components' => $rateVersion->components
+                        ->sortBy('calculation_order')
+                        ->values()
+                        ->map(static fn ($component): array => [
+                            'component_code' => $component->component_code->value,
+                            'unit' => $component->unit->value,
+                            'rate' => (string) $component->rate,
+                            'included_quantity' => (string) $component->included_quantity,
+                            'multiplier' => (string) $component->multiplier,
+                        ])
+                        ->all(),
+                ],
+        ];
     }
 
     private function assertStructuralDraftChangesAllowed(RentalAgreement $agreement, array $data): void

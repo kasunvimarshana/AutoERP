@@ -135,6 +135,7 @@ final class RentalEndToEndContractFixTest extends TestCase
         self::assertStringContainsString("'customer_rental'", $lookups);
         self::assertStringContainsString("'owner_supply'", $lookups);
         self::assertStringNotContainsString('agreement_kind: direction', $lookups);
+        self::assertStringContainsString("agreementKind?: 'customer_rental' | 'owner_supply'", $lookups);
     }
 
     public function test_vehicle_allocation_lifecycle_contracts_are_conflict_safe_and_guided(): void

@@ -89,6 +89,23 @@ final class RentalAgreementIntegrityContractTest extends TestCase
         self::assertStringContainsString('transitionRentalAgreement(', $detail);
     }
 
+    public function test_activation_requires_complete_terms_and_captures_print_snapshot(): void
+    {
+        $request = $this->source('app/Modules/VehicleRental/Http/Requests/StoreRentalAgreementRequest.php');
+        $service = $this->source('app/Modules/VehicleRental/Services/RentalAgreementService.php');
+        $resource = $this->source('app/Modules/VehicleRental/Http/Resources/RentalAgreementResource.php');
+        $createPage = $this->source('resources/js/modules/vehicle-rental/pages/RentalAgreementCreatePage.tsx');
+        $detailPage = $this->source('resources/js/modules/vehicle-rental/pages/RentalAgreementDetailPage.tsx');
+
+        self::assertStringContainsString("'executed_at' => ['required'", $request);
+        self::assertStringContainsString("'terms' => ['required', 'array', 'min:1'", $request);
+        self::assertStringContainsString('assertReadyForActivation', $service);
+        self::assertStringContainsString('documentSnapshot', $service);
+        self::assertStringContainsString("'document_snapshot' =>", $resource);
+        self::assertStringContainsString('Clause ${index + 1} content', $createPage);
+        self::assertStringContainsString('RentalAgreementPrintDocument', $detailPage);
+    }
+
     private function source(string $relativePath): string
     {
         $source = file_get_contents($this->root.'/'.$relativePath);
