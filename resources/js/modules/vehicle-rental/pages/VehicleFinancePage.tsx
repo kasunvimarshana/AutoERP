@@ -87,6 +87,10 @@ export default function VehicleFinancePage() {
         auth,
         vehicleRentalPermissions.financeAgreementsManage,
     );
+    const canCreateDocument = hasPermission(
+        auth,
+        vehicleRentalPermissions.financialCreate,
+    );
 
     const save = async (event: FormEvent) => {
         event.preventDefault();
@@ -225,7 +229,7 @@ export default function VehicleFinancePage() {
             header: "",
             className: "text-right",
             render: (row) =>
-                canManage && !row.invoice ? (
+                canCreateDocument && !row.invoice ? (
                     <Button
                         variant="secondary"
                         onClick={() => void createPayable(row)}
