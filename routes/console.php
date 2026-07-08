@@ -32,3 +32,8 @@ Schedule::command('auth:retention:purge')
     ->dailyAt('02:30')
     ->withoutOverlapping()
     ->onOneServer();
+
+Schedule::command('vehicle-rental:finance-installments:refresh-due')
+    ->hourly()
+    ->withoutOverlapping()
+    ->onOneServer();
