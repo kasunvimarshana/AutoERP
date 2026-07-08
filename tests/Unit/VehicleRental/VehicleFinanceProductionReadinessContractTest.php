@@ -18,12 +18,14 @@ final class VehicleFinanceProductionReadinessContractTest extends TestCase
 
     public function test_vehicle_finance_due_status_refresh_is_scheduled_and_lock_safe(): void
     {
+        $financeService = $this->source('app/Modules/VehicleRental/Services/VehicleFinanceService.php');
         $refreshService = $this->source('app/Modules/VehicleRental/Services/VehicleFinanceInstallmentStatusRefreshService.php');
         $command = $this->source('app/Modules/VehicleRental/Console/Commands/VehicleFinanceRefreshDueStatusesCommand.php');
         $provider = $this->source('app/Modules/VehicleRental/Providers/VehicleRentalServiceProvider.php');
         $console = $this->source('routes/console.php');
         $controller = $this->source('app/Modules/VehicleRental/Http/Controllers/VehicleFinanceController.php');
 
+        self::assertStringNotContainsString('function refreshDueStatuses', $financeService);
         self::assertStringContainsString('VehicleFinanceInstallmentStatusRefreshService', $controller);
         self::assertStringContainsString('VehicleFinanceInstallmentStatusRefreshService $service', $controller);
         self::assertStringContainsString('DB::transaction', $refreshService);
