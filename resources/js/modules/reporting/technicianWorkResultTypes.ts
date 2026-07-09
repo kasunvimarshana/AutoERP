@@ -6,7 +6,9 @@ export interface TechnicianWorkReportRow {
     id: number;
     job_number: string;
     job_date: string | null;
-    job_status: string | null;
+    operational_status: string | null;
+    billing_status: string | null;
+    payment_status: string | null;
     customer: NamedResource | null;
     customer_name: string;
     vehicle: NamedResource | null;
