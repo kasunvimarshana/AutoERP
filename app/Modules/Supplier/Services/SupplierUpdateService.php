@@ -82,9 +82,9 @@ final class SupplierUpdateService
                     $attributes[$key] = $value;
                 }
             }
-            $attributes['row_version'] = ((int) $supplier->row_version) + 1;
 
             $supplier->fill($attributes);
+            $supplier->setAttribute('row_version', ((int) $supplier->row_version) + 1);
             $supplier->save();
 
             if ($data->contacts !== null) {
