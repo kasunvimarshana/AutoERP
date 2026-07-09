@@ -66,8 +66,16 @@ final class RentalInvoiceIntegrationService
                 $invoiceDate,
                 (int) ($agreement->payment_term_days ?? self::DEFAULT_PAYMENT_TERM_DAYS),
             );
+            $requestedLineIds = array_values(array_unique(array_map('intval', $lineIds ?? [])));
+            $availableLineIds = $run->lines
+                ->pluck('id')
+                ->map(static fn (mixed $id): int => (int) $id)
+                ->all();
+            if ($requestedLineIds !== [] && array_diff($requestedLineIds, $availableLineIds) !== []) {
+                throw new InvalidArgumentException('Selected rental calculation line does not belong to this calculation run.');
+            }
             $selected = $run->lines
-                ->when($lineIds !== null && $lineIds !== [], fn ($lines) => $lines->whereIn('id', $lineIds))
+                ->when($requestedLineIds !== [], fn ($lines) => $lines->whereIn('id', $requestedLineIds))
                 ->values();
             if ($selected->isEmpty()) {
                 throw new InvalidArgumentException('Select at least one remaining calculation line.');
