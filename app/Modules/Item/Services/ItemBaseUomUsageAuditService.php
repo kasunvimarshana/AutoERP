@@ -188,7 +188,7 @@ final class ItemBaseUomUsageAuditService
         )->where('lines.is_inventory_tracked', true)
             ->whereNull('lines.inventory_movement_id')
             ->whereNull('lines.uom_id')
-            ->whereNotIn('parents.status', ['invoiced', 'partially_paid', 'paid', 'cancelled'])
+            ->where('parents.operational_status', '!=', 'cancelled')
             ->count();
         $this->addBlocker($blockers, 'unsafe_vehicle_service_lines', 'Unissued vehicle-service inventory lines without a UOM snapshot must be resolved.', $unsafeServiceLines);
 
