@@ -13,7 +13,7 @@ import type { CustomerCategory } from '../customerTypes';
 import { CustomerCategorySelect } from './CustomerCategorySelect';
 import { CustomerRelationHeader } from './CustomerRelationHeader';
 
-export default function CustomerCategoryTab({ customerId }: { customerId: number }) {
+export default function CustomerCategoryTab({ customerId, canManage }: { customerId: number; canManage: boolean }) {
     const [page, setPage] = useState(1);
     const [open, setOpen] = useState(false);
     const [category, setCategory] = useState<CustomerCategory | null>(null);
@@ -24,7 +24,7 @@ export default function CustomerCategoryTab({ customerId }: { customerId: number
     const columns: DataColumn<CustomerCategory>[] = [
         { key: 'category', header: 'Category', render: (row) => <>{row.code} - {row.name}</> },
         { key: 'parent', header: 'Parent', render: (row) => row.parent ? `${row.parent.code} - ${row.parent.name}` : '-' },
-        { key: 'actions', header: '', className: 'text-right', render: (row) => <button type="button" className="font-semibold text-rose-600" onClick={() => setRemoveTarget(row)}>Remove</button> },
+        ...(canManage ? [{ key: 'actions', header: '', className: 'text-right', render: (row: CustomerCategory) => <button type="button" className="font-semibold text-rose-600" onClick={() => setRemoveTarget(row)}>Remove</button> }] : []),
     ];
     async function remove(row: CustomerCategory) {
         setActionError(null);
@@ -38,5 +38,5 @@ export default function CustomerCategoryTab({ customerId }: { customerId: number
         catch (error) { setActionError(toApiError(error)); }
         finally { setSubmitting(false); }
     }
-    return <><CustomerRelationHeader title="Categories" description="Active customer classification assignments." onAdd={() => { setActionError(null); setOpen(true); }} addLabel="Assign category" /><ErrorAlert error={actionError ?? result.error} />{result.loading ? <LoadingState /> : <DataTable rows={result.data?.data ?? []} columns={columns} rowKey={(row) => row.id} />}<Pagination meta={result.data?.meta} onPageChange={setPage} /><FormDrawer open={open} title="Assign category" onClose={() => !submitting && setOpen(false)}><div className="space-y-4"><ErrorAlert error={actionError} /><CustomerCategorySelect value={category} onChange={setCategory} /><div className="flex justify-end gap-2"><Button variant="secondary" onClick={() => setOpen(false)}>Cancel</Button><Button loading={submitting} disabled={!category} onClick={() => void assign()}>Assign</Button></div></div></FormDrawer><ConfirmDialog open={Boolean(removeTarget)} title="Remove category" message="This category assignment will be removed from the customer." confirmLabel="Remove" onCancel={() => setRemoveTarget(null)} onConfirm={() => removeTarget && void remove(removeTarget)} /></>;
+    return <><CustomerRelationHeader title="Categories" description="Active customer classification assignments." onAdd={canManage ? () => { setActionError(null); setOpen(true); } : undefined} addLabel="Assign category" /><ErrorAlert error={actionError ?? result.error} />{result.loading ? <LoadingState /> : <DataTable rows={result.data?.data ?? []} columns={columns} rowKey={(row) => row.id} />}<Pagination meta={result.data?.meta} onPageChange={setPage} />{canManage && <FormDrawer open={open} title="Assign category" onClose={() => !submitting && setOpen(false)}><div className="space-y-4"><ErrorAlert error={actionError} /><CustomerCategorySelect value={category} onChange={setCategory} /><div className="flex justify-end gap-2"><Button variant="secondary" onClick={() => setOpen(false)}>Cancel</Button><Button loading={submitting} disabled={!category} onClick={() => void assign()}>Assign</Button></div></div></FormDrawer>}{canManage && <ConfirmDialog open={Boolean(removeTarget)} title="Remove category" message="This category assignment will be removed from the customer." confirmLabel="Remove" onCancel={() => setRemoveTarget(null)} onConfirm={() => removeTarget && void remove(removeTarget)} />}</>;
 }
