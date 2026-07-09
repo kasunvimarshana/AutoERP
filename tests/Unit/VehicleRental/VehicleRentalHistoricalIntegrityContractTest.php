@@ -60,6 +60,25 @@ final class VehicleRentalHistoricalIntegrityContractTest extends TestCase
         self::assertStringContainsString('Only draft rental usage logs can be deleted.', $usageLog);
     }
 
+    public function test_calculation_history_and_source_consumption_records_block_destructive_deletes(): void
+    {
+        $run = $this->source('app/Modules/VehicleRental/Models/RentalCalculationRun.php');
+        $line = $this->source('app/Modules/VehicleRental/Models/RentalCalculationLine.php');
+        $source = $this->source('app/Modules/VehicleRental/Models/RentalCalculationSource.php');
+        $sourceService = $this->source('app/Modules/VehicleRental/Services/RentalCalculationSourceService.php');
+
+        foreach ([$run, $line, $source] as $model) {
+            self::assertStringContainsString('static::deleting', $model);
+            self::assertStringContainsString('LogicException', $model);
+        }
+
+        self::assertStringContainsString('Only draft rental calculation runs can be deleted.', $run);
+        self::assertStringContainsString('Only draft rental calculation lines can be deleted.', $line);
+        self::assertStringContainsString('Only draft rental calculation sources can be deleted.', $source);
+        self::assertStringContainsString('lockForUpdate()', $sourceService);
+        self::assertStringContainsString('already consumed by another approved calculation', $sourceService);
+    }
+
     /** @return list<string> */
     private function agreementOwnedHistoricalMigrations(): array
     {
