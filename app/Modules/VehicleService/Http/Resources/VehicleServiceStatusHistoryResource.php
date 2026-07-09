@@ -13,8 +13,9 @@ final class VehicleServiceStatusHistoryResource extends JsonResource
     {
         return [
             'id' => (int) $this->getKey(),
-            'old_status' => $this->old_status instanceof \BackedEnum ? $this->old_status->value : $this->old_status,
-            'new_status' => $this->new_status instanceof \BackedEnum ? $this->new_status->value : $this->new_status,
+            'dimension' => $this->dimension instanceof \BackedEnum ? $this->dimension->value : $this->dimension,
+            'old_status' => $this->old_status,
+            'new_status' => $this->new_status,
             'reason' => $this->reason,
             'changed_by' => $this->changed_by,
             'changed_at' => $this->changed_at?->toISOString(),
