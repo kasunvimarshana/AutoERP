@@ -16,16 +16,16 @@ import { useSupplierRelationCrud } from './useSupplierRelationCrud';
 
 const list = (id: number, page: number, signal: AbortSignal) => listSupplierDocuments(id, { page, per_page: 20 }, signal);
 const options = (values: readonly string[]) => values.map((value) => ({ value, label: value.replaceAll('_', ' ') }));
-export default function SupplierDocumentTab({ supplierId }: { supplierId: number }) {
+export default function SupplierDocumentTab({ supplierId, canManage }: { supplierId: number; canManage: boolean }) {
     const crud = useSupplierRelationCrud({ supplierId, list, create: createSupplierDocument, update: updateSupplierDocument, remove: deleteSupplierDocument });
     const columns: DataColumn<SupplierDocument>[] = [
         { key: 'type', header: 'Type', render: (row) => row.document_type.replaceAll('_', ' ') },
         { key: 'number', header: 'Number', render: (row) => row.document_number ?? '-' },
         { key: 'dates', header: 'Validity', render: (row) => `${row.issued_date ?? '-'} to ${row.expiry_date ?? '-'}` },
         { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.status} /> },
-        { key: 'actions', header: '', className: 'text-right', render: (row) => <Actions edit={() => crud.startEdit(row)} remove={() => crud.destroy(row)} /> },
+        ...(canManage ? [{ key: 'actions', header: '', className: 'text-right', render: (row: SupplierDocument) => <Actions edit={() => crud.startEdit(row)} remove={() => crud.destroy(row)} /> }] : []),
     ];
-    return <><SupplierRelationHeader title="Compliance documents" description="Supplier registrations, certificates, contracts, and licenses." onAdd={crud.startCreate} /><ErrorAlert error={crud.actionError ?? crud.error} />{crud.loading ? <LoadingState /> : <DataTable rows={crud.data?.data ?? []} columns={columns} rowKey={(row) => row.id} />}<Pagination meta={crud.data?.meta} onPageChange={crud.setPage} /><FormDrawer open={crud.open} title={crud.editing ? 'Edit document' : 'Add document'} onClose={crud.close}>{crud.open && <DocumentForm key={crud.editing?.id ?? 'new'} row={crud.editing} error={crud.actionError} submitting={crud.submitting} onCancel={crud.close} onSubmit={crud.submit} />}</FormDrawer>{crud.confirmDialog}</>;
+    return <><SupplierRelationHeader title="Compliance documents" description="Supplier registrations, certificates, contracts, and licenses." onAdd={canManage ? crud.startCreate : undefined} /><ErrorAlert error={crud.actionError ?? crud.error} />{crud.loading ? <LoadingState /> : <DataTable rows={crud.data?.data ?? []} columns={columns} rowKey={(row) => row.id} />}<Pagination meta={crud.data?.meta} onPageChange={crud.setPage} />{canManage && <FormDrawer open={crud.open} title={crud.editing ? 'Edit document' : 'Add document'} onClose={crud.close}>{crud.open && <DocumentForm key={crud.editing?.id ?? 'new'} row={crud.editing} error={crud.actionError} submitting={crud.submitting} onCancel={crud.close} onSubmit={crud.submit} />}</FormDrawer>}{canManage && crud.confirmDialog}</>;
 }
 function DocumentForm({ row, error, submitting, onCancel, onSubmit }: { row: SupplierDocument | null; error: ApiError | null; submitting: boolean; onCancel: () => void; onSubmit: (payload: SupplierDocumentPayload) => Promise<void> }) {
     const [form, setForm] = useState<SupplierDocumentPayload>(row ? { ...row } : { document_type: 'business_registration', status: 'pending' });
