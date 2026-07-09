@@ -4,6 +4,7 @@
 ini_set('zend.exception_ignore_args', '1');
 
 use App\Console\Commands\EnsureApplicationKeyCommand;
+use App\Console\Commands\ProductionReadinessCommand;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
@@ -44,6 +45,7 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withCommands([
         EnsureApplicationKeyCommand::class,
+        ProductionReadinessCommand::class,
     ])
     ->withMiddleware(function (Middleware $middleware): void {
         $trustedProxies = array_values(array_filter(array_map(
