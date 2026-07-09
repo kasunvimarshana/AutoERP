@@ -21,6 +21,7 @@ final readonly class UpdateCustomerData
      * @param  list<string>  $provided
      */
     public function __construct(
+        public int $rowVersion,
         public ?int $organizationUnitId = null,
         public ?string $code = null,
         public ?string $name = null,
