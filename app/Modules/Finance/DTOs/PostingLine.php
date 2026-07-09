@@ -45,9 +45,10 @@ readonly class PostingLine
 
     public function __get(string $name): mixed
     {
-        return match ($name) {
-            'accountCode', 'account' => null,
-            default => null,
-        };
+        if ($name === 'accountCode' || $name === 'account') {
+            return null;
+        }
+
+        throw new \Error('Undefined property: '.__CLASS__.'::$'.$name);
     }
 }
