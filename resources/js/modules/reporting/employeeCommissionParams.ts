@@ -22,7 +22,9 @@ export interface EmployeeCommissionReportParams extends PaymentLifecycleFilterPa
     supervisor_id?: number | null;
     customer_id?: number | null;
     vehicle_id?: number | null;
-    job_status?: string;
+    operational_status?: string;
+    billing_status?: string;
+    payment_status?: string;
     invoice_status?: string;
     commission_type?: string;
     commission_source?: 'technician' | 'supervisor' | '';
