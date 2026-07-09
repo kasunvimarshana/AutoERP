@@ -17,33 +17,35 @@ import { listVehicleServiceJobs } from '../vehicleServiceApi';
 import type { VehicleServiceJob } from '../vehicleServiceTypes';
 import { VehicleServiceStatusBadge } from '../components/VehicleServiceStatusBadge';
 
-const statuses = ['draft', 'inspected', 'in_progress', 'completed', 'invoiced', 'partially_paid', 'paid', 'cancelled']
+const operationalStatuses = ['draft', 'inspected', 'in_progress', 'completed', 'cancelled']
     .map((value) => ({ value, label: value.replaceAll('_', ' ') }));
 
 export default function VehicleServiceJobListPage() {
     const [searchParams] = useSearchParams();
     const [search, setSearch] = useState('');
-    const [status, setStatus] = useState(searchParams.get('status') ?? '');
+    const [operationalStatus, setOperationalStatus] = useState(searchParams.get('operational_status') ?? '');
     const [dateFrom, setDateFrom] = useState('');
     const [dateTo, setDateTo] = useState('');
     const [page, setPage] = useState(1);
     const debounced = useDebounce(search);
     const result = useApi((signal) => listVehicleServiceJobs({
         search: debounced || undefined,
-        status: status || undefined,
+        operational_status: operationalStatus || undefined,
         date_from: dateFrom || undefined,
         date_to: dateTo || undefined,
         page,
         per_page: 25,
-    }, signal), [debounced, status, dateFrom, dateTo, page]);
+    }, signal), [debounced, operationalStatus, dateFrom, dateTo, page]);
     const columns: DataColumn<VehicleServiceJob>[] = [
         { key: 'number', header: 'Job', render: (job) => <Link className="font-semibold text-sky-700 hover:underline" to={`/vehicle-service/jobs/${job.id}`}>{job.job_number}</Link> },
         { key: 'date', header: 'Date', render: (job) => formatDate(job.job_date) },
         { key: 'customer', header: 'Customer', render: (job) => readableRelation(job.customer) },
         { key: 'vehicle', header: 'Vehicle', render: (job) => readableRelation(job.vehicle) },
         { key: 'total', header: 'Total', render: (job) => <MoneyDisplay value={job.grand_total} /> },
-        { key: 'status', header: 'Status', render: (job) => <VehicleServiceStatusBadge status={job.status} /> },
-        { key: 'actions', header: '', render: (job) => <div className="flex gap-2"><LinkButton to={`/vehicle-service/jobs/${job.id}`} variant="ghost">View</LinkButton>{['draft', 'inspected', 'in_progress'].includes(job.status) && <LinkButton to={`/vehicle-service/jobs/${job.id}/edit`} variant="secondary">Edit</LinkButton>}</div> },
+        { key: 'operational_status', header: 'Operational', render: (job) => <VehicleServiceStatusBadge status={job.operational_status} /> },
+        { key: 'billing_status', header: 'Billing', render: (job) => <VehicleServiceStatusBadge status={job.billing_status} /> },
+        { key: 'payment_status', header: 'Payment', render: (job) => <VehicleServiceStatusBadge status={job.payment_status} /> },
+        { key: 'actions', header: '', render: (job) => <div className="flex gap-2"><LinkButton to={`/vehicle-service/jobs/${job.id}`} variant="ghost">View</LinkButton>{['draft', 'inspected', 'in_progress'].includes(job.operational_status) && <LinkButton to={`/vehicle-service/jobs/${job.id}/edit`} variant="secondary">Edit</LinkButton>}</div> },
     ];
 
     return (
@@ -51,7 +53,7 @@ export default function VehicleServiceJobListPage() {
             <ContentHeader title="Vehicle service jobs" description="Service workflow, mixed job lines, workforce, stock, invoicing, and payment preparation." actions={<LinkButton to="/vehicle-service/jobs/create">New service job</LinkButton>} />
             <div className="mb-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <Input label="Search" type="search" placeholder="Job, customer, or vehicle" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} />
-                <Select label="Status" value={status} options={statuses} onChange={(event) => { setStatus(event.target.value); setPage(1); }} />
+                <Select label="Operational status" value={operationalStatus} options={operationalStatuses} onChange={(event) => { setOperationalStatus(event.target.value); setPage(1); }} />
                 <Input label="From" type="date" value={dateFrom} onChange={(event) => { setDateFrom(event.target.value); setPage(1); }} />
                 <Input label="To" type="date" value={dateTo} onChange={(event) => { setDateTo(event.target.value); setPage(1); }} />
             </div>
