@@ -57,6 +57,15 @@
             "@php artisan config:clear --ansi",
             "@php artisan auth:readiness --no-interaction"
         ],
+        "production:verify": [
+            "@php artisan config:clear --ansi",
+            "@php artisan auth:readiness --no-interaction",
+            "@php artisan route:list --compact",
+            "@php artisan test",
+            "npm run typecheck",
+            "npm run lint",
+            "npm run build"
+        ],
         "dev": [
             "Composer\\Config::disableProcessTimeout",
             "@runtime:check",
