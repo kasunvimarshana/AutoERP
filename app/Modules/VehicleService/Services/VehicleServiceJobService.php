@@ -9,7 +9,9 @@ use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\VehicleService\DTOs\VehicleServiceInspectionData;
 use Modules\VehicleService\DTOs\VehicleServiceJobData;
-use Modules\VehicleService\Enums\VehicleServiceJobStatus;
+use Modules\VehicleService\Enums\VehicleServiceBillingStatus;
+use Modules\VehicleService\Enums\VehicleServiceOperationalStatus;
+use Modules\VehicleService\Enums\VehicleServicePaymentStatus;
 use Modules\VehicleService\Models\VehicleServiceInspection;
 use Modules\VehicleService\Models\VehicleServiceJob;
 use Modules\VehicleService\Services\Concerns\AssertsVehicleServiceExpectedVersion;
@@ -92,7 +94,7 @@ final class VehicleServiceJobService
             $job = VehicleServiceJob::query()->lockForUpdate()->findOrFail($job->getKey());
             $this->assertExpectedVersion($job, $expectedVersion);
 
-            if ($job->status !== VehicleServiceJobStatus::Draft
+            if ($job->operational_status !== VehicleServiceOperationalStatus::Draft
                 || $job->invoiceLinks()->exists()
                 || $job->lines()->whereNotNull('inventory_movement_id')->exists()) {
                 throw new InvalidArgumentException('Only uninvoiced draft service jobs can be deleted.');
@@ -129,7 +131,9 @@ final class VehicleServiceJobService
         if ($creating) {
             $attributes += [
                 'job_number' => $data->jobNumber ?? $this->numbers->next($data->tenantId),
-                'status' => VehicleServiceJobStatus::Draft->value,
+                'operational_status' => VehicleServiceOperationalStatus::Draft->value,
+                'billing_status' => VehicleServiceBillingStatus::Unbilled->value,
+                'payment_status' => VehicleServicePaymentStatus::Unpaid->value,
                 'subtotal' => '0.000000',
                 'discount_total' => '0.000000',
                 'tax_total' => '0.000000',
