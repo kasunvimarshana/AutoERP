@@ -47,6 +47,7 @@ vi.mock('@/modules/auth/AuthProvider', () => ({
 }));
 const vehicle: Vehicle = {
     id: 10,
+    row_version: 1,
     vehicle_number: 'VEH-10',
     code: 'VEH-CODE',
     registration_number: 'CAR-1000',
@@ -143,9 +144,4 @@ function renderPage(page: ReactElement, initialEntries: string[]) {
         </TestRouter>,
     );
 }
-function collection<T>(data: T[]) {
-    return {
-        data,
-        meta: { current_page: 1, from: data.length ? 1 : null, last_page: 1, per_page: 25, to: data.length, total: data.length },
-    };
-}
+function collection(data: unknown[]) { return { data, links: {}, meta: { current_page: 1, per_page: data.length || 1, total: data.length } }; }
