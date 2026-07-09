@@ -14,7 +14,9 @@ interface ServiceAssignmentTableProps {
 const columns = [
     ['job_number', 'Job number', 'job_number'],
     ['job_date', 'Job date', 'job_date'],
-    ['job_status', 'Job status', 'job_status'],
+    ['operational_status', 'Operational', 'operational_status'],
+    ['billing_status', 'Billing', 'billing_status'],
+    ['payment_status', 'Payment', 'payment_status'],
     ['customer_name', 'Customer', ''],
     ['vehicle_label', 'Vehicle', ''],
     ['employee_name', 'Technician', ''],
@@ -46,7 +48,7 @@ export function ServiceAssignmentTable({
     return (
         <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
             <div className="overflow-x-auto">
-                <table className="min-w-[1900px] divide-y divide-slate-200 text-left text-sm">
+                <table className="min-w-[2100px] divide-y divide-slate-200 text-left text-sm">
                     <thead className="bg-slate-50 text-xs uppercase text-slate-500">
                         <tr>
                             {columns.map(([key, label, sort]) => (
@@ -65,7 +67,9 @@ export function ServiceAssignmentTable({
                             <tr key={row.id} className="hover:bg-slate-50/70">
                                 <td className="whitespace-nowrap px-3 py-3">{row.job_number}</td>
                                 <td className="whitespace-nowrap px-3 py-3">{formatDate(row.job_date)}</td>
-                                <td className="whitespace-nowrap px-3 py-3">{humanize(row.job_status)}</td>
+                                <td className="whitespace-nowrap px-3 py-3">{humanize(row.operational_status)}</td>
+                                <td className="whitespace-nowrap px-3 py-3">{humanize(row.billing_status)}</td>
+                                <td className="whitespace-nowrap px-3 py-3">{humanize(row.payment_status)}</td>
                                 <td className="whitespace-nowrap px-3 py-3">{row.customer_name || '-'}</td>
                                 <td className="whitespace-nowrap px-3 py-3">{row.vehicle_label || '-'}</td>
                                 <td className="whitespace-nowrap px-3 py-3">{row.employee_name || '-'}</td>
