@@ -8,6 +8,7 @@ Vehicle Service used one job `status` to represent operational progress, billing
 
 - Added separate Vehicle Service lifecycle enums for operational, billing, and payment state.
 - Replaced the service job table's single status source of truth with explicit `operational_status`, `billing_status`, and `payment_status` columns in the owning creation migration.
+- Removed the old mixed `VehicleServiceJobStatus` enum so new code cannot keep depending on the flawed shared lifecycle concept.
 - Added lifecycle dimension tracking to Vehicle Service status history.
 - Updated Vehicle Service model casts, job resources, list filters, operational transitions, invoice billing updates, and payment settlement updates.
 - Updated main Vehicle Service frontend job list/detail/summary/invoice/history views to display separate lifecycle dimensions.
