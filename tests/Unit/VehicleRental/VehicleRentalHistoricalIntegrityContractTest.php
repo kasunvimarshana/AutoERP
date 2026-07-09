@@ -44,6 +44,22 @@ final class VehicleRentalHistoricalIntegrityContractTest extends TestCase
         self::assertStringContainsString('Only draft rental agreements can be deleted.', $model);
     }
 
+    public function test_financial_and_operational_evidence_models_block_destructive_deletes(): void
+    {
+        $rateVersion = $this->source('app/Modules/VehicleRental/Models/RentalAgreementRateVersion.php');
+        $allocation = $this->source('app/Modules/VehicleRental/Models/RentalVehicleAllocation.php');
+        $usageLog = $this->source('app/Modules/VehicleRental/Models/RentalUsageLog.php');
+
+        foreach ([$rateVersion, $allocation, $usageLog] as $source) {
+            self::assertStringContainsString('static::deleting', $source);
+            self::assertStringContainsString('LogicException', $source);
+        }
+
+        self::assertStringContainsString('Only draft rental agreement rate versions can be deleted.', $rateVersion);
+        self::assertStringContainsString('Only planned or cancelled rental vehicle allocations can be deleted.', $allocation);
+        self::assertStringContainsString('Only draft rental usage logs can be deleted.', $usageLog);
+    }
+
     /** @return list<string> */
     private function agreementOwnedHistoricalMigrations(): array
     {
