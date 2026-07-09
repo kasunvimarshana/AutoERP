@@ -28,8 +28,12 @@ final class VehicleServiceJobResource extends JsonResource
             'supervisor_commission_type' => $this->enum($this->supervisor_commission_type),
             'supervisor_commission_value' => (string) $this->supervisor_commission_value,
             'supervisor_commission_amount' => (string) $this->supervisor_commission_amount,
-            'status' => $this->enum($this->status),
-            'status_label' => str((string) $this->enum($this->status))->replace('_', ' ')->title()->toString(),
+            'operational_status' => $this->enum($this->operational_status),
+            'operational_status_label' => $this->label($this->operational_status),
+            'billing_status' => $this->enum($this->billing_status),
+            'billing_status_label' => $this->label($this->billing_status),
+            'payment_status' => $this->enum($this->payment_status),
+            'payment_status_label' => $this->label($this->payment_status),
             'odometer_reading' => $this->odometer_reading === null ? null : (string) $this->odometer_reading,
             'fuel_level' => $this->fuel_level,
             'priority' => $this->priority,
@@ -63,6 +67,11 @@ final class VehicleServiceJobResource extends JsonResource
     private function enum(mixed $value): mixed
     {
         return $value instanceof \BackedEnum ? $value->value : $value;
+    }
+
+    private function label(mixed $value): string
+    {
+        return str((string) $this->enum($value))->replace('_', ' ')->title()->toString();
     }
 
     private function vehicleSummary(): ?array
