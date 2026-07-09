@@ -13,6 +13,7 @@ use Modules\Item\Enums\ItemType;
 use Modules\Vehicle\Enums\VehicleStatus;
 use Modules\Vehicle\Models\Vehicle;
 use Modules\VehicleService\Enums\VehicleServiceLineSourceType;
+use Modules\VehicleService\Enums\VehicleServiceOperationalStatus;
 use Modules\VehicleService\Models\VehicleServiceJob;
 use Modules\VehicleService\Models\VehicleServiceJobLine;
 
@@ -83,7 +84,11 @@ final class VehicleServiceValidationService
 
     public function assertMutable(VehicleServiceJob $job): void
     {
-        if (! in_array($job->status->value, ['draft', 'inspected', 'in_progress'], true)) {
+        if (! in_array($job->operational_status, [
+            VehicleServiceOperationalStatus::Draft,
+            VehicleServiceOperationalStatus::Inspected,
+            VehicleServiceOperationalStatus::InProgress,
+        ], true)) {
             throw new InvalidArgumentException('This service job can no longer be edited.');
         }
     }
