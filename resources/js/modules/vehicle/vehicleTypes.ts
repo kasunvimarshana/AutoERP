@@ -69,6 +69,7 @@ export interface VehicleCategoryPayload {
 
 export interface VehicleSummary {
     id: number;
+    row_version: number;
     vehicle_number: string;
     code?: string | null;
     registration_number?: string | null;
@@ -106,6 +107,7 @@ export interface Vehicle extends VehicleSummary {
 }
 
 export interface VehiclePayload {
+    row_version?: number;
     vehicle_number?: string | null;
     code?: string | null;
     vehicle_make_id?: number | null;
