@@ -6,7 +6,7 @@ namespace Modules\VehicleService\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
-use Modules\VehicleService\Enums\VehicleServiceJobStatus;
+use Modules\VehicleService\Enums\VehicleServiceOperationalStatus;
 use Modules\VehicleService\Http\Requests\ListVehicleServiceJobRequest;
 use Modules\VehicleService\Http\Requests\StoreVehicleServiceInspectionRequest;
 use Modules\VehicleService\Http\Requests\StoreVehicleServiceJobRequest;
@@ -103,7 +103,7 @@ final class VehicleServiceJobController extends VehicleServiceController
         int $job,
         VehicleServiceStatusService $service,
     ): VehicleServiceJobResource {
-        return $this->changeStatus($request, $job, VehicleServiceJobStatus::InProgress, $service);
+        return $this->changeOperationalStatus($request, $job, VehicleServiceOperationalStatus::InProgress, $service);
     }
 
     public function complete(
@@ -111,7 +111,7 @@ final class VehicleServiceJobController extends VehicleServiceController
         int $job,
         VehicleServiceStatusService $service,
     ): VehicleServiceJobResource {
-        return $this->changeStatus($request, $job, VehicleServiceJobStatus::Completed, $service);
+        return $this->changeOperationalStatus($request, $job, VehicleServiceOperationalStatus::Completed, $service);
     }
 
     public function cancel(
@@ -119,7 +119,7 @@ final class VehicleServiceJobController extends VehicleServiceController
         int $job,
         VehicleServiceStatusService $service,
     ): VehicleServiceJobResource {
-        return $this->changeStatus($request, $job, VehicleServiceJobStatus::Cancelled, $service);
+        return $this->changeOperationalStatus($request, $job, VehicleServiceOperationalStatus::Cancelled, $service);
     }
 
     public function inspection(
@@ -152,13 +152,13 @@ final class VehicleServiceJobController extends VehicleServiceController
         );
     }
 
-    private function changeStatus(
+    private function changeOperationalStatus(
         VehicleServiceActionRequest $request,
         int $job,
-        VehicleServiceJobStatus $status,
+        VehicleServiceOperationalStatus $status,
         VehicleServiceStatusService $service,
     ): VehicleServiceJobResource {
-        return new VehicleServiceJobResource($service->change(
+        return new VehicleServiceJobResource($service->changeOperational(
             $this->job($request, $job),
             $status,
             $request->currentUserId(),
