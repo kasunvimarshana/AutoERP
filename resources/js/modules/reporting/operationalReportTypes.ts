@@ -12,7 +12,9 @@ export interface OperationalReportParams {
     date_from?: string;
     date_to?: string;
     purchase_status?: string;
-    job_status?: string;
+    operational_status?: string;
+    billing_status?: string;
+    payment_status?: string;
     line_source_type?: string;
     incentive_source?: 'technician' | 'supervisor' | '';
     supplier_id?: number | null;
