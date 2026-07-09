@@ -13,8 +13,10 @@ use Modules\Core\Models\TenantOwnedModel;
 use Modules\Customer\Models\Customer;
 use Modules\Hr\Models\HrEmployee;
 use Modules\Vehicle\Models\Vehicle;
+use Modules\VehicleService\Enums\VehicleServiceBillingStatus;
 use Modules\VehicleService\Enums\VehicleServiceCommissionType;
-use Modules\VehicleService\Enums\VehicleServiceJobStatus;
+use Modules\VehicleService\Enums\VehicleServiceOperationalStatus;
+use Modules\VehicleService\Enums\VehicleServicePaymentStatus;
 use Modules\VehicleService\Models\Concerns\HasVehicleServiceJobRowVersion;
 
 final class VehicleServiceJob extends TenantOwnedModel
@@ -41,7 +43,9 @@ final class VehicleServiceJob extends TenantOwnedModel
             'supervisor_commission_type' => VehicleServiceCommissionType::class,
             'supervisor_commission_value' => 'decimal:6',
             'supervisor_commission_amount' => 'decimal:6',
-            'status' => VehicleServiceJobStatus::class,
+            'operational_status' => VehicleServiceOperationalStatus::class,
+            'billing_status' => VehicleServiceBillingStatus::class,
+            'payment_status' => VehicleServicePaymentStatus::class,
             'odometer_reading' => 'decimal:6',
             'subtotal' => 'decimal:6',
             'discount_total' => 'decimal:6',
