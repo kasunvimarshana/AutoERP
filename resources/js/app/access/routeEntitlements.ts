@@ -58,7 +58,6 @@ const rules: readonly EntitlementRule[] = [
     operational('/uoms/*'),
     operational('/uom-conversions/*'),
     operational('/uom-convert'),
-    operational('/hr/*'),
     operational('/vouchers/*'),
     // Tenant administration and access control.
     operational('/access/users/create', undefined, [accessPermissions.usersCreate]),
@@ -125,6 +124,7 @@ const rules: readonly EntitlementRule[] = [
     operational('/warehouses/:id', ['warehouse'], [warehousePermissions.warehousesView]),
     operational('/warehouses', ['warehouse'], [warehousePermissions.warehousesView]),
     operational('/inventory/*', ['inventory']),
+    operational('/hr/*', ['hr']),
 
     // Purchase workflows.
     operational('/purchase/fast-purchase', ['purchase'], [

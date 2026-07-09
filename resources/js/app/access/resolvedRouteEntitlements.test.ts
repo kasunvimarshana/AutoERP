@@ -39,4 +39,11 @@ describe('resolved tenant route entitlements', () => {
         expect(entitlement?.modules).toContain('inventory');
         expect(entitlement?.requiresOrganizationUnit).toBe(true);
     });
+
+    it('protects HR employee routes through the HR tenant module', () => {
+        const entitlement = resolveTenantRouteEntitlement('/hr/employees');
+
+        expect(entitlement?.modules).toContain('hr');
+        expect(entitlement?.requiresOrganizationUnit).toBe(true);
+    });
 });

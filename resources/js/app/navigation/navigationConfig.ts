@@ -582,6 +582,31 @@ export const tenantNavigationSections: NavigationSection[] = [
                 ],
             },
             {
+                id: "hr",
+                type: "module",
+                label: "HR",
+                icon: "users",
+                access: operationalAccess(["hr"]),
+                children: [
+                    {
+                        id: "employees",
+                        type: "link",
+                        label: "Employees",
+                        to: "/hr/employees",
+                        match: ["/hr/employees"],
+                        access: operationalAccess(["hr"]),
+                    },
+                    {
+                        id: "employee-create",
+                        type: "link",
+                        label: "Create Employee",
+                        to: "/hr/employees/create",
+                        match: ["/hr/employees/create"],
+                        access: operationalAccess(["hr"]),
+                    },
+                ],
+            },
+            {
                 id: "vehicle-service",
                 type: "module",
                 label: "Vehicle Service",
