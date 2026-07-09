@@ -118,6 +118,6 @@ final class VehicleServiceJob extends TenantOwnedModel
 
     public function statusHistories(): HasMany
     {
-        return $this->hasMany(VehicleServiceStatusHistory::class, 'vehicle_service_job_id')->latest('changed_at');
+        return $this->hasMany(VehicleServiceStatusHistory::class, 'vehicle_service_job_id');
     }
 }
