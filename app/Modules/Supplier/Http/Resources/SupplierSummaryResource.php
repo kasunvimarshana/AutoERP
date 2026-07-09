@@ -16,6 +16,7 @@ final class SupplierSummaryResource extends JsonResource
     {
         return [
             'id' => (int) $this->getKey(),
+            'row_version' => (int) $this->row_version,
             'supplier_number' => $this->supplier_number,
             'code' => $this->code,
             'name' => $this->name,
