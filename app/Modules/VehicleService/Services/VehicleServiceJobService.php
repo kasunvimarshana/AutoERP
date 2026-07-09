@@ -47,7 +47,7 @@ final class VehicleServiceJobService
                     customerComplaint: $data->customerComplaint,
                     odometerReading: $data->odometerReading,
                     fuelLevel: $data->fuelLevel,
-                ));
+                ), (int) $job->row_version);
             }
 
             return $job->load($this->relations());
