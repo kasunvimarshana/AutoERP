@@ -153,18 +153,44 @@ Route::prefix('api/v1')->middleware($middleware)->name('api.v1.')->group(functio
             ->name('status-history.index');
     });
 
-    Route::apiResource('suppliers', SupplierController::class)->middlewareFor([
-        'index', 'show' => $requires(SupplierAuthorizationService::VIEW),
-        'store' => $requires(SupplierAuthorizationService::CREATE),
-        'update' => $requires(SupplierAuthorizationService::UPDATE),
-        'destroy' => $requires(SupplierAuthorizationService::DELETE),
-    ]);
+    Route::get('suppliers', [SupplierController::class, 'index'])
+        ->middleware($requires(SupplierAuthorizationService::VIEW))
+        ->name('suppliers.index');
+    Route::post('suppliers', [SupplierController::class, 'store'])
+        ->middleware($requires(SupplierAuthorizationService::CREATE))
+        ->name('suppliers.store');
+    Route::get('suppliers/{supplier}', [SupplierController::class, 'show'])
+        ->whereNumber('supplier')
+        ->middleware($requires(SupplierAuthorizationService::VIEW))
+        ->name('suppliers.show');
+    Route::match(['put', 'patch'], 'suppliers/{supplier}', [SupplierController::class, 'update'])
+        ->whereNumber('supplier')
+        ->middleware($requires(SupplierAuthorizationService::UPDATE))
+        ->name('suppliers.update');
+    Route::delete('suppliers/{supplier}', [SupplierController::class, 'destroy'])
+        ->whereNumber('supplier')
+        ->middleware($requires(SupplierAuthorizationService::DELETE))
+        ->name('suppliers.destroy');
 
     Route::get('supplier-categories/lookup', [SupplierCategoryController::class, 'lookup'])
         ->middleware($requires(SupplierAuthorizationService::VIEW))
         ->name('supplier-categories.lookup');
-    Route::apiResource('supplier-categories', SupplierCategoryController::class)->middlewareFor([
-        'index', 'show' => $requires(SupplierAuthorizationService::VIEW),
-        'store', 'update', 'destroy' => $requires(SupplierAuthorizationService::UPDATE),
-    ]);
+    Route::get('supplier-categories', [SupplierCategoryController::class, 'index'])
+        ->middleware($requires(SupplierAuthorizationService::VIEW))
+        ->name('supplier-categories.index');
+    Route::post('supplier-categories', [SupplierCategoryController::class, 'store'])
+        ->middleware($requires(SupplierAuthorizationService::UPDATE))
+        ->name('supplier-categories.store');
+    Route::get('supplier-categories/{supplier_category}', [SupplierCategoryController::class, 'show'])
+        ->whereNumber('supplier_category')
+        ->middleware($requires(SupplierAuthorizationService::VIEW))
+        ->name('supplier-categories.show');
+    Route::match(['put', 'patch'], 'supplier-categories/{supplier_category}', [SupplierCategoryController::class, 'update'])
+        ->whereNumber('supplier_category')
+        ->middleware($requires(SupplierAuthorizationService::UPDATE))
+        ->name('supplier-categories.update');
+    Route::delete('supplier-categories/{supplier_category}', [SupplierCategoryController::class, 'destroy'])
+        ->whereNumber('supplier_category')
+        ->middleware($requires(SupplierAuthorizationService::UPDATE))
+        ->name('supplier-categories.destroy');
 });
