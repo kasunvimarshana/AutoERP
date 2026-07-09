@@ -56,6 +56,7 @@ final class InvoiceBalanceProviderTest extends TestCase
     {
         $tenantId = $this->createTenant();
         $otherTenantId = $this->createTenant();
+        $customerId = $this->createCustomer($tenantId, null);
         $invoice = $this->withTenantExecutionContext($tenantId, fn () => app(InvoiceCreationService::class)->create(new CreateInvoiceData(
             tenantId: $tenantId,
             invoiceType: InvoiceType::Manual,
@@ -63,7 +64,7 @@ final class InvoiceBalanceProviderTest extends TestCase
             invoiceDate: '2026-06-07',
             invoiceNumber: 'INV-BAL-SCOPED',
             partyType: 'customer',
-            partyId: 123,
+            partyId: $customerId,
             status: InvoiceStatus::Posted,
             lines: [
                 new InvoiceLineData(
@@ -82,7 +83,7 @@ final class InvoiceBalanceProviderTest extends TestCase
             tenantId: $tenantId,
             organizationUnitId: null,
             partyType: 'customer',
-            partyId: 123,
+            partyId: $customerId,
         ));
 
         $this->assertSame((int) $invoice->getKey(), $balance->sourceId);
@@ -95,7 +96,7 @@ final class InvoiceBalanceProviderTest extends TestCase
             tenantId: $otherTenantId,
             organizationUnitId: null,
             partyType: 'customer',
-            partyId: 123,
+            partyId: $customerId,
         ));
     }
 
@@ -111,6 +112,28 @@ final class InvoiceBalanceProviderTest extends TestCase
             'status' => 'active',
             'status_changed_at' => now(),
             'created_at' => now(),
-            'updated_at' => now()]);
+            'updated_at' => now(),
+        ]);
+    }
+
+    private function createCustomer(int $tenantId, ?int $organizationUnitId): int
+    {
+        $suffix = Str::upper(Str::random(5));
+
+        return (int) DB::table('customers')->insertGetId([
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => $organizationUnitId,
+            'customer_number' => 'CUS-IBP-'.$suffix,
+            'code' => 'CUS-IBP-'.$suffix,
+            'name' => 'Invoice Balance Provider Customer '.$suffix,
+            'legal_name' => 'Invoice Balance Provider Customer '.$suffix.' Legal',
+            'display_name' => 'Invoice Balance Provider Customer '.$suffix,
+            'customer_type' => 'company',
+            'status' => 'active',
+            'email' => 'invoice-balance-provider-customer-'.Str::lower($suffix).'@example.test',
+            'phone' => '0111234567',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
     }
 }
