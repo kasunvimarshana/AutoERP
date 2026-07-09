@@ -16,16 +16,16 @@ import { SupplierRelationHeader } from './SupplierRelationHeader';
 import { useSupplierRelationCrud } from './useSupplierRelationCrud';
 
 const list = (id: number, page: number, signal: AbortSignal) => listSupplierBankAccounts(id, { page, per_page: 20 }, signal);
-export default function SupplierBankAccountTab({ supplierId }: { supplierId: number }) {
+export default function SupplierBankAccountTab({ supplierId, canManage }: { supplierId: number; canManage: boolean }) {
     const crud = useSupplierRelationCrud({ supplierId, list, create: createSupplierBankAccount, update: updateSupplierBankAccount, remove: deleteSupplierBankAccount });
     const columns: DataColumn<SupplierBankAccount>[] = [
         { key: 'bank', header: 'Bank', render: (row) => <>{row.bank_name}<span className="block text-xs text-slate-500">{row.branch_name ?? ''}</span></> },
         { key: 'account', header: 'Account', render: (row) => <>{row.account_name}<span className="block text-xs text-slate-500">{row.account_number}</span></> },
         { key: 'currency', header: 'Currency', render: (row) => readableRelation(row.currency) },
         { key: 'primary', header: 'Primary', render: (row) => row.is_primary ? 'Yes' : 'No' },
-        { key: 'actions', header: '', className: 'text-right', render: (row) => <Actions edit={() => crud.startEdit(row)} remove={() => crud.destroy(row)} /> },
+        ...(canManage ? [{ key: 'actions', header: '', className: 'text-right', render: (row: SupplierBankAccount) => <Actions edit={() => crud.startEdit(row)} remove={() => crud.destroy(row)} /> }] : []),
     ];
-    return <><SupplierRelationHeader title="Bank accounts" description="Payment destination reference accounts owned by the supplier master." onAdd={crud.startCreate} /><ErrorAlert error={crud.actionError ?? crud.error} />{crud.loading ? <LoadingState /> : <DataTable rows={crud.data?.data ?? []} columns={columns} rowKey={(row) => row.id} />}<Pagination meta={crud.data?.meta} onPageChange={crud.setPage} /><FormDrawer open={crud.open} title={crud.editing ? 'Edit bank account' : 'Add bank account'} onClose={crud.close}>{crud.open && <BankForm key={crud.editing?.id ?? 'new'} row={crud.editing} error={crud.actionError} submitting={crud.submitting} onCancel={crud.close} onSubmit={crud.submit} />}</FormDrawer>{crud.confirmDialog}</>;
+    return <><SupplierRelationHeader title="Bank accounts" description="Payment destination reference accounts owned by the supplier master." onAdd={canManage ? crud.startCreate : undefined} /><ErrorAlert error={crud.actionError ?? crud.error} />{crud.loading ? <LoadingState /> : <DataTable rows={crud.data?.data ?? []} columns={columns} rowKey={(row) => row.id} />}<Pagination meta={crud.data?.meta} onPageChange={crud.setPage} />{canManage && <FormDrawer open={crud.open} title={crud.editing ? 'Edit bank account' : 'Add bank account'} onClose={crud.close}>{crud.open && <BankForm key={crud.editing?.id ?? 'new'} row={crud.editing} error={crud.actionError} submitting={crud.submitting} onCancel={crud.close} onSubmit={crud.submit} />}</FormDrawer>}{canManage && crud.confirmDialog}</>;
 }
 function BankForm({ row, error, submitting, onCancel, onSubmit }: { row: SupplierBankAccount | null; error: ApiError | null; submitting: boolean; onCancel: () => void; onSubmit: (payload: SupplierBankAccountPayload) => Promise<void> }) {
     const [currency, setCurrency] = useState<NamedResource | null>(row?.currency ?? null);
