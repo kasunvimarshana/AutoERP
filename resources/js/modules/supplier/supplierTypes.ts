@@ -7,6 +7,7 @@ export const supplierDocumentTypes = ['business_registration', 'tax_certificate'
 export const supplierDocumentStatuses = ['active', 'expired', 'revoked', 'pending'] as const;
 
 export interface SupplierSummary extends NamedResource {
+    row_version: number;
     supplier_number: string;
     code: string;
     display_name?: string | null;
@@ -42,6 +43,7 @@ export interface Supplier extends SupplierSummary {
 }
 
 export interface SupplierPayload {
+    row_version?: number;
     supplier_number?: string | null;
     code: string;
     name: string;
