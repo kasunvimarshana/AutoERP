@@ -86,7 +86,7 @@ final class VehicleServiceInvoiceCreator
             $statusChanged = false;
             if (! $this->sources->hasRemainingBillableLines($job)
                 && $job->status === VehicleServiceJobStatus::Completed) {
-                $this->statuses->change($job, VehicleServiceJobStatus::Invoiced, $createdBy);
+                $this->statuses->change($job, VehicleServiceJobStatus::Invoiced, $createdBy, expectedVersion: (int) $job->row_version);
                 $this->payments->syncJobStatus($job->refresh(), $createdBy);
                 $statusChanged = true;
             }
