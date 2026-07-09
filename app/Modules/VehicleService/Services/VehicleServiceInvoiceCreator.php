@@ -11,7 +11,8 @@ use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Models\Invoice;
 use Modules\Invoice\Services\InvoiceCreationService;
 use Modules\Invoice\Services\InvoiceStatusService;
-use Modules\VehicleService\Enums\VehicleServiceJobStatus;
+use Modules\VehicleService\Enums\VehicleServiceBillingStatus;
+use Modules\VehicleService\Enums\VehicleServiceOperationalStatus;
 use Modules\VehicleService\Models\VehicleServiceInvoiceLink;
 use Modules\VehicleService\Models\VehicleServiceJob;
 use Modules\VehicleService\Services\Concerns\AssertsVehicleServiceExpectedVersion;
@@ -83,14 +84,13 @@ final class VehicleServiceInvoiceCreator
             $invoice = $this->invoiceStatuses->transition($invoice, InvoiceStatus::Approved);
             $invoice = $this->invoiceStatuses->transition($invoice, InvoiceStatus::Posted);
 
-            $statusChanged = false;
-            if (! $this->sources->hasRemainingBillableLines($job)
-                && $job->status === VehicleServiceJobStatus::Completed) {
-                $this->statuses->change($job, VehicleServiceJobStatus::Invoiced, $createdBy, expectedVersion: (int) $job->row_version);
-                $this->payments->syncJobStatus($job->refresh(), $createdBy);
-                $statusChanged = true;
-            }
-            if (! $statusChanged) {
+            if ($job->operational_status === VehicleServiceOperationalStatus::Completed) {
+                $billingStatus = $this->sources->hasRemainingBillableLines($job)
+                    ? VehicleServiceBillingStatus::PartiallyBilled
+                    : VehicleServiceBillingStatus::Billed;
+                $job = $this->statuses->changeBilling($job, $billingStatus, $createdBy, expectedVersion: (int) $job->row_version);
+                $this->payments->syncJobStatus($job, $createdBy);
+            } else {
                 $this->bumpJobVersion($job);
             }
 
