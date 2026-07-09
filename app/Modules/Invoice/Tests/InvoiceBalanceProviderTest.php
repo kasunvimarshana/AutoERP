@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Invoice\Tests;
 
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -11,6 +12,7 @@ use Modules\Invoice\Contracts\InvoiceBalanceProviderInterface;
 use Modules\Invoice\DTOs\CreateInvoiceData;
 use Modules\Invoice\DTOs\InvoiceLineData;
 use Modules\Invoice\Enums\InvoiceDirection;
+use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Enums\InvoiceType;
 use Modules\Invoice\Services\InvoiceCreationService;
 use Tests\TestCase;
@@ -48,6 +50,53 @@ final class InvoiceBalanceProviderTest extends TestCase
         $this->assertSame('1250.000000', $invoiceBalance->remainingAmount);
         $this->assertSame('1250.000000', $sharedBalance->remainingAmount);
         $this->assertSame('draft', $this->withTenantExecutionContext($tenantId, fn () => $provider->getInvoiceStatus((int) $invoice->getKey())));
+    }
+
+    public function test_payable_state_validation_is_scoped_before_balance_is_returned(): void
+    {
+        $tenantId = $this->createTenant();
+        $otherTenantId = $this->createTenant();
+        $invoice = $this->withTenantExecutionContext($tenantId, fn () => app(InvoiceCreationService::class)->create(new CreateInvoiceData(
+            tenantId: $tenantId,
+            invoiceType: InvoiceType::Manual,
+            direction: InvoiceDirection::Outbound,
+            invoiceDate: '2026-06-07',
+            invoiceNumber: 'INV-BAL-SCOPED',
+            partyType: 'customer',
+            partyId: 123,
+            status: InvoiceStatus::Posted,
+            lines: [
+                new InvoiceLineData(
+                    lineNumber: 1,
+                    description: 'Scoped payable invoice',
+                    quantity: '1.000000',
+                    unitPrice: '750.000000',
+                ),
+            ],
+        )));
+
+        $provider = app(InvoiceBalanceProviderInterface::class);
+
+        $balance = $this->withTenantExecutionContext($tenantId, fn () => $provider->validatePayableState(
+            invoiceId: (int) $invoice->getKey(),
+            tenantId: $tenantId,
+            organizationUnitId: null,
+            partyType: 'customer',
+            partyId: 123,
+        ));
+
+        $this->assertSame((int) $invoice->getKey(), $balance->sourceId);
+        $this->assertSame('750.000000', $balance->remainingAmount);
+
+        $this->expectException(ModelNotFoundException::class);
+
+        $this->withTenantExecutionContext($tenantId, fn () => $provider->validatePayableState(
+            invoiceId: (int) $invoice->getKey(),
+            tenantId: $otherTenantId,
+            organizationUnitId: null,
+            partyType: 'customer',
+            partyId: 123,
+        ));
     }
 
     private function createTenant(): int
