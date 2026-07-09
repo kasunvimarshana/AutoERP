@@ -15,6 +15,7 @@ return new class extends Migration
             $table->foreignId('tenant_id')->constrained('tenants', indexName: 'vehicle_service_status_histories_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('vehicle_service_job_id');
+            $table->string('dimension', 30);
             $table->string('old_status', 30)->nullable();
             $table->string('new_status', 30);
             $table->text('reason')->nullable();
@@ -24,6 +25,7 @@ return new class extends Migration
 
             $table->index(['tenant_id', 'organization_unit_id'], 'vehicle_service_status_histories_tenant_org_ix');
             $table->index(['vehicle_service_job_id', 'changed_at'], 'vehicle_service_status_histories_job_changed_ix');
+            $table->index(['vehicle_service_job_id', 'dimension', 'changed_at'], 'vehicle_service_status_histories_job_dimension_ix');
 
             $table->unique(['id', 'tenant_id'], 'vehicle_service_status_histories_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'vehicle_service_status_histories_org_unit_fk')
