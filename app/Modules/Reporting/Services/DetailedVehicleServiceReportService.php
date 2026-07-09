@@ -62,7 +62,9 @@ final class DetailedVehicleServiceReportService
             columns: [
                 new ReportColumn('job_number', 'Job number', sortBy: 'job_number'),
                 new ReportColumn('job_date', 'Job date', sortBy: 'job_date', format: 'date'),
-                new ReportColumn('job_status', 'Job status', sortBy: 'job_status'),
+                new ReportColumn('operational_status', 'Operational status', sortBy: 'operational_status'),
+                new ReportColumn('billing_status', 'Billing status', sortBy: 'billing_status'),
+                new ReportColumn('payment_status', 'Payment status', sortBy: 'payment_status'),
                 new ReportColumn('customer', 'Customer', sortBy: 'customer'),
                 new ReportColumn('vehicle', 'Vehicle', sortBy: 'vehicle'),
                 new ReportColumn('supervisor', 'Supervisor'),
@@ -82,8 +84,6 @@ final class DetailedVehicleServiceReportService
                 new ReportColumn('assigned_employee_count', 'Employees', format: 'decimal'),
                 new ReportColumn('employee_incentive', 'Employee incentive', sortBy: 'employee_incentive', format: 'money', summarize: true),
                 new ReportColumn('estimated_contribution', 'Estimated contribution', sortBy: 'estimated_contribution', format: 'money', summarize: true),
-                new ReportColumn('invoice_progress', 'Invoice progress'),
-                new ReportColumn('payment_progress', 'Payment progress'),
                 new ReportColumn('invoice_total', 'Invoiced total', format: 'money'),
                 new ReportColumn('paid_total', 'Paid total', format: 'money'),
                 new ReportColumn('balance_due', 'Balance due', format: 'money'),
@@ -120,8 +120,6 @@ final class DetailedVehicleServiceReportService
             ->whereNull('invoices.deleted_at')
             ->selectRaw(
                 'links.vehicle_service_job_id, COUNT(DISTINCT invoices.id) as invoice_count, '
-                ."SUM(CASE WHEN invoices.status IN ('draft', 'approved') THEN 1 ELSE 0 END) as draft_invoice_count, "
-                ."SUM(CASE WHEN invoices.status IN ('posted', 'partially_paid', 'paid') THEN 1 ELSE 0 END) as posted_invoice_count, "
                 .'COALESCE(SUM(links.invoice_total), 0) as invoice_total, '
                 .'COALESCE(SUM(balances.paid_amount), 0) as paid_total, '
                 .'COALESCE(SUM(balances.remaining_amount), 0) as balance_due'
@@ -146,7 +144,9 @@ final class DetailedVehicleServiceReportService
                 'jobs.id as job_id',
                 'jobs.job_number',
                 'jobs.job_date',
-                'jobs.status as job_status',
+                'jobs.operational_status',
+                'jobs.billing_status',
+                'jobs.payment_status',
                 'jobs.supervisor_commission_amount',
                 'customers.code as customer_code',
                 'customers.name as customer_name',
@@ -171,8 +171,6 @@ final class DetailedVehicleServiceReportService
                 DB::raw('COALESCE(employee_totals.assigned_employee_count, 0) as assigned_employee_count'),
                 DB::raw('COALESCE(employee_totals.employee_incentive, 0) as employee_incentive'),
                 DB::raw('COALESCE(invoice_totals.invoice_count, 0) as invoice_count'),
-                DB::raw('COALESCE(invoice_totals.draft_invoice_count, 0) as draft_invoice_count'),
-                DB::raw('COALESCE(invoice_totals.posted_invoice_count, 0) as posted_invoice_count'),
                 DB::raw('COALESCE(invoice_totals.invoice_total, 0) as invoice_total'),
                 DB::raw('COALESCE(invoice_totals.paid_total, 0) as paid_total'),
                 DB::raw('COALESCE(invoice_totals.balance_due, 0) as balance_due'),
@@ -187,8 +185,14 @@ final class DetailedVehicleServiceReportService
         if (! empty($params['date_to'])) {
             $query->whereDate('jobs.job_date', '<=', (string) $params['date_to']);
         }
-        if (! empty($params['job_status'])) {
-            $query->where('jobs.status', (string) $params['job_status']);
+        if (! empty($params['operational_status'])) {
+            $query->where('jobs.operational_status', (string) $params['operational_status']);
+        }
+        if (! empty($params['billing_status'])) {
+            $query->where('jobs.billing_status', (string) $params['billing_status']);
+        }
+        if (! empty($params['payment_status'])) {
+            $query->where('jobs.payment_status', (string) $params['payment_status']);
         }
         if (! empty($params['line_source_type'])) {
             $query->where('lines.line_source_type', (string) $params['line_source_type']);
@@ -218,6 +222,9 @@ final class DetailedVehicleServiceReportService
             $query->where(function (Builder $searchQuery) use ($search): void {
                 $searchQuery
                     ->where('jobs.job_number', 'like', $search)
+                    ->orWhere('jobs.operational_status', 'like', $search)
+                    ->orWhere('jobs.billing_status', 'like', $search)
+                    ->orWhere('jobs.payment_status', 'like', $search)
                     ->orWhere('customers.code', 'like', $search)
                     ->orWhere('customers.name', 'like', $search)
                     ->orWhere('vehicles.vehicle_number', 'like', $search)
@@ -279,7 +286,9 @@ final class DetailedVehicleServiceReportService
         $columns = [
             'job_number' => 'jobs.job_number',
             'job_date' => 'jobs.job_date',
-            'job_status' => 'jobs.status',
+            'operational_status' => 'jobs.operational_status',
+            'billing_status' => 'jobs.billing_status',
+            'payment_status' => 'jobs.payment_status',
             'customer' => 'customers.name',
             'vehicle' => 'vehicles.registration_number',
             'line_number' => 'lines.line_number',
@@ -317,7 +326,9 @@ final class DetailedVehicleServiceReportService
             'id' => (int) $row->id,
             'job_number' => (string) $row->job_number,
             'job_date' => (string) $row->job_date,
-            'job_status' => (string) $row->job_status,
+            'operational_status' => (string) $row->operational_status,
+            'billing_status' => (string) $row->billing_status,
+            'payment_status' => (string) $row->payment_status,
             'customer' => trim((string) ($row->customer_code ?? '').' '.(string) ($row->customer_name ?? '')),
             'vehicle' => trim((string) ($row->vehicle_number ?? '').' '.(string) ($row->registration_number ?? '')),
             'supervisor' => trim((string) ($row->supervisor_code ?? '').' '.(string) ($row->supervisor_name ?? '')),
@@ -339,43 +350,10 @@ final class DetailedVehicleServiceReportService
             'employee_incentive' => $employeeIncentive,
             'estimated_contribution' => $estimatedContribution,
             'job_supervisor_incentive' => $this->decimal($row->supervisor_commission_amount),
-            'invoice_progress' => $this->invoiceProgress($row),
-            'payment_progress' => $this->paymentProgress($row),
             'invoice_total' => $this->decimal($row->invoice_total),
             'paid_total' => $this->decimal($row->paid_total),
             'balance_due' => $this->decimal($row->balance_due),
         ];
-    }
-
-    private function invoiceProgress(object $row): string
-    {
-        if ((int) $row->invoice_count === 0) {
-            return 'uninvoiced';
-        }
-        if ((int) $row->draft_invoice_count > 0) {
-            return 'draft';
-        }
-        if (in_array((string) $row->job_status, ['invoiced', 'partially_paid', 'paid'], true)) {
-            return 'invoiced';
-        }
-
-        return (int) $row->posted_invoice_count > 0 ? 'partially_invoiced' : 'uninvoiced';
-    }
-
-    private function paymentProgress(object $row): string
-    {
-        if ((int) $row->invoice_count === 0) {
-            return 'not_applicable';
-        }
-        if ($this->math->compare((string) $row->invoice_total, '0') > 0
-            && $this->math->compare((string) $row->balance_due, '0') <= 0) {
-            return 'paid';
-        }
-        if ($this->math->compare((string) $row->paid_total, '0') > 0) {
-            return 'partially_paid';
-        }
-
-        return 'unpaid';
     }
 
     private function organizationScope(Builder $query, string $column, mixed $organizationUnitId): void
