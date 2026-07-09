@@ -14,14 +14,15 @@ export default function VehicleServiceStatusHistoryTab({ jobId }: { jobId: numbe
         <div className="space-y-4">
             <ErrorAlert error={result.error} />
             <DataTable
-            rows={result.data ?? []}
-            rowKey={(row) => row.id}
-            columns={[
-                { key: 'old', header: 'From', render: (row) => row.old_status ? <VehicleServiceStatusBadge status={row.old_status} /> : '-' },
-                { key: 'new', header: 'To', render: (row) => <VehicleServiceStatusBadge status={row.new_status} /> },
-                { key: 'reason', header: 'Reason', render: (row) => row.reason ?? '-' },
-                { key: 'changed', header: 'Changed at', render: (row) => formatDate(row.changed_at) },
-            ]}
+                rows={result.data ?? []}
+                rowKey={(row) => row.id}
+                columns={[
+                    { key: 'dimension', header: 'Dimension', render: (row) => row.dimension.replaceAll('_', ' ') },
+                    { key: 'old', header: 'From', render: (row) => row.old_status ? <VehicleServiceStatusBadge status={row.old_status as never} /> : '-' },
+                    { key: 'new', header: 'To', render: (row) => <VehicleServiceStatusBadge status={row.new_status as never} /> },
+                    { key: 'reason', header: 'Reason', render: (row) => row.reason ?? '-' },
+                    { key: 'changed', header: 'Changed at', render: (row) => formatDate(row.changed_at) },
+                ]}
             />
         </div>
     );
