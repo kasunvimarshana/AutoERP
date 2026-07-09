@@ -14,6 +14,7 @@ Vehicle Service used one job `status` to represent operational progress, billing
 - Updated Reporting request contracts, Vehicle Service detailed report, technician work report, employee commission report, and reporting frontend filters/tables to use the split lifecycle fields instead of `job_status`.
 - Updated Reporting tests to assert split lifecycle fields and to seed billing/payment status explicitly when test fixtures bypass service-layer invoice/payment sync.
 - Added focused Vehicle Service lifecycle boundary tests for initial state/history, operational completion, partial/full billing, payment sync, and invalid operational transitions.
+- Added a Vehicle Service engine test migration map for the remaining large legacy test file.
 
 ## Verification
 
@@ -25,5 +26,5 @@ Vehicle Service used one job `status` to represent operational progress, billing
 
 ## Open gate before merge
 
-- `VehicleServiceEngineTest` still needs a careful source-truth update pass for the old single-status assertions/usages that remain in that large test file.
+- `VehicleServiceEngineTest` still needs a careful source-truth update pass for the old single-status assertions/usages that remain in that large test file. Follow `docs/changes/2026-07-09-vehicle-service-engine-test-migration-map.md`.
 - Full runtime checks must pass before merge: PHP syntax/static analysis, migrations, backend tests, frontend typecheck, and production-like UAT.
