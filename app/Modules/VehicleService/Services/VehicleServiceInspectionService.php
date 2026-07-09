@@ -54,7 +54,7 @@ final class VehicleServiceInspectionService
 
             $statusChanged = false;
             if ($data->markInspected && $job->status === VehicleServiceJobStatus::Draft) {
-                $this->statuses->change($job, VehicleServiceJobStatus::Inspected, $data->inspectedBy);
+                $this->statuses->change($job, VehicleServiceJobStatus::Inspected, $data->inspectedBy, expectedVersion: (int) $job->row_version);
                 $statusChanged = true;
             }
             if (! $statusChanged) {
