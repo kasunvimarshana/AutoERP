@@ -20,24 +20,29 @@ final class PostingProfileService
         private readonly AccountRoleAssignmentService $assignments,
     ) {}
 
-    public function saveProfile(
+    /**
+     * @param  list<array<string, mixed>>  $rules
+     */
+    public function save(
         int $tenantId,
+        ?int $organizationUnitId,
         string $code,
         string $name,
+        ?string $description,
+        bool $isActive,
         array $rules,
-        ?int $organizationUnitId = null,
+        ?FinancePostingProfile $profile = null,
     ): FinancePostingProfile {
-        $profile = FinancePostingProfile::query()->updateOrCreate(
-            [
-                'tenant_id' => $tenantId,
-                'organization_unit_id' => $organizationUnitId,
-                'code' => $code,
-            ],
-            [
-                'name' => $name,
-                'is_active' => true,
-            ],
-        );
+        $profile ??= new FinancePostingProfile();
+        $profile->forceFill([
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => $organizationUnitId,
+            'code' => $code,
+            'name' => $name,
+            'description' => $description,
+            'is_active' => $isActive,
+        ])->save();
+
         $profile->rules()->delete();
         foreach ($rules as $rule) {
             $lineKey = trim((string) ($rule['line_key'] ?? ''));
@@ -50,6 +55,7 @@ final class PostingProfileService
                 'posting_profile_id' => $profile->getKey(),
                 'line_key' => $lineKey,
                 'account_role_id' => $accountRoleId,
+                'description' => $rule['description'] ?? null,
             ]);
         }
 
