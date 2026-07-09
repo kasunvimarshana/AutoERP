@@ -24,7 +24,7 @@ import {
     WorkflowPanel,
 } from '../inventoryUi';
 
-export function ReservationsTab({ data, loading, error, reload }: WorkflowProps) {
+export function ReservationsTab({ data, loading, error, reload, canManage }: WorkflowProps & { canManage: boolean }) {
     const [form, setForm] = useState({ reservation_date: localToday(), quantity_reserved: '1.000000', notes: '' });
     const [item, setItem] = useState<NamedResource | null>(null);
     const [warehouse, setWarehouse] = useState<NamedResource | null>(null);
@@ -49,27 +49,31 @@ export function ReservationsTab({ data, loading, error, reload }: WorkflowProps)
 
     return (
         <WorkflowPanel title="Reservation management" loading={loading} error={error} actionError={actionError}>
-            <form className="grid gap-4 lg:grid-cols-[1fr_1fr_10rem_1fr_auto]" onSubmit={submit}>
-                <LookupSelect label="Item" value={item} onChange={(value) => { setItem(value); setDimensions(emptyInventoryDimensions()); }} search={lookupApi.stockableItems} error={fieldError(actionError, 'item_id')} />
-                <LookupSelect label="Warehouse" value={warehouse} onChange={(value) => { setWarehouse(value); setDimensions({ ...dimensions, warehouseLocation: null }); }} search={searchWarehouses} error={fieldError(actionError, 'warehouse_id')} loadOnOpen minSearchLength={0} />
-                <DecimalInput label="Quantity (base)" value={form.quantity_reserved} error={fieldError(actionError, 'quantity_reserved')} onChange={(event) => setForm({ ...form, quantity_reserved: event.target.value })} />
-                <Input label="Date" type="date" value={form.reservation_date} error={fieldError(actionError, 'reservation_date')} onChange={(event) => setForm({ ...form, reservation_date: event.target.value })} />
-                <div className="flex items-end"><Button type="submit" loading={busy} disabled={!item || !warehouse}>Reserve</Button></div>
-                <InventoryDimensionFields
-                    item={item}
-                    warehouse={warehouse}
-                    value={dimensions}
-                    onChange={setDimensions}
-                    includeSerial={false}
-                    errors={{
-                        itemVariant: fieldError(actionError, 'item_variant_id'),
-                        warehouseLocation: fieldError(actionError, 'warehouse_location_id'),
-                        batch: fieldError(actionError, 'batch_id'),
-                        uom: fieldError(actionError, 'uom_id'),
-                    }}
-                />
-            </form>
+            {canManage && (
+                <form className="grid gap-4 lg:grid-cols-[1fr_1fr_10rem_1fr_auto]" onSubmit={submit}>
+                    <LookupSelect label="Item" value={item} onChange={(value) => { setItem(value); setDimensions(emptyInventoryDimensions()); }} search={lookupApi.stockableItems} error={fieldError(actionError, 'item_id')} />
+                    <LookupSelect label="Warehouse" value={warehouse} onChange={(value) => { setWarehouse(value); setDimensions({ ...dimensions, warehouseLocation: null }); }} search={searchWarehouses} error={fieldError(actionError, 'warehouse_id')} loadOnOpen minSearchLength={0} />
+                    <DecimalInput label="Quantity (base)" value={form.quantity_reserved} error={fieldError(actionError, 'quantity_reserved')} onChange={(event) => setForm({ ...form, quantity_reserved: event.target.value })} />
+                    <Input label="Date" type="date" value={form.reservation_date} error={fieldError(actionError, 'reservation_date')} onChange={(event) => setForm({ ...form, reservation_date: event.target.value })} />
+                    <div className="flex items-end"><Button type="submit" loading={busy} disabled={!item || !warehouse}>Reserve</Button></div>
+                    <InventoryDimensionFields
+                        item={item}
+                        warehouse={warehouse}
+                        value={dimensions}
+                        onChange={setDimensions}
+                        includeSerial={false}
+                        errors={{
+                            itemVariant: fieldError(actionError, 'item_variant_id'),
+                            warehouseLocation: fieldError(actionError, 'warehouse_location_id'),
+                            batch: fieldError(actionError, 'batch_id'),
+                            uom: fieldError(actionError, 'uom_id'),
+                        }}
+                    />
+                </form>
+            )}
             <RecordList rows={data} columns={columns((row) => {
+                if (!canManage) return null;
+
                 const key = `release-reservation:${row.id}`;
                 const actionable = ['active', 'partially_allocated'].includes(String(row.status ?? ''));
 
