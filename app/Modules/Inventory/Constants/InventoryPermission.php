@@ -59,10 +59,4 @@ final class InventoryPermission
             self::TRACKING_VIEW => 'View inventory batch and serial tracking records.',
         ];
     }
-
-    /** @return list<string> */
-    public static function routeAccess(): array
-    {
-        return array_keys(self::descriptions());
-    }
 }
