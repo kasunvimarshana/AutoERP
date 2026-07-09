@@ -25,7 +25,9 @@ return new class extends Migration
             $table->string('supervisor_commission_type', 20)->default('none');
             $table->decimal('supervisor_commission_value', 20, 6)->default('0.000000');
             $table->decimal('supervisor_commission_amount', 20, 6)->default('0.000000');
-            $table->string('status', 30)->default('draft');
+            $table->string('operational_status', 30)->default('draft');
+            $table->string('billing_status', 30)->default('unbilled');
+            $table->string('payment_status', 30)->default('unpaid');
             $table->decimal('odometer_reading', 20, 6)->nullable();
             $table->string('fuel_level')->nullable();
             $table->string('priority', 30)->nullable();
@@ -47,7 +49,9 @@ return new class extends Migration
             $table->index(['tenant_id', 'organization_unit_id'], 'vehicle_service_jobs_tenant_org_ix');
             $table->index(['customer_id', 'vehicle_id'], 'vehicle_service_jobs_party_vehicle_ix');
             $table->index('bill_to_customer_id', 'vehicle_service_jobs_bill_to_customer_ix');
-            $table->index(['status', 'job_date'], 'vehicle_service_jobs_status_date_ix');
+            $table->index(['operational_status', 'job_date'], 'vehicle_service_jobs_operational_date_ix');
+            $table->index(['billing_status', 'job_date'], 'vehicle_service_jobs_billing_date_ix');
+            $table->index(['payment_status', 'job_date'], 'vehicle_service_jobs_payment_date_ix');
 
             $table->unique(['id', 'tenant_id'], 'vehicle_service_jobs_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'vehicle_service_jobs_organization_unit_id_tenant_fk')
