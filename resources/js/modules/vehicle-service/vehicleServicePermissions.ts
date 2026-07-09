@@ -1,0 +1,18 @@
+export const vehicleServicePermissions = {
+    jobsView: 'vehicle_service.jobs.view',
+    jobsCreate: 'vehicle_service.jobs.create',
+    jobsUpdate: 'vehicle_service.jobs.update',
+    jobsTransition: 'vehicle_service.jobs.transition',
+    linesView: 'vehicle_service.lines.view',
+    linesManage: 'vehicle_service.lines.manage',
+    workforceView: 'vehicle_service.workforce.view',
+    workforceManage: 'vehicle_service.workforce.manage',
+    inventoryView: 'vehicle_service.inventory.view',
+    inventoryIssue: 'vehicle_service.inventory.issue',
+    invoicesView: 'vehicle_service.invoices.view',
+    invoicesCreate: 'vehicle_service.invoices.create',
+    paymentsView: 'vehicle_service.payments.view',
+    paymentsCreate: 'vehicle_service.payments.create',
+    documentsView: 'vehicle_service.documents.view',
+    documentsManage: 'vehicle_service.documents.manage',
+} as const;
