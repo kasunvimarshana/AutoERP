@@ -44,6 +44,7 @@ export default function VehicleServiceJobDetailPage() {
     const job = result.data;
     const expectedVersion = job.row_version ?? 0;
     const currentCustomerOwner = job.vehicle?.current_ownerships?.find((ownership) => ownership.owner_type === 'customer')?.owner ?? job.customer;
+    const isOperationallyMutable = ['draft', 'inspected', 'in_progress'].includes(job.operational_status);
 
     const action = async (name: 'inspect' | 'start' | 'complete' | 'cancel' | 'delete') => {
         setBusy(true);
@@ -66,11 +67,11 @@ export default function VehicleServiceJobDetailPage() {
         }
     };
 
-    const nextAction = job.status === 'draft'
+    const nextAction = job.operational_status === 'draft'
         ? { label: 'Mark inspected', action: 'inspect' as const }
-        : job.status === 'inspected'
+        : job.operational_status === 'inspected'
             ? { label: 'Start work', action: 'start' as const }
-            : job.status === 'in_progress'
+            : job.operational_status === 'in_progress'
                 ? { label: 'Complete job', action: 'complete' as const }
                 : null;
     const sideSummary = (
@@ -78,9 +79,11 @@ export default function VehicleServiceJobDetailPage() {
             <div className="space-y-4">
                 <div>
                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Workshop status</p>
-                    <div className="mt-2"><VehicleServiceStatusBadge status={job.status} /></div>
+                    <div className="mt-2"><VehicleServiceStatusBadge status={job.operational_status} /></div>
                 </div>
                 <DetailGrid items={[
+                    { label: 'Billing', value: <VehicleServiceStatusBadge status={job.billing_status} /> },
+                    { label: 'Payment', value: <VehicleServiceStatusBadge status={job.payment_status} /> },
                     { label: 'Customer', value: readableRelation(job.customer) },
                     { label: 'Registration', value: job.vehicle?.registration_number ?? readableRelation(job.vehicle) },
                     { label: 'Make / model', value: `${job.vehicle?.make?.name ?? '-'} / ${job.vehicle?.model?.name ?? '-'}` },
@@ -98,19 +101,19 @@ export default function VehicleServiceJobDetailPage() {
         <>
             <ContentHeader title={job.job_number} description={`${job.customer?.name ?? 'Customer'} / ${job.vehicle?.name ?? 'Vehicle'}`} />
             <WorkflowHeader
-                status={<VehicleServiceStatusBadge status={job.status} />}
+                status={<VehicleServiceStatusBadge status={job.operational_status} />}
                 nextAction={nextAction ? <Button type="button" loading={busy} onClick={() => action(nextAction.action)}>{nextAction.label}</Button> : undefined}
                 historyAction={<Button type="button" variant="ghost" onClick={() => tabs.openTab('history')}>History</Button>}
                 secondaryActions={<>
-                    {['draft', 'inspected', 'in_progress'].includes(job.status) && <LinkButton to={`/vehicle-service/jobs/${job.id}/edit`} variant="secondary">Edit</LinkButton>}
-                    {!['paid', 'cancelled'].includes(job.status) && (
+                    {isOperationallyMutable && <LinkButton to={`/vehicle-service/jobs/${job.id}/edit`} variant="secondary">Edit</LinkButton>}
+                    {job.operational_status !== 'cancelled' && (
                         <ActionMenu>
                             <Button type="button" variant="ghost" className="w-full justify-start text-rose-700" loading={busy} onClick={() => action('cancel')}>Cancel job</Button>
-                            {job.status === 'draft' && <Button type="button" variant="ghost" className="w-full justify-start text-rose-700" loading={busy} onClick={() => action('delete')}>Delete draft</Button>}
+                            {job.operational_status === 'draft' && <Button type="button" variant="ghost" className="w-full justify-start text-rose-700" loading={busy} onClick={() => action('delete')}>Delete draft</Button>}
                         </ActionMenu>
                     )}
                 </>}
-                blockedReason={job.status === 'cancelled' ? 'No further actions are available for a cancelled job.' : undefined}
+                blockedReason={job.operational_status === 'cancelled' ? 'No further actions are available for a cancelled job.' : undefined}
             />
             <ErrorAlert error={actionError ?? result.error} />
             <EntityDetailLayout
@@ -120,7 +123,7 @@ export default function VehicleServiceJobDetailPage() {
                         <Button type="button" variant="secondary" className="w-full" onClick={() => tabs.openTab('inspection')}>Open inspection</Button>
                         <Button type="button" variant="secondary" className="w-full" onClick={() => tabs.openTab('lines')}>Open job lines</Button>
                         <Button type="button" variant="secondary" className="w-full" onClick={() => tabs.openTab('workforce')}>Assign workforce</Button>
-                        {['completed', 'invoiced'].includes(job.status) && <LinkButton to={`/vehicle-service/jobs/${job.id}/invoice`} variant="secondary" className="w-full">Create & post invoice</LinkButton>}
+                        {job.operational_status === 'completed' && job.billing_status !== 'billed' && <LinkButton to={`/vehicle-service/jobs/${job.id}/invoice`} variant="secondary" className="w-full">Create & post invoice</LinkButton>}
                         {(job.invoice_links ?? []).some((link) => link.status === 'active' && compareDecimalStrings(link.balance_due ?? '0', '0') > 0) && <LinkButton to={`/vehicle-service/jobs/${job.id}/payment`} variant="secondary" className="w-full">Receive payment</LinkButton>}
                     </>
                 }
