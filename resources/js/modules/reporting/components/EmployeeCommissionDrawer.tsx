@@ -55,11 +55,14 @@ export function EmployeeCommissionDrawer({
                             <Detail label="Date" value={formatDate(row.job_date)} />
                             <Detail label="Source" value={humanize(row.commission_source)} />
                             <Detail label="Commission status" value={humanize(row.commission_status)} />
+                            <Detail label="Operational status" value={humanize(row.operational_status)} />
+                            <Detail label="Billing status" value={humanize(row.billing_status)} />
+                            <Detail label="Payment status" value={humanize(row.payment_status)} />
                             <Detail label="Labour value" value={formatMoney(row.labour_amount)} />
                             <Detail label="Commission base" value={formatMoney(row.commission_base)} />
                             <Detail label="Commission" value={formatMoney(row.commission_amount)} />
-                            <Detail label="Invoice progress" value={humanize(row.invoice_progress)} />
-                            <Detail label="Payment progress" value={humanize(row.payment_progress)} />
+                            <Detail label="Invoice total" value={formatMoney(row.invoice_total)} />
+                            <Detail label="Paid total" value={formatMoney(row.paid_total)} />
                             <Detail label="Balance due" value={formatMoney(row.balance_due)} />
                         </dl>
                     </Panel>
