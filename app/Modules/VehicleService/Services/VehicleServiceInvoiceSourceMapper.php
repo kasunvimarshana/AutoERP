@@ -16,9 +16,10 @@ use Modules\Invoice\Enums\InvoiceLineType;
 use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Enums\InvoiceType;
 use Modules\Invoice\Models\InvoiceSourceLine;
-use Modules\VehicleService\Enums\VehicleServiceJobStatus;
+use Modules\VehicleService\Enums\VehicleServiceBillingStatus;
 use Modules\VehicleService\Enums\VehicleServiceLineSourceType;
 use Modules\VehicleService\Enums\VehicleServiceLineStatus;
+use Modules\VehicleService\Enums\VehicleServiceOperationalStatus;
 use Modules\VehicleService\Models\VehicleServiceJob;
 use Modules\VehicleService\Models\VehicleServiceJobLine;
 
@@ -224,11 +225,12 @@ final class VehicleServiceInvoiceSourceMapper
 
     private function assertInvoiceable(VehicleServiceJob $job): void
     {
-        if (! in_array($job->status, [
-            VehicleServiceJobStatus::Completed,
-            VehicleServiceJobStatus::Invoiced,
-        ], true)) {
-            throw new InvalidArgumentException('Only completed service jobs can be invoiced.');
+        if ($job->operational_status !== VehicleServiceOperationalStatus::Completed
+            || ! in_array($job->billing_status, [
+                VehicleServiceBillingStatus::Unbilled,
+                VehicleServiceBillingStatus::PartiallyBilled,
+            ], true)) {
+            throw new InvalidArgumentException('Only completed service jobs with remaining unbilled lines can be invoiced.');
         }
     }
 }
