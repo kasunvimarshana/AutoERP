@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { hasPermission } from '@/modules/auth/accessControl';
+import { useAuth } from '@/modules/auth/AuthProvider';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
@@ -13,10 +15,15 @@ import { StatusBadge } from '@/shared/components/StatusBadge';
 import { useApi } from '@/shared/hooks/useApi';
 import { useDebounce } from '@/shared/hooks/useDebounce';
 import { deactivateUom, listUoms } from './uomApi';
+import { uomPermissions } from './uomPermissions';
 import type { UnitOfMeasure } from './uomTypes';
 import { uomCategories, uomTypes } from './uomTypes';
 
 export default function UomListPage() {
+    const auth = useAuth();
+    const canCreate = hasPermission(auth, uomPermissions.create);
+    const canUpdate = hasPermission(auth, uomPermissions.update);
+    const canDeactivate = hasPermission(auth, uomPermissions.deactivate);
     const [search, setSearch] = useState('');
     const [type, setType] = useState('');
     const [category, setCategory] = useState('');
@@ -41,14 +48,14 @@ export default function UomListPage() {
         { key: 'precision', header: 'Precision', render: (row) => row.decimal_precision },
         { key: 'base', header: 'Base', render: (row) => row.is_base ? 'Yes' : 'No' },
         { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.is_active ? 'active' : 'inactive'} /> },
-        {
+        ...((canUpdate || canDeactivate) ? [{
             key: 'actions',
             header: '',
             className: 'text-right',
-            render: (row) => (
+            render: (row: UnitOfMeasure) => (
                 <div className="flex justify-end gap-3">
-                    <Link className="text-sm font-semibold text-slate-600 hover:text-sky-700" to={`/uoms/${row.id}/edit`}>Edit</Link>
-                    {row.is_active && (
+                    {canUpdate && <Link className="text-sm font-semibold text-slate-600 hover:text-sky-700" to={`/uoms/${row.id}/edit`}>Edit</Link>}
+                    {canDeactivate && row.is_active && (
                         <button type="button" className="text-sm font-semibold text-rose-600 hover:text-rose-700" onClick={async () => {
                             setActionError(null);
                             try {
@@ -63,12 +70,12 @@ export default function UomListPage() {
                     )}
                 </div>
             ),
-        },
+        }] : []),
     ];
 
     return (
         <>
-            <ContentHeader title="Units of Measure" description="Generic unit definitions and categories." actions={<LinkButton to="/uoms/create">New UOM</LinkButton>} />
+            <ContentHeader title="Units of Measure" description="Generic unit definitions and categories." actions={canCreate ? <LinkButton to="/uoms/create">New UOM</LinkButton> : undefined} />
             <div className="mb-4 grid gap-3 lg:grid-cols-4">
                 <Input type="search" placeholder="Search code, name, or symbol" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} />
                 <Select value={type} onChange={(event) => { setType(event.target.value); setPage(1); }} options={uomTypes.map((value) => ({ value, label: value }))} placeholder="All types" />
