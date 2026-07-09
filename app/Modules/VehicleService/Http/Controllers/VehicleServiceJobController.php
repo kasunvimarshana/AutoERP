@@ -148,7 +148,7 @@ final class VehicleServiceJobController extends VehicleServiceController
         int $job,
     ): AnonymousResourceCollection {
         return VehicleServiceStatusHistoryResource::collection(
-            $this->job($request, $job)->statusHistories()->get(),
+            $this->job($request, $job)->statusHistories()->latest('changed_at')->latest('id')->get(),
         );
     }
 
