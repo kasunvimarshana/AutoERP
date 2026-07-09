@@ -15,9 +15,9 @@ final class TenantPlanSchemaTest extends TestCase
         $schema = new TenantPlanSchema();
 
         self::assertSame(
-            ['enabled_modules' => ['inventory', 'purchase']],
+            ['enabled_modules' => ['inventory', 'purchase', 'hr']],
             $schema->normalizeFeatures([
-                'enabled_modules' => [' Inventory ', 'purchase', 'inventory'],
+                'enabled_modules' => [' Inventory ', 'purchase', 'inventory', ' HR '],
             ]),
         );
         self::assertSame(

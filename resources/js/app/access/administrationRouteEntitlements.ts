@@ -24,7 +24,6 @@ export const administrationRouteEntitlements: readonly EntitlementRule[] = [
     operational('/uoms/*'),
     operational('/uom-conversions/*'),
     operational('/uom-convert'),
-    operational('/hr/*'),
     operational('/vouchers/*'),
 
     operational('/access/users/create', undefined, [accessPermissions.usersCreate]),
@@ -88,4 +87,5 @@ export const administrationRouteEntitlements: readonly EntitlementRule[] = [
     operational('/warehouses/:id', ['warehouse'], [warehousePermissions.warehousesView]),
     operational('/warehouses', ['warehouse'], [warehousePermissions.warehousesView]),
     operational('/inventory/*', ['inventory']),
+    operational('/hr/*', ['hr']),
 ];

@@ -33,7 +33,7 @@ const LIMIT_OPTIONS: Array<{ key: keyof TenantPlanLimits; label: string; hint: s
 
 const MODULE_GROUPS: Array<{ label: string; modules: TenantModuleCode[] }> = [
     { label: 'Master data', modules: ['customer', 'supplier', 'item', 'warehouse', 'vehicle'] },
-    { label: 'Operations', modules: ['inventory', 'purchase', 'vehicle-service', 'vehicle-rental'] },
+    { label: 'Operations', modules: ['inventory', 'purchase', 'hr', 'vehicle-service', 'vehicle-rental'] },
     { label: 'Billing and finance', modules: ['invoice', 'payment', 'finance'] },
     { label: 'Insights', modules: ['reporting'] },
 ];

@@ -198,6 +198,40 @@ describe('navigation access and matching', () => {
         expect(findNavigationMatch('/inventory', '', tenantNavigationSections)?.parent?.id).toBe('inventory');
     });
 
+    it('shows HR navigation only when the tenant plan enables HR', () => {
+        const withHr = filterNavigation(tenantNavigationSections, {
+            tenantId: 10,
+            isPlatformOperator: false,
+            organizationUnitId: 20,
+            roles: [],
+            permissions: [],
+            permissionsLoaded: true,
+            enabledModules: ['hr'],
+            enabledModulesLoaded: true,
+        });
+        const withoutHr = filterNavigation(tenantNavigationSections, {
+            tenantId: 10,
+            isPlatformOperator: false,
+            organizationUnitId: 20,
+            roles: [],
+            permissions: [],
+            permissionsLoaded: true,
+            enabledModules: ['inventory'],
+            enabledModulesLoaded: true,
+        });
+        const hrModule = withHr
+            .flatMap((section) => section.items)
+            .find((item) => item.id === 'hr');
+
+        expect(hrModule?.type).toBe('module');
+        expect(hrModule?.type === 'module' ? hrModule.children.map((child) => child.label) : []).toEqual([
+            'Employees',
+            'Create Employee',
+        ]);
+        expect(withoutHr.flatMap((section) => section.items).map((item) => item.id)).not.toContain('hr');
+        expect(findNavigationMatch('/hr/employees', '', tenantNavigationSections)?.parent?.id).toBe('hr');
+    });
+
     it('preserves navigation-specific module constraints for shared route paths', () => {
         const sections = filterNavigation(tenantNavigationSections, {
             tenantId: 10,

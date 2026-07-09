@@ -131,6 +131,7 @@ const rules: readonly EntitlementRule[] = [
     operational('/warehouses/:id', ['warehouse'], [warehousePermissions.warehousesView]),
     operational('/warehouses', ['warehouse'], [warehousePermissions.warehousesView]),
     operational('/inventory/*', ['inventory']),
+    operational('/hr/*', ['hr']),
 
     // Purchase workflows.
     operational('/purchase/fast-purchase', ['purchase'], [
