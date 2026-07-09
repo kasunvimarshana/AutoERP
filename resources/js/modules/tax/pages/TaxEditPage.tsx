@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { hasPermission } from '@/modules/auth/accessControl';
+import { useAuth } from '@/modules/auth/AuthProvider';
 import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
@@ -11,6 +13,7 @@ import { Panel } from '@/shared/components/Panel';
 import { Select } from '@/shared/components/Select';
 import { useApi } from '@/shared/hooks/useApi';
 import { addTaxRate, getTax, getTaxLookups, updateTax } from '../taxApi';
+import { taxPermissions } from '../taxPermissions';
 import type { Tax, TaxCalculationMethod, TaxLookups, TaxPayload, TaxRate } from '../taxTypes';
 
 function taxPayload(tax: Tax): TaxPayload {
@@ -29,9 +32,23 @@ function taxPayload(tax: Tax): TaxPayload {
 }
 
 export default function TaxEditPage() {
+    const auth = useAuth();
+    const canViewTax = hasPermission(auth, taxPermissions.taxesView);
+    const canViewLookups = hasPermission(auth, taxPermissions.lookupsView);
     const id = Number(useParams().id);
-    const tax = useApi((signal) => getTax(id, signal), [id]);
-    const lookups = useApi((signal) => getTaxLookups(signal), []);
+    const tax = useApi((signal) => getTax(id, signal), [id], canViewTax);
+    const lookups = useApi((signal) => getTaxLookups(signal), [], canViewLookups);
+
+    if (!canViewTax) {
+        return (
+            <>
+                <ContentHeader title="Edit tax" actions={<Link className="text-sm font-semibold text-sky-700 hover:underline" to="/tax/taxes">Back to taxes</Link>} />
+                <Panel title="Tax view permission required">
+                    <p className="text-sm text-slate-600">Tax details must be viewable before they can be edited.</p>
+                </Panel>
+            </>
+        );
+    }
 
     if (tax.loading && !tax.data) return <LoadingState />;
     if (!tax.data) {
