@@ -1,14 +1,23 @@
 import type { NamedResource } from '@/shared/types/common';
 
-export type VehicleServiceJobStatus =
+export type VehicleServiceOperationalStatus =
     | 'draft'
     | 'inspected'
     | 'in_progress'
     | 'completed'
-    | 'invoiced'
-    | 'partially_paid'
-    | 'paid'
     | 'cancelled';
+
+export type VehicleServiceBillingStatus =
+    | 'unbilled'
+    | 'partially_billed'
+    | 'billed';
+
+export type VehicleServicePaymentStatus =
+    | 'unpaid'
+    | 'partially_paid'
+    | 'paid';
+
+export type VehicleServiceLifecycleDimension = 'operational' | 'billing' | 'payment';
 
 export type VehicleServiceLineSourceType =
     | 'inventory_item'
@@ -175,8 +184,12 @@ export interface VehicleServiceJob {
     supervisor_commission_type: CommissionType;
     supervisor_commission_value: string;
     supervisor_commission_amount: string;
-    status: VehicleServiceJobStatus;
-    status_label?: string;
+    operational_status: VehicleServiceOperationalStatus;
+    operational_status_label?: string;
+    billing_status: VehicleServiceBillingStatus;
+    billing_status_label?: string;
+    payment_status: VehicleServicePaymentStatus;
+    payment_status_label?: string;
     odometer_reading?: string | null;
     fuel_level?: string | null;
     priority?: string | null;
@@ -258,100 +271,27 @@ export interface VehicleServiceInvoiceCreated {
     posted_at?: string | null;
 }
 
-export interface VehicleServiceInventoryIssuePayload {
-    expected_version?: number;
-    warehouse_id: number;
-    warehouse_location_id: number;
-    line_ids?: number[];
-}
-
-export interface VehicleServiceInventoryMovement {
+export interface VehicleServiceStatusHistory {
     id: number;
-    movement_number: string;
-    source_line_id?: number | null;
-    quantity: string;
-    status: string;
+    dimension: VehicleServiceLifecycleDimension;
+    old_status?: string | null;
+    new_status: string;
+    reason?: string | null;
+    changed_by?: number | null;
+    changed_at?: string | null;
 }
 
-export interface VehicleServicePaymentMethod {
-    id: number | null;
-    code?: string | null;
-    name: string;
+export interface VehicleServicePaymentMethod extends NamedResource {
     method_type: string;
     requires_reference: boolean;
     requires_instrument_details: boolean;
 }
 
-export interface VehicleServicePaymentOptions {
-    job_version: number;
-    methods: VehicleServicePaymentMethod[];
-}
-
-export interface VehicleServicePaymentPayload {
-    expected_version: number;
+export interface VehicleServicePaymentOption {
     invoice_id: number;
-    payment_date: string;
-    amount: string;
-    payment_method_id: number;
-    currency_id?: number;
-    exchange_rate?: string;
-    reference_number?: string;
-    external_bank_name?: string;
-    external_bank_branch?: string;
-    instrument_number?: string;
-    instrument_date?: string;
-}
-
-export interface VehicleServicePaymentCreated {
-    id: number;
-    row_version?: number;
-    payment_number?: string | null;
-    document_status?: string | null;
-    posting_status?: string | null;
-    allocation_status?: string | null;
-    instrument_status?: string | null;
-    total_amount?: string | null;
-    allocated_amount?: string | null;
-}
-
-export interface PreparedVehicleServicePayment {
-    paymentType: string;
-    direction: string;
-    paymentDate: string;
-    referenceNumber?: string | null;
-    lines: Array<{
-        amount: string;
-        paymentMethodId?: number | null;
-        externalBankName?: string | null;
-        externalBankBranch?: string | null;
-        instrumentNumber?: string | null;
-        instrumentDate?: string | null;
-    }>;
-    allocations: Array<{ invoiceId: number; allocatedAmount: string }>;
-}
-
-export interface VehicleServiceStatusHistory {
-    id: number;
-    old_status?: VehicleServiceJobStatus | null;
-    new_status: VehicleServiceJobStatus;
-    reason?: string | null;
-    changed_by?: number | null;
-    changed_at: string;
-}
-
-export interface VehicleServiceDocumentOptions {
-    document_types: string[];
-    mime_types: string[];
-    max_size_bytes: number;
-}
-
-export interface VehicleServiceDocument {
-    id: number;
-    document_type: string;
-    original_filename: string;
-    mime_type: string;
-    size_bytes: number;
-    description?: string | null;
-    uploaded_by?: number | null;
-    created_at?: string | null;
+    invoice_number?: string | null;
+    remaining_amount: string;
+    currency_id?: number | null;
+    due_date?: string | null;
+    payment_allowed: boolean;
 }
