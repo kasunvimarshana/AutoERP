@@ -13,15 +13,22 @@ import type { LookupLoadParams } from '@/shared/types/lookup';
 import type { TechnicianWorkReportParams } from '../reportingTypes';
 import { PaymentLifecycleFilters } from './PaymentLifecycleFilters';
 
-const jobStatuses = [
+const operationalStatuses = [
     ['draft', 'Draft'],
     ['inspected', 'Inspected'],
     ['in_progress', 'In progress'],
     ['completed', 'Completed'],
-    ['invoiced', 'Invoiced'],
+    ['cancelled', 'Cancelled'],
+];
+const billingStatuses = [
+    ['unbilled', 'Unbilled'],
+    ['partially_billed', 'Partially billed'],
+    ['billed', 'Billed'],
+];
+const servicePaymentStatuses = [
+    ['unpaid', 'Unpaid'],
     ['partially_paid', 'Partially paid'],
     ['paid', 'Paid'],
-    ['cancelled', 'Cancelled'],
 ];
 const invoiceStatuses = [
     ['draft', 'Draft'],
@@ -77,7 +84,9 @@ export function ServiceAssignmentFilters({
                 <Input label="Search" value={value.search ?? ''} onChange={(event) => onChange({ search: event.target.value })} placeholder="Job, line, customer or vehicle" />
                 <Input label="From" type="date" value={value.date_from ?? ''} onChange={(event) => onChange({ date_from: event.target.value })} />
                 <Input label="To" type="date" value={value.date_to ?? ''} onChange={(event) => onChange({ date_to: event.target.value })} />
-                <Select label="Job status" value={value.job_status ?? ''} options={options(jobStatuses)} onChange={(event) => onChange({ job_status: event.target.value })} />
+                <Select label="Operational status" value={value.operational_status ?? ''} options={options(operationalStatuses)} onChange={(event) => onChange({ operational_status: event.target.value })} />
+                <Select label="Billing status" value={value.billing_status ?? ''} options={options(billingStatuses)} onChange={(event) => onChange({ billing_status: event.target.value })} />
+                <Select label="Service payment status" value={value.payment_status ?? ''} options={options(servicePaymentStatuses)} onChange={(event) => onChange({ payment_status: event.target.value })} />
                 <GenericLookupSelect<EmployeeSummary>
                     label="Technician"
                     value={value.employee_id ? employee : null}
