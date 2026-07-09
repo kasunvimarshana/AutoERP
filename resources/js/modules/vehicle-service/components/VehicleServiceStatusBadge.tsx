@@ -1,8 +1,6 @@
 import { StatusBadge } from '@/shared/components/StatusBadge';
-import type { VehicleServiceBillingStatus, VehicleServiceOperationalStatus, VehicleServicePaymentStatus } from '../vehicleServiceTypes';
+import type { VehicleServiceLifecycleStatus } from '../vehicleServiceTypes';
 
-type VehicleServiceStatus = VehicleServiceOperationalStatus | VehicleServiceBillingStatus | VehicleServicePaymentStatus;
-
-export function VehicleServiceStatusBadge({ status }: { status?: VehicleServiceStatus | null }) {
+export function VehicleServiceStatusBadge({ status }: { status?: VehicleServiceLifecycleStatus | null }) {
     return <StatusBadge status={status} />;
 }
