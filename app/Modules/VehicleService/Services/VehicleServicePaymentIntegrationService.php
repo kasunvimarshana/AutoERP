@@ -193,10 +193,10 @@ final class VehicleServicePaymentIntegrationService
         ) > 0);
 
         if ($allSettled && $job->status !== VehicleServiceJobStatus::Paid) {
-            return $this->statuses->change($job, VehicleServiceJobStatus::Paid, $changedBy);
+            return $this->statuses->change($job, VehicleServiceJobStatus::Paid, $changedBy, expectedVersion: (int) $job->row_version);
         }
         if ($anySettled && $job->status === VehicleServiceJobStatus::Invoiced) {
-            return $this->statuses->change($job, VehicleServiceJobStatus::PartiallyPaid, $changedBy);
+            return $this->statuses->change($job, VehicleServiceJobStatus::PartiallyPaid, $changedBy, expectedVersion: (int) $job->row_version);
         }
 
         return $job;
