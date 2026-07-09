@@ -11,6 +11,7 @@ import { reportingPermissions } from '@/modules/reporting/reportingPermissions';
 import { settingsPermissions } from '@/modules/settings/settingsPermissions';
 import { supplierPermissions } from '@/modules/supplier/supplierPermissions';
 import { tenantPermissions } from '@/modules/tenant/tenantPermissions';
+import { uomPermissions } from '@/modules/uom/uomPermissions';
 import { vehicleRentalPermissions } from '@/modules/vehicle-rental/vehicleRentalPermissions';
 import { vehiclePermissions } from '@/modules/vehicle/vehiclePermissions';
 import { warehousePermissions } from '@/modules/warehouse/warehousePermissions';
@@ -55,9 +56,14 @@ const tenant = (
 const rules: readonly EntitlementRule[] = [
     // Tenant shell and plan-independent operational modules.
     rule(DASHBOARD_PATH),
-    operational('/uoms/*'),
-    operational('/uom-conversions/*'),
-    operational('/uom-convert'),
+    operational('/uoms/create', undefined, [uomPermissions.create]),
+    operational('/uoms/:id/edit', undefined, [uomPermissions.update]),
+    operational('/uoms/:id', undefined, [uomPermissions.view]),
+    operational('/uoms', undefined, [uomPermissions.view]),
+    operational('/uom-conversions/create', undefined, [uomPermissions.conversionsCreate]),
+    operational('/uom-conversions/:id/edit', undefined, [uomPermissions.conversionsUpdate]),
+    operational('/uom-conversions', undefined, [uomPermissions.conversionsView]),
+    operational('/uom-convert', undefined, [uomPermissions.conversionsRun]),
     operational('/hr/*'),
     operational('/vouchers/*'),
     // Tenant administration and access control.
