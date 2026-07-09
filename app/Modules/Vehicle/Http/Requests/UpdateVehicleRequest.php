@@ -39,6 +39,7 @@ final class UpdateVehicleRequest extends TenantScopedRequest
         return [
             'tenant_id' => ['required', 'integer', 'min:1'],
             'organization_unit_id' => ['nullable', 'integer', 'min:1'],
+            'row_version' => ['required', 'integer', 'min:0'],
             'code' => ['nullable', 'string', 'max:80'],
             'vehicle_make_id' => ['nullable', 'integer', 'min:1'],
             'vehicle_model_id' => ['nullable', 'integer', 'min:1'],
@@ -64,6 +65,7 @@ final class UpdateVehicleRequest extends TenantScopedRequest
     public function toData(): UpdateVehicleData
     {
         return new UpdateVehicleData(
+            rowVersion: (int) $this->input('row_version'),
             organizationUnitId: $this->organizationUnitId(),
             code: $this->stringOrNull('code'),
             vehicleMakeId: $this->integerOrNull('vehicle_make_id'),
