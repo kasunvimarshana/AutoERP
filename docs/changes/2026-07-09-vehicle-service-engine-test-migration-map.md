@@ -1,127 +1,22 @@
-# Vehicle Service engine test migration map
+# Vehicle Service engine test migration
 
 ## Why this exists
 
-`VehicleServiceEngineTest` is a large legacy-style integration test file that still references the removed single job lifecycle concept. It must be migrated without adding production compatibility shims such as a `status` accessor or a `VehicleServiceStatusService::change()` wrapper.
+`VehicleServiceEngineTest` was a large legacy-style integration test file that referenced the removed single job lifecycle concept. It has now been migrated without adding production compatibility shims such as a `status` accessor or a `VehicleServiceStatusService::change()` wrapper.
 
-## Remaining source-truth updates
+## Completed source-truth updates
 
-### Imports
+- Replaced the old mixed `VehicleServiceJobStatus` dependency with explicit lifecycle enums.
+- Replaced workshop flow helper calls with `changeOperational(...)` using `VehicleServiceOperationalStatus`.
+- Replaced invoice-result expectations with `billing_status` assertions.
+- Replaced payment/lifecycle expectations with explicit `payment_status` assertions in the focused lifecycle boundary tests.
+- Replaced resource assertions for `status` / `status_label` with `operational_status`, `billing_status`, and `payment_status` assertions.
+- Removed force-filled usage of the removed `status` column from the rewritten engine test.
+- Updated engine test helpers to pass the current job `row_version` into write services.
 
-Replace the old mixed lifecycle enum:
+## Compatibility workarounds intentionally not added
 
-```php
-use Modules\VehicleService\Enums\VehicleServiceJobStatus;
-```
-
-with explicit lifecycle enums as needed:
-
-```php
-use Modules\VehicleService\Enums\VehicleServiceOperationalStatus;
-use Modules\VehicleService\Enums\VehicleServiceBillingStatus;
-use Modules\VehicleService\Enums\VehicleServicePaymentStatus;
-```
-
-### Operational transitions
-
-Replace test helper calls that currently express workshop flow through the old mixed enum:
-
-```php
-$this->changeStatus($job, VehicleServiceJobStatus::InProgress);
-$this->changeStatus($job, VehicleServiceJobStatus::Completed);
-$this->changeStatus($job, VehicleServiceJobStatus::Cancelled);
-```
-
-with operational lifecycle calls:
-
-```php
-$this->changeOperational($job, VehicleServiceOperationalStatus::InProgress);
-$this->changeOperational($job, VehicleServiceOperationalStatus::Completed);
-$this->changeOperational($job, VehicleServiceOperationalStatus::Cancelled);
-```
-
-The helper must call:
-
-```php
-VehicleServiceStatusService::changeOperational(...)
-```
-
-and must pass the current locked row version.
-
-### Billing assertions
-
-Replace invoice-result expectations such as:
-
-```php
-$this->assertSame(VehicleServiceJobStatus::Invoiced, $job->status);
-```
-
-with:
-
-```php
-$this->assertSame(VehicleServiceBillingStatus::Billed, $job->billing_status);
-$this->assertSame(VehicleServicePaymentStatus::Unpaid, $job->payment_status);
-```
-
-For partial billing scenarios, assert:
-
-```php
-VehicleServiceBillingStatus::PartiallyBilled
-```
-
-### Payment assertions
-
-Replace payment-result expectations such as:
-
-```php
-$this->assertSame(VehicleServiceJobStatus::PartiallyPaid, $job->status);
-$this->assertSame(VehicleServiceJobStatus::Paid, $job->status);
-```
-
-with:
-
-```php
-$this->assertSame(VehicleServicePaymentStatus::PartiallyPaid, $job->payment_status);
-$this->assertSame(VehicleServicePaymentStatus::Paid, $job->payment_status);
-```
-
-Operational and billing state must be asserted unchanged unless the scenario intentionally changes them.
-
-### Resource assertions
-
-Replace JSON assertions for:
-
-```php
-status
-status_label
-```
-
-with:
-
-```php
-operational_status
-operational_status_label
-billing_status
-billing_status_label
-payment_status
-payment_status_label
-```
-
-### Fixture setup
-
-Do not force-fill a removed `status` column. If a fixture bypasses service-layer invoice/payment sync, seed explicit lifecycle fields:
-
-```php
-$job->forceFill([
-    'operational_status' => VehicleServiceOperationalStatus::Completed,
-    'billing_status' => VehicleServiceBillingStatus::Billed,
-    'payment_status' => VehicleServicePaymentStatus::Paid,
-])->save();
-```
-
-## Do not implement
-
-Do not add any of the following as compatibility workarounds:
+The migration did not add any of the following legacy patches:
 
 - `VehicleServiceJob::getStatusAttribute()`
 - `VehicleServiceJob::setStatusAttribute()`
@@ -129,26 +24,29 @@ Do not add any of the following as compatibility workarounds:
 - Mapping `invoiced`, `partially_paid`, or `paid` back into operational status
 - A shared status column retained only for tests
 
-## Replacement coverage already added
+## Coverage retained in `VehicleServiceEngineTest`
 
-`VehicleServiceLifecycleBoundaryTest` now covers:
+- Job creation, inspection, mixed line totals, and supervisor commission calculation.
+- Technician assignment rules and employee commission calculation.
+- Inventory issue eligibility and stock availability enforcement.
+- Invoice billable-line selection, duplicate invoice prevention, and billing lifecycle update.
+- Partial invoice remaining quantity tracking.
+- Operational workflow transitions and lifecycle history dimensions.
+- Bill-to customer invoice party behavior.
+- Resource decimal readability, compact relations, and split lifecycle fields.
+- Tenant/cross-scope reference rejection.
 
-- Initial operational/billing/payment states
-- Lifecycle history dimensions
-- Operational completion not implying billing/payment completion
-- Partial and full billing transitions
-- Payment sync to partially paid and paid
-- Invalid operational backward transition rejection
+## Additional focused coverage
 
-## Safe migration strategy
+`VehicleServiceLifecycleBoundaryTest` covers the lifecycle-specific edge cases that should remain independent from the broader engine test:
 
-Migrate `VehicleServiceEngineTest` in small commits by scenario group:
+- Initial operational/billing/payment states.
+- Lifecycle history dimensions.
+- Operational completion not implying billing/payment completion.
+- Partial and full billing transitions.
+- Payment sync to partially paid and paid.
+- Invalid operational backward transition rejection.
 
-1. Import and helper replacement only.
-2. Invoice scenario assertions.
-3. Payment scenario assertions.
-4. Resource JSON assertions.
-5. Fixture force-fill cleanup.
-6. Runtime test pass.
+## Remaining verification gate
 
-Each step should be run locally before the next step because the file is large and covers many unrelated engine behaviors.
+Full runtime checks still need to pass before merge: PHP syntax/static analysis, migrations, backend tests, frontend typecheck, and production-like UAT.
