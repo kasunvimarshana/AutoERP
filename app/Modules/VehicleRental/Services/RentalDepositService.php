@@ -122,7 +122,14 @@ final class RentalDepositService
                 throw new InvalidArgumentException('Deposit application exceeds the unapplied deposit balance.');
             }
 
-            $invoice = $this->invoiceBalances->validatePayableState($invoiceId);
+            $invoice = $this->invoiceBalances->validatePayableState(
+                invoiceId: $invoiceId,
+                tenantId: (int) $requirement->tenant_id,
+                organizationUnitId: $requirement->organization_unit_id,
+                partyType: 'customer',
+                partyId: (int) $requirement->agreement->customer_id,
+                currencyId: (int) $requirement->currency_id,
+            );
             if ($invoice->tenantId !== (int) $requirement->tenant_id
                 || $invoice->organizationUnitId !== $requirement->organization_unit_id
                 || $invoice->partyType !== 'customer'
@@ -227,7 +234,14 @@ final class RentalDepositService
             if ($this->math->compare($amount, $this->availableToRefund($requirement)) > 0) {
                 throw new InvalidArgumentException('Deposit forfeiture exceeds the uncommitted deposit balance.');
             }
-            $invoice = $this->invoiceBalances->validatePayableState($invoiceId);
+            $invoice = $this->invoiceBalances->validatePayableState(
+                invoiceId: $invoiceId,
+                tenantId: (int) $requirement->tenant_id,
+                organizationUnitId: $requirement->organization_unit_id,
+                partyType: 'customer',
+                partyId: (int) $requirement->agreement->customer_id,
+                currencyId: (int) $requirement->currency_id,
+            );
             if ($invoice->tenantId !== (int) $requirement->tenant_id
                 || $invoice->organizationUnitId !== $requirement->organization_unit_id
                 || $invoice->partyType !== 'customer'
