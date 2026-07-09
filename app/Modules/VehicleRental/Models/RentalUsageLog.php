@@ -6,6 +6,7 @@ namespace Modules\VehicleRental\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use LogicException;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\Hr\Models\HrEmployee;
 use Modules\Vehicle\Models\Vehicle;
@@ -18,6 +19,19 @@ final class RentalUsageLog extends TenantOwnedModel
 
     protected $table = 'rental_usage_logs';
     protected $guarded = ['id'];
+
+    protected static function booted(): void
+    {
+        static::deleting(static function (RentalUsageLog $usageLog): void {
+            $status = $usageLog->status instanceof RentalUsageStatus
+                ? $usageLog->status
+                : RentalUsageStatus::from((string) $usageLog->status);
+
+            if ($status !== RentalUsageStatus::Draft) {
+                throw new LogicException('Only draft rental usage logs can be deleted. Use rejection or reversal for running-chart history.');
+            }
+        });
+    }
 
     protected function casts(): array
     {
@@ -45,6 +59,7 @@ final class RentalUsageLog extends TenantOwnedModel
             'night_out_count' => 'decimal:6',
             'operational_sequence' => 'integer',
             'status' => RentalUsageStatus::class,
+            'fingerprint_sequence' => 'integer',
             'metadata' => 'array',
             'submitted_at' => 'datetime',
             'approved_at' => 'datetime',

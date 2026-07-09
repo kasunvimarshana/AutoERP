@@ -503,6 +503,43 @@ final class VehicleServiceEngineTest extends TestCase
         }
     }
 
+    public function test_nullable_commission_request_fields_default_to_none(): void
+    {
+        $this->withoutMiddleware();
+        $context = $this->context();
+        $this->actingAsTenantUser($context['tenant_id']);
+
+        $createdJobId = (int) $this->tenantPostJson($context['tenant_id'], '/api/v1/vehicle-service/jobs', [
+            'tenant_id' => $context['tenant_id'],
+            'job_date' => '2026-06-07',
+            'customer_id' => $context['customer_id'],
+            'vehicle_id' => $context['vehicle_id'],
+            'supervisor_employee_id' => $context['employee_id'],
+            'supervisor_commission_type' => null,
+            'supervisor_commission_value' => null,
+        ])->assertCreated()
+            ->assertJsonPath('data.supervisor_commission_type', VehicleServiceCommissionType::None->value)
+            ->assertJsonPath('data.supervisor_commission_value', '0.000000')
+            ->json('data.id');
+
+        $job = $this->withTenantExecutionContext(
+            (int) $context['tenant_id'],
+            fn (): VehicleServiceJob => VehicleServiceJob::query()->findOrFail($createdJobId),
+        );
+        $line = $this->line($job, VehicleServiceLineSourceType::ServiceItem, $context['service'], '1.000000', '25.000000');
+
+        $this->tenantPostJson($context['tenant_id'], "/api/v1/vehicle-service/jobs/{$job->getKey()}/lines/{$line->getKey()}/employees", [
+            'tenant_id' => $context['tenant_id'],
+            'expected_version' => $this->currentJobVersion($job),
+            'employee_id' => $context['employee_id'],
+            'role_type' => 'technician',
+            'commission_type' => null,
+            'commission_value' => null,
+        ])->assertCreated()
+            ->assertJsonPath('data.commission_type', VehicleServiceCommissionType::None->value)
+            ->assertJsonPath('data.commission_value', '0.000000');
+    }
+
     public function test_line_sources_enforce_inventory_and_customer_supplied_rules(): void
     {
         $context = $this->context();

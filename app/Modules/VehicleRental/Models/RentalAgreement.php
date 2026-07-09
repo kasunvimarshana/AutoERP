@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use LogicException;
 use Modules\ReferenceData\Models\CurrencyModel;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\Customer\Models\Customer;
@@ -29,6 +30,23 @@ final class RentalAgreement extends TenantOwnedModel
 
     protected $table = 'rental_agreements';
     protected $guarded = ['id'];
+
+    protected static function booted(): void
+    {
+        static::saving(static function (RentalAgreement $agreement): void {
+            $agreement->assertPartyShape();
+        });
+
+        static::deleting(static function (RentalAgreement $agreement): void {
+            $status = $agreement->status instanceof RentalAgreementStatus
+                ? $agreement->status
+                : RentalAgreementStatus::from((string) $agreement->status);
+
+            if ($status !== RentalAgreementStatus::Draft) {
+                throw new LogicException('Only draft rental agreements can be deleted. Use governed cancellation, completion, or termination for contract history.');
+            }
+        });
+    }
 
     protected function casts(): array
     {
@@ -57,4 +75,21 @@ final class RentalAgreement extends TenantOwnedModel
     public function billingPeriods(): HasMany { return $this->hasMany(RentalBillingPeriod::class, 'agreement_id'); }
     public function expenses(): HasMany { return $this->hasMany(RentalExpense::class, 'agreement_id'); }
     public function depositRequirement(): HasOne { return $this->hasOne(RentalDepositRequirement::class, 'agreement_id'); }
+
+    private function assertPartyShape(): void
+    {
+        $kind = $this->agreement_kind instanceof RentalAgreementKind
+            ? $this->agreement_kind
+            : RentalAgreementKind::from((string) $this->agreement_kind);
+
+        if ($kind === RentalAgreementKind::CustomerRental
+            && ($this->customer_id === null || $this->supplier_id !== null)) {
+            throw new LogicException('Customer rental agreement requires only a customer.');
+        }
+
+        if ($kind === RentalAgreementKind::OwnerSupply
+            && ($this->supplier_id === null || $this->customer_id !== null)) {
+            throw new LogicException('Owner supply agreement requires only a supplier/vehicle owner.');
+        }
+    }
 }

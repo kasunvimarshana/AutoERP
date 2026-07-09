@@ -65,6 +65,70 @@ export interface RentalRateVersion {
     status: string;
     components: RentalRateComponent[];
 }
+export interface RentalAgreementTerm {
+    id: number;
+    row_version: number;
+    sequence: number;
+    term_code?: string | null;
+    title?: string | null;
+    content: string;
+    is_printable: boolean;
+    is_active: boolean;
+}
+export interface RentalAgreementDocumentSnapshot {
+    version: number;
+    captured_at: string;
+    agreement_number: string;
+    agreement_kind: string;
+    agreement_date: string;
+    executed_at: string;
+    legal_context: string;
+    organization: {
+        name?: string | null;
+        code?: string | null;
+    };
+    party: {
+        type: "customer" | "supplier";
+        id: number;
+        code?: string | null;
+        name?: string | null;
+    };
+    period: {
+        starts_at: string;
+        ends_at: string;
+    };
+    commercial_terms: {
+        rental_mode: string;
+        billing_cycle: string;
+        billing_basis: string;
+        proration_rule: string;
+        payment_term_days?: number | null;
+        currency: {
+            code?: string | null;
+            name?: string | null;
+            symbol?: string | null;
+        };
+        remarks?: string | null;
+    };
+    terms: Array<{
+        sequence: number;
+        term_code?: string | null;
+        title?: string | null;
+        content: string;
+    }>;
+    rate_version?: {
+        version_number: number;
+        effective_from: string;
+        effective_to?: string | null;
+        components: Array<{
+            component_code: string;
+            unit: string;
+            rate: string;
+            included_quantity: string;
+            multiplier: string;
+        }>;
+    } | null;
+}
 export interface RentalAgreement {
     id: number;
     row_version: number;
@@ -80,6 +144,7 @@ export interface RentalAgreement {
     customer?: RentalParty | null;
     supplier?: RentalParty | null;
     agreement_date: string;
+    executed_at?: string | null;
     starts_at: string;
     ends_at: string;
     actual_ended_at?: string | null;
@@ -93,6 +158,8 @@ export interface RentalAgreement {
     currency?: RentalCurrency | null;
     status: string;
     remarks?: string | null;
+    terms?: RentalAgreementTerm[];
+    document_snapshot?: RentalAgreementDocumentSnapshot | null;
     active_rate_version?: RentalRateVersion | null;
     rate_versions?: RentalRateVersion[];
     allocations?: RentalAllocation[];
@@ -301,6 +368,7 @@ export interface RentalExpense {
 }
 export interface RentalCalculationLine {
     id: number;
+    row_version: number;
     line_number: number;
     source_type: string;
     source: {
@@ -383,7 +451,8 @@ export interface RentalCalculationRun {
     row_version: number;
     billing_period?: {
         id: number;
-        agreement?: NamedResource | null;
+        row_version: number;
+        agreement?: (NamedResource & { row_version?: number }) | null;
         financial_side: string;
         period_start: string;
         period_end: string;
@@ -435,7 +504,9 @@ export interface RentalDeposit {
     id: number;
     row_version: number;
     agreement?: NamedResource | null;
+    customer?: RentalParty | null;
     required_amount: string;
+    currency?: RentalCurrency | null;
     received_amount: string;
     applied_amount: string;
     refunded_amount: string;
@@ -491,6 +562,7 @@ export interface RentalMetadata {
     vehicle_source_types: string[];
     custody_event_types: string[];
     usage_event_types: string[];
+    usage_event_rate_components: Record<string, string>;
     usage_event_applicabilities: RentalUsageEventApplicability[];
     expense_types: string[];
     expense_allocation_types: string[];

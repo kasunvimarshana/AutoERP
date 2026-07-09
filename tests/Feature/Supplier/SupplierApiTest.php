@@ -26,12 +26,23 @@ final class SupplierApiTest extends TestCase
             ->assertJsonPath('data.status', 'active');
 
         $supplierId = (int) $response->json('data.id');
+        $rowVersion = (int) $response->json('data.row_version');
+        $this->assertGreaterThanOrEqual(0, $rowVersion);
+
         $this->withAuth($context)->putJson('/api/v1/suppliers/'.$supplierId, [
+            'row_version' => $rowVersion,
             'name' => 'Updated Supplier',
             'phone' => '+94 11 555 1111',
         ])->assertOk()
             ->assertJsonPath('data.name', 'Updated Supplier')
-            ->assertJsonPath('data.phone', '+94 11 555 1111');
+            ->assertJsonPath('data.phone', '+94 11 555 1111')
+            ->assertJsonPath('data.row_version', $rowVersion + 1);
+
+        $this->withAuth($context)->putJson('/api/v1/suppliers/'.$supplierId, [
+            'row_version' => $rowVersion,
+            'name' => 'Stale Supplier',
+        ])->assertStatus(409)
+            ->assertJsonPath('message', 'Supplier was changed by someone else. Reload before saving.');
 
         $this->withAuth($context)->getJson('/api/v1/suppliers/lookup?search=SUP-001')
             ->assertOk()

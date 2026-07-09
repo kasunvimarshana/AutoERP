@@ -6,6 +6,7 @@ namespace Modules\VehicleRental\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use LogicException;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\ReferenceData\Models\CurrencyModel;
 use Modules\VehicleRental\Enums\RentalCalculationStatus;
@@ -18,6 +19,19 @@ final class RentalCalculationRun extends TenantOwnedModel
 
     protected $table = 'rental_calculation_runs';
     protected $guarded = ['id'];
+
+    protected static function booted(): void
+    {
+        static::deleting(static function (RentalCalculationRun $run): void {
+            $status = $run->calculation_status instanceof RentalCalculationStatus
+                ? $run->calculation_status
+                : RentalCalculationStatus::from((string) $run->calculation_status);
+
+            if ($status !== RentalCalculationStatus::Draft) {
+                throw new LogicException('Only draft rental calculation runs can be deleted. Use reversal for calculated, approved, or documented billing history.');
+            }
+        });
+    }
 
     protected function casts(): array
     {

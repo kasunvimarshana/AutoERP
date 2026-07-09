@@ -16,6 +16,7 @@ final class VehicleSummaryResource extends JsonResource
     {
         return [
             'id' => (int) $this->getKey(),
+            'row_version' => (int) $this->row_version,
             'vehicle_number' => $this->vehicle_number,
             'code' => $this->code,
             'registration_number' => $this->registration_number,

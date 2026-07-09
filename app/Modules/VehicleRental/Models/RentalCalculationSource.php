@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\VehicleRental\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use LogicException;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\VehicleRental\Enums\RentalCalculationSourceKind;
 use Modules\VehicleRental\Enums\RentalCalculationSourceStatus;
@@ -17,6 +18,19 @@ final class RentalCalculationSource extends TenantOwnedModel
     protected $table = 'rental_calculation_sources';
 
     protected $guarded = ['id'];
+
+    protected static function booted(): void
+    {
+        static::deleting(static function (RentalCalculationSource $source): void {
+            $status = $source->status instanceof RentalCalculationSourceStatus
+                ? $source->status
+                : RentalCalculationSourceStatus::from((string) $source->status);
+
+            if ($status !== RentalCalculationSourceStatus::Draft) {
+                throw new LogicException('Only draft rental calculation sources can be deleted. Use calculation reversal for source-consumption history.');
+            }
+        });
+    }
 
     protected function casts(): array
     {

@@ -17,6 +17,7 @@ enum RentalRateComponentCode: string
     case Toll = 'toll';
     case Waiting = 'waiting';
     case Outstation = 'outstation';
+    case Pass = 'pass';
     case Fuel = 'fuel';
     case Damage = 'damage';
     case Repair = 'repair';

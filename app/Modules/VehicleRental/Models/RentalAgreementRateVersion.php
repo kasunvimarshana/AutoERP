@@ -6,6 +6,7 @@ namespace Modules\VehicleRental\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use LogicException;
 use Modules\ReferenceData\Models\CurrencyModel;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\Tax\Models\TaxGroup;
@@ -20,8 +21,23 @@ use Modules\VehicleRental\Models\Concerns\ScopesRentalContext;
 final class RentalAgreementRateVersion extends TenantOwnedModel
 {
     use ScopesRentalContext;
+
     protected $table = 'rental_agreement_rate_versions';
     protected $guarded = ['id'];
+
+    protected static function booted(): void
+    {
+        static::deleting(static function (RentalAgreementRateVersion $version): void {
+            $status = $version->status instanceof RentalRateVersionStatus
+                ? $version->status
+                : RentalRateVersionStatus::from((string) $version->status);
+
+            if ($status !== RentalRateVersionStatus::Draft) {
+                throw new LogicException('Only draft rental agreement rate versions can be deleted. Use cancellation or supersession for rate history.');
+            }
+        });
+    }
+
     protected function casts(): array { return [
         'row_version'=>'integer','tenant_id'=>'integer','organization_unit_id'=>'integer','agreement_id'=>'integer','version_number'=>'integer',
         'effective_from'=>'datetime','effective_to'=>'datetime','driver_mode'=>RentalMode::class,'billing_cycle'=>RentalBillingCycle::class,

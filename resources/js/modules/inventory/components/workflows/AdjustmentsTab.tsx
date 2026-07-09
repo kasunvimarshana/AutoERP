@@ -25,7 +25,7 @@ import {
     WorkflowPanel,
 } from '../inventoryUi';
 
-export function AdjustmentsTab({ data, loading, error, reload }: WorkflowProps) {
+export function AdjustmentsTab({ data, loading, error, reload, canManage, canPost }: WorkflowProps & { canManage: boolean; canPost: boolean }) {
     const [form, setForm] = useState({
         adjustment_date: localToday(),
         adjustment_type: 'recount',
@@ -65,37 +65,41 @@ export function AdjustmentsTab({ data, loading, error, reload }: WorkflowProps) 
 
     return (
         <WorkflowPanel title="Stock adjustment workflow" loading={loading} error={error} actionError={actionError}>
-            <form className="grid gap-4 xl:grid-cols-[1fr_1fr_10rem_9rem_9rem_9rem_1fr_1fr_auto]" onSubmit={submit}>
-                <LookupSelect label="Item" value={item} onChange={(value) => { setItem(value); setDimensions(emptyInventoryDimensions()); }} search={lookupApi.stockableItems} error={fieldError(actionError, 'lines.0.item_id')} />
-                <LookupSelect label="Warehouse" value={warehouse} onChange={(value) => { setWarehouse(value); setDimensions({ ...dimensions, warehouseLocation: null, serial: null }); }} search={searchWarehouses} error={fieldError(actionError, 'warehouse_id')} loadOnOpen minSearchLength={0} />
-                <Select
-                    label="Type"
-                    value={form.adjustment_type}
-                    options={['recount', 'increase', 'decrease', 'damage', 'expiry', 'opening_balance'].map((value) => ({ value, label: value.replaceAll('_', ' ') }))}
-                    onChange={(event) => setForm({ ...form, adjustment_type: event.target.value })}
-                />
-                <DecimalInput label="System (base)" value={form.system_quantity} error={fieldError(actionError, 'lines.0.system_quantity')} onChange={(event) => setForm({ ...form, system_quantity: event.target.value })} />
-                <DecimalInput label="Counted (base)" value={form.counted_quantity} error={fieldError(actionError, 'lines.0.counted_quantity')} onChange={(event) => setForm({ ...form, counted_quantity: event.target.value })} />
-                <DecimalInput label="Cost/base" value={form.unit_cost} error={fieldError(actionError, 'lines.0.unit_cost')} onChange={(event) => setForm({ ...form, unit_cost: event.target.value })} />
-                <Input label="Reason" value={form.reason} error={fieldError(actionError, 'reason')} onChange={(event) => setForm({ ...form, reason: event.target.value })} />
-                <Input label="Date" type="date" value={form.adjustment_date} error={fieldError(actionError, 'adjustment_date')} onChange={(event) => setForm({ ...form, adjustment_date: event.target.value })} />
-                <div className="flex items-end"><Button type="submit" loading={busy} disabled={!item || !warehouse}>Create</Button></div>
-                <InventoryDimensionFields
-                    item={item}
-                    warehouse={warehouse}
-                    value={dimensions}
-                    onChange={setDimensions}
-                    includeSerial
-                    errors={{
-                        itemVariant: fieldError(actionError, 'lines.0.item_variant_id'),
-                        warehouseLocation: fieldError(actionError, 'warehouse_location_id'),
-                        batch: fieldError(actionError, 'lines.0.batch_id'),
-                        serial: fieldError(actionError, 'lines.0.serial_number_id'),
-                        uom: fieldError(actionError, 'lines.0.uom_id'),
-                    }}
-                />
-            </form>
+            {canManage && (
+                <form className="grid gap-4 xl:grid-cols-[1fr_1fr_10rem_9rem_9rem_9rem_1fr_1fr_auto]" onSubmit={submit}>
+                    <LookupSelect label="Item" value={item} onChange={(value) => { setItem(value); setDimensions(emptyInventoryDimensions()); }} search={lookupApi.stockableItems} error={fieldError(actionError, 'lines.0.item_id')} />
+                    <LookupSelect label="Warehouse" value={warehouse} onChange={(value) => { setWarehouse(value); setDimensions({ ...dimensions, warehouseLocation: null, serial: null }); }} search={searchWarehouses} error={fieldError(actionError, 'warehouse_id')} loadOnOpen minSearchLength={0} />
+                    <Select
+                        label="Type"
+                        value={form.adjustment_type}
+                        options={['recount', 'increase', 'decrease', 'damage', 'expiry', 'opening_balance'].map((value) => ({ value, label: value.replaceAll('_', ' ') }))}
+                        onChange={(event) => setForm({ ...form, adjustment_type: event.target.value })}
+                    />
+                    <DecimalInput label="System (base)" value={form.system_quantity} error={fieldError(actionError, 'lines.0.system_quantity')} onChange={(event) => setForm({ ...form, system_quantity: event.target.value })} />
+                    <DecimalInput label="Counted (base)" value={form.counted_quantity} error={fieldError(actionError, 'lines.0.counted_quantity')} onChange={(event) => setForm({ ...form, counted_quantity: event.target.value })} />
+                    <DecimalInput label="Cost/base" value={form.unit_cost} error={fieldError(actionError, 'lines.0.unit_cost')} onChange={(event) => setForm({ ...form, unit_cost: event.target.value })} />
+                    <Input label="Reason" value={form.reason} error={fieldError(actionError, 'reason')} onChange={(event) => setForm({ ...form, reason: event.target.value })} />
+                    <Input label="Date" type="date" value={form.adjustment_date} error={fieldError(actionError, 'adjustment_date')} onChange={(event) => setForm({ ...form, adjustment_date: event.target.value })} />
+                    <div className="flex items-end"><Button type="submit" loading={busy} disabled={!item || !warehouse}>Create</Button></div>
+                    <InventoryDimensionFields
+                        item={item}
+                        warehouse={warehouse}
+                        value={dimensions}
+                        onChange={setDimensions}
+                        includeSerial
+                        errors={{
+                            itemVariant: fieldError(actionError, 'lines.0.item_variant_id'),
+                            warehouseLocation: fieldError(actionError, 'warehouse_location_id'),
+                            batch: fieldError(actionError, 'lines.0.batch_id'),
+                            serial: fieldError(actionError, 'lines.0.serial_number_id'),
+                            uom: fieldError(actionError, 'lines.0.uom_id'),
+                        }}
+                    />
+                </form>
+            )}
             <RecordList rows={data} columns={columns((row) => {
+                if (!canPost) return null;
+
                 const key = `post-adjustment:${row.id}`;
 
                 return (

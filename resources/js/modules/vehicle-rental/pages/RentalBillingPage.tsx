@@ -69,11 +69,17 @@ export default function RentalBillingPage() {
         setSaving(true);
         setActionError(null);
         try {
-            await calculateRentalAgreement(agreement.id, agreement.row_version, {
+            const run = await calculateRentalAgreement(agreement.id, agreement.row_version, {
                 financial_side: financialSide,
                 period_start: periodStart,
                 period_end: periodEnd,
             });
+            const nextAgreementVersion = run.billing_period?.agreement?.row_version;
+            if (nextAgreementVersion) {
+                setAgreement((current) => current === null
+                    ? current
+                    : { ...current, row_version: nextAgreementVersion });
+            }
             runs.reload();
         } catch (error: unknown) {
             setActionError(toApiError(error));
@@ -98,7 +104,6 @@ export default function RentalBillingPage() {
             const documentDate = businessDateInputValue();
             await createRentalInvoice(run.id, run.row_version, {
                 invoice_date: documentDate,
-                due_date: documentDate,
                 status: 'draft',
                 notes: `${run.billing_period?.financial_side === 'cost' ? 'Owner rental payable' : 'Lessee rental invoice'} from approved rental calculation`,
             });
@@ -183,7 +188,7 @@ export default function RentalBillingPage() {
                         <RentalAgreementLookupSelect
                             value={agreement}
                             onChange={setAgreement}
-                            direction={financialSide === 'revenue' ? 'inbound' : 'outbound'}
+                            agreementKind={financialSide === 'revenue' ? 'customer_rental' : 'owner_supply'}
                             required
                         />
                         <Select

@@ -15,6 +15,7 @@ use Modules\VehicleRental\Http\Requests\StoreVehicleFinanceAgreementRequest;
 use Modules\VehicleRental\Http\Resources\VehicleFinanceAgreementResource;
 use Modules\VehicleRental\Models\VehicleFinanceAgreement;
 use Modules\VehicleRental\Models\VehicleFinanceInstallment;
+use Modules\VehicleRental\Services\VehicleFinanceInstallmentStatusRefreshService;
 use Modules\VehicleRental\Services\VehicleFinanceService;
 use Modules\VehicleRental\Services\VehicleRentalAuthorizationService;
 
@@ -66,10 +67,10 @@ final class VehicleFinanceController
         return response()->json(['data' => ['id' => (int) $invoice->getKey(), 'invoice_number' => $invoice->invoice_number, 'status' => $invoice->status->value]], 201);
     }
 
-    public function refreshDueStatuses(ListRentalRequest $request, VehicleFinanceService $service): JsonResponse
+    public function refreshDueStatuses(ListRentalRequest $request, VehicleFinanceInstallmentStatusRefreshService $service): JsonResponse
     {
         $this->authorization->assert($request->currentUserId(), $request->tenantId(), VehicleRentalAuthorizationService::MANAGE_FINANCE_AGREEMENTS);
-        return response()->json(['data' => ['updated' => $service->refreshDueStatuses(
+        return response()->json(['data' => ['updated' => $service->refresh(
             $request->tenantId(),
             $request->organizationUnitId(),
             $request->input('date_to'),

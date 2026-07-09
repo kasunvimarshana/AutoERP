@@ -6,6 +6,7 @@ namespace Modules\VehicleRental\Services;
 
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
@@ -14,6 +15,7 @@ use Modules\VehicleRental\Enums\RentalAgreementKind;
 use Modules\VehicleRental\Enums\RentalExpenseAllocationType;
 use Modules\VehicleRental\Enums\RentalExpenseStatus;
 use Modules\VehicleRental\Models\RentalExpense;
+use Modules\VehicleRental\Models\RentalExpenseAllocation;
 
 final class RentalExpenseService
 {
@@ -157,12 +159,112 @@ final class RentalExpenseService
         return $query->latest('expense_date')->latest('id')->paginate($perPage);
     }
 
+    /**
+     * @param  Collection<int, int>|array<int, int>  $allocationIds
+     * @param  Collection<int, int>|array<int, int>  $consumedAllocationIds
+     */
+    public function syncCalculationConsumption(
+        int $tenantId,
+        Collection|array $allocationIds,
+        Collection|array $consumedAllocationIds,
+        ?int $userId,
+    ): void {
+        $ids = collect($allocationIds)
+            ->map(static fn ($id): int => (int) $id)
+            ->filter(static fn (int $id): bool => $id > 0)
+            ->unique()
+            ->values();
+        if ($ids->isEmpty()) {
+            return;
+        }
+
+        $consumed = collect($consumedAllocationIds)
+            ->map(static fn ($id): int => (int) $id)
+            ->filter(static fn (int $id): bool => $id > 0)
+            ->unique()
+            ->flip();
+
+        DB::transaction(function () use ($tenantId, $ids, $consumed, $userId): void {
+            $allocations = RentalExpenseAllocation::query()
+                ->where('tenant_id', $tenantId)
+                ->whereIn('id', $ids->all())
+                ->lockForUpdate()
+                ->get();
+
+            foreach ($allocations as $allocation) {
+                if (! in_array((string) $allocation->status, ['approved', 'consumed'], true)) {
+                    continue;
+                }
+
+                $nextStatus = $consumed->has((int) $allocation->getKey()) ? 'consumed' : 'approved';
+                if ((string) $allocation->status === $nextStatus) {
+                    continue;
+                }
+
+                $allocation->forceFill([
+                    'status' => $nextStatus,
+                    'row_version' => (int) $allocation->row_version + 1,
+                    'updated_by' => $userId,
+                ])->save();
+            }
+
+            $expenseIds = $allocations
+                ->pluck('expense_id')
+                ->map(static fn ($id): int => (int) $id)
+                ->unique()
+                ->values();
+            if ($expenseIds->isEmpty()) {
+                return;
+            }
+
+            $expenses = RentalExpense::query()
+                ->where('tenant_id', $tenantId)
+                ->whereIn('id', $expenseIds->all())
+                ->with('allocations')
+                ->lockForUpdate()
+                ->get();
+
+            foreach ($expenses as $expense) {
+                if (! in_array($expense->status, [RentalExpenseStatus::Approved, RentalExpenseStatus::Allocated], true)) {
+                    continue;
+                }
+
+                $approvedAllocations = $expense->allocations->contains(
+                    fn (RentalExpenseAllocation $allocation): bool => (string) $allocation->status === 'approved',
+                );
+                $consumedAllocations = $expense->allocations->contains(
+                    fn (RentalExpenseAllocation $allocation): bool => (string) $allocation->status === 'consumed',
+                );
+                $nextStatus = $consumedAllocations && ! $approvedAllocations
+                    ? RentalExpenseStatus::Allocated
+                    : RentalExpenseStatus::Approved;
+                if ($expense->status === $nextStatus) {
+                    continue;
+                }
+
+                $from = $expense->status;
+                $expense->forceFill([
+                    'status' => $nextStatus->value,
+                    'row_version' => (int) $expense->row_version + 1,
+                    'updated_by' => $userId,
+                ])->save();
+                $this->history->record(
+                    $expense,
+                    $from->value,
+                    $nextStatus->value,
+                    $userId,
+                    'Rental calculation expense allocation consumption changed.',
+                );
+            }
+        });
+    }
+
     public function relations(): array
     {
         return [
-            'agreement.customer', 'agreement.supplier', 'vehicleAllocation', 'usageLog', 'vehicle.make', 'vehicle.model',
+            'agreement.customer', 'agreement.supplier', 'allocation', 'usageLog', 'vehicle.make', 'vehicle.model',
             'supplier', 'employee', 'currency', 'taxGroup', 'allocations.targetAgreement', 'allocations.customer',
-            'allocations.supplier', 'allocations.employee', 'attachments',
+            'allocations.supplier', 'allocations.employee',
         ];
     }
 

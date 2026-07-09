@@ -1,5 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { useParams } from 'react-router-dom';
+import { hasPermission } from '@/modules/auth/accessControl';
+import { useAuth } from '@/modules/auth/AuthProvider';
 import { LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { EntityDetailLayout } from '@/shared/components/EntityDetailLayout';
@@ -10,6 +12,7 @@ import { Tabs } from '@/shared/components/Tabs';
 import { useApi } from '@/shared/hooks/useApi';
 import { useOnDemandTab } from '@/shared/hooks/useOnDemandTab';
 import { getCustomer } from './customerApi';
+import { customerPermissions } from './customerPermissions';
 import { CustomerSummaryCard } from './components/CustomerSummaryCard';
 
 const CustomerContactTab = lazy(() => import('./components/CustomerContactTab'));
@@ -24,9 +27,11 @@ type Tab = 'summary' | 'contacts' | 'addresses' | 'bank_accounts' | 'categories'
 const tabs = [['summary', 'Summary'], ['contacts', 'Contacts'], ['addresses', 'Addresses'], ['bank_accounts', 'Bank Accounts'], ['categories', 'Categories'], ['documents', 'Documents'], ['credit_profile', 'Credit Profile'], ['status_history', 'Status History']].map(([id, label]) => ({ id: id as Tab, label }));
 
 export default function CustomerDetailPage() {
+    const auth = useAuth();
     const customerId = Number(useParams().id);
     const customer = useApi((signal) => getCustomer(customerId, signal), [customerId], Number.isFinite(customerId));
     const tab = useOnDemandTab<Tab>('summary');
+    const canManage = hasPermission(auth, customerPermissions.update);
     if (customer.loading) return <LoadingState />;
     if (!customer.data) return <ErrorAlert error={customer.error} />;
 
@@ -34,7 +39,7 @@ export default function CustomerDetailPage() {
         <ContentHeader
             title={`${customer.data.code} - ${customer.data.name}`}
             description="Customer master data and relation-aware CRUD."
-            actions={<LinkButton to={`/customers/${customerId}/edit`} variant="secondary">Edit customer</LinkButton>}
+            actions={canManage ? <LinkButton to={`/customers/${customerId}/edit`} variant="secondary">Edit customer</LinkButton> : undefined}
         />
         <EntityDetailLayout actions={
             <>
@@ -48,12 +53,12 @@ export default function CustomerDetailPage() {
                 <div className="p-5">
                     {tab.activeTab === 'summary' && <CustomerSummaryCard customer={customer.data} />}
                     <Suspense fallback={<LoadingState />}>
-                        {tab.openedTabs.has('contacts') && <div hidden={tab.activeTab !== 'contacts'}><CustomerContactTab customerId={customerId} /></div>}
-                        {tab.openedTabs.has('addresses') && <div hidden={tab.activeTab !== 'addresses'}><CustomerAddressTab customerId={customerId} /></div>}
-                        {tab.openedTabs.has('bank_accounts') && <div hidden={tab.activeTab !== 'bank_accounts'}><CustomerBankAccountTab customerId={customerId} /></div>}
-                        {tab.openedTabs.has('categories') && <div hidden={tab.activeTab !== 'categories'}><CustomerCategoryTab customerId={customerId} /></div>}
-                        {tab.openedTabs.has('documents') && <div hidden={tab.activeTab !== 'documents'}><CustomerDocumentTab customerId={customerId} /></div>}
-                        {tab.openedTabs.has('credit_profile') && <div hidden={tab.activeTab !== 'credit_profile'}><CustomerCreditProfileTab customerId={customerId} /></div>}
+                        {tab.openedTabs.has('contacts') && <div hidden={tab.activeTab !== 'contacts'}><CustomerContactTab customerId={customerId} canManage={canManage} /></div>}
+                        {tab.openedTabs.has('addresses') && <div hidden={tab.activeTab !== 'addresses'}><CustomerAddressTab customerId={customerId} canManage={canManage} /></div>}
+                        {tab.openedTabs.has('bank_accounts') && <div hidden={tab.activeTab !== 'bank_accounts'}><CustomerBankAccountTab customerId={customerId} canManage={canManage} /></div>}
+                        {tab.openedTabs.has('categories') && <div hidden={tab.activeTab !== 'categories'}><CustomerCategoryTab customerId={customerId} canManage={canManage} /></div>}
+                        {tab.openedTabs.has('documents') && <div hidden={tab.activeTab !== 'documents'}><CustomerDocumentTab customerId={customerId} canManage={canManage} /></div>}
+                        {tab.openedTabs.has('credit_profile') && <div hidden={tab.activeTab !== 'credit_profile'}><CustomerCreditProfileTab customerId={customerId} canManage={canManage} /></div>}
                         {tab.openedTabs.has('status_history') && <div hidden={tab.activeTab !== 'status_history'}><CustomerStatusHistoryTab customerId={customerId} /></div>}
                     </Suspense>
                 </div>

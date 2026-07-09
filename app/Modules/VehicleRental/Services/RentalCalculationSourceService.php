@@ -203,7 +203,7 @@ final class RentalCalculationSourceService
             default => RentalCalculationSourceStatus::Draft,
         };
 
-        $run->sources()->update([
+        $run->sources()->where('status', '!=', $sourceStatus->value)->update([
             'status' => $sourceStatus->value,
             'row_version' => DB::raw('row_version + 1'),
             'updated_by' => $userId,

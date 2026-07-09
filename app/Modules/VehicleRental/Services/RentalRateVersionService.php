@@ -5,17 +5,23 @@ declare(strict_types=1);
 namespace Modules\VehicleRental\Services;
 
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use Modules\VehicleRental\Enums\RentalAgreementStatus;
+use Modules\VehicleRental\Enums\RentalRateComponentCode;
+use Modules\VehicleRental\Enums\RentalRateUnit;
 use Modules\VehicleRental\Enums\RentalRateVersionStatus;
+use Modules\VehicleRental\Enums\RentalUsageStatus;
 use Modules\VehicleRental\Models\RentalAgreement;
 use Modules\VehicleRental\Models\RentalAgreementRateVersion;
+use Modules\VehicleRental\Models\RentalUsageContext;
 
 final class RentalRateVersionService
 {
     private const OPEN_ENDED_EFFECTIVE_AT = '9999-12-31 23:59:59';
+    private const GLOBAL_COMPONENT_SCOPE = 'global';
 
     public function __construct(private readonly RentalReferenceValidator $references) {}
 
@@ -30,6 +36,7 @@ final class RentalRateVersionService
                 $this->assertAgreementExpectedVersion($agreement, (int) $data['expected_agreement_version']);
             }
             $this->assertAgreementAllowsRateChanges($agreement);
+            $this->assertUniqueComponentKeys($data['components'] ?? []);
 
             $versionNumber = ((int) $agreement->rateVersions()->max('version_number')) + 1;
             $effectiveFrom = CarbonImmutable::parse((string) ($data['effective_from'] ?? $agreement->starts_at));
@@ -57,6 +64,10 @@ final class RentalRateVersionService
                 $agreement->organization_unit_id,
             );
             foreach ($data['components'] ?? [] as $component) {
+                $this->assertSupportedComponentUnit(
+                    RentalRateComponentCode::from((string) $component['component_code']),
+                    RentalRateUnit::from((string) $component['unit']),
+                );
                 $this->references->vehicleCategory(
                     isset($component['vehicle_category_id']) ? (int) $component['vehicle_category_id'] : null,
                     (int) $agreement->tenant_id,
@@ -123,6 +134,9 @@ final class RentalRateVersionService
                     'updated_by' => $userId,
                 ]);
             }
+            if (array_key_exists('expected_agreement_version', $data)) {
+                $this->bumpAgreementVersion($agreement, $userId);
+            }
 
             return $version->refresh()->load('components');
         }, 3);
@@ -171,6 +185,7 @@ final class RentalRateVersionService
                     'effective_to' => ['Choose a non-overlapping period; active rate history is never rewritten during activation.'],
                 ]);
             }
+            $this->assertNoUsageCrossesRateBoundaries($version);
 
             $version->status = RentalRateVersionStatus::Active;
             $version->approved_by = $userId;
@@ -178,6 +193,7 @@ final class RentalRateVersionService
             $version->row_version = $expectedVersion + 1;
             $version->updated_by = $userId;
             $version->save();
+            $this->bumpAgreementVersion($agreement, $userId);
 
             return $version->refresh()->load('components');
         }, 3);
@@ -199,6 +215,41 @@ final class RentalRateVersionService
             ->firstOrFail();
     }
 
+    public function assertSingleVersionCoversPeriod(
+        RentalAgreement $agreement,
+        CarbonImmutable $start,
+        CarbonImmutable $end,
+    ): void {
+        if (! $end->greaterThan($start)) {
+            throw new InvalidArgumentException('Usage finish time must be after start time.');
+        }
+
+        $versions = $agreement->rateVersions()
+            ->whereIn('status', [
+                RentalRateVersionStatus::Active->value,
+                RentalRateVersionStatus::Superseded->value,
+            ])
+            ->where('effective_from', '<', $end->toDateTimeString())
+            ->where(fn (Builder $query) => $query
+                ->whereNull('effective_to')
+                ->orWhere('effective_to', '>', $start->toDateTimeString()))
+            ->lockForUpdate()
+            ->get();
+        $coveringVersions = $versions->filter(fn (RentalAgreementRateVersion $version): bool => (
+            CarbonImmutable::parse($version->effective_from)->lessThanOrEqualTo($start)
+            && (
+                $version->effective_to === null
+                || CarbonImmutable::parse($version->effective_to)->greaterThanOrEqualTo($end)
+            )
+        ));
+
+        if ($versions->count() !== 1 || $coveringVersions->count() !== 1) {
+            throw new InvalidArgumentException(
+                'Usage period must stay inside one active rental rate version. Split the running-chart entry at the rate effective time.',
+            );
+        }
+    }
+
     private function assertExpectedVersion(RentalAgreementRateVersion $version, int $expectedVersion): void
     {
         if ((int) $version->row_version !== $expectedVersion) {
@@ -217,6 +268,32 @@ final class RentalRateVersionService
         }
     }
 
+    private function assertUniqueComponentKeys(array $components): void
+    {
+        $seen = [];
+        foreach (array_values($components) as $index => $component) {
+            $categoryScope = isset($component['vehicle_category_id']) && $component['vehicle_category_id'] !== null
+                ? (string) (int) $component['vehicle_category_id']
+                : self::GLOBAL_COMPONENT_SCOPE;
+            $key = ((string) $component['component_code']).'|'.$categoryScope;
+            if (isset($seen[$key])) {
+                throw ValidationException::withMessages([
+                    "components.{$index}.component_code" => ['Duplicate rate component for the same vehicle category is not allowed.'],
+                ]);
+            }
+
+            $seen[$key] = true;
+        }
+    }
+
+    private function bumpAgreementVersion(RentalAgreement $agreement, ?int $userId): void
+    {
+        $agreement->forceFill([
+            'row_version' => (int) $agreement->row_version + 1,
+            'updated_by' => $userId,
+        ])->save();
+    }
+
     private function assertAgreementAllowsRateChanges(RentalAgreement $agreement): void
     {
         if (in_array($agreement->status, [
@@ -225,6 +302,66 @@ final class RentalRateVersionService
             RentalAgreementStatus::Cancelled,
         ], true)) {
             throw new InvalidArgumentException('Terminal rental agreements cannot receive or activate rate versions.');
+        }
+    }
+
+    private function assertNoUsageCrossesRateBoundaries(RentalAgreementRateVersion $version): void
+    {
+        foreach ([
+            'effective_from' => $version->effective_from,
+            'effective_to' => $version->effective_to,
+        ] as $field => $boundary) {
+            if ($boundary === null) {
+                continue;
+            }
+
+            $boundaryAt = CarbonImmutable::parse($boundary)->toDateTimeString();
+            $usageCrossesBoundary = RentalUsageContext::query()
+                ->where('tenant_id', $version->tenant_id)
+                ->where('agreement_id', $version->agreement_id)
+                ->whereHas('usageLog', fn (Builder $query): Builder => $query
+                    ->whereNot('status', RentalUsageStatus::Reversed->value)
+                    ->where('started_at', '<', $boundaryAt)
+                    ->where('ended_at', '>', $boundaryAt))
+                ->lockForUpdate()
+                ->exists();
+
+            if ($usageCrossesBoundary) {
+                throw ValidationException::withMessages([
+                    $field => ['Rate activation would split existing running-chart usage. Reverse or split those entries before activating this rate version.'],
+                ]);
+            }
+        }
+    }
+
+    private function assertSupportedComponentUnit(RentalRateComponentCode $component, RentalRateUnit $unit): void
+    {
+        $supported = match ($component) {
+            RentalRateComponentCode::DriverSalary => [
+                RentalRateUnit::Fixed,
+                RentalRateUnit::Month,
+                RentalRateUnit::Week,
+                RentalRateUnit::Day,
+                RentalRateUnit::Hour,
+                RentalRateUnit::Minute,
+                RentalRateUnit::Trip,
+                RentalRateUnit::Count,
+            ],
+            RentalRateComponentCode::NormalOvertime,
+            RentalRateComponentCode::DoubleOvertime,
+            RentalRateComponentCode::TripleOvertime => [
+                RentalRateUnit::Hour,
+                RentalRateUnit::Minute,
+            ],
+            default => null,
+        };
+
+        if ($supported !== null && ! in_array($unit, $supported, true)) {
+            throw new InvalidArgumentException(sprintf(
+                '%s does not support %s rates.',
+                ucwords(str_replace('_', ' ', $component->value)),
+                $unit->value,
+            ));
         }
     }
 }

@@ -1,8 +1,14 @@
 import { useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import {
+    Link,
+    useNavigate,
+    useParams,
+    useSearchParams,
+} from "react-router-dom";
 import { toApiError, type ApiError } from "@/shared/api/apiError";
 import { Button, LinkButton } from "@/shared/components/Button";
 import { ContentHeader } from "@/shared/components/ContentHeader";
+import { useConfirmDialog } from "@/shared/components/ConfirmDialog";
 import { DataTable, type DataColumn } from "@/shared/components/DataTable";
 import { DetailGrid } from "@/shared/components/DetailGrid";
 import { ErrorAlert } from "@/shared/components/ErrorAlert";
@@ -13,6 +19,7 @@ import { useApi } from "@/shared/hooks/useApi";
 import { formatDate } from "@/shared/utils/formatDate";
 import { readableRelation } from "@/shared/utils/object";
 import { RentalPage } from "../components/RentalPage";
+import { RentalAgreementPrintDocument } from "../components/RentalAgreementPrintDocument";
 import {
     RENTAL_AGREEMENT_KIND,
     agreementDetailPath,
@@ -38,9 +45,11 @@ export default function RentalAgreementDetailPage({
 }: RentalAgreementDetailPageProps) {
     const id = Number(useParams().id);
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
     const result = useApi((signal) => getRentalAgreement(id, signal), [id]);
     const [busy, setBusy] = useState(false);
     const [actionError, setActionError] = useState<ApiError | null>(null);
+    const { confirm, confirmDialog } = useConfirmDialog();
 
     const transition = async (status: string) => {
         if (!result.data) return;
@@ -58,6 +67,28 @@ export default function RentalAgreementDetailPage({
             setActionError(toApiError(error));
         } finally {
             setBusy(false);
+        }
+    };
+    const confirmTransition = async (status: "active" | "terminated") => {
+        const confirmed = await confirm(
+            status === "active"
+                ? {
+                      title: "Activate agreement?",
+                      message:
+                          "Activation freezes the executed terms, parties and current rates into the printable agreement snapshot.",
+                      confirmLabel: "Activate agreement",
+                      danger: false,
+                  }
+                : {
+                      title: "Terminate agreement?",
+                      message:
+                          "Terminate only after all planned and active allocations have been closed.",
+                      confirmLabel: "Terminate agreement",
+                      danger: true,
+                  },
+        );
+        if (confirmed) {
+            await transition(status);
         }
     };
 
@@ -89,6 +120,28 @@ export default function RentalAgreementDetailPage({
     const correctAgreementMode = agreementModeForKind(row.agreement_kind);
     const correctAgreementLabel =
         correctAgreementMode === "lessee" ? "lessee agreement" : "lessor agreement";
+    const printRequested = searchParams.get("print") === "1";
+
+    if (printRequested && isExpectedAgreement) {
+        return (
+            <RentalPage>
+                {row.document_snapshot ? (
+                    <RentalAgreementPrintDocument
+                        snapshot={row.document_snapshot}
+                        backPath={agreementDetailPath(mode, row.id)}
+                    />
+                ) : (
+                    <div
+                        className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800"
+                        role="alert"
+                    >
+                        The immutable agreement document becomes available after
+                        the agreement is activated.
+                    </div>
+                )}
+            </RentalPage>
+        );
+    }
 
     return (
         <RentalPage>
@@ -110,10 +163,20 @@ export default function RentalAgreementDetailPage({
                             >
                                 Allocations
                             </LinkButton>
+                            {row.document_snapshot && (
+                                <LinkButton
+                                    variant="secondary"
+                                    to={`${agreementDetailPath(mode, row.id)}?print=1`}
+                                >
+                                    Print agreement
+                                </LinkButton>
+                            )}
                             {row.status === "draft" && (
                                 <Button
                                     loading={busy}
-                                    onClick={() => void transition("active")}
+                                    onClick={() =>
+                                        void confirmTransition("active")
+                                    }
                                 >
                                     Activate
                                 </Button>
@@ -122,7 +185,9 @@ export default function RentalAgreementDetailPage({
                                 <Button
                                     variant="danger"
                                     loading={busy}
-                                    onClick={() => void transition("terminated")}
+                                    onClick={() =>
+                                        void confirmTransition("terminated")
+                                    }
                                 >
                                     Terminate
                                 </Button>
@@ -178,6 +243,20 @@ export default function RentalAgreementDetailPage({
                                         value: formatDate(row.agreement_date),
                                     },
                                     {
+                                        label: "Executed",
+                                        value: row.executed_at
+                                            ? formatDate(row.executed_at)
+                                            : "-",
+                                    },
+                                    {
+                                        label: "Legal context",
+                                        value:
+                                            row.legal_context?.replaceAll(
+                                                "_",
+                                                " ",
+                                            ) ?? "-",
+                                    },
+                                    {
                                         label: "Start",
                                         value: formatDate(row.starts_at),
                                     },
@@ -190,8 +269,24 @@ export default function RentalAgreementDetailPage({
                                         label: "Billing",
                                         value: `${row.billing_cycle} / ${row.billing_basis}`,
                                     },
+                                    {
+                                        label: "Payment terms",
+                                        value: `${row.payment_term_days ?? 0} days`,
+                                    },
+                                    {
+                                        label: "Currency",
+                                        value: readableRelation(row.currency),
+                                    },
                                 ]}
                             />
+                            {row.remarks && (
+                                <div className="mt-4 border-t border-slate-200 pt-4 text-sm">
+                                    <h3 className="font-semibold">Remarks</h3>
+                                    <p className="mt-1 whitespace-pre-wrap text-slate-600">
+                                        {row.remarks}
+                                    </p>
+                                </div>
+                            )}
                         </Panel>
                         <Panel title="Active rate version">
                             {row.active_rate_version ? (
@@ -258,6 +353,69 @@ export default function RentalAgreementDetailPage({
                             )}
                         </Panel>
                     </div>
+                    <Panel title="Terms and conditions" className="mt-5">
+                        {row.terms?.length ? (
+                            <ol className="space-y-4">
+                                {row.terms.map((term) => (
+                                    <li
+                                        key={term.id}
+                                        className="rounded-lg border border-slate-200 p-4 text-sm"
+                                    >
+                                        <h3 className="font-semibold">
+                                            {term.sequence}.{" "}
+                                            {term.title ||
+                                                `Clause ${term.sequence}`}
+                                        </h3>
+                                        <p className="mt-2 whitespace-pre-wrap leading-6 text-slate-600">
+                                            {term.content}
+                                        </p>
+                                    </li>
+                                ))}
+                            </ol>
+                        ) : (
+                            <p className="text-sm text-slate-500">
+                                No agreement terms have been recorded.
+                            </p>
+                        )}
+                    </Panel>
+                    {row.agreement_kind ===
+                        RENTAL_AGREEMENT_KIND.customerRental &&
+                        row.deposit_requirement && (
+                            <Panel
+                                title="Security deposit obligation"
+                                className="mt-5"
+                            >
+                                <DetailGrid
+                                    items={[
+                                        {
+                                            label: "Required",
+                                            value: `${row.deposit_requirement.required_amount} ${row.deposit_requirement.currency?.code ?? ""}`.trim(),
+                                        },
+                                        {
+                                            label: "Received",
+                                            value: row.deposit_requirement
+                                                .received_amount,
+                                        },
+                                        {
+                                            label: "Balance",
+                                            value: row.deposit_requirement
+                                                .balance_amount,
+                                        },
+                                        {
+                                            label: "Status",
+                                            value: (
+                                                <StatusBadge
+                                                    status={
+                                                        row.deposit_requirement
+                                                            .status
+                                                    }
+                                                />
+                                            ),
+                                        },
+                                    ]}
+                                />
+                            </Panel>
+                        )}
                     <Panel title="Vehicle allocations" className="mt-5">
                         {row.allocations?.length ? (
                             <div className="space-y-2">
@@ -285,6 +443,7 @@ export default function RentalAgreementDetailPage({
                         agreementId={row.id}
                         side={rentalAgreementFinancialSide(row.agreement_kind)}
                     />
+                    {confirmDialog}
                 </>
             )}
         </RentalPage>

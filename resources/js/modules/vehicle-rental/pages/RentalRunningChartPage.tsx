@@ -69,7 +69,6 @@ interface EventDraft {
     applicability: RentalUsageEventApplicability;
     occurred_at: string;
     quantity: string;
-    unit: string;
     reference_number: string;
     remarks: string;
 }
@@ -100,7 +99,6 @@ const newEvent = (key: number): EventDraft => ({
     applicability: "customer",
     occurred_at: "",
     quantity: "",
-    unit: "",
     reference_number: "",
     remarks: "",
 });
@@ -320,7 +318,6 @@ export default function RentalRunningChartPage() {
                 events: events.map(({ key: _key, ...row }) => ({
                     ...row,
                     occurred_at: row.occurred_at || null,
-                    unit: row.unit || null,
                     reference_number: row.reference_number || null,
                     remarks: row.remarks || null,
                 })),
@@ -760,15 +757,6 @@ export default function RentalRunningChartPage() {
                                                 onChange={(event) =>
                                                     updateEvent(row.key, {
                                                         quantity: event.target.value,
-                                                    })
-                                                }
-                                            />
-                                            <Input
-                                                label="Unit"
-                                                value={row.unit}
-                                                onChange={(event) =>
-                                                    updateEvent(row.key, {
-                                                        unit: event.target.value,
                                                     })
                                                 }
                                             />

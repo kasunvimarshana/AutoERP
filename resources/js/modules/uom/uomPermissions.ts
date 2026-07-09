@@ -1,0 +1,15 @@
+export const uomPermissions = {
+    view: 'uom.view',
+    create: 'uom.create',
+    update: 'uom.update',
+    activate: 'uom.activate',
+    deactivate: 'uom.deactivate',
+    delete: 'uom.delete',
+    conversionsView: 'uom.conversions.view',
+    conversionsCreate: 'uom.conversions.create',
+    conversionsUpdate: 'uom.conversions.update',
+    conversionsActivate: 'uom.conversions.activate',
+    conversionsDeactivate: 'uom.conversions.deactivate',
+    conversionsDelete: 'uom.conversions.delete',
+    conversionsRun: 'uom.conversions.run',
+} as const;

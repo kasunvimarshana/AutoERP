@@ -40,8 +40,8 @@ final class TaxMasterDataService
         if (! in_array($method, config('tax.calculation_methods', []), true)) {
             throw new InvalidArgumentException('Tax calculation method is invalid.');
         }
-        if ($tax instanceof Tax && ((int) $tax->tenant_id !== $tenantId)) {
-            throw new InvalidArgumentException('Tax tenant scope cannot be changed.');
+        if ($tax instanceof Tax && ((int) $tax->tenant_id !== $tenantId || $tax->organization_unit_id !== $organizationUnitId)) {
+            throw new InvalidArgumentException('Tax scope cannot be changed.');
         }
 
         $duplicate = Tax::query()
@@ -206,8 +206,12 @@ final class TaxMasterDataService
     {
         $tenantId = (int) $data['tenant_id'];
         $organizationUnitId = $this->nullableInt($data, 'organization_unit_id');
-        $customer = $this->parties->resolve('customer', $tenantId, $organizationUnitId, (int) $data['customer_id']);
 
+        if ($profile instanceof CustomerTaxProfile && ((int) $profile->tenant_id !== $tenantId || $profile->organization_unit_id !== $organizationUnitId)) {
+            throw new InvalidArgumentException('Customer tax profile scope cannot be changed.');
+        }
+
+        $customer = $this->parties->resolve('customer', $tenantId, $organizationUnitId, (int) $data['customer_id']);
         $taxGroupId = $this->nullableInt($data, 'tax_group_id');
         if ($taxGroupId !== null) {
             $this->assertGroupInScope(TaxGroup::query()->findOrFail($taxGroupId), $tenantId, $organizationUnitId);
@@ -236,8 +240,12 @@ final class TaxMasterDataService
     {
         $tenantId = (int) $data['tenant_id'];
         $organizationUnitId = $this->nullableInt($data, 'organization_unit_id');
-        $supplier = $this->parties->resolve('supplier', $tenantId, $organizationUnitId, (int) $data['supplier_id']);
 
+        if ($profile instanceof SupplierTaxProfile && ((int) $profile->tenant_id !== $tenantId || $profile->organization_unit_id !== $organizationUnitId)) {
+            throw new InvalidArgumentException('Supplier tax profile scope cannot be changed.');
+        }
+
+        $supplier = $this->parties->resolve('supplier', $tenantId, $organizationUnitId, (int) $data['supplier_id']);
         $taxGroupId = $this->nullableInt($data, 'tax_group_id');
         if ($taxGroupId !== null) {
             $this->assertGroupInScope(TaxGroup::query()->findOrFail($taxGroupId), $tenantId, $organizationUnitId);
@@ -266,6 +274,11 @@ final class TaxMasterDataService
     {
         $tenantId = (int) $data['tenant_id'];
         $organizationUnitId = $this->nullableInt($data, 'organization_unit_id');
+
+        if ($profile instanceof TaxPostingProfile && ((int) $profile->tenant_id !== $tenantId || $profile->organization_unit_id !== $organizationUnitId)) {
+            throw new InvalidArgumentException('Tax posting profile scope cannot be changed.');
+        }
+
         $tax = Tax::query()->findOrFail((int) $data['tax_id']);
         $this->assertTaxInScope($tax, $tenantId, $organizationUnitId);
 

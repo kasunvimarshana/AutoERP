@@ -9,9 +9,13 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Carbon\CarbonImmutable;
+use InvalidArgumentException;
+use Modules\VehicleRental\Enums\RentalAgreementStatus;
 use Modules\VehicleRental\Enums\RentalRateVersionStatus;
 use Modules\VehicleRental\Models\RentalAgreement;
 use Modules\VehicleRental\Services\RentalAgreementService;
+use Modules\VehicleRental\Services\RentalRateVersionService;
 use Tests\TestCase;
 
 final class RentalAgreementCreateTest extends TestCase
@@ -68,6 +72,84 @@ final class RentalAgreementCreateTest extends TestCase
             'status' => RentalRateVersionStatus::Active->value,
             'row_version' => 2,
         ]);
+    }
+
+    public function test_usage_period_crossing_rate_version_boundary_is_rejected(): void
+    {
+        $currencyId = $this->createCurrency('VRB');
+        $tenantId = $this->createTenant($currencyId);
+        $customerId = $this->createCustomer($tenantId, $currencyId);
+
+        $agreement = $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): RentalAgreement => app(RentalAgreementService::class)->create([
+                'agreement_number' => 'RA-RATE-BOUNDARY-001',
+                'agreement_kind' => 'customer_rental',
+                'customer_id' => $customerId,
+                'agreement_date' => '2026-07-07',
+                'starts_at' => '2026-07-07 08:00:00',
+                'ends_at' => '2026-08-07 08:00:00',
+                'legal_context' => 'company',
+                'rental_mode' => 'with_driver',
+                'billing_cycle' => 'monthly',
+                'billing_basis' => 'calendar_month',
+                'proration_rule' => 'exact_day_count',
+                'payment_term_days' => 30,
+                'currency_id' => $currencyId,
+                'rate_version' => [
+                    'effective_from' => '2026-07-07 08:00:00',
+                    'effective_to' => '2026-07-15 08:00:00',
+                    'excess_km_method' => 'period',
+                    'included_km' => '0.000000',
+                    'currency_id' => $currencyId,
+                    'components' => [[
+                        'component_code' => 'base_rental',
+                        'unit' => 'month',
+                        'rate' => '1000.000000',
+                        'multiplier' => '1.000000',
+                        'calculation_order' => 1,
+                        'is_taxable' => true,
+                    ]],
+                ],
+                'activate_rate_version' => true,
+            ], $tenantId, null, null),
+        );
+
+        $service = app(RentalRateVersionService::class);
+        $secondVersion = $this->withTenantExecutionContext(
+            $tenantId,
+            fn () => $service->createDraft($agreement->refresh(), [
+                'effective_from' => '2026-07-15 08:00:00',
+                'effective_to' => '2026-08-07 08:00:00',
+                'excess_km_method' => 'period',
+                'included_km' => '0.000000',
+                'currency_id' => $currencyId,
+                'components' => [[
+                    'component_code' => 'base_rental',
+                    'unit' => 'month',
+                    'rate' => '1200.000000',
+                    'multiplier' => '1.000000',
+                    'calculation_order' => 1,
+                    'is_taxable' => true,
+                ]],
+            ]),
+        );
+        $this->withTenantExecutionContext(
+            $tenantId,
+            fn () => $service->activate($secondVersion, (int) $secondVersion->row_version),
+        );
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Usage period must stay inside one active rental rate version.');
+
+        $this->withTenantExecutionContext(
+            $tenantId,
+            fn () => $service->assertSingleVersionCoversPeriod(
+                $agreement->refresh(),
+                CarbonImmutable::parse('2026-07-14 08:00:00'),
+                CarbonImmutable::parse('2026-07-16 08:00:00'),
+            ),
+        );
     }
 
     public function test_lessor_agreement_is_created_as_supplier_side_owner_supply(): void
@@ -167,6 +249,7 @@ final class RentalAgreementCreateTest extends TestCase
         self::assertSame($customerId, (int) $agreement->customer_id);
         self::assertNull($agreement->supplier_id);
         self::assertNotNull($agreement->depositRequirement);
+        self::assertSame('customer_rental', $agreement->depositRequirement->agreement_kind->value);
         self::assertSame($customerId, (int) $agreement->depositRequirement->customer_id);
         self::assertSame('1000.000000', (string) $agreement->depositRequirement->required_amount);
         self::assertNotNull($agreement->activeRateVersion);
@@ -298,6 +381,204 @@ final class RentalAgreementCreateTest extends TestCase
                 null,
             ),
         );
+    }
+
+    public function test_agreement_activation_requires_execution_and_printable_terms(): void
+    {
+        $currencyId = $this->createCurrency('VRA');
+        $tenantId = $this->createTenant($currencyId);
+        $customerId = $this->createCustomer($tenantId, $currencyId);
+        $payload = $this->completeAgreementPayload(
+            'LE-ACTIVATION-INCOMPLETE',
+            'customer_rental',
+            $customerId,
+            $currencyId,
+        );
+        unset($payload['executed_at'], $payload['terms']);
+
+        $agreement = $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): RentalAgreement => app(RentalAgreementService::class)->create(
+                $payload,
+                $tenantId,
+                null,
+                null,
+            ),
+        );
+
+        $this->expectException(ValidationException::class);
+
+        $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): RentalAgreement => app(RentalAgreementService::class)->transition(
+                $agreement,
+                RentalAgreementStatus::Active,
+                (int) $agreement->row_version,
+            ),
+        );
+    }
+
+    public function test_activation_captures_an_immutable_side_specific_document_snapshot(): void
+    {
+        $currencyId = $this->createCurrency('VRI');
+        $tenantId = $this->createTenant($currencyId);
+        $supplierId = $this->createSupplier($tenantId, $currencyId);
+        $agreement = $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): RentalAgreement => app(RentalAgreementService::class)->create(
+                $this->completeAgreementPayload(
+                    'LO-SNAPSHOT-001',
+                    'owner_supply',
+                    $supplierId,
+                    $currencyId,
+                ),
+                $tenantId,
+                null,
+                null,
+            ),
+        );
+
+        $activated = $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): RentalAgreement => app(RentalAgreementService::class)->transition(
+                $agreement,
+                RentalAgreementStatus::Active,
+                (int) $agreement->row_version,
+            ),
+        );
+        $snapshot = $activated->metadata['document_snapshot'] ?? null;
+
+        self::assertSame(RentalAgreementStatus::Active, $activated->status);
+        self::assertIsArray($snapshot);
+        self::assertSame('owner_supply', $snapshot['agreement_kind']);
+        self::assertSame('supplier', $snapshot['party']['type']);
+        self::assertSame('Vehicle Rental Lessor', $snapshot['party']['name']);
+        self::assertSame('Owner supply terms', $snapshot['terms'][0]['title']);
+        self::assertSame('750.000000', $snapshot['rate_version']['components'][0]['rate']);
+
+        DB::table('suppliers')->where('id', $supplierId)->update([
+            'name' => 'Renamed Vehicle Owner',
+            'updated_at' => now(),
+        ]);
+
+        $persistedSnapshot = $activated->refresh()->metadata['document_snapshot'];
+        self::assertSame('Vehicle Rental Lessor', $persistedSnapshot['party']['name']);
+    }
+
+    public function test_agreement_kind_filter_keeps_lessor_and_lessee_records_separate(): void
+    {
+        $currencyId = $this->createCurrency('VRF');
+        $tenantId = $this->createTenant($currencyId);
+        $customerId = $this->createCustomer($tenantId, $currencyId);
+        $supplierId = $this->createSupplier($tenantId, $currencyId);
+        $service = app(RentalAgreementService::class);
+
+        $this->withTenantExecutionContext($tenantId, function () use (
+            $service,
+            $tenantId,
+            $customerId,
+            $supplierId,
+            $currencyId,
+        ): void {
+            $service->create(
+                $this->completeAgreementPayload(
+                    'LE-FILTER-001',
+                    'customer_rental',
+                    $customerId,
+                    $currencyId,
+                ),
+                $tenantId,
+                null,
+                null,
+            );
+            $service->create(
+                $this->completeAgreementPayload(
+                    'LO-FILTER-001',
+                    'owner_supply',
+                    $supplierId,
+                    $currencyId,
+                ),
+                $tenantId,
+                null,
+                null,
+            );
+        });
+
+        $lessee = $this->withTenantExecutionContext(
+            $tenantId,
+            fn () => $service->paginate(
+                $tenantId,
+                null,
+                ['agreement_kind' => 'customer_rental'],
+                25,
+            ),
+        );
+        $lessor = $this->withTenantExecutionContext(
+            $tenantId,
+            fn () => $service->paginate(
+                $tenantId,
+                null,
+                ['agreement_kind' => 'owner_supply'],
+                25,
+            ),
+        );
+
+        self::assertSame(['LE-FILTER-001'], $lessee->getCollection()->pluck('agreement_number')->all());
+        self::assertSame(['LO-FILTER-001'], $lessor->getCollection()->pluck('agreement_number')->all());
+    }
+
+    /** @return array<string, mixed> */
+    private function completeAgreementPayload(
+        string $number,
+        string $kind,
+        int $partyId,
+        int $currencyId,
+    ): array {
+        $agreementDate = now()->subDay()->toDateString();
+        $startsAt = now()->subDay()->startOfHour()->toDateTimeString();
+        $endsAt = now()->addMonth()->startOfHour()->toDateTimeString();
+        $isCustomerRental = $kind === 'customer_rental';
+
+        return [
+            'agreement_number' => $number,
+            'agreement_kind' => $kind,
+            'customer_id' => $isCustomerRental ? $partyId : null,
+            'supplier_id' => $isCustomerRental ? null : $partyId,
+            'agreement_date' => $agreementDate,
+            'executed_at' => now()->subMinute()->toDateTimeString(),
+            'starts_at' => $startsAt,
+            'ends_at' => $endsAt,
+            'legal_context' => 'company',
+            'rental_mode' => 'with_driver',
+            'billing_cycle' => 'monthly',
+            'billing_basis' => 'calendar_month',
+            'proration_rule' => 'exact_day_count',
+            'payment_term_days' => 30,
+            'currency_id' => $currencyId,
+            'terms' => [[
+                'sequence' => 1,
+                'title' => $isCustomerRental ? 'Customer rental terms' : 'Owner supply terms',
+                'content' => $isCustomerRental
+                    ? 'The customer accepts the recorded billable rates.'
+                    : 'The owner accepts the recorded payable rates.',
+                'is_printable' => true,
+            ]],
+            'rate_version' => [
+                'effective_from' => $startsAt,
+                'excess_km_method' => 'period',
+                'included_km' => '0.000000',
+                'currency_id' => $currencyId,
+                'components' => [[
+                    'component_code' => 'base_rental',
+                    'unit' => 'month',
+                    'rate' => $isCustomerRental ? '1250.000000' : '750.000000',
+                    'multiplier' => '1.000000',
+                    'calculation_order' => 1,
+                    'is_taxable' => true,
+                ]],
+            ],
+            'activate_rate_version' => true,
+        ];
     }
 
     private function createCurrency(string $code = 'VRT'): int

@@ -40,10 +40,14 @@ export function CostingTab({
     loading,
     error,
     reload,
+    canManage,
+    canPost,
 }: WorkflowProps & {
     layers: InventoryRecord[];
     layersLoading: boolean;
     layersError: ApiError | null;
+    canManage: boolean;
+    canPost: boolean;
 }) {
     const [form, setForm] = useState({
         adjustment_date: localToday(),
@@ -70,22 +74,26 @@ export function CostingTab({
     return (
         <div className="space-y-5">
             <WorkflowPanel title="Inventory cost adjustments" loading={loading} error={error} actionError={actionError}>
-                <form className="grid gap-4 xl:grid-cols-[1fr_10rem_1fr_1fr_auto]" onSubmit={submit}>
-                    <Select
-                        label="Valuation layer"
-                        value={form.valuation_layer}
-                        error={fieldError(actionError, 'lines.0.valuation_layer_id')}
-                        options={layers.map((layer) => ({ value: String(layer.id), label: valuationLayerLabel(layer) }))}
-                        onChange={(event) => setForm({ ...form, valuation_layer: event.target.value })}
-                    />
-                    <DecimalInput label="Adjustment" value={form.adjustment_amount} error={fieldError(actionError, 'lines.0.adjustment_amount')} onChange={(event) => setForm({ ...form, adjustment_amount: event.target.value })} />
-                    <Input label="Reason" value={form.reason} error={fieldError(actionError, 'reason')} onChange={(event) => setForm({ ...form, reason: event.target.value })} />
-                    <Input label="Date" type="date" value={form.adjustment_date} error={fieldError(actionError, 'adjustment_date')} onChange={(event) => setForm({ ...form, adjustment_date: event.target.value })} />
-                    <div className="flex items-end">
-                        <Button type="submit" loading={busy} disabled={!form.valuation_layer}>Create</Button>
-                    </div>
-                </form>
+                {canManage && (
+                    <form className="grid gap-4 xl:grid-cols-[1fr_10rem_1fr_1fr_auto]" onSubmit={submit}>
+                        <Select
+                            label="Valuation layer"
+                            value={form.valuation_layer}
+                            error={fieldError(actionError, 'lines.0.valuation_layer_id')}
+                            options={layers.map((layer) => ({ value: String(layer.id), label: valuationLayerLabel(layer) }))}
+                            onChange={(event) => setForm({ ...form, valuation_layer: event.target.value })}
+                        />
+                        <DecimalInput label="Adjustment" value={form.adjustment_amount} error={fieldError(actionError, 'lines.0.adjustment_amount')} onChange={(event) => setForm({ ...form, adjustment_amount: event.target.value })} />
+                        <Input label="Reason" value={form.reason} error={fieldError(actionError, 'reason')} onChange={(event) => setForm({ ...form, reason: event.target.value })} />
+                        <Input label="Date" type="date" value={form.adjustment_date} error={fieldError(actionError, 'adjustment_date')} onChange={(event) => setForm({ ...form, adjustment_date: event.target.value })} />
+                        <div className="flex items-end">
+                            <Button type="submit" loading={busy} disabled={!form.valuation_layer}>Create</Button>
+                        </div>
+                    </form>
+                )}
                 <RecordList rows={data} columns={costAdjustmentColumns((row) => {
+                    if (!canPost) return null;
+
                     const key = `post-cost-adjustment:${row.id}`;
 
                     return (

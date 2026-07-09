@@ -16,18 +16,18 @@ import { useSupplierRelationCrud } from './useSupplierRelationCrud';
 const list = (id: number, page: number, signal: AbortSignal) => listSupplierAddresses(id, { page, per_page: 20 }, signal);
 const options = supplierAddressTypes.map((value) => ({ value, label: value.replaceAll('_', ' ') }));
 
-export default function SupplierAddressTab({ supplierId }: { supplierId: number }) {
+export default function SupplierAddressTab({ supplierId, canManage }: { supplierId: number; canManage: boolean }) {
     const crud = useSupplierRelationCrud({ supplierId, list, create: createSupplierAddress, update: updateSupplierAddress, remove: deleteSupplierAddress });
     const columns: DataColumn<SupplierAddress>[] = [
         { key: 'type', header: 'Type', render: (row) => row.address_type },
         { key: 'address', header: 'Address', render: (row) => <>{row.address_line_1}<span className="block text-xs text-slate-500">{[row.city, row.state, row.country].filter(Boolean).join(', ')}</span></> },
         { key: 'primary', header: 'Primary', render: (row) => row.is_primary ? 'Yes' : 'No' },
-        { key: 'actions', header: '', className: 'text-right', render: (row) => <Actions edit={() => crud.startEdit(row)} remove={() => crud.destroy(row)} /> },
+        ...(canManage ? [{ key: 'actions', header: '', className: 'text-right', render: (row: SupplierAddress) => <Actions edit={() => crud.startEdit(row)} remove={() => crud.destroy(row)} /> }] : []),
     ];
-    return <><SupplierRelationHeader title="Addresses" description="Billing, shipping, registered, and warehouse addresses." onAdd={crud.startCreate} />
+    return <><SupplierRelationHeader title="Addresses" description="Billing, shipping, registered, and warehouse addresses." onAdd={canManage ? crud.startCreate : undefined} />
         <ErrorAlert error={crud.actionError ?? crud.error} />{crud.loading ? <LoadingState /> : <DataTable rows={crud.data?.data ?? []} columns={columns} rowKey={(row) => row.id} />}<Pagination meta={crud.data?.meta} onPageChange={crud.setPage} />
-        <FormDrawer open={crud.open} title={crud.editing ? 'Edit address' : 'Add address'} onClose={crud.close}>{crud.open && <AddressForm key={crud.editing?.id ?? 'new'} row={crud.editing} error={crud.actionError} submitting={crud.submitting} onCancel={crud.close} onSubmit={crud.submit} />}</FormDrawer>
-        {crud.confirmDialog}
+        {canManage && <FormDrawer open={crud.open} title={crud.editing ? 'Edit address' : 'Add address'} onClose={crud.close}>{crud.open && <AddressForm key={crud.editing?.id ?? 'new'} row={crud.editing} error={crud.actionError} submitting={crud.submitting} onCancel={crud.close} onSubmit={crud.submit} />}</FormDrawer>}
+        {canManage && crud.confirmDialog}
     </>;
 }
 function AddressForm({ row, error, submitting, onCancel, onSubmit }: { row: SupplierAddress | null; error: ApiError | null; submitting: boolean; onCancel: () => void; onSubmit: (payload: SupplierAddressPayload) => Promise<void> }) {

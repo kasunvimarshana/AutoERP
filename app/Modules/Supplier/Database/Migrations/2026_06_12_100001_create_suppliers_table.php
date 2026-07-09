@@ -12,6 +12,7 @@ return new class extends Migration
     {
         Schema::create('suppliers', function (Blueprint $table): void {
             $table->id();
+            $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->foreignId('tenant_id')->constrained('tenants', indexName: 'suppliers_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->string('supplier_number');

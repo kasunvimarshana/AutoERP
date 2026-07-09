@@ -11,6 +11,7 @@ use Modules\Vehicle\DTOs\UpdateVehicleData;
 use Modules\Vehicle\Enums\VehicleStatus;
 use Modules\Vehicle\Models\Vehicle;
 use Modules\Vehicle\Validators\VehicleValidationService;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 use Throwable;
 
 final class VehicleUpdateService
@@ -24,14 +25,31 @@ final class VehicleUpdateService
 
     public function update(Vehicle $vehicle, UpdateVehicleData $data): Vehicle
     {
-        if (in_array($vehicle->status, [VehicleStatus::Sold, VehicleStatus::Scrapped], true)) {
-            throw new InvalidArgumentException('Sold or scrapped vehicle master data cannot be updated directly.');
-        }
-        $this->validator->validateUpdate($vehicle, $data);
         $storedDocumentPaths = [];
 
         try {
             return DB::transaction(function () use ($vehicle, $data, &$storedDocumentPaths): Vehicle {
+                $vehicle = Vehicle::query()
+                    ->whereKey($vehicle->getKey())
+                    ->where('tenant_id', (int) $vehicle->tenant_id)
+                    ->when(
+                        $vehicle->organization_unit_id === null,
+                        static fn ($query) => $query->whereNull('organization_unit_id'),
+                        static fn ($query) => $query->where('organization_unit_id', (int) $vehicle->organization_unit_id),
+                    )
+                    ->lockForUpdate()
+                    ->firstOrFail();
+
+                if ($data->rowVersion !== (int) $vehicle->row_version) {
+                    throw new ConflictHttpException('Vehicle was changed by someone else. Reload before saving.');
+                }
+
+                if (in_array($vehicle->status, [VehicleStatus::Sold, VehicleStatus::Scrapped], true)) {
+                    throw new InvalidArgumentException('Sold or scrapped vehicle master data cannot be updated directly.');
+                }
+
+                $this->validator->validateUpdate($vehicle, $data);
+
                 $attributes = [];
                 foreach ([
                     'code' => $data->code,
@@ -58,14 +76,17 @@ final class VehicleUpdateService
                         $attributes[$key] = $value;
                     }
                 }
-                $vehicle->fill($attributes)->save();
+
+                $vehicle->fill($attributes);
+                $vehicle->setAttribute('row_version', ((int) $vehicle->row_version) + 1);
+                $vehicle->save();
 
                 if ($data->documents !== null) {
                     $this->documents->replace($vehicle, $data->documents, static function (string $path) use (&$storedDocumentPaths): void {
                         $storedDocumentPaths[] = $path;
                     });
                 }
-                    if ($data->attributes !== null) {
+                if ($data->attributes !== null) {
                     $this->attributes->replace($vehicle, $data->attributes);
                 }
 

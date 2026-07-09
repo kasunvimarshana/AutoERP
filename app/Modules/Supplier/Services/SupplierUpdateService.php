@@ -11,6 +11,7 @@ use Modules\Supplier\DTOs\UpdateSupplierData;
 use Modules\Supplier\Enums\SupplierStatus;
 use Modules\Supplier\Models\Supplier;
 use Modules\Supplier\Validators\SupplierValidationService;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 final class SupplierUpdateService
 {
@@ -28,13 +29,28 @@ final class SupplierUpdateService
 
     public function update(Supplier $supplier, UpdateSupplierData $data): Supplier
     {
-        if ($supplier->status === SupplierStatus::Blacklisted) {
-            throw new InvalidArgumentException('Blacklisted supplier master data cannot be updated directly.');
-        }
-
-        $this->validator->validateUpdate($supplier, $data);
-
         return DB::transaction(function () use ($supplier, $data): Supplier {
+            $supplier = Supplier::query()
+                ->whereKey($supplier->getKey())
+                ->where('tenant_id', (int) $supplier->tenant_id)
+                ->when(
+                    $supplier->organization_unit_id === null,
+                    static fn ($query) => $query->whereNull('organization_unit_id'),
+                    static fn ($query) => $query->where('organization_unit_id', (int) $supplier->organization_unit_id),
+                )
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($data->rowVersion !== (int) $supplier->row_version) {
+                throw new ConflictHttpException('Supplier was changed by someone else. Reload before saving.');
+            }
+
+            if ($supplier->status === SupplierStatus::Blacklisted) {
+                throw new InvalidArgumentException('Blacklisted supplier master data cannot be updated directly.');
+            }
+
+            $this->validator->validateUpdate($supplier, $data);
+
             $attributes = [];
             foreach ([
                 'organization_unit_id' => $data->organizationUnitId,
@@ -68,6 +84,7 @@ final class SupplierUpdateService
             }
 
             $supplier->fill($attributes);
+            $supplier->setAttribute('row_version', ((int) $supplier->row_version) + 1);
             $supplier->save();
 
             if ($data->contacts !== null) {
@@ -101,6 +118,6 @@ final class SupplierUpdateService
                 'itemMappings',
                 'creditProfile',
             ]);
-        });
+        }, 3);
     }
 }

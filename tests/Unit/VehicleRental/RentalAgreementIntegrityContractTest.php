@@ -43,13 +43,17 @@ final class RentalAgreementIntegrityContractTest extends TestCase
 
         self::assertStringContainsString('rental_agreements_customer_id_tenant_fk', $migration);
         self::assertStringContainsString('rental_agreements_supplier_id_tenant_fk', $migration);
-        self::assertStringContainsString('rental_agreements_id_tenant_customer_uk', $migration);
+        self::assertStringContainsString('rental_agreements_id_tenant_kind_customer_uk', $migration);
         self::assertStringContainsString('rental_agreements_terminated_by_tenant_fk', $migration);
         self::assertStringContainsString('Customer rental agreement requires only a customer.', $service);
         self::assertStringContainsString('Owner supply agreement requires only a supplier/vehicle owner.', $service);
         self::assertStringContainsString('Security deposits are supported only for customer rental agreements.', $service);
+        self::assertStringContainsString('agreement_kind', $depositMigration);
+        self::assertStringContainsString("\$table->string('agreement_kind', 30)", $depositMigration);
+        self::assertStringNotContainsString("\$table->enum('agreement_kind'", $depositMigration);
+        self::assertStringContainsString('RentalAgreementKind::CustomerRental->value', $depositMigration);
         self::assertStringContainsString('rental_deposit_requirements_customer_id_tenant_fk', $depositMigration);
-        self::assertStringContainsString('rental_deposit_requirements_agreement_id_tenant_customer_fk', $depositMigration);
+        self::assertStringContainsString('rental_deposit_req_agreement_kind_customer_fk', $depositMigration);
         self::assertStringNotContainsString('Asia/Colombo', $migration.$service.$configuration);
         self::assertStringContainsString("'vehicle_rental.billing_timezone'", $service);
         self::assertStringContainsString('VEHICLE_RENTAL_BILLING_TIMEZONE', $configuration);
@@ -65,6 +69,8 @@ final class RentalAgreementIntegrityContractTest extends TestCase
         self::assertStringContainsString('assertExpectedVersion', $service);
         self::assertStringContainsString('active immutable rate version', $service);
         self::assertStringContainsString('$version->row_version = $expectedVersion + 1;', $service);
+        self::assertStringContainsString('$this->bumpAgreementVersion($agreement, $userId);', $service);
+        self::assertStringContainsString('Duplicate rate component for the same vehicle category is not allowed.', $service);
         self::assertStringContainsString("return \$version->refresh()->load('components');", $service);
         self::assertStringNotContainsString('$active->effective_to =', $service);
         self::assertStringNotContainsString('$active->status = RentalRateVersionStatus::Superseded;', $service);
@@ -81,6 +87,23 @@ final class RentalAgreementIntegrityContractTest extends TestCase
         self::assertStringContainsString('expected_version: expectedVersion', $api);
         self::assertStringContainsString('result.data.row_version', $detail);
         self::assertStringContainsString('transitionRentalAgreement(', $detail);
+    }
+
+    public function test_activation_requires_complete_terms_and_captures_print_snapshot(): void
+    {
+        $request = $this->source('app/Modules/VehicleRental/Http/Requests/StoreRentalAgreementRequest.php');
+        $service = $this->source('app/Modules/VehicleRental/Services/RentalAgreementService.php');
+        $resource = $this->source('app/Modules/VehicleRental/Http/Resources/RentalAgreementResource.php');
+        $createPage = $this->source('resources/js/modules/vehicle-rental/pages/RentalAgreementCreatePage.tsx');
+        $detailPage = $this->source('resources/js/modules/vehicle-rental/pages/RentalAgreementDetailPage.tsx');
+
+        self::assertStringContainsString("'executed_at' => ['required'", $request);
+        self::assertStringContainsString("'terms' => ['required', 'array', 'min:1'", $request);
+        self::assertStringContainsString('assertReadyForActivation', $service);
+        self::assertStringContainsString('documentSnapshot', $service);
+        self::assertStringContainsString("'document_snapshot' =>", $resource);
+        self::assertStringContainsString('Clause ${index + 1} content', $createPage);
+        self::assertStringContainsString('RentalAgreementPrintDocument', $detailPage);
     }
 
     private function source(string $relativePath): string

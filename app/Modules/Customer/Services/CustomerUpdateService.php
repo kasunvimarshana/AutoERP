@@ -11,6 +11,7 @@ use Modules\Customer\DTOs\UpdateCustomerData;
 use Modules\Customer\Enums\CustomerStatus;
 use Modules\Customer\Models\Customer;
 use Modules\Customer\Validators\CustomerValidationService;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 final class CustomerUpdateService
 {
@@ -27,13 +28,28 @@ final class CustomerUpdateService
 
     public function update(Customer $customer, UpdateCustomerData $data): Customer
     {
-        if ($customer->status === CustomerStatus::Blacklisted) {
-            throw new InvalidArgumentException('Blacklisted customer master data cannot be updated directly.');
-        }
-
-        $this->validator->validateUpdate($customer, $data);
-
         return DB::transaction(function () use ($customer, $data): Customer {
+            $customer = Customer::query()
+                ->whereKey($customer->getKey())
+                ->where('tenant_id', (int) $customer->tenant_id)
+                ->when(
+                    $customer->organization_unit_id === null,
+                    static fn ($query) => $query->whereNull('organization_unit_id'),
+                    static fn ($query) => $query->where('organization_unit_id', (int) $customer->organization_unit_id),
+                )
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($data->rowVersion !== (int) $customer->row_version) {
+                throw new ConflictHttpException('Customer was changed by someone else. Reload before saving.');
+            }
+
+            if ($customer->status === CustomerStatus::Blacklisted) {
+                throw new InvalidArgumentException('Blacklisted customer master data cannot be updated directly.');
+            }
+
+            $this->validator->validateUpdate($customer, $data);
+
             $attributes = [];
             foreach ([
                 'organization_unit_id' => $data->organizationUnitId,
@@ -71,6 +87,7 @@ final class CustomerUpdateService
             }
 
             $customer->fill($attributes);
+            $customer->setAttribute('row_version', ((int) $customer->row_version) + 1);
             $customer->save();
 
             if ($data->contacts !== null) {
@@ -100,6 +117,6 @@ final class CustomerUpdateService
                 'documents',
                 'creditProfile',
             ]);
-        });
+        }, 3);
     }
 }

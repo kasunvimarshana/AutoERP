@@ -24,7 +24,7 @@ import {
     WorkflowPanel,
 } from '../inventoryUi';
 
-export function CountsTab({ data, loading, error, reload }: WorkflowProps) {
+export function CountsTab({ data, loading, error, reload, canManage, canApprove, canPost }: WorkflowProps & { canManage: boolean; canApprove: boolean; canPost: boolean }) {
     const [form, setForm] = useState({
         count_date: localToday(),
         counted_quantity: '0.000000',
@@ -60,30 +60,32 @@ export function CountsTab({ data, loading, error, reload }: WorkflowProps) {
 
     return (
         <WorkflowPanel title="Stock count workflow" loading={loading} error={error} actionError={actionError}>
-            <form className="grid gap-4 xl:grid-cols-[1fr_1fr_9rem_9rem_9rem_1fr_10rem_auto]" onSubmit={submit}>
-                <LookupSelect label="Item" value={item} onChange={(value) => { setItem(value); setDimensions(emptyInventoryDimensions()); }} search={lookupApi.stockableItems} error={fieldError(actionError, 'lines.0.item_id')} />
-                <LookupSelect label="Warehouse" value={warehouse} onChange={(value) => { setWarehouse(value); setDimensions({ ...dimensions, warehouseLocation: null, serial: null }); }} search={searchWarehouses} error={fieldError(actionError, 'warehouse_id')} loadOnOpen minSearchLength={0} />
-                <DecimalInput label="Counted (base)" value={form.counted_quantity} error={fieldError(actionError, 'lines.0.counted_quantity')} onChange={(event) => setForm({ ...form, counted_quantity: event.target.value })} />
-                <DecimalInput label="System (base)" value={form.system_quantity} error={fieldError(actionError, 'lines.0.system_quantity')} onChange={(event) => setForm({ ...form, system_quantity: event.target.value })} />
-                <DecimalInput label="Cost/base" value={form.unit_cost} error={fieldError(actionError, 'lines.0.unit_cost')} onChange={(event) => setForm({ ...form, unit_cost: event.target.value })} />
-                <Input label="Date" type="date" value={form.count_date} error={fieldError(actionError, 'count_date')} onChange={(event) => setForm({ ...form, count_date: event.target.value })} />
-                <Select label="Type" value={form.count_type} error={fieldError(actionError, 'count_type')} options={[{ value: 'stock_count', label: 'Stock count' }, { value: 'cycle_count', label: 'Cycle count' }]} onChange={(event) => setForm({ ...form, count_type: event.target.value })} />
-                <div className="flex items-end"><Button type="submit" loading={busy} disabled={!item || !warehouse}>Create</Button></div>
-                <InventoryDimensionFields
-                    item={item}
-                    warehouse={warehouse}
-                    value={dimensions}
-                    onChange={setDimensions}
-                    includeSerial
-                    errors={{
-                        itemVariant: fieldError(actionError, 'lines.0.item_variant_id'),
-                        warehouseLocation: fieldError(actionError, 'warehouse_location_id'),
-                        batch: fieldError(actionError, 'lines.0.batch_id'),
-                        serial: fieldError(actionError, 'lines.0.serial_number_id'),
-                        uom: fieldError(actionError, 'lines.0.uom_id'),
-                    }}
-                />
-            </form>
+            {canManage && (
+                <form className="grid gap-4 xl:grid-cols-[1fr_1fr_9rem_9rem_9rem_1fr_10rem_auto]" onSubmit={submit}>
+                    <LookupSelect label="Item" value={item} onChange={(value) => { setItem(value); setDimensions(emptyInventoryDimensions()); }} search={lookupApi.stockableItems} error={fieldError(actionError, 'lines.0.item_id')} />
+                    <LookupSelect label="Warehouse" value={warehouse} onChange={(value) => { setWarehouse(value); setDimensions({ ...dimensions, warehouseLocation: null, serial: null }); }} search={searchWarehouses} error={fieldError(actionError, 'warehouse_id')} loadOnOpen minSearchLength={0} />
+                    <DecimalInput label="Counted (base)" value={form.counted_quantity} error={fieldError(actionError, 'lines.0.counted_quantity')} onChange={(event) => setForm({ ...form, counted_quantity: event.target.value })} />
+                    <DecimalInput label="System (base)" value={form.system_quantity} error={fieldError(actionError, 'lines.0.system_quantity')} onChange={(event) => setForm({ ...form, system_quantity: event.target.value })} />
+                    <DecimalInput label="Cost/base" value={form.unit_cost} error={fieldError(actionError, 'lines.0.unit_cost')} onChange={(event) => setForm({ ...form, unit_cost: event.target.value })} />
+                    <Input label="Date" type="date" value={form.count_date} error={fieldError(actionError, 'count_date')} onChange={(event) => setForm({ ...form, count_date: event.target.value })} />
+                    <Select label="Type" value={form.count_type} error={fieldError(actionError, 'count_type')} options={[{ value: 'stock_count', label: 'Stock count' }, { value: 'cycle_count', label: 'Cycle count' }]} onChange={(event) => setForm({ ...form, count_type: event.target.value })} />
+                    <div className="flex items-end"><Button type="submit" loading={busy} disabled={!item || !warehouse}>Create</Button></div>
+                    <InventoryDimensionFields
+                        item={item}
+                        warehouse={warehouse}
+                        value={dimensions}
+                        onChange={setDimensions}
+                        includeSerial
+                        errors={{
+                            itemVariant: fieldError(actionError, 'lines.0.item_variant_id'),
+                            warehouseLocation: fieldError(actionError, 'warehouse_location_id'),
+                            batch: fieldError(actionError, 'lines.0.batch_id'),
+                            serial: fieldError(actionError, 'lines.0.serial_number_id'),
+                            uom: fieldError(actionError, 'lines.0.uom_id'),
+                        }}
+                    />
+                </form>
+            )}
             <RecordList rows={data} columns={columns((row) => {
                 const status = String(row.status ?? '');
                 const approveKey = `approve-count:${row.id}`;
@@ -91,8 +93,8 @@ export function CountsTab({ data, loading, error, reload }: WorkflowProps) {
 
                 return (
                     <div className="flex flex-wrap gap-2">
-                        <Button variant="secondary" loading={recordAction.pendingKey === approveKey} disabled={status !== 'draft' || recordAction.pendingKey !== null} onClick={() => void recordAction.run(approveKey, () => approveStockCount(row.id))}>Approve</Button>
-                        <Button variant="secondary" loading={recordAction.pendingKey === postKey} disabled={!['draft', 'approved'].includes(status) || recordAction.pendingKey !== null} onClick={() => void recordAction.run(postKey, () => postStockCount(row.id))}>Post</Button>
+                        {canApprove && <Button variant="secondary" loading={recordAction.pendingKey === approveKey} disabled={status !== 'draft' || recordAction.pendingKey !== null} onClick={() => void recordAction.run(approveKey, () => approveStockCount(row.id))}>Approve</Button>}
+                        {canPost && <Button variant="secondary" loading={recordAction.pendingKey === postKey} disabled={!['draft', 'approved'].includes(status) || recordAction.pendingKey !== null} onClick={() => void recordAction.run(postKey, () => postStockCount(row.id))}>Post</Button>}
                     </div>
                 );
             })} />

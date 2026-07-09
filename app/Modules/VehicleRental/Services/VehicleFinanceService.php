@@ -125,50 +125,6 @@ final class VehicleFinanceService
         });
     }
 
-    public function refreshDueStatuses(int $tenantId, ?int $organizationUnitId, ?string $asAt = null): int
-    {
-        $date = CarbonImmutable::parse($asAt ?? now())->toDateString();
-        $updated = 0;
-        VehicleFinanceInstallment::query()
-            ->forContext($tenantId, $organizationUnitId)
-            ->with('invoice.balance')
-            ->whereNotIn('status', [VehicleFinanceInstallmentStatus::Waived->value, VehicleFinanceInstallmentStatus::Reversed->value])
-            ->chunkById(200, function ($installments) use ($date, &$updated): void {
-                foreach ($installments as $installment) {
-                    if ($installment->invoice !== null && ! in_array($installment->invoice->status, [InvoiceStatus::Cancelled, InvoiceStatus::Void], true)) {
-                        $balance = (string) ($installment->invoice->balance?->balance_due ?? $installment->invoice->balance_due ?? $installment->total_due);
-                        $paid = $this->math->sub((string) $installment->total_due, $balance);
-                        $installment->paid_amount = $this->math->isNegative($paid) ? '0.000000' : $paid;
-                        $installment->balance_due = $this->math->isNegative($balance) ? '0.000000' : $balance;
-                    } elseif ($installment->invoice !== null) {
-                        $installment->invoice_id = null;
-                        $installment->paid_amount = '0.000000';
-                        $installment->balance_due = (string) $installment->total_due;
-                    }
-                    $new = match (true) {
-                        $this->math->isZero((string) $installment->balance_due) => VehicleFinanceInstallmentStatus::Paid,
-                        $installment->due_date->toDateString() < $date => VehicleFinanceInstallmentStatus::Overdue,
-                        $installment->due_date->toDateString() === $date => VehicleFinanceInstallmentStatus::Due,
-                        $this->math->compare((string) $installment->paid_amount, '0') > 0 => VehicleFinanceInstallmentStatus::PartiallyPaid,
-                        default => VehicleFinanceInstallmentStatus::Scheduled,
-                    };
-                    $old = $installment->status;
-                    $dirtyFinancials = $installment->isDirty(['invoice_id', 'paid_amount', 'balance_due']);
-                    if ($old !== $new || $dirtyFinancials) {
-                        $installment->status = $new;
-                        $installment->row_version = (int) $installment->row_version + 1;
-                        $installment->save();
-                    }
-                    if ($old !== $new) {
-                        $this->history($installment->financeAgreement, $old->value, $new->value, null, (int) $installment->getKey());
-                        $updated++;
-                    }
-                }
-            });
-
-        return $updated;
-    }
-
     public function createInstallmentPayable(
         VehicleFinanceInstallment $installment,
         int $expectedVersion,
@@ -287,7 +243,6 @@ final class VehicleFinanceService
     {
         return ['supplier', 'vehicle.make', 'vehicle.model', 'currency', 'taxGroup', 'installments.invoice'];
     }
-
 
     private function validateCustomSchedule(array $data, CarbonImmutable $startsAt, CarbonImmutable $maturesAt): void
     {

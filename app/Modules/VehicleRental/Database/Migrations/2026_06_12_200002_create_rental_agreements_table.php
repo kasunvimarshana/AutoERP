@@ -53,7 +53,7 @@ return new class extends Migration
             $table->index(['supplier_id', 'status', 'starts_at', 'ends_at'], 'rental_agreements_supplier_period_ix');
 
             $table->unique(['id', 'tenant_id'], 'rental_agreements_id_tenant_uk');
-            $table->unique(['id', 'tenant_id', 'customer_id'], 'rental_agreements_id_tenant_customer_uk');
+            $table->unique(['id', 'tenant_id', 'agreement_kind', 'customer_id'], 'rental_agreements_id_tenant_kind_customer_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'rental_agreements_organization_unit_id_tenant_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('organization_units')

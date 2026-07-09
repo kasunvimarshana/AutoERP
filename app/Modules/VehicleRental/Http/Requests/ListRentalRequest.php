@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\VehicleRental\Http\Requests;
 
+use Illuminate\Validation\Rule;
 use Modules\Core\Http\Requests\TenantScopedRequest;
+use Modules\VehicleRental\Enums\RentalAgreementKind;
 
 final class ListRentalRequest extends TenantScopedRequest
 {
@@ -16,7 +18,7 @@ final class ListRentalRequest extends TenantScopedRequest
             'search' => ['nullable', 'string', 'max:150'],
             'per_page' => ['nullable', 'integer', 'between:1,100'],
             'status' => ['nullable', 'string', 'max:40'],
-            'agreement_kind' => ['nullable', 'string', 'max:40'],
+            'agreement_kind' => ['nullable', Rule::enum(RentalAgreementKind::class)],
             'financial_side' => ['nullable', 'string', 'max:20'],
             'customer_id' => ['nullable', 'integer', 'min:1'],
             'supplier_id' => ['nullable', 'integer', 'min:1'],

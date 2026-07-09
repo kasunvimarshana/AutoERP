@@ -303,9 +303,12 @@ final class CustomerEngineTest extends TestCase
             ->assertJsonPath('data.code', 'API-CUS')
             ->assertJsonPath('data.contacts.0.contact_name', 'API Contact')
             ->assertJsonPath('data.documents.0.document_type', 'id_document')
-            ->assertJsonStructure(['data' => ['id', 'customer_number', 'code', 'name', 'contacts', 'addresses', 'documents', 'credit_profile']]);
+            ->assertJsonStructure(['data' => ['id', 'row_version', 'customer_number', 'code', 'name', 'contacts', 'addresses', 'documents', 'credit_profile']]);
 
         $id = (int) $create->json('data.id');
+        $rowVersion = (int) $create->json('data.row_version');
+        $this->assertGreaterThanOrEqual(0, $rowVersion);
+
         $this->tenantGetJson($tenantId, "/api/v1/customers/lookup/active?tenant_id={$tenantId}&organization_unit_id={$organizationUnitId}")
             ->assertOk()
             ->assertJsonFragment(['code' => 'API-CUS']);
@@ -313,8 +316,19 @@ final class CustomerEngineTest extends TestCase
         $this->withTenantExecutionContext($tenantId, fn () => $this->putJson("/api/v1/customers/{$id}", [
             'tenant_id' => $tenantId,
             'organization_unit_id' => $organizationUnitId,
+            'row_version' => $rowVersion,
             'name' => 'API Customer Updated',
-        ]))->assertOk()->assertJsonPath('data.name', 'API Customer Updated');
+        ]))->assertOk()
+            ->assertJsonPath('data.name', 'API Customer Updated')
+            ->assertJsonPath('data.row_version', $rowVersion + 1);
+
+        $this->withTenantExecutionContext($tenantId, fn () => $this->putJson("/api/v1/customers/{$id}", [
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => $organizationUnitId,
+            'row_version' => $rowVersion,
+            'name' => 'Stale API Customer',
+        ]))->assertStatus(409)
+            ->assertJsonPath('message', 'Customer was changed by someone else. Reload before saving.');
     }
 
     public function test_customer_validation_error_response(): void

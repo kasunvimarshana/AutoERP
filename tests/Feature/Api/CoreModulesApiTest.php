@@ -67,6 +67,7 @@ final class CoreModulesApiTest extends TestCase
         $this->tenantPatchJson($tenantId, '/api/v1/suppliers/'.$created['id'], [
             'tenant_id' => $tenantId,
             'organization_unit_id' => $organizationUnitId,
+            'row_version' => $created['row_version'],
             'name' => 'Updated API Supplier',
         ])->assertSuccessful()->assertJsonPath('data.name', 'Updated API Supplier');
 

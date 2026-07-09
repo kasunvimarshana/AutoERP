@@ -367,7 +367,7 @@ export default function RentalAllocationPage() {
         setSaving(true);
         setError(null);
         try {
-            await createRentalAllocation(agreement.id, agreementDetails.row_version, {
+            const allocation = await createRentalAllocation(agreement.id, agreementDetails.row_version, {
                 vehicle_id: vehicle.id,
                 vehicle_ownership_id: isOwnerSupplyAgreement
                     ? ownerSupplyOwnership?.id ?? null
@@ -391,6 +391,11 @@ export default function RentalAllocationPage() {
                 allocated_to: form.allocatedTo ? toIsoDateTime(form.allocatedTo) : null,
                 start_odometer: form.startOdometer || null,
             });
+            if (allocation.agreement?.row_version) {
+                setAgreementDetails((current) => current === null
+                    ? current
+                    : { ...current, row_version: allocation.agreement?.row_version ?? current.row_version });
+            }
             setVehicle(null);
             setSourceAllocation(null);
             setFinanceAgreement(null);

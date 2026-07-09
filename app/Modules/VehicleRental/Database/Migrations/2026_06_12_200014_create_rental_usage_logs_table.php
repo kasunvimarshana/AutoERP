@@ -42,6 +42,7 @@ return new class extends Migration
             $table->unsignedInteger('operational_sequence')->default(1);
             $table->string('status', 30)->default('draft');
             $table->char('fingerprint', 64);
+            $table->unsignedInteger('fingerprint_sequence')->default(1);
             $table->unsignedBigInteger('submitted_by')->nullable();
             $table->dateTime('submitted_at')->nullable();
             $table->unsignedBigInteger('approved_by')->nullable();
@@ -57,7 +58,7 @@ return new class extends Migration
             $table->timestamps();
 
             $table->unique(['tenant_id', 'usage_number'], 'rental_usage_logs_tenant_number_uk');
-            $table->unique(['tenant_id', 'fingerprint'], 'rental_usage_logs_fingerprint_uk');
+            $table->unique(['tenant_id', 'fingerprint', 'fingerprint_sequence'], 'rental_usage_logs_fingerprint_uk');
             $table->index(['vehicle_allocation_id', 'usage_date', 'status'], 'rental_usage_logs_allocation_date_ix');
             $table->index(['vehicle_id', 'usage_date', 'status'], 'rental_usage_logs_vehicle_date_ix');
             $table->index(['driver_id', 'usage_date', 'status'], 'rental_usage_logs_driver_date_ix');

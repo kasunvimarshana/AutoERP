@@ -109,10 +109,14 @@ export default function RentalDepositPage() {
                     allocation_date: businessDateInputValue(),
                 });
             } else {
+                if (!selectedReceiptLink?.payment) return;
                 await forfeitRentalDeposit(selected.id, {
                     expected_requirement_version: selected.row_version,
+                    payment_id: selectedReceiptLink.payment.id,
+                    expected_payment_version: selectedReceiptLink.payment.row_version,
                     invoice_id: invoice?.id,
                     amount,
+                    allocation_date: businessDateInputValue(),
                 });
             }
             setAmount("");
@@ -331,10 +335,14 @@ export default function RentalDepositPage() {
                             <RentalInvoiceLookupSelect
                                 value={invoice}
                                 onChange={setInvoice}
+                                invoiceType="rental"
+                                direction="outbound"
+                                partyId={selected.customer?.id ?? null}
+                                disabled={!selected.customer?.id}
                                 required
                             />
                         )}
-                        {(action === "apply" || action === "refund") && (
+                        {(action === "apply" || action === "refund" || action === "forfeit") && (
                             <Select
                                 label="Deposit receipt"
                                 value={receiptSelectValue}
@@ -385,7 +393,7 @@ export default function RentalDepositPage() {
                                     !amount ||
                                     ((action === "apply" || action === "forfeit") && !invoice) ||
                                     ((action === "receive" || action === "refund") && !paymentMethod) ||
-                                    ((action === "apply" || action === "refund") && !selectedReceiptLink) ||
+                                    ((action === "apply" || action === "refund" || action === "forfeit") && !selectedReceiptLink) ||
                                     (action === "refund" && !reason.trim())
                                 }
                             >

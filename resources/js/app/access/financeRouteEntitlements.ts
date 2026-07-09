@@ -1,6 +1,7 @@
 import { financePermissions } from '@/modules/finance/financePermissions';
 import { paymentPermissions } from '@/modules/payment/paymentPermissions';
 import { reportingPermissions } from '@/modules/reporting/reportingPermissions';
+import { taxPermissions } from '@/modules/tax/taxPermissions';
 import { vehicleRentalPermissions } from '@/modules/vehicle-rental/vehicleRentalPermissions';
 import { operational, type EntitlementRule } from './routeEntitlementPolicy';
 
@@ -33,6 +34,15 @@ export const financeRouteEntitlements: readonly EntitlementRule[] = [
     operational('/finance/bank-reconciliations', ['finance'], [financePermissions.bankReconciliationsView]),
     operational('/finance/budgets', ['finance'], [financePermissions.budgetsView]),
 
+    operational('/tax/taxes/create', ['finance'], [taxPermissions.taxesManage]),
+    operational('/tax/taxes/:id/edit', ['finance'], [taxPermissions.taxesManage]),
+    operational('/tax/taxes', ['finance'], [taxPermissions.taxesView]),
+    operational('/tax/groups', ['finance'], [taxPermissions.groupsView]),
+    operational('/tax/customer-profiles', ['finance'], [taxPermissions.profilesView]),
+    operational('/tax/supplier-profiles', ['finance'], [taxPermissions.profilesView]),
+    operational('/tax/posting-profiles', ['finance'], [taxPermissions.postingProfilesView]),
+    operational('/tax/reports', ['finance'], [taxPermissions.reportsView]),
+
     operational('/reports/*', ['reporting'], [reportingPermissions.view]),
 
     operational('/vehicle-rental/reservations/create', ['vehicle-rental'], [vehicleRentalPermissions.reservationsManage]),
@@ -55,8 +65,4 @@ export const financeRouteEntitlements: readonly EntitlementRule[] = [
     operational('/vehicle-rental/deposits', ['vehicle-rental'], [vehicleRentalPermissions.financialView]),
     operational('/vehicle-rental/finance-agreements', ['vehicle-rental'], [vehicleRentalPermissions.financialView]),
     operational('/vehicle-rental/*', ['vehicle-rental'], [vehicleRentalPermissions.view]),
-
-    // These modules still require module-owned granular permission catalogues.
-    operational('/vehicle-service/*', ['vehicle-service']),
-    operational('/tax/*', ['finance']),
 ];

@@ -19,6 +19,7 @@ use Modules\Tax\DTOs\TaxCalculationData;
 use Modules\Tax\DTOs\TaxCalculationLineData;
 use Modules\Tax\Services\TaxCalculationService;
 use Modules\VehicleRental\Enums\RentalAgreementKind;
+use Modules\VehicleRental\Enums\RentalBillingBasis;
 use Modules\VehicleRental\Enums\RentalBillingPeriodStatus;
 use Modules\VehicleRental\Enums\RentalCalculationLineStatus;
 use Modules\VehicleRental\Enums\RentalCalculationSourceStatus;
@@ -28,6 +29,7 @@ use Modules\VehicleRental\Enums\RentalExcessKmMethod;
 use Modules\VehicleRental\Enums\RentalExpenseAllocationType;
 use Modules\VehicleRental\Enums\RentalExpenseType;
 use Modules\VehicleRental\Enums\RentalFinancialSide;
+use Modules\VehicleRental\Enums\RentalProrationRule;
 use Modules\VehicleRental\Enums\RentalRateComponentCode;
 use Modules\VehicleRental\Enums\RentalRateUnit;
 use Modules\VehicleRental\Enums\RentalUsageFactStatus;
@@ -50,6 +52,7 @@ final class RentalCalculationService
         private readonly RentalRateVersionService $rates,
         private readonly RentalStatusHistoryService $history,
         private readonly RentalCalculationSourceService $sources,
+        private readonly RentalExpenseService $expenses,
     ) {}
 
     public function calculate(
@@ -66,8 +69,8 @@ final class RentalCalculationService
             $this->assertSide($agreement, $side);
             $start = CarbonImmutable::parse($periodStart);
             $end = CarbonImmutable::parse($periodEnd);
-            if (! $end->greaterThan($start)) {
-                throw new InvalidArgumentException('Billing period end must be after its start.');
+            if ($end->lessThan($start)) {
+                throw new InvalidArgumentException('Billing period end cannot be before its start.');
             }
             if ($start->lessThan(CarbonImmutable::parse($agreement->starts_at))
                 || $end->greaterThan(CarbonImmutable::parse($agreement->ends_at)->endOfDay())) {
@@ -184,6 +187,7 @@ final class RentalCalculationService
                 RentalCalculationStatus::Calculated->value,
                 $userId,
             );
+            $this->bumpAgreementVersion($agreement, $userId);
 
             return $run->refresh()->load($this->relations());
         });
@@ -236,12 +240,14 @@ final class RentalCalculationService
             );
             $run->updated_by = $userId;
             $run->save();
-            $run->lines()->update([
-                'status' => $to === RentalCalculationStatus::Approved
-                    ? RentalCalculationLineStatus::Approved->value
-                    : ($to === RentalCalculationStatus::Reversed
-                        ? RentalCalculationLineStatus::Reversed->value
-                        : RentalCalculationLineStatus::Draft->value),
+            $lineStatus = $to === RentalCalculationStatus::Approved
+                ? RentalCalculationLineStatus::Approved->value
+                : ($to === RentalCalculationStatus::Reversed
+                    ? RentalCalculationLineStatus::Reversed->value
+                    : RentalCalculationLineStatus::Draft->value);
+            $run->lines()->where('status', '!=', $lineStatus)->update([
+                'status' => $lineStatus,
+                'row_version' => DB::raw('row_version + 1'),
                 'updated_by' => $userId,
                 'updated_at' => now(),
             ]);
@@ -253,32 +259,46 @@ final class RentalCalculationService
                 ->map(static fn ($id): int => (int) $id)
                 ->unique()
                 ->values();
+            $consumedExpenseAllocationIds = $this->consumedExpenseAllocationIds(
+                (int) $run->tenant_id,
+                $expenseAllocationIds,
+            );
+            $billingPeriod = RentalBillingPeriod::query()
+                ->where('tenant_id', $run->tenant_id)
+                ->lockForUpdate()
+                ->findOrFail($run->billing_period_id);
             if ($to === RentalCalculationStatus::Approved) {
-                $this->syncExpenseAllocationStatuses(
+                $this->expenses->syncCalculationConsumption(
                     (int) $run->tenant_id,
                     $expenseAllocationIds,
+                    $consumedExpenseAllocationIds,
                     $userId,
                 );
-                $run->billingPeriod->forceFill([
+                $billingPeriod->forceFill([
                     'status' => RentalBillingPeriodStatus::Finalized->value,
                     'is_final' => true,
                     'closed_by' => $userId,
                     'closed_at' => now(),
+                    'row_version' => (int) $billingPeriod->row_version + 1,
                     'updated_by' => $userId,
                 ])->save();
             } elseif ($to === RentalCalculationStatus::Reversed) {
                 $run->document_status = RentalDocumentStatus::NotGenerated;
                 $run->save();
-                $this->syncExpenseAllocationStatuses(
+                $this->expenses->syncCalculationConsumption(
                     (int) $run->tenant_id,
                     $expenseAllocationIds,
+                    $consumedExpenseAllocationIds,
                     $userId,
                 );
-                $run->billingPeriod->forceFill([
+                $billingPeriod->forceFill([
                     'status' => RentalBillingPeriodStatus::Reopened->value,
                     'is_final' => false,
                     'closed_by' => null,
                     'closed_at' => null,
+                    'reopened_by' => $userId,
+                    'reopened_at' => now(),
+                    'row_version' => (int) $billingPeriod->row_version + 1,
                     'updated_by' => $userId,
                 ])->save();
             }
@@ -399,6 +419,7 @@ final class RentalCalculationService
                     $quantity = $this->positiveDifference($measured, $allowed);
                     if (! $this->math->isZero($quantity)) {
                         $lines[] = $this->lineFromComponent(
+                            $agreement,
                             $component,
                             $context,
                             $quantity,
@@ -406,6 +427,9 @@ final class RentalCalculationService
                             $allowed,
                             'usage_context',
                             (int) $context->getKey(),
+                            $rate,
+                            $start,
+                            $end,
                         );
                     }
                 }
@@ -426,6 +450,7 @@ final class RentalCalculationService
                     if (! $this->math->isZero($quantity)) {
                         $context = $allocationContexts->first();
                         $lines[] = $this->lineFromComponent(
+                            $agreement,
                             $component,
                             $context,
                             $quantity,
@@ -433,23 +458,27 @@ final class RentalCalculationService
                             $allowed,
                             'rental_vehicle_allocation',
                             (int) $context->vehicle_allocation_id,
+                            $rate,
+                            $start,
+                            $end,
                         );
                     }
                 }
                 continue;
             }
 
-            $quantity = $this->quantityFor($component, $contexts, $start, $end, $rate);
+            $quantity = $this->quantityFor($agreement, $component, $contexts, $start, $end, $rate);
             if ($this->math->isZero($quantity)
                 && $component->component_code !== RentalRateComponentCode::BaseRental) {
                 continue;
             }
             $source = $contexts->first();
-            $measured = $this->measuredFor($component, $contexts, $start, $end);
+            $measured = $this->measuredFor($agreement, $component, $contexts, $start, $end, $rate);
             $allowed = $component->component_code === RentalRateComponentCode::ExcessKm
                 ? (string) ($component->included_quantity ?: $rate->included_km)
                 : (string) $component->included_quantity;
             $lines[] = $this->lineFromComponent(
+                $agreement,
                 $component,
                 $source,
                 $quantity,
@@ -457,6 +486,9 @@ final class RentalCalculationService
                 $allowed,
                 'billing_period',
                 (int) $period->getKey(),
+                $rate,
+                $start,
+                $end,
             );
         }
 
@@ -568,6 +600,7 @@ final class RentalCalculationService
     }
 
     private function lineFromComponent(
+        RentalAgreement $agreement,
         RentalAgreementRateComponent $component,
         RentalUsageContext $context,
         string $quantity,
@@ -575,11 +608,11 @@ final class RentalCalculationService
         string $allowed,
         string $sourceType,
         int $sourceId,
+        RentalAgreementRateVersion $rate,
+        CarbonImmutable $start,
+        CarbonImmutable $end,
     ): array {
-        $amount = $this->math->mul(
-            $this->math->mul($quantity, (string) $component->rate),
-            (string) $component->multiplier,
-        );
+        $amount = $this->componentAmount($agreement, $component, $quantity, $rate, $start, $end);
         if ($component->minimum_amount !== null
             && $this->math->compare($amount, (string) $component->minimum_amount) < 0) {
             $amount = (string) $component->minimum_amount;
@@ -596,6 +629,11 @@ final class RentalCalculationService
             'unit' => $component->unit->value,
             'rate' => (string) $component->rate,
             'multiplier' => (string) $component->multiplier,
+            'quantity_strategy' => $this->quantityStrategyFor($component),
+            'billing_basis' => $rate->billing_basis->value,
+            'proration_rule' => $rate->proration_rule->value,
+            'period_start' => $start->toIso8601String(),
+            'period_end' => $end->toIso8601String(),
         ];
         if ($sourceType === 'usage_context') {
             $ruleSnapshot['usage_fact_id'] = $context->usageFact->getKey();
@@ -627,7 +665,33 @@ final class RentalCalculationService
         ];
     }
 
+    private function componentAmount(
+        RentalAgreement $agreement,
+        RentalAgreementRateComponent $component,
+        string $quantity,
+        RentalAgreementRateVersion $rate,
+        CarbonImmutable $start,
+        CarbonImmutable $end,
+    ): string {
+        if ($component->unit === RentalRateUnit::Month
+            && in_array($component->component_code, [
+                RentalRateComponentCode::BaseRental,
+                RentalRateComponentCode::DriverSalary,
+            ], true)) {
+            return $this->math->mul(
+                $this->monthlyAmount($agreement, $rate, (string) $component->rate, $start, $end),
+                (string) $component->multiplier,
+            );
+        }
+
+        return $this->math->mul(
+            $this->math->mul($quantity, (string) $component->rate),
+            (string) $component->multiplier,
+        );
+    }
+
     private function quantityFor(
+        RentalAgreement $agreement,
         RentalAgreementRateComponent $component,
         Collection $contexts,
         CarbonImmutable $start,
@@ -635,76 +699,327 @@ final class RentalCalculationService
         RentalAgreementRateVersion $rate,
     ): string {
         return match ($component->component_code) {
-            RentalRateComponentCode::BaseRental => $this->baseQuantity($component->unit, $contexts, $start, $end),
+            RentalRateComponentCode::BaseRental => $this->baseOrDriverQuantity($agreement, $rate, $component->unit, $contexts, $start, $end),
             RentalRateComponentCode::ExcessKm => $this->positiveDifference(
                 $this->sumFactField($contexts, 'commercial_distance_km'),
                 (string) ($component->included_quantity ?: $rate->included_km),
             ),
-            RentalRateComponentCode::DriverSalary => $this->quantityByUnit($component->unit, $contexts, 'working_minutes'),
-            RentalRateComponentCode::NormalOvertime => $this->quantityByUnit($component->unit, $contexts, 'normal_overtime_minutes'),
-            RentalRateComponentCode::DoubleOvertime => $this->quantityByUnit($component->unit, $contexts, 'double_overtime_minutes'),
-            RentalRateComponentCode::TripleOvertime => $this->quantityByUnit($component->unit, $contexts, 'triple_overtime_minutes'),
+            RentalRateComponentCode::DriverSalary => $this->baseOrDriverQuantity($agreement, $rate, $component->unit, $contexts, $start, $end),
+            RentalRateComponentCode::NormalOvertime => $this->overtimeQuantity($component->unit, $contexts, 'normal_overtime_minutes', $component->component_code),
+            RentalRateComponentCode::DoubleOvertime => $this->overtimeQuantity($component->unit, $contexts, 'double_overtime_minutes', $component->component_code),
+            RentalRateComponentCode::TripleOvertime => $this->overtimeQuantity($component->unit, $contexts, 'triple_overtime_minutes', $component->component_code),
             RentalRateComponentCode::NightOut => $this->sumFactField($contexts, 'night_out_count'),
-            RentalRateComponentCode::Parking => $this->eventQuantity($contexts, 'parking'),
-            RentalRateComponentCode::Toll => $this->eventQuantity($contexts, 'toll'),
-            RentalRateComponentCode::Waiting => $this->eventQuantity($contexts, 'waiting'),
-            RentalRateComponentCode::Outstation => $this->eventQuantity($contexts, 'outstation'),
-            RentalRateComponentCode::Fuel => $this->eventQuantity($contexts, 'fuel'),
-            RentalRateComponentCode::Damage => $this->eventQuantity($contexts, 'damage'),
-            RentalRateComponentCode::Repair => $this->eventQuantity($contexts, 'repair'),
-            RentalRateComponentCode::OtherRecovery => $this->eventQuantity($contexts, 'other'),
+            RentalRateComponentCode::Parking,
+            RentalRateComponentCode::Toll,
+            RentalRateComponentCode::Waiting,
+            RentalRateComponentCode::Outstation,
+            RentalRateComponentCode::Pass,
+            RentalRateComponentCode::Fuel,
+            RentalRateComponentCode::Damage,
+            RentalRateComponentCode::Repair,
+            RentalRateComponentCode::OtherRecovery => $this->eventQuantityForComponent($contexts, $component->component_code),
             RentalRateComponentCode::WithholdingTax => '0.000000',
         };
     }
 
     private function measuredFor(
+        RentalAgreement $agreement,
         RentalAgreementRateComponent $component,
         Collection $contexts,
         CarbonImmutable $start,
         CarbonImmutable $end,
+        RentalAgreementRateVersion $rate,
     ): string {
         if ($component->component_code === RentalRateComponentCode::ExcessKm) {
             return $this->sumFactField($contexts, 'commercial_distance_km');
         }
 
         return $this->quantityFor(
+            $agreement,
             $component,
             $contexts,
             $start,
             $end,
-            $contexts->first()->rateVersion,
+            $rate,
         );
     }
 
-    private function baseQuantity(
+    private function baseOrDriverQuantity(
+        RentalAgreement $agreement,
+        RentalAgreementRateVersion $rate,
         RentalRateUnit $unit,
         Collection $contexts,
         CarbonImmutable $start,
         CarbonImmutable $end,
     ): string {
         return match ($unit) {
-            RentalRateUnit::Fixed, RentalRateUnit::Month => '1.000000',
-            RentalRateUnit::Day => $this->math->normalize((string) ($start->startOfDay()->diffInDays($end->startOfDay()) + 1)),
+            RentalRateUnit::Fixed => '1.000000',
+            RentalRateUnit::Month => $this->monthlyQuantity($agreement, $rate, $start, $end),
+            RentalRateUnit::Day => $this->math->normalize((string) $this->inclusiveDayCount($start, $end)),
             RentalRateUnit::Week => $this->math->div(
-                $this->math->normalize((string) ($start->startOfDay()->diffInDays($end->startOfDay()) + 1)),
+                $this->math->normalize((string) $this->inclusiveDayCount($start, $end)),
                 '7',
             ),
             RentalRateUnit::Hour => $this->math->div($this->sumFactField($contexts, 'working_minutes'), '60'),
             RentalRateUnit::Minute => $this->sumFactField($contexts, 'working_minutes'),
             RentalRateUnit::Trip, RentalRateUnit::Count => $this->math->normalize((string) $contexts->count()),
             RentalRateUnit::Kilometre => $this->sumFactField($contexts, 'commercial_distance_km'),
-            RentalRateUnit::Litre => '0.000000',
+            RentalRateUnit::Litre => throw new InvalidArgumentException('Litre is not supported for base rental or driver salary components.'),
         };
     }
 
-    private function quantityByUnit(
+    private function overtimeQuantity(
         RentalRateUnit $unit,
         Collection $contexts,
         string $minutesField,
+        RentalRateComponentCode $componentCode,
     ): string {
         $minutes = $this->sumFactField($contexts, $minutesField);
 
-        return $unit === RentalRateUnit::Hour ? $this->math->div($minutes, '60') : $minutes;
+        return match ($unit) {
+            RentalRateUnit::Hour => $this->math->div($minutes, '60'),
+            RentalRateUnit::Minute => $minutes,
+            default => throw new InvalidArgumentException(sprintf(
+                '%s components only support hour or minute units.',
+                ucwords(str_replace('_', ' ', $componentCode->value)),
+            )),
+        };
+    }
+
+    private function monthlyQuantity(
+        RentalAgreement $agreement,
+        RentalAgreementRateVersion $rate,
+        CarbonImmutable $start,
+        CarbonImmutable $end,
+    ): string {
+        return match ($rate->proration_rule) {
+            RentalProrationRule::NoProration => $this->math->normalize((string) $this->startedMonthlyCycleCount($agreement, $rate, $start, $end)),
+            RentalProrationRule::FixedThirtyDay => $this->math->div(
+                $this->math->normalize((string) $this->inclusiveDayCount($start, $end)),
+                '30',
+            ),
+            RentalProrationRule::ExactDayCount => $this->exactMonthlyQuantity($agreement, $rate, $start, $end),
+        };
+    }
+
+    private function monthlyAmount(
+        RentalAgreement $agreement,
+        RentalAgreementRateVersion $rate,
+        string $monthlyRate,
+        CarbonImmutable $start,
+        CarbonImmutable $end,
+    ): string {
+        return match ($rate->proration_rule) {
+            RentalProrationRule::NoProration => $this->math->mul(
+                $monthlyRate,
+                (string) $this->startedMonthlyCycleCount($agreement, $rate, $start, $end),
+            ),
+            RentalProrationRule::FixedThirtyDay => $this->math->div(
+                $this->math->mul($monthlyRate, (string) $this->inclusiveDayCount($start, $end)),
+                '30',
+            ),
+            RentalProrationRule::ExactDayCount => $this->exactMonthlyAmount($agreement, $rate, $monthlyRate, $start, $end),
+        };
+    }
+
+    private function exactMonthlyQuantity(
+        RentalAgreement $agreement,
+        RentalAgreementRateVersion $rate,
+        CarbonImmutable $start,
+        CarbonImmutable $end,
+    ): string {
+        return match ($rate->billing_basis) {
+            RentalBillingBasis::CalendarMonth => $this->calendarMonthFraction($start, $end),
+            RentalBillingBasis::Anniversary => $this->anniversaryMonthFraction($agreement, $start, $end),
+            RentalBillingBasis::FixedPeriod => $this->math->div(
+                $this->math->normalize((string) $this->inclusiveDayCount($start, $end)),
+                $this->math->normalize((string) $this->inclusiveDayCount(
+                    CarbonImmutable::parse($agreement->starts_at),
+                    CarbonImmutable::parse($agreement->ends_at),
+                )),
+            ),
+            RentalBillingBasis::PerHire, RentalBillingBasis::PerUsageLog => '1.000000',
+        };
+    }
+
+    private function exactMonthlyAmount(
+        RentalAgreement $agreement,
+        RentalAgreementRateVersion $rate,
+        string $monthlyRate,
+        CarbonImmutable $start,
+        CarbonImmutable $end,
+    ): string {
+        return match ($rate->billing_basis) {
+            RentalBillingBasis::CalendarMonth => $this->calendarMonthAmount($monthlyRate, $start, $end),
+            RentalBillingBasis::Anniversary => $this->anniversaryMonthAmount($agreement, $monthlyRate, $start, $end),
+            RentalBillingBasis::FixedPeriod => $this->math->div(
+                $this->math->mul($monthlyRate, (string) $this->inclusiveDayCount($start, $end)),
+                $this->math->normalize((string) $this->inclusiveDayCount(
+                    CarbonImmutable::parse($agreement->starts_at),
+                    CarbonImmutable::parse($agreement->ends_at),
+                )),
+            ),
+            RentalBillingBasis::PerHire, RentalBillingBasis::PerUsageLog => $this->math->normalize($monthlyRate),
+        };
+    }
+
+    private function calendarMonthFraction(CarbonImmutable $start, CarbonImmutable $end): string
+    {
+        $quantity = '0.000000';
+        $cursor = $start->startOfDay();
+        $last = $end->startOfDay();
+
+        while ($cursor->lessThanOrEqualTo($last)) {
+            $monthEnd = $cursor->endOfMonth()->startOfDay();
+            $segmentEnd = $monthEnd->lessThan($last) ? $monthEnd : $last;
+            $segmentDays = $this->inclusiveDayCount($cursor, $segmentEnd);
+            $quantity = $this->math->add(
+                $quantity,
+                $this->math->div(
+                    $this->math->normalize((string) $segmentDays),
+                    $this->math->normalize((string) $cursor->daysInMonth),
+                ),
+            );
+            $cursor = $segmentEnd->addDay()->startOfDay();
+        }
+
+        return $quantity;
+    }
+
+    private function calendarMonthAmount(string $monthlyRate, CarbonImmutable $start, CarbonImmutable $end): string
+    {
+        $amount = '0.000000';
+        $cursor = $start->startOfDay();
+        $last = $end->startOfDay();
+
+        while ($cursor->lessThanOrEqualTo($last)) {
+            $monthEnd = $cursor->endOfMonth()->startOfDay();
+            $segmentEnd = $monthEnd->lessThan($last) ? $monthEnd : $last;
+            $segmentDays = $this->inclusiveDayCount($cursor, $segmentEnd);
+            $amount = $this->math->add(
+                $amount,
+                $this->math->div(
+                    $this->math->mul($monthlyRate, (string) $segmentDays),
+                    $this->math->normalize((string) $cursor->daysInMonth),
+                ),
+            );
+            $cursor = $segmentEnd->addDay()->startOfDay();
+        }
+
+        return $amount;
+    }
+
+    private function anniversaryMonthFraction(
+        RentalAgreement $agreement,
+        CarbonImmutable $start,
+        CarbonImmutable $end,
+    ): string {
+        $quantity = '0.000000';
+        $cursor = CarbonImmutable::parse($agreement->starts_at)->startOfDay();
+        $first = $start->startOfDay();
+        $last = $end->startOfDay();
+
+        while ($cursor->addMonthNoOverflow()->lessThanOrEqualTo($first)) {
+            $cursor = $cursor->addMonthNoOverflow();
+        }
+
+        while ($cursor->lessThanOrEqualTo($last)) {
+            $cycleEnd = $cursor->addMonthNoOverflow()->subDay()->startOfDay();
+            $segmentStart = $cursor->greaterThan($first) ? $cursor : $first;
+            $segmentEnd = $cycleEnd->lessThan($last) ? $cycleEnd : $last;
+            if ($segmentStart->lessThanOrEqualTo($segmentEnd)) {
+                $quantity = $this->math->add(
+                    $quantity,
+                    $this->math->div(
+                        $this->math->normalize((string) $this->inclusiveDayCount($segmentStart, $segmentEnd)),
+                        $this->math->normalize((string) $this->inclusiveDayCount($cursor, $cycleEnd)),
+                    ),
+                );
+            }
+            $cursor = $cursor->addMonthNoOverflow();
+        }
+
+        return $quantity;
+    }
+
+    private function anniversaryMonthAmount(
+        RentalAgreement $agreement,
+        string $monthlyRate,
+        CarbonImmutable $start,
+        CarbonImmutable $end,
+    ): string {
+        $amount = '0.000000';
+        $cursor = CarbonImmutable::parse($agreement->starts_at)->startOfDay();
+        $first = $start->startOfDay();
+        $last = $end->startOfDay();
+
+        while ($cursor->addMonthNoOverflow()->lessThanOrEqualTo($first)) {
+            $cursor = $cursor->addMonthNoOverflow();
+        }
+
+        while ($cursor->lessThanOrEqualTo($last)) {
+            $cycleEnd = $cursor->addMonthNoOverflow()->subDay()->startOfDay();
+            $segmentStart = $cursor->greaterThan($first) ? $cursor : $first;
+            $segmentEnd = $cycleEnd->lessThan($last) ? $cycleEnd : $last;
+            if ($segmentStart->lessThanOrEqualTo($segmentEnd)) {
+                $amount = $this->math->add(
+                    $amount,
+                    $this->math->div(
+                        $this->math->mul($monthlyRate, (string) $this->inclusiveDayCount($segmentStart, $segmentEnd)),
+                        $this->math->normalize((string) $this->inclusiveDayCount($cursor, $cycleEnd)),
+                    ),
+                );
+            }
+            $cursor = $cursor->addMonthNoOverflow();
+        }
+
+        return $amount;
+    }
+
+    private function startedMonthlyCycleCount(
+        RentalAgreement $agreement,
+        RentalAgreementRateVersion $rate,
+        CarbonImmutable $start,
+        CarbonImmutable $end,
+    ): int {
+        if ($rate->billing_basis !== RentalBillingBasis::Anniversary) {
+            return (int) $start->startOfMonth()->diffInMonths($end->startOfMonth()) + 1;
+        }
+
+        $cycles = 0;
+        $cursor = CarbonImmutable::parse($agreement->starts_at)->startOfDay();
+        $first = $start->startOfDay();
+        $last = $end->startOfDay();
+
+        while ($cursor->addMonthNoOverflow()->lessThanOrEqualTo($first)) {
+            $cursor = $cursor->addMonthNoOverflow();
+        }
+
+        while ($cursor->lessThanOrEqualTo($last)) {
+            $cycles++;
+            $cursor = $cursor->addMonthNoOverflow();
+        }
+
+        return max(1, $cycles);
+    }
+
+    private function inclusiveDayCount(CarbonImmutable $start, CarbonImmutable $end): int
+    {
+        return (int) $start->startOfDay()->diffInDays($end->startOfDay()) + 1;
+    }
+
+    private function quantityStrategyFor(RentalAgreementRateComponent $component): string
+    {
+        return match ($component->component_code) {
+            RentalRateComponentCode::BaseRental => 'base_'.$component->unit->value,
+            RentalRateComponentCode::DriverSalary => 'driver_salary_'.$component->unit->value,
+            RentalRateComponentCode::NormalOvertime,
+            RentalRateComponentCode::DoubleOvertime,
+            RentalRateComponentCode::TripleOvertime => 'overtime_'.$component->unit->value,
+            RentalRateComponentCode::ExcessKm => 'excess_km',
+            RentalRateComponentCode::NightOut => 'night_out_count',
+            default => 'usage_event_quantity',
+        };
     }
 
     private function sumFactField(Collection $contexts, string $field): string
@@ -731,6 +1046,16 @@ final class RentalCalculationService
         }
 
         return $total;
+    }
+
+    private function eventQuantityForComponent(Collection $contexts, RentalRateComponentCode $componentCode): string
+    {
+        $eventType = RentalUsageEventBillingMap::eventForComponent($componentCode);
+        if ($eventType === null) {
+            throw new InvalidArgumentException('Rate component is not backed by a running-chart event type.');
+        }
+
+        return $this->eventQuantity($contexts, $eventType->value);
     }
 
     private function positiveDifference(string $measured, string $allowed): string
@@ -842,57 +1167,28 @@ final class RentalCalculationService
         $run->save();
     }
 
-    private function syncExpenseAllocationStatuses(
+    /**
+     * @param  Collection<int, int>  $allocationIds
+     * @return Collection<int, int>
+     */
+    private function consumedExpenseAllocationIds(
         int $tenantId,
         Collection $allocationIds,
-        ?int $userId,
-    ): void {
-        foreach ($allocationIds as $allocationId) {
-            $consumed = RentalCalculationSource::query()
-                ->where('expense_allocation_id', $allocationId)
-                ->where('status', RentalCalculationSourceStatus::Approved->value)
-                ->whereHas('run', fn (Builder $query) => $query
-                    ->where('calculation_status', RentalCalculationStatus::Approved->value))
-                ->exists();
-
-            DB::table('rental_expense_allocations')
-                ->where('tenant_id', $tenantId)
-                ->where('id', $allocationId)
-                ->whereIn('status', ['approved', 'consumed'])
-                ->update([
-                    'status' => $consumed ? 'consumed' : 'approved',
-                    'row_version' => DB::raw('row_version + 1'),
-                    'updated_by' => $userId,
-                    'updated_at' => now(),
-                ]);
+    ): Collection {
+        if ($allocationIds->isEmpty()) {
+            return collect();
         }
 
-        $expenseIds = DB::table('rental_expense_allocations')
+        return RentalCalculationSource::query()
             ->where('tenant_id', $tenantId)
-            ->whereIn('id', $allocationIds)
-            ->pluck('expense_id')
-            ->unique();
-        foreach ($expenseIds as $expenseId) {
-            $hasApproved = DB::table('rental_expense_allocations')
-                ->where('tenant_id', $tenantId)
-                ->where('expense_id', $expenseId)
-                ->where('status', 'approved')
-                ->exists();
-            $hasConsumed = DB::table('rental_expense_allocations')
-                ->where('tenant_id', $tenantId)
-                ->where('expense_id', $expenseId)
-                ->where('status', 'consumed')
-                ->exists();
-            DB::table('rental_expenses')
-                ->where('tenant_id', $tenantId)
-                ->where('id', $expenseId)
-                ->whereIn('status', ['approved', 'allocated'])
-                ->update([
-                    'status' => $hasConsumed && ! $hasApproved ? 'allocated' : 'approved',
-                    'updated_by' => $userId,
-                    'updated_at' => now(),
-                ]);
-        }
+            ->whereIn('expense_allocation_id', $allocationIds->all())
+            ->where('status', RentalCalculationSourceStatus::Approved->value)
+            ->whereHas('run', fn (Builder $query) => $query
+                ->where('calculation_status', RentalCalculationStatus::Approved->value))
+            ->pluck('expense_allocation_id')
+            ->map(static fn ($id): int => (int) $id)
+            ->unique()
+            ->values();
     }
 
     private function hasActiveFinancialDocument(RentalCalculationRun $run): bool
@@ -935,5 +1231,13 @@ final class RentalCalculationService
                 'expected_agreement_version' => ['The rental agreement changed after it was loaded. Reload and review the latest version.'],
             ]);
         }
+    }
+
+    private function bumpAgreementVersion(RentalAgreement $agreement, ?int $userId): void
+    {
+        $agreement->forceFill([
+            'row_version' => (int) $agreement->row_version + 1,
+            'updated_by' => $userId,
+        ])->save();
     }
 }

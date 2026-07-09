@@ -34,13 +34,23 @@ export default function RentalAgreementListPage({
 }: RentalAgreementListPageProps) {
     const [params] = useSearchParams();
     const requestedKind = params.get("kind");
-    const initialKind =
-        defaultAgreementKindForMode(mode) ||
-        (isRentalAgreementKind(requestedKind) ? requestedKind : "");
+    const modeKind = defaultAgreementKindForMode(mode);
+    const initialSelectedKind = isRentalAgreementKind(requestedKind)
+        ? requestedKind
+        : "";
     const [search, setSearch] = useState("");
-    const [kind, setKind] = useState<string>(initialKind);
+    const [selectedKind, setSelectedKind] =
+        useState<string>(initialSelectedKind);
     const [status, setStatus] = useState("");
-    const [page, setPage] = useState(1);
+    const kind = modeKind || selectedKind;
+    const [pagination, setPagination] = useState({
+        kind,
+        page: 1,
+    });
+    const page = pagination.kind === kind ? pagination.page : 1;
+    const setPage = (nextPage: number) => {
+        setPagination({ kind, page: nextPage });
+    };
     const debounced = useDebounce(search);
     const result = useApi(
         (signal) =>
@@ -150,7 +160,7 @@ export default function RentalAgreementListPage({
                         label="Agreement kind"
                         value={kind}
                         onChange={(e) => {
-                            setKind(e.target.value);
+                            setSelectedKind(e.target.value);
                             setPage(1);
                         }}
                         options={[...RENTAL_AGREEMENT_KIND_OPTIONS]}

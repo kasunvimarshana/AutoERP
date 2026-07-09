@@ -13,7 +13,7 @@ import {
     listRentalAllocations,
     listVehicleFinanceAgreements,
 } from '../vehicleRentalApi';
-import type { RentalVehicle } from '../vehicleRentalTypes';
+import type { RentalParty, RentalVehicle } from '../vehicleRentalTypes';
 
 interface LookupProps<T extends NamedResource = NamedResource> extends LookupBehaviorOptions {
     label?: string;
@@ -42,16 +42,36 @@ interface FinanceLookupFilters {
     activeOnly?: boolean;
 }
 
+interface InvoiceLookupFilters {
+    invoiceType?: string | null;
+    direction?: 'inbound' | 'outbound' | null;
+    status?: string | null;
+    partyId?: number | null;
+    balanceStatus?: string | null;
+}
+
 type AvailableVehicleOption = VehicleSummary & NamedResource;
+export type RentalAgreementLookupOption = NamedResource & {
+    row_version?: number;
+    agreement_kind?: string;
+    status?: string;
+    customer?: RentalParty | null;
+    supplier?: RentalParty | null;
+};
 
 export function RentalCurrencyLookupSelect(props: LookupProps) {
     return <LookupSelect label="Currency" search={searchCurrencies} loadOnOpen minSearchLength={0} {...props} />;
 }
 
-export function RentalAgreementLookupSelect({ direction, ...props }: LookupProps & { direction?: 'inbound' | 'outbound' }) {
+export function RentalAgreementLookupSelect({
+    agreementKind,
+    ...props
+}: LookupProps<RentalAgreementLookupOption> & {
+    agreementKind?: 'customer_rental' | 'owner_supply';
+}) {
     const search = useCallback(
-        (params: LookupLoadParams) => searchAgreements(params, direction),
-        [direction],
+        (params: LookupLoadParams) => searchAgreements(params, agreementKind),
+        [agreementKind],
     );
 
     return <LookupSelect label="Rental agreement" search={search} placeholder="Search agreement number or party..." {...props} />;
@@ -145,8 +165,26 @@ export function RentalPaymentMethodLookupSelect({ direction = 'inbound', ...prop
     return <LookupSelect label="Payment method" search={search} loadOnOpen minSearchLength={0} {...props} />;
 }
 
-export function RentalInvoiceLookupSelect(props: LookupProps) {
-    return <LookupSelect label="Invoice" search={searchInvoices} placeholder="Search invoice number or party..." {...props} />;
+export function RentalInvoiceLookupSelect({
+    invoiceType,
+    direction,
+    status,
+    partyId,
+    balanceStatus,
+    ...props
+}: LookupProps & InvoiceLookupFilters) {
+    const search = useCallback(
+        (params: LookupLoadParams) => searchInvoices(params, {
+            invoiceType,
+            direction,
+            status,
+            partyId,
+            balanceStatus,
+        }),
+        [invoiceType, direction, status, partyId, balanceStatus],
+    );
+
+    return <LookupSelect label="Invoice" search={search} placeholder="Search invoice number or party..." {...props} />;
 }
 
 export function RentalTaxGroupLookupSelect(props: LookupProps) {
@@ -155,13 +193,8 @@ export function RentalTaxGroupLookupSelect(props: LookupProps) {
 
 async function searchAgreements(
     { search, page, perPage, signal }: LookupLoadParams,
-    direction?: 'inbound' | 'outbound',
-): Promise<LookupResult<NamedResource>> {
-    const agreementKind = direction === 'inbound'
-        ? 'customer_rental'
-        : direction === 'outbound'
-            ? 'owner_supply'
-            : undefined;
+    agreementKind?: 'customer_rental' | 'owner_supply',
+): Promise<LookupResult<RentalAgreementLookupOption>> {
     const response = await listRentalAgreements({
         search,
         page,
@@ -174,6 +207,10 @@ async function searchAgreements(
             id: agreement.id,
             code: agreement.agreement_number,
             row_version: agreement.row_version,
+            agreement_kind: agreement.agreement_kind,
+            status: agreement.status,
+            customer: agreement.customer ?? null,
+            supplier: agreement.supplier ?? null,
             name: [
                 agreement.agreement_number,
                 agreement.customer?.name ?? agreement.supplier?.name,
@@ -321,8 +358,18 @@ async function searchPaymentMethods(
 
 async function searchInvoices(
     { search, page, perPage, signal }: LookupLoadParams,
+    filters: InvoiceLookupFilters = {},
 ): Promise<LookupResult<NamedResource>> {
-    const response = await listInvoices({ search, page, per_page: perPage }, signal);
+    const response = await listInvoices({
+        search,
+        page,
+        per_page: perPage,
+        invoice_type: filters.invoiceType ?? undefined,
+        direction: filters.direction ?? undefined,
+        status: filters.status ?? undefined,
+        party_id: filters.partyId ?? undefined,
+        balance_status: filters.balanceStatus ?? undefined,
+    }, signal);
 
     return {
         data: response.data.map((invoice) => ({
