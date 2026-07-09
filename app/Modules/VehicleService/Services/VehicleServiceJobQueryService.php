@@ -35,7 +35,7 @@ final class VehicleServiceJobQueryService
             });
         }
 
-        foreach (['status', 'customer_id', 'vehicle_id'] as $filter) {
+        foreach (['operational_status', 'billing_status', 'payment_status', 'customer_id', 'vehicle_id'] as $filter) {
             if (! empty($filters[$filter])) {
                 $query->where($filter, $filters[$filter]);
             }
