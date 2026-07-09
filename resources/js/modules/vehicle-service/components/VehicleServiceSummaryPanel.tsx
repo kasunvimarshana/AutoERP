@@ -11,7 +11,9 @@ export function VehicleServiceSummaryPanel({ job }: { job: VehicleServiceJob }) 
     return (
         <div>
             <DetailGrid items={[
-                { label: 'Status', value: <VehicleServiceStatusBadge status={job.status} /> },
+                { label: 'Operational status', value: <VehicleServiceStatusBadge status={job.operational_status} /> },
+                { label: 'Billing status', value: <VehicleServiceStatusBadge status={job.billing_status} /> },
+                { label: 'Payment status', value: <VehicleServiceStatusBadge status={job.payment_status} /> },
                 { label: 'Customer', value: readableRelation(job.customer) },
                 { label: 'Vehicle', value: readableRelation(job.vehicle) },
                 { label: 'Make / model', value: `${job.vehicle?.make?.name ?? '-'} / ${job.vehicle?.model?.name ?? '-'}` },
