@@ -25,7 +25,7 @@ export default function TaxPostingProfilePage() {
     const [refresh, setRefresh] = useState(0);
     const [error, setError] = useState<ApiError | null>(null);
     const profiles = useApi((signal) => listTaxPostingProfiles({ page, per_page: 25 }, signal), [page, refresh]);
-    const lookups = useApi((signal) => getTaxLookups(signal), []);
+    const lookups = useApi((signal) => getTaxLookups(signal), [], canManage);
 
     const columns: DataColumn<TaxPostingProfile>[] = [
         { key: 'tax', header: 'Tax', render: (row) => row.tax ? `${row.tax.code ?? ''} ${row.tax.name}` : '-' },
