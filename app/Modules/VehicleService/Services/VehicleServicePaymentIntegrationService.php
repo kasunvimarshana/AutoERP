@@ -21,7 +21,8 @@ use Modules\Payment\Services\PaymentCreationService;
 use Modules\Payment\Services\PaymentDocumentLifecycleService;
 use Modules\Payment\Services\PaymentPostingService;
 use Modules\VehicleService\DTOs\VehicleServicePaymentData;
-use Modules\VehicleService\Enums\VehicleServiceJobStatus;
+use Modules\VehicleService\Enums\VehicleServiceBillingStatus;
+use Modules\VehicleService\Enums\VehicleServicePaymentStatus;
 use Modules\VehicleService\Models\VehicleServiceJob;
 use Modules\VehicleService\Models\VehicleServicePaymentLink;
 use Modules\VehicleService\Services\Concerns\AssertsVehicleServiceExpectedVersion;
@@ -160,11 +161,7 @@ final class VehicleServicePaymentIntegrationService
 
     public function syncJobStatus(VehicleServiceJob $job, ?int $changedBy = null): VehicleServiceJob
     {
-        if (! in_array($job->status, [
-            VehicleServiceJobStatus::Invoiced,
-            VehicleServiceJobStatus::PartiallyPaid,
-            VehicleServiceJobStatus::Paid,
-        ], true)) {
+        if ($job->billing_status === VehicleServiceBillingStatus::Unbilled) {
             return $job;
         }
 
@@ -192,11 +189,11 @@ final class VehicleServicePaymentIntegrationService
             '0.000000',
         ) > 0);
 
-        if ($allSettled && $job->status !== VehicleServiceJobStatus::Paid) {
-            return $this->statuses->change($job, VehicleServiceJobStatus::Paid, $changedBy, expectedVersion: (int) $job->row_version);
+        if ($allSettled && $job->payment_status !== VehicleServicePaymentStatus::Paid) {
+            return $this->statuses->changePayment($job, VehicleServicePaymentStatus::Paid, $changedBy, expectedVersion: (int) $job->row_version);
         }
-        if ($anySettled && $job->status === VehicleServiceJobStatus::Invoiced) {
-            return $this->statuses->change($job, VehicleServiceJobStatus::PartiallyPaid, $changedBy, expectedVersion: (int) $job->row_version);
+        if ($anySettled && $job->payment_status === VehicleServicePaymentStatus::Unpaid) {
+            return $this->statuses->changePayment($job, VehicleServicePaymentStatus::PartiallyPaid, $changedBy, expectedVersion: (int) $job->row_version);
         }
 
         return $job;
