@@ -8,6 +8,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
+use Modules\Invoice\Enums\InvoiceBalanceStatus;
 use Modules\Item\DTOs\CreateItemData;
 use Modules\Item\Enums\CostingMethod;
 use Modules\Item\Enums\ItemType;
@@ -25,6 +26,7 @@ use Modules\VehicleService\Models\VehicleServiceJob;
 use Modules\VehicleService\Services\VehicleServiceInvoiceIntegrationService;
 use Modules\VehicleService\Services\VehicleServiceJobService;
 use Modules\VehicleService\Services\VehicleServiceLineService;
+use Modules\VehicleService\Services\VehicleServicePaymentIntegrationService;
 use Modules\VehicleService\Services\VehicleServiceStatusService;
 use Tests\TestCase;
 
@@ -98,6 +100,35 @@ final class VehicleServiceLifecycleBoundaryTest extends TestCase
         $this->assertSame(VehicleServiceOperationalStatus::Completed, $job->operational_status);
         $this->assertSame(VehicleServiceBillingStatus::Billed, $job->billing_status);
         $this->assertSame(VehicleServicePaymentStatus::Unpaid, $job->payment_status);
+    }
+
+    public function test_payment_sync_updates_payment_without_changing_operational_or_billing(): void
+    {
+        $context = $this->context();
+        $job = $this->createJob($context);
+        $this->line($job, $context['service'], '1.000000', '250.000000');
+        $this->changeOperational($job, VehicleServiceOperationalStatus::InProgress);
+        $this->changeOperational($this->refreshJob($job), VehicleServiceOperationalStatus::Completed);
+        $invoice = $this->createServiceInvoice($this->refreshJob($job));
+        $job = $this->refreshJob($job);
+
+        $this->assertSame(VehicleServiceOperationalStatus::Completed, $job->operational_status);
+        $this->assertSame(VehicleServiceBillingStatus::Billed, $job->billing_status);
+        $this->assertSame(VehicleServicePaymentStatus::Unpaid, $job->payment_status);
+
+        $this->setInvoiceBalance($context['tenant_id'], (int) $invoice->getKey(), '250.000000', '100.000000', '150.000000', InvoiceBalanceStatus::Partial);
+        $job = $this->syncPaymentStatus($job);
+
+        $this->assertSame(VehicleServiceOperationalStatus::Completed, $job->operational_status);
+        $this->assertSame(VehicleServiceBillingStatus::Billed, $job->billing_status);
+        $this->assertSame(VehicleServicePaymentStatus::PartiallyPaid, $job->payment_status);
+
+        $this->setInvoiceBalance($context['tenant_id'], (int) $invoice->getKey(), '250.000000', '250.000000', '0.000000', InvoiceBalanceStatus::Paid);
+        $job = $this->syncPaymentStatus($this->refreshJob($job));
+
+        $this->assertSame(VehicleServiceOperationalStatus::Completed, $job->operational_status);
+        $this->assertSame(VehicleServiceBillingStatus::Billed, $job->billing_status);
+        $this->assertSame(VehicleServicePaymentStatus::Paid, $job->payment_status);
     }
 
     public function test_operational_transition_rejects_invalid_backward_move(): void
@@ -190,6 +221,41 @@ final class VehicleServiceLifecycleBoundaryTest extends TestCase
                 $lineQuantities,
                 expectedVersion: $this->currentJobVersion($job),
             ),
+        );
+    }
+
+    private function syncPaymentStatus(VehicleServiceJob $job): VehicleServiceJob
+    {
+        return $this->withTenantExecutionContext(
+            (int) $job->tenant_id,
+            fn (): VehicleServiceJob => app(VehicleServicePaymentIntegrationService::class)->syncJobStatus(
+                VehicleServiceJob::query()->findOrFail($job->getKey()),
+            ),
+        );
+    }
+
+    private function setInvoiceBalance(
+        int $tenantId,
+        int $invoiceId,
+        string $invoiceTotal,
+        string $paidAmount,
+        string $remainingAmount,
+        InvoiceBalanceStatus $status,
+    ): void {
+        DB::table('invoice_balances')->updateOrInsert(
+            ['tenant_id' => $tenantId, 'invoice_id' => $invoiceId],
+            [
+                'organization_unit_id' => null,
+                'invoice_total' => $invoiceTotal,
+                'paid_amount' => $paidAmount,
+                'credit_allocated_amount' => '0.000000',
+                'debit_allocated_amount' => '0.000000',
+                'refunded_amount' => '0.000000',
+                'remaining_amount' => $remainingAmount,
+                'status' => $status->value,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
         );
     }
 
