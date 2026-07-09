@@ -6,7 +6,9 @@ namespace Modules\VehicleService\Http\Requests;
 
 use Illuminate\Validation\Rule;
 use Modules\Core\Http\Requests\TenantScopedRequest;
-use Modules\VehicleService\Enums\VehicleServiceJobStatus;
+use Modules\VehicleService\Enums\VehicleServiceBillingStatus;
+use Modules\VehicleService\Enums\VehicleServiceOperationalStatus;
+use Modules\VehicleService\Enums\VehicleServicePaymentStatus;
 
 final class ListVehicleServiceJobRequest extends TenantScopedRequest
 {
@@ -16,7 +18,9 @@ final class ListVehicleServiceJobRequest extends TenantScopedRequest
             'tenant_id' => ['required', 'integer', 'min:1'],
             'organization_unit_id' => ['nullable', 'integer', 'min:1'],
             'search' => ['nullable', 'string', 'max:150'],
-            'status' => ['nullable', Rule::enum(VehicleServiceJobStatus::class)],
+            'operational_status' => ['nullable', Rule::enum(VehicleServiceOperationalStatus::class)],
+            'billing_status' => ['nullable', Rule::enum(VehicleServiceBillingStatus::class)],
+            'payment_status' => ['nullable', Rule::enum(VehicleServicePaymentStatus::class)],
             'customer_id' => ['nullable', 'integer', 'min:1'],
             'vehicle_id' => ['nullable', 'integer', 'min:1'],
             'date_from' => ['nullable', 'date'],
