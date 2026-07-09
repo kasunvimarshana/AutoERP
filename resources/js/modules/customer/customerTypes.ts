@@ -8,6 +8,7 @@ export const customerDocumentStatuses = ['active', 'expired', 'revoked', 'pendin
 export const preferredCommunicationChannels = ['email', 'phone', 'mobile', 'sms', 'whatsapp', 'other'] as const;
 
 export interface CustomerSummary extends NamedResource {
+    row_version: number;
     customer_number: string;
     code: string;
     display_name?: string | null;
@@ -46,6 +47,7 @@ export interface Customer extends CustomerSummary {
 }
 
 export interface CustomerPayload {
+    row_version?: number;
     customer_number?: string | null;
     code: string;
     name: string;
