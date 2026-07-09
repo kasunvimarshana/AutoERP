@@ -1,0 +1,27 @@
+export const inventoryPermissions = {
+    stockView: 'inventory.stock.view',
+    auditView: 'inventory.audit.view',
+    reservationsView: 'inventory.reservations.view',
+    reservationsManage: 'inventory.reservations.manage',
+    allocationsView: 'inventory.allocations.view',
+    allocationsManage: 'inventory.allocations.manage',
+    allocationsIssue: 'inventory.allocations.issue',
+    adjustmentsView: 'inventory.adjustments.view',
+    adjustmentsManage: 'inventory.adjustments.manage',
+    adjustmentsPost: 'inventory.adjustments.post',
+    transfersView: 'inventory.transfers.view',
+    transfersManage: 'inventory.transfers.manage',
+    transfersDispatch: 'inventory.transfers.dispatch',
+    transfersReceive: 'inventory.transfers.receive',
+    valuationView: 'inventory.valuation.view',
+    costAdjustmentsView: 'inventory.cost_adjustments.view',
+    costAdjustmentsManage: 'inventory.cost_adjustments.manage',
+    costAdjustmentsPost: 'inventory.cost_adjustments.post',
+    stockCountsView: 'inventory.stock_counts.view',
+    stockCountsManage: 'inventory.stock_counts.manage',
+    stockCountsApprove: 'inventory.stock_counts.approve',
+    stockCountsPost: 'inventory.stock_counts.post',
+    trackingView: 'inventory.tracking.view',
+} as const;
+
+export const inventoryRoutePermissions = Object.values(inventoryPermissions);
