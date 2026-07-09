@@ -91,7 +91,9 @@ final class TechnicianWorkReportService
             columns: [
                 new ReportColumn('job_number', 'Job number', 'job_number', 'job_number'),
                 new ReportColumn('job_date', 'Job date', 'job_date', 'job_date', 'date'),
-                new ReportColumn('job_status', 'Job status', 'job_status', 'job_status'),
+                new ReportColumn('operational_status', 'Operational status', 'operational_status', 'operational_status'),
+                new ReportColumn('billing_status', 'Billing status', 'billing_status', 'billing_status'),
+                new ReportColumn('payment_status', 'Payment status', 'payment_status', 'payment_status'),
                 new ReportColumn('customer_name', 'Customer'),
                 new ReportColumn('vehicle_label', 'Vehicle'),
                 new ReportColumn('line_description', 'Line description', 'line_description', 'line_description'),
@@ -158,7 +160,9 @@ final class TechnicianWorkReportService
         $this->whereInteger($query, 'jobs.supervisor_employee_id', $params['supervisor_id'] ?? null);
         $this->whereInteger($query, 'jobs.customer_id', $params['customer_id'] ?? null);
         $this->whereInteger($query, 'jobs.vehicle_id', $params['vehicle_id'] ?? null);
-        $this->whereString($query, 'jobs.status', $params['job_status'] ?? null);
+        $this->whereString($query, 'jobs.operational_status', $params['operational_status'] ?? null);
+        $this->whereString($query, 'jobs.billing_status', $params['billing_status'] ?? null);
+        $this->whereString($query, 'jobs.payment_status', $params['payment_status'] ?? null);
         $this->whereString($query, 'vehicle_service_line_employees.role_type', $params['role_type'] ?? null);
         $this->whereString($query, 'vehicle_service_line_employees.commission_type', $params['commission_type'] ?? null);
 
@@ -183,7 +187,9 @@ final class TechnicianWorkReportService
             $query->where(function (Builder $searchQuery) use ($search): void {
                 $searchQuery
                     ->where('jobs.job_number', 'like', $search)
-                    ->orWhere('jobs.status', 'like', $search)
+                    ->orWhere('jobs.operational_status', 'like', $search)
+                    ->orWhere('jobs.billing_status', 'like', $search)
+                    ->orWhere('jobs.payment_status', 'like', $search)
                     ->orWhere('lines.description', 'like', $search)
                     ->orWhere('lines.line_source_type', 'like', $search)
                     ->orWhere('vehicle_service_line_employees.role_type', 'like', $search)
@@ -261,7 +267,9 @@ final class TechnicianWorkReportService
         $columns = [
             'job_number' => 'jobs.job_number',
             'job_date' => 'jobs.job_date',
-            'job_status' => 'jobs.status',
+            'operational_status' => 'jobs.operational_status',
+            'billing_status' => 'jobs.billing_status',
+            'payment_status' => 'jobs.payment_status',
             'line_description' => 'lines.description',
             'line_source_type' => 'lines.line_source_type',
             'role_type' => 'vehicle_service_line_employees.role_type',
@@ -319,7 +327,9 @@ final class TechnicianWorkReportService
             'id' => (int) $assignment->getKey(),
             'job_number' => (string) ($job?->job_number ?? ''),
             'job_date' => $job?->job_date?->toDateString(),
-            'job_status' => $this->enumValue($job?->status),
+            'operational_status' => $this->enumValue($job?->operational_status),
+            'billing_status' => $this->enumValue($job?->billing_status),
+            'payment_status' => $this->enumValue($job?->payment_status),
             'customer' => $this->customerResource($job?->customer),
             'customer_name' => (string) ($job?->customer?->display_name ?? $job?->customer?->name ?? ''),
             'vehicle' => $this->vehicleResource($job?->vehicle),
