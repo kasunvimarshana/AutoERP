@@ -31,7 +31,7 @@ export default function TaxGroupPage() {
     const [refresh, setRefresh] = useState(0);
     const [error, setError] = useState<ApiError | null>(null);
     const groups = useApi((signal) => listTaxGroups({ page, per_page: 25 }, signal), [page, refresh]);
-    const lookups = useApi((signal) => getTaxLookups(signal), []);
+    const lookups = useApi((signal) => getTaxLookups(signal), [], canManage);
     const taxOptions = (lookups.data?.taxes ?? []).map((tax) => ({ value: tax.id, label: `${tax.code} - ${tax.name}` }));
 
     const columns: DataColumn<TaxGroup>[] = [
