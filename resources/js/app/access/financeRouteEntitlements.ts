@@ -36,14 +36,11 @@ export const financeRouteEntitlements: readonly EntitlementRule[] = [
 
     operational('/tax/taxes/create', ['finance'], [taxPermissions.taxesManage]),
     operational('/tax/taxes/:id/edit', ['finance'], [taxPermissions.taxesManage]),
-    operational('/tax/taxes', ['finance'], [taxPermissions.taxesView, taxPermissions.taxesManage]),
-    operational('/tax/groups', ['finance'], [taxPermissions.groupsView, taxPermissions.groupsManage]),
-    operational('/tax/customer-profiles', ['finance'], [taxPermissions.profilesView, taxPermissions.profilesManage]),
-    operational('/tax/supplier-profiles', ['finance'], [taxPermissions.profilesView, taxPermissions.profilesManage]),
-    operational('/tax/posting-profiles', ['finance'], [
-        taxPermissions.postingProfilesView,
-        taxPermissions.postingProfilesManage,
-    ]),
+    operational('/tax/taxes', ['finance'], [taxPermissions.taxesView]),
+    operational('/tax/groups', ['finance'], [taxPermissions.groupsView]),
+    operational('/tax/customer-profiles', ['finance'], [taxPermissions.profilesView]),
+    operational('/tax/supplier-profiles', ['finance'], [taxPermissions.profilesView]),
+    operational('/tax/posting-profiles', ['finance'], [taxPermissions.postingProfilesView]),
     operational('/tax/reports', ['finance'], [taxPermissions.reportsView]),
 
     operational('/reports/*', ['reporting'], [reportingPermissions.view]),
