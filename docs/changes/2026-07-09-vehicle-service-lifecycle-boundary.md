@@ -13,6 +13,7 @@ Vehicle Service used one job `status` to represent operational progress, billing
 - Updated Vehicle Service model casts, job resources, list filters, operational transitions, invoice billing updates, and payment settlement updates.
 - Updated invoiceability to depend on actual remaining billable source quantities instead of trusting a potentially stale billing lifecycle after invoice cancellation.
 - Updated main Vehicle Service frontend job list/detail/summary/invoice/history views to display separate lifecycle dimensions.
+- Added a shared frontend `VehicleServiceLifecycleStatus` union and removed unsafe `as never` casts from the status history tab.
 - Updated Reporting request contracts, Vehicle Service detailed report, technician work report, employee commission report, and reporting frontend filters/tables to use the split lifecycle fields instead of `job_status`.
 - Updated Reporting tests to assert split lifecycle fields and to seed billing/payment status explicitly when test fixtures bypass service-layer invoice/payment sync.
 - Added focused Vehicle Service lifecycle boundary tests for initial state/history, operational completion, partial/full billing, payment sync, and invalid operational transitions.
@@ -26,6 +27,7 @@ Vehicle Service used one job `status` to represent operational progress, billing
 - Spot-checked the updated Reporting test source after replacement.
 - Fetched back `VehicleServiceEngineTest` after replacement and verified it imports the split lifecycle enums instead of the removed mixed enum.
 - Fetched back the tenant-isolation engine test after patching and verified it now runs inside the selected tenant execution context.
+- Fetched back the frontend lifecycle status type cleanup and verified status history no longer uses unsafe casts.
 - Source-reviewed Vehicle Service status, invoice, payment, model, resource, controller, request, query, validation, and migration files for lifecycle contract consistency.
 - Found and fixed a source invoiceability edge case where stale billing lifecycle could block replacement invoicing after invoice cancellation.
 - No runtime Laravel/MySQL, TypeScript, or production-like UAT suite was available in this connector session.
