@@ -24,9 +24,11 @@ Vehicle Service used one job `status` to represent operational progress, billing
 - Manually traced the affected Vehicle Service and Reporting source paths for removed `status`/`job_status` ownership.
 - Spot-checked the updated Reporting test source after replacement.
 - Fetched back `VehicleServiceEngineTest` after replacement and verified it imports the split lifecycle enums instead of the removed mixed enum.
-- Source-reviewed Vehicle Service status, invoice, payment, model, and resource files for lifecycle contract consistency.
+- Source-reviewed Vehicle Service status, invoice, payment, model, resource, controller, request, query, validation, and migration files for lifecycle contract consistency.
+- Found and fixed a source invoiceability edge case where stale billing lifecycle could block replacement invoicing after invoice cancellation.
 - No runtime Laravel/MySQL, TypeScript, or production-like UAT suite was available in this connector session.
 
 ## Open gate before merge
 
+- `VehicleServiceEngineTest::test_tenant_isolation_rejects_cross_scope_references` should be wrapped in the selected tenant execution context before runtime test execution, because tenant-owned models fail closed outside the trusted tenant boundary.
 - Full runtime checks must pass before merge: PHP syntax/static analysis, migrations, backend tests, frontend typecheck, and production-like UAT.
