@@ -349,12 +349,15 @@ final class VehicleServiceEngineTest extends TestCase
         $other = $this->context('OTHER');
 
         $this->expectException(ModelNotFoundException::class);
-        app(VehicleServiceJobService::class)->create(new VehicleServiceJobData(
-            tenantId: $context['tenant_id'],
-            jobDate: '2026-06-07',
-            customerId: $other['customer_id'],
-            vehicleId: $other['vehicle_id'],
-        ));
+        $this->withTenantExecutionContext(
+            (int) $context['tenant_id'],
+            fn (): VehicleServiceJob => app(VehicleServiceJobService::class)->create(new VehicleServiceJobData(
+                tenantId: $context['tenant_id'],
+                jobDate: '2026-06-07',
+                customerId: $other['customer_id'],
+                vehicleId: $other['vehicle_id'],
+            )),
+        );
     }
 
     /** @return array<string, mixed> */
