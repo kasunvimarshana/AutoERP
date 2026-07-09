@@ -7,8 +7,10 @@ namespace Modules\Reporting\Http\Requests;
 use Illuminate\Validation\Rule;
 use Modules\Core\Http\Requests\TenantScopedRequest;
 use Modules\Purchase\Enums\PurchaseOrderStatus;
-use Modules\VehicleService\Enums\VehicleServiceJobStatus;
+use Modules\VehicleService\Enums\VehicleServiceBillingStatus;
 use Modules\VehicleService\Enums\VehicleServiceLineSourceType;
+use Modules\VehicleService\Enums\VehicleServiceOperationalStatus;
+use Modules\VehicleService\Enums\VehicleServicePaymentStatus;
 
 final class OperationalReportRequest extends TenantScopedRequest
 {
@@ -28,7 +30,9 @@ final class OperationalReportRequest extends TenantScopedRequest
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
             'purchase_status' => ['nullable', Rule::enum(PurchaseOrderStatus::class)],
-            'job_status' => ['nullable', Rule::enum(VehicleServiceJobStatus::class)],
+            'operational_status' => ['nullable', Rule::enum(VehicleServiceOperationalStatus::class)],
+            'billing_status' => ['nullable', Rule::enum(VehicleServiceBillingStatus::class)],
+            'payment_status' => ['nullable', Rule::enum(VehicleServicePaymentStatus::class)],
             'line_source_type' => ['nullable', Rule::enum(VehicleServiceLineSourceType::class)],
             'incentive_source' => ['nullable', Rule::in(['technician', 'supervisor'])],
             'supplier_id' => ['nullable', 'integer', 'min:1'],
