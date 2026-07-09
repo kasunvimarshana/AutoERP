@@ -16,7 +16,7 @@ final class UpdateSupplierRequest extends TenantScopedRequest
         return [
             'tenant_id' => ['required', 'integer', 'min:1'],
             'organization_unit_id' => ['nullable', 'integer', 'min:1'],
-            'row_version' => ['required', 'integer', 'min:1'],
+            'row_version' => ['required', 'integer', 'min:0'],
             'code' => ['sometimes', 'string', 'max:80'],
             'name' => ['sometimes', 'string', 'max:255'],
             'supplier_type' => ['sometimes', Rule::enum(SupplierType::class)],
