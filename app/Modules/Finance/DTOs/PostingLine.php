@@ -42,4 +42,12 @@ readonly class PostingLine
         $this->sourceLineId = $sourceLineId;
         $this->dimensions = $dimensions;
     }
+
+    public function __get(string $name): mixed
+    {
+        return match ($name) {
+            'accountCode', 'account' => null,
+            default => null,
+        };
+    }
 }
