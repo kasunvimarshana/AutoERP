@@ -70,8 +70,9 @@ final class ProductionReadinessCommand extends Command
             return;
         }
 
-        $blockedHosts = ['localhost', '127.0.0.1', '0.0.0.0', '::1'];
-        if ($scheme !== 'https' || in_array(strtolower($host), $blockedHosts, true) || str_ends_with(strtolower($host), '.example.com')) {
+        $normalizedHost = strtolower($host);
+        $blockedHosts = ['localhost', '127.0.0.1', '0.0.0.0', '::1', 'example.com'];
+        if ($scheme !== 'https' || in_array($normalizedHost, $blockedHosts, true) || str_ends_with($normalizedHost, '.example.com')) {
             $failures[] = $name.' must use a real public HTTPS host.';
         }
     }
@@ -81,6 +82,19 @@ final class ProductionReadinessCommand extends Command
     {
         if ($value === '' || in_array($value, ['public', 'local'], true)) {
             $failures[] = $name.' must point to a private storage disk.';
+
+            return;
+        }
+
+        $disk = config('filesystems.disks.'.$value);
+        if (! is_array($disk)) {
+            $failures[] = $name.' references an undefined filesystem disk.';
+
+            return;
+        }
+
+        if (($disk['visibility'] ?? null) !== 'private' || ($disk['serve'] ?? false) !== false) {
+            $failures[] = $name.' must reference a non-served private filesystem disk.';
         }
     }
 
@@ -100,8 +114,10 @@ final class ProductionReadinessCommand extends Command
         }
     }
 
-    /** @param list<string> $blocked */
-    /** @param list<string> $failures */
+    /**
+     * @param list<string> $blocked
+     * @param list<string> $failures
+     */
     private function assertNotOneOf(string $value, array $blocked, string $message, array &$failures): void
     {
         if (in_array($value, $blocked, true)) {
