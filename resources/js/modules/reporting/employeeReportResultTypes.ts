@@ -20,6 +20,9 @@ export interface EmployeeCommissionReportRow {
     job: NamedResource;
     job_number: string;
     job_date: string | null;
+    operational_status: string;
+    billing_status: string;
+    payment_status: string;
     customer: NamedResource | null;
     customer_name: string;
     vehicle: NamedResource | null;
@@ -37,12 +40,9 @@ export interface EmployeeCommissionReportRow {
     commission_amount: string;
     commission_status: string;
     completed_at: string | null;
-    invoice_progress: string;
-    payment_progress: string;
     invoice_total: string;
     paid_total: string;
     balance_due: string;
-    job_status: string;
     group_key: string;
     group_label: string;
 }
