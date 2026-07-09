@@ -23,6 +23,7 @@ use Modules\VehicleService\Enums\VehicleServiceLineSourceType;
 use Modules\VehicleService\Enums\VehicleServiceOperationalStatus;
 use Modules\VehicleService\Enums\VehicleServicePaymentStatus;
 use Modules\VehicleService\Models\VehicleServiceJob;
+use Modules\VehicleService\Models\VehicleServiceStatusHistory;
 use Modules\VehicleService\Services\VehicleServiceInvoiceIntegrationService;
 use Modules\VehicleService\Services\VehicleServiceJobService;
 use Modules\VehicleService\Services\VehicleServiceLineService;
@@ -49,10 +50,7 @@ final class VehicleServiceLifecycleBoundaryTest extends TestCase
         $this->assertSame(VehicleServiceBillingStatus::Unbilled, $job->billing_status);
         $this->assertSame(VehicleServicePaymentStatus::Unpaid, $job->payment_status);
 
-        $history = $this->withTenantExecutionContext(
-            $context['tenant_id'],
-            fn () => $job->statusHistories()->oldest('changed_at')->get(),
-        );
+        $history = $this->orderedLifecycleHistory($job);
 
         $this->assertCount(3, $history);
         $this->assertSame([
@@ -259,6 +257,16 @@ final class VehicleServiceLifecycleBoundaryTest extends TestCase
         );
     }
 
+    private function currentJobVersion(VehicleServiceJob $job): int
+    {
+        return $this->withTenantExecutionContext(
+            (int) $job->tenant_id,
+            fn (): int => (int) VehicleServiceJob::query()
+                ->whereKey($job->getKey())
+                ->value('row_version'),
+        );
+    }
+
     private function refreshJob(VehicleServiceJob $job): VehicleServiceJob
     {
         return $this->withTenantExecutionContext(
@@ -267,13 +275,14 @@ final class VehicleServiceLifecycleBoundaryTest extends TestCase
         );
     }
 
-    private function currentJobVersion(VehicleServiceJob $job): int
+    private function orderedLifecycleHistory(VehicleServiceJob $job)
     {
         return $this->withTenantExecutionContext(
             (int) $job->tenant_id,
-            fn (): int => (int) VehicleServiceJob::query()
-                ->whereKey($job->getKey())
-                ->value('row_version'),
+            fn () => VehicleServiceStatusHistory::query()
+                ->where('vehicle_service_job_id', $job->getKey())
+                ->orderBy('id')
+                ->get(),
         );
     }
 
@@ -298,7 +307,7 @@ final class VehicleServiceLifecycleBoundaryTest extends TestCase
     {
         return (int) DB::table('tenants')->insertGetId([
             'uuid' => (string) Str::uuid(),
-            'code' => 'TEN-VSLB-'.$suffix,
+            'code' => 'TEN-VS-LC-'.$suffix,
             'name' => 'Vehicle Service Lifecycle '.$suffix,
             'slug' => 'vehicle-service-lifecycle-'.Str::lower($suffix),
             'status' => 'active',
