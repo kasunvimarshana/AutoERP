@@ -19,12 +19,15 @@ export default function VehicleServiceInvoiceTab({ job }: { job: VehicleServiceJ
         { key: 'price', header: 'Unit price', render: (line) => line.unit_price },
         { key: 'total', header: 'Line total', render: (line) => line.line_total },
     ];
+    const canCreateInvoice = job.operational_status === 'completed'
+        && job.billing_status !== 'billed'
+        && (result.data ?? []).some((line) => line.invoice_state !== 'invoiced');
 
     return (
         <div className="space-y-5">
             <ErrorAlert error={result.error} />
             <div className="flex justify-end">
-                {['completed', 'invoiced'].includes(job.status) && (result.data ?? []).some((line) => line.invoice_state !== 'invoiced')
+                {canCreateInvoice
                     ? <LinkButton to={`/vehicle-service/jobs/${job.id}/invoice`}>Create & post invoice</LinkButton>
                     : <Button type="button" disabled>Create & post invoice</Button>}
             </div>
