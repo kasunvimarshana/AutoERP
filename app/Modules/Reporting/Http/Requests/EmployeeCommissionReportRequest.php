@@ -11,8 +11,10 @@ use Modules\Payment\Enums\PaymentAllocationState;
 use Modules\Payment\Enums\PaymentDocumentStatus;
 use Modules\Payment\Enums\PaymentInstrumentStatus;
 use Modules\Payment\Enums\PaymentPostingStatus;
+use Modules\VehicleService\Enums\VehicleServiceBillingStatus;
 use Modules\VehicleService\Enums\VehicleServiceCommissionType;
-use Modules\VehicleService\Enums\VehicleServiceJobStatus;
+use Modules\VehicleService\Enums\VehicleServiceOperationalStatus;
+use Modules\VehicleService\Enums\VehicleServicePaymentStatus;
 
 final class EmployeeCommissionReportRequest extends TenantScopedRequest
 {
@@ -38,7 +40,9 @@ final class EmployeeCommissionReportRequest extends TenantScopedRequest
             'supervisor_id' => ['nullable', 'integer', 'min:1'],
             'customer_id' => ['nullable', 'integer', 'min:1'],
             'vehicle_id' => ['nullable', 'integer', 'min:1'],
-            'job_status' => ['nullable', Rule::enum(VehicleServiceJobStatus::class)],
+            'operational_status' => ['nullable', Rule::enum(VehicleServiceOperationalStatus::class)],
+            'billing_status' => ['nullable', Rule::enum(VehicleServiceBillingStatus::class)],
+            'payment_status' => ['nullable', Rule::enum(VehicleServicePaymentStatus::class)],
             'invoice_status' => ['nullable', Rule::enum(InvoiceStatus::class)],
             'payment_document_status' => ['nullable', Rule::enum(PaymentDocumentStatus::class)],
             'payment_posting_status' => ['nullable', Rule::enum(PaymentPostingStatus::class)],
