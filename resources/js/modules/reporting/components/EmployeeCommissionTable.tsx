@@ -23,15 +23,18 @@ const columns = [
     ['employee', 'Employee', 'employee'],
     ['job', 'Job', 'job_number'],
     ['job_date', 'Date', 'job_date'],
+    ['operational_status', 'Operational', 'operational_status'],
+    ['billing_status', 'Billing', 'billing_status'],
+    ['payment_status', 'Payment', 'payment_status'],
     ['customer', 'Customer', 'customer'],
     ['vehicle', 'Vehicle', 'vehicle'],
     ['hours', 'Hours', 'assigned_hours'],
     ['labour', 'Labour value', 'labour_amount'],
     ['commission', 'Commission', 'commission_amount'],
     ['commission_status', 'Commission status', 'commission_status'],
-    ['invoice_progress', 'Invoice progress', ''],
-    ['payment_progress', 'Payment progress', ''],
-    ['job_status', 'Job status', 'job_status'],
+    ['invoice_total', 'Invoice total', ''],
+    ['paid_total', 'Paid total', ''],
+    ['balance_due', 'Balance due', ''],
 ] as const;
 
 export function EmployeeCommissionTable({
@@ -61,7 +64,7 @@ export function EmployeeCommissionTable({
         <>
             <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
                 <div className="overflow-x-auto">
-                    <table className="min-w-[1500px] divide-y divide-slate-200 text-left text-sm">
+                    <table className="min-w-[1700px] divide-y divide-slate-200 text-left text-sm">
                         <thead className="bg-slate-50 text-xs uppercase text-slate-500">
                             <tr>
                                 {columns.map(([key, label, sort]) => (
@@ -105,15 +108,18 @@ export function EmployeeCommissionTable({
                                         </td>
                                         <td className="whitespace-nowrap px-3 py-3"><Link className="text-sky-700 hover:underline" to={`/vehicle-service/jobs/${row.job.id}`}>{row.job_number}</Link></td>
                                         <td className="whitespace-nowrap px-3 py-3">{formatDate(row.job_date)}</td>
+                                        <td className="whitespace-nowrap px-3 py-3">{humanize(row.operational_status)}</td>
+                                        <td className="whitespace-nowrap px-3 py-3">{humanize(row.billing_status)}</td>
+                                        <td className="whitespace-nowrap px-3 py-3">{humanize(row.payment_status)}</td>
                                         <td className="whitespace-nowrap px-3 py-3">{row.customer_name || '-'}</td>
                                         <td className="whitespace-nowrap px-3 py-3">{row.vehicle_label || '-'}</td>
                                         <td className="whitespace-nowrap px-3 py-3 text-right">{formatQuantity(row.assigned_hours)}</td>
                                         <td className="whitespace-nowrap px-3 py-3 text-right">{formatMoney(row.labour_amount)}</td>
                                         <td className="whitespace-nowrap px-3 py-3 text-right font-semibold">{formatMoney(row.commission_amount)}</td>
                                         <td className="whitespace-nowrap px-3 py-3">{humanize(row.commission_status)}</td>
-                                        <td className="whitespace-nowrap px-3 py-3">{humanize(row.invoice_progress)}</td>
-                                        <td className="whitespace-nowrap px-3 py-3">{humanize(row.payment_progress)}</td>
-                                        <td className="whitespace-nowrap px-3 py-3">{humanize(row.job_status)}</td>
+                                        <td className="whitespace-nowrap px-3 py-3 text-right">{formatMoney(row.invoice_total)}</td>
+                                        <td className="whitespace-nowrap px-3 py-3 text-right">{formatMoney(row.paid_total)}</td>
+                                        <td className="whitespace-nowrap px-3 py-3 text-right">{formatMoney(row.balance_due)}</td>
                                     </tr>,
                                 );
 
