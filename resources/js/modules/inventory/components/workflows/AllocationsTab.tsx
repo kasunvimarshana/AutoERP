@@ -31,7 +31,9 @@ export function AllocationsTab({
     loading,
     error,
     reload,
-}: WorkflowProps & { reservations: InventoryRecord[] }) {
+    canManage,
+    canIssue,
+}: WorkflowProps & { reservations: InventoryRecord[]; canManage: boolean; canIssue: boolean }) {
     const [form, setForm] = useState({ allocation_date: localToday(), quantity_allocated: '1.000000', reservation: '' });
     const [item, setItem] = useState<NamedResource | null>(null);
     const [warehouse, setWarehouse] = useState<NamedResource | null>(null);
@@ -57,39 +59,41 @@ export function AllocationsTab({
 
     return (
         <WorkflowPanel title="Allocation management" loading={loading} error={error} actionError={actionError}>
-            <form className="grid gap-4 lg:grid-cols-[1fr_1fr_10rem_1fr_12rem_auto]" onSubmit={submit}>
-                <LookupSelect label="Item" value={item} onChange={(value) => { setItem(value); setDimensions(emptyInventoryDimensions()); }} search={lookupApi.stockableItems} error={fieldError(actionError, 'item_id')} />
-                <LookupSelect label="Warehouse" value={warehouse} onChange={(value) => { setWarehouse(value); setDimensions({ ...dimensions, warehouseLocation: null, serial: null }); }} search={searchWarehouses} error={fieldError(actionError, 'warehouse_id')} loadOnOpen minSearchLength={0} />
-                <DecimalInput label="Quantity (base)" value={form.quantity_allocated} error={fieldError(actionError, 'quantity_allocated')} onChange={(event) => setForm({ ...form, quantity_allocated: event.target.value })} />
-                <Input label="Date" type="date" value={form.allocation_date} error={fieldError(actionError, 'allocation_date')} onChange={(event) => setForm({ ...form, allocation_date: event.target.value })} />
-                <Select
-                    label="Reservation"
-                    value={form.reservation}
-                    error={fieldError(actionError, 'reservation_id')}
-                    options={reservations
-                        .filter((row) => ['active', 'partially_allocated'].includes(String(row.status)))
-                        .map((row) => ({
-                            value: String(row.id),
-                            label: `${label(row, 'reservation_number')} / ${relation(row.item)} / ${String(row.quantity_remaining ?? '0.000000')}`,
-                        }))}
-                    onChange={(event) => setForm({ ...form, reservation: event.target.value })}
-                />
-                <div className="flex items-end"><Button type="submit" loading={busy} disabled={!item || !warehouse}>Allocate</Button></div>
-                <InventoryDimensionFields
-                    item={item}
-                    warehouse={warehouse}
-                    value={dimensions}
-                    onChange={setDimensions}
-                    includeSerial
-                    errors={{
-                        itemVariant: fieldError(actionError, 'item_variant_id'),
-                        warehouseLocation: fieldError(actionError, 'warehouse_location_id'),
-                        batch: fieldError(actionError, 'batch_id'),
-                        serial: fieldError(actionError, 'serial_number_id'),
-                        uom: fieldError(actionError, 'uom_id'),
-                    }}
-                />
-            </form>
+            {canManage && (
+                <form className="grid gap-4 lg:grid-cols-[1fr_1fr_10rem_1fr_12rem_auto]" onSubmit={submit}>
+                    <LookupSelect label="Item" value={item} onChange={(value) => { setItem(value); setDimensions(emptyInventoryDimensions()); }} search={lookupApi.stockableItems} error={fieldError(actionError, 'item_id')} />
+                    <LookupSelect label="Warehouse" value={warehouse} onChange={(value) => { setWarehouse(value); setDimensions({ ...dimensions, warehouseLocation: null, serial: null }); }} search={searchWarehouses} error={fieldError(actionError, 'warehouse_id')} loadOnOpen minSearchLength={0} />
+                    <DecimalInput label="Quantity (base)" value={form.quantity_allocated} error={fieldError(actionError, 'quantity_allocated')} onChange={(event) => setForm({ ...form, quantity_allocated: event.target.value })} />
+                    <Input label="Date" type="date" value={form.allocation_date} error={fieldError(actionError, 'allocation_date')} onChange={(event) => setForm({ ...form, allocation_date: event.target.value })} />
+                    <Select
+                        label="Reservation"
+                        value={form.reservation}
+                        error={fieldError(actionError, 'reservation_id')}
+                        options={reservations
+                            .filter((row) => ['active', 'partially_allocated'].includes(String(row.status)))
+                            .map((row) => ({
+                                value: String(row.id),
+                                label: `${label(row, 'reservation_number')} / ${relation(row.item)} / ${String(row.quantity_remaining ?? '0.000000')}`,
+                            }))}
+                        onChange={(event) => setForm({ ...form, reservation: event.target.value })}
+                    />
+                    <div className="flex items-end"><Button type="submit" loading={busy} disabled={!item || !warehouse}>Allocate</Button></div>
+                    <InventoryDimensionFields
+                        item={item}
+                        warehouse={warehouse}
+                        value={dimensions}
+                        onChange={setDimensions}
+                        includeSerial
+                        errors={{
+                            itemVariant: fieldError(actionError, 'item_variant_id'),
+                            warehouseLocation: fieldError(actionError, 'warehouse_location_id'),
+                            batch: fieldError(actionError, 'batch_id'),
+                            serial: fieldError(actionError, 'serial_number_id'),
+                            uom: fieldError(actionError, 'uom_id'),
+                        }}
+                    />
+                </form>
+            )}
             <RecordList rows={data} columns={columns((row) => {
                 const issueKey = `issue-allocation:${row.id}`;
                 const releaseKey = `release-allocation:${row.id}`;
@@ -97,8 +101,8 @@ export function AllocationsTab({
 
                 return (
                     <div className="flex flex-wrap gap-2">
-                        <Button variant="secondary" loading={recordAction.pendingKey === issueKey} disabled={!actionable || recordAction.pendingKey !== null} onClick={() => void recordAction.run(issueKey, () => issueAllocation(row.id))}>Issue</Button>
-                        <Button variant="ghost" loading={recordAction.pendingKey === releaseKey} disabled={!actionable || recordAction.pendingKey !== null} onClick={() => void recordAction.run(releaseKey, () => releaseAllocation(row.id))}>Release</Button>
+                        {canIssue && <Button variant="secondary" loading={recordAction.pendingKey === issueKey} disabled={!actionable || recordAction.pendingKey !== null} onClick={() => void recordAction.run(issueKey, () => issueAllocation(row.id))}>Issue</Button>}
+                        {canManage && <Button variant="ghost" loading={recordAction.pendingKey === releaseKey} disabled={!actionable || recordAction.pendingKey !== null} onClick={() => void recordAction.run(releaseKey, () => releaseAllocation(row.id))}>Release</Button>}
                     </div>
                 );
             })} />
