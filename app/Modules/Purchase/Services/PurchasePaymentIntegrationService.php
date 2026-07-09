@@ -243,7 +243,14 @@ final class PurchasePaymentIntegrationService
                 throw new InvalidArgumentException('Payment can only allocate once to the same supplier invoice.');
             }
             $seen[$allocation->invoiceId] = true;
-            $balance = $this->invoiceBalances->validatePayableState($allocation->invoiceId);
+            $balance = $this->invoiceBalances->validatePayableState(
+                invoiceId: $allocation->invoiceId,
+                tenantId: $tenantId,
+                organizationUnitId: $organizationUnitId,
+                partyType: $supplierType,
+                partyId: $supplierId,
+                currencyId: $currencyId,
+            );
             if ($balance->tenantId !== $tenantId || $balance->organizationUnitId !== $organizationUnitId) {
                 throw new InvalidArgumentException('Selected supplier invoice is outside the payment scope.');
             }
