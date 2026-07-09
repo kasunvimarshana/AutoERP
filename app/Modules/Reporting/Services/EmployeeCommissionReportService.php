@@ -77,6 +77,9 @@ final class EmployeeCommissionReportService
                 new ReportColumn('role_type', 'Role', sortBy: 'role_type'),
                 new ReportColumn('job_number', 'Job number', sortBy: 'job_number'),
                 new ReportColumn('job_date', 'Job date', sortBy: 'job_date', format: 'date'),
+                new ReportColumn('operational_status', 'Operational status', sortBy: 'operational_status'),
+                new ReportColumn('billing_status', 'Billing status', sortBy: 'billing_status'),
+                new ReportColumn('payment_status', 'Payment status', sortBy: 'payment_status'),
                 new ReportColumn('customer_name', 'Customer', sortBy: 'customer'),
                 new ReportColumn('vehicle_label', 'Vehicle', sortBy: 'vehicle'),
                 new ReportColumn('work_description', 'Work / responsibility'),
@@ -88,9 +91,9 @@ final class EmployeeCommissionReportService
                 new ReportColumn('commission_value', 'Commission value', sortBy: 'commission_value', format: 'decimal'),
                 new ReportColumn('commission_amount', 'Commission amount', sortBy: 'commission_amount', format: 'money', summarize: true),
                 new ReportColumn('commission_status', 'Commission status', sortBy: 'commission_status'),
-                new ReportColumn('invoice_progress', 'Invoice progress'),
-                new ReportColumn('payment_progress', 'Payment progress'),
-                new ReportColumn('job_status', 'Job status', sortBy: 'job_status'),
+                new ReportColumn('invoice_total', 'Invoice total', format: 'money'),
+                new ReportColumn('paid_total', 'Paid total', format: 'money'),
+                new ReportColumn('balance_due', 'Balance due', format: 'money'),
             ],
             dateColumn: 'job_date',
             defaultSort: 'job_date',
@@ -129,8 +132,6 @@ final class EmployeeCommissionReportService
             ->select([
                 'commission_rows.*',
                 DB::raw('COALESCE(invoice_totals.invoice_count, 0) as invoice_count'),
-                DB::raw('COALESCE(invoice_totals.draft_invoice_count, 0) as draft_invoice_count'),
-                DB::raw('COALESCE(invoice_totals.posted_invoice_count, 0) as posted_invoice_count'),
                 DB::raw('COALESCE(invoice_totals.invoice_total, 0) as invoice_total'),
                 DB::raw('COALESCE(payment_totals.paid_total, 0) as paid_total'),
             ]);
@@ -166,7 +167,7 @@ final class EmployeeCommissionReportService
         $this->organizationScope($query, 'lines.organization_unit_id', $organizationUnitId);
         if (! $includeCancelled) {
             $query
-                ->where('jobs.status', '<>', 'cancelled')
+                ->where('jobs.operational_status', '<>', 'cancelled')
                 ->where('lines.status', '<>', 'cancelled');
         }
 
@@ -176,15 +177,15 @@ final class EmployeeCommissionReportService
             .'departments.id as department_id, departments.code as department_code, departments.name as department_name, '
             .'designations.id as designation_id, designations.code as designation_code, designations.name as designation_name, '
             .'jobs.supervisor_employee_id as job_supervisor_id, supervisors.employee_number as job_supervisor_code, supervisors.display_name as job_supervisor_name, '
-            .'jobs.job_number, jobs.job_date, jobs.status as job_status, '
+            .'jobs.job_number, jobs.job_date, jobs.operational_status, jobs.billing_status, jobs.payment_status, '
             .'customers.id as customer_id, customers.customer_number as customer_code, COALESCE(customers.display_name, customers.name) as customer_name, '
             .'vehicles.id as vehicle_id, vehicles.vehicle_number as vehicle_code, COALESCE(vehicles.registration_number, vehicles.vehicle_number) as vehicle_label, '
             .'lines.description as work_description, assignments.role_type, assignments.assigned_hours, assignments.rate, '
             .'(assignments.assigned_hours * assignments.rate) as labour_amount, lines.line_total as commission_base, '
             .'assignments.commission_type, assignments.commission_value, assignments.commission_amount, '
-            ."CASE WHEN jobs.status = 'cancelled' OR lines.status = 'cancelled' THEN 'cancelled' "
+            ."CASE WHEN jobs.operational_status = 'cancelled' OR lines.status = 'cancelled' THEN 'cancelled' "
             ."WHEN assignments.completed_at IS NOT NULL OR assignments.status = 'completed' OR jobs.completed_at IS NOT NULL "
-            ."OR jobs.status IN ('completed', 'invoiced', 'partially_paid', 'paid') THEN 'earned' ELSE 'pending' END as commission_status, "
+            ."OR jobs.operational_status = 'completed' THEN 'earned' ELSE 'pending' END as commission_status, "
             .'COALESCE(assignments.completed_at, jobs.completed_at) as completed_at',
         );
     }
@@ -208,7 +209,7 @@ final class EmployeeCommissionReportService
 
         $this->organizationScope($query, 'jobs.organization_unit_id', $organizationUnitId);
         if (! $includeCancelled) {
-            $query->where('jobs.status', '<>', 'cancelled');
+            $query->where('jobs.operational_status', '<>', 'cancelled');
         }
 
         return $query->selectRaw(
@@ -217,14 +218,14 @@ final class EmployeeCommissionReportService
             .'departments.id as department_id, departments.code as department_code, departments.name as department_name, '
             .'designations.id as designation_id, designations.code as designation_code, designations.name as designation_name, '
             .'jobs.supervisor_employee_id as job_supervisor_id, employees.employee_number as job_supervisor_code, employees.display_name as job_supervisor_name, '
-            .'jobs.job_number, jobs.job_date, jobs.status as job_status, '
+            .'jobs.job_number, jobs.job_date, jobs.operational_status, jobs.billing_status, jobs.payment_status, '
             .'customers.id as customer_id, customers.customer_number as customer_code, COALESCE(customers.display_name, customers.name) as customer_name, '
             .'vehicles.id as vehicle_id, vehicles.vehicle_number as vehicle_code, COALESCE(vehicles.registration_number, vehicles.vehicle_number) as vehicle_label, '
             ."'Job supervision' as work_description, 'supervisor' as role_type, 0 as assigned_hours, 0 as rate, 0 as labour_amount, "
             .'jobs.grand_total as commission_base, jobs.supervisor_commission_type as commission_type, '
             .'jobs.supervisor_commission_value as commission_value, jobs.supervisor_commission_amount as commission_amount, '
-            ."CASE WHEN jobs.status = 'cancelled' THEN 'cancelled' WHEN jobs.completed_at IS NOT NULL "
-            ."OR jobs.status IN ('completed', 'invoiced', 'partially_paid', 'paid') THEN 'earned' ELSE 'pending' END as commission_status, "
+            ."CASE WHEN jobs.operational_status = 'cancelled' THEN 'cancelled' WHEN jobs.completed_at IS NOT NULL "
+            ."OR jobs.operational_status = 'completed' THEN 'earned' ELSE 'pending' END as commission_status, "
             .'jobs.completed_at as completed_at',
         );
     }
@@ -239,8 +240,6 @@ final class EmployeeCommissionReportService
             ->whereNotIn('invoices.status', ['cancelled', 'void'])
             ->selectRaw(
                 'links.vehicle_service_job_id, COUNT(DISTINCT invoices.id) as invoice_count, '
-                ."SUM(CASE WHEN invoices.status IN ('draft', 'approved') THEN 1 ELSE 0 END) as draft_invoice_count, "
-                ."SUM(CASE WHEN invoices.status IN ('posted', 'partially_paid', 'paid') THEN 1 ELSE 0 END) as posted_invoice_count, "
                 .'COALESCE(SUM(links.invoice_total), 0) as invoice_total',
             )
             ->groupBy('links.vehicle_service_job_id');
@@ -283,7 +282,9 @@ final class EmployeeCommissionReportService
         $this->whereInteger($query, 'commission_rows.job_supervisor_id', $params['supervisor_id'] ?? null);
         $this->whereInteger($query, 'commission_rows.customer_id', $params['customer_id'] ?? null);
         $this->whereInteger($query, 'commission_rows.vehicle_id', $params['vehicle_id'] ?? null);
-        $this->whereString($query, 'commission_rows.job_status', $params['job_status'] ?? null);
+        $this->whereString($query, 'commission_rows.operational_status', $params['operational_status'] ?? null);
+        $this->whereString($query, 'commission_rows.billing_status', $params['billing_status'] ?? null);
+        $this->whereString($query, 'commission_rows.payment_status', $params['payment_status'] ?? null);
         $this->whereString($query, 'commission_rows.commission_type', $params['commission_type'] ?? null);
         $this->whereString($query, 'commission_rows.commission_source', $params['commission_source'] ?? null);
         $this->whereString($query, 'commission_rows.role_type', $params['role_type'] ?? null);
@@ -331,6 +332,9 @@ final class EmployeeCommissionReportService
                     ->orWhere('commission_rows.designation_name', 'like', $search)
                     ->orWhere('commission_rows.job_supervisor_name', 'like', $search)
                     ->orWhere('commission_rows.job_number', 'like', $search)
+                    ->orWhere('commission_rows.operational_status', 'like', $search)
+                    ->orWhere('commission_rows.billing_status', 'like', $search)
+                    ->orWhere('commission_rows.payment_status', 'like', $search)
                     ->orWhere('commission_rows.customer_name', 'like', $search)
                     ->orWhere('commission_rows.vehicle_label', 'like', $search)
                     ->orWhere('commission_rows.work_description', 'like', $search)
@@ -366,7 +370,9 @@ final class EmployeeCommissionReportService
             'commission_value' => 'commission_rows.commission_value',
             'commission_amount' => 'commission_rows.commission_amount',
             'commission_status' => 'commission_rows.commission_status',
-            'job_status' => 'commission_rows.job_status',
+            'operational_status' => 'commission_rows.operational_status',
+            'billing_status' => 'commission_rows.billing_status',
+            'payment_status' => 'commission_rows.payment_status',
         ];
         $groupColumns = [
             'employee' => 'commission_rows.employee_name',
@@ -547,7 +553,9 @@ final class EmployeeCommissionReportService
             'job' => ['id' => (int) $row->job_id, 'code' => (string) $row->job_number, 'name' => (string) $row->job_number],
             'job_number' => (string) $row->job_number,
             'job_date' => (string) $row->job_date,
-            'job_status' => (string) $row->job_status,
+            'operational_status' => (string) $row->operational_status,
+            'billing_status' => (string) $row->billing_status,
+            'payment_status' => (string) $row->payment_status,
             'customer' => $this->namedResource($row->customer_id ?? null, $row->customer_code ?? null, $row->customer_name ?? null),
             'customer_name' => (string) ($row->customer_name ?? ''),
             'vehicle' => $this->namedResource($row->vehicle_id ?? null, $row->vehicle_code ?? null, $row->vehicle_label ?? null),
@@ -565,8 +573,6 @@ final class EmployeeCommissionReportService
             'commission_amount' => $this->decimal($row->commission_amount),
             'commission_status' => (string) $row->commission_status,
             'completed_at' => $row->completed_at === null ? null : (string) $row->completed_at,
-            'invoice_progress' => $this->invoiceProgress($row),
-            'payment_progress' => $this->paymentProgress($row),
             'invoice_total' => $this->decimal($row->invoice_total),
             'paid_total' => $this->decimal($row->paid_total),
             'balance_due' => $this->balanceDue($row),
@@ -592,37 +598,6 @@ final class EmployeeCommissionReportService
             'key' => $key === null || $key === '' ? 'unassigned' : (string) $key,
             'label' => trim((string) $label) ?: 'Unassigned',
         ];
-    }
-
-    private function invoiceProgress(object $row): string
-    {
-        if ((int) $row->invoice_count === 0) {
-            return 'uninvoiced';
-        }
-        if ((int) $row->draft_invoice_count > 0) {
-            return 'draft';
-        }
-        if (in_array((string) $row->job_status, ['invoiced', 'partially_paid', 'paid'], true)) {
-            return 'invoiced';
-        }
-
-        return (int) $row->posted_invoice_count > 0 ? 'partially_invoiced' : 'uninvoiced';
-    }
-
-    private function paymentProgress(object $row): string
-    {
-        if ((int) $row->invoice_count === 0) {
-            return 'not_applicable';
-        }
-        if ($this->math->compare((string) $row->invoice_total, '0') > 0
-            && $this->math->compare($this->balanceDue($row), '0') <= 0) {
-            return 'paid';
-        }
-        if ($this->math->compare((string) $row->paid_total, '0') > 0) {
-            return 'partially_paid';
-        }
-
-        return 'unpaid';
     }
 
     private function balanceDue(object $row): string
