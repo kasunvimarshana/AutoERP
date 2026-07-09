@@ -163,6 +163,7 @@ export default function VehicleEditPage() {
 
 function vehicleToPayload(vehicle: Vehicle): VehiclePayload {
     return {
+        row_version: vehicle.row_version,
         vehicle_number: vehicle.vehicle_number ?? '',
         code: vehicle.code ?? '',
         registration_number: vehicle.registration_number ?? '',
