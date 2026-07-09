@@ -12,7 +12,9 @@ trait AssertsVehicleServiceExpectedVersion
     private function assertExpectedVersion(VehicleServiceJob $job, ?int $expectedVersion): void
     {
         if ($expectedVersion === null) {
-            return;
+            throw ValidationException::withMessages([
+                'expected_version' => ['Vehicle service job version is required. Reload it before continuing.'],
+            ]);
         }
 
         if ((int) $job->row_version === $expectedVersion) {
