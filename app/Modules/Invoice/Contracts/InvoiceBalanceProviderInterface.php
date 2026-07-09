@@ -37,5 +37,12 @@ interface InvoiceBalanceProviderInterface
         int $partyId,
     ): array;
 
-    public function validatePayableState(int $invoiceId): BalanceResultData;
+    public function validatePayableState(
+        int $invoiceId,
+        int $tenantId,
+        ?int $organizationUnitId,
+        string $partyType,
+        int $partyId,
+        ?int $currencyId = null,
+    ): BalanceResultData;
 }
