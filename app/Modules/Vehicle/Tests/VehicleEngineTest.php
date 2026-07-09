@@ -264,9 +264,12 @@ final class VehicleEngineTest extends TestCase
             ->assertJsonPath('data.documents.0.document_type', 'insurance')
             ->assertJsonPath('data.current_customer.name', $customer->name)
             ->assertJsonPath('data.current_ownerships.0.owner.name', $customer->name)
-            ->assertJsonStructure(['data' => ['id', 'vehicle_number', 'make', 'model', 'current_ownerships', 'documents', 'ownerships', 'attributes']]);
+            ->assertJsonStructure(['data' => ['id', 'row_version', 'vehicle_number', 'make', 'model', 'current_ownerships', 'documents', 'ownerships', 'attributes']]);
 
         $id = (int) $create->json('data.id');
+        $rowVersion = (int) $create->json('data.row_version');
+        $this->assertGreaterThanOrEqual(0, $rowVersion);
+
         $this->tenantGetJson($tenantId, "/api/v1/vehicles/{$id}?tenant_id={$tenantId}&organization_unit_id={$organizationUnitId}")
             ->assertOk()
             ->assertJsonPath('data.current_customer.name', $customer->name)
@@ -278,8 +281,19 @@ final class VehicleEngineTest extends TestCase
         $this->runInTenant($tenantId, fn () => $this->putJson("/api/v1/vehicles/{$id}", [
             'tenant_id' => $tenantId,
             'organization_unit_id' => $organizationUnitId,
+            'row_version' => $rowVersion,
             'color' => 'Blue',
-        ]))->assertOk()->assertJsonPath('data.color', 'Blue');
+        ]))->assertOk()
+            ->assertJsonPath('data.color', 'Blue')
+            ->assertJsonPath('data.row_version', $rowVersion + 1);
+
+        $this->runInTenant($tenantId, fn () => $this->putJson("/api/v1/vehicles/{$id}", [
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => $organizationUnitId,
+            'row_version' => $rowVersion,
+            'color' => 'Red',
+        ]))->assertStatus(409)
+            ->assertJsonPath('message', 'Vehicle was changed by someone else. Reload before saving.');
 
         $this->tenantPatchJson($tenantId, "/api/v1/vehicles/{$id}/status", [
             'tenant_id' => $tenantId,
