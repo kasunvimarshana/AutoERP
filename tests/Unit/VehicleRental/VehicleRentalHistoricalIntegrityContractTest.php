@@ -27,13 +27,21 @@ final class VehicleRentalHistoricalIntegrityContractTest extends TestCase
         }
     }
 
-    public function test_agreement_party_shape_is_service_enforced(): void
+    public function test_agreement_party_shape_is_service_and_model_enforced(): void
     {
         $service = $this->source('app/Modules/VehicleRental/Services/RentalAgreementService.php');
+        $model = $this->source('app/Modules/VehicleRental/Models/RentalAgreement.php');
 
-        self::assertStringContainsString('Customer rental agreement requires only a customer.', $service);
-        self::assertStringContainsString('Owner supply agreement requires only a supplier/vehicle owner.', $service);
+        foreach ([$service, $model] as $source) {
+            self::assertStringContainsString('Customer rental agreement requires only a customer.', $source);
+            self::assertStringContainsString('Owner supply agreement requires only a supplier/vehicle owner.', $source);
+        }
+
         self::assertStringContainsString('Only draft agreements can be edited.', $service);
+        self::assertStringContainsString('static::saving', $model);
+        self::assertStringContainsString('assertPartyShape', $model);
+        self::assertStringContainsString('static::deleting', $model);
+        self::assertStringContainsString('Only draft rental agreements can be deleted.', $model);
     }
 
     /** @return list<string> */
