@@ -7,7 +7,7 @@ namespace Modules\VehicleService\Services;
 use Illuminate\Support\Facades\DB;
 use Modules\Core\Services\DecimalMath;
 use Modules\VehicleService\DTOs\VehicleServiceInspectionData;
-use Modules\VehicleService\Enums\VehicleServiceJobStatus;
+use Modules\VehicleService\Enums\VehicleServiceOperationalStatus;
 use Modules\VehicleService\Models\VehicleServiceInspection;
 use Modules\VehicleService\Models\VehicleServiceJob;
 use Modules\VehicleService\Services\Concerns\AssertsVehicleServiceExpectedVersion;
@@ -53,8 +53,8 @@ final class VehicleServiceInspectionService
             );
 
             $statusChanged = false;
-            if ($data->markInspected && $job->status === VehicleServiceJobStatus::Draft) {
-                $this->statuses->change($job, VehicleServiceJobStatus::Inspected, $data->inspectedBy, expectedVersion: (int) $job->row_version);
+            if ($data->markInspected && $job->operational_status === VehicleServiceOperationalStatus::Draft) {
+                $this->statuses->changeOperational($job, VehicleServiceOperationalStatus::Inspected, $data->inspectedBy, expectedVersion: (int) $job->row_version);
                 $statusChanged = true;
             }
             if (! $statusChanged) {
