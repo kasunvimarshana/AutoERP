@@ -60,6 +60,7 @@
         "production:verify": [
             "@php artisan config:clear --ansi",
             "@php artisan auth:readiness --no-interaction",
+            "@php artisan production:readiness --no-interaction",
             "@php artisan route:list --compact",
             "@php artisan test",
             "npm run typecheck",
