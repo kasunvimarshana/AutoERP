@@ -28,8 +28,8 @@ export default function SupplierTaxProfilePage() {
     const [refresh, setRefresh] = useState(0);
     const [error, setError] = useState<ApiError | null>(null);
     const profiles = useApi((signal) => listSupplierTaxProfiles({ page, per_page: 25 }, signal), [page, refresh]);
-    const lookups = useApi((signal) => getTaxLookups(signal), []);
-    const suppliers = useApi((signal) => listSuppliers({ per_page: 100 }, signal), []);
+    const lookups = useApi((signal) => getTaxLookups(signal), [], canManage);
+    const suppliers = useApi((signal) => listSuppliers({ per_page: 100 }, signal), [], canManage);
 
     const columns: DataColumn<TaxProfile>[] = [
         { key: 'supplier', header: 'Supplier', render: (row) => row.party ? `${row.party.code ?? ''} ${row.party.name}` : '-' },
