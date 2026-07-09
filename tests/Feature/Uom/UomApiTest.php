@@ -7,6 +7,7 @@ namespace Tests\Feature\Uom;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Modules\UOM\Constants\UomPermission;
 use Tests\TestCase;
 
 final class UomApiTest extends TestCase
@@ -281,7 +282,7 @@ final class UomApiTest extends TestCase
         ]);
     }
 
-    private function createAuthContext(array $overrides = []): array
+    private function createAuthContext(array $overrides = [], ?array $permissions = null): array
     {
         $now = now();
         $code = strtoupper((string) ($overrides['code'] ?? 'AUTOERP'));
@@ -331,6 +332,33 @@ final class UomApiTest extends TestCase
             'created_at' => $now,
             'updated_at' => $now,
         ]);
+        $roleId = (int) DB::table('roles')->insertGetId([
+            'tenant_id' => $tenantId,
+            'name' => 'UOM Test Role',
+            'guard_name' => 'auth-api',
+            'description' => 'UOM test role',
+            'row_version' => 1,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+        foreach ($this->seedUomPermissions($tenantId, $permissions ?? array_keys(UomPermission::descriptions())) as $permissionId) {
+            DB::table('role_permissions')->insert([
+                'tenant_id' => $tenantId,
+                'role_id' => $roleId,
+                'permission_id' => $permissionId,
+                'row_version' => 1,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+        }
+        DB::table('user_roles')->insert([
+            'tenant_id' => $tenantId,
+            'user_id' => $userId,
+            'role_id' => $roleId,
+            'row_version' => 1,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
         \Tests\Support\TenantAuthenticationFixture::provision($tenantId, $userId, $email);
 
         $token = (string) $this->withHeader('X-Tenant-Id', (string) $tenantId)->postJson('/api/v1/auth/login', [
@@ -345,5 +373,24 @@ final class UomApiTest extends TestCase
             'user_id' => $userId,
             'token' => $token,
         ];
+    }
+
+    private function seedUomPermissions(int $tenantId, array $names): array
+    {
+        $ids = [];
+        foreach ($names as $name) {
+            $ids[] = (int) DB::table('permissions')->insertGetId([
+                'tenant_id' => $tenantId,
+                'name' => $name,
+                'guard_name' => 'auth-api',
+                'module' => 'uom',
+                'description' => UomPermission::descriptions()[$name] ?? 'UOM test permission',
+                'row_version' => 1,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        return $ids;
     }
 }
