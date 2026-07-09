@@ -11,6 +11,7 @@ Vehicle Service used one job `status` to represent operational progress, billing
 - Removed the old mixed `VehicleServiceJobStatus` enum so new code cannot keep depending on the flawed shared lifecycle concept.
 - Added lifecycle dimension tracking to Vehicle Service status history.
 - Updated Vehicle Service model casts, job resources, list filters, operational transitions, invoice billing updates, and payment settlement updates.
+- Updated invoiceability to depend on actual remaining billable source quantities instead of trusting a potentially stale billing lifecycle after invoice cancellation.
 - Updated main Vehicle Service frontend job list/detail/summary/invoice/history views to display separate lifecycle dimensions.
 - Updated Reporting request contracts, Vehicle Service detailed report, technician work report, employee commission report, and reporting frontend filters/tables to use the split lifecycle fields instead of `job_status`.
 - Updated Reporting tests to assert split lifecycle fields and to seed billing/payment status explicitly when test fixtures bypass service-layer invoice/payment sync.
@@ -23,6 +24,7 @@ Vehicle Service used one job `status` to represent operational progress, billing
 - Manually traced the affected Vehicle Service and Reporting source paths for removed `status`/`job_status` ownership.
 - Spot-checked the updated Reporting test source after replacement.
 - Fetched back `VehicleServiceEngineTest` after replacement and verified it imports the split lifecycle enums instead of the removed mixed enum.
+- Source-reviewed Vehicle Service status, invoice, payment, model, and resource files for lifecycle contract consistency.
 - No runtime Laravel/MySQL, TypeScript, or production-like UAT suite was available in this connector session.
 
 ## Open gate before merge
