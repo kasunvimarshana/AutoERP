@@ -42,13 +42,4 @@ readonly class PostingLine
         $this->sourceLineId = $sourceLineId;
         $this->dimensions = $dimensions;
     }
-
-    public function __get(string $name): mixed
-    {
-        if ($name === 'accountCode' || $name === 'account') {
-            return null;
-        }
-
-        throw new \Error('Undefined property: '.__CLASS__.'::$'.$name);
-    }
 }
