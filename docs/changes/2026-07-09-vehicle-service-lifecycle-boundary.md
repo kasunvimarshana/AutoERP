@@ -13,7 +13,7 @@ Vehicle Service used one job `status` to represent operational progress, billing
 - Updated main Vehicle Service frontend job list/detail/summary/invoice/history views to display separate lifecycle dimensions.
 - Updated Reporting request contracts, Vehicle Service detailed report, technician work report, employee commission report, and reporting frontend filters/tables to use the split lifecycle fields instead of `job_status`.
 - Updated Reporting tests to assert split lifecycle fields and to seed billing/payment status explicitly when test fixtures bypass service-layer invoice/payment sync.
-- Added focused Vehicle Service lifecycle boundary tests for initial state/history, operational completion, partial/full billing, and invalid operational transitions.
+- Added focused Vehicle Service lifecycle boundary tests for initial state/history, operational completion, partial/full billing, payment sync, and invalid operational transitions.
 
 ## Verification
 
