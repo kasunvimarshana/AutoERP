@@ -7,6 +7,7 @@ namespace Modules\Vehicle\Tests;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Modules\User\Models\UserModel;
 use Modules\Vehicle\DTOs\CreateVehicleData;
 use Modules\Vehicle\DTOs\VehicleMakeData;
 use Modules\Vehicle\DTOs\VehicleModelData;
@@ -35,6 +36,7 @@ final class VehicleRowVersionTest extends TestCase
     public function test_vehicle_api_update_requires_current_row_version_and_rejects_stale_version(): void
     {
         [$tenantId, $organizationUnitId] = $this->scopeContext();
+        $this->actingAsTenantUser($tenantId);
         [$make, $model] = $this->masterData($tenantId, $organizationUnitId);
         $vehicle = $this->vehicle($tenantId, $organizationUnitId, (int) $make->getKey(), (int) $model->getKey());
         $vehicleId = (int) $vehicle->getKey();
@@ -121,6 +123,22 @@ final class VehicleRowVersionTest extends TestCase
             vehicleModelId: $modelId,
             status: VehicleStatus::Active,
         )));
+    }
+
+    private function actingAsTenantUser(int $tenantId): void
+    {
+        $userId = (int) \Tests\Support\TenantUserFixture::create([
+            'tenant_id' => $tenantId,
+            'first_name' => 'Vehicle',
+            'last_name' => 'Row Version Tester',
+            'email' => 'vehicle-row-version-'.Str::lower(Str::random(8)).'@example.test',
+            'password' => 'secret-password',
+            'status' => 'active',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->actingAs($this->runInTenant($tenantId, fn (): UserModel => UserModel::query()->findOrFail($userId)));
     }
 
     private function runInTenant(int $tenantId, callable $callback): mixed
