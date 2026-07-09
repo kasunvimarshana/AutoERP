@@ -22,7 +22,9 @@ interface EmployeeLookupOption extends NamedResource {
     display_name: string;
 }
 
-const jobStatuses = ['draft', 'inspected', 'in_progress', 'completed', 'invoiced', 'partially_paid', 'paid', 'cancelled'];
+const operationalStatuses = ['draft', 'inspected', 'in_progress', 'completed', 'cancelled'];
+const billingStatuses = ['unbilled', 'partially_billed', 'billed'];
+const servicePaymentStatuses = ['unpaid', 'partially_paid', 'paid'];
 const invoiceStatuses = ['draft', 'approved', 'posted', 'partially_paid', 'paid', 'cancelled', 'void'];
 const commissionTypes = ['none', 'fixed', 'percentage'];
 const commissionSources = ['technician', 'supervisor'];
@@ -139,7 +141,9 @@ export function EmployeeCommissionFilters({
                     setVehicle(selected);
                     onChange({ vehicle_id: selected?.id ?? null });
                 }} />
-                <Select label="Job status" value={value.job_status ?? ''} options={enumOptions(jobStatuses)} onChange={(event) => onChange({ job_status: event.target.value })} />
+                <Select label="Operational status" value={value.operational_status ?? ''} options={enumOptions(operationalStatuses)} onChange={(event) => onChange({ operational_status: event.target.value })} />
+                <Select label="Billing status" value={value.billing_status ?? ''} options={enumOptions(billingStatuses)} onChange={(event) => onChange({ billing_status: event.target.value })} />
+                <Select label="Service payment status" value={value.payment_status ?? ''} options={enumOptions(servicePaymentStatuses)} onChange={(event) => onChange({ payment_status: event.target.value })} />
                 <Select label="Invoice status" value={value.invoice_status ?? ''} options={enumOptions(invoiceStatuses)} onChange={(event) => onChange({ invoice_status: event.target.value })} />
                 <PaymentLifecycleFilters value={value} onChange={onChange} />
                 <Select label="Commission source" value={value.commission_source ?? ''} options={enumOptions(commissionSources)} onChange={(event) => onChange({ commission_source: event.target.value as EmployeeCommissionReportParams['commission_source'] })} />
