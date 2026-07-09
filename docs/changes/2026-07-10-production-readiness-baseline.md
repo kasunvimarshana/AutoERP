@@ -6,7 +6,9 @@ The project needed an explicit production gate instead of relying on local devel
 
 ## Change
 
-- Added `composer production:verify` as a single production verification entrypoint.
+- Added `php artisan production:readiness` to fail fast when runtime configuration is unsafe for production.
+- Registered the production readiness command during application bootstrap.
+- Added `composer production:verify` as a single production verification entrypoint and wired it to run the production readiness command.
 - Added `.env.production.example` with production-safe defaults for debug mode, cookies, sessions, tenant fallback, logging, database, queue, cache, mail, tenant routing, and private document storage.
 - Added `docs/deployment/production-readiness.md` to define environment, verification, migration, permissions, runtime process, storage, smoke testing, and rollback gates.
 
@@ -16,6 +18,8 @@ The project needed an explicit production gate instead of relying on local devel
 - Compared `vehicle-service-lifecycle-boundary-20260709` against `worktree` and confirmed it is ahead and not behind.
 - Inspected existing Composer and npm scripts before adding the production verification script.
 - Inspected `.env.example` and added a separate production template instead of weakening the local development template.
+- Verified Auth module configuration is merged under `module-auth` before checking refresh cookie security.
+- Verified `tenant_private` is configured as a non-served private filesystem disk before making it the production private storage baseline.
 - No runtime Laravel/MySQL, TypeScript, or production-like UAT suite was available in this connector session.
 
 ## Open gate before production
