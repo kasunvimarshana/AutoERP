@@ -23,6 +23,16 @@ Required production values:
 
 Never deploy with local development defaults such as debug mode, local tenant fallback, insecure cookies, or empty database credentials.
 
+## Runtime readiness command
+
+Run this in the release environment to fail fast on unsafe production configuration:
+
+```bash
+php artisan production:readiness --no-interaction
+```
+
+The command validates production environment, debug mode, application key, public HTTPS URLs, secure refresh cookies, tenant fallback, database/cache/queue/session drivers, encrypted sessions, private document disks, and log level.
+
 ## Verification command
 
 Run the source and runtime gate before every production promotion:
@@ -31,7 +41,7 @@ Run the source and runtime gate before every production promotion:
 composer production:verify
 ```
 
-This command clears cached config, verifies Auth readiness, lists routes, runs the backend test suite, runs frontend typecheck/lint, and builds the frontend bundle.
+This command clears cached config, verifies Auth readiness, runs the production readiness command, lists routes, runs the backend test suite, runs frontend typecheck/lint, and builds the frontend bundle.
 
 ## Database and permissions gate
 
@@ -41,6 +51,7 @@ Before switching traffic to a new release:
 php artisan migrate --force
 php artisan platform:permissions:sync --no-interaction
 php artisan auth:readiness --no-interaction
+php artisan production:readiness --no-interaction
 ```
 
 Run these against the same environment and database used by the release candidate.
