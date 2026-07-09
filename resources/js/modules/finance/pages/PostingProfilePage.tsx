@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react';
+import { hasPermission } from '@/modules/auth/accessControl';
+import { useAuth } from '@/modules/auth/AuthProvider';
 import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
@@ -28,6 +30,7 @@ import {
     type PostingProfile,
     type PostingProfilePayload,
 } from '../financeApi';
+import { financePermissions } from '../financePermissions';
 
 const emptyProfile = (): PostingProfilePayload => ({
     code: '',
@@ -56,6 +59,9 @@ function emptyProfileRule(): PostingProfilePayload['rules'][number] {
 }
 
 export default function PostingProfilePage() {
+    const auth = useAuth();
+    const canManage = hasPermission(auth, financePermissions.postingProfilesManage);
+    const canViewAccounts = hasPermission(auth, financePermissions.accountsView);
     const [selectedProfile, setSelectedProfile] = useState<PostingProfile | null>(null);
     const [profileForm, setProfileForm] = useState<PostingProfilePayload>(emptyProfile);
     const [selectedRole, setSelectedRole] = useState<FinanceAccountRole | null>(null);
@@ -73,7 +79,7 @@ export default function PostingProfilePage() {
     const profiles = useApi((signal) => listPostingProfiles({ per_page: 100 }, signal), []);
     const roles = useApi((signal) => listAccountRoles({ per_page: 100 }, signal), []);
     const assignments = useApi((signal) => listAccountAssignments({ per_page: 100 }, signal), []);
-    const lookups = useApi((signal) => getFinanceLookups(signal), []);
+    const lookups = useApi((signal) => getFinanceLookups(signal), [], canViewAccounts);
 
     const activeRoles = useMemo(
         () => (roles.data?.data ?? lookups.data?.account_roles ?? []).filter((role) => role.is_active),
@@ -88,11 +94,11 @@ export default function PostingProfilePage() {
         {
             key: 'code',
             header: 'Profile',
-            render: (row) => (
+            render: (row) => canManage ? (
                 <button type="button" className="font-semibold text-sky-700 hover:underline" onClick={() => editProfile(row)}>
                     {row.code} - {row.name}
                 </button>
-            ),
+            ) : <span className="font-semibold text-slate-700">{row.code} - {row.name}</span>,
         },
         { key: 'lines', header: 'Semantic mappings', render: (row) => row.rules?.length ?? 0 },
         { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.is_active ? 'active' : 'inactive'} /> },
@@ -102,11 +108,11 @@ export default function PostingProfilePage() {
         {
             key: 'code',
             header: 'Role',
-            render: (row) => (
+            render: (row) => canManage ? (
                 <button type="button" className="font-semibold text-sky-700 hover:underline" onClick={() => editRole(row)}>
                     {row.code} - {row.name}
                 </button>
-            ),
+            ) : <span className="font-semibold text-slate-700">{row.code} - {row.name}</span>,
         },
         { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.is_active ? 'active' : 'inactive'} /> },
     ];
@@ -121,7 +127,7 @@ export default function PostingProfilePage() {
             key: 'actions',
             header: 'Actions',
             className: 'text-right',
-            render: (row) => row.effective_to
+            render: (row) => row.effective_to || !canManage
                 ? null
                 : <Button type="button" variant="secondary" onClick={() => { setEndingAssignmentId(row.id); setEndingDate(todayDate()); }}>End</Button>,
         },
@@ -262,122 +268,130 @@ export default function PostingProfilePage() {
             />
 
             <div className="space-y-6">
-                <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(28rem,34rem)]">
+                <div className={canManage ? 'grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(28rem,34rem)]' : ''}>
                     <Panel title="Posting profiles">
                         <ErrorAlert error={profiles.error} />
                         {profiles.loading
                             ? <LoadingState />
                             : <DataTable rows={profiles.data?.data ?? []} rowKey={(row) => row.id} columns={profileColumns} />}
                     </Panel>
-                    <Panel title={selectedProfile ? 'Edit posting profile' : 'New posting profile'}>
-                        <ErrorAlert error={profileError} />
-                        <form className="space-y-4" onSubmit={(event) => { event.preventDefault(); void saveProfile(); }}>
-                            <div className="grid gap-4 sm:grid-cols-2">
-                                <Input label="Code" value={profileForm.code} onChange={(event) => setProfileForm({ ...profileForm, code: event.target.value })} error={fieldError(profileError, 'code')} required />
-                                <Input label="Name" value={profileForm.name} onChange={(event) => setProfileForm({ ...profileForm, name: event.target.value })} error={fieldError(profileError, 'name')} required />
-                            </div>
-                            <Input label="Description" value={profileForm.description ?? ''} onChange={(event) => setProfileForm({ ...profileForm, description: event.target.value || null })} error={fieldError(profileError, 'description')} />
-                            <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
-                                <input type="checkbox" checked={profileForm.is_active} onChange={(event) => setProfileForm({ ...profileForm, is_active: event.target.checked })} />
-                                Active
-                            </label>
-                            <div className="space-y-3">
-                                {profileForm.rules.map((rule, index) => (
-                                    <div key={index} className="grid gap-3 sm:grid-cols-[1fr_1.5fr_auto]">
-                                        <Input label="Line key" value={rule.line_key} onChange={(event) => updateRule(index, { line_key: event.target.value })} error={fieldError(profileError, `rules.${index}.line_key`)} />
-                                        <Select
-                                            label="Account role"
-                                            value={rule.account_role_id || ''}
-                                            onChange={(event) => updateRule(index, { account_role_id: Number(event.target.value) || 0 })}
-                                            options={activeRoles.map((role) => ({ value: String(role.id), label: `${role.code} - ${role.name}` }))}
-                                            error={fieldError(profileError, `rules.${index}.account_role_id`)}
-                                        />
-                                        <div className="flex items-end">
-                                            <Button type="button" variant="danger" disabled={profileForm.rules.length <= 1} onClick={() => removeRule(index)}>Remove</Button>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                            <div className="flex flex-wrap justify-between gap-3">
-                                <Button type="button" variant="secondary" onClick={() => setProfileForm({ ...profileForm, rules: [...profileForm.rules, emptyProfileRule()] })}>Add line</Button>
-                                <div className="flex gap-2">
-                                    {selectedProfile && <Button type="button" variant="secondary" onClick={resetProfile}>New</Button>}
-                                    <Button type="submit" loading={savingProfile}>{selectedProfile ? 'Update profile' : 'Create profile'}</Button>
+                    {canManage && (
+                        <Panel title={selectedProfile ? 'Edit posting profile' : 'New posting profile'}>
+                            <ErrorAlert error={profileError} />
+                            <form className="space-y-4" onSubmit={(event) => { event.preventDefault(); void saveProfile(); }}>
+                                <div className="grid gap-4 sm:grid-cols-2">
+                                    <Input label="Code" value={profileForm.code} onChange={(event) => setProfileForm({ ...profileForm, code: event.target.value })} error={fieldError(profileError, 'code')} required />
+                                    <Input label="Name" value={profileForm.name} onChange={(event) => setProfileForm({ ...profileForm, name: event.target.value })} error={fieldError(profileError, 'name')} required />
                                 </div>
-                            </div>
-                        </form>
-                    </Panel>
+                                <Input label="Description" value={profileForm.description ?? ''} onChange={(event) => setProfileForm({ ...profileForm, description: event.target.value || null })} error={fieldError(profileError, 'description')} />
+                                <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                                    <input type="checkbox" checked={profileForm.is_active} onChange={(event) => setProfileForm({ ...profileForm, is_active: event.target.checked })} />
+                                    Active
+                                </label>
+                                <div className="space-y-3">
+                                    {profileForm.rules.map((rule, index) => (
+                                        <div key={index} className="grid gap-3 sm:grid-cols-[1fr_1.5fr_auto]">
+                                            <Input label="Line key" value={rule.line_key} onChange={(event) => updateRule(index, { line_key: event.target.value })} error={fieldError(profileError, `rules.${index}.line_key`)} />
+                                            <Select
+                                                label="Account role"
+                                                value={rule.account_role_id || ''}
+                                                onChange={(event) => updateRule(index, { account_role_id: Number(event.target.value) || 0 })}
+                                                options={activeRoles.map((role) => ({ value: String(role.id), label: `${role.code} - ${role.name}` }))}
+                                                error={fieldError(profileError, `rules.${index}.account_role_id`)}
+                                            />
+                                            <div className="flex items-end">
+                                                <Button type="button" variant="danger" disabled={profileForm.rules.length <= 1} onClick={() => removeRule(index)}>Remove</Button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="flex flex-wrap justify-between gap-3">
+                                    <Button type="button" variant="secondary" onClick={() => setProfileForm({ ...profileForm, rules: [...profileForm.rules, emptyProfileRule()] })}>Add line</Button>
+                                    <div className="flex gap-2">
+                                        {selectedProfile && <Button type="button" variant="secondary" onClick={resetProfile}>New</Button>}
+                                        <Button type="submit" loading={savingProfile}>{selectedProfile ? 'Update profile' : 'Create profile'}</Button>
+                                    </div>
+                                </div>
+                            </form>
+                        </Panel>
+                    )}
                 </div>
 
-                <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(28rem,34rem)]">
+                <div className={canManage ? 'grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(28rem,34rem)]' : ''}>
                     <Panel title="Account roles">
                         <ErrorAlert error={roles.error} />
                         {roles.loading
                             ? <LoadingState />
                             : <DataTable rows={roles.data?.data ?? []} rowKey={(row) => row.id} columns={roleColumns} />}
                     </Panel>
-                    <Panel title={selectedRole ? 'Edit account role' : 'New account role'}>
-                        <ErrorAlert error={roleError} />
-                        <form className="space-y-4" onSubmit={(event) => { event.preventDefault(); void saveRole(); }}>
-                            <div className="grid gap-4 sm:grid-cols-2">
-                                <Input label="Code" value={roleForm.code} onChange={(event) => setRoleForm({ ...roleForm, code: event.target.value })} error={fieldError(roleError, 'code')} required />
-                                <Input label="Name" value={roleForm.name} onChange={(event) => setRoleForm({ ...roleForm, name: event.target.value })} error={fieldError(roleError, 'name')} required />
-                            </div>
-                            <Input label="Description" value={roleForm.description ?? ''} onChange={(event) => setRoleForm({ ...roleForm, description: event.target.value || null })} error={fieldError(roleError, 'description')} />
-                            <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
-                                <input type="checkbox" checked={roleForm.is_active} onChange={(event) => setRoleForm({ ...roleForm, is_active: event.target.checked })} />
-                                Active
-                            </label>
-                            <div className="flex justify-end gap-2">
-                                {selectedRole && <Button type="button" variant="secondary" onClick={resetRole}>New</Button>}
-                                <Button type="submit" loading={savingRole}>{selectedRole ? 'Update role' : 'Create role'}</Button>
-                            </div>
-                        </form>
-                    </Panel>
+                    {canManage && (
+                        <Panel title={selectedRole ? 'Edit account role' : 'New account role'}>
+                            <ErrorAlert error={roleError} />
+                            <form className="space-y-4" onSubmit={(event) => { event.preventDefault(); void saveRole(); }}>
+                                <div className="grid gap-4 sm:grid-cols-2">
+                                    <Input label="Code" value={roleForm.code} onChange={(event) => setRoleForm({ ...roleForm, code: event.target.value })} error={fieldError(roleError, 'code')} required />
+                                    <Input label="Name" value={roleForm.name} onChange={(event) => setRoleForm({ ...roleForm, name: event.target.value })} error={fieldError(roleError, 'name')} required />
+                                </div>
+                                <Input label="Description" value={roleForm.description ?? ''} onChange={(event) => setRoleForm({ ...roleForm, description: event.target.value || null })} error={fieldError(roleError, 'description')} />
+                                <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                                    <input type="checkbox" checked={roleForm.is_active} onChange={(event) => setRoleForm({ ...roleForm, is_active: event.target.checked })} />
+                                    Active
+                                </label>
+                                <div className="flex justify-end gap-2">
+                                    {selectedRole && <Button type="button" variant="secondary" onClick={resetRole}>New</Button>}
+                                    <Button type="submit" loading={savingRole}>{selectedRole ? 'Update role' : 'Create role'}</Button>
+                                </div>
+                            </form>
+                        </Panel>
+                    )}
                 </div>
 
-                <div className="grid gap-5 xl:grid-cols-[minmax(0,1.4fr)_minmax(25rem,30rem)]">
+                <div className={canManage ? 'grid gap-5 xl:grid-cols-[minmax(0,1.4fr)_minmax(25rem,30rem)]' : ''}>
                     <Panel title="Effective account assignments">
                         <ErrorAlert error={assignments.error ?? assignmentError} />
                         {assignments.loading
                             ? <LoadingState />
                             : <DataTable rows={assignments.data?.data ?? []} rowKey={(row) => row.id} columns={assignmentColumns} />}
                     </Panel>
-                    <Panel title={endingAssignmentId === null ? 'New effective assignment' : 'End assignment'}>
-                        {endingAssignmentId === null ? (
-                            <form className="space-y-4" onSubmit={(event) => { event.preventDefault(); void saveAssignment(); }}>
-                                <Select
-                                    label="Account role"
-                                    value={assignmentForm.account_role_id || ''}
-                                    onChange={(event) => setAssignmentForm({ ...assignmentForm, account_role_id: Number(event.target.value) || 0 })}
-                                    options={activeRoles.map((role) => ({ value: String(role.id), label: `${role.code} - ${role.name}` }))}
-                                    error={fieldError(assignmentError, 'account_role_id')}
-                                />
-                                <Select
-                                    label="Finance account"
-                                    value={assignmentForm.account_id || ''}
-                                    onChange={(event) => setAssignmentForm({ ...assignmentForm, account_id: Number(event.target.value) || 0 })}
-                                    options={activeAccounts.map((account) => ({ value: String(account.id), label: `${account.code} - ${account.name}` }))}
-                                    error={fieldError(assignmentError, 'account_id')}
-                                />
-                                <div className="grid gap-4 sm:grid-cols-2">
-                                    <Input label="Effective from" type="date" value={assignmentForm.effective_from} onChange={(event) => setAssignmentForm({ ...assignmentForm, effective_from: event.target.value })} error={fieldError(assignmentError, 'effective_from')} required />
-                                    <Input label="Effective to" type="date" value={assignmentForm.effective_to ?? ''} onChange={(event) => setAssignmentForm({ ...assignmentForm, effective_to: event.target.value || null })} error={fieldError(assignmentError, 'effective_to')} />
-                                </div>
-                                <div className="flex justify-end">
-                                    <Button type="submit" loading={savingAssignment}>Create assignment</Button>
-                                </div>
-                            </form>
-                        ) : (
-                            <form className="space-y-4" onSubmit={(event) => { event.preventDefault(); void endAssignment(); }}>
-                                <Input label="Effective end date" type="date" value={endingDate} onChange={(event) => setEndingDate(event.target.value)} error={fieldError(assignmentError, 'effective_to')} required />
-                                <div className="flex justify-end gap-2">
-                                    <Button type="button" variant="secondary" onClick={() => setEndingAssignmentId(null)}>Cancel</Button>
-                                    <Button type="submit" loading={savingAssignment}>End assignment</Button>
-                                </div>
-                            </form>
-                        )}
-                    </Panel>
+                    {canManage && (
+                        <Panel title={endingAssignmentId === null ? 'New effective assignment' : 'End assignment'}>
+                            {!canViewAccounts ? (
+                                <p className="text-sm text-slate-600">Finance account view permission is required before account assignments can be created or changed.</p>
+                            ) : endingAssignmentId === null ? (
+                                <form className="space-y-4" onSubmit={(event) => { event.preventDefault(); void saveAssignment(); }}>
+                                    <Select
+                                        label="Account role"
+                                        value={assignmentForm.account_role_id || ''}
+                                        onChange={(event) => setAssignmentForm({ ...assignmentForm, account_role_id: Number(event.target.value) || 0 })}
+                                        options={activeRoles.map((role) => ({ value: String(role.id), label: `${role.code} - ${role.name}` }))}
+                                        error={fieldError(assignmentError, 'account_role_id')}
+                                    />
+                                    <Select
+                                        label="Finance account"
+                                        value={assignmentForm.account_id || ''}
+                                        onChange={(event) => setAssignmentForm({ ...assignmentForm, account_id: Number(event.target.value) || 0 })}
+                                        options={activeAccounts.map((account) => ({ value: String(account.id), label: `${account.code} - ${account.name}` }))}
+                                        error={fieldError(assignmentError, 'account_id')}
+                                    />
+                                    <div className="grid gap-4 sm:grid-cols-2">
+                                        <Input label="Effective from" type="date" value={assignmentForm.effective_from} onChange={(event) => setAssignmentForm({ ...assignmentForm, effective_from: event.target.value })} error={fieldError(assignmentError, 'effective_from')} required />
+                                        <Input label="Effective to" type="date" value={assignmentForm.effective_to ?? ''} onChange={(event) => setAssignmentForm({ ...assignmentForm, effective_to: event.target.value || null })} error={fieldError(assignmentError, 'effective_to')} />
+                                    </div>
+                                    <div className="flex justify-end">
+                                        <Button type="submit" loading={savingAssignment}>Create assignment</Button>
+                                    </div>
+                                </form>
+                            ) : (
+                                <form className="space-y-4" onSubmit={(event) => { event.preventDefault(); void endAssignment(); }}>
+                                    <Input label="Effective end date" type="date" value={endingDate} onChange={(event) => setEndingDate(event.target.value)} error={fieldError(assignmentError, 'effective_to')} required />
+                                    <div className="flex justify-end gap-2">
+                                        <Button type="button" variant="secondary" onClick={() => setEndingAssignmentId(null)}>Cancel</Button>
+                                        <Button type="submit" loading={savingAssignment}>End assignment</Button>
+                                    </div>
+                                </form>
+                            )}
+                        </Panel>
+                    )}
                 </div>
             </div>
         </>
