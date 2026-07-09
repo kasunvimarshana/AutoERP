@@ -424,6 +424,7 @@ final class VehicleServiceEngineTest extends TestCase
                 supervisorEmployeeId: $context['employee_id'],
             )),
         );
+        $this->assertSame($billToCustomerId, (int) $job->bill_to_customer_id);
         $this->line($job, VehicleServiceLineSourceType::ServiceItem, $context['service'], '1.000000', '150.000000');
         $this->changeStatus($job, VehicleServiceJobStatus::InProgress);
         $this->changeStatus($this->refreshJob($job), VehicleServiceJobStatus::Completed);
