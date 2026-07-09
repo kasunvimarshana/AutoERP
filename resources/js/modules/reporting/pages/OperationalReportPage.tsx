@@ -40,15 +40,24 @@ const PURCHASE_STATUSES = [
     ['cancelled', 'Cancelled'],
 ] as const;
 
-const JOB_STATUSES = [
+const OPERATIONAL_STATUSES = [
     ['draft', 'Draft'],
     ['inspected', 'Inspected'],
     ['in_progress', 'In progress'],
     ['completed', 'Completed'],
-    ['invoiced', 'Invoiced'],
+    ['cancelled', 'Cancelled'],
+] as const;
+
+const BILLING_STATUSES = [
+    ['unbilled', 'Unbilled'],
+    ['partially_billed', 'Partially billed'],
+    ['billed', 'Billed'],
+] as const;
+
+const SERVICE_PAYMENT_STATUSES = [
+    ['unpaid', 'Unpaid'],
     ['partially_paid', 'Partially paid'],
     ['paid', 'Paid'],
-    ['cancelled', 'Cancelled'],
 ] as const;
 
 const LINE_SOURCES = [
@@ -153,10 +162,22 @@ function OperationalReportContent({ reportKey, kind }: OperationalReportPageProp
                             onChange={(event) => setDraft((current) => ({ ...current, purchase_status: event.target.value || undefined }))}
                         />}
                         {kind !== 'purchase' && <Select
-                            label="Job status"
-                            value={draft.job_status ?? ''}
-                            options={[{ value: '', label: 'All statuses' }, ...JOB_STATUSES.map(([value, label]) => ({ value, label }))]}
-                            onChange={(event) => setDraft((current) => ({ ...current, job_status: event.target.value || undefined }))}
+                            label="Operational status"
+                            value={draft.operational_status ?? ''}
+                            options={[{ value: '', label: 'All statuses' }, ...OPERATIONAL_STATUSES.map(([value, label]) => ({ value, label }))]}
+                            onChange={(event) => setDraft((current) => ({ ...current, operational_status: event.target.value || undefined }))}
+                        />}
+                        {kind !== 'purchase' && <Select
+                            label="Billing status"
+                            value={draft.billing_status ?? ''}
+                            options={[{ value: '', label: 'All billing states' }, ...BILLING_STATUSES.map(([value, label]) => ({ value, label }))]}
+                            onChange={(event) => setDraft((current) => ({ ...current, billing_status: event.target.value || undefined }))}
+                        />}
+                        {kind !== 'purchase' && <Select
+                            label="Service payment status"
+                            value={draft.payment_status ?? ''}
+                            options={[{ value: '', label: 'All service payment states' }, ...SERVICE_PAYMENT_STATUSES.map(([value, label]) => ({ value, label }))]}
+                            onChange={(event) => setDraft((current) => ({ ...current, payment_status: event.target.value || undefined }))}
                         />}
                         {kind === 'purchase' && <SupplierLookupSelect
                             value={supplier}
@@ -261,43 +282,25 @@ function OperationalReportContent({ reportKey, kind }: OperationalReportPageProp
 
 function SummaryCards({ summary }: { summary: Record<string, string | number> }) {
     return (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {Object.entries(summary).map(([key, value]) => (
-                <div key={key} className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
-                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label(key)}</div>
-                    <div className="mt-1 break-words text-lg font-semibold tabular-nums text-slate-900">{formatSummary(value)}</div>
-                </div>
+                <Panel key={key} className="rounded-lg">
+                    <p className="text-xs uppercase tracking-wide text-slate-500">{key.replaceAll('_', ' ')}</p>
+                    <p className="mt-2 text-2xl font-semibold text-slate-900">{value}</p>
+                </Panel>
             ))}
         </div>
     );
 }
 
-function label(value: string): string {
-    return value.split('_').map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
-}
-
-function formatSummary(value: string | number): string {
-    if (typeof value === 'number') return value.toLocaleString();
-    const match = value.match(/^([+-]?)(\d+)(?:\.(\d+))?$/);
-    if (!match) return value;
-    const [, sign, integer, fraction = ''] = match;
-    const grouped = integer.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-    const trimmed = fraction.replace(/0+$/, '').padEnd(2, '0');
-    return `${sign}${grouped}.${trimmed}`;
-}
-
 function titleFor(kind: OperationalReportKind): string {
-    return {
-        purchase: 'Detailed Purchase Report',
-        'vehicle-service': 'Detailed Vehicle Service Report',
-        'employee-incentive': 'Employee Incentive Report',
-    }[kind];
+    if (kind === 'purchase') return 'Detailed Purchase Report';
+    if (kind === 'employee-incentive') return 'Employee Incentive Report';
+    return 'Detailed Vehicle Service Report';
 }
 
 function descriptionFor(kind: OperationalReportKind): string {
-    return {
-        purchase: 'Line-level purchase quantities, progress and financial values.',
-        'vehicle-service': 'Line-level service revenue, recorded cost and financial progress.',
-        'employee-incentive': 'Technician and supervisor incentives from Vehicle Service jobs.',
-    }[kind];
+    if (kind === 'purchase') return 'Purchase orders, items, suppliers, received quantities, and invoice/payment progress.';
+    if (kind === 'employee-incentive') return 'Technician and supervisor incentives for completed Vehicle Service work.';
+    return 'Vehicle Service job lines, materials, labour, external work and invoice/payment progress.';
 }
