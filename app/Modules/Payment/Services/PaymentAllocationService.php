@@ -9,6 +9,7 @@ use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Invoice\Contracts\InvoiceBalanceProviderInterface;
 use Modules\Invoice\Contracts\InvoiceSettlementServiceInterface;
+use Modules\Invoice\DTOs\BalanceResultData;
 use Modules\Payment\DTOs\PaymentAllocationData;
 use Modules\Payment\Enums\AllocationStatus;
 use Modules\Payment\Models\Payment;
@@ -115,7 +116,7 @@ final class PaymentAllocationService
                     allocationMethod: (string) $allocation->allocation_method,
                     metadata: is_array($allocation->metadata) ? $allocation->metadata : null,
                 );
-                $invoiceBalance = $this->invoiceBalances->validatePayableState((int) $allocation->invoice_id);
+                $invoiceBalance = $this->payableInvoiceBalance($locked, (int) $allocation->invoice_id);
                 $this->validator->validateInvoiceAllocation($locked, $invoiceBalance, $data);
 
                 if ($this->math->compare((string) $allocation->allocated_amount, $invoiceBalance->remainingAmount) > 0) {
@@ -201,7 +202,7 @@ final class PaymentAllocationService
 
     private function createPendingOne(Payment $payment, PaymentAllocationData $allocation): PaymentAllocation
     {
-        $invoiceBalance = $this->invoiceBalances->validatePayableState($allocation->invoiceId);
+        $invoiceBalance = $this->payableInvoiceBalance($payment, $allocation->invoiceId);
         $this->validator->validateInvoiceAllocation($payment, $invoiceBalance, $allocation);
         if ($this->math->compare($allocation->allocatedAmount, $invoiceBalance->remainingAmount) > 0) {
             throw new InvalidArgumentException('Payment allocation cannot exceed invoice remaining balance.');
@@ -237,7 +238,7 @@ final class PaymentAllocationService
         PaymentAllocationData $allocation,
         ?int $actorId,
     ): PaymentAllocation {
-        $invoiceBalance = $this->invoiceBalances->validatePayableState($allocation->invoiceId);
+        $invoiceBalance = $this->payableInvoiceBalance($payment, $allocation->invoiceId);
         $this->validator->validateInvoiceAllocation($payment, $invoiceBalance, $allocation);
         if ($this->math->compare($allocation->allocatedAmount, $this->availableAmount($payment)) > 0) {
             throw new InvalidArgumentException('Payment allocation cannot exceed available payment amount.');
@@ -290,6 +291,22 @@ final class PaymentAllocationService
             'invoice_date_snapshot' => $reference['invoice_date'] ?? null,
             'invoice_currency_code_snapshot' => $reference['currency_code'] ?? null,
         ];
+    }
+
+    private function payableInvoiceBalance(Payment $payment, int $invoiceId): BalanceResultData
+    {
+        if ($payment->party_type === null || $payment->party_id === null) {
+            throw new InvalidArgumentException('Payment invoice allocation requires a payment party.');
+        }
+
+        return $this->invoiceBalances->validatePayableState(
+            invoiceId: $invoiceId,
+            tenantId: (int) $payment->tenant_id,
+            organizationUnitId: $payment->organization_unit_id,
+            partyType: (string) $payment->party_type,
+            partyId: (int) $payment->party_id,
+            currencyId: $payment->currency_id === null ? null : (int) $payment->currency_id,
+        );
     }
 
     private function availableAmount(Payment $payment): string
