@@ -1,4 +1,5 @@
 import { purchasePermissions } from '@/modules/purchase/purchasePermissions';
+import { vehicleServicePermissions } from '@/modules/vehicle-service/vehicleServicePermissions';
 import { operational, type EntitlementRule } from './routeEntitlementPolicy';
 
 export const commerceRouteEntitlements: readonly EntitlementRule[] = [
@@ -25,4 +26,11 @@ export const commerceRouteEntitlements: readonly EntitlementRule[] = [
     operational('/purchase/debit-notes/create', ['purchase'], [purchasePermissions.debitNotesCreate]),
     operational('/purchase/debit-notes/:id', ['purchase'], [purchasePermissions.debitNotesView]),
     operational('/purchase/debit-notes', ['purchase'], [purchasePermissions.debitNotesView]),
+
+    operational('/vehicle-service/jobs/create', ['vehicle-service'], [vehicleServicePermissions.jobsCreate]),
+    operational('/vehicle-service/jobs/:id/edit', ['vehicle-service'], [vehicleServicePermissions.jobsUpdate]),
+    operational('/vehicle-service/jobs/:id/invoice', ['vehicle-service'], [vehicleServicePermissions.invoicesCreate]),
+    operational('/vehicle-service/jobs/:id/payment', ['vehicle-service'], [vehicleServicePermissions.paymentsCreate]),
+    operational('/vehicle-service/jobs/:id', ['vehicle-service'], [vehicleServicePermissions.jobsView]),
+    operational('/vehicle-service/jobs', ['vehicle-service'], [vehicleServicePermissions.jobsView]),
 ];
