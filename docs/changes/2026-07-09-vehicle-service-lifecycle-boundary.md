@@ -12,14 +12,16 @@ Vehicle Service used one job `status` to represent operational progress, billing
 - Updated Vehicle Service model casts, job resources, list filters, operational transitions, invoice billing updates, and payment settlement updates.
 - Updated main Vehicle Service frontend job list/detail/summary/invoice/history views to display separate lifecycle dimensions.
 - Updated Reporting request contracts, Vehicle Service detailed report, technician work report, employee commission report, and reporting frontend filters/tables to use the split lifecycle fields instead of `job_status`.
+- Updated Reporting tests to assert split lifecycle fields and to seed billing/payment status explicitly when test fixtures bypass service-layer invoice/payment sync.
 
 ## Verification
 
 - Compared the branch against `vehicle-service-version-hardening-20260709`.
 - Manually traced the affected Vehicle Service and Reporting source paths for removed `status`/`job_status` ownership.
+- Spot-checked the updated Reporting test source after replacement.
 - No runtime Laravel/MySQL, TypeScript, or production-like UAT suite was available in this connector session.
 
 ## Open gate before merge
 
-- Reporting tests and Vehicle Service engine tests still need a dedicated source-truth update pass where they assert old single-status behavior.
+- Vehicle Service engine tests still need a dedicated source-truth update pass where they assert old single-status behavior.
 - Full runtime checks must pass before merge: PHP syntax/static analysis, migrations, backend tests, frontend typecheck, and production-like UAT.
