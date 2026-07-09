@@ -12,7 +12,9 @@ export interface TechnicianWorkReportParams extends PaymentLifecycleFilterParams
     supervisor_id?: number | null;
     customer_id?: number | null;
     vehicle_id?: number | null;
-    job_status?: string;
+    operational_status?: string;
+    billing_status?: string;
+    payment_status?: string;
     role_type?: string;
     commission_type?: string;
     invoice_status?: string;
