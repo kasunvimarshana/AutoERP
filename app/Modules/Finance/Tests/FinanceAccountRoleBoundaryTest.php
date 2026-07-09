@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Finance\Tests;
 
+use Modules\Finance\DTOs\FinancePostingLine;
 use Modules\Finance\DTOs\PostingLine;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
@@ -26,24 +27,26 @@ final class FinanceAccountRoleBoundaryTest extends TestCase
         self::assertStringContainsString('semantic posting profile mapping key', $service);
     }
 
-    public function test_posting_line_dto_has_no_direct_account_selector_surface(): void
+    public function test_posting_line_dtos_have_no_direct_account_selector_surface(): void
     {
-        $postingLine = new ReflectionClass(PostingLine::class);
-        $constructorParameters = array_map(
-            static fn ($parameter): string => $parameter->getName(),
-            $postingLine->getConstructor()?->getParameters() ?? [],
-        );
-        $properties = array_map(
-            static fn ($property): string => $property->getName(),
-            $postingLine->getProperties(),
-        );
+        foreach ([PostingLine::class, FinancePostingLine::class] as $dto) {
+            $reflection = new ReflectionClass($dto);
+            $constructorParameters = array_map(
+                static fn ($parameter): string => $parameter->getName(),
+                $reflection->getConstructor()?->getParameters() ?? [],
+            );
+            $properties = array_map(
+                static fn ($property): string => $property->getName(),
+                $reflection->getProperties(),
+            );
 
-        self::assertNotContains('accountCode', $constructorParameters);
-        self::assertNotContains('account', $constructorParameters);
-        self::assertNotContains('accountCode', $properties);
-        self::assertNotContains('account', $properties);
-        self::assertContains('profileKey', $constructorParameters);
-        self::assertContains('profileKey', $properties);
+            self::assertNotContains('accountCode', $constructorParameters);
+            self::assertNotContains('account', $constructorParameters);
+            self::assertNotContains('accountCode', $properties);
+            self::assertNotContains('account', $properties);
+            self::assertContains('profileKey', $constructorParameters);
+            self::assertContains('profileKey', $properties);
+        }
     }
 
     public function test_account_resolution_is_effective_dated_and_scope_aware(): void
