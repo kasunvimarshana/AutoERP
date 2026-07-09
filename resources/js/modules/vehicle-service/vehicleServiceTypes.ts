@@ -17,6 +17,11 @@ export type VehicleServicePaymentStatus =
     | 'partially_paid'
     | 'paid';
 
+export type VehicleServiceLifecycleStatus =
+    | VehicleServiceOperationalStatus
+    | VehicleServiceBillingStatus
+    | VehicleServicePaymentStatus;
+
 export type VehicleServiceLifecycleDimension = 'operational' | 'billing' | 'payment';
 
 export type VehicleServiceLineSourceType =
@@ -274,8 +279,8 @@ export interface VehicleServiceInvoiceCreated {
 export interface VehicleServiceStatusHistory {
     id: number;
     dimension: VehicleServiceLifecycleDimension;
-    old_status?: string | null;
-    new_status: string;
+    old_status?: VehicleServiceLifecycleStatus | null;
+    new_status: VehicleServiceLifecycleStatus;
     reason?: string | null;
     changed_by?: number | null;
     changed_at?: string | null;
