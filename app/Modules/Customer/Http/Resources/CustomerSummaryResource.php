@@ -16,6 +16,7 @@ final class CustomerSummaryResource extends JsonResource
     {
         return [
             'id' => (int) $this->getKey(),
+            'row_version' => (int) $this->row_version,
             'customer_number' => $this->customer_number,
             'code' => $this->code,
             'name' => $this->name,
