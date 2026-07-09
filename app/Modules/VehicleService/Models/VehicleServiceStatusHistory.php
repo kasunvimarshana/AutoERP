@@ -6,7 +6,7 @@ namespace Modules\VehicleService\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Core\Models\TenantOwnedModel;
-use Modules\VehicleService\Enums\VehicleServiceJobStatus;
+use Modules\VehicleService\Enums\VehicleServiceLifecycleDimension;
 
 final class VehicleServiceStatusHistory extends TenantOwnedModel
 {
@@ -20,8 +20,7 @@ final class VehicleServiceStatusHistory extends TenantOwnedModel
             'tenant_id' => 'integer',
             'organization_unit_id' => 'integer',
             'vehicle_service_job_id' => 'integer',
-            'old_status' => VehicleServiceJobStatus::class,
-            'new_status' => VehicleServiceJobStatus::class,
+            'dimension' => VehicleServiceLifecycleDimension::class,
             'changed_by' => 'integer',
             'changed_at' => 'datetime',
         ]);
