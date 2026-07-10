@@ -53,6 +53,9 @@ export interface PostingProfile extends FinanceLookup {
         id: number;
         line_key: string;
         account_role_id: number;
+        effective_from: string;
+        effective_to?: string | null;
+        is_active: boolean;
         role?: FinanceAccountRole;
         description?: string | null;
     }>;
@@ -193,7 +196,14 @@ export interface PostingProfilePayload {
     name: string;
     description?: string | null;
     is_active: boolean;
-    rules: Array<{ line_key: string; account_role_id: number; description?: string | null }>;
+    rules: Array<{
+        line_key: string;
+        account_role_id: number;
+        effective_from?: string | null;
+        effective_to?: string | null;
+        is_active?: boolean;
+        description?: string | null;
+    }>;
 }
 
 export interface AccountRolePayload {
