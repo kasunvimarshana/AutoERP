@@ -71,8 +71,8 @@ function customerWithoutCode(): CustomerSummary {
         name: 'No Code Customer',
         customer_type: 'company',
         status: 'active',
-        is_credit_allowed: true,
-        is_advance_allowed: false,
+        credit_allowed: true,
+        advance_allowed: false,
         is_tax_exempt: false,
         marketing_consent: false,
     };
