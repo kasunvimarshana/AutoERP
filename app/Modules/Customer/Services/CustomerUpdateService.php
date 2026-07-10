@@ -6,7 +6,6 @@ namespace Modules\Customer\Services;
 
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
-use Modules\Core\Services\DecimalMath;
 use Modules\Customer\DTOs\UpdateCustomerData;
 use Modules\Customer\Enums\CustomerStatus;
 use Modules\Customer\Models\Customer;
@@ -16,14 +15,12 @@ use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 final class CustomerUpdateService
 {
     public function __construct(
-        private readonly DecimalMath $math,
         private readonly CustomerValidationService $validator,
         private readonly CustomerContactService $contacts,
         private readonly CustomerAddressService $addresses,
         private readonly CustomerBankAccountService $bankAccounts,
         private readonly CustomerCategoryService $categories,
         private readonly CustomerDocumentService $documents,
-        private readonly CustomerCreditProfileService $creditProfiles,
     ) {}
 
     public function update(Customer $customer, UpdateCustomerData $data): Customer
@@ -68,20 +65,13 @@ final class CustomerUpdateService
                 'vat_number' => $data->vatNumber,
                 'svat_number' => $data->svatNumber,
                 'business_registration_number' => $data->businessRegistrationNumber,
-                'credit_limit' => $data->creditProfile !== null
-                    ? $this->math->normalize($data->creditProfile->creditLimit)
-                    : ($data->creditLimit !== null ? $this->math->normalize($data->creditLimit) : null),
-                'opening_balance' => $data->openingBalance !== null ? $this->math->normalize($data->openingBalance) : null,
-                'is_credit_allowed' => $data->isCreditAllowed,
-                'is_advance_allowed' => $data->isAdvanceAllowed,
                 'is_tax_exempt' => $data->isTaxExempt,
                 'marketing_consent' => $data->marketingConsent,
                 'preferred_communication_channel' => $data->preferredCommunicationChannel,
                 'notes' => $data->notes,
                 'metadata' => $data->metadata,
             ] as $key => $value) {
-                $requestKey = $key;
-                if (in_array($requestKey, $data->provided, true)) {
+                if (in_array($key, $data->provided, true)) {
                     $attributes[$key] = $value;
                 }
             }
@@ -104,9 +94,6 @@ final class CustomerUpdateService
             }
             if ($data->documents !== null) {
                 $this->documents->replace($customer, $data->documents);
-            }
-            if ($data->creditProfile !== null) {
-                $this->creditProfiles->set($customer, $data->creditProfile);
             }
 
             return $customer->refresh()->load([
