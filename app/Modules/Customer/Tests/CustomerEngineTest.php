@@ -46,7 +46,10 @@ final class CustomerEngineTest extends TestCase
         self::assertFalse(array_key_exists('is_credit_allowed', $customer->getAttributes()));
         self::assertFalse(array_key_exists('is_advance_allowed', $customer->getAttributes()));
 
-        $profile = $customer->creditProfile()->firstOrFail();
+        $profile = $this->withTenantExecutionContext(
+            $tenantId,
+            fn () => $customer->creditProfile()->firstOrFail(),
+        );
         self::assertSame(1, (int) $profile->row_version);
         self::assertSame('25000.000000', (string) $profile->credit_limit);
         self::assertSame(30, (int) $profile->credit_period_days);
@@ -58,7 +61,10 @@ final class CustomerEngineTest extends TestCase
     {
         $tenantId = $this->tenant();
         $customer = $this->customer($tenantId);
-        $profileBefore = $customer->creditProfile()->firstOrFail()->getAttributes();
+        $profileBefore = $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): array => $customer->creditProfile()->firstOrFail()->getAttributes(),
+        );
 
         $updated = $this->withTenantExecutionContext($tenantId, fn (): Customer => app(CustomerUpdateService::class)->update(
             $customer,
@@ -68,20 +74,24 @@ final class CustomerEngineTest extends TestCase
                 provided: ['name'],
             ),
         ));
+        $profileAfter = $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): array => $updated->creditProfile()->firstOrFail()->getAttributes(),
+        );
 
         self::assertSame('Updated Customer Name', $updated->name);
         self::assertSame(2, (int) $updated->row_version);
-        self::assertSame(
-            $profileBefore,
-            $updated->creditProfile()->firstOrFail()->getAttributes(),
-        );
+        self::assertSame($profileBefore, $profileAfter);
     }
 
     public function test_credit_profile_update_requires_exact_profile_version(): void
     {
         $tenantId = $this->tenant();
         $customer = $this->customer($tenantId);
-        $profile = $customer->creditProfile()->firstOrFail();
+        $profile = $this->withTenantExecutionContext(
+            $tenantId,
+            fn () => $customer->creditProfile()->firstOrFail(),
+        );
 
         $updated = $this->withTenantExecutionContext($tenantId, fn () => app(CustomerCreditProfileService::class)->set(
             $customer,
@@ -135,7 +145,10 @@ final class CustomerEngineTest extends TestCase
         $tenantId = $this->tenant();
         $customer = $this->customer($tenantId, 'CUS-RESULT', true, false);
 
-        $result = app(CustomerLookupService::class)->result($customer->load('creditProfile'));
+        $result = $this->withTenantExecutionContext(
+            $tenantId,
+            fn () => app(CustomerLookupService::class)->result($customer->load('creditProfile')),
+        );
 
         self::assertSame('10000.000000', $result->creditLimit);
         self::assertTrue($result->creditAllowed);

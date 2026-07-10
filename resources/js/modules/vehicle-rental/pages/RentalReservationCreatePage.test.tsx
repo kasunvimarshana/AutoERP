@@ -196,8 +196,8 @@ function customer(): CustomerSummary {
         customer_type: "company",
         status: "active",
         default_currency: apiMocks.customerDefaultCurrency.current,
-        is_credit_allowed: true,
-        is_advance_allowed: false,
+        credit_allowed: true,
+        advance_allowed: false,
         is_tax_exempt: false,
         marketing_consent: false,
     };
