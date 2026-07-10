@@ -1,6 +1,7 @@
 export const TENANT_MODULES = [
     { code: 'customer', label: 'Customers' },
     { code: 'supplier', label: 'Suppliers' },
+    { code: 'hr', label: 'Human resources' },
     { code: 'item', label: 'Items' },
     { code: 'warehouse', label: 'Warehouses' },
     { code: 'inventory', label: 'Inventory' },
