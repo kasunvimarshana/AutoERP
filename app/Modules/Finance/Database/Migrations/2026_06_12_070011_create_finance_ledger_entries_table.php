@@ -21,6 +21,7 @@ return new class extends Migration
             $table->date('entry_date');
             $table->decimal('debit', 20, 6)->default('0');
             $table->decimal('credit', 20, 6)->default('0');
+            $table->decimal('balance_after', 20, 6)->default('0')->comment('Rebuildable chronological projection; ledger debit and credit remain authoritative.');
             $table->string('source_module', 100)->nullable();
             $table->string('source_type')->nullable();
             $table->unsignedBigInteger('source_id')->nullable();
