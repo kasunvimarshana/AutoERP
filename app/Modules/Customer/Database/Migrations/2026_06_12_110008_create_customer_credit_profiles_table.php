@@ -12,12 +12,15 @@ return new class extends Migration
     {
         Schema::create('customer_credit_profiles', function (Blueprint $table): void {
             $table->id();
+            $table->unsignedBigInteger('row_version')->default(1)->comment('Used for optimistic concurrency control');
             $table->foreignId('tenant_id')->constrained('tenants', indexName: 'customer_credit_profiles_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('customer_id')->unique('customer_credit_profiles_cust_uk');
             $table->decimal('credit_limit', 20, 6)->default('0.000000');
             $table->integer('credit_period_days')->nullable();
             $table->decimal('warning_threshold_percent', 20, 6)->default('80.000000');
+            $table->boolean('credit_allowed')->default(true);
+            $table->boolean('advance_allowed')->default(true);
             $table->boolean('allow_over_credit')->default(false);
             $table->boolean('allow_partial_payment')->default(true);
             $table->boolean('is_active')->default(true);
@@ -33,7 +36,7 @@ return new class extends Migration
             $table->foreign(['customer_id', 'tenant_id'], 'customer_credit_profiles_customer_id_tenant_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('customers')
-                ->cascadeOnDelete();
+                ->restrictOnDelete();
         });
     }
 
