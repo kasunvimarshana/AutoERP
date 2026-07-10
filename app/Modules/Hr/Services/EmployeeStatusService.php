@@ -11,6 +11,7 @@ use Modules\Hr\Enums\EmployeeAvailabilityStatus;
 use Modules\Hr\Enums\EmployeeStatus;
 use Modules\Hr\Models\HrEmployee;
 use Modules\Hr\Models\HrEmployeeStatusHistory;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 final class EmployeeStatusService
 {
@@ -21,12 +22,28 @@ final class EmployeeStatusService
 
     public function change(HrEmployee $employee, EmployeeStatusChangeData $data): HrEmployee
     {
-        $from = $employee->status;
-        $this->assertTransition($from, $data->newStatus);
-        if ($from === $data->newStatus) {
-            return $employee;
-        }
-        return DB::transaction(function () use ($employee, $data, $from): HrEmployee {
+        return DB::transaction(function () use ($employee, $data): HrEmployee {
+            $employee = HrEmployee::query()
+                ->whereKey($employee->getKey())
+                ->where('tenant_id', (int) $employee->tenant_id)
+                ->when(
+                    $employee->organization_unit_id === null,
+                    static fn ($query) => $query->whereNull('organization_unit_id'),
+                    static fn ($query) => $query->where('organization_unit_id', (int) $employee->organization_unit_id),
+                )
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($data->rowVersion !== (int) $employee->row_version) {
+                throw new ConflictHttpException('Employee was changed by someone else. Reload before changing status.');
+            }
+
+            $from = $employee->status;
+            $this->assertTransition($from, $data->newStatus);
+            if ($from === $data->newStatus) {
+                return $employee;
+            }
+
             $this->history($employee, $from, $data->newStatus, $data->reason, $data->changedBy);
             $employee->status = $data->newStatus;
             $employee->availability_status = match ($data->newStatus) {
@@ -39,14 +56,16 @@ final class EmployeeStatusService
                 $employee->approved_by = $data->changedBy;
                 $employee->approved_at = now();
             }
+            $employee->setAttribute('row_version', ((int) $employee->row_version) + 1);
             $employee->save();
+
             return $employee->refresh();
         });
     }
 
-    public function changeTo(HrEmployee $employee, EmployeeStatus $status, ?int $changedBy = null, ?string $reason = null): HrEmployee
+    public function changeTo(HrEmployee $employee, EmployeeStatus $status, int $rowVersion, ?int $changedBy = null, ?string $reason = null): HrEmployee
     {
-        return $this->change($employee, new EmployeeStatusChangeData($status, $reason, $changedBy));
+        return $this->change($employee, new EmployeeStatusChangeData($status, $rowVersion, $reason, $changedBy));
     }
 
     public function assertTransition(EmployeeStatus $from, EmployeeStatus $to): void
