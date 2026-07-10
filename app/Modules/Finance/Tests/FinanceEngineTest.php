@@ -83,12 +83,14 @@ final class FinanceEngineTest extends TestCase
             $cashBalance = $cash->balances()->firstOrFail();
             $capitalBalance = $capital->balances()->firstOrFail();
 
-            $this->assertSame('100000.000000', (string) $cashBalance->total_debit);
-            $this->assertSame('0.000000', (string) $cashBalance->total_credit);
+            $this->assertSame('100000.000000', (string) $cashBalance->opening_debit);
+            $this->assertSame('0.000000', (string) $cashBalance->period_debit);
             $this->assertSame('100000.000000', (string) $cashBalance->closing_debit);
-            $this->assertSame('0.000000', (string) $capitalBalance->total_debit);
-            $this->assertSame('100000.000000', (string) $capitalBalance->total_credit);
+            $this->assertSame('100000.000000', (string) $capitalBalance->opening_credit);
+            $this->assertSame('0.000000', (string) $capitalBalance->period_credit);
             $this->assertSame('100000.000000', (string) $capitalBalance->closing_credit);
+            $this->assertSame('100000.000000', (string) $cash->ledgerEntries()->firstOrFail()->balance_after);
+            $this->assertSame('100000.000000', (string) $capital->ledgerEntries()->firstOrFail()->balance_after);
 
             $trialBalance = app(TrialBalanceService::class)->calculate(
                 tenantId: $tenantId,
@@ -137,12 +139,12 @@ final class FinanceEngineTest extends TestCase
 
             $cashBalance = $cash->balances()->firstOrFail();
             $capitalBalance = $capital->balances()->firstOrFail();
-            $this->assertSame('100000.000000', (string) $cashBalance->total_debit);
-            $this->assertSame('100000.000000', (string) $cashBalance->total_credit);
+            $this->assertSame('100000.000000', (string) $cashBalance->opening_debit);
+            $this->assertSame('100000.000000', (string) $cashBalance->period_credit);
             $this->assertSame('0.000000', (string) $cashBalance->closing_debit);
             $this->assertSame('0.000000', (string) $cashBalance->closing_credit);
-            $this->assertSame('100000.000000', (string) $capitalBalance->total_debit);
-            $this->assertSame('100000.000000', (string) $capitalBalance->total_credit);
+            $this->assertSame('100000.000000', (string) $capitalBalance->opening_credit);
+            $this->assertSame('100000.000000', (string) $capitalBalance->period_debit);
             $this->assertSame('0.000000', (string) $capitalBalance->closing_debit);
             $this->assertSame('0.000000', (string) $capitalBalance->closing_credit);
 
@@ -153,7 +155,7 @@ final class FinanceEngineTest extends TestCase
         });
     }
 
-    public function test_backdated_posting_keeps_date_range_balances_ledger_derived(): void
+    public function test_backdated_posting_rebuilds_later_ledger_balances_and_date_range_results(): void
     {
         [$tenantId, $cash, $capital] = $this->chart();
 
@@ -165,8 +167,10 @@ final class FinanceEngineTest extends TestCase
                 'JE-LATER',
                 '2026-06-20',
                 '40.000000',
+                JournalType::General,
             );
             app(JournalPostingService::class)->post($later);
+            $this->assertSame('40.000000', (string) $cash->ledgerEntries()->firstOrFail()->balance_after);
 
             $earlier = $this->createCashCapitalJournal(
                 $tenantId,
@@ -175,6 +179,7 @@ final class FinanceEngineTest extends TestCase
                 'JE-EARLIER',
                 '2026-06-05',
                 '60.000000',
+                JournalType::General,
             );
             app(JournalPostingService::class)->post($earlier);
 
@@ -188,7 +193,11 @@ final class FinanceEngineTest extends TestCase
             $this->assertSame('40.000000', $balance->periodDebit);
             $this->assertSame('100.000000', $balance->closingDebit);
             $this->assertSame('100.000000', $balance->balance);
-            $this->assertSame('100.000000', (string) $cash->balances()->firstOrFail()->total_debit);
+            $this->assertSame('100.000000', (string) $cash->balances()->firstOrFail()->period_debit);
+
+            $cashLedger = $cash->ledgerEntries()->orderBy('entry_date')->orderBy('id')->get();
+            $this->assertSame('60.000000', (string) $cashLedger[0]->balance_after);
+            $this->assertSame('100.000000', (string) $cashLedger[1]->balance_after);
         });
     }
 
@@ -282,13 +291,14 @@ final class FinanceEngineTest extends TestCase
         string $journalNumber = 'JE-001',
         string $journalDate = '2026-06-06',
         string $amount = '100000.000000',
+        JournalType $journalType = JournalType::Opening,
     ): FinanceJournalEntry {
         return app(JournalEntryCreationService::class)->create(new CreateJournalEntryData(
             tenantId: $tenantId,
             journalDate: $journalDate,
             journalNumber: $journalNumber,
-            journalType: JournalType::Opening,
-            description: 'Opening capital contribution',
+            journalType: $journalType,
+            description: 'Capital contribution',
             lines: [
                 new JournalLineData(
                     accountId: (int) $cash->getKey(),
@@ -313,9 +323,7 @@ final class FinanceEngineTest extends TestCase
             'code' => $code,
             'name' => Str::headline($code),
             'normal_balance' => $normalBalance->value,
-            'statement_type' => $normalBalance === NormalBalance::Debit
-                ? StatementType::BalanceSheet->value
-                : StatementType::BalanceSheet->value,
+            'statement_type' => StatementType::BalanceSheet->value,
             'is_active' => true,
         ]);
     }
