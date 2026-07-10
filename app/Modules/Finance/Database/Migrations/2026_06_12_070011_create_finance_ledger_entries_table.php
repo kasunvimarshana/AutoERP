@@ -21,7 +21,6 @@ return new class extends Migration
             $table->date('entry_date');
             $table->decimal('debit', 20, 6)->default('0');
             $table->decimal('credit', 20, 6)->default('0');
-            $table->decimal('balance_after', 20, 6)->default('0');
             $table->string('source_module', 100)->nullable();
             $table->string('source_type')->nullable();
             $table->unsignedBigInteger('source_id')->nullable();
@@ -35,7 +34,7 @@ return new class extends Migration
             $table->index('account_id', 'finance_ledger_account_ix');
             $table->index('entry_date', 'finance_ledger_date_ix');
             $table->index(['source_type', 'source_id'], 'finance_ledger_source_ix');
-            $table->index(['tenant_id', 'source_module', 'source_type', 'source_id'], 'finance_ledger_tenant_source_trace_ix', );
+            $table->index(['tenant_id', 'source_module', 'source_type', 'source_id'], 'finance_ledger_tenant_source_trace_ix');
 
             $table->unique(['id', 'tenant_id'], 'finance_ledger_entries_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'finance_ledger_entries_organization_unit_id_tenant_fk')
