@@ -182,9 +182,14 @@ export const createRentalCustodyEvent = (
         `allocations/${allocationId}/custody-events`,
         { ...payload, expected_allocation_version: expectedAllocationVersion },
     );
-export const confirmRentalCustodyEvent = (id: number, expectedVersion: number) =>
+export const confirmRentalCustodyEvent = (
+    id: number,
+    expectedVersion: number,
+    expectedAllocationVersion: number,
+) =>
     patch<RentalCustodyEvent>(`custody-events/${id}/confirm`, {
         expected_version: expectedVersion,
+        expected_allocation_version: expectedAllocationVersion,
     });
 export const reverseRentalCustodyEvent = (
     id: number,
