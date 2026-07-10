@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { TENANT_MODULE_CODE, TENANT_MODULES } from '@/app/access/tenantModules';
 import { TestRouter } from '@/test/TestRouter';
 import type { TenantPlan, TenantPlanRevision } from '../tenantTypes';
 import { TenantPlanEditor } from './TenantPlanEditor';
@@ -11,7 +12,7 @@ function createPlan(): TenantPlan {
         revision_number: 2,
         features_schema_version: 1,
         limits_schema_version: 1,
-        features: { enabled_modules: ['inventory'] },
+        features: { enabled_modules: [TENANT_MODULE_CODE.INVENTORY] },
         limits: { max_users: 10 },
         price: '100.000000',
         currency_id: 9,
@@ -35,7 +36,7 @@ function createPlan(): TenantPlan {
         historical_subscription_count: 2,
         current_revision: revision,
         latest_revision: revision,
-        features: { enabled_modules: ['inventory'] },
+        features: { enabled_modules: [TENANT_MODULE_CODE.INVENTORY] },
         limits: { max_users: 10 },
         price: '100.000000',
         currency_id: 9,
@@ -46,21 +47,50 @@ function createPlan(): TenantPlan {
     };
 }
 
+function renderNewPlan(onSubmit = vi.fn().mockResolvedValue(undefined)) {
+    render(
+        <TestRouter>
+            <TenantPlanEditor
+                plan={null}
+                currencies={[{ id: 1, code: 'USD', name: 'US Dollar', is_active: true, row_version: 1, updated_at: null }]}
+                saving={false}
+                error={null}
+                onCancel={vi.fn()}
+                onSubmit={onSubmit}
+            />
+        </TestRouter>,
+    );
+
+    return onSubmit;
+}
+
 describe('TenantPlanEditor', () => {
+    it('renders every supported tenant module in the commercial module selector', () => {
+        renderNewPlan();
+
+        expect(screen.getByText('Enabled commercial modules')).toBeInTheDocument();
+        for (const module of TENANT_MODULES) {
+            expect(screen.getByLabelText(module.label)).toBeInTheDocument();
+        }
+    });
+
+    it('submits human resources when the HR commercial module is enabled', async () => {
+        const onSubmit = renderNewPlan();
+
+        fireEvent.change(screen.getByLabelText('Plan name'), { target: { value: 'People Plan' } });
+        fireEvent.change(screen.getByLabelText('Plan slug'), { target: { value: 'people-plan' } });
+        fireEvent.click(screen.getByLabelText('Human resources'));
+        fireEvent.change(screen.getByLabelText('Revision reason'), { target: { value: 'Enable HR for the people operations plan.' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Review new plan' }));
+        fireEvent.click(await screen.findByRole('button', { name: 'Create plan' }));
+
+        await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+        const payload = onSubmit.mock.calls[0][0] as Record<string, { enabled_modules?: string[] }>;
+        expect(payload.features.enabled_modules).toEqual([TENANT_MODULE_CODE.HR]);
+    });
+
     it('omits a blank effective date instead of sending null', async () => {
-        const onSubmit = vi.fn().mockResolvedValue(undefined);
-        render(
-            <TestRouter>
-                <TenantPlanEditor
-                    plan={null}
-                    currencies={[{ id: 1, code: 'USD', name: 'US Dollar', is_active: true, row_version: 1, updated_at: null }]}
-                    saving={false}
-                    error={null}
-                    onCancel={vi.fn()}
-                    onSubmit={onSubmit}
-                />
-            </TestRouter>,
-        );
+        const onSubmit = renderNewPlan();
 
         fireEvent.change(screen.getByLabelText('Plan name'), { target: { value: 'Professional' } });
         fireEvent.change(screen.getByLabelText('Plan slug'), { target: { value: 'professional' } });
@@ -125,5 +155,4 @@ describe('TenantPlanEditor', () => {
         expect(await screen.findByText('Select an active billing currency for the new revision.')).toBeInTheDocument();
         expect(onSubmit).not.toHaveBeenCalled();
     });
-
 });
