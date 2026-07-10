@@ -32,10 +32,6 @@ return new class extends Migration
             $table->string('vat_number')->nullable();
             $table->string('svat_number')->nullable();
             $table->string('business_registration_number')->nullable();
-            $table->decimal('credit_limit', 20, 6)->default('0.000000');
-            $table->decimal('opening_balance', 20, 6)->default('0.000000');
-            $table->boolean('is_credit_allowed')->default(true);
-            $table->boolean('is_advance_allowed')->default(true);
             $table->boolean('is_tax_exempt')->default(false);
             $table->boolean('marketing_consent')->default(false);
             $table->string('preferred_communication_channel')->nullable();
