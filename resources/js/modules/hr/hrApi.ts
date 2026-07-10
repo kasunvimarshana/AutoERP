@@ -17,9 +17,9 @@ export const getEmployee = (id: number, signal?: AbortSignal) => apiClient.get<A
 export const createEmployee = (payload: EmployeePayload) => apiClient.post<ApiResource<Employee>>(endpoints.hrEmployees, payload).then((r) => r.data.data);
 export const createEmployeeWithRelations = (payload: EmployeeWithRelationsPayload) => apiClient.post<ApiResource<Employee>>(`${endpoints.hrEmployees}/with-relations`, payload).then((r) => r.data.data);
 export const updateEmployee = (id: number, payload: Partial<EmployeePayload>) => apiClient.put<ApiResource<Employee>>(`${endpoints.hrEmployees}/${id}`, payload).then((r) => r.data.data);
-export const deleteEmployee = (id: number) => apiClient.delete(`${endpoints.hrEmployees}/${id}`);
-export const setEmployeeActive = (id: number, active: boolean) => apiClient.patch<ApiResource<Employee>>(`${endpoints.hrEmployees}/${id}/${active ? 'activate' : 'deactivate'}`).then((r) => r.data.data);
-export const changeEmployeeStatus = (id: number, status: string, reason?: string) => apiClient.patch<ApiResource<Employee>>(`${endpoints.hrEmployees}/${id}/status`, { status, reason }).then((r) => r.data.data);
+export const deleteEmployee = (id: number, rowVersion: number) => apiClient.delete(`${endpoints.hrEmployees}/${id}`, { data: { row_version: rowVersion } });
+export const setEmployeeActive = (id: number, active: boolean, rowVersion: number) => apiClient.patch<ApiResource<Employee>>(`${endpoints.hrEmployees}/${id}/${active ? 'activate' : 'deactivate'}`, { row_version: rowVersion }).then((r) => r.data.data);
+export const changeEmployeeStatus = (id: number, status: string, rowVersion: number, reason?: string) => apiClient.patch<ApiResource<Employee>>(`${endpoints.hrEmployees}/${id}/status`, { status, row_version: rowVersion, reason }).then((r) => r.data.data);
 export const changeEmployeeAvailability = (id: number, payload: EmployeeAvailabilityPayload) => apiClient.patch<ApiResource<Employee>>(`${endpoints.hrEmployees}/${id}/availability`, payload).then((r) => r.data.data);
 
 export function searchEmployees(params: LookupLoadParams, kind = 'active'): Promise<LookupResult<EmployeeSummary>> {
