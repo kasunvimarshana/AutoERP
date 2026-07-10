@@ -135,11 +135,19 @@ export default function RentalDepositPage() {
     };
 
     const reverseLink = async (link: RentalDepositLink) => {
-        if (!selected) return;
+        if (!selected || !link.payment?.row_version) return;
+        const reversalReason = window.prompt("Enter the reason for reversing this deposit movement.");
+        if (!reversalReason?.trim()) return;
+
         setSaving(true);
         setActionError(null);
         try {
-            const updated = await reverseRentalDepositLink(link.id, selected.row_version);
+            const updated = await reverseRentalDepositLink(
+                link.id,
+                selected.row_version,
+                link.payment.row_version,
+                reversalReason.trim(),
+            );
             setSelected(updated);
             result.reload();
         } catch (error) {
@@ -255,7 +263,10 @@ export default function RentalDepositPage() {
             header: "",
             className: "text-right",
             render: (row) =>
-                canManage && row.status === "active" && row.link_type !== "reversal" ? (
+                canManage
+                && row.status === "active"
+                && row.link_type !== "reversal"
+                && row.payment?.row_version ? (
                     <Button
                         variant="secondary"
                         loading={saving}
