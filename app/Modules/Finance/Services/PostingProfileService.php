@@ -17,6 +17,8 @@ use Modules\Finance\Models\FinancePostingProfileRule;
 
 final class PostingProfileService
 {
+    private const OPEN_ENDED_EFFECTIVE_TO = '9999-12-31';
+
     public function __construct(
         private readonly AccountRoleAssignmentService $assignments,
     ) {}
@@ -196,14 +198,14 @@ final class PostingProfileService
             ->where('posting_profile_id', $postingProfileId)
             ->where('line_key', $lineKey)
             ->where('is_active', true)
-            ->whereDate('effective_from', '<=', $effectiveTo ?? '9999-12-31')
+            ->whereDate('effective_from', '<=', $effectiveTo ?? self::OPEN_ENDED_EFFECTIVE_TO)
             ->where(function (Builder $query) use ($effectiveFrom): void {
                 $query->whereNull('effective_to')
                     ->orWhereDate('effective_to', '>=', $effectiveFrom);
             });
 
         if ($ignoreRuleId !== null) {
-            $query->whereKeyNot($ignoreRuleId);
+            $query->where('id', '!=', $ignoreRuleId);
         }
 
         if ($query->exists()) {
@@ -223,7 +225,9 @@ final class PostingProfileService
     private function normalizeDate(mixed $value, string $label): string
     {
         $date = DateTimeImmutable::createFromFormat('!Y-m-d', trim((string) $value));
-        if (! $date instanceof DateTimeImmutable) {
+        $errors = DateTimeImmutable::getLastErrors();
+        $hasErrors = is_array($errors) && ($errors['warning_count'] > 0 || $errors['error_count'] > 0);
+        if (! $date instanceof DateTimeImmutable || $hasErrors) {
             throw new InvalidArgumentException("{$label} must use YYYY-MM-DD format.");
         }
 
