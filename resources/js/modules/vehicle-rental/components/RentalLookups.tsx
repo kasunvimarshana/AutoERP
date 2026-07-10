@@ -55,6 +55,7 @@ export type RentalAgreementLookupOption = NamedResource & {
     row_version?: number;
     agreement_kind?: string;
     status?: string;
+    currency?: NamedResource | null;
     customer?: RentalParty | null;
     supplier?: RentalParty | null;
 };
@@ -209,6 +210,7 @@ async function searchAgreements(
             row_version: agreement.row_version,
             agreement_kind: agreement.agreement_kind,
             status: agreement.status,
+            currency: agreement.currency ?? null,
             customer: agreement.customer ?? null,
             supplier: agreement.supplier ?? null,
             name: [

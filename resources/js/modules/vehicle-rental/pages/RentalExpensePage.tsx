@@ -35,6 +35,7 @@ import {
     listRentalExpenses,
     transitionRentalExpense,
 } from '../vehicleRentalApi';
+import { useRentalCurrencyDefault } from '../hooks/useRentalCurrencyDefault';
 import { vehicleRentalPermissions } from '../vehicleRentalPermissions';
 import type { RentalExpense } from '../vehicleRentalTypes';
 
@@ -66,7 +67,13 @@ export default function RentalExpensePage() {
     const auth = useAuth();
     const [form, setForm] = useState<ExpenseForm>(emptyForm);
     const [vehicle, setVehicle] = useState<VehicleSummary | null>(null);
-    const [currency, setCurrency] = useState<NamedResource | null>(null);
+    const {
+        currency,
+        error: currencyDefaultError,
+        selectCurrency,
+        applyCurrencyDefault,
+        resetCurrencyToDefault,
+    } = useRentalCurrencyDefault();
     const [taxGroup, setTaxGroup] = useState<NamedResource | null>(null);
     const [targetAgreement, setTargetAgreement] = useState<RentalAgreementLookupOption | null>(null);
     const [targetAllocation, setTargetAllocation] = useState<NamedResource | null>(null);
@@ -100,6 +107,7 @@ export default function RentalExpensePage() {
         setCustomer(null);
         setSupplier(null);
         setEmployee(null);
+        applyCurrencyDefault(null);
     };
 
     const changeTargetAgreement = (agreement: RentalAgreementLookupOption | null) => {
@@ -107,6 +115,7 @@ export default function RentalExpensePage() {
         setTargetAllocation(null);
         setCustomer(form.allocationType === 'customer_recovery' ? agreement?.customer ?? null : null);
         setSupplier(form.allocationType === 'owner_deduction' ? agreement?.supplier ?? null : null);
+        applyCurrencyDefault(agreement?.currency ?? null);
     };
 
     const save = async (event: FormEvent) => {
@@ -144,7 +153,7 @@ export default function RentalExpensePage() {
             });
             setForm(emptyForm());
             setVehicle(null);
-            setCurrency(null);
+            resetCurrencyToDefault();
             setTaxGroup(null);
             setTargetAgreement(null);
             setTargetAllocation(null);
@@ -208,7 +217,7 @@ export default function RentalExpensePage() {
                 title="Rental expenses"
                 description="Record an operational expense once, then allocate it as company cost, customer recovery or owner deduction through guided relationships."
             />
-            <ErrorAlert error={actionError ?? result.error} />
+            <ErrorAlert error={actionError ?? result.error ?? currencyDefaultError} />
             {canRecord && (
                 <form onSubmit={save} className="mb-5">
                     <Panel title="New expense">
@@ -238,7 +247,7 @@ export default function RentalExpensePage() {
                                 value={form.expenseDate}
                                 onChange={(event) => setForm({ ...form, expenseDate: event.target.value })}
                             />
-                            <RentalCurrencyLookupSelect value={currency} onChange={setCurrency} required />
+                            <RentalCurrencyLookupSelect value={currency} onChange={selectCurrency} required />
                             <Input
                                 label="Net amount"
                                 type="number"

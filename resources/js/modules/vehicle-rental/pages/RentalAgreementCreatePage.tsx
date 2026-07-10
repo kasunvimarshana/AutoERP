@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { CustomerLookupSelect } from "@/modules/customer/components/CustomerLookupSelect";
 import type { CustomerSummary } from "@/modules/customer/customerTypes";
@@ -13,7 +13,6 @@ import { LoadingState } from "@/shared/components/LoadingState";
 import { Panel } from "@/shared/components/Panel";
 import { Select } from "@/shared/components/Select";
 import { Textarea } from "@/shared/components/Textarea";
-import type { NamedResource } from "@/shared/types/common";
 import { useMutationFormGuard } from "@/shared/hooks/useMutationFormGuard";
 import {
     businessDateInputValue,
@@ -32,11 +31,11 @@ import {
 import {
     createRentalAgreement,
     getRentalAgreement,
-    getRentalMetadata,
     getRentalReservation,
     updateRentalAgreement,
 } from "../vehicleRentalApi";
 import type { RentalAgreement, RentalReservation } from "../vehicleRentalTypes";
+import { useRentalCurrencyDefault } from "../hooks/useRentalCurrencyDefault";
 
 const coreComponentDefaults = [
     ["base_rental", "month"],
@@ -132,9 +131,13 @@ export default function RentalAgreementCreatePage({
                 : RENTAL_AGREEMENT_KIND.customerRental;
     const [customer, setCustomer] = useState<CustomerSummary | null>(null);
     const [supplier, setSupplier] = useState<SupplierSummary | null>(null);
-    const [currency, setCurrency] = useState<NamedResource | null>(null);
-    const [defaultCurrency, setDefaultCurrency] =
-        useState<NamedResource | null>(null);
+    const {
+        currency,
+        error: currencyDefaultError,
+        selectCurrency,
+        setAuthoritativeCurrency,
+        applyCurrencyDefault,
+    } = useRentalCurrencyDefault({ initialTouched: isEditing });
     const [reservation, setReservation] = useState<RentalReservation | null>(null);
     const [loadedAgreement, setLoadedAgreement] =
         useState<RentalAgreement | null>(null);
@@ -164,30 +167,8 @@ export default function RentalAgreementCreatePage({
     ]);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
-    const currencyTouched = useRef(isEditing);
     const { markDirty, markSaved, resetDirty } = useMutationFormGuard(saving);
     const updateForm: typeof setForm = (next) => { markDirty(); setForm(next); };
-    useEffect(() => {
-        const controller = new AbortController();
-
-        void getRentalMetadata(controller.signal)
-            .then((metadata) => {
-                const nextCurrency = metadata.default_currency ?? null;
-                setDefaultCurrency(nextCurrency);
-                setCurrency((current) => {
-                    if (currencyTouched.current || current !== null) {
-                        return current;
-                    }
-
-                    return nextCurrency;
-                });
-            })
-            .catch((requestError: unknown) => {
-                if (!controller.signal.aborted) setError(toApiError(requestError));
-            });
-
-        return () => controller.abort();
-    }, []);
 
     useEffect(() => {
         if (!isEditing || routeAgreementId === null) return;
@@ -205,8 +186,7 @@ export default function RentalAgreementCreatePage({
                 setLoadedAgreement(resource);
                 setCustomer((resource.customer ?? null) as CustomerSummary | null);
                 setSupplier((resource.supplier ?? null) as SupplierSummary | null);
-                setCurrency(resource.currency ?? null);
-                currencyTouched.current = true;
+                setAuthoritativeCurrency(resource.currency ?? null);
                 setForm({
                     agreement_kind: resource.agreement_kind,
                     agreement_date: resource.agreement_date,
@@ -250,7 +230,7 @@ export default function RentalAgreementCreatePage({
             });
 
         return () => controller.abort();
-    }, [isEditing, resetDirty, routeAgreementId]);
+    }, [isEditing, resetDirty, routeAgreementId, setAuthoritativeCurrency]);
 
     useEffect(() => {
         if (!reservationId) return;
@@ -263,10 +243,15 @@ export default function RentalAgreementCreatePage({
         void getRentalReservation(reservationId, controller.signal)
             .then((resource) => {
                 setReservation(resource);
-                if (resource.customer) setCustomer(resource.customer as CustomerSummary);
+                if (resource.customer) {
+                    const nextCustomer = resource.customer as CustomerSummary;
+                    setCustomer(nextCustomer);
+                    if (!resource.currency) {
+                        applyCurrencyDefault(nextCustomer.default_currency ?? null);
+                    }
+                }
                 if (resource.currency) {
-                    setCurrency(resource.currency);
-                    currencyTouched.current = true;
+                    setAuthoritativeCurrency(resource.currency);
                 }
                 setForm((current) => ({
                     ...current,
@@ -283,13 +268,11 @@ export default function RentalAgreementCreatePage({
             });
 
         return () => controller.abort();
-    }, [reservationId]);
+    }, [reservationId, setAuthoritativeCurrency, applyCurrencyDefault]);
     const applyPartyDefaultCurrency = (
         party: CustomerSummary | SupplierSummary | null,
     ) => {
-        if (currencyTouched.current) return;
-
-        setCurrency(party?.default_currency ?? defaultCurrency);
+        applyCurrencyDefault(party?.default_currency ?? null);
     };
     const structuralFieldsLocked = Boolean(
         isEditing &&
@@ -465,7 +448,7 @@ export default function RentalAgreementCreatePage({
                         : "Create the lessee or lessor agreement and its first immutable rate version."
                 }
             />
-            <ErrorAlert error={error} />
+            <ErrorAlert error={error ?? currencyDefaultError} />
             <form onSubmit={submit} className="space-y-5">
                 <Panel title="Agreement">
                     {structuralFieldsLocked && (
@@ -487,9 +470,7 @@ export default function RentalAgreementCreatePage({
                                     setCustomer(null);
                                     setSupplier(null);
                                     setTerms([emptyAgreementTerm()]);
-                                    if (!currencyTouched.current) {
-                                        setCurrency(defaultCurrency);
-                                    }
+                                    applyCurrencyDefault(null);
                                     updateForm({
                                         ...form,
                                         agreement_kind: e.target.value,
@@ -660,9 +641,8 @@ export default function RentalAgreementCreatePage({
                             error={errorFor("currency_id")}
                             disabled={structuralFieldsLocked}
                             onChange={(next) => {
-                                currencyTouched.current = true;
                                 markDirty();
-                                setCurrency(next);
+                                selectCurrency(next);
                             }}
                             required
                         />

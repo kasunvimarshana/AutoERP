@@ -19,10 +19,10 @@ import { toApiError, type ApiError } from "@/shared/api/apiError";
 import { useApi } from "@/shared/hooks/useApi";
 import { businessDateInputValue } from "@/shared/utils/businessDate";
 import { formatDate } from "@/shared/utils/formatDate";
-import type { NamedResource } from "@/shared/types/common";
 import { readableRelation } from "@/shared/utils/object";
 import { RentalPage } from "../components/RentalPage";
 import { RentalCurrencyLookupSelect } from "../components/RentalLookups";
+import { useRentalCurrencyDefault } from "../hooks/useRentalCurrencyDefault";
 import {
     activateVehicleFinanceAgreement,
     createVehicleFinanceAgreement,
@@ -72,7 +72,13 @@ export default function VehicleFinancePage() {
     const [form, setForm] = useState<FinanceForm>(emptyForm);
     const [supplier, setSupplier] = useState<SupplierSummary | null>(null);
     const [vehicle, setVehicle] = useState<VehicleSummary | null>(null);
-    const [currency, setCurrency] = useState<NamedResource | null>(null);
+    const {
+        currency,
+        error: currencyDefaultError,
+        selectCurrency,
+        applyCurrencyDefault,
+        resetCurrencyToDefault,
+    } = useRentalCurrencyDefault();
     const [saving, setSaving] = useState(false);
     const [actionError, setActionError] = useState<ApiError | null>(null);
     const [selected, setSelected] = useState<VehicleFinanceAgreement | null>(
@@ -94,7 +100,7 @@ export default function VehicleFinancePage() {
 
     const save = async (event: FormEvent) => {
         event.preventDefault();
-        if (!supplier || !vehicle) return;
+        if (!supplier || !vehicle || !currency) return;
         setSaving(true);
         setActionError(null);
         try {
@@ -109,7 +115,7 @@ export default function VehicleFinancePage() {
             setForm(emptyForm());
             setSupplier(null);
             setVehicle(null);
-            setCurrency(null);
+            resetCurrencyToDefault();
             result.reload();
         } catch (error) {
             setActionError(toApiError(error));
@@ -248,14 +254,17 @@ export default function VehicleFinancePage() {
                 title="Vehicle finance"
                 description="Track leasing-company agreements and installment schedules separately from usage-based owner payables."
             />
-            <ErrorAlert error={actionError ?? result.error} />
+            <ErrorAlert error={actionError ?? result.error ?? currencyDefaultError} />
             {canManage && (
                 <form onSubmit={save} className="mb-5">
                     <Panel title="New finance agreement">
                         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                             <SupplierLookupSelect
                                 value={supplier}
-                                onChange={setSupplier}
+                                onChange={(next) => {
+                                    setSupplier(next);
+                                    applyCurrencyDefault(next?.default_currency ?? null);
+                                }}
                             />
                             <VehicleLookupSelect
                                 value={vehicle}
@@ -309,7 +318,7 @@ export default function VehicleFinancePage() {
                             />
                             <RentalCurrencyLookupSelect
                                 value={currency}
-                                onChange={setCurrency}
+                                onChange={selectCurrency}
                                 required
                             />
                             <Input

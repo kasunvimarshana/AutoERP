@@ -397,6 +397,113 @@ describe("RentalAgreement lessee flow", () => {
             ),
         );
     });
+
+    it("uses the tenant currency default without manual currency selection", async () => {
+        const user = userEvent.setup();
+        apiMocks.getRentalMetadata.mockResolvedValue(
+            rentalMetadata({ id: 1, code: "LKR", name: "Tenant Currency" }),
+        );
+        renderPage(
+            <RentalAgreementCreatePage mode="lessee" />,
+            "/vehicle-rental/lessee-agreements/create",
+        );
+
+        await user.click(
+            screen.getByRole("button", { name: "Choose lessee customer" }),
+        );
+        await screen.findByRole("button", { name: "Tenant Currency" });
+        await user.type(screen.getByLabelText("Agreement date"), "2026-07-06");
+        await user.type(screen.getByLabelText("Start"), "2026-07-06T08:00");
+        await user.type(screen.getByLabelText("End"), "2026-08-06T08:00");
+        await user.click(
+            screen.getByRole("button", { name: "Create lessee agreement" }),
+        );
+
+        await waitFor(() =>
+            expect(apiMocks.createRentalAgreement).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    currency_id: 1,
+                }),
+            ),
+        );
+    });
+
+    it("preserves a manual currency selection after party defaults are applied", async () => {
+        const user = userEvent.setup();
+        apiMocks.getRentalMetadata.mockResolvedValue(
+            rentalMetadata({ id: 1, code: "LKR", name: "Tenant Currency" }),
+        );
+        apiMocks.customerDefaultCurrency.current = {
+            id: 2,
+            code: "USD",
+            name: "Customer Currency",
+        };
+        renderPage(
+            <RentalAgreementCreatePage mode="lessee" />,
+            "/vehicle-rental/lessee-agreements/create",
+        );
+
+        await user.click(
+            screen.getByRole("button", { name: "Choose lessee customer" }),
+        );
+        await user.click(await screen.findByRole("button", { name: "Customer Currency" }));
+        await user.type(screen.getByLabelText("Agreement date"), "2026-07-06");
+        await user.type(screen.getByLabelText("Start"), "2026-07-06T08:00");
+        await user.type(screen.getByLabelText("End"), "2026-08-06T08:00");
+        await user.click(
+            screen.getByRole("button", { name: "Create lessee agreement" }),
+        );
+
+        await waitFor(() =>
+            expect(apiMocks.createRentalAgreement).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    currency_id: 1,
+                }),
+            ),
+        );
+    });
+
+    it("preserves reservation currency during reservation conversion", async () => {
+        const user = userEvent.setup();
+        apiMocks.getRentalMetadata.mockResolvedValue(
+            rentalMetadata({ id: 1, code: "LKR", name: "Tenant Currency" }),
+        );
+        apiMocks.getRentalReservation.mockResolvedValue({
+            id: 91,
+            row_version: 6,
+            reservation_number: "RR-91",
+            customer: { id: 22, name: "Lessee Customer" },
+            requested_vehicle: null,
+            requested_vehicle_category: null,
+            rental_mode: "with_driver",
+            billing_cycle: "monthly",
+            requested_start_at: "2026-07-06T08:00:00.000Z",
+            requested_end_at: "2026-08-06T08:00:00.000Z",
+            currency: { id: 4, code: "EUR", name: "Reservation Currency" },
+            estimated_amount: "0.000000",
+            estimated_deposit_amount: "0.000000",
+            status: "confirmed",
+        });
+        renderPage(
+            <RentalAgreementCreatePage mode="lessee" />,
+            "/vehicle-rental/lessee-agreements/create?reservation_id=91",
+        );
+
+        await screen.findByRole("button", { name: "Reservation Currency" });
+        await user.click(
+            screen.getByRole("button", { name: "Create lessee agreement" }),
+        );
+
+        await waitFor(() =>
+            expect(apiMocks.createRentalAgreement).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    reservation_id: 91,
+                    expected_reservation_version: 6,
+                    currency_id: 4,
+                }),
+            ),
+        );
+    });
 });
 
 describe("RentalAgreement running chart data", () => {
