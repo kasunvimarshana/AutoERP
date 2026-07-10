@@ -7,13 +7,14 @@ use Modules\Tax\Constants\TaxPermission;
 use Modules\Tax\Http\Controllers\TaxController;
 use Modules\Tenant\Services\Plans\TenantPlanSchema;
 
+$featureMiddleware = (string) config('tenant.entitlements.middleware_alias', 'tenant.feature');
 $middleware = [
     'api',
     'auth:'.(string) config('module-auth.protected_route_guard', 'auth-api'),
     (string) config('core.current_user.middleware_alias', 'current.user'),
     (string) config('core.current_tenant.middleware_alias', 'current.tenant'),
     (string) config('core.current_organization_unit.middleware_alias', 'current.organization-unit').':required',
-    'tenant.feature:'.TenantPlanSchema::MODULE_FINANCE,
+    $featureMiddleware.':'.TenantPlanSchema::MODULE_FINANCE,
 ];
 $permissionMiddleware = (string) config('user.tenant.permission_middleware_alias', 'tenant.permission');
 $requires = static fn (string $permission): string => $permissionMiddleware.':'.$permission;
