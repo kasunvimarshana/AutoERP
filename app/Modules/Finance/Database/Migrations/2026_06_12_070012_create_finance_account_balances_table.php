@@ -15,10 +15,8 @@ return new class extends Migration
             $table->foreignId('tenant_id')->constrained('tenants', 'id', indexName: 'finance_account_balances_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('account_id');
-            $table->decimal('opening_debit', 20, 6)->default('0');
-            $table->decimal('opening_credit', 20, 6)->default('0');
-            $table->decimal('period_debit', 20, 6)->default('0');
-            $table->decimal('period_credit', 20, 6)->default('0');
+            $table->decimal('total_debit', 20, 6)->default('0');
+            $table->decimal('total_credit', 20, 6)->default('0');
             $table->decimal('closing_debit', 20, 6)->default('0');
             $table->decimal('closing_credit', 20, 6)->default('0');
             $table->timestamps();
@@ -36,7 +34,7 @@ return new class extends Migration
             $table->foreign(['account_id', 'tenant_id'], 'finance_account_balances_account_id_tenant_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('finance_accounts')
-                ->cascadeOnDelete();
+                ->restrictOnDelete();
         });
     }
 
