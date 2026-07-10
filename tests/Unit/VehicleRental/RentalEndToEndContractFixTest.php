@@ -207,7 +207,9 @@ final class RentalEndToEndContractFixTest extends TestCase
         self::assertStringContainsString('GenericLookupSelect<EmployeeSummary>', $detailPage);
         self::assertStringContainsString('searchEmployees', $detailPage);
         self::assertStringContainsString('employee_id: selectedDriver.id', $detailPage);
-        self::assertStringContainsString('assigned_from: driverForm.assignedFrom', $detailPage);
+        self::assertStringContainsString('assigned_from: toIsoDateTime(driverForm.assignedFrom)', $detailPage);
+        self::assertStringContainsString('assigned_to: driverForm.assignedTo', $detailPage);
+        self::assertStringContainsString('? toIsoDateTime(driverForm.assignedTo)', $detailPage);
         self::assertStringContainsString('Source allocation', $detailPage);
         self::assertStringContainsString('Finance agreement', $detailPage);
         self::assertStringContainsString("'replacement' =>", $custodyResource);

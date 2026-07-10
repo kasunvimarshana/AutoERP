@@ -64,6 +64,12 @@ function toDateTimeLocal(value?: string | null): string {
     return local.toISOString().slice(0, 16);
 }
 
+function toIsoDateTime(value: string): string {
+    const date = new Date(value);
+
+    return Number.isNaN(date.getTime()) ? value : date.toISOString();
+}
+
 function employeeLabel(employee: EmployeeSummary): string {
     return [
         employee.employee_number,
@@ -108,8 +114,10 @@ function DriverAssignmentForm({
             await assignRentalDriver(row.id, row.row_version, {
                 employee_id: selectedDriver.id,
                 assignment_role: driverForm.assignmentRole,
-                assigned_from: driverForm.assignedFrom,
-                assigned_to: driverForm.assignedTo || null,
+                assigned_from: toIsoDateTime(driverForm.assignedFrom),
+                assigned_to: driverForm.assignedTo
+                    ? toIsoDateTime(driverForm.assignedTo)
+                    : null,
                 is_primary: driverForm.primary === "yes",
                 remarks: driverForm.remarks || null,
             });
