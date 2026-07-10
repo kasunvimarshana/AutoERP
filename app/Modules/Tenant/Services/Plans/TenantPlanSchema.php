@@ -11,6 +11,9 @@ use Illuminate\Validation\ValidationException;
 final class TenantPlanSchema
 {
     public const SCHEMA_VERSION = 1;
+    public const MODULE_HR = 'hr';
+    public const MODULE_FINANCE = 'finance';
+
     /**
      * Foundation capabilities are required for every tenant workspace and are
      * never toggled by commercial subscriptions.
@@ -31,6 +34,7 @@ final class TenantPlanSchema
     public const SUPPORTED_MODULES = [
         'customer' => 'Customers',
         'supplier' => 'Suppliers',
+        self::MODULE_HR => 'Human resources',
         'item' => 'Items',
         'warehouse' => 'Warehouses',
         'inventory' => 'Inventory',
@@ -40,7 +44,7 @@ final class TenantPlanSchema
         'vehicle-rental' => 'Vehicle rental',
         'invoice' => 'Invoicing',
         'payment' => 'Payments',
-        'finance' => 'Finance',
+        self::MODULE_FINANCE => 'Finance',
         'reporting' => 'Reporting',
     ];
 
