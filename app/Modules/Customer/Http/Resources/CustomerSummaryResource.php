@@ -14,6 +14,8 @@ final class CustomerSummaryResource extends JsonResource
 
     public function toArray(Request $request): array
     {
+        $creditProfile = $this->relationLoaded('creditProfile') ? $this->creditProfile : null;
+
         return [
             'id' => (int) $this->getKey(),
             'row_version' => (int) $this->row_version,
@@ -30,8 +32,8 @@ final class CustomerSummaryResource extends JsonResource
                 ? $this->namedResource($this->defaultCurrency, true)
                 : null,
             'categories' => $this->whenLoaded('categories', fn () => CustomerCategoryResource::collection($this->categories)->resolve($request)),
-            'is_credit_allowed' => (bool) $this->is_credit_allowed,
-            'is_advance_allowed' => (bool) $this->is_advance_allowed,
+            'credit_allowed' => (bool) ($creditProfile?->credit_allowed ?? false),
+            'advance_allowed' => (bool) ($creditProfile?->advance_allowed ?? false),
             'is_tax_exempt' => (bool) $this->is_tax_exempt,
             'marketing_consent' => (bool) $this->marketing_consent,
             'created_at' => $this->created_at?->toISOString(),
