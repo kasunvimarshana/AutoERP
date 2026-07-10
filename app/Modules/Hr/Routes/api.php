@@ -12,6 +12,7 @@ use Modules\Hr\Http\Controllers\HrEmploymentTypeController;
 use Modules\Hr\Http\Controllers\HrLicenseController;
 use Modules\Hr\Http\Controllers\HrSkillController;
 use Modules\Hr\Services\HrAuthorizationService;
+use Modules\Tenant\Services\Plans\TenantPlanSchema;
 
 $middleware = [
     'api',
@@ -19,6 +20,7 @@ $middleware = [
     (string) config('core.current_user.middleware_alias', 'current.user'),
     (string) config('core.current_tenant.middleware_alias', 'current.tenant'),
     (string) config('core.current_organization_unit.middleware_alias', 'current.organization-unit').':required',
+    'tenant.feature:'.TenantPlanSchema::MODULE_HR,
 ];
 $permissionMiddleware = (string) config('user.tenant.permission_middleware_alias', 'tenant.permission');
 $requires = static fn (string $permission): string => $permissionMiddleware.':'.$permission;
