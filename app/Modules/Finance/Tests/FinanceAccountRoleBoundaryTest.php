@@ -79,6 +79,23 @@ final class FinanceAccountRoleBoundaryTest extends TestCase
         self::assertStringNotContainsString('rules()->delete()', $service);
     }
 
+    public function test_finance_posting_resolution_and_journal_creation_share_transaction(): void
+    {
+        $service = $this->source('../Services/FinancePostingService.php');
+        $transactionPosition = strpos($service, 'return DB::transaction(function () use ($request): PostingResultData {');
+        $validationPosition = strpos($service, '$this->validatePosting($request, $profile);');
+        $lineResolutionPosition = strpos($service, '$lines = $this->journalLines($request, $profile);');
+        $journalCreationPosition = strpos($service, '$journal = $this->journals->create(');
+
+        self::assertIsInt($transactionPosition);
+        self::assertIsInt($validationPosition);
+        self::assertIsInt($lineResolutionPosition);
+        self::assertIsInt($journalCreationPosition);
+        self::assertLessThan($validationPosition, $transactionPosition);
+        self::assertLessThan($lineResolutionPosition, $validationPosition);
+        self::assertLessThan($journalCreationPosition, $lineResolutionPosition);
+    }
+
     public function test_schema_migrates_direct_rules_without_silent_conflict_resolution(): void
     {
         $roles = $this->source('../Database/Migrations/2026_06_12_070017_create_finance_account_roles_table.php');
