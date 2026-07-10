@@ -49,6 +49,24 @@ final class ApplicationBootstrapContractTest extends TestCase
         self::assertLessThan($processes, $preflight);
     }
 
+    public function test_production_check_runs_auth_and_platform_operational_health(): void
+    {
+        $composer = $this->composerConfiguration();
+        $productionCheck = $composer['scripts']['production:check'] ?? [];
+        $tenantProvider = (string) file_get_contents($this->root.'/app/Modules/Tenant/Providers/TenantServiceProvider.php');
+        $platformHealthCommand = (string) file_get_contents($this->root.'/app/Modules/Tenant/Console/Commands/PlatformHealthCommand.php');
+
+        self::assertSame([
+            '@php artisan config:clear --ansi',
+            '@php artisan auth:readiness --no-interaction',
+            '@php artisan platform:health --no-interaction',
+        ], $productionCheck);
+        self::assertStringContainsString('PlatformHealthCommand::class', $tenantProvider);
+        self::assertStringNotContainsString('__construct(', $platformHealthCommand);
+        self::assertStringContainsString('PlatformOperationalInfrastructureHealthService $health', $platformHealthCommand);
+        self::assertStringContainsString('platform:health', $platformHealthCommand);
+    }
+
     public function test_key_ensure_command_is_registered_without_resolving_runtime_auth_services(): void
     {
         $bootstrap = (string) file_get_contents($this->root.'/bootstrap/app.php');
