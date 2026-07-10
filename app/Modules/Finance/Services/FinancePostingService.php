@@ -31,13 +31,13 @@ final class FinancePostingService implements FinancePostingInterface
 
     public function createDraftJournal(PostingContext $request): PostingResultData
     {
-        $this->validatePosting($request);
-        $profile = $this->profiles->resolveProfile($request);
-        $lines = $this->journalLines($request, $profile);
-        $sourceKey = $this->sourceKey($request);
-        $fingerprint = $this->postingFingerprint($request, $profile, $lines);
+        return DB::transaction(function () use ($request): PostingResultData {
+            $profile = $this->profiles->resolveProfile($request);
+            $this->validatePosting($request, $profile);
+            $lines = $this->journalLines($request, $profile);
+            $sourceKey = $this->sourceKey($request);
+            $fingerprint = $this->postingFingerprint($request, $profile, $lines);
 
-        return DB::transaction(function () use ($request, $profile, $lines, $sourceKey, $fingerprint): PostingResultData {
             $existing = $this->sourceJournal($sourceKey);
             if ($existing instanceof FinanceJournalEntry) {
                 return $this->assertReplayMatches($existing, $fingerprint);
@@ -83,7 +83,7 @@ final class FinancePostingService implements FinancePostingInterface
         });
     }
 
-    public function validatePosting(PostingContext $request): void
+    public function validatePosting(PostingContext $request, ?FinancePostingProfile $profile = null): void
     {
         if (trim($request->postingDate) === '') {
             throw new InvalidArgumentException('Posting date is required.');
@@ -101,7 +101,7 @@ final class FinancePostingService implements FinancePostingInterface
             throw new InvalidArgumentException('Posting source type and ID are required.');
         }
 
-        $profile = $this->profiles->resolveProfile($request);
+        $profile ??= $this->profiles->resolveProfile($request);
 
         if ($this->math->isNegative($request->exchangeRate) || $this->math->isZero($request->exchangeRate)) {
             throw new InvalidArgumentException('Posting exchange rate must be greater than zero.');
