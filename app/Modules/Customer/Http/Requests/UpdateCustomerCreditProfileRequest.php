@@ -14,9 +14,12 @@ final class UpdateCustomerCreditProfileRequest extends TenantScopedRequest
         return [
             'tenant_id' => ['required', 'integer', 'min:1'],
             'organization_unit_id' => ['nullable', 'integer', 'min:1'],
+            'row_version' => ['required', 'integer', 'min:1'],
             'credit_limit' => ['required', 'decimal:0,6', 'gte:0'],
             'credit_period_days' => ['nullable', 'integer', 'min:0'],
             'warning_threshold_percent' => ['required', 'decimal:0,6', 'between:0,100'],
+            'credit_allowed' => ['required', 'boolean'],
+            'advance_allowed' => ['required', 'boolean'],
             'allow_over_credit' => ['nullable', 'boolean'],
             'allow_partial_payment' => ['nullable', 'boolean'],
             'is_active' => ['nullable', 'boolean'],
@@ -29,9 +32,12 @@ final class UpdateCustomerCreditProfileRequest extends TenantScopedRequest
             creditLimit: (string) $this->input('credit_limit'),
             creditPeriodDays: $this->filled('credit_period_days') ? (int) $this->input('credit_period_days') : null,
             warningThresholdPercent: (string) $this->input('warning_threshold_percent'),
+            creditAllowed: $this->boolean('credit_allowed'),
+            advanceAllowed: $this->boolean('advance_allowed'),
             allowOverCredit: $this->boolean('allow_over_credit'),
             allowPartialPayment: $this->boolean('allow_partial_payment', true),
             isActive: $this->boolean('is_active', true),
+            rowVersion: (int) $this->input('row_version'),
         );
     }
 }

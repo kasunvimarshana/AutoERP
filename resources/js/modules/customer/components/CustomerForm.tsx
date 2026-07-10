@@ -37,13 +37,10 @@ export function CustomerForm({ value, onChange, currency, onCurrencyChange, erro
                 <Input label="Mobile" value={value.mobile ?? ''} onChange={(event) => set('mobile', event.target.value || null)} />
                 <Input label="Website" type="url" value={value.website ?? ''} onChange={(event) => set('website', event.target.value || null)} />
                 <CustomerCurrencySelect value={currency} onChange={(next) => { onCurrencyChange(next); set('default_currency_id', next ? Number(next.id) : null); }} error={fieldError(error, 'default_currency_id') ?? fieldError(error, 'customer.default_currency_id')} />
-                <Input label="Reference credit limit" value={value.credit_limit ?? '0.000000'} onChange={(event) => set('credit_limit', event.target.value)} error={fieldError(error, 'credit_limit') ?? fieldError(error, 'customer.credit_limit')} />
-                <Input label="Opening balance" value={value.opening_balance ?? '0.000000'} onChange={(event) => set('opening_balance', event.target.value)} error={fieldError(error, 'opening_balance') ?? fieldError(error, 'customer.opening_balance')} />
                 <Select label="Preferred channel" value={value.preferred_communication_channel ?? ''} onChange={(event) => set('preferred_communication_channel', event.target.value || null)} options={options(preferredCommunicationChannels)} error={fieldError(error, 'preferred_communication_channel') ?? fieldError(error, 'customer.preferred_communication_channel')} />
             </div>
+            <p className="mt-3 text-sm text-slate-500">Credit and advance rules are maintained in the dedicated Credit Profile workspace. Opening balances are created through governed financial documents.</p>
             <div className="mt-4 flex flex-wrap gap-6 text-sm">
-                <label><input className="mr-2" type="checkbox" checked={value.is_credit_allowed} onChange={(event) => set('is_credit_allowed', event.target.checked)} />Credit allowed</label>
-                <label><input className="mr-2" type="checkbox" checked={value.is_advance_allowed} onChange={(event) => set('is_advance_allowed', event.target.checked)} />Advance allowed</label>
                 <label><input className="mr-2" type="checkbox" checked={value.is_tax_exempt} onChange={(event) => set('is_tax_exempt', event.target.checked)} />Tax exempt</label>
                 <label><input className="mr-2" type="checkbox" checked={value.marketing_consent} onChange={(event) => set('marketing_consent', event.target.checked)} />Marketing consent</label>
             </div>

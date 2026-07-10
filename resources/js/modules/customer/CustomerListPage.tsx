@@ -40,7 +40,7 @@ export default function CustomerListPage() {
         customer_type: type || undefined,
         status: status || undefined,
         category_id: category?.id,
-        is_credit_allowed: creditAllowed === '' ? undefined : creditAllowed === 'true',
+        credit_allowed: creditAllowed === '' ? undefined : creditAllowed === 'true',
         page,
         per_page: 25,
         sort, direction,
@@ -51,6 +51,7 @@ export default function CustomerListPage() {
         { key: 'type', header: 'Type', render: (row) => row.customer_type.replaceAll('_', ' ') },
         { key: 'category', header: 'Categories', render: (row) => row.categories?.map((entry) => entry.name).join(', ') || '-' },
         { key: 'contact', header: 'Contact', render: (row) => row.email ?? row.phone ?? '-' },
+        { key: 'credit', header: 'Credit', render: (row) => row.credit_allowed ? 'Allowed' : 'Not allowed' },
         { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.status} /> },
         { key: 'actions', header: '', className: 'text-right', render: (row) => canUpdate ? <div className="flex justify-end gap-3"><Link className="font-semibold text-slate-600 hover:text-sky-700" to={`/customers/${row.id}/edit`}>Edit</Link><button type="button" className="font-semibold text-amber-700" onClick={() => void toggle(row)}>{row.status === 'active' ? 'Deactivate' : 'Activate'}</button><button type="button" className="font-semibold text-sky-700" onClick={() => { setStatusCustomer(row); setNextStatus(row.status === 'active' ? 'on_hold' : 'active'); setReason(''); }}>Change status</button></div> : null },
     ];

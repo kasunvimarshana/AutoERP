@@ -10,8 +10,11 @@ final readonly class CustomerCreditProfileData
         public string $creditLimit = '0.000000',
         public ?int $creditPeriodDays = null,
         public string $warningThresholdPercent = '80.000000',
+        public bool $creditAllowed = true,
+        public bool $advanceAllowed = true,
         public bool $allowOverCredit = false,
         public bool $allowPartialPayment = true,
         public bool $isActive = true,
+        public ?int $rowVersion = null,
     ) {}
 }
