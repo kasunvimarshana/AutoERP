@@ -227,9 +227,11 @@ export default function RentalCustodyPage() {
     };
 
     const confirm = async (row: RentalCustodyEvent) => {
+        if (!allocationDetails) return;
+
         setError(null);
         try {
-            await confirmRentalCustodyEvent(row.id, row.row_version);
+            await confirmRentalCustodyEvent(row.id, row.row_version, allocationDetails.row_version);
             setAllocationRefresh((value) => value + 1);
             setRefresh((value) => value + 1);
         } catch (requestError: unknown) {

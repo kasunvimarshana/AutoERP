@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
+use Modules\Core\Services\DecimalMath;
 use Modules\VehicleRental\Enums\RentalAgreementKind;
 use Modules\VehicleRental\Enums\RentalAllocationStatus;
 use Modules\VehicleRental\Enums\RentalCustodyEventType;
@@ -24,6 +25,7 @@ final class RentalCustodyService
         private readonly RentalNumberService $numbers,
         private readonly RentalAllocationService $allocations,
         private readonly RentalStatusHistoryService $history,
+        private readonly DecimalMath $math,
     ) {}
 
     public function create(RentalVehicleAllocation $allocation, array $data, ?int $userId): RentalCustodyEvent
@@ -61,7 +63,7 @@ final class RentalCustodyService
                 'vehicle_id' => $allocation->vehicle_id,
                 'event_type' => $eventType->value,
                 'occurred_at' => $data['occurred_at'],
-                'odometer' => $data['odometer'],
+                'odometer' => $this->math->normalize((string) $data['odometer']),
                 'fuel_level_percent' => $data['fuel_level_percent'] ?? null,
                 'location' => $data['location'] ?? null,
                 'from_role' => $fromRole,
@@ -103,9 +105,13 @@ final class RentalCustodyService
         });
     }
 
-    public function confirm(RentalCustodyEvent $event, int $expectedVersion, ?int $userId): RentalCustodyEvent
-    {
-        return DB::transaction(function () use ($event, $expectedVersion, $userId): RentalCustodyEvent {
+    public function confirm(
+        RentalCustodyEvent $event,
+        int $expectedVersion,
+        int $expectedAllocationVersion,
+        ?int $userId,
+    ): RentalCustodyEvent {
+        return DB::transaction(function () use ($event, $expectedVersion, $expectedAllocationVersion, $userId): RentalCustodyEvent {
             $event = RentalCustodyEvent::query()->with('allocation.agreement')->lockForUpdate()->findOrFail($event->getKey());
             $this->assertExpectedVersion($event, $expectedVersion);
             if ($event->status === RentalCustodyStatus::Confirmed) {
@@ -118,6 +124,7 @@ final class RentalCustodyService
                 ->with('agreement')
                 ->lockForUpdate()
                 ->findOrFail($event->vehicle_allocation_id);
+            $this->assertAllocationExpectedVersion($allocation, $expectedAllocationVersion);
             $this->lockCustodyTimeline($allocation);
             $event->setRelation('allocation', $allocation);
             $this->assertEventAllowed(
@@ -139,12 +146,12 @@ final class RentalCustodyService
             $this->history->record($event, $previous->value, RentalCustodyStatus::Confirmed->value, $userId);
 
             match ($event->event_type) {
-                RentalCustodyEventType::OwnerToCompany => $this->activateOwnerAllocation($event, $userId),
+                RentalCustodyEventType::OwnerToCompany => $this->activateOwnerAllocation($event, $expectedAllocationVersion, $userId),
                 RentalCustodyEventType::CompanyToCustomer,
-                RentalCustodyEventType::ReplacementIn => $this->activateCustomerAllocation($event, $userId),
+                RentalCustodyEventType::ReplacementIn => $this->activateCustomerAllocation($event, $expectedAllocationVersion, $userId),
                 RentalCustodyEventType::CustomerToCompany,
-                RentalCustodyEventType::ReplacementOut => $this->closeCustomerAllocation($event, $userId),
-                RentalCustodyEventType::CompanyToOwner => $this->closeOwnerAllocation($event, $userId),
+                RentalCustodyEventType::ReplacementOut => $this->closeCustomerAllocation($event, $expectedAllocationVersion, $userId),
+                RentalCustodyEventType::CompanyToOwner => $this->closeOwnerAllocation($event, $expectedAllocationVersion, $userId),
                 RentalCustodyEventType::InternalTransfer => null,
             };
 
@@ -245,6 +252,7 @@ final class RentalCustodyService
             throw new InvalidArgumentException('Custody event type is not valid for an owner supply allocation.');
         }
 
+        $normalizedOdometer = $this->math->normalize($odometer);
         $confirmed = $allocation->custodyEvents()
             ->where('status', RentalCustodyStatus::Confirmed->value)
             ->when($excludeEventId !== null, fn (Builder $query) => $query->whereKeyNot($excludeEventId))
@@ -257,7 +265,7 @@ final class RentalCustodyService
             if ($occurred->lessThan(CarbonImmutable::parse($latest->occurred_at))) {
                 throw new InvalidArgumentException('Custody events must be recorded in chronological order.');
             }
-            if ((float) $odometer < (float) $latest->odometer) {
+            if ($this->math->compare($normalizedOdometer, (string) $latest->odometer) < 0) {
                 throw new InvalidArgumentException('Custody-event odometer cannot be below the previous confirmed event.');
             }
         }
@@ -365,20 +373,24 @@ final class RentalCustodyService
         };
     }
 
-    private function activateOwnerAllocation(RentalCustodyEvent $event, ?int $userId): void
-    {
-        $allocation = $this->allocations->activate($event->allocation, $userId);
-        if ($allocation->start_odometer === null) {
-            $allocation->forceFill([
-                'start_odometer' => $event->odometer,
-                'row_version' => (int) $allocation->row_version + 1,
-                'updated_by' => $userId,
-            ])->save();
-        }
+    private function activateOwnerAllocation(
+        RentalCustodyEvent $event,
+        int $expectedAllocationVersion,
+        ?int $userId,
+    ): void {
+        $this->allocations->activate(
+            $event->allocation,
+            $expectedAllocationVersion,
+            (string) $event->odometer,
+            $userId,
+        );
     }
 
-    private function activateCustomerAllocation(RentalCustodyEvent $event, ?int $userId): void
-    {
+    private function activateCustomerAllocation(
+        RentalCustodyEvent $event,
+        int $expectedAllocationVersion,
+        ?int $userId,
+    ): void {
         if ($event->allocation->source_allocation_id !== null) {
             $sourceReceived = RentalCustodyEvent::query()
                 ->where('vehicle_allocation_id', $event->allocation->source_allocation_id)
@@ -390,27 +402,45 @@ final class RentalCustodyService
                 throw new InvalidArgumentException('Owner-supplied vehicle must be received by the company before customer handover.');
             }
         }
-        $allocation = $this->allocations->activate($event->allocation, $userId);
-        if ($allocation->start_odometer === null) {
-            $allocation->forceFill([
-                'start_odometer' => $event->odometer,
-                'row_version' => (int) $allocation->row_version + 1,
-                'updated_by' => $userId,
-            ])->save();
-        }
+        $this->allocations->activate(
+            $event->allocation,
+            $expectedAllocationVersion,
+            (string) $event->odometer,
+            $userId,
+        );
     }
 
-    private function closeCustomerAllocation(RentalCustodyEvent $event, ?int $userId): void
-    {
+    private function closeCustomerAllocation(
+        RentalCustodyEvent $event,
+        int $expectedAllocationVersion,
+        ?int $userId,
+    ): void {
         $status = $event->event_type === RentalCustodyEventType::ReplacementOut
             ? RentalAllocationStatus::Replaced
             : RentalAllocationStatus::Returned;
-        $this->allocations->close($event->allocation, $status, $event->occurred_at->toDateTimeString(), (string) $event->odometer, $userId);
+        $this->allocations->close(
+            $event->allocation,
+            $expectedAllocationVersion,
+            $status,
+            $event->occurred_at->toDateTimeString(),
+            (string) $event->odometer,
+            $userId,
+        );
     }
 
-    private function closeOwnerAllocation(RentalCustodyEvent $event, ?int $userId): void
-    {
-        $this->allocations->close($event->allocation, RentalAllocationStatus::Returned, $event->occurred_at->toDateTimeString(), (string) $event->odometer, $userId);
+    private function closeOwnerAllocation(
+        RentalCustodyEvent $event,
+        int $expectedAllocationVersion,
+        ?int $userId,
+    ): void {
+        $this->allocations->close(
+            $event->allocation,
+            $expectedAllocationVersion,
+            RentalAllocationStatus::Returned,
+            $event->occurred_at->toDateTimeString(),
+            (string) $event->odometer,
+            $userId,
+        );
     }
 
     private function assertExpectedVersion(RentalCustodyEvent $event, int $expectedVersion): void
