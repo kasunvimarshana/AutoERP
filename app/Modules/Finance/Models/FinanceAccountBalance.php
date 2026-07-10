@@ -21,8 +21,10 @@ final class FinanceAccountBalance extends TenantOwnedModel
             'tenant_id' => 'integer',
             'organization_unit_id' => 'integer',
             'account_id' => 'integer',
-            'total_debit' => 'decimal:6',
-            'total_credit' => 'decimal:6',
+            'opening_debit' => 'decimal:6',
+            'opening_credit' => 'decimal:6',
+            'period_debit' => 'decimal:6',
+            'period_credit' => 'decimal:6',
             'closing_debit' => 'decimal:6',
             'closing_credit' => 'decimal:6',
         ]);
