@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
+use Modules\Core\Services\DecimalMath;
 use Modules\Hr\Models\HrEmployee;
 use Modules\Vehicle\Enums\VehicleStatus;
 use Modules\Vehicle\Models\Vehicle;
@@ -34,6 +35,7 @@ final class RentalAllocationService
         private readonly RentalAvailabilityService $availability,
         private readonly VehicleStatusService $vehicleStatuses,
         private readonly RentalStatusHistoryService $history,
+        private readonly DecimalMath $math,
     ) {}
 
     public function create(RentalAgreement $agreement, array $data, ?int $userId): RentalVehicleAllocation
@@ -164,13 +166,23 @@ final class RentalAllocationService
         });
     }
 
-    public function activate(RentalVehicleAllocation $allocation, ?int $userId): RentalVehicleAllocation
-    {
-        return DB::transaction(function () use ($allocation, $userId): RentalVehicleAllocation {
+    public function activate(
+        RentalVehicleAllocation $allocation,
+        int $expectedVersion,
+        string $startOdometer,
+        ?int $userId,
+    ): RentalVehicleAllocation {
+        return DB::transaction(function () use ($allocation, $expectedVersion, $startOdometer, $userId): RentalVehicleAllocation {
             $allocation = RentalVehicleAllocation::query()
                 ->with('agreement')
                 ->lockForUpdate()
                 ->findOrFail($allocation->getKey());
+            $this->assertAllocationExpectedVersion($allocation, $expectedVersion);
+            $normalizedStartOdometer = $this->math->normalize($startOdometer);
+            if ($allocation->start_odometer !== null
+                && $this->math->compare((string) $allocation->start_odometer, $normalizedStartOdometer) !== 0) {
+                throw new InvalidArgumentException('Custody handover odometer must match the allocation start odometer.');
+            }
             if ($allocation->agreement->status !== RentalAgreementStatus::Active) {
                 throw new InvalidArgumentException('Only allocations under an active rental agreement can be activated.');
             }
@@ -193,9 +205,10 @@ final class RentalAllocationService
 
             $from = $allocation->status;
             $allocation->status = RentalAllocationStatus::Active;
+            $allocation->start_odometer = $normalizedStartOdometer;
             $allocation->activated_by = $userId;
             $allocation->activated_at = now();
-            $allocation->row_version = (int) $allocation->row_version + 1;
+            $allocation->row_version = $expectedVersion + 1;
             $allocation->updated_by = $userId;
             $allocation->save();
             $allocation->driverAssignments()->where('status', RentalDriverAssignmentStatus::Planned->value)
@@ -215,6 +228,7 @@ final class RentalAllocationService
 
     public function close(
         RentalVehicleAllocation $allocation,
+        int $expectedVersion,
         RentalAllocationStatus $status,
         string $returnedAt,
         ?string $endOdometer,
@@ -224,12 +238,16 @@ final class RentalAllocationService
             throw new InvalidArgumentException('Invalid closing allocation status.');
         }
 
-        return DB::transaction(function () use ($allocation, $status, $returnedAt, $endOdometer, $userId): RentalVehicleAllocation {
+        return DB::transaction(function () use ($allocation, $expectedVersion, $status, $returnedAt, $endOdometer, $userId): RentalVehicleAllocation {
             $allocation = RentalVehicleAllocation::query()->with('agreement')->lockForUpdate()->findOrFail($allocation->getKey());
+            $this->assertAllocationExpectedVersion($allocation, $expectedVersion);
             if (! in_array($allocation->status, [RentalAllocationStatus::Planned, RentalAllocationStatus::Active], true)) {
                 throw new InvalidArgumentException('Only a planned or active allocation can be closed.');
             }
-            if ($endOdometer !== null && $allocation->start_odometer !== null && (float) $endOdometer < (float) $allocation->start_odometer) {
+            $normalizedEndOdometer = $endOdometer === null ? null : $this->math->normalize($endOdometer);
+            if ($normalizedEndOdometer !== null
+                && $allocation->start_odometer !== null
+                && $this->math->compare($normalizedEndOdometer, (string) $allocation->start_odometer) < 0) {
                 throw new InvalidArgumentException('End odometer cannot be below the allocation start odometer.');
             }
 
@@ -237,10 +255,10 @@ final class RentalAllocationService
             $allocation->status = $status;
             $allocation->actual_returned_at = $returnedAt;
             $returnTime = CarbonImmutable::parse($returnedAt);
-            $allocation->end_odometer = $endOdometer;
+            $allocation->end_odometer = $normalizedEndOdometer;
             $allocation->closed_by = $userId;
             $allocation->closed_at = now();
-            $allocation->row_version = (int) $allocation->row_version + 1;
+            $allocation->row_version = $expectedVersion + 1;
             $allocation->updated_by = $userId;
             $allocation->save();
             $allocation->driverAssignments()
