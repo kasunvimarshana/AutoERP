@@ -41,11 +41,11 @@ final class RentalDepositRequirementResource extends RentalResource
                         'row_version' => (int) $link->reversesLink->row_version,
                         'link_type' => $this->enumValue($link->reversesLink->link_type),
                         'amount' => $this->decimal($link->reversesLink->amount),
-                        'status' => $link->reversesLink->status,
+                        'status' => $this->enumValue($link->reversesLink->status),
                         'linked_at' => $link->reversesLink->linked_at?->toISOString(),
                     ]
                     : null,
-                'amount' => $this->decimal($link->amount), 'status' => $link->status,
+                'amount' => $this->decimal($link->amount), 'status' => $this->enumValue($link->status),
                 'linked_at' => $link->linked_at?->toISOString(),
             ]),
             'created_at' => $this->created_at?->toISOString(),
