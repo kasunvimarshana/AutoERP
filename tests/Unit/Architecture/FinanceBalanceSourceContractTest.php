@@ -45,7 +45,7 @@ final class FinanceBalanceSourceContractTest extends TestCase
         self::assertStringContainsString('rebuildForAccounts', $posting);
         self::assertStringContainsString("orderBy('entry_date')", $projection);
         self::assertStringContainsString("orderBy('id')", $projection);
-        self::assertStringContainsString("'balance_after' => $runningBalance", $projection);
+        self::assertStringContainsString("'balance_after' => \$runningBalance", $projection);
     }
 
     private function source(string $relativePath): string
