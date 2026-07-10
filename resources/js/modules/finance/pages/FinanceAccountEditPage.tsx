@@ -33,7 +33,6 @@ export default function FinanceAccountEditPage() {
                     name: account.name,
                     description: account.description,
                     normal_balance: account.normal_balance,
-                    opening_balance: account.opening_balance,
                     is_control_account: account.is_control_account,
                     is_posting_account: account.is_posting_account,
                     is_cash_account: account.is_cash_account,
