@@ -16,6 +16,8 @@ use Modules\Finance\Models\FinanceLedgerEntry;
 
 final class AccountBalanceService
 {
+    private const ZERO_AMOUNT = '0.000000';
+
     public function __construct(private readonly DecimalMath $math) {}
 
     public function applyJournalLine(FinanceJournalEntry $journal, FinanceJournalLine $line): FinanceAccountBalance
@@ -29,17 +31,15 @@ final class AccountBalanceService
 
         if (! $balance->exists) {
             $balance->forceFill([
-                'opening_debit' => '0.000000',
-                'opening_credit' => '0.000000',
-                'period_debit' => '0.000000',
-                'period_credit' => '0.000000',
-                'closing_debit' => '0.000000',
-                'closing_credit' => '0.000000',
+                'total_debit' => self::ZERO_AMOUNT,
+                'total_credit' => self::ZERO_AMOUNT,
+                'closing_debit' => self::ZERO_AMOUNT,
+                'closing_credit' => self::ZERO_AMOUNT,
             ]);
         }
 
-        $balance->period_debit = $this->math->add((string) $balance->period_debit, (string) $line->debit);
-        $balance->period_credit = $this->math->add((string) $balance->period_credit, (string) $line->credit);
+        $balance->total_debit = $this->math->add((string) $balance->total_debit, (string) $line->debit);
+        $balance->total_credit = $this->math->add((string) $balance->total_credit, (string) $line->credit);
         $this->syncClosing($balance, $account);
         $balance->save();
 
@@ -56,10 +56,10 @@ final class AccountBalanceService
         return new AccountBalanceResult(
             accountId: (int) $account->getKey(),
             normalBalance: $normalBalance,
-            openingDebit: (string) $balance->opening_debit,
-            openingCredit: (string) $balance->opening_credit,
-            periodDebit: (string) $balance->period_debit,
-            periodCredit: (string) $balance->period_credit,
+            openingDebit: self::ZERO_AMOUNT,
+            openingCredit: self::ZERO_AMOUNT,
+            periodDebit: (string) $balance->total_debit,
+            periodCredit: (string) $balance->total_credit,
             closingDebit: (string) $balance->closing_debit,
             closingCredit: (string) $balance->closing_credit,
             balance: $this->accountBalanceAmount(
@@ -109,14 +109,10 @@ final class AccountBalanceService
             $normalBalance = $account->normal_balance instanceof NormalBalance
                 ? $account->normal_balance
                 : NormalBalance::from((string) $account->normal_balance);
-            $openingDebit = $normalBalance === NormalBalance::Debit
-                ? $this->math->normalize((string) $account->opening_balance)
-                : '0.000000';
-            $openingCredit = $normalBalance === NormalBalance::Credit
-                ? $this->math->normalize((string) $account->opening_balance)
-                : '0.000000';
-            $periodDebit = '0.000000';
-            $periodCredit = '0.000000';
+            $openingDebit = self::ZERO_AMOUNT;
+            $openingCredit = self::ZERO_AMOUNT;
+            $periodDebit = self::ZERO_AMOUNT;
+            $periodCredit = self::ZERO_AMOUNT;
 
             foreach ($entries->get($account->getKey(), collect()) as $entry) {
                 $entryDate = $entry->entry_date->toDateString();
@@ -155,23 +151,10 @@ final class AccountBalanceService
         return $results;
     }
 
-    public function accountBalanceAfter(FinanceAccount $account, string $debit, string $credit): string
-    {
-        $normalBalance = $account->normal_balance instanceof NormalBalance
-            ? $account->normal_balance
-            : NormalBalance::from((string) $account->normal_balance);
-
-        $current = $this->math->normalize((string) $account->current_balance);
-
-        return $normalBalance === NormalBalance::Debit
-            ? $this->math->sub($this->math->add($current, $debit), $credit)
-            : $this->math->sub($this->math->add($current, $credit), $debit);
-    }
-
     private function syncClosing(FinanceAccountBalance $balance, FinanceAccount $account): void
     {
-        $debit = $this->math->add((string) $balance->opening_debit, (string) $balance->period_debit);
-        $credit = $this->math->add((string) $balance->opening_credit, (string) $balance->period_credit);
+        $debit = (string) $balance->total_debit;
+        $credit = (string) $balance->total_credit;
 
         $normalBalance = $account->normal_balance instanceof NormalBalance
             ? $account->normal_balance
@@ -179,15 +162,15 @@ final class AccountBalanceService
 
         if ($normalBalance === NormalBalance::Debit) {
             $net = $this->math->sub($debit, $credit);
-            $balance->closing_debit = $this->math->compare($net, '0') >= 0 ? $net : '0.000000';
-            $balance->closing_credit = $this->math->compare($net, '0') < 0 ? ltrim($net, '-') : '0.000000';
+            $balance->closing_debit = $this->math->compare($net, '0') >= 0 ? $net : self::ZERO_AMOUNT;
+            $balance->closing_credit = $this->math->compare($net, '0') < 0 ? ltrim($net, '-') : self::ZERO_AMOUNT;
 
             return;
         }
 
         $net = $this->math->sub($credit, $debit);
-        $balance->closing_credit = $this->math->compare($net, '0') >= 0 ? $net : '0.000000';
-        $balance->closing_debit = $this->math->compare($net, '0') < 0 ? ltrim($net, '-') : '0.000000';
+        $balance->closing_credit = $this->math->compare($net, '0') >= 0 ? $net : self::ZERO_AMOUNT;
+        $balance->closing_debit = $this->math->compare($net, '0') < 0 ? ltrim($net, '-') : self::ZERO_AMOUNT;
     }
 
     private function accountBalanceAmount(NormalBalance $normalBalance, string $closingDebit, string $closingCredit): string
@@ -205,7 +188,7 @@ final class AccountBalanceService
         $net = $this->math->sub($debit, $credit);
 
         return $this->math->compare($net, '0') >= 0
-            ? [$net, '0.000000']
-            : ['0.000000', ltrim($net, '-')];
+            ? [$net, self::ZERO_AMOUNT]
+            : [self::ZERO_AMOUNT, ltrim($net, '-')];
     }
 }
