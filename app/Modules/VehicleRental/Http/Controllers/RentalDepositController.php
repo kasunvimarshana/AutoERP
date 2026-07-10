@@ -118,6 +118,8 @@ final class RentalDepositController
         return new RentalDepositRequirementResource($service->reverseLink(
             $this->scope(RentalDepositLink::query(), $request)->findOrFail($link),
             (int) $request->input('expected_requirement_version'),
+            (int) $request->input('expected_payment_version'),
+            (string) $request->input('reason'),
             $request->currentUserId(),
         ));
     }
