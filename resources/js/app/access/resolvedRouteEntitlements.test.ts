@@ -28,6 +28,20 @@ describe('resolved tenant route entitlements', () => {
         expect(entitlement?.permissions).toContain(permission);
     });
 
+    it('requires the HR tenant module for HR routes', () => {
+        const entitlement = resolveTenantRouteEntitlement('/hr/employees');
+
+        expect(entitlement?.modules).toEqual(['hr']);
+        expect(entitlement?.requiresOrganizationUnit).toBe(true);
+    });
+
+    it('keeps Tax routes under the Finance tenant module', () => {
+        const entitlement = resolveTenantRouteEntitlement('/tax/taxes');
+
+        expect(entitlement?.modules).toContain('finance');
+        expect(entitlement?.requiresOrganizationUnit).toBe(true);
+    });
+
     it('preserves existing non-Finance route policies through the feature-owned resolver', () => {
         expect(resolveTenantRouteEntitlement('/payments')?.permissions).toContain('payments.view');
         expect(resolveTenantRouteEntitlement('/customers')?.permissions).toContain('customers.view');
