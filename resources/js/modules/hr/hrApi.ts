@@ -45,13 +45,19 @@ function relationApi<T, P>(relation: string) {
         remove: (employeeId: number, id: number) => apiClient.delete(`${path(employeeId, relation)}/${id}`),
     };
 }
+function createOnlyRelationApi<T, P>(relation: string) {
+    return {
+        list: (employeeId: number, page: number, signal: AbortSignal) => apiClient.get<ApiCollection<T>>(path(employeeId, relation), { params: { page, per_page: 20 }, signal }).then((r) => r.data),
+        create: (employeeId: number, payload: P) => apiClient.post<ApiResource<T>>(path(employeeId, relation), payload).then((r) => r.data.data),
+    };
+}
 export const contactApi = relationApi<EmployeeContact, EmployeeContactPayload>('contacts');
 export const addressApi = relationApi<EmployeeAddress, EmployeeAddressPayload>('addresses');
 export const documentApi = relationApi<EmployeeDocument, EmployeeDocumentPayload>('documents');
 export const skillApi = relationApi<EmployeeSkillAssignment, EmployeeSkillPayload>('skills');
 export const certificationApi = relationApi<EmployeeCertificationAssignment, EmployeeCertificationPayload>('certifications');
 export const licenseApi = relationApi<EmployeeLicenseAssignment, EmployeeLicensePayload>('licenses');
-export const rateApi = relationApi<EmployeeRate, EmployeeRatePayload>('rates');
+export const rateApi = createOnlyRelationApi<EmployeeRate, EmployeeRatePayload>('rates');
 export const availabilityApi = {
     ...relationApi<EmployeeAvailability, EmployeeAvailabilityPayload>('availability'),
     create: (employeeId: number, payload: EmployeeAvailabilityPayload) => apiClient.post<ApiResource<EmployeeAvailability>>(path(employeeId, 'availability'), payload).then((r) => r.data.data),
