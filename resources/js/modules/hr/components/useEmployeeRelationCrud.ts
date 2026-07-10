@@ -23,7 +23,7 @@ export function useEmployeeRelationCrud<T extends { id: number }, P>(employeeId:
     return {
         ...result, page, setPage, editing, open, submitting, actionError, confirmDialog,
         startCreate: () => { setEditing(null); setActionError(null); setOpen(true); },
-        startEdit: api.update ? (row: T) => { setEditing(row); setActionError(null); setOpen(true); } : undefined,
+        startEdit: (row: T) => { setEditing(row); setActionError(null); setOpen(true); },
         close: () => { if (!submitting) setOpen(false); },
         submit: async (payload: P) => { setSubmitting(true); setActionError(null); try { if (editing) { if (!api.update) throw new Error(UPDATE_NOT_SUPPORTED_MESSAGE); await api.update(employeeId, editing.id, payload); } else await api.create(employeeId, payload); setOpen(false); result.reload(); } catch (error) { setActionError(toApiError(error)); } finally { setSubmitting(false); } },
         destroy: api.remove ? async (row: T) => { const confirmed = await confirm({ title: 'Delete employee record', message: 'This employee relation record will be permanently deleted.', confirmLabel: 'Delete' }); if (!confirmed) return; try { await api.remove?.(employeeId, row.id); result.reload(); } catch (error) { setActionError(toApiError(error)); } } : async () => { setActionError(toApiError(new Error(DELETE_NOT_SUPPORTED_MESSAGE))); },
