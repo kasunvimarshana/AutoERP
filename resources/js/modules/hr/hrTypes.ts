@@ -11,7 +11,7 @@ export type HrCertification = HrMaster;
 export type HrLicense = HrMaster;
 
 export interface EmployeeSummary extends NamedResource {
-    id: number; tenant_id: number; organization_unit_id?: number | null; employee_number: string; code?: string | null;
+    id: number; row_version: number; tenant_id: number; organization_unit_id?: number | null; employee_number: string; code?: string | null;
     display_name: string; first_name: string; middle_name?: string | null; last_name?: string | null;
     email?: string | null; phone?: string | null; mobile?: string | null; status: EmployeeStatus;
     availability_status: EmployeeAvailabilityStatus; department?: HrDepartment | null; designation?: HrDesignation | null; employment_type?: HrEmploymentType | null;
@@ -23,7 +23,7 @@ export interface Employee extends EmployeeSummary {
     default_service_rate: string; notes?: string | null; metadata?: Record<string, unknown> | null; approved_at?: string | null;
 }
 export interface EmployeePayload {
-    employee_number?: string; code?: string; first_name: string; middle_name?: string; last_name?: string; display_name?: string;
+    row_version?: number; employee_number?: string; code?: string; first_name: string; middle_name?: string; last_name?: string; display_name?: string;
     email?: string; phone?: string; mobile?: string; department_id?: number | null; designation_id?: number | null;
     employment_type_id?: number | null; reporting_manager_id?: number | null; joined_date?: string; resigned_date?: string;
     date_of_birth?: string; gender?: string; status?: EmployeeStatus; availability_status?: EmployeeAvailabilityStatus;

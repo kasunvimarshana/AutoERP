@@ -54,27 +54,7 @@ final class InvoiceBalanceProvider implements InvoiceBalanceProviderInterface
 
     public function getBalance(int $invoiceId): BalanceResultData
     {
-        $invoice = Invoice::query()->with('balance')->findOrFail($invoiceId);
-        $balance = $invoice->balance;
-
-        return new BalanceResultData(
-            sourceId: (int) $invoice->getKey(),
-            tenantId: (int) $invoice->tenant_id,
-            organizationUnitId: $invoice->organization_unit_id,
-            totalAmount: (string) $balance->invoice_total,
-            paidAmount: (string) $balance->paid_amount,
-            creditAmount: (string) $balance->credit_allocated_amount,
-            remainingAmount: (string) $balance->remaining_amount,
-            status: (string) (
-                $balance->status instanceof InvoiceBalanceStatus
-                    ? $balance->status->value
-                    : $balance->status
-            ),
-            partyType: $invoice->party_type,
-            partyId: $invoice->party_id,
-            currencyId: $invoice->currency_id,
-            sourceType: 'invoice',
-        );
+        return $this->balanceData(Invoice::query()->with('balance')->findOrFail($invoiceId));
     }
 
     public function getInvoiceStatus(int $invoiceId): string
@@ -112,11 +92,59 @@ final class InvoiceBalanceProvider implements InvoiceBalanceProviderInterface
             ->all();
     }
 
-    public function validatePayableState(int $invoiceId): BalanceResultData
-    {
-        $invoice = Invoice::query()->with('balance')->findOrFail($invoiceId);
+    public function validatePayableState(
+        int $invoiceId,
+        int $tenantId,
+        ?int $organizationUnitId,
+        string $partyType,
+        int $partyId,
+        ?int $currencyId = null,
+    ): BalanceResultData {
+        $query = Invoice::query()
+            ->with('balance')
+            ->whereKey($invoiceId)
+            ->where('tenant_id', $tenantId)
+            ->where('party_type', $partyType)
+            ->where('party_id', $partyId);
+
+        $organizationUnitId === null
+            ? $query->whereNull('organization_unit_id')
+            : $query->where('organization_unit_id', $organizationUnitId);
+
+        if ($currencyId !== null) {
+            $query->where(function ($scope) use ($currencyId): void {
+                $scope->whereNull('currency_id')
+                    ->orWhere('currency_id', $currencyId);
+            });
+        }
+
+        $invoice = $query->firstOrFail();
         $this->statuses->assertCanSettle($invoice);
 
-        return $this->getBalance($invoiceId);
+        return $this->balanceData($invoice);
+    }
+
+    private function balanceData(Invoice $invoice): BalanceResultData
+    {
+        $balance = $invoice->balance;
+
+        return new BalanceResultData(
+            sourceId: (int) $invoice->getKey(),
+            tenantId: (int) $invoice->tenant_id,
+            organizationUnitId: $invoice->organization_unit_id,
+            totalAmount: (string) $balance->invoice_total,
+            paidAmount: (string) $balance->paid_amount,
+            creditAmount: (string) $balance->credit_allocated_amount,
+            remainingAmount: (string) $balance->remaining_amount,
+            status: (string) (
+                $balance->status instanceof InvoiceBalanceStatus
+                    ? $balance->status->value
+                    : $balance->status
+            ),
+            partyType: $invoice->party_type,
+            partyId: $invoice->party_id,
+            currencyId: $invoice->currency_id,
+            sourceType: 'invoice',
+        );
     }
 }

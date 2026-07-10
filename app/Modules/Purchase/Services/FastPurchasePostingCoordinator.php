@@ -92,8 +92,8 @@ final class FastPurchasePostingCoordinator
             currencyId: $resolved['currency_id'],
             exchangeRate: (string) $resolved['exchange_rate'],
             lines: [
-                new FinancePostingLine(null, 'Inventory', debit: $amount, profileKey: 'inventory'),
-                new FinancePostingLine(null, 'Goods received payable', credit: $amount, profileKey: 'payable'),
+                new FinancePostingLine(accountName: 'Inventory', debit: $amount, profileKey: 'inventory'),
+                new FinancePostingLine(accountName: 'Goods received payable', credit: $amount, profileKey: 'payable'),
             ],
             description: 'Fast purchase stock receipt '.$goodsReceipt->grn_number,
             postingProfileCode: 'inventory_receipt',
@@ -117,16 +117,16 @@ final class FastPurchasePostingCoordinator
         $creditPayable = $this->math->sub($this->math->add($directTaxable, $tax), $withholding);
         $lines = [];
         if (! $this->math->isZero($directTaxable)) {
-            $lines[] = new FinancePostingLine(null, 'Purchase expense', debit: $directTaxable, profileKey: 'expense');
+            $lines[] = new FinancePostingLine(accountName: 'Purchase expense', debit: $directTaxable, profileKey: 'expense');
         }
         if (! $this->math->isZero($tax)) {
-            $lines[] = new FinancePostingLine(null, 'Input tax', debit: $tax, profileKey: 'tax_receivable');
+            $lines[] = new FinancePostingLine(accountName: 'Input tax', debit: $tax, profileKey: 'tax_receivable');
         }
         if (! $this->math->isZero($creditPayable)) {
-            $lines[] = new FinancePostingLine(null, 'Supplier payable', credit: $creditPayable, profileKey: 'payable');
+            $lines[] = new FinancePostingLine(accountName: 'Supplier payable', credit: $creditPayable, profileKey: 'payable');
         }
         if (! $this->math->isZero($withholding)) {
-            $lines[] = new FinancePostingLine(null, 'Withholding payable', credit: $withholding, profileKey: 'payable');
+            $lines[] = new FinancePostingLine(accountName: 'Withholding payable', credit: $withholding, profileKey: 'payable');
         }
         $lines = array_merge($lines, $nonTaxAdjustments);
 
@@ -193,11 +193,11 @@ final class FastPurchasePostingCoordinator
             }
 
             if ($adjustment->effect->value === 'increase') {
-                $lines[] = new FinancePostingLine(null, (string) $adjustment->name, debit: $amount, profileKey: $profileKey);
-                $lines[] = new FinancePostingLine(null, 'Supplier payable', credit: $amount, profileKey: 'payable');
+                $lines[] = new FinancePostingLine(accountName: (string) $adjustment->name, debit: $amount, profileKey: $profileKey);
+                $lines[] = new FinancePostingLine(accountName: 'Supplier payable', credit: $amount, profileKey: 'payable');
             } else {
-                $lines[] = new FinancePostingLine(null, 'Supplier payable', debit: $amount, profileKey: 'payable');
-                $lines[] = new FinancePostingLine(null, (string) $adjustment->name, credit: $amount, profileKey: $profileKey);
+                $lines[] = new FinancePostingLine(accountName: 'Supplier payable', debit: $amount, profileKey: 'payable');
+                $lines[] = new FinancePostingLine(accountName: (string) $adjustment->name, credit: $amount, profileKey: $profileKey);
             }
         }
 

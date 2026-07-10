@@ -10,6 +10,7 @@ use Modules\Core\Services\DecimalMath;
 use Modules\Hr\DTOs\UpdateEmployeeData;
 use Modules\Hr\Enums\EmployeeStatus;
 use Modules\Hr\Models\HrEmployee;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 final class EmployeeUpdateService
 {
@@ -17,12 +18,27 @@ final class EmployeeUpdateService
 
     public function update(HrEmployee $employee, UpdateEmployeeData $data): HrEmployee
     {
-        if ($employee->status === EmployeeStatus::Terminated) {
-            throw new InvalidArgumentException('Terminated employee master data cannot be updated directly.');
-        }
-        $this->validator->validateUpdate($employee, $data);
-
         return DB::transaction(function () use ($employee, $data): HrEmployee {
+            $employee = HrEmployee::query()
+                ->whereKey($employee->getKey())
+                ->where('tenant_id', (int) $employee->tenant_id)
+                ->when(
+                    $employee->organization_unit_id === null,
+                    static fn ($query) => $query->whereNull('organization_unit_id'),
+                    static fn ($query) => $query->where('organization_unit_id', (int) $employee->organization_unit_id),
+                )
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($data->rowVersion !== (int) $employee->row_version) {
+                throw new ConflictHttpException('Employee was changed by someone else. Reload before saving.');
+            }
+
+            if ($employee->status === EmployeeStatus::Terminated) {
+                throw new InvalidArgumentException('Terminated employee master data cannot be updated directly.');
+            }
+            $this->validator->validateUpdate($employee, $data);
+
             $map = [
                 'organization_unit_id' => $data->organizationUnitId, 'code' => $data->code,
                 'first_name' => $data->firstName, 'middle_name' => $data->middleName, 'last_name' => $data->lastName,
@@ -42,7 +58,10 @@ final class EmployeeUpdateService
                     $attributes[$key] = $value;
                 }
             }
-            $employee->fill($attributes)->save();
+            $employee->fill($attributes);
+            $employee->setAttribute('row_version', ((int) $employee->row_version) + 1);
+            $employee->save();
+
             return $employee->refresh()->load(['department', 'designation', 'employmentType', 'reportingManager']);
         });
     }

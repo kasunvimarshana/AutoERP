@@ -279,9 +279,12 @@ final class FinanceSeeder extends Seeder
                         'tenant_id' => $tenantId,
                         'posting_profile_id' => $profile->getKey(),
                         'line_key' => $lineKey,
+                        'effective_from' => FinancePostingProfileRule::OPENING_EFFECTIVE_DATE,
                     ],
                     [
                         'account_role_id' => $role->getKey(),
+                        'effective_to' => null,
+                        'is_active' => true,
                         'description' => $definition['name'].' '.$lineKey,
                     ],
                 );

@@ -31,4 +31,23 @@ final class TenantInfrastructureCapabilityServiceTest extends TestCase
         );
         self::assertFalse($capabilities['configuration']['arbitrary_laravel_config_overrides_supported']);
     }
+
+    public function test_platform_operational_health_reports_pending_migration_state(): void
+    {
+        $source = file_get_contents(__DIR__.'/../Services/Platform/PlatformOperationalInfrastructureHealthService.php');
+        self::assertIsString($source);
+
+        self::assertStringContainsString('Migrator $migrator', $source);
+        self::assertStringContainsString('$migrationStatus = $this->migrationStatus();', $source);
+        self::assertStringContainsString("'ready' => $"."mailReady && $"."queueReady && (bool) $"."migrationStatus['ready']", $source);
+        self::assertStringContainsString("'migrations' => $"."migrationStatus", $source);
+        self::assertStringContainsString('getMigrationFiles', $source);
+        self::assertStringContainsString('getRepository()->getRan()', $source);
+        self::assertStringContainsString("'pending_count' => count($"."pending)", $source);
+        self::assertStringContainsString('NON_PRODUCTION_MAILERS', $source);
+        self::assertStringContainsString('QUEUE_SYNC', $source);
+        self::assertStringContainsString('QUEUE_DATABASE', $source);
+        self::assertStringContainsString('JOBS_TABLE', $source);
+        self::assertStringContainsString('FAILED_JOBS_TABLE', $source);
+    }
 }

@@ -60,6 +60,8 @@ final class PaymentPostingService
                 $this->validator->assertPositive((string) $line->amount, 'Payment line amount');
             }
 
+            $locked = $this->allocations->realizePending($locked, $postedBy);
+
             $locked->forceFill([
                 'posting_status' => PaymentPostingStatus::Posting->value,
                 'row_version' => (int) $locked->row_version + 1,
@@ -92,8 +94,6 @@ final class PaymentPostingService
                 $postedBy,
                 'Payment posted to Finance as '.$result->journalNumber.'.',
             );
-
-            $locked = $this->allocations->realizePending($locked, $postedBy);
 
             return $locked->refresh()->load(['lines', 'allocations', 'unappliedBalance', 'lifecycleEvents']);
         });

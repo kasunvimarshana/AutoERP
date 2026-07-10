@@ -9,6 +9,7 @@ use Modules\Hr\Enums\Gender;
 final readonly class UpdateEmployeeData
 {
     public function __construct(
+        public int $rowVersion,
         public array $provided,
         public ?int $organizationUnitId = null,
         public ?string $code = null,

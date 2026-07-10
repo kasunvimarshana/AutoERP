@@ -9,6 +9,8 @@ use Modules\Core\Models\TenantOwnedModel;
 
 final class FinancePostingProfileRule extends TenantOwnedModel
 {
+    public const OPENING_EFFECTIVE_DATE = '1900-01-01';
+
     protected $table = 'finance_posting_profile_rules';
 
     protected $guarded = ['id'];
@@ -19,6 +21,9 @@ final class FinancePostingProfileRule extends TenantOwnedModel
             'tenant_id' => 'integer',
             'posting_profile_id' => 'integer',
             'account_role_id' => 'integer',
+            'effective_from' => 'date:Y-m-d',
+            'effective_to' => 'date:Y-m-d',
+            'is_active' => 'boolean',
         ]);
     }
 

@@ -19,19 +19,8 @@ const emptyRate: EmployeeRatePayload = {
     is_active: true,
 };
 
-function rateDraft(row: EmployeeRate): EmployeeRatePayload {
-    return {
-        rate_type: row.rate_type,
-        amount: row.amount,
-        currency_id: row.currency_id,
-        effective_from: row.effective_from,
-        effective_to: row.effective_to,
-        is_active: row.is_active,
-    };
-}
-
 export function EmployeeRateTab({ employeeId }: { employeeId: number }) {
-    const crud = useEmployeeRelationCrud(employeeId, rateApi);
+    const crud = useEmployeeRelationCrud<EmployeeRate, EmployeeRatePayload>(employeeId, rateApi);
     const [currency, setCurrency] = useState<NamedResource | null>(null);
     const [draft, setDraft] = useState<EmployeeRatePayload>(emptyRate);
 
@@ -41,15 +30,9 @@ export function EmployeeRateTab({ employeeId }: { employeeId: number }) {
         crud.startCreate();
     };
 
-    const startEdit = (row: EmployeeRate) => {
-        setCurrency(row.currency ?? null);
-        setDraft(rateDraft(row));
-        crud.startEdit(row);
-    };
-
     return (
         <EmployeeRelationTab
-            title="Rate"
+            title="Rate Revision"
             fields={['rate_type', 'amount', 'currency', 'effective_from', 'effective_to', 'is_active']}
             result={crud}
             open={crud.open}
@@ -57,8 +40,6 @@ export function EmployeeRateTab({ employeeId }: { employeeId: number }) {
             submitting={crud.submitting}
             actionError={crud.actionError}
             onCreate={startCreate}
-            onEdit={startEdit}
-            onDelete={crud.destroy}
             onClose={crud.close}
             onSubmit={() => void crud.submit({ ...draft, currency_id: currency?.id ?? null })}
         >

@@ -56,7 +56,14 @@ final class VehicleServicePaymentIntegrationService
             throw new InvalidArgumentException('Payment invoice is not linked to this service job.');
         }
 
-        $balance = $this->invoiceBalances->validatePayableState($data->invoiceId);
+        $balance = $this->invoiceBalances->validatePayableState(
+            invoiceId: $data->invoiceId,
+            tenantId: (int) $job->tenant_id,
+            organizationUnitId: $job->organization_unit_id,
+            partyType: 'customer',
+            partyId: $billToCustomerId,
+            currencyId: $data->currencyId,
+        );
         if ($balance->tenantId !== (int) $job->tenant_id
             || $balance->organizationUnitId !== $job->organization_unit_id
             || $balance->partyType !== 'customer'

@@ -6,7 +6,6 @@ namespace Modules\Finance\DTOs;
 
 readonly class PostingLine
 {
-    public ?string $accountCode;
     public string $accountName;
     public string $debit;
     public string $credit;
@@ -15,7 +14,6 @@ readonly class PostingLine
     public ?string $dimensionCode;
     public ?string $sourceLineType;
     public ?int $sourceLineId;
-    public ?string $account;
     /** @var array<string, string|null> */
     public array $dimensions;
 
@@ -23,8 +21,8 @@ readonly class PostingLine
      * @param  array<string, string|null>  $dimensions
      */
     public function __construct(
-        ?string $accountCode = null,
-        string $accountName = '',
+        ?string $accountName = null,
+        ?string $lineName = null,
         string $debit = '0.000000',
         string $credit = '0.000000',
         ?string $description = null,
@@ -32,12 +30,9 @@ readonly class PostingLine
         ?string $dimensionCode = null,
         ?string $sourceLineType = null,
         ?int $sourceLineId = null,
-        ?string $account = null,
         array $dimensions = [],
     ) {
-        $this->account = $account ?? $accountCode;
-        $this->accountCode = $accountCode ?? $account;
-        $this->accountName = $accountName;
+        $this->accountName = $accountName ?? $lineName ?? '';
         $this->debit = $debit;
         $this->credit = $credit;
         $this->description = $description;

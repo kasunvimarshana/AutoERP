@@ -73,6 +73,74 @@ final class VehicleRentalModuleBaselineTest extends TestCase
         self::assertStringContainsString("allocations/{allocation}/replacement", $routes);
     }
 
+    public function test_vehicle_rental_route_actions_have_explicit_controller_authorization(): void
+    {
+        $missing = [];
+
+        foreach ($this->routedControllerActions() as [$controller, $method]) {
+            $source = $this->controllerMethodSource($controller, $method);
+            if (! str_contains($source, '->authorization->assert(')) {
+                $missing[] = $controller.'::'.$method;
+            }
+        }
+
+        self::assertSame([], $missing, 'Vehicle Rental route actions must explicitly authorize through VehicleRentalAuthorizationService.');
+    }
+
+    /** @return list<array{0: string, 1: string}> */
+    private function routedControllerActions(): array
+    {
+        $routes = (string) file_get_contents($this->root.'/app/Modules/VehicleRental/Routes/api.php');
+        preg_match_all(
+            "/\[([A-Za-z0-9_]+Controller)::class,\s*'([A-Za-z0-9_]+)'\]/",
+            $routes,
+            $matches,
+            PREG_SET_ORDER,
+        );
+
+        $actions = [];
+        foreach ($matches as $match) {
+            $key = $match[1].'::'.$match[2];
+            $actions[$key] = [$match[1], $match[2]];
+        }
+        ksort($actions);
+
+        return array_values($actions);
+    }
+
+    private function controllerMethodSource(string $controller, string $method): string
+    {
+        $path = $this->root.'/app/Modules/VehicleRental/Http/Controllers/'.$controller.'.php';
+        self::assertFileExists($path);
+        $source = (string) file_get_contents($path);
+
+        $pattern = '/public\s+function\s+'.preg_quote($method, '/').'\s*\(/';
+        if (preg_match($pattern, $source, $match, PREG_OFFSET_CAPTURE) !== 1) {
+            throw new \RuntimeException("Route action {$controller}::{$method} was not found.");
+        }
+
+        $start = (int) $match[0][1];
+        $bodyStart = strpos($source, '{', $start);
+        if ($bodyStart === false) {
+            throw new \RuntimeException("Route action {$controller}::{$method} has no method body.");
+        }
+
+        $depth = 0;
+        $length = strlen($source);
+        for ($position = $bodyStart; $position < $length; $position++) {
+            if ($source[$position] === '{') {
+                $depth++;
+            } elseif ($source[$position] === '}') {
+                $depth--;
+                if ($depth === 0) {
+                    return substr($source, $start, $position - $start + 1);
+                }
+            }
+        }
+
+        throw new \RuntimeException("Route action {$controller}::{$method} has an unterminated method body.");
+    }
+
     /** @return list<string> */
     private function requiredTables(): array
     {

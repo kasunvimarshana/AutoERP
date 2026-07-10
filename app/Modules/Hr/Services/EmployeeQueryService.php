@@ -6,7 +6,9 @@ namespace Modules\Hr\Services;
 
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 use Modules\Hr\Models\HrEmployee;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 final class EmployeeQueryService
 {
@@ -28,9 +30,26 @@ final class EmployeeQueryService
         return $this->base($tenantId, $organizationUnitId)->findOrFail($id);
     }
 
-    public function delete(HrEmployee $employee): void
+    public function delete(HrEmployee $employee, int $rowVersion): void
     {
-        $employee->delete();
+        DB::transaction(function () use ($employee, $rowVersion): void {
+            $employee = HrEmployee::query()
+                ->whereKey($employee->getKey())
+                ->where('tenant_id', (int) $employee->tenant_id)
+                ->when(
+                    $employee->organization_unit_id === null,
+                    static fn ($query) => $query->whereNull('organization_unit_id'),
+                    static fn ($query) => $query->where('organization_unit_id', (int) $employee->organization_unit_id),
+                )
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($rowVersion !== (int) $employee->row_version) {
+                throw new ConflictHttpException('Employee was changed by someone else. Reload before deleting.');
+            }
+
+            $employee->delete();
+        });
     }
 
     public function lookup(array $criteria, int $tenantId, ?int $organizationUnitId, int $perPage, string $kind = 'all'): LengthAwarePaginator

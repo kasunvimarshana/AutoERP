@@ -14,6 +14,7 @@ use Modules\Core\Contracts\TenantDirectoryInterface;
 use Modules\Core\Contracts\TenantEntitlementReaderInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\Core\Contracts\TenantPrivateFileServiceInterface;
+use Modules\Tenant\Console\Commands\PlatformHealthCommand;
 use Modules\Tenant\Console\Commands\TenantActivateCommand;
 use Modules\Tenant\Console\Commands\TenantCreateCommand;
 use Modules\Tenant\Console\Commands\TenantDeactivateCommand;
@@ -158,6 +159,7 @@ final class TenantServiceProvider extends ServiceProvider
             // Keep command constructors dependency-free so setup and recovery commands
             // can boot before runtime services such as Auth cryptography are configured.
             $this->commands([
+                PlatformHealthCommand::class,
                 TenantCreateCommand::class,
                 TenantActivateCommand::class,
                 TenantSuspendCommand::class,

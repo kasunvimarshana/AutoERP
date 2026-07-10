@@ -13,7 +13,7 @@ final class EmployeeSummaryResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
-            'id' => $this->getKey(), 'tenant_id' => $this->tenant_id, 'organization_unit_id' => $this->organization_unit_id,
+            'id' => $this->getKey(), 'row_version' => (int) $this->row_version, 'tenant_id' => $this->tenant_id, 'organization_unit_id' => $this->organization_unit_id,
             'employee_number' => $this->employee_number, 'code' => $this->code, 'name' => $this->display_name, 'display_name' => $this->display_name,
             'first_name' => $this->first_name, 'middle_name' => $this->middle_name, 'last_name' => $this->last_name,
             'email' => $this->email, 'phone' => $this->phone, 'mobile' => $this->mobile,

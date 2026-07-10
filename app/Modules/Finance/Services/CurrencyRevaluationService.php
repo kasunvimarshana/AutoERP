@@ -65,7 +65,6 @@ final class CurrencyRevaluationService
 
             if ($this->math->compare($difference, '0.000000') > 0) {
                 $lines[] = new PostingLine(
-                    accountCode: null,
                     accountName: 'Revalued exposure',
                     debit: $amount,
                     description: $description,
@@ -74,7 +73,6 @@ final class CurrencyRevaluationService
                     sourceLineId: $exposure['source_line_id'] ?? null,
                 );
                 $lines[] = new PostingLine(
-                    accountCode: null,
                     accountName: 'Unrealized gain',
                     credit: $amount,
                     description: $description,
@@ -87,7 +85,6 @@ final class CurrencyRevaluationService
             }
 
             $lines[] = new PostingLine(
-                accountCode: null,
                 accountName: 'Unrealized loss',
                 debit: $amount,
                 description: $description,
@@ -96,7 +93,6 @@ final class CurrencyRevaluationService
                 sourceLineId: $exposure['source_line_id'] ?? null,
             );
             $lines[] = new PostingLine(
-                accountCode: null,
                 accountName: 'Revalued exposure',
                 credit: $amount,
                 description: $description,
