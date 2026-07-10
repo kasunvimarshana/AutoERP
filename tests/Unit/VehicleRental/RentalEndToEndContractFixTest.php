@@ -221,6 +221,7 @@ final class RentalEndToEndContractFixTest extends TestCase
         $financeService = $this->source('app/Modules/VehicleRental/Services/VehicleFinanceService.php');
         $financeRequest = $this->source('app/Modules/VehicleRental/Http/Requests/StoreVehicleFinanceAgreementRequest.php');
         $financePage = $this->source('resources/js/modules/vehicle-rental/pages/VehicleFinancePage.tsx');
+        $configuration = $this->source('config/vehicle_rental.php');
         $calculationResource = $this->source('app/Modules/VehicleRental/Http/Resources/RentalCalculationRunResource.php');
         $agreementResource = $this->source('app/Modules/VehicleRental/Http/Resources/RentalAgreementResource.php');
         $types = $this->source('resources/js/modules/vehicle-rental/vehicleRentalTypes.ts');
@@ -228,7 +229,8 @@ final class RentalEndToEndContractFixTest extends TestCase
         self::assertStringContainsString('generateReducingBalanceSchedule', $financeService);
         self::assertStringContainsString('INSTALLMENT_PERIODS_PER_YEAR', $financeService);
         self::assertStringContainsString("'schedule' => ['required_if:interest_method,custom', 'prohibited_unless:interest_method,custom'", $financeRequest);
-        self::assertStringContainsString('"reducing_balance"', $financePage);
+        self::assertStringContainsString("'reducing_balance'", $configuration);
+        self::assertStringContainsString('finance_interest_methods', $financePage);
         self::assertStringNotContainsString('"custom"', $financePage);
 
         self::assertStringContainsString("'reservation' =>", $agreementResource);
@@ -324,6 +326,8 @@ final class RentalEndToEndContractFixTest extends TestCase
         self::assertStringContainsString('financial_side: side', $agreementDetailPage);
         self::assertStringContainsString('rentalAgreementFinancialSide(row.agreement_kind)', $agreementDetailPage);
         self::assertStringContainsString('usageContextForSide(row, side)?.allocation', $agreementDetailPage);
+        self::assertStringContainsString('placeholder="Select event type"', $runningChartPage);
+        self::assertStringNotContainsString('{ value: "", label: "Select event type" }', $runningChartPage);
 
         $calculationService = $this->source('app/Modules/VehicleRental/Services/RentalCalculationService.php');
         $usageEventBillingMap = $this->source('app/Modules/VehicleRental/Services/RentalUsageEventBillingMap.php');
@@ -335,6 +339,58 @@ final class RentalEndToEndContractFixTest extends TestCase
         self::assertStringContainsString('eventQuantityForComponent($contexts, $component->component_code)', $calculationService);
         self::assertStringContainsString('eventComponentDefaults', $agreementCreatePage);
         self::assertStringContainsString('["pass", "count"]', $agreementCreatePage);
+    }
+
+    public function test_vehicle_rental_frontend_defaults_are_loaded_from_metadata(): void
+    {
+        $configuration = $this->source('config/vehicle_rental.php');
+        $contextController = $this->source('app/Modules/VehicleRental/Http/Controllers/RentalContextController.php');
+        $types = $this->source('resources/js/modules/vehicle-rental/vehicleRentalTypes.ts');
+        $metadataHook = $this->source('resources/js/modules/vehicle-rental/hooks/useRentalMetadata.ts');
+        $currencyHook = $this->source('resources/js/modules/vehicle-rental/hooks/useRentalCurrencyDefault.ts');
+        $agreementPage = $this->source('resources/js/modules/vehicle-rental/pages/RentalAgreementCreatePage.tsx');
+        $reservationPage = $this->source('resources/js/modules/vehicle-rental/pages/RentalReservationCreatePage.tsx');
+        $expensePage = $this->source('resources/js/modules/vehicle-rental/pages/RentalExpensePage.tsx');
+        $financePage = $this->source('resources/js/modules/vehicle-rental/pages/VehicleFinancePage.tsx');
+        $allocationPage = $this->source('resources/js/modules/vehicle-rental/pages/RentalAllocationPage.tsx');
+        $replacementPage = $this->source('resources/js/modules/vehicle-rental/pages/RentalReplacementPage.tsx');
+        $custodyPage = $this->source('resources/js/modules/vehicle-rental/pages/RentalCustodyPage.tsx');
+        $customerLookup = $this->source('resources/js/modules/customer/components/CustomerLookupSelect.tsx');
+        $supplierLookup = $this->source('resources/js/modules/supplier/components/SupplierLookupSelect.tsx');
+
+        self::assertStringContainsString("'defaults' =>", $configuration);
+        self::assertStringContainsString("'reservation_sources' =>", $configuration);
+        self::assertStringContainsString('RentalExpenseType::Fuel->value', $configuration);
+        self::assertStringContainsString('RentalExpenseAllocationType::CompanyCost->value', $configuration);
+        self::assertStringContainsString('RentalCustodyEventType::OwnerToCompany->value', $configuration);
+        self::assertStringNotContainsString('driver_allowance', $configuration);
+
+        self::assertStringContainsString("'defaults' => config('vehicle_rental.defaults'", $contextController);
+        self::assertStringContainsString("'reservation_sources' => array_values(config('vehicle_rental.reservation_sources'", $contextController);
+        self::assertStringContainsString("'public_custody_event_types' => array_values(config('vehicle_rental.public_custody_event_types'", $contextController);
+        self::assertStringContainsString('export interface RentalMetadataDefaults', $types);
+        self::assertStringContainsString('reservation_sources?: string[];', $types);
+        self::assertStringContainsString('public_custody_event_types?: string[];', $types);
+        self::assertStringContainsString('useRentalMetadata', $metadataHook);
+        self::assertStringContainsString('metadata: metadata.data', $currencyHook);
+
+        foreach ([$agreementPage, $reservationPage, $expensePage, $financePage, $allocationPage, $replacementPage] as $page) {
+            self::assertStringContainsString('metadataDefaults', $page);
+        }
+
+        self::assertStringContainsString('rentalOptions(metadata?.expense_types)', $expensePage);
+        self::assertStringContainsString('rentalOptions(metadata?.reservation_sources)', $reservationPage);
+        self::assertStringContainsString('rentalOptions(metadata?.finance_interest_methods)', $financePage);
+        self::assertStringContainsString('rentalOptions(metadata.data?.vehicle_source_types)', $allocationPage);
+        self::assertStringContainsString('public_custody_event_types', $custodyPage);
+        self::assertStringContainsString("odometer: ''", $custodyPage);
+        self::assertStringNotContainsString("odometer: '0'", $custodyPage);
+        self::assertStringNotContainsString('driver_allowance', $expensePage);
+
+        self::assertStringContainsString('filter(Boolean).join', $customerLookup);
+        self::assertStringContainsString('required={required}', $customerLookup);
+        self::assertStringContainsString('filter(Boolean).join', $supplierLookup);
+        self::assertStringContainsString('required={required}', $supplierLookup);
     }
 
     private function source(string $relativePath): string

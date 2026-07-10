@@ -57,6 +57,12 @@ final class RentalContextController
 
         return response()->json(['data' => [
             'default_currency' => $this->currencySummary($tenant->baseCurrency),
+            'defaults' => config('vehicle_rental.defaults', []),
+            'legal_contexts' => array_values(config('vehicle_rental.legal_contexts', [])),
+            'reservation_sources' => array_values(config('vehicle_rental.reservation_sources', [])),
+            'finance_interest_methods' => array_values(config('vehicle_rental.finance_interest_methods', [])),
+            'finance_installment_frequencies' => array_values(config('vehicle_rental.finance_installment_frequencies', [])),
+            'public_custody_event_types' => array_values(config('vehicle_rental.public_custody_event_types', [])),
             'agreement_kinds' => $values(RentalAgreementKind::cases()),
             'agreement_statuses' => $values(RentalAgreementStatus::cases()),
             'allocation_statuses' => $values(RentalAllocationStatus::cases()),

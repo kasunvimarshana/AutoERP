@@ -5,7 +5,10 @@ import { RouterProvider, createMemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TestRouter } from "@/test/TestRouter";
 import type { NamedResource } from "@/shared/types/common";
-import { configureBusinessTimeZone } from "@/shared/utils/businessDate";
+import {
+    businessDateInputValue,
+    configureBusinessTimeZone,
+} from "@/shared/utils/businessDate";
 import {
     RENTAL_AGREEMENT_KIND,
 } from "../rentalAgreementPresentation";
@@ -231,6 +234,7 @@ describe("RentalAgreement lessor flow", () => {
             screen.getByRole("button", { name: "Choose lessor supplier" }),
         );
         await user.click(screen.getByRole("button", { name: "Choose currency" }));
+        await user.clear(screen.getByLabelText("Agreement date"));
         await user.type(screen.getByLabelText("Agreement date"), "2026-07-06");
         await user.type(
             screen.getByLabelText(/Executed date/),
@@ -316,6 +320,7 @@ describe("RentalAgreement lessee flow", () => {
             screen.getByRole("button", { name: "Choose lessee customer" }),
         );
         await user.click(screen.getByRole("button", { name: "Choose currency" }));
+        await user.clear(screen.getByLabelText("Agreement date"));
         await user.type(screen.getByLabelText("Agreement date"), "2026-07-06");
         await user.type(
             screen.getByLabelText(/Executed date/),
@@ -380,6 +385,7 @@ describe("RentalAgreement lessee flow", () => {
         await user.click(
             screen.getByRole("button", { name: "Choose lessee customer" }),
         );
+        await user.clear(screen.getByLabelText("Agreement date"));
         await user.type(screen.getByLabelText("Agreement date"), "2026-07-06");
         await user.type(screen.getByLabelText("Start"), "2026-07-06T08:00");
         await user.type(screen.getByLabelText("End"), "2026-08-06T08:00");
@@ -412,6 +418,7 @@ describe("RentalAgreement lessee flow", () => {
             screen.getByRole("button", { name: "Choose lessee customer" }),
         );
         await screen.findByRole("button", { name: "Tenant Currency" });
+        await user.clear(screen.getByLabelText("Agreement date"));
         await user.type(screen.getByLabelText("Agreement date"), "2026-07-06");
         await user.type(screen.getByLabelText("Start"), "2026-07-06T08:00");
         await user.type(screen.getByLabelText("End"), "2026-08-06T08:00");
@@ -423,6 +430,44 @@ describe("RentalAgreement lessee flow", () => {
             expect(apiMocks.createRentalAgreement).toHaveBeenCalledWith(
                 expect.objectContaining({
                     currency_id: 1,
+                }),
+            ),
+        );
+    });
+
+    it("loads editable agreement defaults from rental metadata", async () => {
+        const user = userEvent.setup();
+        apiMocks.getRentalMetadata.mockResolvedValue(
+            rentalMetadata({ id: 1, code: "LKR", name: "Tenant Currency" }),
+        );
+        renderPage(
+            <RentalAgreementCreatePage mode="lessee" />,
+            "/vehicle-rental/lessee-agreements/create",
+        );
+
+        await user.click(
+            screen.getByRole("button", { name: "Choose lessee customer" }),
+        );
+        await screen.findByRole("button", { name: "Tenant Currency" });
+        expect(screen.getByLabelText("Agreement date")).toHaveValue(
+            businessDateInputValue(),
+        );
+        await user.type(screen.getByLabelText("Start"), "2026-07-06T08:00");
+        await user.type(screen.getByLabelText("End"), "2026-08-06T08:00");
+        await user.click(
+            screen.getByRole("button", { name: "Create lessee agreement" }),
+        );
+
+        await waitFor(() =>
+            expect(apiMocks.createRentalAgreement).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    agreement_date: businessDateInputValue(),
+                    legal_context: "company",
+                    rental_mode: "with_driver",
+                    billing_cycle: "monthly",
+                    billing_basis: "calendar_month",
+                    proration_rule: "exact_day_count",
+                    payment_term_days: 30,
                 }),
             ),
         );
@@ -447,6 +492,7 @@ describe("RentalAgreement lessee flow", () => {
             screen.getByRole("button", { name: "Choose lessee customer" }),
         );
         await user.click(await screen.findByRole("button", { name: "Customer Currency" }));
+        await user.clear(screen.getByLabelText("Agreement date"));
         await user.type(screen.getByLabelText("Agreement date"), "2026-07-06");
         await user.type(screen.getByLabelText("Start"), "2026-07-06T08:00");
         await user.type(screen.getByLabelText("End"), "2026-08-06T08:00");
@@ -993,6 +1039,17 @@ function collection<T>(data: T[]) {
 function rentalMetadata(defaultCurrency: NamedResource | null = null) {
     return {
         default_currency: defaultCurrency,
+        defaults: rentalDefaults(),
+        legal_contexts: ["company", "personal"],
+        finance_interest_methods: ["flat", "reducing_balance"],
+        finance_installment_frequencies: ["weekly", "monthly", "quarterly", "yearly"],
+        public_custody_event_types: [
+            "owner_to_company",
+            "company_to_customer",
+            "customer_to_company",
+            "company_to_owner",
+            "internal_transfer",
+        ],
         agreement_kinds: ["customer_rental", "owner_supply"],
         agreement_statuses: [
             "draft",
@@ -1018,5 +1075,25 @@ function rentalMetadata(defaultCurrency: NamedResource | null = null) {
         financial_sides: ["revenue", "cost"],
         rate_component_codes: ["base_rental"],
         rate_units: ["month"],
+    };
+}
+
+function rentalDefaults() {
+    return {
+        legal_context: "company",
+        rental_mode: "with_driver",
+        billing_cycle: "monthly",
+        billing_basis: "calendar_month",
+        proration_rule: "exact_day_count",
+        excess_km_method: "period",
+        payment_term_days: 30,
+        reservation_source: "walk_in",
+        expense_type: "fuel",
+        expense_allocation_type: "company_cost",
+        vehicle_source_type: "company_owned",
+        finance_interest_method: "flat",
+        finance_installment_frequency: "monthly",
+        finance_installment_count: 12,
+        finance_payment_term_days: 0,
     };
 }

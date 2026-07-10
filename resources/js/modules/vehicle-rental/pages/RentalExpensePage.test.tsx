@@ -113,6 +113,18 @@ describe('RentalExpensePage', () => {
         expect(screen.getByRole('button', { name: 'Save expense' })).toBeEnabled();
     });
 
+    it('uses rental metadata expense options without unsupported driver allowance', async () => {
+        renderPage();
+
+        await screen.findByRole('button', { name: 'Tenant Currency' });
+
+        const options = Array.from(
+            (screen.getByLabelText('Expense type') as HTMLSelectElement).options,
+        ).map((option) => option.value);
+        expect(options).toContain('allowance');
+        expect(options).not.toContain('driver_allowance');
+    });
+
     it('submits recovery payload with party derived from the selected agreement', async () => {
         const user = userEvent.setup();
         renderPage();
@@ -276,5 +288,27 @@ function collection<T>(data: T[]) {
 function rentalMetadata(defaultCurrency: NamedResource | null) {
     return {
         default_currency: defaultCurrency,
+        defaults: {
+            expense_type: 'fuel',
+            expense_allocation_type: 'company_cost',
+        },
+        expense_types: [
+            'fuel',
+            'toll',
+            'parking',
+            'repair',
+            'service',
+            'allowance',
+            'licence',
+            'insurance',
+            'damage',
+            'other',
+        ],
+        expense_allocation_types: [
+            'company_cost',
+            'customer_recovery',
+            'owner_deduction',
+            'employee_reimbursement',
+        ],
     };
 }

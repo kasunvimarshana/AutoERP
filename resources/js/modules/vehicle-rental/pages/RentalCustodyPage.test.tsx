@@ -10,6 +10,7 @@ const apiMocks = vi.hoisted(() => ({
     confirmRentalCustodyEvent: vi.fn(),
     createRentalCustodyEvent: vi.fn(),
     getRentalAllocation: vi.fn(),
+    getRentalMetadata: vi.fn(),
     listRentalCustodyEvents: vi.fn(),
 }));
 
@@ -36,6 +37,7 @@ describe('RentalCustodyPage', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         apiMocks.getRentalAllocation.mockResolvedValue(ownerSupplyAllocation());
+        apiMocks.getRentalMetadata.mockResolvedValue(rentalMetadata());
         apiMocks.listRentalCustodyEvents.mockResolvedValue(collection([]));
         apiMocks.createRentalCustodyEvent.mockResolvedValue({ id: 9 });
     });
@@ -49,14 +51,17 @@ describe('RentalCustodyPage', () => {
         expect(eventType).toHaveValue('owner_to_company');
         expect(screen.getByLabelText('From')).toHaveValue('owner');
         expect(screen.getByLabelText('To')).toHaveValue('company');
-        expect(screen.queryByRole('option', { name: 'company to customer' })).not.toBeInTheDocument();
-        expect(screen.queryByRole('option', { name: 'replacement out' })).not.toBeInTheDocument();
-        expect(screen.queryByRole('option', { name: 'replacement in' })).not.toBeInTheDocument();
+        expect(screen.getByLabelText('Odometer')).toHaveValue(null);
+        expect(screen.queryByRole('option', { name: 'Company To Customer' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('option', { name: 'Replacement Out' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('option', { name: 'Replacement In' })).not.toBeInTheDocument();
 
+        await user.type(screen.getByLabelText('Odometer'), '1000');
         await user.click(screen.getByRole('button', { name: 'Save custody event' }));
 
         await waitFor(() => expect(apiMocks.createRentalCustodyEvent).toHaveBeenCalledWith(31, 1, expect.objectContaining({
             event_type: 'owner_to_company',
+            odometer: '1000',
             from_role: 'owner',
             to_role: 'company',
             fuel_level_percent: null,
@@ -104,6 +109,18 @@ function ownerSupplyAllocation() {
         remarks: null,
         drivers: [],
         custody_events: [],
+    };
+}
+
+function rentalMetadata() {
+    return {
+        public_custody_event_types: [
+            'owner_to_company',
+            'company_to_customer',
+            'customer_to_company',
+            'company_to_owner',
+            'internal_transfer',
+        ],
     };
 }
 

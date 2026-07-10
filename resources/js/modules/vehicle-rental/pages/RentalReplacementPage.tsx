@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { listVehicleOwnerships } from "@/modules/vehicle/vehicleOwnershipApi";
 import type { VehicleSummary } from "@/modules/vehicle/vehicleTypes";
@@ -24,6 +24,7 @@ import {
     RentalFinanceAgreementLookupSelect,
 } from "../components/RentalLookups";
 import { RentalPage } from "../components/RentalPage";
+import { rentalOptions, useRentalMetadata } from "../hooks/useRentalMetadata";
 import { getRentalAllocation, replaceRentalVehicle } from "../vehicleRentalApi";
 
 interface InspectionForm {
@@ -103,6 +104,12 @@ export default function RentalReplacementPage() {
         [allocationId],
         allocationId !== null,
     );
+    const metadata = useRentalMetadata();
+    const metadataDefaults = metadata.data?.defaults;
+    const vehicleSourceOptions = useMemo(
+        () => rentalOptions(metadata.data?.vehicle_source_types),
+        [metadata.data?.vehicle_source_types],
+    );
     const [vehicle, setVehicle] = useState<VehicleSummary | null>(null);
     const [sourceAllocation, setSourceAllocation] = useState<AllocationLookupValue | null>(null);
     const [financeAgreement, setFinanceAgreement] = useState<VersionedNamedResource | null>(null);
@@ -110,7 +117,7 @@ export default function RentalReplacementPage() {
     const [companyOwnershipLoading, setCompanyOwnershipLoading] = useState(false);
     const [companyOwnershipHint, setCompanyOwnershipHint] = useState<string | null>(null);
     const [form, setForm] = useState({
-        vehicle_source_type: "company_owned",
+        vehicle_source_type: "",
         replacement_at: businessDateTimeInputValue(),
         allocated_to: "",
         reason_code: "breakdown",
@@ -122,6 +129,27 @@ export default function RentalReplacementPage() {
         useState<InspectionForm>(emptyInspection);
     const [saving, setSaving] = useState(false);
     const [actionError, setActionError] = useState<ApiError | null>(null);
+
+    useEffect(() => {
+        if (!metadataDefaults?.vehicle_source_type) return;
+
+        let cancelled = false;
+        queueMicrotask(() => {
+            if (cancelled) return;
+
+            setForm((current) => ({
+                ...current,
+                vehicle_source_type:
+                    current.vehicle_source_type ||
+                    metadataDefaults.vehicle_source_type ||
+                    "",
+            }));
+        });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [metadataDefaults?.vehicle_source_type]);
 
     useEffect(() => {
         const controller = new AbortController();
@@ -271,7 +299,7 @@ export default function RentalReplacementPage() {
                 title="Replace rental vehicle"
                 description="Close the old allocation, record its return and hand over the replacement as one atomic transaction."
             />
-            <ErrorAlert error={actionError ?? allocation.error} />
+            <ErrorAlert error={actionError ?? allocation.error ?? metadata.error} />
             <Panel title="Current allocation">
                 <DetailGrid
                     items={[
@@ -330,17 +358,7 @@ export default function RentalReplacementPage() {
                                 setCompanyOwnership(null);
                                 setCompanyOwnershipHint(null);
                             }}
-                            options={[
-                                {
-                                    value: "company_owned",
-                                    label: "Company owned",
-                                },
-                                {
-                                    value: "owner_supplied",
-                                    label: "Owner supplied",
-                                },
-                                { value: "financed", label: "Financed" },
-                            ]}
+                            options={vehicleSourceOptions}
                         />
                         {form.vehicle_source_type === SOURCE_TYPE_COMPANY_OWNED && (
                             <Input

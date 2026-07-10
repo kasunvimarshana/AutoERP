@@ -94,6 +94,10 @@ describe("VehicleFinancePage currency defaults", () => {
                     supplier_id: 33,
                     vehicle_id: 12,
                     currency_id: 1,
+                    interest_method: "flat",
+                    installment_frequency: "monthly",
+                    installment_count: 12,
+                    payment_term_days: 0,
                 }),
             ),
         );
@@ -196,6 +200,14 @@ function manualCurrency(): NamedResource {
 function rentalMetadata(defaultCurrency: NamedResource | null) {
     return {
         default_currency: defaultCurrency,
+        defaults: {
+            finance_interest_method: "flat",
+            finance_installment_frequency: "monthly",
+            finance_installment_count: 12,
+            finance_payment_term_days: 0,
+        },
+        finance_interest_methods: ["flat", "reducing_balance"],
+        finance_installment_frequencies: ["weekly", "monthly", "quarterly", "yearly"],
     };
 }
 

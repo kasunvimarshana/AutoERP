@@ -74,6 +74,11 @@ describe("RentalReservationCreatePage currency defaults", () => {
 
         await user.click(screen.getByRole("button", { name: "Choose customer" }));
         await screen.findByRole("button", { name: "Tenant Currency" });
+        await waitFor(() =>
+            expect(screen.getByLabelText("Reservation source")).toHaveValue(
+                "walk_in",
+            ),
+        );
         await fillRequiredDates(user);
         await user.click(screen.getByRole("button", { name: "Create reservation" }));
 
@@ -82,6 +87,39 @@ describe("RentalReservationCreatePage currency defaults", () => {
                 expect.objectContaining({
                     customer_id: 22,
                     currency_id: 1,
+                    rental_mode: "with_driver",
+                    billing_cycle: "monthly",
+                    source: "walk_in",
+                }),
+            ),
+        );
+    });
+
+    it("preserves editable metadata defaults when the user changes them", async () => {
+        const user = userEvent.setup();
+        renderPage();
+
+        await user.click(screen.getByRole("button", { name: "Choose customer" }));
+        await screen.findByRole("button", { name: "Tenant Currency" });
+        await waitFor(() =>
+            expect(screen.getByLabelText("Reservation source")).toHaveValue(
+                "walk_in",
+            ),
+        );
+        await user.selectOptions(screen.getByLabelText("Rental mode"), "self_drive");
+        await user.selectOptions(
+            screen.getByLabelText("Reservation source"),
+            "referral",
+        );
+        await fillRequiredDates(user);
+        await user.click(screen.getByRole("button", { name: "Create reservation" }));
+
+        await waitFor(() =>
+            expect(apiMocks.createRentalReservation).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    rental_mode: "self_drive",
+                    billing_cycle: "monthly",
+                    source: "referral",
                 }),
             ),
         );
@@ -183,5 +221,13 @@ function manualCurrency(): NamedResource {
 function rentalMetadata(defaultCurrency: NamedResource | null) {
     return {
         default_currency: defaultCurrency,
+        defaults: {
+            rental_mode: "with_driver",
+            billing_cycle: "monthly",
+            reservation_source: "walk_in",
+        },
+        rental_modes: ["with_driver", "self_drive", "vehicle_only"],
+        billing_cycles: ["hourly", "daily", "weekly", "monthly", "per_hire"],
+        reservation_sources: ["walk_in", "referral"],
     };
 }

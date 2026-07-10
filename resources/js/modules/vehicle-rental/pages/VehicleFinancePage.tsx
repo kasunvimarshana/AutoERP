@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import type { SupplierSummary } from "@/modules/supplier/supplierTypes";
 import { SupplierLookupSelect } from "@/modules/supplier/components/SupplierLookupSelect";
 import type { VehicleSummary } from "@/modules/vehicle/vehicleTypes";
@@ -23,6 +23,7 @@ import { readableRelation } from "@/shared/utils/object";
 import { RentalPage } from "../components/RentalPage";
 import { RentalCurrencyLookupSelect } from "../components/RentalLookups";
 import { useRentalCurrencyDefault } from "../hooks/useRentalCurrencyDefault";
+import { rentalOptions } from "../hooks/useRentalMetadata";
 import {
     activateVehicleFinanceAgreement,
     createVehicleFinanceAgreement,
@@ -31,6 +32,7 @@ import {
 } from "../vehicleRentalApi";
 import { vehicleRentalPermissions } from "../vehicleRentalPermissions";
 import type {
+    RentalMetadataDefaults,
     VehicleFinanceAgreement,
     VehicleFinanceInstallment,
 } from "../vehicleRentalTypes";
@@ -51,7 +53,7 @@ interface FinanceForm {
     remarks: string;
 }
 
-const emptyForm = (): FinanceForm => ({
+const emptyForm = (defaults?: RentalMetadataDefaults): FinanceForm => ({
     agreement_number: "",
     agreement_date: businessDateInputValue(),
     starts_at: "",
@@ -59,11 +61,17 @@ const emptyForm = (): FinanceForm => ({
     principal_amount: "",
     initial_deposit_amount: "0",
     residual_value: "0",
-    interest_method: "flat",
+    interest_method: defaults?.finance_interest_method ?? "",
     annual_interest_rate: "0",
-    installment_frequency: "monthly",
-    installment_count: "12",
-    payment_term_days: "0",
+    installment_frequency: defaults?.finance_installment_frequency ?? "",
+    installment_count:
+        defaults?.finance_installment_count === undefined
+            ? ""
+            : String(defaults.finance_installment_count),
+    payment_term_days:
+        defaults?.finance_payment_term_days === undefined
+            ? ""
+            : String(defaults.finance_payment_term_days),
     remarks: "",
 });
 
@@ -78,6 +86,7 @@ export default function VehicleFinancePage() {
         selectCurrency,
         applyCurrencyDefault,
         resetCurrencyToDefault,
+        metadata,
     } = useRentalCurrencyDefault();
     const [saving, setSaving] = useState(false);
     const [actionError, setActionError] = useState<ApiError | null>(null);
@@ -97,6 +106,46 @@ export default function VehicleFinancePage() {
         auth,
         vehicleRentalPermissions.financialCreate,
     );
+    const metadataDefaults = metadata?.defaults;
+    const interestMethodOptions = useMemo(
+        () => rentalOptions(metadata?.finance_interest_methods),
+        [metadata?.finance_interest_methods],
+    );
+    const frequencyOptions = useMemo(
+        () => rentalOptions(metadata?.finance_installment_frequencies),
+        [metadata?.finance_installment_frequencies],
+    );
+
+    useEffect(() => {
+        if (!metadataDefaults) return;
+
+        let cancelled = false;
+        queueMicrotask(() => {
+            if (cancelled) return;
+
+            setForm((current) => ({
+                ...current,
+                interest_method:
+                    current.interest_method ||
+                    metadataDefaults.finance_interest_method ||
+                    "",
+                installment_frequency:
+                    current.installment_frequency ||
+                    metadataDefaults.finance_installment_frequency ||
+                    "",
+                installment_count:
+                    current.installment_count ||
+                    String(metadataDefaults.finance_installment_count ?? ""),
+                payment_term_days:
+                    current.payment_term_days ||
+                    String(metadataDefaults.finance_payment_term_days ?? ""),
+            }));
+        });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [metadataDefaults]);
 
     const save = async (event: FormEvent) => {
         event.preventDefault();
@@ -112,7 +161,7 @@ export default function VehicleFinancePage() {
                 installment_count: Number(form.installment_count),
                 payment_term_days: Number(form.payment_term_days),
             });
-            setForm(emptyForm());
+            setForm(emptyForm(metadataDefaults));
             setSupplier(null);
             setVehicle(null);
             resetCurrencyToDefault();
@@ -261,6 +310,7 @@ export default function VehicleFinancePage() {
                         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                             <SupplierLookupSelect
                                 value={supplier}
+                                required
                                 onChange={(next) => {
                                     setSupplier(next);
                                     applyCurrencyDefault(next?.default_currency ?? null);
@@ -269,6 +319,7 @@ export default function VehicleFinancePage() {
                             <VehicleLookupSelect
                                 value={vehicle}
                                 onChange={setVehicle}
+                                required
                             />
                             <Input
                                 label="Agreement number"
@@ -365,19 +416,14 @@ export default function VehicleFinancePage() {
                             <Select
                                 label="Interest method"
                                 value={form.interest_method}
+                                required
                                 onChange={(event) =>
                                     setForm({
                                         ...form,
                                         interest_method: event.target.value,
                                     })
                                 }
-                                options={[
-                                    "flat",
-                                    "reducing_balance",
-                                ].map((value) => ({
-                                    value,
-                                    label: value.replaceAll("_", " "),
-                                }))}
+                                options={interestMethodOptions}
                             />
                             <Input
                                 label="Annual interest %"
@@ -396,6 +442,7 @@ export default function VehicleFinancePage() {
                             <Select
                                 label="Frequency"
                                 value={form.installment_frequency}
+                                required
                                 onChange={(event) =>
                                     setForm({
                                         ...form,
@@ -403,12 +450,7 @@ export default function VehicleFinancePage() {
                                             event.target.value,
                                     })
                                 }
-                                options={[
-                                    "weekly",
-                                    "monthly",
-                                    "quarterly",
-                                    "yearly",
-                                ].map((value) => ({ value, label: value }))}
+                                options={frequencyOptions}
                             />
                             <Input
                                 label="Installment count"

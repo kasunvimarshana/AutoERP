@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { CustomerLookupSelect } from "@/modules/customer/components/CustomerLookupSelect";
 import type { CustomerSummary } from "@/modules/customer/customerTypes";
@@ -16,6 +16,7 @@ import { useMutationFormGuard } from "@/shared/hooks/useMutationFormGuard";
 import { RentalPage } from "../components/RentalPage";
 import { RentalCurrencyLookupSelect } from "../components/RentalLookups";
 import { useRentalCurrencyDefault } from "../hooks/useRentalCurrencyDefault";
+import { rentalOptions } from "../hooks/useRentalMetadata";
 import { createRentalReservation } from "../vehicleRentalApi";
 
 export default function RentalReservationCreatePage() {
@@ -28,21 +29,57 @@ export default function RentalReservationCreatePage() {
         selectCurrency,
         applyCurrencyDefault,
         resetCurrencyToDefault,
+        metadata,
     } = useRentalCurrencyDefault();
     const [form, setForm] = useState({
-        rental_mode: "with_driver",
-        billing_cycle: "monthly",
+        rental_mode: "",
+        billing_cycle: "",
         requested_start_at: "",
         requested_end_at: "",
         estimated_amount: "0",
         estimated_deposit_amount: "0",
-        source: "walk_in",
+        source: "",
         remarks: "",
     });
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
     const formGuard = useMutationFormGuard(saving);
     const updateForm: typeof setForm = (next) => { formGuard.markDirty(); setForm(next); };
+    const metadataDefaults = metadata?.defaults;
+    const rentalModeOptions = useMemo(
+        () => rentalOptions(metadata?.rental_modes),
+        [metadata?.rental_modes],
+    );
+    const billingCycleOptions = useMemo(
+        () => rentalOptions(metadata?.billing_cycles),
+        [metadata?.billing_cycles],
+    );
+    const sourceOptions = useMemo(
+        () => rentalOptions(metadata?.reservation_sources),
+        [metadata?.reservation_sources],
+    );
+
+    useEffect(() => {
+        if (!metadataDefaults) return;
+
+        let cancelled = false;
+        queueMicrotask(() => {
+            if (cancelled) return;
+
+            setForm((current) => ({
+                ...current,
+                rental_mode:
+                    current.rental_mode || metadataDefaults.rental_mode || "",
+                billing_cycle:
+                    current.billing_cycle || metadataDefaults.billing_cycle || "",
+                source: current.source || metadataDefaults.reservation_source || "",
+            }));
+        });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [metadataDefaults]);
     const submit = async (event: FormEvent) => {
         event.preventDefault();
         if (!customer || !currency) return;
@@ -79,6 +116,7 @@ export default function RentalReservationCreatePage() {
                     <div className="grid gap-4 md:grid-cols-2">
                         <CustomerLookupSelect
                             value={customer}
+                            required
                             onChange={(next) => {
                                 formGuard.markDirty();
                                 setCustomer(next);
@@ -92,40 +130,37 @@ export default function RentalReservationCreatePage() {
                         <Select
                             label="Rental mode"
                             value={form.rental_mode}
+                            required
                             onChange={(e) =>
                                 updateForm({
                                     ...form,
                                     rental_mode: e.target.value,
                                 })
                             }
-                            options={[
-                                { value: "with_driver", label: "With driver" },
-                                { value: "self_drive", label: "Self-drive" },
-                                {
-                                    value: "vehicle_only",
-                                    label: "Vehicle only",
-                                },
-                            ]}
+                            options={rentalModeOptions}
                         />
                         <Select
                             label="Billing cycle"
                             value={form.billing_cycle}
+                            required
                             onChange={(e) =>
                                 updateForm({
                                     ...form,
                                     billing_cycle: e.target.value,
                                 })
                             }
-                            options={[
-                                "hourly",
-                                "daily",
-                                "weekly",
-                                "monthly",
-                                "per_hire",
-                            ].map((value) => ({
-                                value,
-                                label: value.replaceAll("_", " "),
-                            }))}
+                            options={billingCycleOptions}
+                        />
+                        <Select
+                            label="Reservation source"
+                            value={form.source}
+                            onChange={(e) =>
+                                updateForm({
+                                    ...form,
+                                    source: e.target.value,
+                                })
+                            }
+                            options={sourceOptions}
                         />
                         <Input
                             label="Start"

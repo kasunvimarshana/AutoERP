@@ -36,6 +36,7 @@ import {
 } from "../vehicleRentalApi";
 import type { RentalAgreement, RentalReservation } from "../vehicleRentalTypes";
 import { useRentalCurrencyDefault } from "../hooks/useRentalCurrencyDefault";
+import { rentalOptions } from "../hooks/useRentalMetadata";
 
 const coreComponentDefaults = [
     ["base_rental", "month"],
@@ -137,6 +138,7 @@ export default function RentalAgreementCreatePage({
         selectCurrency,
         setAuthoritativeCurrency,
         applyCurrencyDefault,
+        metadata,
     } = useRentalCurrencyDefault({ initialTouched: isEditing });
     const [reservation, setReservation] = useState<RentalReservation | null>(null);
     const [loadedAgreement, setLoadedAgreement] =
@@ -144,18 +146,18 @@ export default function RentalAgreementCreatePage({
     const [loadingAgreement, setLoadingAgreement] = useState(isEditing);
     const [form, setForm] = useState({
         agreement_kind: initialAgreementKind as string,
-        agreement_date: "",
+        agreement_date: isEditing ? "" : businessDateInputValue(),
         executed_at: "",
         starts_at: "",
         ends_at: "",
-        legal_context: "company",
-        rental_mode: "with_driver",
-        billing_cycle: "monthly",
-        billing_basis: "calendar_month",
-        proration_rule: "exact_day_count",
-        payment_term_days: "30",
+        legal_context: "",
+        rental_mode: "",
+        billing_cycle: "",
+        billing_basis: "",
+        proration_rule: "",
+        payment_term_days: "",
         included_km: "0",
-        excess_km_method: "period",
+        excess_km_method: "",
         deposit_amount: "0",
         remarks: "",
     });
@@ -169,6 +171,61 @@ export default function RentalAgreementCreatePage({
     const [error, setError] = useState<ApiError | null>(null);
     const { markDirty, markSaved, resetDirty } = useMutationFormGuard(saving);
     const updateForm: typeof setForm = (next) => { markDirty(); setForm(next); };
+    const metadataDefaults = metadata?.defaults;
+    const legalContextOptions = useMemo(
+        () => rentalOptions(metadata?.legal_contexts),
+        [metadata?.legal_contexts],
+    );
+    const rentalModeOptions = useMemo(
+        () => rentalOptions(metadata?.rental_modes),
+        [metadata?.rental_modes],
+    );
+    const billingCycleOptions = useMemo(
+        () => rentalOptions(metadata?.billing_cycles),
+        [metadata?.billing_cycles],
+    );
+    const billingBasisOptions = useMemo(
+        () => rentalOptions(metadata?.billing_bases),
+        [metadata?.billing_bases],
+    );
+    const excessKmMethodOptions = useMemo(
+        () => rentalOptions(metadata?.excess_km_methods),
+        [metadata?.excess_km_methods],
+    );
+
+    useEffect(() => {
+        if (isEditing || !metadataDefaults) return;
+
+        let cancelled = false;
+        queueMicrotask(() => {
+            if (cancelled) return;
+
+            setForm((current) => ({
+                ...current,
+                legal_context:
+                    current.legal_context || metadataDefaults.legal_context || "",
+                rental_mode:
+                    current.rental_mode || metadataDefaults.rental_mode || "",
+                billing_cycle:
+                    current.billing_cycle || metadataDefaults.billing_cycle || "",
+                billing_basis:
+                    current.billing_basis || metadataDefaults.billing_basis || "",
+                proration_rule:
+                    current.proration_rule || metadataDefaults.proration_rule || "",
+                payment_term_days:
+                    current.payment_term_days ||
+                    String(metadataDefaults.payment_term_days ?? ""),
+                excess_km_method:
+                    current.excess_km_method ||
+                    metadataDefaults.excess_km_method ||
+                    "",
+            }));
+        });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [isEditing, metadataDefaults]);
 
     useEffect(() => {
         if (!isEditing || routeAgreementId === null) return;
@@ -193,7 +250,7 @@ export default function RentalAgreementCreatePage({
                     executed_at: toDateInputValue(resource.executed_at),
                     starts_at: toDateTimeLocal(resource.starts_at),
                     ends_at: toDateTimeLocal(resource.ends_at),
-                    legal_context: resource.legal_context ?? "company",
+                    legal_context: resource.legal_context ?? "",
                     rental_mode: resource.rental_mode,
                     billing_cycle: resource.billing_cycle,
                     billing_basis: resource.billing_basis,
@@ -205,7 +262,7 @@ export default function RentalAgreementCreatePage({
                             : String(resource.payment_term_days),
                     included_km: resource.active_rate_version?.included_km ?? "0",
                     excess_km_method:
-                        resource.active_rate_version?.excess_km_method ?? "period",
+                        resource.active_rate_version?.excess_km_method ?? "",
                     deposit_amount:
                         resource.deposit_requirement?.required_amount ?? "0",
                     remarks: resource.remarks ?? "",
@@ -485,6 +542,7 @@ export default function RentalAgreementCreatePage({
                                 value={customer}
                                 error={errorFor("customer_id")}
                                 disabled={structuralFieldsLocked}
+                                required
                                 onChange={(next) => {
                                     markDirty();
                                     setCustomer(next);
@@ -496,6 +554,7 @@ export default function RentalAgreementCreatePage({
                                 value={supplier}
                                 error={errorFor("supplier_id")}
                                 disabled={structuralFieldsLocked}
+                                required
                                 onChange={(next) => {
                                     markDirty();
                                     setSupplier(next);
@@ -539,16 +598,14 @@ export default function RentalAgreementCreatePage({
                             label="Legal context"
                             value={form.legal_context}
                             error={errorFor("legal_context")}
+                            required
                             onChange={(e) =>
                                 updateForm({
                                     ...form,
                                     legal_context: e.target.value,
                                 })
                             }
-                            options={[
-                                { value: "company", label: "Company" },
-                                { value: "personal", label: "Personal" },
-                            ]}
+                            options={legalContextOptions}
                         />
                         <Input
                             label="Start"
@@ -577,64 +634,42 @@ export default function RentalAgreementCreatePage({
                             value={form.rental_mode}
                             error={errorFor("rental_mode")}
                             disabled={structuralFieldsLocked}
+                            required
                             onChange={(e) =>
                                 updateForm({
                                     ...form,
                                     rental_mode: e.target.value,
                                 })
                             }
-                            options={[
-                                { value: "with_driver", label: "With driver" },
-                                { value: "self_drive", label: "Self-drive" },
-                                {
-                                    value: "vehicle_only",
-                                    label: "Vehicle only",
-                                },
-                            ]}
+                            options={rentalModeOptions}
                         />
                         <Select
                             label="Billing cycle"
                             value={form.billing_cycle}
                             error={errorFor("billing_cycle")}
                             disabled={structuralFieldsLocked}
+                            required
                             onChange={(e) =>
                                 updateForm({
                                     ...form,
                                     billing_cycle: e.target.value,
                                 })
                             }
-                            options={[
-                                "hourly",
-                                "daily",
-                                "weekly",
-                                "monthly",
-                                "per_hire",
-                            ].map((value) => ({
-                                value,
-                                label: value.replaceAll("_", " "),
-                            }))}
+                            options={billingCycleOptions}
                         />
                         <Select
                             label="Billing basis"
                             value={form.billing_basis}
                             error={errorFor("billing_basis")}
                             disabled={structuralFieldsLocked}
+                            required
                             onChange={(e) =>
                                 updateForm({
                                     ...form,
                                     billing_basis: e.target.value,
                                 })
                             }
-                            options={[
-                                "calendar_month",
-                                "anniversary",
-                                "fixed_period",
-                                "per_hire",
-                                "per_usage_log",
-                            ].map((value) => ({
-                                value,
-                                label: value.replaceAll("_", " "),
-                            }))}
+                            options={billingBasisOptions}
                         />
                         <RentalCurrencyLookupSelect
                             value={currency}
@@ -680,20 +715,14 @@ export default function RentalAgreementCreatePage({
                                     label="Excess KM method"
                                     value={form.excess_km_method}
                                     error={errorFor("rate_version.excess_km_method")}
+                                    required
                                     onChange={(e) =>
                                         updateForm({
                                             ...form,
                                             excess_km_method: e.target.value,
                                         })
                                     }
-                                    options={[
-                                        "period",
-                                        "per_hire",
-                                        "per_usage_log",
-                                    ].map((value) => ({
-                                        value,
-                                        label: value.replaceAll("_", " "),
-                                    }))}
+                                    options={excessKmMethodOptions}
                                 />
                             </>
                         )}

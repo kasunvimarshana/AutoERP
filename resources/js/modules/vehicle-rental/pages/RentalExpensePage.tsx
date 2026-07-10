@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useAuth } from '@/modules/auth/AuthProvider';
 import { hasPermission } from '@/modules/auth/accessControl';
 import { searchEmployees } from '@/modules/hr/hrApi';
@@ -21,7 +21,7 @@ import { useApi } from '@/shared/hooks/useApi';
 import type { NamedResource } from '@/shared/types/common';
 import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { formatDate } from '@/shared/utils/formatDate';
-import { readableRelation } from '@/shared/utils/object';
+import { humanize, readableRelation } from '@/shared/utils/object';
 import {
     RentalAgreementLookupSelect,
     RentalAllocationLookupSelect,
@@ -30,6 +30,7 @@ import {
     type RentalAgreementLookupOption,
 } from '../components/RentalLookups';
 import { RentalPage } from '../components/RentalPage';
+import { rentalOptions } from '../hooks/useRentalMetadata';
 import {
     createRentalExpense,
     listRentalExpenses,
@@ -52,13 +53,13 @@ interface ExpenseForm {
 }
 
 const emptyForm = (): ExpenseForm => ({
-    expenseType: 'fuel',
+    expenseType: '',
     expenseDate: businessDateInputValue(),
     netAmount: '',
     taxAmount: '0',
     referenceNumber: '',
     description: '',
-    allocationType: 'company_cost',
+    allocationType: '',
     withholdingAmount: '0',
     markupAmount: '0',
 });
@@ -73,6 +74,7 @@ export default function RentalExpensePage() {
         selectCurrency,
         applyCurrencyDefault,
         resetCurrencyToDefault,
+        metadata,
     } = useRentalCurrencyDefault();
     const [taxGroup, setTaxGroup] = useState<NamedResource | null>(null);
     const [targetAgreement, setTargetAgreement] = useState<RentalAgreementLookupOption | null>(null);
@@ -85,13 +87,14 @@ export default function RentalExpensePage() {
     const [status, setStatus] = useState('');
     const agreementBackedAllocation = form.allocationType === 'customer_recovery'
         || form.allocationType === 'owner_deduction';
+    const employeeBackedAllocation = form.allocationType === 'employee_reimbursement';
     const partySelectionValid = form.allocationType === 'customer_recovery'
         ? targetAgreement !== null && customer !== null
         : form.allocationType === 'owner_deduction'
             ? targetAgreement !== null && supplier !== null
-            : form.allocationType === 'employee_reimbursement'
+            : employeeBackedAllocation
                 ? employee !== null
-                : true;
+                : form.allocationType !== '';
 
     const result = useApi(
         (signal) => listRentalExpenses({ status: status || undefined, per_page: 50 }, signal),
@@ -99,6 +102,38 @@ export default function RentalExpensePage() {
     );
     const canRecord = hasPermission(auth, vehicleRentalPermissions.expensesRecord);
     const canApprove = hasPermission(auth, vehicleRentalPermissions.expensesApprove);
+    const metadataDefaults = metadata?.defaults;
+    const expenseTypeOptions = useMemo(
+        () => rentalOptions(metadata?.expense_types),
+        [metadata?.expense_types],
+    );
+    const allocationTypeOptions = useMemo(
+        () => rentalOptions(metadata?.expense_allocation_types),
+        [metadata?.expense_allocation_types],
+    );
+
+    useEffect(() => {
+        if (!metadataDefaults) return;
+
+        let cancelled = false;
+        queueMicrotask(() => {
+            if (cancelled) return;
+
+            setForm((current) => ({
+                ...current,
+                expenseType:
+                    current.expenseType || metadataDefaults.expense_type || '',
+                allocationType:
+                    current.allocationType ||
+                    metadataDefaults.expense_allocation_type ||
+                    '',
+            }));
+        });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [metadataDefaults]);
 
     const changeAllocationType = (allocationType: string) => {
         setForm((current) => ({ ...current, allocationType }));
@@ -120,7 +155,7 @@ export default function RentalExpensePage() {
 
     const save = async (event: FormEvent) => {
         event.preventDefault();
-        if (!vehicle || !currency || !form.netAmount || !partySelectionValid) return;
+        if (!vehicle || !currency || !form.expenseType || !form.netAmount || !partySelectionValid) return;
 
         setSaving(true);
         setActionError(null);
@@ -182,7 +217,7 @@ export default function RentalExpensePage() {
         { key: 'number', header: 'Expense', render: (row) => row.expense_number },
         { key: 'date', header: 'Date', render: (row) => formatDate(row.expense_date) },
         { key: 'vehicle', header: 'Vehicle', render: (row) => readableRelation(row.vehicle) },
-        { key: 'type', header: 'Type', render: (row) => row.expense_type.replaceAll('_', ' ') },
+        { key: 'type', header: 'Type', render: (row) => humanize(row.expense_type) },
         { key: 'amount', header: 'Gross amount', render: (row) => row.gross_amount },
         { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.status} /> },
         {
@@ -226,19 +261,9 @@ export default function RentalExpensePage() {
                             <Select
                                 label="Expense type"
                                 value={form.expenseType}
+                                required
                                 onChange={(event) => setForm({ ...form, expenseType: event.target.value })}
-                                options={[
-                                    'fuel',
-                                    'toll',
-                                    'parking',
-                                    'repair',
-                                    'service',
-                                    'driver_allowance',
-                                    'licence',
-                                    'insurance',
-                                    'damage',
-                                    'other',
-                                ].map((value) => ({ value, label: value.replaceAll('_', ' ') }))}
+                                options={expenseTypeOptions}
                             />
                             <Input
                                 label="Expense date"
@@ -274,27 +299,26 @@ export default function RentalExpensePage() {
                             <Select
                                 label="Financial treatment"
                                 value={form.allocationType}
+                                required
                                 onChange={(event) => changeAllocationType(event.target.value)}
-                                options={[
-                                    'company_cost',
-                                    'customer_recovery',
-                                    'owner_deduction',
-                                    'employee_reimbursement',
-                                ].map((value) => ({ value, label: value.replaceAll('_', ' ') }))}
+                                options={allocationTypeOptions}
                             />
-                            <RentalAgreementLookupSelect
-                                value={targetAgreement}
-                                onChange={changeTargetAgreement}
-                                agreementKind={form.allocationType === 'owner_deduction' ? 'owner_supply' : 'customer_rental'}
-                                disabled={!agreementBackedAllocation}
-                                required={agreementBackedAllocation}
-                            />
-                            <RentalAllocationLookupSelect
-                                value={targetAllocation}
-                                onChange={setTargetAllocation}
-                                agreementId={targetAgreement?.id}
-                                disabled={!agreementBackedAllocation}
-                            />
+                            {agreementBackedAllocation && (
+                                <>
+                                    <RentalAgreementLookupSelect
+                                        value={targetAgreement}
+                                        onChange={changeTargetAgreement}
+                                        agreementKind={form.allocationType === 'owner_deduction' ? 'owner_supply' : 'customer_rental'}
+                                        required
+                                    />
+                                    <RentalAllocationLookupSelect
+                                        value={targetAllocation}
+                                        onChange={setTargetAllocation}
+                                        agreementId={targetAgreement?.id}
+                                        disabled={!targetAgreement}
+                                    />
+                                </>
+                            )}
                             <Input
                                 label="Withholding amount"
                                 type="number"
@@ -317,7 +341,7 @@ export default function RentalExpensePage() {
                             {form.allocationType === 'owner_deduction' && (
                                 <Input label="Supplier" value={supplier?.name ?? ''} readOnly disabled />
                             )}
-                            {form.allocationType === 'employee_reimbursement' && (
+                            {employeeBackedAllocation && (
                                 <LookupSelect
                                     label="Employee"
                                     value={employee}
@@ -339,7 +363,7 @@ export default function RentalExpensePage() {
                             <Button
                                 type="submit"
                                 loading={saving}
-                                disabled={!vehicle || !currency || !form.netAmount || !partySelectionValid}
+                                disabled={!vehicle || !currency || !form.expenseType || !form.netAmount || !partySelectionValid}
                             >
                                 Save expense
                             </Button>
