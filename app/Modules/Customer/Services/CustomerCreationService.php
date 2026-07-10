@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modules\Customer\Services;
 
 use Illuminate\Support\Facades\DB;
-use Modules\Core\Services\DecimalMath;
 use Modules\Customer\DTOs\CreateCustomerData;
 use Modules\Customer\DTOs\CustomerCreditProfileData;
 use Modules\Customer\Models\Customer;
@@ -14,7 +13,6 @@ use Modules\Customer\Validators\CustomerValidationService;
 final class CustomerCreationService
 {
     public function __construct(
-        private readonly DecimalMath $math,
         private readonly CustomerValidationService $validator,
         private readonly CustomerNumberService $numbers,
         private readonly CustomerContactService $contacts,
@@ -51,10 +49,6 @@ final class CustomerCreationService
                 'vat_number' => $data->vatNumber,
                 'svat_number' => $data->svatNumber,
                 'business_registration_number' => $data->businessRegistrationNumber,
-                'credit_limit' => $this->math->normalize($data->creditProfile?->creditLimit ?? $data->creditLimit),
-                'opening_balance' => $this->math->normalize($data->openingBalance),
-                'is_credit_allowed' => $data->isCreditAllowed,
-                'is_advance_allowed' => $data->isAdvanceAllowed,
                 'is_tax_exempt' => $data->isTaxExempt,
                 'marketing_consent' => $data->marketingConsent,
                 'preferred_communication_channel' => $data->preferredCommunicationChannel,
@@ -77,12 +71,7 @@ final class CustomerCreationService
             foreach ($data->documents as $document) {
                 $this->documents->create($customer, $document);
             }
-            $this->creditProfiles->set(
-                $customer,
-                $data->creditProfile ?? new CustomerCreditProfileData(
-                    creditLimit: $data->creditLimit,
-                ),
-            );
+            $this->creditProfiles->set($customer, $data->creditProfile ?? new CustomerCreditProfileData());
             $this->statuses->recordInitial($customer, $data->createdBy);
 
             return $customer->refresh()->load([
