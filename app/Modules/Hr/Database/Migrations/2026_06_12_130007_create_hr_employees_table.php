@@ -12,6 +12,7 @@ return new class extends Migration
     {
         Schema::create('hr_employees', function (Blueprint $table): void {
             $table->id();
+            $table->unsignedBigInteger('row_version')->default(1);
             $table->foreignId('tenant_id')->constrained('tenants', indexName: 'hr_employees_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->string('employee_number');
