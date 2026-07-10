@@ -57,6 +57,11 @@
             "@php artisan config:clear --ansi",
             "@php artisan auth:readiness --no-interaction"
         ],
+        "production:check": [
+            "@php artisan config:clear --ansi",
+            "@php artisan auth:readiness --no-interaction",
+            "@php artisan platform:health --no-interaction"
+        ],
         "dev": [
             "Composer\\Config::disableProcessTimeout",
             "@runtime:check",
