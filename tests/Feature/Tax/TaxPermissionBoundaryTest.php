@@ -6,8 +6,8 @@ namespace Tests\Feature\Tax;
 
 use Illuminate\Support\Facades\Route;
 use Modules\Core\Contracts\PermissionDefinitionRegistryInterface;
+use Modules\Core\Tenancy\TenantFeature;
 use Modules\Tax\Constants\TaxPermission;
-use Modules\Tenant\Services\Plans\TenantPlanSchema;
 use Tests\TestCase;
 
 final class TaxPermissionBoundaryTest extends TestCase
@@ -26,7 +26,7 @@ final class TaxPermissionBoundaryTest extends TestCase
     public function test_tax_routes_require_finance_tenant_feature(): void
     {
         $featureMiddleware = (string) config('tenant.entitlements.middleware_alias', 'tenant.feature')
-            .':'.TenantPlanSchema::MODULE_FINANCE;
+            .':'.TenantFeature::FINANCE;
 
         foreach (array_keys($this->expectedRoutePermissions()) as $routeName) {
             $route = Route::getRoutes()->getByName($routeName);
