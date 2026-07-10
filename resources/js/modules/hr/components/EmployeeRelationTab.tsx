@@ -13,14 +13,20 @@ export function EmployeeRelationTab<T extends { id: number }>({ title, fields, r
     title: string; fields: string[]; result: { data: ApiCollection<T> | null; loading: boolean; error: ApiError | null; page: number; setPage: (page: number) => void; confirmDialog?: ReactNode };
     open: boolean; editing: T | null; submitting: boolean; actionError: ApiError | null; onCreate: () => void; onEdit?: (row: T) => void; onDelete?: (row: T) => void; onClose: () => void; onSubmit: () => void; children: ReactNode;
 }) {
-    const columns: DataColumn<T>[] = [
-        ...fields.map((field) => ({
-            key: field,
-            header: humanize(field),
-            render: (row: T) => renderRelationValue((row as Record<string, unknown>)[field]),
-        })),
-        ...((onEdit || onDelete) ? [{ key: 'actions', header: 'Actions', className: 'text-right', render: (row: T) => <RelationActions edit={onEdit ? () => onEdit(row) : undefined} remove={onDelete ? () => onDelete(row) : undefined} /> } satisfies DataColumn<T>] : []),
-    ];
+    const columns: DataColumn<T>[] = fields.map((field) => ({
+        key: field,
+        header: humanize(field),
+        render: (row: T) => renderRelationValue((row as Record<string, unknown>)[field]),
+    }));
+
+    if (onEdit || onDelete) {
+        columns.push({
+            key: 'actions',
+            header: 'Actions',
+            className: 'text-right',
+            render: (row: T) => <RelationActions edit={onEdit ? () => onEdit(row) : undefined} remove={onDelete ? () => onDelete(row) : undefined} />,
+        });
+    }
 
     return <div className="space-y-4">
         <div className="flex justify-end"><Button onClick={onCreate}>Add {title}</Button></div>
