@@ -79,6 +79,21 @@ final class FinanceAccountRoleBoundaryTest extends TestCase
         self::assertStringNotContainsString('rules()->delete()', $service);
     }
 
+    public function test_posting_profile_rule_validity_has_a_deployed_database_upgrade_path(): void
+    {
+        $provider = $this->source('../Providers/FinanceServiceProvider.php');
+        $upgrade = $this->source('../Database/UpgradeMigrations/2026_07_10_000001_add_validity_to_finance_posting_profile_rules_table.php');
+
+        self::assertStringContainsString('Database/UpgradeMigrations', $provider);
+        self::assertStringContainsString("private const TABLE = 'finance_posting_profile_rules'", $upgrade);
+        self::assertStringContainsString("private const OPENING_EFFECTIVE_DATE = '1900-01-01'", $upgrade);
+        self::assertStringContainsString("Schema::hasColumn(self::TABLE, 'effective_from')", $upgrade);
+        self::assertStringContainsString('Schema::hasIndex(self::TABLE, self::OLD_PROFILE_KEY_UNIQUE', $upgrade);
+        self::assertStringContainsString('Schema::hasIndex(self::TABLE, self::PROFILE_KEY_FROM_UNIQUE', $upgrade);
+        self::assertStringContainsString('Schema::hasIndex(self::TABLE, self::EFFECTIVE_LOOKUP_INDEX', $upgrade);
+        self::assertStringContainsString('$table->dropUnique(self::OLD_PROFILE_KEY_UNIQUE)', $upgrade);
+    }
+
     public function test_finance_posting_resolution_and_journal_creation_share_transaction(): void
     {
         $service = $this->source('../Services/FinancePostingService.php');
