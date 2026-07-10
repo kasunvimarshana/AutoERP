@@ -49,7 +49,7 @@ export default function EmployeeEditPage() {
                     setSubmitting(true);
                     setError(null);
                     try {
-                        await updateEmployee(id, payload);
+                        await updateEmployee(id, { ...payload, row_version: employee.row_version });
                         formGuard.markSaved();
                         navigate(`/hr/employees/${id}`);
                     } catch (requestError) {
