@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace Modules\Customer\Database\Seeders;
 
+use Database\Seeders\Concerns\ResolvesSeedContext;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Database\Seeders\Concerns\ResolvesSeedContext;
 use Modules\Customer\Models\Customer;
 use Modules\Customer\Models\CustomerCategory;
 use Modules\Customer\Models\CustomerCategoryAssignment;
+use Modules\Customer\Models\CustomerCreditProfile;
 use Modules\Sequence\Models\SequenceModel;
 use Modules\Sequence\Services\Contracts\SequenceDomainServiceInterface;
 
@@ -23,7 +24,6 @@ final class CustomerSeeder extends Seeder
         if (! Schema::hasTable('customers')) {
             return;
         }
-
 
         $tenant = $this->defaultTenant();
         $organizationUnit = $this->defaultOrganizationUnit($tenant);
@@ -55,14 +55,27 @@ final class CustomerSeeder extends Seeder
                     'status' => 'active',
                     'email' => 'customer@example.com',
                     'default_currency_id' => $this->defaultCurrency()?->getKey(),
-                    'credit_limit' => '0.000000',
-                    'is_credit_allowed' => false,
-                    'is_advance_allowed' => true,
                     'is_tax_exempt' => false,
                     'marketing_consent' => false,
                     'preferred_communication_channel' => 'email',
                     'notes' => 'Default customer for local development and testing.',
                     'metadata' => ['seed_source' => 'customer_module'],
+                ],
+            );
+
+            CustomerCreditProfile::query()->updateOrCreate(
+                ['tenant_id' => $tenant->getKey(), 'customer_id' => $customer->getKey()],
+                [
+                    'organization_unit_id' => $organizationUnit?->getKey(),
+                    'row_version' => 1,
+                    'credit_limit' => '0.000000',
+                    'credit_period_days' => null,
+                    'warning_threshold_percent' => '80.000000',
+                    'credit_allowed' => false,
+                    'advance_allowed' => true,
+                    'allow_over_credit' => false,
+                    'allow_partial_payment' => true,
+                    'is_active' => true,
                 ],
             );
 
@@ -103,5 +116,4 @@ final class CustomerSeeder extends Seeder
             }
         }, 3);
     }
-
 }
