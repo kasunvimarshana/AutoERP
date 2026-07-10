@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Tenant\Tests;
 
 use Illuminate\Validation\ValidationException;
+use Modules\Core\Tenancy\TenantFeature;
 use Modules\Tenant\Services\Plans\TenantPlanSchema;
 use Tests\TestCase;
 
@@ -15,7 +16,7 @@ final class TenantPlanSchemaTest extends TestCase
         $schema = new TenantPlanSchema();
 
         self::assertSame(
-            ['enabled_modules' => ['inventory', 'purchase', TenantPlanSchema::MODULE_HR]],
+            ['enabled_modules' => ['inventory', 'purchase', TenantFeature::HR]],
             $schema->normalizeFeatures([
                 'enabled_modules' => [' Inventory ', 'purchase', 'inventory', ' HR '],
             ]),
@@ -42,9 +43,9 @@ final class TenantPlanSchemaTest extends TestCase
     {
         $schema = new TenantPlanSchema();
 
-        self::assertContains(TenantPlanSchema::MODULE_HR, $schema->supportedModuleCodes());
-        self::assertArrayHasKey(TenantPlanSchema::MODULE_HR, TenantPlanSchema::SUPPORTED_MODULES);
-        self::assertNotContains(TenantPlanSchema::MODULE_HR, TenantPlanSchema::ALWAYS_ON_MODULES);
+        self::assertContains(TenantFeature::HR, $schema->supportedModuleCodes());
+        self::assertArrayHasKey(TenantFeature::HR, TenantPlanSchema::SUPPORTED_MODULES);
+        self::assertNotContains(TenantFeature::HR, TenantPlanSchema::ALWAYS_ON_MODULES);
     }
 
     public function test_unknown_modules_are_rejected_instead_of_silently_enabled(): void
