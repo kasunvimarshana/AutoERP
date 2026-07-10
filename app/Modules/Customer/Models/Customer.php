@@ -10,12 +10,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Modules\ReferenceData\Models\CurrencyModel;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\Customer\Enums\CustomerStatus;
 use Modules\Customer\Enums\CustomerType;
 use Modules\Customer\Enums\PreferredCommunicationChannel;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
+use Modules\ReferenceData\Models\CurrencyModel;
 use Modules\Tenant\Models\TenantModel;
 
 final class Customer extends TenantOwnedModel
@@ -35,10 +35,6 @@ final class Customer extends TenantOwnedModel
             'status' => CustomerStatus::class,
             'default_currency_id' => 'integer',
             'payment_term_id' => 'integer',
-            'credit_limit' => 'decimal:6',
-            'opening_balance' => 'decimal:6',
-            'is_credit_allowed' => 'boolean',
-            'is_advance_allowed' => 'boolean',
             'is_tax_exempt' => 'boolean',
             'marketing_consent' => 'boolean',
             'preferred_communication_channel' => PreferredCommunicationChannel::class,
