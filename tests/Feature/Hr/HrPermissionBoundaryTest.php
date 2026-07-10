@@ -38,6 +38,14 @@ final class HrPermissionBoundaryTest extends TestCase
         }
     }
 
+    public function test_hr_employee_rate_routes_are_create_only(): void
+    {
+        self::assertNotNull(Route::getRoutes()->getByName('api.v1.hr.employees.rates.index'));
+        self::assertNotNull(Route::getRoutes()->getByName('api.v1.hr.employees.rates.store'));
+        self::assertNull(Route::getRoutes()->getByName('api.v1.hr.employees.rates.update'));
+        self::assertNull(Route::getRoutes()->getByName('api.v1.hr.employees.rates.destroy'));
+    }
+
     /** @return array<string,string> */
     private function expectedRoutePermissions(): array
     {
@@ -64,9 +72,12 @@ final class HrPermissionBoundaryTest extends TestCase
     /** @return array<string,string> */
     private function employeeRelationRoutePermissions(): array
     {
-        $expected = [];
+        $expected = [
+            'api.v1.hr.employees.rates.index' => HrAuthorizationService::VIEW_EMPLOYEES,
+            'api.v1.hr.employees.rates.store' => HrAuthorizationService::UPDATE_EMPLOYEES,
+        ];
 
-        foreach (['contacts', 'addresses', 'documents', 'skills', 'certifications', 'licenses', 'rates'] as $relation) {
+        foreach (['contacts', 'addresses', 'documents', 'skills', 'certifications', 'licenses'] as $relation) {
             $expected["api.v1.hr.employees.{$relation}.index"] = HrAuthorizationService::VIEW_EMPLOYEES;
             $expected["api.v1.hr.employees.{$relation}.store"] = HrAuthorizationService::UPDATE_EMPLOYEES;
             $expected["api.v1.hr.employees.{$relation}.update"] = HrAuthorizationService::UPDATE_EMPLOYEES;
