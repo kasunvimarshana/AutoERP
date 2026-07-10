@@ -306,10 +306,8 @@ final class TaxEngineTest extends TestCase
 
         $this->assertCount(2, $context->financeContext->lines);
         $this->assertSame('sales_invoice', $context->financeContext->postingProfileCode);
-        $this->assertNull($context->financeContext->lines[0]->accountCode);
         $this->assertSame('receivable', $context->financeContext->lines[0]->profileKey);
         $this->assertSame('15.000000', $context->financeContext->lines[0]->debit);
-        $this->assertNull($context->financeContext->lines[1]->accountCode);
         $this->assertSame('tax_payable', $context->financeContext->lines[1]->profileKey);
         $this->assertSame('15.000000', $context->financeContext->lines[1]->credit);
     }

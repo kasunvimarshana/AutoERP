@@ -1346,7 +1346,7 @@ final class PurchaseEngineTest extends TestCase
             journalDate: '2026-06-06',
             sourceType: 'purchase_order',
             sourceId: 1,
-            lines: [new FinancePostingLine(accountCode: '5100', accountName: 'Purchase Expense', debit: '100.000000')],
+            lines: [new FinancePostingLine(accountName: 'Purchase Expense', debit: '100.000000', profileKey: 'expense')],
         );
 
         $this->assertSame(PaymentType::SupplierPayment, $payment->paymentType);
