@@ -19,8 +19,8 @@ export interface CustomerSummary extends NamedResource {
     mobile?: string | null;
     default_currency?: NamedResource | null;
     categories?: CustomerCategory[];
-    is_credit_allowed: boolean;
-    is_advance_allowed: boolean;
+    credit_allowed: boolean;
+    advance_allowed: boolean;
     is_tax_exempt: boolean;
     marketing_consent: boolean;
 }
@@ -32,8 +32,6 @@ export interface Customer extends CustomerSummary {
     vat_number?: string | null;
     svat_number?: string | null;
     business_registration_number?: string | null;
-    credit_limit: string;
-    opening_balance: string;
     preferred_communication_channel?: string | null;
     notes?: string | null;
     metadata?: Record<string, unknown> | null;
@@ -60,14 +58,11 @@ export interface CustomerPayload {
     mobile?: string | null;
     website?: string | null;
     default_currency_id?: number | null;
+    payment_term_id?: number | null;
     tax_registration_number?: string | null;
     vat_number?: string | null;
     svat_number?: string | null;
     business_registration_number?: string | null;
-    credit_limit?: string;
-    opening_balance?: string;
-    is_credit_allowed: boolean;
-    is_advance_allowed: boolean;
     is_tax_exempt: boolean;
     marketing_consent: boolean;
     preferred_communication_channel?: string | null;
@@ -154,9 +149,12 @@ export type CustomerDocumentPayload = Omit<CustomerDocument, 'id'>;
 
 export interface CustomerCreditProfile {
     id?: number;
+    row_version: number;
     credit_limit: string;
     credit_period_days?: number | null;
     warning_threshold_percent: string;
+    credit_allowed: boolean;
+    advance_allowed: boolean;
     allow_over_credit: boolean;
     allow_partial_payment: boolean;
     is_active: boolean;
@@ -177,5 +175,5 @@ export interface CustomerWithRelationsPayload {
     bank_accounts: CustomerBankAccountPayload[];
     categories: number[];
     documents: CustomerDocumentPayload[];
-    credit_profile?: CustomerCreditProfile | null;
+    credit_profile?: Omit<CustomerCreditProfile, 'id' | 'row_version'> | null;
 }
