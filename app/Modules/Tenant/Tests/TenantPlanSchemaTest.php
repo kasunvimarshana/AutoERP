@@ -15,9 +15,9 @@ final class TenantPlanSchemaTest extends TestCase
         $schema = new TenantPlanSchema();
 
         self::assertSame(
-            ['enabled_modules' => ['inventory', 'purchase']],
+            ['enabled_modules' => ['inventory', 'purchase', TenantPlanSchema::MODULE_HR]],
             $schema->normalizeFeatures([
-                'enabled_modules' => [' Inventory ', 'purchase', 'inventory'],
+                'enabled_modules' => [' Inventory ', 'purchase', 'inventory', ' HR '],
             ]),
         );
         self::assertSame(
@@ -36,6 +36,15 @@ final class TenantPlanSchemaTest extends TestCase
             TenantPlanSchema::ALWAYS_ON_MODULES,
             array_keys(TenantPlanSchema::SUPPORTED_MODULES),
         )));
+    }
+
+    public function test_hr_is_a_plan_controlled_commercial_module(): void
+    {
+        $schema = new TenantPlanSchema();
+
+        self::assertContains(TenantPlanSchema::MODULE_HR, $schema->supportedModuleCodes());
+        self::assertArrayHasKey(TenantPlanSchema::MODULE_HR, TenantPlanSchema::SUPPORTED_MODULES);
+        self::assertNotContains(TenantPlanSchema::MODULE_HR, TenantPlanSchema::ALWAYS_ON_MODULES);
     }
 
     public function test_unknown_modules_are_rejected_instead_of_silently_enabled(): void
