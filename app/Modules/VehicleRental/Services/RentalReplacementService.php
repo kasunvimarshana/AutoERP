@@ -70,7 +70,12 @@ final class RentalReplacementService
                 'to_role' => 'company',
             ]);
             $returnEvent = $this->custody->create($oldAllocation, $returnData, $userId);
-            $this->custody->confirm($returnEvent, (int) $returnEvent->row_version, $userId);
+            $this->custody->confirm(
+                $returnEvent,
+                (int) $returnEvent->row_version,
+                (int) $oldAllocation->row_version,
+                $userId,
+            );
 
             $newAllocation = $this->allocations->create($oldAllocation->agreement, [
                 'expected_agreement_version' => $data['expected_agreement_version'],
@@ -100,7 +105,12 @@ final class RentalReplacementService
                 'to_role' => 'customer',
             ]);
             $handoverEvent = $this->custody->create($newAllocation, $handoverData, $userId);
-            $this->custody->confirm($handoverEvent, (int) $handoverEvent->row_version, $userId);
+            $this->custody->confirm(
+                $handoverEvent,
+                (int) $handoverEvent->row_version,
+                (int) $newAllocation->row_version,
+                $userId,
+            );
 
             $replacement->status = RentalReplacementStatus::Completed;
             $replacement->completed_by = $userId;
