@@ -30,6 +30,7 @@ final class RentalEndToEndContractFixTest extends TestCase
         $assignDriverRequest = $this->source('app/Modules/VehicleRental/Http/Requests/AssignRentalDriverRequest.php');
         $replacementRequest = $this->source('app/Modules/VehicleRental/Http/Requests/StoreRentalReplacementRequest.php');
         $storeCustodyRequest = $this->source('app/Modules/VehicleRental/Http/Requests/StoreRentalCustodyEventRequest.php');
+        $confirmCustodyRequest = $this->source('app/Modules/VehicleRental/Http/Requests/ConfirmRentalCustodyEventRequest.php');
         $storeUsageRequest = $this->source('app/Modules/VehicleRental/Http/Requests/StoreRentalUsageRequest.php');
         $forfeitRequest = $this->source('app/Modules/VehicleRental/Http/Requests/ForfeitRentalDepositRequest.php');
         $depositService = $this->source('app/Modules/VehicleRental/Services/RentalDepositService.php');
@@ -50,7 +51,7 @@ final class RentalEndToEndContractFixTest extends TestCase
         self::assertStringContainsString('expected_allocation_version: expectedAllocationVersion', $api);
         self::assertStringContainsString('createRentalCustodyEvent = (', $api);
         self::assertStringContainsString('createRentalUsageLog = (', $api);
-        self::assertStringContainsString('confirmRentalCustodyEvent = (id: number, expectedVersion: number)', $api);
+        self::assertStringContainsString('confirmRentalCustodyEvent = (', $api);
         self::assertStringContainsString('transitionRentalExpense', $api);
         self::assertStringContainsString('createRentalInvoice', $api);
         self::assertStringContainsString('activateVehicleFinanceAgreement', $api);
@@ -75,6 +76,7 @@ final class RentalEndToEndContractFixTest extends TestCase
         self::assertStringContainsString("'expected_source_allocation_version' => ['nullable', 'required_with:source_allocation_id'", $replacementRequest);
         self::assertStringContainsString("'expected_finance_agreement_version' => ['nullable', 'required_with:vehicle_finance_agreement_id'", $replacementRequest);
         self::assertStringContainsString("'expected_allocation_version' => ['required'", $storeCustodyRequest);
+        self::assertStringContainsString("'expected_allocation_version' => ['required'", $confirmCustodyRequest);
         self::assertStringContainsString("'expected_allocation_version' => ['required'", $storeUsageRequest);
         self::assertStringContainsString("'expected_source_allocation_version' => ['nullable'", $storeUsageRequest);
         self::assertStringContainsString("'events.*.unit' => ['prohibited']", $storeUsageRequest);
@@ -152,6 +154,7 @@ final class RentalEndToEndContractFixTest extends TestCase
         $detailPage = $this->source('resources/js/modules/vehicle-rental/pages/RentalAllocationDetailPage.tsx');
         $custodyResource = $this->source('app/Modules/VehicleRental/Http/Resources/RentalCustodyEventResource.php');
         $custodyRequest = $this->source('app/Modules/VehicleRental/Http/Requests/StoreRentalCustodyEventRequest.php');
+        $confirmCustodyRequest = $this->source('app/Modules/VehicleRental/Http/Requests/ConfirmRentalCustodyEventRequest.php');
         $custodyPage = $this->source('resources/js/modules/vehicle-rental/pages/RentalCustodyPage.tsx');
 
         self::assertStringContainsString("allocations/{allocation}/cancel", $routes);
@@ -165,17 +168,24 @@ final class RentalEndToEndContractFixTest extends TestCase
         self::assertStringContainsString('Only allocations under an active rental agreement can be activated.', $allocationService);
         self::assertStringContainsString('assertActiveSourceAllocationForActivation', $allocationService);
         self::assertStringContainsString('Customer allocation requires an active owner source allocation covering the full allocation period.', $allocationService);
+        self::assertStringContainsString('private readonly DecimalMath $math', $allocationService);
+        self::assertStringContainsString('Custody handover odometer must match the allocation start odometer.', $allocationService);
+        self::assertStringNotContainsString('(float) $endOdometer', $allocationService);
         self::assertStringContainsString('lockCustodyTimeline', $custodyService);
         self::assertStringContainsString('assertReplacementEventMatchesAllocation', $custodyService);
         self::assertStringContainsString('Vehicle cannot be returned to its owner while a customer allocation is planned or active.', $custodyService);
-        self::assertGreaterThanOrEqual(2, substr_count($custodyService, '$this->allocations->activate($event->allocation, $userId)'));
+        self::assertGreaterThanOrEqual(2, substr_count($custodyService, '$this->allocations->activate('));
+        self::assertStringNotContainsString('(float) $odometer', $custodyService);
+        self::assertStringContainsString("'expected_allocation_version' => ['required'", $confirmCustodyRequest);
         self::assertStringContainsString('PUBLIC_EVENT_TYPES', $custodyRequest);
         self::assertStringContainsString("'replacement_id' => ['prohibited']", $custodyRequest);
         self::assertStringNotContainsString('Rule::enum(RentalCustodyEventType::class)', $custodyRequest);
         self::assertStringContainsString('allocationRefresh', $custodyPage);
+        self::assertStringContainsString('confirmRentalCustodyEvent(row.id, row.row_version, allocationDetails.row_version)', $custodyPage);
         self::assertStringContainsString('rental_vehicle_allocations_activated_by_tenant_fk', $migration);
-        self::assertStringContainsString('$this->custody->confirm($returnEvent, (int) $returnEvent->row_version, $userId);', $replacementService);
-        self::assertStringContainsString('$this->custody->confirm($handoverEvent, (int) $handoverEvent->row_version, $userId);', $replacementService);
+        self::assertGreaterThanOrEqual(2, substr_count($replacementService, '$this->custody->confirm('));
+        self::assertStringContainsString('(int) $oldAllocation->row_version', $replacementService);
+        self::assertStringContainsString('(int) $newAllocation->row_version', $replacementService);
         self::assertStringContainsString("'expected_source_allocation_version' => \$data['expected_source_allocation_version'] ?? null", $replacementService);
         self::assertStringContainsString("'expected_finance_agreement_version' => \$data['expected_finance_agreement_version'] ?? null", $replacementService);
         self::assertStringContainsString('Company-owned allocations require a company vehicle ownership record.', $allocationService);
