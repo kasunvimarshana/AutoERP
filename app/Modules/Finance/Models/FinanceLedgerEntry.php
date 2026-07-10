@@ -28,6 +28,7 @@ final class FinanceLedgerEntry extends TenantOwnedModel
             'entry_date' => 'date',
             'debit' => 'decimal:6',
             'credit' => 'decimal:6',
+            'balance_after' => 'decimal:6',
             'source_id' => 'integer',
             'source_date' => 'date',
             'source_line_id' => 'integer',
@@ -67,7 +68,7 @@ final class FinanceLedgerEntry extends TenantOwnedModel
     protected static function booted(): void
     {
         self::updating(static function (): never {
-            throw new LogicException('Ledger entries are immutable.');
+            throw new LogicException('Ledger debit and credit facts are immutable.');
         });
 
         self::deleting(static function (): never {
