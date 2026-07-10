@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Customer\Services;
 
+use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Customer\DTOs\CustomerCreditProfileData;
@@ -19,31 +20,33 @@ final class CustomerCreditProfileService
     {
         $this->validate($data);
 
-        $profile = CustomerCreditProfile::query()
-            ->where('tenant_id', (int) $customer->tenant_id)
-            ->where('customer_id', (int) $customer->getKey())
-            ->lockForUpdate()
-            ->first();
+        return DB::transaction(function () use ($customer, $data): CustomerCreditProfile {
+            $profile = CustomerCreditProfile::query()
+                ->where('tenant_id', (int) $customer->tenant_id)
+                ->where('customer_id', (int) $customer->getKey())
+                ->lockForUpdate()
+                ->first();
 
-        if ($profile instanceof CustomerCreditProfile) {
-            if ($data->rowVersion === null || $data->rowVersion !== (int) $profile->row_version) {
-                throw new ConflictHttpException('Customer credit profile was changed by someone else. Reload before saving.');
+            if ($profile instanceof CustomerCreditProfile) {
+                if ($data->rowVersion === null || $data->rowVersion !== (int) $profile->row_version) {
+                    throw new ConflictHttpException('Customer credit profile was changed by someone else. Reload before saving.');
+                }
+
+                $profile->forceFill($this->attributes($customer, $data) + [
+                    'row_version' => ((int) $profile->row_version) + 1,
+                ])->save();
+
+                return $profile->refresh();
             }
 
-            $profile->forceFill($this->attributes($customer, $data) + [
-                'row_version' => ((int) $profile->row_version) + 1,
-            ])->save();
+            if ($data->rowVersion !== null) {
+                throw new ConflictHttpException('Customer credit profile no longer exists. Reload before saving.');
+            }
 
-            return $profile->refresh();
-        }
-
-        if ($data->rowVersion !== null) {
-            throw new ConflictHttpException('Customer credit profile no longer exists. Reload before saving.');
-        }
-
-        return CustomerCreditProfile::query()->create($this->attributes($customer, $data) + [
-            'row_version' => 1,
-        ]);
+            return CustomerCreditProfile::query()->create($this->attributes($customer, $data) + [
+                'row_version' => 1,
+            ]);
+        }, 3);
     }
 
     public function get(Customer $customer): ?CustomerCreditProfile
