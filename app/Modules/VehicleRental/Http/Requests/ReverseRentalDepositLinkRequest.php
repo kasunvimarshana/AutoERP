@@ -12,6 +12,8 @@ final class ReverseRentalDepositLinkRequest extends TenantScopedRequest
     {
         return [
             'expected_requirement_version' => ['required', 'integer', 'min:1'],
+            'expected_payment_version' => ['required', 'integer', 'min:1'],
+            'reason' => ['required', 'string', 'max:1000'],
         ];
     }
 }
