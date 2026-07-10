@@ -80,7 +80,7 @@ export default function FinanceJournalDetailPage() {
     return <>
         <ContentHeader
             title={journal.journal_number}
-            description="Journal entry and immutable ledger impact."
+            description="Journal entry and immutable ledger impact. Balance after is a rebuildable chronological projection."
             actions={<div className="flex flex-wrap gap-2">
                 {journal.can_edit && <LinkButton to={`/finance/journals/${journal.id}/edit`} variant="secondary">Edit draft</LinkButton>}
                 {journal.can_post && <Button type="button" onClick={() => setAction('post')}>Post journal</Button>}

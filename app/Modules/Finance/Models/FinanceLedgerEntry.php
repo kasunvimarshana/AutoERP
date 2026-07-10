@@ -68,7 +68,7 @@ final class FinanceLedgerEntry extends TenantOwnedModel
     protected static function booted(): void
     {
         self::updating(static function (): never {
-            throw new LogicException('Ledger entries are immutable.');
+            throw new LogicException('Ledger debit and credit facts are immutable.');
         });
 
         self::deleting(static function (): never {

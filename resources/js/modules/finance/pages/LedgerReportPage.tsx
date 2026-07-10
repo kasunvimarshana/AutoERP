@@ -27,7 +27,7 @@ export default function LedgerReportPage() {
     }, signal), [accountId, dateFrom, dateTo, page]);
 
     return <>
-        <ContentHeader title="General ledger" description="Posted ledger entries with account, journal, and source traceability." actions={<Link className="text-sm font-semibold text-sky-700 hover:underline" to="/reports/finance.ledger">Export report</Link>} />
+        <ContentHeader title="General ledger" description="Posted ledger entries with account, journal, and source traceability. Balance after is a rebuildable chronological projection." actions={<Link className="text-sm font-semibold text-sky-700 hover:underline" to="/reports/finance.ledger">Export report</Link>} />
         <div className="mb-4 grid gap-3 md:grid-cols-3">
             <Select
                 value={accountId}

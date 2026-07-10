@@ -27,15 +27,25 @@ final class FinanceApiWorkflowTest extends TestCase
         $scope = ['tenant_id' => $tenantId, 'organization_unit_id' => $organizationUnitId];
         $this->actingAsFinanceUser($tenantId);
 
-        $this->tenantPatchJson($tenantId, '/api/v1/finance/accounts/'.$cashId, $scope + [
+        $accountPayload = [
             'account_type_id' => $this->accountTypeId($tenantId, 'ASSET'),
             'code' => '1010',
             'name' => 'Main Cash',
             'normal_balance' => 'debit',
-            'opening_balance' => '0.000000',
             'is_posting_account' => true,
             'is_active' => true,
-        ])->assertSuccessful()->assertJsonPath('data.name', 'Main Cash');
+        ];
+
+        $this->tenantPatchJson($tenantId, '/api/v1/finance/accounts/'.$cashId, $scope + $accountPayload)
+            ->assertSuccessful()
+            ->assertJsonPath('data.name', 'Main Cash')
+            ->assertJsonMissingPath('data.opening_balance')
+            ->assertJsonMissingPath('data.current_balance');
+
+        $this->tenantPatchJson($tenantId, '/api/v1/finance/accounts/'.$cashId, $scope + $accountPayload + [
+            'opening_balance' => '10.000000',
+        ])->assertStatus(422)
+            ->assertJsonValidationErrors(['opening_balance']);
 
         $profile = $this->tenantPostJson($tenantId, '/api/v1/finance/posting-profiles', $scope + [
             'code' => 'api_profile',
@@ -162,8 +172,6 @@ final class FinanceApiWorkflowTest extends TestCase
             'normal_balance' => $normalBalance,
             'is_posting_account' => true,
             'is_active' => true,
-            'opening_balance' => '0.000000',
-            'current_balance' => '0.000000',
             'created_at' => now(),
             'updated_at' => now(),
         ]);
