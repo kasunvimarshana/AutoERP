@@ -2,9 +2,10 @@ import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { RouterProvider, createMemoryRouter } from "react-router-dom";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TestRouter } from "@/test/TestRouter";
 import type { NamedResource } from "@/shared/types/common";
+import { configureBusinessTimeZone } from "@/shared/utils/businessDate";
 import {
     RENTAL_AGREEMENT_KIND,
 } from "../rentalAgreementPresentation";
@@ -96,6 +97,8 @@ vi.mock("../components/RentalLookups", () => ({
         </button>
     ),
 }));
+
+afterEach(() => configureBusinessTimeZone(null));
 
 describe("RentalAgreement list route changes", () => {
     beforeEach(() => {
@@ -569,6 +572,61 @@ describe("RentalAgreement draft CRUD actions", () => {
         );
     });
 
+    it("does not resubmit locked structural fields when a draft has dependent records", async () => {
+        const user = userEvent.setup();
+        configureBusinessTimeZone("Asia/Colombo");
+        apiMocks.getRentalAgreement.mockResolvedValue({
+            ...agreement("customer_rental"),
+            status: "draft",
+            executed_at: null,
+            starts_at: "2026-07-06T02:30:00.000Z",
+            ends_at: "2026-08-06T02:30:00.000Z",
+            terms: [],
+            active_rate_version: rateVersion(),
+            rate_versions: [rateVersion()],
+        });
+
+        renderRoute(
+            "/vehicle-rental/lessee-agreements/:id/edit",
+            <RentalAgreementCreatePage mode="lessee" />,
+            "/vehicle-rental/lessee-agreements/55/edit",
+        );
+
+        const startInput = await screen.findByLabelText("Start");
+        expect(startInput).toHaveValue("2026-07-06T08:00");
+        expect(startInput).toBeDisabled();
+        expect(screen.getByLabelText("End")).toBeDisabled();
+
+        await user.click(
+            screen.getByRole("button", { name: "Update lessee agreement" }),
+        );
+
+        await waitFor(() =>
+            expect(apiMocks.updateRentalAgreement).toHaveBeenCalled(),
+        );
+        const payload = apiMocks.updateRentalAgreement.mock.calls[0][2];
+        expect(payload).toEqual(
+            expect.objectContaining({
+                agreement_date: "2026-07-06",
+                executed_at: null,
+                terms: [],
+            }),
+        );
+        for (const field of [
+            "starts_at",
+            "ends_at",
+            "customer_id",
+            "supplier_id",
+            "rental_mode",
+            "billing_cycle",
+            "billing_basis",
+            "currency_id",
+            "payment_term_days",
+        ]) {
+            expect(payload).not.toHaveProperty(field);
+        }
+    });
+
     it("deletes a draft agreement with the loaded row version", async () => {
         const user = userEvent.setup();
         apiMocks.getRentalAgreement.mockResolvedValue({
@@ -673,6 +731,28 @@ function agreement(kind: "customer_rental" | "owner_supply") {
         rate_versions: [],
         allocations: [],
         deposit_requirement: null,
+    };
+}
+
+function rateVersion() {
+    return {
+        id: 201,
+        row_version: 2,
+        version_number: 1,
+        effective_from: "2026-07-06T02:30:00.000Z",
+        effective_to: null,
+        driver_mode: "with_driver",
+        billing_cycle: "monthly",
+        billing_basis: "calendar_month",
+        proration_rule: "exact_day_count",
+        excess_km_method: "period",
+        included_km: "0.000000",
+        included_hours: "0.000000",
+        weekday_included_minutes: 0,
+        saturday_included_minutes: 0,
+        holiday_included_minutes: 0,
+        status: "active",
+        components: [],
     };
 }
 

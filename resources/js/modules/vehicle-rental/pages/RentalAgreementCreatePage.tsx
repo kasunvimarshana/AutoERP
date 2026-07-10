@@ -4,7 +4,7 @@ import { CustomerLookupSelect } from "@/modules/customer/components/CustomerLook
 import type { CustomerSummary } from "@/modules/customer/customerTypes";
 import { SupplierLookupSelect } from "@/modules/supplier/components/SupplierLookupSelect";
 import type { SupplierSummary } from "@/modules/supplier/supplierTypes";
-import { toApiError, type ApiError } from "@/shared/api/apiError";
+import { fieldError, toApiError, type ApiError } from "@/shared/api/apiError";
 import { Button } from "@/shared/components/Button";
 import { ContentHeader } from "@/shared/components/ContentHeader";
 import { ErrorAlert } from "@/shared/components/ErrorAlert";
@@ -15,7 +15,10 @@ import { Select } from "@/shared/components/Select";
 import { Textarea } from "@/shared/components/Textarea";
 import type { NamedResource } from "@/shared/types/common";
 import { useMutationFormGuard } from "@/shared/hooks/useMutationFormGuard";
-import { businessDateInputValue } from "@/shared/utils/businessDate";
+import {
+    businessDateInputValue,
+    businessDateTimeInputValue,
+} from "@/shared/utils/businessDate";
 import { parsePositiveInteger } from "@/shared/utils/routeParams";
 import { RentalPage } from "../components/RentalPage";
 import { RentalCurrencyLookupSelect } from "../components/RentalLookups";
@@ -81,21 +84,26 @@ function nextTermSequence(terms: AgreementTermForm[]): number {
 
 function toDateInputValue(value: string | null | undefined): string {
     if (!value) return "";
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
 
-    return value.slice(0, 10);
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value.slice(0, 10);
+
+    return businessDateInputValue(date);
 }
 
 function toDateTimeLocal(value: string | null | undefined): string {
     if (!value) return "";
+    const localMatch = value.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2})/);
+    const hasExplicitOffset = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(value);
+    if (localMatch && !hasExplicitOffset) {
+        return `${localMatch[1]}T${localMatch[2]}`;
+    }
 
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return value.slice(0, 16);
 
-    return [
-        date.getFullYear(),
-        String(date.getMonth() + 1).padStart(2, "0"),
-        String(date.getDate()).padStart(2, "0"),
-    ].join("-") + `T${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+    return businessDateTimeInputValue(date);
 }
 
 interface RentalAgreementCreatePageProps {
@@ -283,6 +291,15 @@ export default function RentalAgreementCreatePage({
 
         setCurrency(party?.default_currency ?? defaultCurrency);
     };
+    const structuralFieldsLocked = Boolean(
+        isEditing &&
+            loadedAgreement &&
+            ((loadedAgreement.allocations?.length ?? 0) > 0 ||
+                (loadedAgreement.rate_versions?.length ?? 0) > 0 ||
+                loadedAgreement.active_rate_version != null ||
+                loadedAgreement.deposit_requirement != null),
+    );
+    const errorFor = (field: string) => fieldError(error, field);
     const partyValid = useMemo(
         () =>
             form.agreement_kind === RENTAL_AGREEMENT_KIND.customerRental
@@ -332,11 +349,20 @@ export default function RentalAgreementCreatePage({
                 remarks: form.remarks,
                 terms: normalizedTerms,
             };
+            const draftUpdatePayload = structuralFieldsLocked
+                ? {
+                      agreement_date: form.agreement_date,
+                      executed_at: form.executed_at || null,
+                      legal_context: form.legal_context || null,
+                      remarks: form.remarks,
+                      terms: normalizedTerms,
+                  }
+                : commonPayload;
             const row = isEditing
                 ? await updateRentalAgreement(
                       routeAgreementId,
                       loadedAgreement?.row_version ?? 0,
-                      commonPayload,
+                      draftUpdatePayload,
                   )
                 : await createRentalAgreement({
                       ...commonPayload,
@@ -442,6 +468,15 @@ export default function RentalAgreementCreatePage({
             <ErrorAlert error={error} />
             <form onSubmit={submit} className="space-y-5">
                 <Panel title="Agreement">
+                    {structuralFieldsLocked && (
+                        <div
+                            className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"
+                            role="status"
+                        >
+                            Party, period, billing, payment term and currency are
+                            locked because dependent rental records already exist.
+                        </div>
+                    )}
                     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                         {mode === "standard" && (
                             <Select
@@ -467,6 +502,8 @@ export default function RentalAgreementCreatePage({
                         RENTAL_AGREEMENT_KIND.customerRental ? (
                             <CustomerLookupSelect
                                 value={customer}
+                                error={errorFor("customer_id")}
+                                disabled={structuralFieldsLocked}
                                 onChange={(next) => {
                                     markDirty();
                                     setCustomer(next);
@@ -476,6 +513,8 @@ export default function RentalAgreementCreatePage({
                         ) : (
                             <SupplierLookupSelect
                                 value={supplier}
+                                error={errorFor("supplier_id")}
+                                disabled={structuralFieldsLocked}
                                 onChange={(next) => {
                                     markDirty();
                                     setSupplier(next);
@@ -488,6 +527,7 @@ export default function RentalAgreementCreatePage({
                             type="date"
                             required
                             value={form.agreement_date}
+                            error={errorFor("agreement_date")}
                             onChange={(e) =>
                                 updateForm({
                                     ...form,
@@ -505,6 +545,7 @@ export default function RentalAgreementCreatePage({
                             }
                             max={businessDateInputValue()}
                             value={form.executed_at}
+                            error={errorFor("executed_at")}
                             onChange={(e) =>
                                 updateForm({
                                     ...form,
@@ -516,6 +557,7 @@ export default function RentalAgreementCreatePage({
                         <Select
                             label="Legal context"
                             value={form.legal_context}
+                            error={errorFor("legal_context")}
                             onChange={(e) =>
                                 updateForm({
                                     ...form,
@@ -532,6 +574,8 @@ export default function RentalAgreementCreatePage({
                             type="datetime-local"
                             required
                             value={form.starts_at}
+                            error={errorFor("starts_at")}
+                            disabled={structuralFieldsLocked}
                             onChange={(e) =>
                                 updateForm({ ...form, starts_at: e.target.value })
                             }
@@ -541,6 +585,8 @@ export default function RentalAgreementCreatePage({
                             type="datetime-local"
                             required
                             value={form.ends_at}
+                            error={errorFor("ends_at")}
+                            disabled={structuralFieldsLocked}
                             onChange={(e) =>
                                 updateForm({ ...form, ends_at: e.target.value })
                             }
@@ -548,6 +594,8 @@ export default function RentalAgreementCreatePage({
                         <Select
                             label="Rental mode"
                             value={form.rental_mode}
+                            error={errorFor("rental_mode")}
+                            disabled={structuralFieldsLocked}
                             onChange={(e) =>
                                 updateForm({
                                     ...form,
@@ -566,6 +614,8 @@ export default function RentalAgreementCreatePage({
                         <Select
                             label="Billing cycle"
                             value={form.billing_cycle}
+                            error={errorFor("billing_cycle")}
+                            disabled={structuralFieldsLocked}
                             onChange={(e) =>
                                 updateForm({
                                     ...form,
@@ -586,6 +636,8 @@ export default function RentalAgreementCreatePage({
                         <Select
                             label="Billing basis"
                             value={form.billing_basis}
+                            error={errorFor("billing_basis")}
+                            disabled={structuralFieldsLocked}
                             onChange={(e) =>
                                 updateForm({
                                     ...form,
@@ -605,6 +657,8 @@ export default function RentalAgreementCreatePage({
                         />
                         <RentalCurrencyLookupSelect
                             value={currency}
+                            error={errorFor("currency_id")}
+                            disabled={structuralFieldsLocked}
                             onChange={(next) => {
                                 currencyTouched.current = true;
                                 markDirty();
@@ -617,6 +671,8 @@ export default function RentalAgreementCreatePage({
                             type="number"
                             min="0"
                             value={form.payment_term_days}
+                            error={errorFor("payment_term_days")}
+                            disabled={structuralFieldsLocked}
                             onChange={(e) =>
                                 updateForm({
                                     ...form,
@@ -632,6 +688,7 @@ export default function RentalAgreementCreatePage({
                                     min="0"
                                     step="0.000001"
                                     value={form.included_km}
+                                    error={errorFor("rate_version.included_km")}
                                     onChange={(e) =>
                                         updateForm({
                                             ...form,
@@ -642,6 +699,7 @@ export default function RentalAgreementCreatePage({
                                 <Select
                                     label="Excess KM method"
                                     value={form.excess_km_method}
+                                    error={errorFor("rate_version.excess_km_method")}
                                     onChange={(e) =>
                                         updateForm({
                                             ...form,
@@ -667,6 +725,7 @@ export default function RentalAgreementCreatePage({
                                 min="0"
                                 step="0.000001"
                                 value={form.deposit_amount}
+                                error={errorFor("deposit.required_amount")}
                                 onChange={(e) =>
                                     updateForm({
                                         ...form,
@@ -680,6 +739,7 @@ export default function RentalAgreementCreatePage({
                         <Textarea
                             label="Remarks"
                             value={form.remarks}
+                            error={errorFor("remarks")}
                             onChange={(e) =>
                                 updateForm({ ...form, remarks: e.target.value })
                             }
@@ -696,6 +756,11 @@ export default function RentalAgreementCreatePage({
                     <p className="mb-4 text-sm text-slate-600">
                         Clauses can be completed before activation.
                     </p>
+                    {errorFor("terms") && (
+                        <p className="mb-4 text-sm text-rose-600">
+                            {errorFor("terms")}
+                        </p>
+                    )}
                     <div className="space-y-4">
                         {terms.map((term, index) => (
                             <div
@@ -706,6 +771,7 @@ export default function RentalAgreementCreatePage({
                                     <Input
                                         label={`Clause ${index + 1} title`}
                                         value={term.title}
+                                        error={errorFor(`terms.${index}.title`)}
                                         onChange={(event) => {
                                             markDirty();
                                             setTerms((current) =>
@@ -744,6 +810,7 @@ export default function RentalAgreementCreatePage({
                                         label={`Clause ${index + 1} content`}
                                         maxLength={20000}
                                         value={term.content}
+                                        error={errorFor(`terms.${index}.content`)}
                                         onChange={(event) => {
                                             markDirty();
                                             setTerms((current) =>

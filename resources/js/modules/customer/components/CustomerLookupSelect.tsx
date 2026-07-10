@@ -4,10 +4,11 @@ import type { CustomerSummary } from '../customerTypes';
 
 const formatCustomer = (customer: CustomerSummary) => `${customer.code} - ${customer.name}`;
 
-export function CustomerLookupSelect({ value, onChange, error }: {
+export function CustomerLookupSelect({ value, onChange, error, disabled }: {
     value: CustomerSummary | null;
     onChange: (customer: CustomerSummary | null) => void;
     error?: string;
+    disabled?: boolean;
 }) {
-    return <GenericLookupSelect label="Customer" value={value} onChange={onChange} search={searchCustomers} formatLabel={formatCustomer} error={error} />;
+    return <GenericLookupSelect label="Customer" value={value} onChange={onChange} search={searchCustomers} formatLabel={formatCustomer} error={error} disabled={disabled} />;
 }
