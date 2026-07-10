@@ -34,7 +34,7 @@ return new class extends Migration
             $table->foreign(['supplier_id', 'tenant_id'], 'supplier_status_histories_supplier_id_tenant_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('suppliers')
-                ->cascadeOnDelete();
+                ->restrictOnDelete();
         });
     }
 

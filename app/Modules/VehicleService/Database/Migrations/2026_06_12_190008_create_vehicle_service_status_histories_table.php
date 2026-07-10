@@ -33,7 +33,7 @@ return new class extends Migration
             $table->foreign(['vehicle_service_job_id', 'tenant_id'], 'vehicle_service_status_histories_veh_svc_job_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('vehicle_service_jobs')
-                ->cascadeOnDelete();
+                ->restrictOnDelete();
         });
     }
 

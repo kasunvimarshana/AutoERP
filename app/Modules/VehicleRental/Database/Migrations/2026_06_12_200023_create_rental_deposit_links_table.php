@@ -43,7 +43,7 @@ return new class extends Migration
             $table->foreign(['deposit_requirement_id', 'tenant_id'], 'rental_deposit_links_deposit_requirement_id_tenant_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('rental_deposit_requirements')
-                ->cascadeOnDelete();
+                ->restrictOnDelete();
             $table->foreign(['payment_id', 'tenant_id'], 'rental_deposit_links_payment_id_tenant_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('payments')

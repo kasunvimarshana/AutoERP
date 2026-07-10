@@ -79,6 +79,19 @@ final class EloquentSequenceRepository extends EloquentRepository implements Seq
         return $this->toRecord($model);
     }
 
+    /** @param array<string, mixed> $attributes */
+    public function insertIfMissing(array $attributes): bool
+    {
+        $model = $this->model->newInstance($attributes);
+        if ($model->usesTimestamps()) {
+            $timestamp = $model->freshTimestampString();
+            $model->setCreatedAt($timestamp);
+            $model->setUpdatedAt($timestamp);
+        }
+
+        return $this->query()->insertOrIgnore($model->getAttributes()) === 1;
+    }
+
     public function pageByFilters(
         ?int $tenantId,
         ?int $organizationUnitId,
