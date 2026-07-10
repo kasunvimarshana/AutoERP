@@ -14,5 +14,7 @@ final class SequenceErrorCode
 
     public const CONCURRENCY_CONFLICT = 'SEQUENCE_CONCURRENCY_CONFLICT';
 
+    public const INTERNAL_ERROR = 'SEQUENCE_INTERNAL_ERROR';
+
     private function __construct() {}
 }
