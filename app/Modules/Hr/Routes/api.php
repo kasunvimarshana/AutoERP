@@ -55,7 +55,6 @@ Route::prefix('api/v1/hr')->middleware($middleware)->name('api.v1.hr.')->group(f
         'skills' => ['storeSkill', 'updateSkill', 'destroySkill', 'assignment'],
         'certifications' => ['storeCertification', 'updateCertification', 'destroyCertification', 'assignment'],
         'licenses' => ['storeLicense', 'updateLicense', 'destroyLicense', 'assignment'],
-        'rates' => ['storeRate', 'updateRate', 'destroyRate', 'rate'],
     ];
 
     foreach ($relations as $relation => [$store, $update, $destroy, $child]) {
@@ -79,6 +78,14 @@ Route::prefix('api/v1/hr')->middleware($middleware)->name('api.v1.hr.')->group(f
             ->name("{$routeName}.destroy");
     }
 
+    Route::get('employees/{employee}/rates', [EmployeeRelationController::class, 'rates'])
+        ->whereNumber('employee')
+        ->middleware($requires(HrAuthorizationService::VIEW_EMPLOYEES))
+        ->name('employees.rates.index');
+    Route::post('employees/{employee}/rates', [EmployeeRelationController::class, 'storeRate'])
+        ->whereNumber('employee')
+        ->middleware($requires(HrAuthorizationService::UPDATE_EMPLOYEES))
+        ->name('employees.rates.store');
     Route::get('employees/{employee}/availability', [EmployeeRelationController::class, 'availability'])
         ->whereNumber('employee')
         ->middleware($requires(HrAuthorizationService::VIEW_EMPLOYEES))
