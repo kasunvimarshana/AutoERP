@@ -18,6 +18,7 @@ use Modules\Finance\Enums\StatementType;
 use Modules\Finance\Models\FinanceAccount;
 use Modules\Finance\Models\FinanceAccountType;
 use Modules\Finance\Models\FinanceJournalEntry;
+use Modules\Finance\Services\AccountBalanceService;
 use Modules\Finance\Services\ChartOfAccountsService;
 use Modules\Finance\Services\JournalEntryCreationService;
 use Modules\Finance\Services\JournalPostingService;
@@ -62,7 +63,7 @@ final class FinanceEngineTest extends TestCase
         });
     }
 
-    public function test_it_posts_balanced_journal_creates_ledger_entries_and_updates_balances(): void
+    public function test_it_posts_balanced_journal_creates_ledger_entries_and_updates_projection(): void
     {
         [$tenantId, $cash, $capital] = $this->chart();
 
@@ -78,13 +79,15 @@ final class FinanceEngineTest extends TestCase
             $journal->refresh();
             $this->assertSame(JournalStatus::Posted, $journal->status);
             $this->assertSame(2, $journal->ledgerEntries()->count());
-            $this->assertSame('100000.000000', (string) $cash->refresh()->current_balance);
-            $this->assertSame('100000.000000', (string) $capital->refresh()->current_balance);
 
             $cashBalance = $cash->balances()->firstOrFail();
             $capitalBalance = $capital->balances()->firstOrFail();
 
+            $this->assertSame('100000.000000', (string) $cashBalance->total_debit);
+            $this->assertSame('0.000000', (string) $cashBalance->total_credit);
             $this->assertSame('100000.000000', (string) $cashBalance->closing_debit);
+            $this->assertSame('0.000000', (string) $capitalBalance->total_debit);
+            $this->assertSame('100000.000000', (string) $capitalBalance->total_credit);
             $this->assertSame('100000.000000', (string) $capitalBalance->closing_credit);
 
             $trialBalance = app(TrialBalanceService::class)->calculate(
@@ -130,14 +133,62 @@ final class FinanceEngineTest extends TestCase
             $this->assertSame(JournalType::Reversal, $reversal->journal_type);
             $this->assertSame(JournalStatus::Posted, $reversal->status);
             $this->assertSame(JournalStatus::Reversed, $journal->refresh()->status);
-            $this->assertSame('0.000000', (string) $cash->refresh()->current_balance);
-            $this->assertSame('0.000000', (string) $capital->refresh()->current_balance);
             $this->assertSame(2, $reversal->ledgerEntries()->count());
+
+            $cashBalance = $cash->balances()->firstOrFail();
+            $capitalBalance = $capital->balances()->firstOrFail();
+            $this->assertSame('100000.000000', (string) $cashBalance->total_debit);
+            $this->assertSame('100000.000000', (string) $cashBalance->total_credit);
+            $this->assertSame('0.000000', (string) $cashBalance->closing_debit);
+            $this->assertSame('0.000000', (string) $cashBalance->closing_credit);
+            $this->assertSame('100000.000000', (string) $capitalBalance->total_debit);
+            $this->assertSame('100000.000000', (string) $capitalBalance->total_credit);
+            $this->assertSame('0.000000', (string) $capitalBalance->closing_debit);
+            $this->assertSame('0.000000', (string) $capitalBalance->closing_credit);
 
             $this->expectException(InvalidArgumentException::class);
             $this->expectExceptionMessage('Only posted journals can be reversed.');
 
             app(JournalReversalService::class)->reverse($journal->refresh(), '2026-06-08');
+        });
+    }
+
+    public function test_backdated_posting_keeps_date_range_balances_ledger_derived(): void
+    {
+        [$tenantId, $cash, $capital] = $this->chart();
+
+        $this->withTenantExecutionContext($tenantId, function () use ($tenantId, $cash, $capital): void {
+            $later = $this->createCashCapitalJournal(
+                $tenantId,
+                $cash,
+                $capital,
+                'JE-LATER',
+                '2026-06-20',
+                '40.000000',
+            );
+            app(JournalPostingService::class)->post($later);
+
+            $earlier = $this->createCashCapitalJournal(
+                $tenantId,
+                $cash,
+                $capital,
+                'JE-EARLIER',
+                '2026-06-05',
+                '60.000000',
+            );
+            app(JournalPostingService::class)->post($earlier);
+
+            $balance = app(AccountBalanceService::class)->forDateRange(
+                $cash,
+                '2026-06-10',
+                '2026-06-30',
+            );
+
+            $this->assertSame('60.000000', $balance->openingDebit);
+            $this->assertSame('40.000000', $balance->periodDebit);
+            $this->assertSame('100.000000', $balance->closingDebit);
+            $this->assertSame('100.000000', $balance->balance);
+            $this->assertSame('100.000000', (string) $cash->balances()->firstOrFail()->total_debit);
         });
     }
 
@@ -229,10 +280,12 @@ final class FinanceEngineTest extends TestCase
         FinanceAccount $cash,
         FinanceAccount $capital,
         string $journalNumber = 'JE-001',
+        string $journalDate = '2026-06-06',
+        string $amount = '100000.000000',
     ): FinanceJournalEntry {
         return app(JournalEntryCreationService::class)->create(new CreateJournalEntryData(
             tenantId: $tenantId,
-            journalDate: '2026-06-06',
+            journalDate: $journalDate,
             journalNumber: $journalNumber,
             journalType: JournalType::Opening,
             description: 'Opening capital contribution',
@@ -240,13 +293,13 @@ final class FinanceEngineTest extends TestCase
                 new JournalLineData(
                     accountId: (int) $cash->getKey(),
                     lineNumber: 1,
-                    debit: '100000.000000',
+                    debit: $amount,
                     description: 'Cash received',
                 ),
                 new JournalLineData(
                     accountId: (int) $capital->getKey(),
                     lineNumber: 2,
-                    credit: '100000.000000',
+                    credit: $amount,
                     description: 'Owner capital',
                 ),
             ],
