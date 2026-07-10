@@ -145,8 +145,6 @@ final class FinanceSeeder extends Seeder
                     'is_posting_account' => false,
                     'is_system' => true,
                     'is_active' => true,
-                    'opening_balance' => '0.000000',
-                    'current_balance' => '0.000000',
                     'metadata' => ['seed_source' => 'finance_module'],
                 ],
             );
@@ -183,8 +181,6 @@ final class FinanceSeeder extends Seeder
                     'is_tax_account' => $isTax,
                     'is_system' => true,
                     'is_active' => true,
-                    'opening_balance' => '0.000000',
-                    'current_balance' => '0.000000',
                     'metadata' => ['seed_source' => 'finance_module'],
                 ],
             );
