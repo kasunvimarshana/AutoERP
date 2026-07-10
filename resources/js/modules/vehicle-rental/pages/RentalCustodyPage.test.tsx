@@ -40,6 +40,7 @@ describe('RentalCustodyPage', () => {
         apiMocks.getRentalMetadata.mockResolvedValue(rentalMetadata());
         apiMocks.listRentalCustodyEvents.mockResolvedValue(collection([]));
         apiMocks.createRentalCustodyEvent.mockResolvedValue({ id: 9 });
+        apiMocks.confirmRentalCustodyEvent.mockResolvedValue({ ...draftCustodyEvent(), status: 'confirmed' });
     });
 
     it('uses owner custody event types for owner supply allocations', async () => {
@@ -69,6 +70,16 @@ describe('RentalCustodyPage', () => {
             condition_summary: null,
             damage_summary: null,
         })));
+    });
+
+    it('confirms custody against the loaded allocation version', async () => {
+        const user = userEvent.setup();
+        apiMocks.listRentalCustodyEvents.mockResolvedValue(collection([draftCustodyEvent()]));
+        renderPage('/vehicle-rental/custody?allocation_id=31');
+
+        await user.click(await screen.findByRole('button', { name: 'Confirm' }));
+
+        await waitFor(() => expect(apiMocks.confirmRentalCustodyEvent).toHaveBeenCalledWith(91, 4, 1));
     });
 });
 
@@ -109,6 +120,34 @@ function ownerSupplyAllocation() {
         remarks: null,
         drivers: [],
         custody_events: [],
+    };
+}
+
+function draftCustodyEvent() {
+    return {
+        id: 91,
+        row_version: 4,
+        event_number: 'RCE-91',
+        allocation: null,
+        replacement: null,
+        vehicle: {
+            id: 12,
+            code: 'VEH-12',
+            name: 'CAR-1000',
+            registration_number: 'CAR-1000',
+            status: 'active',
+        },
+        event_type: 'owner_to_company',
+        occurred_at: '2026-07-10T08:00:00.000Z',
+        odometer: '1000.000000',
+        fuel_level_percent: null,
+        location: null,
+        from_role: 'owner',
+        to_role: 'company',
+        condition_summary: null,
+        damage_summary: null,
+        status: 'draft',
+        items: [],
     };
 }
 
