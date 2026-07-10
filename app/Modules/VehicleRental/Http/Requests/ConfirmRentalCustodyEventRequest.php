@@ -14,6 +14,7 @@ final class ConfirmRentalCustodyEventRequest extends TenantScopedRequest
             'tenant_id' => ['required', 'integer', 'min:1'],
             'organization_unit_id' => ['nullable', 'integer', 'min:1'],
             'expected_version' => ['required', 'integer', 'min:1'],
+            'expected_allocation_version' => ['required', 'integer', 'min:1'],
         ];
     }
 }
