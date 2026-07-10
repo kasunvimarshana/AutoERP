@@ -27,7 +27,7 @@ export default function LedgerReportPage() {
     }, signal), [accountId, dateFrom, dateTo, page]);
 
     return <>
-        <ContentHeader title="General ledger" description="Posted ledger entries with account, journal, and source traceability." actions={<Link className="text-sm font-semibold text-sky-700 hover:underline" to="/reports/finance.ledger">Export report</Link>} />
+        <ContentHeader title="General ledger" description="Posted ledger entries with account, journal, and source traceability. Balances are derived from the dated ledger." actions={<Link className="text-sm font-semibold text-sky-700 hover:underline" to="/reports/finance.ledger">Export report</Link>} />
         <div className="mb-4 grid gap-3 md:grid-cols-3">
             <Select
                 value={accountId}
@@ -46,7 +46,6 @@ export default function LedgerReportPage() {
             { key: 'source', header: 'Source', render: (row) => row.source_number ?? row.source_type ?? '-' },
             { key: 'debit', header: 'Debit', render: (row) => <MoneyDisplay value={row.debit} /> },
             { key: 'credit', header: 'Credit', render: (row) => <MoneyDisplay value={row.credit} /> },
-            { key: 'balance', header: 'Balance after', render: (row) => <MoneyDisplay value={row.balance_after} /> },
         ]} />}
         <Pagination meta={result.data?.meta} onPageChange={setPage} />
     </>;
