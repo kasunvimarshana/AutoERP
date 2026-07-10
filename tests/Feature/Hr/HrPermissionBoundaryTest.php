@@ -6,8 +6,8 @@ namespace Tests\Feature\Hr;
 
 use Illuminate\Support\Facades\Route;
 use Modules\Core\Contracts\PermissionDefinitionRegistryInterface;
+use Modules\Core\Tenancy\TenantFeature;
 use Modules\Hr\Services\HrAuthorizationService;
-use Modules\Tenant\Services\Plans\TenantPlanSchema;
 use Tests\TestCase;
 
 final class HrPermissionBoundaryTest extends TestCase
@@ -26,7 +26,7 @@ final class HrPermissionBoundaryTest extends TestCase
     public function test_hr_routes_require_hr_tenant_feature(): void
     {
         $featureMiddleware = (string) config('tenant.entitlements.middleware_alias', 'tenant.feature')
-            .':'.TenantPlanSchema::MODULE_HR;
+            .':'.TenantFeature::HR;
 
         foreach (array_keys($this->expectedRoutePermissions()) as $routeName) {
             $route = Route::getRoutes()->getByName($routeName);
