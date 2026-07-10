@@ -62,6 +62,23 @@ final class FinanceAccountRoleBoundaryTest extends TestCase
         self::assertStringContainsString('$request->postingDate', $posting);
     }
 
+    public function test_posting_profile_rules_are_validity_dated_and_not_recreated(): void
+    {
+        $migration = $this->source('../Database/Migrations/2026_06_12_070019_create_finance_posting_profile_rules_table.php');
+        $model = $this->source('../Models/FinancePostingProfileRule.php');
+        $request = $this->source('../Http/Requests/UpsertPostingProfileRequest.php');
+        $resource = $this->source('../Http/Resources/PostingProfileRuleResource.php');
+        $service = $this->source('../Services/PostingProfileService.php');
+
+        self::assertStringContainsString('effective_from', $migration.$model.$request.$resource.$service);
+        self::assertStringContainsString('effective_to', $migration.$model.$request.$resource.$service);
+        self::assertStringContainsString('is_active', $migration.$model.$request.$resource.$service);
+        self::assertStringContainsString("whereDate('effective_from', '<=', \$request->postingDate)", $service);
+        self::assertStringContainsString("orWhereDate('effective_to', '>=', \$request->postingDate)", $service);
+        self::assertStringContainsString('assertNoOverlappingRule', $service);
+        self::assertStringNotContainsString('rules()->delete()', $service);
+    }
+
     public function test_schema_migrates_direct_rules_without_silent_conflict_resolution(): void
     {
         $roles = $this->source('../Database/Migrations/2026_06_12_070017_create_finance_account_roles_table.php');
@@ -74,6 +91,7 @@ final class FinanceAccountRoleBoundaryTest extends TestCase
         self::assertStringContainsString("Schema::create('finance_posting_profile_rules'", $rules);
         self::assertStringContainsString('account_role_id', $schema);
         self::assertStringContainsString('effective_from', $assignments);
+        self::assertStringContainsString('effective_from', $rules);
         self::assertStringNotContainsString('account_id', $rules);
         self::assertStringNotContainsString('suspense', strtolower($schema));
     }
@@ -90,6 +108,7 @@ final class FinanceAccountRoleBoundaryTest extends TestCase
         self::assertStringContainsString("with('rules.role')", $controller);
         self::assertStringContainsString('account_roles', $frontendTypes);
         self::assertStringContainsString('account_assignments', $frontendTypes);
+        self::assertStringContainsString('effective_from', $frontendTypes);
         self::assertStringNotContainsString('account_id: number; description', $frontendTypes);
     }
 
