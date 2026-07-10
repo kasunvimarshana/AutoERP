@@ -80,7 +80,7 @@ export default function FinanceJournalDetailPage() {
     return <>
         <ContentHeader
             title={journal.journal_number}
-            description="Journal entry and immutable ledger impact."
+            description="Journal entry and immutable ledger impact. Account balances are derived from all dated ledger entries."
             actions={<div className="flex flex-wrap gap-2">
                 {journal.can_edit && <LinkButton to={`/finance/journals/${journal.id}/edit`} variant="secondary">Edit draft</LinkButton>}
                 {journal.can_post && <Button type="button" onClick={() => setAction('post')}>Post journal</Button>}
@@ -116,7 +116,6 @@ export default function FinanceJournalDetailPage() {
                 { key: 'account', header: 'Account', render: (row) => row.account ? `${row.account.code} - ${row.account.name}` : '-' },
                 { key: 'debit', header: 'Debit', render: (row) => <MoneyDisplay value={row.debit} /> },
                 { key: 'credit', header: 'Credit', render: (row) => <MoneyDisplay value={row.credit} /> },
-                { key: 'balance', header: 'Balance after', render: (row) => <MoneyDisplay value={row.balance_after} /> },
             ]} />
         </Panel>
 
