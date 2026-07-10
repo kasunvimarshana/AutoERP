@@ -28,7 +28,6 @@ final readonly class CreateAccountData
         public bool $isTaxAccount = false,
         public bool $isSystem = false,
         public bool $isActive = true,
-        public string $openingBalance = '0.000000',
         public ?array $metadata = null,
     ) {}
 }
