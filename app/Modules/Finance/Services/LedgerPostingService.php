@@ -25,7 +25,6 @@ final class LedgerPostingService
 
         foreach ($journal->lines as $line) {
             $account = $line->account()->lockForUpdate()->firstOrFail();
-            $balanceAfter = $this->balances->accountBalanceAfter($account, (string) $line->debit, (string) $line->credit);
 
             FinanceLedgerEntry::query()->create([
                 'tenant_id' => $journal->tenant_id,
@@ -37,7 +36,6 @@ final class LedgerPostingService
                 'entry_date' => $journal->journal_date,
                 'debit' => $this->math->normalize((string) $line->debit),
                 'credit' => $this->math->normalize((string) $line->credit),
-                'balance_after' => $balanceAfter,
                 'source_module' => $journal->source_module,
                 'source_type' => $journal->source_type,
                 'source_id' => $journal->source_id,
@@ -47,11 +45,7 @@ final class LedgerPostingService
                 'source_line_id' => $line->source_line_id,
             ]);
 
-            $account->forceFill([
-                'current_balance' => $balanceAfter,
-            ])->save();
-
-            $line->setRelation('account', $account->refresh());
+            $line->setRelation('account', $account);
             $this->balances->applyJournalLine($journal, $line);
             $count++;
         }
