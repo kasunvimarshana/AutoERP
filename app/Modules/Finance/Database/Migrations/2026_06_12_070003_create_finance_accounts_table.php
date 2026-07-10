@@ -28,8 +28,6 @@ return new class extends Migration
             $table->boolean('is_tax_account')->default(false);
             $table->boolean('is_system')->default(false);
             $table->boolean('is_active')->default(true);
-            $table->decimal('opening_balance', 20, 6)->default('0');
-            $table->decimal('current_balance', 20, 6)->default('0');
             $table->json('metadata')->nullable();
             $table->timestamps();
             $table->softDeletes();
