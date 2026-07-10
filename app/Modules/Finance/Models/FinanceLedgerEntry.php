@@ -28,7 +28,6 @@ final class FinanceLedgerEntry extends TenantOwnedModel
             'entry_date' => 'date',
             'debit' => 'decimal:6',
             'credit' => 'decimal:6',
-            'balance_after' => 'decimal:6',
             'source_id' => 'integer',
             'source_date' => 'date',
             'source_line_id' => 'integer',
