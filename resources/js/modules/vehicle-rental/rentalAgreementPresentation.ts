@@ -73,3 +73,30 @@ export function agreementDetailPath(
 
     return `/vehicle-rental/agreements/${agreementId}`;
 }
+
+export function agreementEditPath(
+    mode: RentalAgreementPageMode,
+    agreementId: number,
+): string {
+    if (mode === "lessee") {
+        return `/vehicle-rental/lessee-agreements/${agreementId}/edit`;
+    }
+
+    if (mode === "lessor") {
+        return `/vehicle-rental/lessor-agreements/${agreementId}/edit`;
+    }
+
+    return `/vehicle-rental/agreements/${agreementId}/edit`;
+}
+
+export function agreementListPath(mode: RentalAgreementPageMode): string {
+    if (mode === "lessee") {
+        return "/vehicle-rental/lessee-agreements";
+    }
+
+    if (mode === "lessor") {
+        return "/vehicle-rental/lessor-agreements";
+    }
+
+    return "/vehicle-rental/agreements";
+}

@@ -23,6 +23,8 @@ import { RentalAgreementPrintDocument } from "../components/RentalAgreementPrint
 import {
     RENTAL_AGREEMENT_KIND,
     agreementDetailPath,
+    agreementEditPath,
+    agreementListPath,
     rentalAgreementFinancialSide,
     rentalAgreementKindLabel,
     rentalAgreementPartyLabel,
@@ -30,6 +32,7 @@ import {
     type RentalAgreementPageMode,
 } from "../rentalAgreementPresentation";
 import {
+    deleteRentalAgreement,
     getRentalAgreement,
     listRentalUsageLogs,
     transitionRentalAgreement,
@@ -63,6 +66,29 @@ export default function RentalAgreementDetailPage({
                 status,
             );
             navigate(0);
+        } catch (error) {
+            setActionError(toApiError(error));
+        } finally {
+            setBusy(false);
+        }
+    };
+    const destroyDraft = async () => {
+        if (!result.data) return;
+
+        const confirmed = await confirm({
+            title: "Delete draft agreement?",
+            message:
+                "Only this draft agreement record is archived. Activated agreement history must be cancelled, completed, or terminated.",
+            confirmLabel: "Delete draft",
+            danger: true,
+        });
+        if (!confirmed) return;
+
+        setBusy(true);
+        setActionError(null);
+        try {
+            await deleteRentalAgreement(id, result.data.row_version);
+            navigate(agreementListPath(mode), { replace: true });
         } catch (error) {
             setActionError(toApiError(error));
         } finally {
@@ -172,14 +198,29 @@ export default function RentalAgreementDetailPage({
                                 </LinkButton>
                             )}
                             {row.status === "draft" && (
-                                <Button
-                                    loading={busy}
-                                    onClick={() =>
-                                        void confirmTransition("active")
-                                    }
-                                >
-                                    Activate
-                                </Button>
+                                <>
+                                    <LinkButton
+                                        variant="secondary"
+                                        to={agreementEditPath(mode, row.id)}
+                                    >
+                                        Edit
+                                    </LinkButton>
+                                    <Button
+                                        loading={busy}
+                                        onClick={() =>
+                                            void confirmTransition("active")
+                                        }
+                                    >
+                                        Activate
+                                    </Button>
+                                    <Button
+                                        variant="danger"
+                                        loading={busy}
+                                        onClick={() => void destroyDraft()}
+                                    >
+                                        Delete
+                                    </Button>
+                                </>
                             )}
                             {row.status === "active" && (
                                 <Button

@@ -7,10 +7,12 @@ namespace Tests\Feature\VehicleRental;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Carbon\CarbonImmutable;
 use InvalidArgumentException;
+use Modules\VehicleRental\Http\Requests\StoreRentalAgreementRequest;
 use Modules\VehicleRental\Enums\RentalAgreementStatus;
 use Modules\VehicleRental\Enums\RentalRateVersionStatus;
 use Modules\VehicleRental\Models\RentalAgreement;
@@ -21,6 +23,32 @@ use Tests\TestCase;
 final class RentalAgreementCreateTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_store_request_allows_draft_execution_and_terms_to_be_completed_later(): void
+    {
+        $rules = (new StoreRentalAgreementRequest())->rules();
+        $payload = [
+            'tenant_id' => 1,
+            'agreement_kind' => 'customer_rental',
+            'customer_id' => 10,
+            'agreement_date' => now()->toDateString(),
+            'executed_at' => now()->addDay()->toDateString(),
+            'starts_at' => now()->toDateTimeString(),
+            'ends_at' => now()->addMonth()->toDateTimeString(),
+            'legal_context' => 'company',
+            'rental_mode' => 'with_driver',
+            'billing_cycle' => 'monthly',
+            'billing_basis' => 'calendar_month',
+            'currency_id' => 1,
+        ];
+
+        $futureExecutionValidator = Validator::make($payload, $rules);
+        self::assertFalse($futureExecutionValidator->fails(), json_encode($futureExecutionValidator->errors()->toArray()));
+
+        unset($payload['executed_at']);
+        $noExecutionOrTermsValidator = Validator::make($payload, $rules);
+        self::assertFalse($noExecutionOrTermsValidator->fails(), json_encode($noExecutionOrTermsValidator->errors()->toArray()));
+    }
 
     public function test_inline_rate_version_is_activated_with_persisted_row_version(): void
     {
@@ -381,6 +409,56 @@ final class RentalAgreementCreateTest extends TestCase
                 null,
             ),
         );
+    }
+
+    public function test_draft_agreement_delete_is_version_checked_and_soft_deletes_the_record(): void
+    {
+        $currencyId = $this->createCurrency('VRX');
+        $tenantId = $this->createTenant($currencyId);
+        $customerId = $this->createCustomer($tenantId, $currencyId);
+        $service = app(RentalAgreementService::class);
+
+        $agreement = $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): RentalAgreement => $service->create([
+                'agreement_number' => 'LE-DELETE-001',
+                'agreement_kind' => 'customer_rental',
+                'customer_id' => $customerId,
+                'agreement_date' => '2026-07-07',
+                'starts_at' => '2026-07-07 08:00:00',
+                'ends_at' => '2026-08-07 08:00:00',
+                'legal_context' => 'company',
+                'rental_mode' => 'with_driver',
+                'billing_cycle' => 'monthly',
+                'billing_basis' => 'calendar_month',
+                'proration_rule' => 'exact_day_count',
+                'payment_term_days' => 30,
+                'currency_id' => $currencyId,
+            ], $tenantId, null, null),
+        );
+
+        try {
+            $this->withTenantExecutionContext(
+                $tenantId,
+                fn () => $service->deleteDraft($agreement, 99, null),
+            );
+            self::fail('Draft agreement delete must reject stale row versions.');
+        } catch (ValidationException) {
+            self::assertDatabaseHas('rental_agreements', [
+                'id' => $agreement->getKey(),
+                'deleted_at' => null,
+            ]);
+        }
+
+        $this->withTenantExecutionContext(
+            $tenantId,
+            fn () => $service->deleteDraft($agreement->refresh(), (int) $agreement->row_version, null),
+        );
+
+        $this->assertSoftDeleted('rental_agreements', [
+            'id' => $agreement->getKey(),
+            'row_version' => 2,
+        ]);
     }
 
     public function test_agreement_activation_requires_execution_and_printable_terms(): void

@@ -42,6 +42,7 @@ Route::prefix('api/v1/vehicle-rental')->middleware($middleware)->name('api.v1.ve
     Route::post('agreements', [RentalAgreementController::class, 'store'])->name('agreements.store');
     Route::get('agreements/{agreement}', [RentalAgreementController::class, 'show'])->whereNumber('agreement')->name('agreements.show');
     Route::put('agreements/{agreement}', [RentalAgreementController::class, 'update'])->whereNumber('agreement')->name('agreements.update');
+    Route::delete('agreements/{agreement}', [RentalAgreementController::class, 'destroy'])->whereNumber('agreement')->name('agreements.destroy');
     Route::patch('agreements/{agreement}/transition', [RentalAgreementController::class, 'transition'])->whereNumber('agreement')->name('agreements.transition');
     Route::post('agreements/{agreement}/rate-versions', [RentalRateVersionController::class, 'store'])->whereNumber('agreement')->name('rate-versions.store');
     Route::patch('rate-versions/{version}/activate', [RentalRateVersionController::class, 'activate'])->whereNumber('version')->name('rate-versions.activate');

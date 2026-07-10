@@ -551,6 +551,7 @@ export interface VehicleFinanceAgreement {
     installments: VehicleFinanceInstallment[];
 }
 export interface RentalMetadata {
+    default_currency?: RentalCurrency | null;
     agreement_kinds: string[];
     agreement_statuses: string[];
     allocation_statuses: string[];

@@ -155,6 +155,29 @@ final class RentalAgreementService
         }, 3);
     }
 
+    public function deleteDraft(
+        RentalAgreement $agreement,
+        int $expectedVersion,
+        ?int $userId,
+    ): void {
+        DB::transaction(function () use ($agreement, $expectedVersion, $userId): void {
+            $agreement = RentalAgreement::query()
+                ->where('tenant_id', $agreement->tenant_id)
+                ->lockForUpdate()
+                ->findOrFail($agreement->getKey());
+            $this->assertExpectedVersion($agreement, $expectedVersion);
+            if ($agreement->status !== RentalAgreementStatus::Draft) {
+                throw new InvalidArgumentException('Only draft agreements can be deleted.');
+            }
+
+            $agreement->forceFill([
+                'row_version' => $expectedVersion + 1,
+                'updated_by' => $userId,
+            ])->save();
+            $agreement->delete();
+        }, 3);
+    }
+
     public function updateDraft(
         RentalAgreement $agreement,
         array $data,
@@ -557,7 +580,7 @@ final class RentalAgreementService
     /** @param list<array<string, mixed>> $terms */
     private function replaceTerms(RentalAgreement $agreement, array $terms, ?int $userId): void
     {
-        foreach (array_values($terms) as $index => $term) {
+        foreach ($this->filledTerms($terms) as $index => $term) {
             $agreement->terms()->create([
                 'tenant_id' => $agreement->tenant_id,
                 'organization_unit_id' => $agreement->organization_unit_id,
@@ -576,6 +599,7 @@ final class RentalAgreementService
     /** @param list<array<string, mixed>> $terms */
     private function syncTerms(RentalAgreement $agreement, array $terms, ?int $userId): void
     {
+        $terms = $this->filledTerms($terms);
         $existing = $agreement->terms()->lockForUpdate()->get();
         $byId = $existing->keyBy(fn ($term): int => (int) $term->getKey());
         $bySequence = $existing->keyBy(fn ($term): int => (int) $term->sequence);
@@ -651,5 +675,18 @@ final class RentalAgreementService
         }
 
         return $timezone;
+    }
+
+    /** @param list<array<string, mixed>> $terms */
+    private function filledTerms(array $terms): array
+    {
+        return array_values(array_filter(
+            array_map(static function (array $term): array {
+                $term['content'] = trim((string) ($term['content'] ?? ''));
+
+                return $term;
+            }, array_values($terms)),
+            static fn (array $term): bool => $term['content'] !== '',
+        ));
     }
 }

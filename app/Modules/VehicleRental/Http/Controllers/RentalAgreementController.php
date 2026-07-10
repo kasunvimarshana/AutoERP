@@ -8,6 +8,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Modules\VehicleRental\Enums\RentalAgreementStatus;
 use Modules\VehicleRental\Http\Controllers\Concerns\ScopesVehicleRentalRequests;
+use Modules\VehicleRental\Http\Requests\DeleteRentalAgreementRequest;
 use Modules\VehicleRental\Http\Requests\ListRentalRequest;
 use Modules\VehicleRental\Http\Requests\RentalTransitionRequest;
 use Modules\VehicleRental\Http\Requests\StoreRentalAgreementRequest;
@@ -87,5 +88,21 @@ final class RentalAgreementController
             $request->currentUserId(),
             $request->input('reason'),
         ));
+    }
+
+    public function destroy(
+        DeleteRentalAgreementRequest $request,
+        int $agreement,
+        RentalAgreementService $service,
+    ): JsonResponse {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), VehicleRentalAuthorizationService::MANAGE_AGREEMENTS);
+
+        $service->deleteDraft(
+            $this->scope(RentalAgreement::query(), $request)->findOrFail($agreement),
+            (int) $request->validated('expected_version'),
+            $request->currentUserId(),
+        );
+
+        return response()->json(null, 204);
     }
 }
