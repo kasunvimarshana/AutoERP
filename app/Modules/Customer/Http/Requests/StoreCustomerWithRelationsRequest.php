@@ -68,9 +68,12 @@ final class StoreCustomerWithRelationsRequest extends TenantScopedRequest
             'credit_profile.credit_limit' => ['nullable', 'decimal:0,6', 'gte:0'],
             'credit_profile.credit_period_days' => ['nullable', 'integer', 'min:0'],
             'credit_profile.warning_threshold_percent' => ['nullable', 'decimal:0,6', 'between:0,100'],
+            'credit_profile.credit_allowed' => ['nullable', 'boolean'],
+            'credit_profile.advance_allowed' => ['nullable', 'boolean'],
             'credit_profile.allow_over_credit' => ['nullable', 'boolean'],
             'credit_profile.allow_partial_payment' => ['nullable', 'boolean'],
             'credit_profile.is_active' => ['nullable', 'boolean'],
+            'credit_profile.row_version' => ['prohibited'],
         ];
     }
 
