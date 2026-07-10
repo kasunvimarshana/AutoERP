@@ -1,5 +1,5 @@
 import { useMemo, useState, type FormEvent } from 'react';
-import { TENANT_MODULES, type TenantModuleCode } from '@/app/access/tenantModules';
+import { TENANT_MODULE_CODE, TENANT_MODULES, type TenantModuleCode } from '@/app/access/tenantModules';
 import type { ReferenceRecord } from '@/modules/reference-data/referenceDataTypes';
 import { ApiError, fieldError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
@@ -32,10 +32,11 @@ const LIMIT_OPTIONS: Array<{ key: keyof TenantPlanLimits; label: string; hint: s
 ];
 
 const MODULE_GROUPS: Array<{ label: string; modules: TenantModuleCode[] }> = [
-    { label: 'Master data', modules: ['customer', 'supplier', 'item', 'warehouse', 'vehicle'] },
-    { label: 'Operations', modules: ['inventory', 'purchase', 'vehicle-service', 'vehicle-rental'] },
-    { label: 'Billing and finance', modules: ['invoice', 'payment', 'finance'] },
-    { label: 'Insights', modules: ['reporting'] },
+    { label: 'Master data', modules: [TENANT_MODULE_CODE.CUSTOMER, TENANT_MODULE_CODE.SUPPLIER, TENANT_MODULE_CODE.ITEM, TENANT_MODULE_CODE.WAREHOUSE, TENANT_MODULE_CODE.VEHICLE] },
+    { label: 'People', modules: [TENANT_MODULE_CODE.HR] },
+    { label: 'Operations', modules: [TENANT_MODULE_CODE.INVENTORY, TENANT_MODULE_CODE.PURCHASE, TENANT_MODULE_CODE.VEHICLE_SERVICE, TENANT_MODULE_CODE.VEHICLE_RENTAL] },
+    { label: 'Billing and finance', modules: [TENANT_MODULE_CODE.INVOICE, TENANT_MODULE_CODE.PAYMENT, TENANT_MODULE_CODE.FINANCE] },
+    { label: 'Insights', modules: [TENANT_MODULE_CODE.REPORTING] },
 ];
 
 export function TenantPlanEditor({ plan, currencies, saving, error, onCancel, onSubmit }: Props) {
@@ -198,7 +199,7 @@ export function TenantPlanEditor({ plan, currencies, saving, error, onCancel, on
                 />
 
                 <fieldset>
-                    <legend className="text-sm font-semibold text-slate-900">Enabled business modules</legend>
+                    <legend className="text-sm font-semibold text-slate-900">Enabled commercial modules</legend>
                     <p className="mt-1 text-sm text-slate-500">Foundation capabilities are always available. These controls manage commercial feature access only.</p>
                     <div className="mt-4 grid gap-4 lg:grid-cols-2">
                         {MODULE_GROUPS.map((group) => (
