@@ -13,9 +13,12 @@ final class CustomerCreditProfileResource extends JsonResource
     {
         return [
             'id' => (int) $this->getKey(),
+            'row_version' => (int) $this->row_version,
             'credit_limit' => (string) $this->credit_limit,
             'credit_period_days' => $this->credit_period_days,
             'warning_threshold_percent' => (string) $this->warning_threshold_percent,
+            'credit_allowed' => (bool) $this->credit_allowed,
+            'advance_allowed' => (bool) $this->advance_allowed,
             'allow_over_credit' => (bool) $this->allow_over_credit,
             'allow_partial_payment' => (bool) $this->allow_partial_payment,
             'is_active' => (bool) $this->is_active,
