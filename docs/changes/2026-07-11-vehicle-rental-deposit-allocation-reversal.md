@@ -13,7 +13,7 @@ The payment-allocation table also enforced one payment/invoice row forever. Keep
 - Payment now owns a versioned `PaymentAllocationReversalService` command for reversing one active invoice allocation.
 - The command locks the posted payment and allocation, restores the invoice settlement, marks only that allocation reversed, and recalculates the payment allocation/unapplied balances.
 - Payment allocations now use a nullable active-identity slot: pending/active rows occupy the slot; reversal or void clears it. This preserves every historical row while allowing one corrected current allocation for the same payment and invoice.
-- A forward Payment migration replaces the old lifetime unique key with the portable active-slot unique key. Existing rows receive the active slot through the column default.
+- The Payment allocation create migration defines the active-identity slot and portable active-slot unique key as part of the fresh schema baseline; no follow-up patch migration is used.
 - Full-payment reversal also clears active slots for reversed and voided allocations.
 - Vehicle Rental deposit application and forfeiture reversal delegate to the Payment command in the same transaction.
 - Receipt and refund movement reversal still require the linked payment to be voided or reversed.
@@ -24,7 +24,7 @@ The payment-allocation table also enforced one payment/invoice row forever. Keep
 
 ## Ownership and scope
 
-Payment owns allocation identity, invoice-settlement reversal, historical allocation retention, and payment balance synchronization. Vehicle Rental owns deposit requirement and movement history. The only schema change is the Payment-owned active-identity slot and its unique constraint. No compatibility aliases, direct Invoice mutation, or unrelated module changes were introduced.
+Payment owns allocation identity, invoice-settlement reversal, historical allocation retention, and payment balance synchronization. Vehicle Rental owns deposit requirement and movement history. The only schema change is the Payment-owned active-identity slot and its unique constraint in the owning create migration. No compatibility aliases, direct Invoice mutation, patch migrations, or unrelated module changes were introduced.
 
 ## Verification
 
@@ -32,5 +32,6 @@ Payment owns allocation identity, invoice-settlement reversal, historical alloca
 - The behavior test reverses one allocation, restores invoice/payment balances, creates a corrected allocation for the same payment/invoice, and retains the reversed row.
 - The Vehicle Rental service no longer requires an invoice-application payment to be fully reversed before correcting that allocation.
 - Request, controller, API, and UI carry exact concurrency versions and the required reason.
-- New and modified PHP sources were reviewed for syntax and owner boundaries; TypeScript caller contracts were reviewed for matching argument order.
-- Full PHP, TypeScript, lint, build, and Vitest suites must be rerun in the project runtime after merge.
+- The migration baseline test remains compatible because the schema change is defined in the owning one-table create migration.
+- The custody confirmation frontend test scopes its action to the semantic desktop table, avoiding ambiguity from the shared responsive table's mobile and desktop renderings.
+- Full PHP, TypeScript, lint, build, and Vitest suites must be rerun in the project runtime before deployment.
