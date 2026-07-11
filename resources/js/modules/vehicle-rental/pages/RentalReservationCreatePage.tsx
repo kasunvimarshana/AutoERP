@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { CustomerLookupSelect } from "@/modules/customer/components/CustomerLookupSelect";
 import type { CustomerSummary } from "@/modules/customer/customerTypes";
@@ -12,33 +12,78 @@ import { Input } from "@/shared/components/Input";
 import { Panel } from "@/shared/components/Panel";
 import { Select } from "@/shared/components/Select";
 import { Textarea } from "@/shared/components/Textarea";
-import type { NamedResource } from "@/shared/types/common";
 import { useMutationFormGuard } from "@/shared/hooks/useMutationFormGuard";
 import { RentalPage } from "../components/RentalPage";
 import { RentalCurrencyLookupSelect } from "../components/RentalLookups";
+import { useRentalCurrencyDefault } from "../hooks/useRentalCurrencyDefault";
+import { rentalOptions } from "../hooks/useRentalMetadata";
 import { createRentalReservation } from "../vehicleRentalApi";
 
 export default function RentalReservationCreatePage() {
     const navigate = useNavigate();
     const [customer, setCustomer] = useState<CustomerSummary | null>(null);
     const [vehicle, setVehicle] = useState<VehicleSummary | null>(null);
-    const [currency, setCurrency] = useState<NamedResource | null>(null);
+    const {
+        currency,
+        error: currencyDefaultError,
+        selectCurrency,
+        applyCurrencyDefault,
+        resetCurrencyToDefault,
+        metadata,
+    } = useRentalCurrencyDefault();
     const [form, setForm] = useState({
-        rental_mode: "with_driver",
-        billing_cycle: "monthly",
+        rental_mode: "",
+        billing_cycle: "",
         requested_start_at: "",
         requested_end_at: "",
         estimated_amount: "0",
         estimated_deposit_amount: "0",
-        source: "walk_in",
+        source: "",
         remarks: "",
     });
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
     const formGuard = useMutationFormGuard(saving);
     const updateForm: typeof setForm = (next) => { formGuard.markDirty(); setForm(next); };
+    const metadataDefaults = metadata?.defaults;
+    const rentalModeOptions = useMemo(
+        () => rentalOptions(metadata?.rental_modes),
+        [metadata?.rental_modes],
+    );
+    const billingCycleOptions = useMemo(
+        () => rentalOptions(metadata?.billing_cycles),
+        [metadata?.billing_cycles],
+    );
+    const sourceOptions = useMemo(
+        () => rentalOptions(metadata?.reservation_sources),
+        [metadata?.reservation_sources],
+    );
+
+    useEffect(() => {
+        if (!metadataDefaults) return;
+
+        let cancelled = false;
+        queueMicrotask(() => {
+            if (cancelled) return;
+
+            setForm((current) => ({
+                ...current,
+                rental_mode:
+                    current.rental_mode || metadataDefaults.rental_mode || "",
+                billing_cycle:
+                    current.billing_cycle || metadataDefaults.billing_cycle || "",
+                source: current.source || metadataDefaults.reservation_source || "",
+            }));
+        });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [metadataDefaults]);
     const submit = async (event: FormEvent) => {
         event.preventDefault();
+        if (!customer || !currency) return;
+
         setSaving(true);
         setError(null);
         try {
@@ -51,6 +96,7 @@ export default function RentalReservationCreatePage() {
                 estimated_deposit_amount: form.estimated_deposit_amount,
             });
             formGuard.markSaved();
+            resetCurrencyToDefault();
             navigate(`/vehicle-rental/reservations/${row.id}`);
         } catch (e) {
             setError(toApiError(e));
@@ -64,13 +110,18 @@ export default function RentalReservationCreatePage() {
                 title="New rental reservation"
                 description="Record the requested period, rental mode, vehicle preference and estimated deposit."
             />
-            <ErrorAlert error={error} />
+            <ErrorAlert error={error ?? currencyDefaultError} />
             <form onSubmit={submit}>
                 <Panel>
                     <div className="grid gap-4 md:grid-cols-2">
                         <CustomerLookupSelect
                             value={customer}
-                            onChange={(next) => { formGuard.markDirty(); setCustomer(next); }}
+                            required
+                            onChange={(next) => {
+                                formGuard.markDirty();
+                                setCustomer(next);
+                                applyCurrencyDefault(next?.default_currency ?? null);
+                            }}
                         />
                         <VehicleLookupSelect
                             value={vehicle}
@@ -79,40 +130,37 @@ export default function RentalReservationCreatePage() {
                         <Select
                             label="Rental mode"
                             value={form.rental_mode}
+                            required
                             onChange={(e) =>
                                 updateForm({
                                     ...form,
                                     rental_mode: e.target.value,
                                 })
                             }
-                            options={[
-                                { value: "with_driver", label: "With driver" },
-                                { value: "self_drive", label: "Self-drive" },
-                                {
-                                    value: "vehicle_only",
-                                    label: "Vehicle only",
-                                },
-                            ]}
+                            options={rentalModeOptions}
                         />
                         <Select
                             label="Billing cycle"
                             value={form.billing_cycle}
+                            required
                             onChange={(e) =>
                                 updateForm({
                                     ...form,
                                     billing_cycle: e.target.value,
                                 })
                             }
-                            options={[
-                                "hourly",
-                                "daily",
-                                "weekly",
-                                "monthly",
-                                "per_hire",
-                            ].map((value) => ({
-                                value,
-                                label: value.replaceAll("_", " "),
-                            }))}
+                            options={billingCycleOptions}
+                        />
+                        <Select
+                            label="Reservation source"
+                            value={form.source}
+                            onChange={(e) =>
+                                updateForm({
+                                    ...form,
+                                    source: e.target.value,
+                                })
+                            }
+                            options={sourceOptions}
                         />
                         <Input
                             label="Start"
@@ -140,7 +188,10 @@ export default function RentalReservationCreatePage() {
                         />
                         <RentalCurrencyLookupSelect
                             value={currency}
-                            onChange={(next) => { formGuard.markDirty(); setCurrency(next); }}
+                            onChange={(next) => {
+                                formGuard.markDirty();
+                                selectCurrency(next);
+                            }}
                             required
                         />
                         <Input

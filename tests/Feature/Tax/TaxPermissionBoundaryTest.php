@@ -6,6 +6,7 @@ namespace Tests\Feature\Tax;
 
 use Illuminate\Support\Facades\Route;
 use Modules\Core\Contracts\PermissionDefinitionRegistryInterface;
+use Modules\Core\Tenancy\TenantFeature;
 use Modules\Tax\Constants\TaxPermission;
 use Tests\TestCase;
 
@@ -22,9 +23,43 @@ final class TaxPermissionBoundaryTest extends TestCase
         }
     }
 
+    public function test_tax_routes_require_finance_tenant_feature(): void
+    {
+        $featureMiddleware = (string) config('tenant.entitlements.middleware_alias', 'tenant.feature')
+            .':'.TenantFeature::FINANCE;
+
+        foreach (array_keys($this->expectedRoutePermissions()) as $routeName) {
+            $route = Route::getRoutes()->getByName($routeName);
+
+            self::assertNotNull($route, "Route [{$routeName}] must exist.");
+            self::assertContains(
+                $featureMiddleware,
+                $route->gatherMiddleware(),
+                "Route [{$routeName}] must require the Finance tenant feature.",
+            );
+        }
+    }
+
     public function test_tax_routes_require_granular_tenant_permissions(): void
     {
-        $expected = [
+        $permissionMiddleware = (string) config('user.tenant.permission_middleware_alias', 'tenant.permission');
+
+        foreach ($this->expectedRoutePermissions() as $routeName => $permission) {
+            $route = Route::getRoutes()->getByName($routeName);
+
+            self::assertNotNull($route, "Route [{$routeName}] must exist.");
+            self::assertContains(
+                $permissionMiddleware.':'.$permission,
+                $route->gatherMiddleware(),
+                "Route [{$routeName}] must require [{$permission}].",
+            );
+        }
+    }
+
+    /** @return array<string,string> */
+    private function expectedRoutePermissions(): array
+    {
+        return [
             'api.v1.tax.lookups' => TaxPermission::LOOKUPS_VIEW,
             'api.v1.tax.calculate' => TaxPermission::CALCULATIONS_RUN,
             'api.v1.tax.taxes.index' => TaxPermission::TAXES_VIEW,
@@ -46,18 +81,5 @@ final class TaxPermissionBoundaryTest extends TestCase
             'api.v1.tax.posting-profiles.update' => TaxPermission::POSTING_PROFILES_MANAGE,
             'api.v1.tax.reports.show' => TaxPermission::REPORTS_VIEW,
         ];
-
-        $permissionMiddleware = (string) config('user.tenant.permission_middleware_alias', 'tenant.permission');
-
-        foreach ($expected as $routeName => $permission) {
-            $route = Route::getRoutes()->getByName($routeName);
-
-            self::assertNotNull($route, "Route [{$routeName}] must exist.");
-            self::assertContains(
-                $permissionMiddleware.':'.$permission,
-                $route->gatherMiddleware(),
-                "Route [{$routeName}] must require [{$permission}].",
-            );
-        }
     }
 }

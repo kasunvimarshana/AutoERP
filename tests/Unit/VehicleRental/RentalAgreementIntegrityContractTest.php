@@ -29,6 +29,7 @@ final class RentalAgreementIntegrityContractTest extends TestCase
         self::assertStringContainsString('assertExpectedVersion', $service);
         self::assertStringContainsString("'row_version' =>", $resource);
         self::assertStringContainsString('$agreement->row_version = $expectedVersion + 1;', $service);
+        self::assertStringContainsString('deleteDraft', $service);
         self::assertMatchesRegularExpression("/(?:'expected_version'\\s*=>|\\\$rules\\['expected_version'\\]\\s*=)\\s*\\['required',\\s*'integer',\\s*'min:1'\\]/", $updateRequest);
         self::assertMatchesRegularExpression("/'expected_version'\\s*=>\\s*\\['required',\\s*'integer',\\s*'min:1'\\]/", $transitionRequest);
         self::assertStringContainsString("validated('expected_version')", $controller);
@@ -97,8 +98,9 @@ final class RentalAgreementIntegrityContractTest extends TestCase
         $createPage = $this->source('resources/js/modules/vehicle-rental/pages/RentalAgreementCreatePage.tsx');
         $detailPage = $this->source('resources/js/modules/vehicle-rental/pages/RentalAgreementDetailPage.tsx');
 
-        self::assertStringContainsString("'executed_at' => ['required'", $request);
-        self::assertStringContainsString("'terms' => ['required', 'array', 'min:1'", $request);
+        self::assertStringContainsString("'executed_at' => ['nullable'", $request);
+        self::assertStringContainsString("'terms' => ['nullable', 'array'", $request);
+        self::assertStringContainsString("'terms.*.content' => ['nullable'", $request);
         self::assertStringContainsString('assertReadyForActivation', $service);
         self::assertStringContainsString('documentSnapshot', $service);
         self::assertStringContainsString("'document_snapshot' =>", $resource);

@@ -7,6 +7,7 @@ namespace Modules\VehicleRental\Http\Resources;
 use BackedEnum;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Collection;
+use Modules\Core\Services\DecimalMath;
 
 abstract class RentalResource extends JsonResource
 {
@@ -30,7 +31,7 @@ abstract class RentalResource extends JsonResource
 
     protected function decimal(mixed $value): string
     {
-        return number_format((float) ($value ?? 0), 6, '.', '');
+        return app(DecimalMath::class)->normalize((string) ($value ?? '0'));
     }
 
     protected function loadedCollection(string $relation, callable $mapper): array

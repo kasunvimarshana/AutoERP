@@ -36,7 +36,7 @@ return new class extends Migration
             $table->foreign(['account_id', 'tenant_id'], 'finance_account_balances_account_id_tenant_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('finance_accounts')
-                ->cascadeOnDelete();
+                ->restrictOnDelete();
         });
     }
 

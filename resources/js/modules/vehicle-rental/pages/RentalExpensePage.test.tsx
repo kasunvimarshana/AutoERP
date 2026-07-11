@@ -9,6 +9,7 @@ import type { RentalAgreementLookupOption } from '../components/RentalLookups';
 
 const apiMocks = vi.hoisted(() => ({
     createRentalExpense: vi.fn(),
+    getRentalMetadata: vi.fn(),
     listRentalExpenses: vi.fn(),
     transitionRentalExpense: vi.fn(),
 }));
@@ -38,7 +39,7 @@ vi.mock('../components/RentalLookups', () => ({
         value: NamedResource | null;
         onChange: (value: NamedResource | null) => void;
     }) => (
-        <button type="button" onClick={() => onChange(currency())}>
+        <button type="button" onClick={() => onChange(manualCurrency())}>
             {value?.name ?? 'Choose currency'}
         </button>
     ),
@@ -92,6 +93,7 @@ vi.mock('../components/RentalLookups', () => ({
 describe('RentalExpensePage', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        apiMocks.getRentalMetadata.mockResolvedValue(rentalMetadata(tenantCurrency()));
         apiMocks.listRentalExpenses.mockResolvedValue(collection([]));
         apiMocks.createRentalExpense.mockResolvedValue({ id: 99 });
     });
@@ -111,6 +113,18 @@ describe('RentalExpensePage', () => {
         expect(screen.getByRole('button', { name: 'Save expense' })).toBeEnabled();
     });
 
+    it('uses rental metadata expense options without unsupported driver allowance', async () => {
+        renderPage();
+
+        await screen.findByRole('button', { name: 'Tenant Currency' });
+
+        const options = Array.from(
+            (screen.getByLabelText('Expense type') as HTMLSelectElement).options,
+        ).map((option) => option.value);
+        expect(options).toContain('allowance');
+        expect(options).not.toContain('driver_allowance');
+    });
+
     it('submits recovery payload with party derived from the selected agreement', async () => {
         const user = userEvent.setup();
         renderPage();
@@ -123,7 +137,7 @@ describe('RentalExpensePage', () => {
 
         await waitFor(() => expect(apiMocks.createRentalExpense).toHaveBeenCalledWith(expect.objectContaining({
             vehicle_id: 12,
-            currency_id: 1,
+            currency_id: 2,
             net_amount: '100',
             allocations: [expect.objectContaining({
                 allocation_type: 'customer_recovery',
@@ -151,11 +165,45 @@ describe('RentalExpensePage', () => {
         expect(screen.getByLabelText('Vehicle allocation')).toHaveValue('');
         expect(screen.getByLabelText('Customer')).toHaveValue('Other Lessee');
     });
+
+    it('uses the tenant default currency for company costs without manual selection', async () => {
+        const user = userEvent.setup();
+        renderPage();
+
+        await prepareRequiredFields(user);
+        await user.click(screen.getByRole('button', { name: 'Save expense' }));
+
+        await waitFor(() => expect(apiMocks.createRentalExpense).toHaveBeenCalledWith(expect.objectContaining({
+            currency_id: 1,
+            allocations: [expect.objectContaining({
+                allocation_type: 'company_cost',
+            })],
+        })));
+    });
+
+    it('preserves manual currency when the target agreement changes', async () => {
+        const user = userEvent.setup();
+        renderPage();
+
+        await prepareRequiredFields(user);
+        await user.click(screen.getByRole('button', { name: 'Tenant Currency' }));
+        await user.selectOptions(screen.getByLabelText('Financial treatment'), 'customer_recovery');
+        await user.click(screen.getByRole('button', { name: 'Choose agreement' }));
+        await user.click(screen.getByRole('button', { name: 'Save expense' }));
+
+        await waitFor(() => expect(apiMocks.createRentalExpense).toHaveBeenCalledWith(expect.objectContaining({
+            currency_id: 3,
+            allocations: [expect.objectContaining({
+                target_agreement_id: 7,
+                customer_id: 22,
+            })],
+        })));
+    });
 });
 
 async function prepareRequiredFields(user: ReturnType<typeof userEvent.setup>) {
     await user.click(await screen.findByRole('button', { name: 'Choose vehicle' }));
-    await user.click(screen.getByRole('button', { name: 'Choose currency' }));
+    await screen.findByRole('button', { name: 'Tenant Currency' });
     await user.type(screen.getByLabelText('Net amount'), '100');
 }
 
@@ -171,8 +219,16 @@ function vehicle() {
     return { id: 12, code: 'VEH-12', name: 'CAR-1000', registration_number: 'CAR-1000' };
 }
 
-function currency() {
-    return { id: 1, code: 'LKR', name: 'LKR' };
+function tenantCurrency() {
+    return { id: 1, code: 'LKR', name: 'Tenant Currency' };
+}
+
+function agreementCurrency() {
+    return { id: 2, code: 'USD', name: 'Agreement Currency' };
+}
+
+function manualCurrency() {
+    return { id: 3, code: 'GBP', name: 'Manual Currency' };
 }
 
 function customerAgreement(): RentalAgreementLookupOption {
@@ -182,6 +238,7 @@ function customerAgreement(): RentalAgreementLookupOption {
         row_version: 1,
         agreement_kind: 'customer_rental',
         status: 'active',
+        currency: agreementCurrency(),
         customer: { id: 22, code: 'CUS-22', name: 'Lessee Customer' },
         supplier: null,
         name: 'RA-7 - Lessee Customer',
@@ -195,6 +252,7 @@ function otherCustomerAgreement(): RentalAgreementLookupOption {
         row_version: 1,
         agreement_kind: 'customer_rental',
         status: 'active',
+        currency: agreementCurrency(),
         customer: { id: 23, code: 'CUS-23', name: 'Other Lessee' },
         supplier: null,
         name: 'RA-8 - Other Lessee',
@@ -208,6 +266,7 @@ function ownerAgreement(): RentalAgreementLookupOption {
         row_version: 1,
         agreement_kind: 'owner_supply',
         status: 'active',
+        currency: agreementCurrency(),
         customer: null,
         supplier: { id: 44, code: 'SUP-44', name: 'Vehicle Owner' },
         name: 'RO-17 - Vehicle Owner',
@@ -223,5 +282,33 @@ function collection<T>(data: T[]) {
         data,
         links: {},
         meta: { current_page: 1, last_page: 1, per_page: 50, total: data.length },
+    };
+}
+
+function rentalMetadata(defaultCurrency: NamedResource | null) {
+    return {
+        default_currency: defaultCurrency,
+        defaults: {
+            expense_type: 'fuel',
+            expense_allocation_type: 'company_cost',
+        },
+        expense_types: [
+            'fuel',
+            'toll',
+            'parking',
+            'repair',
+            'service',
+            'allowance',
+            'licence',
+            'insurance',
+            'damage',
+            'other',
+        ],
+        expense_allocation_types: [
+            'company_cost',
+            'customer_recovery',
+            'owner_deduction',
+            'employee_reimbursement',
+        ],
     };
 }

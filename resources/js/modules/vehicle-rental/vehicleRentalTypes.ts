@@ -550,7 +550,31 @@ export interface VehicleFinanceAgreement {
     status: string;
     installments: VehicleFinanceInstallment[];
 }
+export interface RentalMetadataDefaults {
+    legal_context?: string;
+    rental_mode?: string;
+    billing_cycle?: string;
+    billing_basis?: string;
+    proration_rule?: string;
+    excess_km_method?: string;
+    payment_term_days?: number;
+    reservation_source?: string;
+    expense_type?: string;
+    expense_allocation_type?: string;
+    vehicle_source_type?: string;
+    finance_interest_method?: string;
+    finance_installment_frequency?: string;
+    finance_installment_count?: number;
+    finance_payment_term_days?: number;
+}
 export interface RentalMetadata {
+    default_currency?: RentalCurrency | null;
+    defaults?: RentalMetadataDefaults;
+    legal_contexts?: string[];
+    reservation_sources?: string[];
+    finance_interest_methods?: string[];
+    finance_installment_frequencies?: string[];
+    public_custody_event_types?: string[];
     agreement_kinds: string[];
     agreement_statuses: string[];
     allocation_statuses: string[];

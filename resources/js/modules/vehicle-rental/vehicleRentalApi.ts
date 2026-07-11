@@ -46,6 +46,8 @@ const patch = <T>(path: string, payload: RentalPayload = {}) =>
     apiClient
         .patch<ApiResource<T>>(`${base}/${path}`, payload)
         .then((response) => response.data.data);
+const destroy = (path: string, payload: RentalPayload = {}) =>
+    apiClient.delete(`${base}/${path}`, { data: payload });
 
 export const getRentalMetadata = (signal?: AbortSignal) =>
     resource<RentalMetadata>("metadata", signal);
@@ -113,6 +115,10 @@ export const transitionRentalAgreement = (
         status,
         reason,
     });
+export const deleteRentalAgreement = (id: number, expectedVersion: number) =>
+    destroy(`agreements/${id}`, {
+        expected_version: expectedVersion,
+    });
 export const createRentalRateVersion = (
     agreementId: number,
     expectedAgreementVersion: number,
@@ -176,9 +182,14 @@ export const createRentalCustodyEvent = (
         `allocations/${allocationId}/custody-events`,
         { ...payload, expected_allocation_version: expectedAllocationVersion },
     );
-export const confirmRentalCustodyEvent = (id: number, expectedVersion: number) =>
+export const confirmRentalCustodyEvent = (
+    id: number,
+    expectedVersion: number,
+    expectedAllocationVersion: number,
+) =>
     patch<RentalCustodyEvent>(`custody-events/${id}/confirm`, {
         expected_version: expectedVersion,
+        expected_allocation_version: expectedAllocationVersion,
     });
 export const reverseRentalCustodyEvent = (
     id: number,
@@ -301,9 +312,13 @@ export const forfeitRentalDeposit = (id: number, payload: RentalPayload) =>
 export const reverseRentalDepositLink = (
     linkId: number,
     expectedRequirementVersion: number,
+    expectedPaymentVersion: number,
+    reason: string,
 ) =>
     patch<RentalDeposit>(`deposit-links/${linkId}/reverse`, {
         expected_requirement_version: expectedRequirementVersion,
+        expected_payment_version: expectedPaymentVersion,
+        reason,
     });
 
 export const listVehicleFinanceAgreements = (

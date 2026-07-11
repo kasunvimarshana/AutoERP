@@ -753,8 +753,6 @@ final class TaxEngineTest extends TestCase
             'name' => $code,
             'customer_type' => 'company',
             'status' => 'active',
-            'is_credit_allowed' => true,
-            'is_advance_allowed' => true,
             'created_at' => now(),
             'updated_at' => now(),
         ]);
@@ -989,5 +987,4 @@ final class TaxEngineTest extends TestCase
             fn (): Payment => Payment::query()->with('allocations')->findOrFail($paymentId),
         );
     }
-
 }

@@ -41,10 +41,6 @@ trait MapsCustomerData
             vatNumber: $this->nullableString($customer, 'vat_number'),
             svatNumber: $this->nullableString($customer, 'svat_number'),
             businessRegistrationNumber: $this->nullableString($customer, 'business_registration_number'),
-            creditLimit: (string) ($customer['credit_limit'] ?? '0.000000'),
-            openingBalance: (string) ($customer['opening_balance'] ?? '0.000000'),
-            isCreditAllowed: (bool) ($customer['is_credit_allowed'] ?? true),
-            isAdvanceAllowed: (bool) ($customer['is_advance_allowed'] ?? true),
             isTaxExempt: (bool) ($customer['is_tax_exempt'] ?? false),
             marketingConsent: (bool) ($customer['marketing_consent'] ?? false),
             preferredCommunicationChannel: isset($customer['preferred_communication_channel']) && $customer['preferred_communication_channel'] !== null
@@ -129,9 +125,12 @@ trait MapsCustomerData
             creditLimit: (string) ($row['credit_limit'] ?? '0.000000'),
             creditPeriodDays: isset($row['credit_period_days']) ? (int) $row['credit_period_days'] : null,
             warningThresholdPercent: (string) ($row['warning_threshold_percent'] ?? '80.000000'),
+            creditAllowed: (bool) ($row['credit_allowed'] ?? true),
+            advanceAllowed: (bool) ($row['advance_allowed'] ?? true),
             allowOverCredit: (bool) ($row['allow_over_credit'] ?? false),
             allowPartialPayment: (bool) ($row['allow_partial_payment'] ?? true),
             isActive: (bool) ($row['is_active'] ?? true),
+            rowVersion: isset($row['row_version']) ? (int) $row['row_version'] : null,
         );
     }
 

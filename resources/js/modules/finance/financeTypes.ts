@@ -4,8 +4,6 @@ export interface FinanceAccount extends Record<string, unknown> {
     name: string;
     description?: string | null;
     normal_balance: 'debit' | 'credit';
-    opening_balance: string;
-    current_balance: string;
     is_control_account: boolean;
     is_posting_account: boolean;
     is_cash_account: boolean;
@@ -80,7 +78,6 @@ export interface AccountPayload {
     name: string;
     description?: string | null;
     normal_balance: 'debit' | 'credit';
-    opening_balance: string;
     is_control_account: boolean;
     is_posting_account: boolean;
     is_cash_account: boolean;

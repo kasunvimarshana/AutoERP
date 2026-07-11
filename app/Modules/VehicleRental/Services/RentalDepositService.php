@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace Modules\VehicleRental\Services;
 
+use DateTimeInterface;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
-use DateTimeInterface;
 use Modules\Core\Services\DecimalMath;
 use Modules\Invoice\Contracts\InvoiceBalanceProviderInterface;
 use Modules\Payment\DTOs\CreatePaymentData;
@@ -18,12 +19,14 @@ use Modules\Payment\Enums\PaymentDocumentStatus;
 use Modules\Payment\Enums\PaymentPostingStatus;
 use Modules\Payment\Enums\PaymentType;
 use Modules\Payment\Models\Payment;
+use Modules\Payment\Services\PaymentAllocationReversalService;
 use Modules\Payment\Services\PaymentAllocationService;
 use Modules\Payment\Services\PaymentCreationService;
 use Modules\Payment\Services\PaymentDocumentLifecycleService;
 use Modules\Payment\Services\PaymentPostingService;
 use Modules\Payment\Services\PaymentRefundWorkflowService;
 use Modules\VehicleRental\Enums\RentalAgreementKind;
+use Modules\VehicleRental\Enums\RentalDepositLinkStatus;
 use Modules\VehicleRental\Enums\RentalDepositLinkType;
 use Modules\VehicleRental\Enums\RentalDepositStatus;
 use Modules\VehicleRental\Models\RentalDepositLink;
@@ -37,6 +40,7 @@ final class RentalDepositService
         private readonly PaymentDocumentLifecycleService $paymentLifecycle,
         private readonly PaymentPostingService $paymentPosting,
         private readonly PaymentAllocationService $allocations,
+        private readonly PaymentAllocationReversalService $allocationReversals,
         private readonly PaymentRefundWorkflowService $refunds,
         private readonly InvoiceBalanceProviderInterface $invoiceBalances,
     ) {}
@@ -278,44 +282,85 @@ final class RentalDepositService
         });
     }
 
-    public function reverseLink(RentalDepositLink $link, int $expectedRequirementVersion, ?int $userId): RentalDepositRequirement
-    {
-        return DB::transaction(function () use ($link, $expectedRequirementVersion, $userId): RentalDepositRequirement {
-            $link = RentalDepositLink::query()->with('requirement.agreement')->lockForUpdate()->findOrFail($link->getKey());
+    public function reverseLink(
+        RentalDepositLink $link,
+        int $expectedRequirementVersion,
+        int $expectedPaymentVersion,
+        string $reason,
+        ?int $userId,
+    ): RentalDepositRequirement {
+        return DB::transaction(function () use (
+            $link,
+            $expectedRequirementVersion,
+            $expectedPaymentVersion,
+            $reason,
+            $userId,
+        ): RentalDepositRequirement {
+            $reason = trim($reason);
+            if ($reason === '') {
+                throw new InvalidArgumentException('Deposit movement reversal reason is required.');
+            }
+
+            $link = RentalDepositLink::query()
+                ->with('requirement.agreement')
+                ->lockForUpdate()
+                ->findOrFail($link->getKey());
             $requirement = $this->locked($link->requirement, $expectedRequirementVersion);
-            if ($link->status !== 'active') {
+            if ($link->status !== RentalDepositLinkStatus::Active) {
                 throw new InvalidArgumentException('Only an active deposit link can be reversed.');
             }
             if ($link->link_type === RentalDepositLinkType::Reversal) {
                 throw new InvalidArgumentException('A deposit reversal link cannot be reversed again.');
             }
-            if ($link->payment_id !== null) {
-                $payment = Payment::query()->lockForUpdate()->findOrFail($link->payment_id);
-                $document = $payment->document_status instanceof PaymentDocumentStatus
-                    ? $payment->document_status
-                    : PaymentDocumentStatus::from((string) $payment->document_status);
-                if (! in_array($document, [PaymentDocumentStatus::Voided, PaymentDocumentStatus::Reversed], true)) {
-                    throw new InvalidArgumentException('Void or reverse the linked payment before reversing this deposit movement.');
-                }
+            if ($link->payment_id === null) {
+                throw new InvalidArgumentException('Deposit movement reversal requires its linked payment.');
             }
-            if ($link->invoice_id !== null) {
-                $activeAllocation = DB::table('payment_allocations')
-                    ->where('tenant_id', $link->tenant_id)
-                    ->where('payment_id', $link->payment_id)
-                    ->where('invoice_id', $link->invoice_id)
-                    ->where('status', 'active')
-                    ->exists();
-                if ($activeAllocation) {
-                    throw new InvalidArgumentException('Reverse the linked payment allocation before reversing this deposit movement.');
+
+            $payment = Payment::query()
+                ->lockForUpdate()
+                ->findOrFail($link->payment_id);
+            $this->assertPaymentExpectedVersion($payment, $expectedPaymentVersion);
+
+            if (in_array($link->link_type, [
+                RentalDepositLinkType::AppliedToInvoice,
+                RentalDepositLinkType::Forfeiture,
+            ], true)) {
+                if ($link->invoice_id === null) {
+                    throw new InvalidArgumentException('Deposit invoice movement is missing its invoice reference.');
                 }
+                $this->allocationReversals->reverseForInvoice(
+                    $payment,
+                    (int) $link->invoice_id,
+                    $expectedPaymentVersion,
+                    $reason,
+                    $userId,
+                );
+            } else {
+                if ($link->link_type === RentalDepositLinkType::Receipt) {
+                    $this->assertReceiptHasNoActiveDependentMovements($requirement, $payment);
+                }
+                $this->assertLinkedPaymentReversed($payment);
             }
 
             $link->forceFill([
-                'status' => 'reversed',
+                'status' => RentalDepositLinkStatus::Reversed->value,
                 'row_version' => (int) $link->row_version + 1,
+                'metadata' => array_merge($link->metadata ?? [], [
+                    'reversal' => [
+                        'reason' => $reason,
+                        'reversed_at' => now()->toISOString(),
+                        'reversed_by' => $userId,
+                    ],
+                ]),
                 'updated_by' => $userId,
             ])->save();
-            $this->link($requirement, RentalDepositLinkType::Reversal, (string) $link->amount, $userId, reversesLinkId: (int) $link->getKey());
+            $this->link(
+                $requirement,
+                RentalDepositLinkType::Reversal,
+                (string) $link->amount,
+                $userId,
+                reversesLinkId: (int) $link->getKey(),
+            );
             $this->sync($requirement);
 
             return $this->reload($requirement);
@@ -324,7 +369,10 @@ final class RentalDepositService
 
     private function locked(RentalDepositRequirement $requirement, int $expectedVersion): RentalDepositRequirement
     {
-        $locked = RentalDepositRequirement::query()->with(['agreement', 'links'])->lockForUpdate()->findOrFail($requirement->getKey());
+        $locked = RentalDepositRequirement::query()
+            ->with(['agreement', 'links'])
+            ->lockForUpdate()
+            ->findOrFail($requirement->getKey());
         if ($expectedVersion < 1 || (int) $locked->row_version !== $expectedVersion) {
             throw new InvalidArgumentException('Deposit requirement was changed by another request. Reload it before continuing.');
         }
@@ -362,9 +410,50 @@ final class RentalDepositService
         if (! $requirement->links()
             ->where('link_type', RentalDepositLinkType::Receipt->value)
             ->where('payment_id', $payment->getKey())
-            ->where('status', 'active')
+            ->where('status', RentalDepositLinkStatus::Active->value)
             ->exists()) {
             throw new InvalidArgumentException('Selected payment is not linked as an active deposit receipt.');
+        }
+    }
+
+    private function assertPaymentExpectedVersion(Payment $payment, int $expectedVersion): void
+    {
+        if ($expectedVersion < 1 || (int) $payment->row_version !== $expectedVersion) {
+            throw new InvalidArgumentException('Linked payment was changed by another request. Reload the deposit before reversing the movement.');
+        }
+    }
+
+    private function assertLinkedPaymentReversed(Payment $payment): void
+    {
+        $document = $payment->document_status instanceof PaymentDocumentStatus
+            ? $payment->document_status
+            : PaymentDocumentStatus::from((string) $payment->document_status);
+        if (! in_array($document, [PaymentDocumentStatus::Voided, PaymentDocumentStatus::Reversed], true)) {
+            throw new InvalidArgumentException('Void or reverse the linked payment before reversing this deposit movement.');
+        }
+    }
+
+    private function assertReceiptHasNoActiveDependentMovements(
+        RentalDepositRequirement $requirement,
+        Payment $receiptPayment,
+    ): void {
+        $hasActiveInvoiceMovement = $requirement->links()
+            ->whereIn('link_type', [
+                RentalDepositLinkType::AppliedToInvoice->value,
+                RentalDepositLinkType::Forfeiture->value,
+            ])
+            ->where('payment_id', $receiptPayment->getKey())
+            ->where('status', RentalDepositLinkStatus::Active->value)
+            ->exists();
+        $hasActiveRefund = $requirement->links()
+            ->where('link_type', RentalDepositLinkType::Refund->value)
+            ->where('status', RentalDepositLinkStatus::Active->value)
+            ->whereHas('payment', fn (Builder $query): Builder => $query
+                ->where('original_payment_id', $receiptPayment->getKey()))
+            ->exists();
+
+        if ($hasActiveInvoiceMovement || $hasActiveRefund) {
+            throw new InvalidArgumentException('Reverse active deposit applications, forfeitures, and refunds before reversing the receipt.');
         }
     }
 
@@ -386,7 +475,7 @@ final class RentalDepositService
             'payment_id' => $paymentId,
             'invoice_id' => $invoiceId,
             'amount' => $amount,
-            'status' => 'active',
+            'status' => RentalDepositLinkStatus::Active->value,
             'linked_at' => $linkedAt,
             'linked_by' => $userId,
             'reverses_link_id' => $reversesLinkId,
@@ -419,7 +508,9 @@ final class RentalDepositService
 
     private function sync(RentalDepositRequirement $requirement): void
     {
-        $links = $requirement->links()->where('status', 'active')->get();
+        $links = $requirement->links()
+            ->where('status', RentalDepositLinkStatus::Active->value)
+            ->get();
         $received = $this->math->sum($links->where('link_type', RentalDepositLinkType::Receipt)->pluck('amount')->map(fn ($value) => (string) $value)->all());
         $applied = $this->math->sum($links->where('link_type', RentalDepositLinkType::AppliedToInvoice)->pluck('amount')->map(fn ($value) => (string) $value)->all());
         $refunded = $this->math->sum($links->where('link_type', RentalDepositLinkType::Refund)->pluck('amount')->map(fn ($value) => (string) $value)->all());

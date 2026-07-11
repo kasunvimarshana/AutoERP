@@ -17,7 +17,6 @@ const initial: AccountPayload = {
     code: '',
     name: '',
     normal_balance: 'debit',
-    opening_balance: '0.000000',
     is_control_account: false,
     is_posting_account: true,
     is_cash_account: false,

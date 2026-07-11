@@ -2,9 +2,13 @@ import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { RouterProvider, createMemoryRouter } from "react-router-dom";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TestRouter } from "@/test/TestRouter";
 import type { NamedResource } from "@/shared/types/common";
+import {
+    businessDateInputValue,
+    configureBusinessTimeZone,
+} from "@/shared/utils/businessDate";
 import {
     RENTAL_AGREEMENT_KIND,
 } from "../rentalAgreementPresentation";
@@ -12,13 +16,22 @@ import RentalAgreementCreatePage from "./RentalAgreementCreatePage";
 import RentalAgreementDetailPage from "./RentalAgreementDetailPage";
 import RentalAgreementListPage from "./RentalAgreementListPage";
 
+type MockParty = NamedResource & {
+    default_currency?: NamedResource | null;
+};
+
 const apiMocks = vi.hoisted(() => ({
     createRentalAgreement: vi.fn(),
+    deleteRentalAgreement: vi.fn(),
     getRentalAgreement: vi.fn(),
+    getRentalMetadata: vi.fn(),
     getRentalReservation: vi.fn(),
     listRentalUsageLogs: vi.fn(),
     listRentalAgreements: vi.fn(),
     transitionRentalAgreement: vi.fn(),
+    updateRentalAgreement: vi.fn(),
+    customerDefaultCurrency: { current: null as NamedResource | null },
+    supplierDefaultCurrency: { current: null as NamedResource | null },
 }));
 
 vi.mock("../vehicleRentalApi", () => apiMocks);
@@ -30,8 +43,8 @@ vi.mock("@/modules/customer/components/CustomerLookupSelect", () => ({
         value,
         onChange,
     }: {
-        value: NamedResource | null;
-        onChange: (value: NamedResource | null) => void;
+        value: MockParty | null;
+        onChange: (value: MockParty | null) => void;
     }) => (
         <button
             type="button"
@@ -40,6 +53,7 @@ vi.mock("@/modules/customer/components/CustomerLookupSelect", () => ({
                     id: 22,
                     code: "CUS-22",
                     name: "Lessee Customer",
+                    default_currency: apiMocks.customerDefaultCurrency.current,
                 })
             }
         >
@@ -52,8 +66,8 @@ vi.mock("@/modules/supplier/components/SupplierLookupSelect", () => ({
         value,
         onChange,
     }: {
-        value: NamedResource | null;
-        onChange: (value: NamedResource | null) => void;
+        value: MockParty | null;
+        onChange: (value: MockParty | null) => void;
     }) => (
         <button
             type="button"
@@ -62,6 +76,7 @@ vi.mock("@/modules/supplier/components/SupplierLookupSelect", () => ({
                     id: 33,
                     code: "SUP-33",
                     name: "Lessor Supplier",
+                    default_currency: apiMocks.supplierDefaultCurrency.current,
                 })
             }
         >
@@ -86,9 +101,14 @@ vi.mock("../components/RentalLookups", () => ({
     ),
 }));
 
+afterEach(() => configureBusinessTimeZone(null));
+
 describe("RentalAgreement list route changes", () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        apiMocks.getRentalMetadata.mockResolvedValue(rentalMetadata());
+        apiMocks.customerDefaultCurrency.current = null;
+        apiMocks.supplierDefaultCurrency.current = null;
         apiMocks.listRentalUsageLogs.mockResolvedValue(collection([]));
         apiMocks.listRentalAgreements.mockImplementation(
             ({
@@ -173,6 +193,9 @@ describe("RentalAgreement list route changes", () => {
 describe("RentalAgreement lessor flow", () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        apiMocks.getRentalMetadata.mockResolvedValue(rentalMetadata());
+        apiMocks.customerDefaultCurrency.current = null;
+        apiMocks.supplierDefaultCurrency.current = null;
         apiMocks.listRentalAgreements.mockResolvedValue(collection([]));
         apiMocks.listRentalUsageLogs.mockResolvedValue(collection([]));
         apiMocks.createRentalAgreement.mockResolvedValue({ id: 44 });
@@ -211,10 +234,11 @@ describe("RentalAgreement lessor flow", () => {
             screen.getByRole("button", { name: "Choose lessor supplier" }),
         );
         await user.click(screen.getByRole("button", { name: "Choose currency" }));
+        await user.clear(screen.getByLabelText("Agreement date"));
         await user.type(screen.getByLabelText("Agreement date"), "2026-07-06");
         await user.type(
-            screen.getByLabelText(/Executed at/),
-            "2026-07-06T09:00",
+            screen.getByLabelText(/Executed date/),
+            "2026-07-06",
         );
         await user.type(screen.getByLabelText("Start"), "2026-07-06T08:00");
         await user.type(screen.getByLabelText("End"), "2026-08-06T08:00");
@@ -255,6 +279,9 @@ describe("RentalAgreement lessor flow", () => {
 describe("RentalAgreement lessee flow", () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        apiMocks.getRentalMetadata.mockResolvedValue(rentalMetadata());
+        apiMocks.customerDefaultCurrency.current = null;
+        apiMocks.supplierDefaultCurrency.current = null;
         apiMocks.listRentalAgreements.mockResolvedValue(collection([]));
         apiMocks.listRentalUsageLogs.mockResolvedValue(collection([]));
         apiMocks.createRentalAgreement.mockResolvedValue({ id: 55 });
@@ -293,10 +320,11 @@ describe("RentalAgreement lessee flow", () => {
             screen.getByRole("button", { name: "Choose lessee customer" }),
         );
         await user.click(screen.getByRole("button", { name: "Choose currency" }));
+        await user.clear(screen.getByLabelText("Agreement date"));
         await user.type(screen.getByLabelText("Agreement date"), "2026-07-06");
         await user.type(
-            screen.getByLabelText(/Executed at/),
-            "2026-07-06T09:00",
+            screen.getByLabelText(/Executed date/),
+            "2026-07-06",
         );
         await user.type(screen.getByLabelText("Start"), "2026-07-06T08:00");
         await user.type(screen.getByLabelText("End"), "2026-08-06T08:00");
@@ -338,11 +366,198 @@ describe("RentalAgreement lessee flow", () => {
             }),
         ).toBeInTheDocument();
     });
+
+    it("uses party currency defaults and saves optional draft execution terms", async () => {
+        const user = userEvent.setup();
+        apiMocks.getRentalMetadata.mockResolvedValue(
+            rentalMetadata({ id: 1, code: "LKR", name: "Tenant Currency" }),
+        );
+        apiMocks.customerDefaultCurrency.current = {
+            id: 2,
+            code: "USD",
+            name: "Customer Currency",
+        };
+        renderPage(
+            <RentalAgreementCreatePage mode="lessee" />,
+            "/vehicle-rental/lessee-agreements/create",
+        );
+
+        await user.click(
+            screen.getByRole("button", { name: "Choose lessee customer" }),
+        );
+        await user.clear(screen.getByLabelText("Agreement date"));
+        await user.type(screen.getByLabelText("Agreement date"), "2026-07-06");
+        await user.type(screen.getByLabelText("Start"), "2026-07-06T08:00");
+        await user.type(screen.getByLabelText("End"), "2026-08-06T08:00");
+        await user.click(
+            screen.getByRole("button", { name: "Create lessee agreement" }),
+        );
+
+        await waitFor(() =>
+            expect(apiMocks.createRentalAgreement).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    currency_id: 2,
+                    executed_at: null,
+                    terms: [],
+                }),
+            ),
+        );
+    });
+
+    it("uses the tenant currency default without manual currency selection", async () => {
+        const user = userEvent.setup();
+        apiMocks.getRentalMetadata.mockResolvedValue(
+            rentalMetadata({ id: 1, code: "LKR", name: "Tenant Currency" }),
+        );
+        renderPage(
+            <RentalAgreementCreatePage mode="lessee" />,
+            "/vehicle-rental/lessee-agreements/create",
+        );
+
+        await user.click(
+            screen.getByRole("button", { name: "Choose lessee customer" }),
+        );
+        await screen.findByRole("button", { name: "Tenant Currency" });
+        await user.clear(screen.getByLabelText("Agreement date"));
+        await user.type(screen.getByLabelText("Agreement date"), "2026-07-06");
+        await user.type(screen.getByLabelText("Start"), "2026-07-06T08:00");
+        await user.type(screen.getByLabelText("End"), "2026-08-06T08:00");
+        await user.click(
+            screen.getByRole("button", { name: "Create lessee agreement" }),
+        );
+
+        await waitFor(() =>
+            expect(apiMocks.createRentalAgreement).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    currency_id: 1,
+                }),
+            ),
+        );
+    });
+
+    it("loads editable agreement defaults from rental metadata", async () => {
+        const user = userEvent.setup();
+        apiMocks.getRentalMetadata.mockResolvedValue(
+            rentalMetadata({ id: 1, code: "LKR", name: "Tenant Currency" }),
+        );
+        renderPage(
+            <RentalAgreementCreatePage mode="lessee" />,
+            "/vehicle-rental/lessee-agreements/create",
+        );
+
+        await user.click(
+            screen.getByRole("button", { name: "Choose lessee customer" }),
+        );
+        await screen.findByRole("button", { name: "Tenant Currency" });
+        expect(screen.getByLabelText("Agreement date")).toHaveValue(
+            businessDateInputValue(),
+        );
+        await user.type(screen.getByLabelText("Start"), "2026-07-06T08:00");
+        await user.type(screen.getByLabelText("End"), "2026-08-06T08:00");
+        await user.click(
+            screen.getByRole("button", { name: "Create lessee agreement" }),
+        );
+
+        await waitFor(() =>
+            expect(apiMocks.createRentalAgreement).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    agreement_date: businessDateInputValue(),
+                    legal_context: "company",
+                    rental_mode: "with_driver",
+                    billing_cycle: "monthly",
+                    billing_basis: "calendar_month",
+                    proration_rule: "exact_day_count",
+                    payment_term_days: 30,
+                }),
+            ),
+        );
+    });
+
+    it("preserves a manual currency selection after party defaults are applied", async () => {
+        const user = userEvent.setup();
+        apiMocks.getRentalMetadata.mockResolvedValue(
+            rentalMetadata({ id: 1, code: "LKR", name: "Tenant Currency" }),
+        );
+        apiMocks.customerDefaultCurrency.current = {
+            id: 2,
+            code: "USD",
+            name: "Customer Currency",
+        };
+        renderPage(
+            <RentalAgreementCreatePage mode="lessee" />,
+            "/vehicle-rental/lessee-agreements/create",
+        );
+
+        await user.click(
+            screen.getByRole("button", { name: "Choose lessee customer" }),
+        );
+        await user.click(await screen.findByRole("button", { name: "Customer Currency" }));
+        await user.clear(screen.getByLabelText("Agreement date"));
+        await user.type(screen.getByLabelText("Agreement date"), "2026-07-06");
+        await user.type(screen.getByLabelText("Start"), "2026-07-06T08:00");
+        await user.type(screen.getByLabelText("End"), "2026-08-06T08:00");
+        await user.click(
+            screen.getByRole("button", { name: "Create lessee agreement" }),
+        );
+
+        await waitFor(() =>
+            expect(apiMocks.createRentalAgreement).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    currency_id: 1,
+                }),
+            ),
+        );
+    });
+
+    it("preserves reservation currency during reservation conversion", async () => {
+        const user = userEvent.setup();
+        apiMocks.getRentalMetadata.mockResolvedValue(
+            rentalMetadata({ id: 1, code: "LKR", name: "Tenant Currency" }),
+        );
+        apiMocks.getRentalReservation.mockResolvedValue({
+            id: 91,
+            row_version: 6,
+            reservation_number: "RR-91",
+            customer: { id: 22, name: "Lessee Customer" },
+            requested_vehicle: null,
+            requested_vehicle_category: null,
+            rental_mode: "with_driver",
+            billing_cycle: "monthly",
+            requested_start_at: "2026-07-06T08:00:00.000Z",
+            requested_end_at: "2026-08-06T08:00:00.000Z",
+            currency: { id: 4, code: "EUR", name: "Reservation Currency" },
+            estimated_amount: "0.000000",
+            estimated_deposit_amount: "0.000000",
+            status: "confirmed",
+        });
+        renderPage(
+            <RentalAgreementCreatePage mode="lessee" />,
+            "/vehicle-rental/lessee-agreements/create?reservation_id=91",
+        );
+
+        await screen.findByRole("button", { name: "Reservation Currency" });
+        await user.click(
+            screen.getByRole("button", { name: "Create lessee agreement" }),
+        );
+
+        await waitFor(() =>
+            expect(apiMocks.createRentalAgreement).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    reservation_id: 91,
+                    expected_reservation_version: 6,
+                    currency_id: 4,
+                }),
+            ),
+        );
+    });
 });
 
 describe("RentalAgreement running chart data", () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        apiMocks.getRentalMetadata.mockResolvedValue(rentalMetadata());
+        apiMocks.customerDefaultCurrency.current = null;
+        apiMocks.supplierDefaultCurrency.current = null;
         apiMocks.listRentalUsageLogs.mockResolvedValue(collection([
             usageLog("revenue"),
         ]));
@@ -448,6 +663,145 @@ describe("RentalAgreement running chart data", () => {
     });
 });
 
+describe("RentalAgreement draft CRUD actions", () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        apiMocks.getRentalMetadata.mockResolvedValue(rentalMetadata());
+        apiMocks.customerDefaultCurrency.current = null;
+        apiMocks.supplierDefaultCurrency.current = null;
+        apiMocks.listRentalUsageLogs.mockResolvedValue(collection([]));
+        apiMocks.updateRentalAgreement.mockResolvedValue({ id: 55 });
+        apiMocks.deleteRentalAgreement.mockResolvedValue({});
+    });
+
+    it("updates a loaded draft agreement without rate or deposit payloads", async () => {
+        const user = userEvent.setup();
+        apiMocks.getRentalAgreement.mockResolvedValue({
+            ...agreement("customer_rental"),
+            status: "draft",
+            executed_at: null,
+            terms: [],
+        });
+
+        renderRoute(
+            "/vehicle-rental/lessee-agreements/:id/edit",
+            <RentalAgreementCreatePage mode="lessee" />,
+            "/vehicle-rental/lessee-agreements/55/edit",
+        );
+
+        expect(
+            await screen.findByRole("heading", {
+                name: "Edit lessee agreement",
+            }),
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByRole("heading", {
+                name: "Lessee billable core rates",
+            }),
+        ).not.toBeInTheDocument();
+
+        await user.click(
+            screen.getByRole("button", { name: "Update lessee agreement" }),
+        );
+
+        await waitFor(() =>
+            expect(apiMocks.updateRentalAgreement).toHaveBeenCalledWith(
+                55,
+                1,
+                expect.not.objectContaining({
+                    rate_version: expect.anything(),
+                    deposit: expect.anything(),
+                }),
+            ),
+        );
+        expect(apiMocks.updateRentalAgreement).toHaveBeenCalledWith(
+            55,
+            1,
+            expect.objectContaining({
+                currency_id: 1,
+                executed_at: null,
+                terms: [],
+            }),
+        );
+    });
+
+    it("does not resubmit locked structural fields when a draft has dependent records", async () => {
+        const user = userEvent.setup();
+        configureBusinessTimeZone("Asia/Colombo");
+        apiMocks.getRentalAgreement.mockResolvedValue({
+            ...agreement("customer_rental"),
+            status: "draft",
+            executed_at: null,
+            starts_at: "2026-07-06T02:30:00.000Z",
+            ends_at: "2026-08-06T02:30:00.000Z",
+            terms: [],
+            active_rate_version: rateVersion(),
+            rate_versions: [rateVersion()],
+        });
+
+        renderRoute(
+            "/vehicle-rental/lessee-agreements/:id/edit",
+            <RentalAgreementCreatePage mode="lessee" />,
+            "/vehicle-rental/lessee-agreements/55/edit",
+        );
+
+        const startInput = await screen.findByLabelText("Start");
+        expect(startInput).toHaveValue("2026-07-06T08:00");
+        expect(startInput).toBeDisabled();
+        expect(screen.getByLabelText("End")).toBeDisabled();
+
+        await user.click(
+            screen.getByRole("button", { name: "Update lessee agreement" }),
+        );
+
+        await waitFor(() =>
+            expect(apiMocks.updateRentalAgreement).toHaveBeenCalled(),
+        );
+        const payload = apiMocks.updateRentalAgreement.mock.calls[0][2];
+        expect(payload).toEqual(
+            expect.objectContaining({
+                agreement_date: "2026-07-06",
+                executed_at: null,
+                terms: [],
+            }),
+        );
+        for (const field of [
+            "starts_at",
+            "ends_at",
+            "customer_id",
+            "supplier_id",
+            "rental_mode",
+            "billing_cycle",
+            "billing_basis",
+            "currency_id",
+            "payment_term_days",
+        ]) {
+            expect(payload).not.toHaveProperty(field);
+        }
+    });
+
+    it("deletes a draft agreement with the loaded row version", async () => {
+        const user = userEvent.setup();
+        apiMocks.getRentalAgreement.mockResolvedValue({
+            ...agreement("owner_supply"),
+            status: "draft",
+        });
+
+        renderRoute(
+            "/vehicle-rental/lessor-agreements/:id",
+            <RentalAgreementDetailPage mode="lessor" />,
+            "/vehicle-rental/lessor-agreements/55",
+        );
+
+        await user.click(await screen.findByRole("button", { name: "Delete" }));
+        await user.click(screen.getByRole("button", { name: "Delete draft" }));
+
+        await waitFor(() =>
+            expect(apiMocks.deleteRentalAgreement).toHaveBeenCalledWith(55, 1),
+        );
+    });
+});
+
 function renderPage(page: ReactNode, path: string) {
     return render(
         <TestRouter initialEntries={[path]}>
@@ -457,9 +811,30 @@ function renderPage(page: ReactNode, path: string) {
 }
 
 function renderRoute(path: string, element: ReactNode, initialEntry: string) {
-    const router = createMemoryRouter([{ path, element }], {
-        initialEntries: [initialEntry],
-    });
+    const router = createMemoryRouter(
+        [
+            { path, element },
+            {
+                path: "/vehicle-rental/lessee-agreements/:id",
+                element: <div>Lessee detail</div>,
+            },
+            {
+                path: "/vehicle-rental/lessor-agreements/:id",
+                element: <div>Lessor detail</div>,
+            },
+            {
+                path: "/vehicle-rental/lessee-agreements",
+                element: <div>Lessee list</div>,
+            },
+            {
+                path: "/vehicle-rental/lessor-agreements",
+                element: <div>Lessor list</div>,
+            },
+        ],
+        {
+            initialEntries: [initialEntry],
+        },
+    );
 
     return render(<RouterProvider router={router} />);
 }
@@ -509,6 +884,28 @@ function agreement(kind: "customer_rental" | "owner_supply") {
         rate_versions: [],
         allocations: [],
         deposit_requirement: null,
+    };
+}
+
+function rateVersion() {
+    return {
+        id: 201,
+        row_version: 2,
+        version_number: 1,
+        effective_from: "2026-07-06T02:30:00.000Z",
+        effective_to: null,
+        driver_mode: "with_driver",
+        billing_cycle: "monthly",
+        billing_basis: "calendar_month",
+        proration_rule: "exact_day_count",
+        excess_km_method: "period",
+        included_km: "0.000000",
+        included_hours: "0.000000",
+        weekday_included_minutes: 0,
+        saturday_included_minutes: 0,
+        holiday_included_minutes: 0,
+        status: "active",
+        components: [],
     };
 }
 
@@ -636,5 +1033,67 @@ function collection<T>(data: T[]) {
             to: data.length,
             total: data.length,
         },
+    };
+}
+
+function rentalMetadata(defaultCurrency: NamedResource | null = null) {
+    return {
+        default_currency: defaultCurrency,
+        defaults: rentalDefaults(),
+        legal_contexts: ["company", "personal"],
+        finance_interest_methods: ["flat", "reducing_balance"],
+        finance_installment_frequencies: ["weekly", "monthly", "quarterly", "yearly"],
+        public_custody_event_types: [
+            "owner_to_company",
+            "company_to_customer",
+            "customer_to_company",
+            "company_to_owner",
+            "internal_transfer",
+        ],
+        agreement_kinds: ["customer_rental", "owner_supply"],
+        agreement_statuses: [
+            "draft",
+            "active",
+            "suspended",
+            "completed",
+            "terminated",
+            "cancelled",
+        ],
+        allocation_statuses: [],
+        rental_modes: ["with_driver", "self_drive", "vehicle_only"],
+        billing_cycles: ["monthly"],
+        billing_bases: ["calendar_month"],
+        proration_rules: ["exact_day_count"],
+        excess_km_methods: ["period"],
+        vehicle_source_types: [],
+        custody_event_types: [],
+        usage_event_types: [],
+        usage_event_rate_components: {},
+        usage_event_applicabilities: [],
+        expense_types: [],
+        expense_allocation_types: [],
+        financial_sides: ["revenue", "cost"],
+        rate_component_codes: ["base_rental"],
+        rate_units: ["month"],
+    };
+}
+
+function rentalDefaults() {
+    return {
+        legal_context: "company",
+        rental_mode: "with_driver",
+        billing_cycle: "monthly",
+        billing_basis: "calendar_month",
+        proration_rule: "exact_day_count",
+        excess_km_method: "period",
+        payment_term_days: 30,
+        reservation_source: "walk_in",
+        expense_type: "fuel",
+        expense_allocation_type: "company_cost",
+        vehicle_source_type: "company_owned",
+        finance_interest_method: "flat",
+        finance_installment_frequency: "monthly",
+        finance_installment_count: 12,
+        finance_payment_term_days: 0,
     };
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Services\Plans;
 
+use Modules\Core\Tenancy\TenantFeature;
 use Modules\Core\Tenancy\TenantPlanLimit;
 
 use Illuminate\Validation\ValidationException;
@@ -11,6 +12,7 @@ use Illuminate\Validation\ValidationException;
 final class TenantPlanSchema
 {
     public const SCHEMA_VERSION = 1;
+
     /**
      * Foundation capabilities are required for every tenant workspace and are
      * never toggled by commercial subscriptions.
@@ -29,19 +31,20 @@ final class TenantPlanSchema
 
     /** Plan-controlled commercial feature modules. @var array<string, string> */
     public const SUPPORTED_MODULES = [
-        'customer' => 'Customers',
-        'supplier' => 'Suppliers',
-        'item' => 'Items',
-        'warehouse' => 'Warehouses',
-        'inventory' => 'Inventory',
-        'purchase' => 'Purchasing',
-        'vehicle' => 'Vehicles',
-        'vehicle-service' => 'Vehicle service',
-        'vehicle-rental' => 'Vehicle rental',
-        'invoice' => 'Invoicing',
-        'payment' => 'Payments',
-        'finance' => 'Finance',
-        'reporting' => 'Reporting',
+        TenantFeature::CUSTOMER => 'Customers',
+        TenantFeature::SUPPLIER => 'Suppliers',
+        TenantFeature::HR => 'Human resources',
+        TenantFeature::ITEM => 'Items',
+        TenantFeature::WAREHOUSE => 'Warehouses',
+        TenantFeature::INVENTORY => 'Inventory',
+        TenantFeature::PURCHASE => 'Purchasing',
+        TenantFeature::VEHICLE => 'Vehicles',
+        TenantFeature::VEHICLE_SERVICE => 'Vehicle service',
+        TenantFeature::VEHICLE_RENTAL => 'Vehicle rental',
+        TenantFeature::INVOICE => 'Invoicing',
+        TenantFeature::PAYMENT => 'Payments',
+        TenantFeature::FINANCE => 'Finance',
+        TenantFeature::REPORTING => 'Reporting',
     ];
 
     /** @var list<string> */

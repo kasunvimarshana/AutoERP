@@ -993,6 +993,10 @@ const appRouter = createBrowserRouter(
                             element={<RentalAgreementCreatePage />}
                         />
                         <Route
+                            path="/vehicle-rental/agreements/:id/edit"
+                            element={<RentalAgreementCreatePage />}
+                        />
+                        <Route
                             path="/vehicle-rental/agreements/:id"
                             element={<RentalAgreementDetailPage />}
                         />
@@ -1005,6 +1009,10 @@ const appRouter = createBrowserRouter(
                             element={<RentalAgreementCreatePage mode="lessee" />}
                         />
                         <Route
+                            path="/vehicle-rental/lessee-agreements/:id/edit"
+                            element={<RentalAgreementCreatePage mode="lessee" />}
+                        />
+                        <Route
                             path="/vehicle-rental/lessee-agreements/:id"
                             element={<RentalAgreementDetailPage mode="lessee" />}
                         />
@@ -1014,6 +1022,10 @@ const appRouter = createBrowserRouter(
                         />
                         <Route
                             path="/vehicle-rental/lessor-agreements/create"
+                            element={<RentalAgreementCreatePage mode="lessor" />}
+                        />
+                        <Route
+                            path="/vehicle-rental/lessor-agreements/:id/edit"
                             element={<RentalAgreementCreatePage mode="lessor" />}
                         />
                         <Route

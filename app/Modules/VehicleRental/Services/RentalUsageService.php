@@ -788,11 +788,11 @@ final class RentalUsageService
             && $this->math->compare(
                 $startOdometer,
                 (string) $previous->end_odometer,
-            ) < 0
+            ) !== 0
             && ! $hasReason
         ) {
             throw new InvalidArgumentException(
-                'Start odometer is below the previous recorded finish. Provide a variance reason.',
+                'Start odometer does not match the previous recorded finish. Provide a variance reason.',
             );
         }
 
@@ -809,11 +809,11 @@ final class RentalUsageService
             && $this->math->compare(
                 $endOdometer,
                 (string) $next->start_odometer,
-            ) > 0
+            ) !== 0
             && ! $hasReason
         ) {
             throw new InvalidArgumentException(
-                'Finish odometer exceeds the next recorded start. Provide a variance reason.',
+                'Finish odometer does not match the next recorded start. Provide a variance reason.',
             );
         }
     }

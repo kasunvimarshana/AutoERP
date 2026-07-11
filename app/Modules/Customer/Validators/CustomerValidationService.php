@@ -8,7 +8,6 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\ReferenceData\Models\CurrencyModel;
-use Modules\Core\Services\DecimalMath;
 use Modules\Customer\DTOs\CreateCustomerData;
 use Modules\Customer\DTOs\UpdateCustomerData;
 use Modules\Customer\Models\Customer;
@@ -18,8 +17,6 @@ use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 final class CustomerValidationService
 {
-    public function __construct(private readonly DecimalMath $math) {}
-
     public function validateCreate(CreateCustomerData $data): void
     {
         $this->assertText($data->code, 'Customer code is required.');
@@ -28,13 +25,9 @@ final class CustomerValidationService
         if ($data->customerNumber !== null) {
             $this->assertNumberUnique($data->tenantId, $data->customerNumber);
         }
-        $this->assertNonNegative($data->creditLimit, 'Customer credit limit cannot be negative.');
         $this->assertOrganizationScope($data->tenantId, $data->organizationUnitId);
         $this->assertCurrencyActive($data->defaultCurrencyId);
         $this->assertTaxNumbers($data->taxRegistrationNumber, $data->vatNumber, $data->svatNumber, $data->businessRegistrationNumber);
-        if ($data->creditProfile !== null) {
-            $this->assertNonNegative($data->creditProfile->creditLimit, 'Customer credit profile limit cannot be negative.');
-        }
     }
 
     public function validateUpdate(Customer $customer, UpdateCustomerData $data): void
@@ -46,15 +39,9 @@ final class CustomerValidationService
         if ($data->name !== null) {
             $this->assertText($data->name, 'Customer name is required.');
         }
-        if ($data->creditLimit !== null) {
-            $this->assertNonNegative($data->creditLimit, 'Customer credit limit cannot be negative.');
-        }
         $this->assertOrganizationScope((int) $customer->tenant_id, $data->organizationUnitId);
         $this->assertCurrencyActive($data->defaultCurrencyId);
         $this->assertTaxNumbers($data->taxRegistrationNumber, $data->vatNumber, $data->svatNumber, $data->businessRegistrationNumber);
-        if ($data->creditProfile !== null) {
-            $this->assertNonNegative($data->creditProfile->creditLimit, 'Customer credit profile limit cannot be negative.');
-        }
     }
 
     public function assertCustomerScope(Customer $customer, int $tenantId, ?int $organizationUnitId): void
@@ -171,13 +158,6 @@ final class CustomerValidationService
         if (($organizationUnitId === null && $recordOrganizationUnitId !== null)
             || ($organizationUnitId !== null && $recordOrganizationUnitId !== null && (int) $recordOrganizationUnitId !== $organizationUnitId)) {
             throw new InvalidArgumentException('Customer reference belongs to a different organization unit.');
-        }
-    }
-
-    private function assertNonNegative(string $value, string $message): void
-    {
-        if ($this->math->isNegative($value)) {
-            throw new InvalidArgumentException($message);
         }
     }
 

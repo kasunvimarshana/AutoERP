@@ -239,13 +239,11 @@ export default function RentalRunningChartPage() {
         [selectedAllocation],
     );
     const eventTypeOptions = useMemo(
-        () => [
-            { value: "", label: "Select event type" },
-            ...(metadata.data?.usage_event_types ?? []).map((value) => ({
+        () =>
+            (metadata.data?.usage_event_types ?? []).map((value) => ({
                 value,
                 label: optionLabel(value),
             })),
-        ],
         [metadata.data],
     );
     const eventApplicabilityOptions = useMemo(
@@ -717,6 +715,7 @@ export default function RentalRunningChartPage() {
                                             <Select
                                                 label={`Event ${index + 1}`}
                                                 required
+                                                placeholder="Select event type"
                                                 value={row.event_type}
                                                 onChange={(event) =>
                                                     updateEvent(row.key, {

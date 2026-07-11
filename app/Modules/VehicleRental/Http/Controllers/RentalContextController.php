@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Modules\VehicleRental\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
+use Modules\ReferenceData\Models\CurrencyModel;
+use Modules\Tenant\Models\TenantModel;
 use Modules\VehicleRental\Enums\RentalAgreementKind;
 use Modules\VehicleRental\Enums\RentalAgreementStatus;
 use Modules\VehicleRental\Enums\RentalAllocationStatus;
@@ -49,7 +51,18 @@ final class RentalContextController
             $cases,
         );
 
+        $tenant = TenantModel::query()
+            ->with('baseCurrency')
+            ->findOrFail($request->tenantId());
+
         return response()->json(['data' => [
+            'default_currency' => $this->currencySummary($tenant->baseCurrency),
+            'defaults' => config('vehicle_rental.defaults', []),
+            'legal_contexts' => array_values(config('vehicle_rental.legal_contexts', [])),
+            'reservation_sources' => array_values(config('vehicle_rental.reservation_sources', [])),
+            'finance_interest_methods' => array_values(config('vehicle_rental.finance_interest_methods', [])),
+            'finance_installment_frequencies' => array_values(config('vehicle_rental.finance_installment_frequencies', [])),
+            'public_custody_event_types' => array_values(config('vehicle_rental.public_custody_event_types', [])),
             'agreement_kinds' => $values(RentalAgreementKind::cases()),
             'agreement_statuses' => $values(RentalAgreementStatus::cases()),
             'allocation_statuses' => $values(RentalAllocationStatus::cases()),
@@ -97,5 +110,15 @@ final class RentalContextController
                 ->where('calculation_status', RentalCalculationStatus::Submitted->value)
                 ->count(),
         ]]);
+    }
+
+    private function currencySummary(?CurrencyModel $currency): ?array
+    {
+        return $currency === null ? null : [
+            'id' => (int) $currency->getKey(),
+            'code' => $currency->code,
+            'name' => $currency->name,
+            'symbol' => $currency->symbol,
+        ];
     }
 }

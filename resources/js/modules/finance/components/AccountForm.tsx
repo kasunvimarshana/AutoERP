@@ -1,5 +1,4 @@
 import { fieldError, type ApiError } from '@/shared/api/apiError';
-import { DecimalInput } from '@/shared/components/DecimalInput';
 import { Input } from '@/shared/components/Input';
 import { Panel } from '@/shared/components/Panel';
 import { Select } from '@/shared/components/Select';
@@ -60,9 +59,9 @@ export function AccountForm({ value, onChange, lookups, error, accountId }: {
                     error={fieldError(error, 'normal_balance')}
                     required
                 />
-                <DecimalInput label="Opening balance" value={value.opening_balance} onChange={(event) => set('opening_balance', event.target.value)} error={fieldError(error, 'opening_balance')} />
             </div>
             <div className="mt-4"><Textarea label="Description" value={value.description ?? ''} onChange={(event) => set('description', event.target.value || null)} /></div>
+            <p className="mt-3 text-sm text-slate-500">Opening balances are posted through an opening journal so the ledger remains the financial source of truth.</p>
         </Panel>
         <Panel title="Posting behavior">
             <div className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-3">

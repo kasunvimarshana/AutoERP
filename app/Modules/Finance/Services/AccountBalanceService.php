@@ -7,6 +7,7 @@ namespace Modules\Finance\Services;
 use Illuminate\Support\Collection;
 use Modules\Core\Services\DecimalMath;
 use Modules\Finance\DTOs\AccountBalanceResult;
+use Modules\Finance\Enums\JournalType;
 use Modules\Finance\Enums\NormalBalance;
 use Modules\Finance\Models\FinanceAccount;
 use Modules\Finance\Models\FinanceAccountBalance;
@@ -16,6 +17,8 @@ use Modules\Finance\Models\FinanceLedgerEntry;
 
 final class AccountBalanceService
 {
+    private const ZERO_AMOUNT = '0.000000';
+
     public function __construct(private readonly DecimalMath $math) {}
 
     public function applyJournalLine(FinanceJournalEntry $journal, FinanceJournalLine $line): FinanceAccountBalance
@@ -29,17 +32,23 @@ final class AccountBalanceService
 
         if (! $balance->exists) {
             $balance->forceFill([
-                'opening_debit' => '0.000000',
-                'opening_credit' => '0.000000',
-                'period_debit' => '0.000000',
-                'period_credit' => '0.000000',
-                'closing_debit' => '0.000000',
-                'closing_credit' => '0.000000',
+                'opening_debit' => self::ZERO_AMOUNT,
+                'opening_credit' => self::ZERO_AMOUNT,
+                'period_debit' => self::ZERO_AMOUNT,
+                'period_credit' => self::ZERO_AMOUNT,
+                'closing_debit' => self::ZERO_AMOUNT,
+                'closing_credit' => self::ZERO_AMOUNT,
             ]);
         }
 
-        $balance->period_debit = $this->math->add((string) $balance->period_debit, (string) $line->debit);
-        $balance->period_credit = $this->math->add((string) $balance->period_credit, (string) $line->credit);
+        if ($this->isOpeningJournal($journal)) {
+            $balance->opening_debit = $this->math->add((string) $balance->opening_debit, (string) $line->debit);
+            $balance->opening_credit = $this->math->add((string) $balance->opening_credit, (string) $line->credit);
+        } else {
+            $balance->period_debit = $this->math->add((string) $balance->period_debit, (string) $line->debit);
+            $balance->period_credit = $this->math->add((string) $balance->period_credit, (string) $line->credit);
+        }
+
         $this->syncClosing($balance, $account);
         $balance->save();
 
@@ -109,14 +118,10 @@ final class AccountBalanceService
             $normalBalance = $account->normal_balance instanceof NormalBalance
                 ? $account->normal_balance
                 : NormalBalance::from((string) $account->normal_balance);
-            $openingDebit = $normalBalance === NormalBalance::Debit
-                ? $this->math->normalize((string) $account->opening_balance)
-                : '0.000000';
-            $openingCredit = $normalBalance === NormalBalance::Credit
-                ? $this->math->normalize((string) $account->opening_balance)
-                : '0.000000';
-            $periodDebit = '0.000000';
-            $periodCredit = '0.000000';
+            $openingDebit = self::ZERO_AMOUNT;
+            $openingCredit = self::ZERO_AMOUNT;
+            $periodDebit = self::ZERO_AMOUNT;
+            $periodCredit = self::ZERO_AMOUNT;
 
             foreach ($entries->get($account->getKey(), collect()) as $entry) {
                 $entryDate = $entry->entry_date->toDateString();
@@ -155,17 +160,13 @@ final class AccountBalanceService
         return $results;
     }
 
-    public function accountBalanceAfter(FinanceAccount $account, string $debit, string $credit): string
+    private function isOpeningJournal(FinanceJournalEntry $journal): bool
     {
-        $normalBalance = $account->normal_balance instanceof NormalBalance
-            ? $account->normal_balance
-            : NormalBalance::from((string) $account->normal_balance);
+        $journalType = $journal->journal_type instanceof JournalType
+            ? $journal->journal_type
+            : JournalType::from((string) $journal->journal_type);
 
-        $current = $this->math->normalize((string) $account->current_balance);
-
-        return $normalBalance === NormalBalance::Debit
-            ? $this->math->sub($this->math->add($current, $debit), $credit)
-            : $this->math->sub($this->math->add($current, $credit), $debit);
+        return $journalType === JournalType::Opening;
     }
 
     private function syncClosing(FinanceAccountBalance $balance, FinanceAccount $account): void
@@ -179,15 +180,15 @@ final class AccountBalanceService
 
         if ($normalBalance === NormalBalance::Debit) {
             $net = $this->math->sub($debit, $credit);
-            $balance->closing_debit = $this->math->compare($net, '0') >= 0 ? $net : '0.000000';
-            $balance->closing_credit = $this->math->compare($net, '0') < 0 ? ltrim($net, '-') : '0.000000';
+            $balance->closing_debit = $this->math->compare($net, '0') >= 0 ? $net : self::ZERO_AMOUNT;
+            $balance->closing_credit = $this->math->compare($net, '0') < 0 ? ltrim($net, '-') : self::ZERO_AMOUNT;
 
             return;
         }
 
         $net = $this->math->sub($credit, $debit);
-        $balance->closing_credit = $this->math->compare($net, '0') >= 0 ? $net : '0.000000';
-        $balance->closing_debit = $this->math->compare($net, '0') < 0 ? ltrim($net, '-') : '0.000000';
+        $balance->closing_credit = $this->math->compare($net, '0') >= 0 ? $net : self::ZERO_AMOUNT;
+        $balance->closing_debit = $this->math->compare($net, '0') < 0 ? ltrim($net, '-') : self::ZERO_AMOUNT;
     }
 
     private function accountBalanceAmount(NormalBalance $normalBalance, string $closingDebit, string $closingCredit): string
@@ -205,7 +206,7 @@ final class AccountBalanceService
         $net = $this->math->sub($debit, $credit);
 
         return $this->math->compare($net, '0') >= 0
-            ? [$net, '0.000000']
-            : ['0.000000', ltrim($net, '-')];
+            ? [$net, self::ZERO_AMOUNT]
+            : [self::ZERO_AMOUNT, ltrim($net, '-')];
     }
 }

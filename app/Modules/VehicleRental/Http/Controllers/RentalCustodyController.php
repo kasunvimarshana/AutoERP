@@ -48,6 +48,7 @@ final class RentalCustodyController
         return new RentalCustodyEventResource($service->confirm(
             $this->scope(RentalCustodyEvent::query(), $request)->findOrFail($event),
             (int) $request->input('expected_version'),
+            (int) $request->input('expected_allocation_version'),
             $request->currentUserId(),
         ));
     }

@@ -24,7 +24,7 @@ export const administrationRouteEntitlements: readonly EntitlementRule[] = [
     operational('/uoms/*'),
     operational('/uom-conversions/*'),
     operational('/uom-convert'),
-    operational('/hr/*'),
+    operational('/hr/*', ['hr']),
     operational('/vouchers/*'),
 
     operational('/access/users/create', undefined, [accessPermissions.usersCreate]),

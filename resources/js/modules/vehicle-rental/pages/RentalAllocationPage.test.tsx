@@ -9,6 +9,7 @@ import type { NamedResource } from '@/shared/types/common';
 const apiMocks = vi.hoisted(() => ({
     createRentalAllocation: vi.fn(),
     getRentalAgreement: vi.fn(),
+    getRentalMetadata: vi.fn(),
     listRentalAllocations: vi.fn(),
 }));
 
@@ -65,6 +66,7 @@ describe('RentalAllocationPage', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         apiMocks.getRentalAgreement.mockResolvedValue(rentalAgreement());
+        apiMocks.getRentalMetadata.mockResolvedValue(rentalMetadata());
         apiMocks.listRentalAllocations.mockResolvedValue(collection([]));
         apiMocks.createRentalAllocation.mockResolvedValue({ id: 99 });
         vehicleApiMocks.getVehicle.mockResolvedValue({
@@ -264,5 +266,14 @@ function collection<T>(data: T[]) {
             to: data.length,
             total: data.length,
         },
+    };
+}
+
+function rentalMetadata() {
+    return {
+        defaults: {
+            vehicle_source_type: 'company_owned',
+        },
+        vehicle_source_types: ['company_owned', 'owner_supplied', 'financed'],
     };
 }

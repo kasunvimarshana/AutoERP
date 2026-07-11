@@ -77,6 +77,7 @@ final class PaymentReversalService
                 );
                 $allocation->forceFill([
                     'status' => AllocationStatus::Reversed->value,
+                    'active_identity_slot' => null,
                     'row_version' => (int) $allocation->row_version + 1,
                 ])->save();
             }
@@ -85,6 +86,7 @@ final class PaymentReversalService
                 ->get() as $allocation) {
                 $allocation->forceFill([
                     'status' => AllocationStatus::Void->value,
+                    'active_identity_slot' => null,
                     'row_version' => (int) $allocation->row_version + 1,
                 ])->save();
             }
