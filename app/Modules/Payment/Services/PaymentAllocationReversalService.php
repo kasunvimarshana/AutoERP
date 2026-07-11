@@ -62,6 +62,7 @@ final class PaymentAllocationReversalService
             );
             $allocation->forceFill([
                 'status' => AllocationStatus::Reversed->value,
+                'active_identity_slot' => null,
                 'row_version' => (int) $allocation->row_version + 1,
                 'metadata' => array_merge($allocation->metadata ?? [], [
                     'reversal' => [
