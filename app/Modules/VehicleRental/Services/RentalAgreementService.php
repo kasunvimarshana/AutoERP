@@ -418,17 +418,6 @@ final class RentalAgreementService
                 'executed_at' => ['Execution date must be on or after the agreement date and cannot be in the future.'],
             ]);
         }
-
-        if (! $agreement->terms()
-            ->where('is_active', true)
-            ->where('is_printable', true)
-            ->whereNotNull('content')
-            ->where('content', '!=', '')
-            ->exists()) {
-            throw ValidationException::withMessages([
-                'terms' => ['At least one active printable agreement term is required before activation.'],
-            ]);
-        }
     }
 
     /** @return array<string, mixed> */
