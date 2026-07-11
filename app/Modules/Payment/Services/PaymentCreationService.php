@@ -38,7 +38,8 @@ final class PaymentCreationService
         return DB::transaction(function () use ($data): Payment {
             $calculation = $this->calculations->calculateForCreation($data);
             $instrumentStatus = $this->initialInstrumentStatus($data);
-            $payment = Payment::query()->create([
+            $payment = new Payment();
+            $payment->forceFill([
                 'tenant_id' => $data->tenantId,
                 'organization_unit_id' => $data->organizationUnitId,
                 'payment_number' => $this->numbers->resolve($data),
@@ -69,6 +70,7 @@ final class PaymentCreationService
                 'metadata' => $data->metadata,
                 'created_by' => $data->createdBy,
             ]);
+            $payment->save();
 
             $this->recordInitialEvents($payment, $instrumentStatus, $data->createdBy);
             foreach ($data->lines as $index => $line) {
