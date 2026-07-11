@@ -72,16 +72,11 @@ final class PaymentAllocationReversalService
                 ]),
             ])->save();
 
-            $payment = $this->balances->sync(
+            return $this->balances->sync(
                 $payment->refresh(),
                 'Payment allocation reversed: '.$reason,
                 $actorId,
-            );
-            $payment->forceFill([
-                'row_version' => (int) $payment->row_version + 1,
-            ])->save();
-
-            return $payment->refresh()->load([
+            )->loadMissing([
                 'lines',
                 'allocations',
                 'unappliedBalance',
