@@ -15,6 +15,7 @@ use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Enums\InvoiceType;
 use Modules\Invoice\Services\InvoiceCreationService;
 use Modules\Invoice\Services\InvoiceStatusService;
+use Modules\Payment\DTOs\PaymentAllocationData;
 use Modules\Payment\Enums\AllocationStatus;
 use Modules\Payment\Enums\PaymentAllocationState;
 use Modules\Payment\Enums\PaymentDirection;
@@ -25,7 +26,9 @@ use Modules\Payment\Enums\PaymentMethodType;
 use Modules\Payment\Enums\PaymentPostingStatus;
 use Modules\Payment\Enums\PaymentType;
 use Modules\Payment\Models\Payment;
+use Modules\Payment\Models\PaymentAllocation;
 use Modules\Payment\Services\PaymentAllocationReversalService;
+use Modules\Payment\Services\PaymentAllocationService;
 use Modules\Tenant\Constants\TenantStatus;
 use Tests\TestCase;
 
@@ -38,16 +41,28 @@ final class PaymentAllocationReversalServiceTest extends TestCase
     private const PAYMENT_METHOD_NAME = 'Test Cash';
     private const ALLOCATION_METHOD = 'specific_invoice';
 
-    public function test_it_reverses_one_invoice_allocation_and_restores_payment_and_invoice_balances(): void
+    public function test_it_reverses_one_invoice_allocation_and_allows_a_corrected_allocation_with_history(): void
     {
         $tenantId = $this->createTenant();
-        $invoice = $this->withTenantExecutionContext($tenantId, function () use ($tenantId) {
+        $customerId = (int) DB::table('customers')->insertGetId([
+            'tenant_id' => $tenantId,
+            'customer_number' => 'CUS-ALLOC-REVERSAL',
+            'code' => 'CUS-ALLOC-REVERSAL',
+            'name' => 'Allocation Reversal Customer',
+            'customer_type' => 'company',
+            'status' => 'active',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $invoice = $this->withTenantExecutionContext($tenantId, function () use ($tenantId, $customerId) {
             $invoice = app(InvoiceCreationService::class)->create(new CreateInvoiceData(
                 tenantId: $tenantId,
                 invoiceType: InvoiceType::Manual,
                 direction: InvoiceDirection::Outbound,
                 invoiceDate: self::PAYMENT_DATE,
                 invoiceNumber: 'INV-ALLOC-REVERSAL',
+                partyType: 'customer',
+                partyId: $customerId,
                 lines: [new InvoiceLineData(
                     lineNumber: 1,
                     description: 'Deposit allocation reversal invoice',
@@ -80,6 +95,8 @@ final class PaymentAllocationReversalServiceTest extends TestCase
             'payment_number' => 'PAY-ALLOC-REVERSAL',
             'payment_type' => PaymentType::Advance->value,
             'direction' => PaymentDirection::Inbound->value,
+            'party_type' => 'customer',
+            'party_id' => $customerId,
             'document_status' => PaymentDocumentStatus::Approved->value,
             'allocation_status' => PaymentAllocationState::FullyAllocated->value,
             'posting_status' => PaymentPostingStatus::Posted->value,
@@ -139,19 +156,45 @@ final class PaymentAllocationReversalServiceTest extends TestCase
 
         $this->assertSame('0.000000', (string) $reversed->allocated_amount);
         $this->assertSame('400.000000', (string) $reversed->unapplied_amount);
-        $this->assertSame(
-            AllocationStatus::Reversed->value,
-            $this->withTenantExecutionContext(
-                $tenantId,
-                fn (): string => (string) $reversed->allocations()->firstOrFail()->status->value,
+        $this->assertSame('1000.000000', $this->invoiceBalance($tenantId, $invoice));
+
+        $corrected = $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): Payment => app(PaymentAllocationService::class)->allocate(
+                $reversed,
+                [new PaymentAllocationData(
+                    invoiceId: (int) $invoice->getKey(),
+                    allocatedAmount: '250.000000',
+                    allocationDate: self::PAYMENT_DATE,
+                    allocationMethod: self::ALLOCATION_METHOD,
+                )],
+                (int) $reversed->row_version,
             ),
         );
-        $this->assertSame(
-            '1000.000000',
-            $this->withTenantExecutionContext(
-                $tenantId,
-                fn (): string => (string) $invoice->refresh()->balance_due,
-            ),
+
+        $this->assertSame('250.000000', (string) $corrected->allocated_amount);
+        $this->assertSame('150.000000', (string) $corrected->unapplied_amount);
+        $this->assertSame('750.000000', $this->invoiceBalance($tenantId, $invoice));
+        $allocations = $this->withTenantExecutionContext(
+            $tenantId,
+            fn () => PaymentAllocation::query()
+                ->where('payment_id', $paymentId)
+                ->where('invoice_id', $invoice->getKey())
+                ->orderBy('id')
+                ->get(),
+        );
+        $this->assertCount(2, $allocations);
+        $this->assertSame(AllocationStatus::Reversed, $allocations[0]->status);
+        $this->assertNull($allocations[0]->active_identity_slot);
+        $this->assertSame(AllocationStatus::Active, $allocations[1]->status);
+        $this->assertSame(PaymentAllocation::ACTIVE_IDENTITY_SLOT, $allocations[1]->active_identity_slot);
+    }
+
+    private function invoiceBalance(int $tenantId, object $invoice): string
+    {
+        return $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): string => (string) $invoice->refresh()->balance_due,
         );
     }
 
