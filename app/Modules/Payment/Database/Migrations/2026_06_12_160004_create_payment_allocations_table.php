@@ -8,6 +8,8 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    private const ACTIVE_IDENTITY_SLOT = 1;
+
     public function up(): void
     {
         Schema::create('payment_allocations', function (Blueprint $table): void {
@@ -17,6 +19,9 @@ return new class extends Migration
             $table->foreignId('organization_unit_id')->nullable();
             $table->foreignId('payment_id');
             $table->foreignId('invoice_id');
+            $table->unsignedTinyInteger('active_identity_slot')
+                ->nullable()
+                ->default(self::ACTIVE_IDENTITY_SLOT);
             $table->string('invoice_number_snapshot', 100);
             $table->date('invoice_date_snapshot')->nullable();
             $table->string('invoice_currency_code_snapshot', 20)->nullable();
@@ -33,7 +38,10 @@ return new class extends Migration
             $table->json('metadata')->nullable();
             $table->timestamps();
 
-            $table->unique(['payment_id', 'invoice_id'], 'payment_allocations_payment_invoice_uk');
+            $table->unique(
+                ['payment_id', 'invoice_id', 'active_identity_slot'],
+                'payment_allocations_payment_invoice_active_uk',
+            );
             $table->index('invoice_id', 'payment_allocations_invoice_ix');
             $table->unique(['id', 'tenant_id'], 'payment_allocations_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'payment_allocations_organization_unit_id_tenant_fk')->references(['id', 'tenant_id'])->on('organization_units')->restrictOnDelete();
