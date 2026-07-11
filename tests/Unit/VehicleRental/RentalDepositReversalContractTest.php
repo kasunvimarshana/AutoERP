@@ -12,21 +12,29 @@ final class RentalDepositReversalContractTest extends TestCase
     {
         $root = dirname(__DIR__, 3);
         $paymentService = file_get_contents($root.'/app/Modules/Payment/Services/PaymentAllocationReversalService.php');
+        $paymentReversalService = file_get_contents($root.'/app/Modules/Payment/Services/PaymentReversalService.php');
+        $paymentAllocation = file_get_contents($root.'/app/Modules/Payment/Models/PaymentAllocation.php');
+        $migration = file_get_contents($root.'/app/Modules/Payment/Database/Migrations/2026_07_11_000001_allow_reversed_payment_allocation_history.php');
         $depositService = file_get_contents($root.'/app/Modules/VehicleRental/Services/RentalDepositService.php');
         $request = file_get_contents($root.'/app/Modules/VehicleRental/Http/Requests/ReverseRentalDepositLinkRequest.php');
         $api = file_get_contents($root.'/resources/js/modules/vehicle-rental/vehicleRentalApi.ts');
         $page = file_get_contents($root.'/resources/js/modules/vehicle-rental/pages/RentalDepositPage.tsx');
 
-        self::assertIsString($paymentService);
-        self::assertIsString($depositService);
-        self::assertIsString($request);
-        self::assertIsString($api);
-        self::assertIsString($page);
+        foreach ([$paymentService, $paymentReversalService, $paymentAllocation, $migration, $depositService, $request, $api, $page] as $source) {
+            self::assertIsString($source);
+        }
 
         self::assertStringContainsString('reverseForInvoice', $paymentService);
         self::assertStringContainsString('reversePaymentAllocation', $paymentService);
         self::assertStringContainsString("'status' => AllocationStatus::Reversed->value", $paymentService);
+        self::assertStringContainsString("'active_identity_slot' => null", $paymentService);
         self::assertStringContainsString('Payment allocation reversal reason is required.', $paymentService);
+
+        self::assertStringContainsString('ACTIVE_IDENTITY_SLOT', $paymentAllocation);
+        self::assertStringContainsString("'active_identity_slot' => 'integer'", $paymentAllocation);
+        self::assertStringContainsString('payment_allocations_payment_invoice_active_uk', $migration);
+        self::assertStringContainsString("['payment_id', 'invoice_id', 'active_identity_slot']", $migration);
+        self::assertGreaterThanOrEqual(2, substr_count($paymentReversalService, "'active_identity_slot' => null"));
 
         self::assertStringContainsString('$this->allocationReversals->reverseForInvoice(', $depositService);
         self::assertStringContainsString('RentalDepositLinkType::AppliedToInvoice', $depositService);
