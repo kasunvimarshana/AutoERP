@@ -312,9 +312,13 @@ export const forfeitRentalDeposit = (id: number, payload: RentalPayload) =>
 export const reverseRentalDepositLink = (
     linkId: number,
     expectedRequirementVersion: number,
+    expectedPaymentVersion: number,
+    reason: string,
 ) =>
     patch<RentalDeposit>(`deposit-links/${linkId}/reverse`, {
         expected_requirement_version: expectedRequirementVersion,
+        expected_payment_version: expectedPaymentVersion,
+        reason,
     });
 
 export const listVehicleFinanceAgreements = (

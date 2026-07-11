@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { TestRouter } from '@/test/TestRouter';
@@ -77,7 +77,8 @@ describe('RentalCustodyPage', () => {
         apiMocks.listRentalCustodyEvents.mockResolvedValue(collection([draftCustodyEvent()]));
         renderPage('/vehicle-rental/custody?allocation_id=31');
 
-        await user.click(await screen.findByRole('button', { name: 'Confirm' }));
+        const table = await screen.findByRole('table');
+        await user.click(within(table).getByRole('button', { name: 'Confirm' }));
 
         await waitFor(() => expect(apiMocks.confirmRentalCustodyEvent).toHaveBeenCalledWith(91, 4, 1));
     });

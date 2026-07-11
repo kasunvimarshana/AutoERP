@@ -12,6 +12,8 @@ use Modules\Tenant\Models\TenantModel;
 
 final class PaymentAllocation extends TenantOwnedModel
 {
+    public const ACTIVE_IDENTITY_SLOT = 1;
+
     protected $table = 'payment_allocations';
     protected $guarded = ['id'];
 
@@ -23,6 +25,7 @@ final class PaymentAllocation extends TenantOwnedModel
             'organization_unit_id' => 'integer',
             'payment_id' => 'integer',
             'invoice_id' => 'integer',
+            'active_identity_slot' => 'integer',
             'invoice_date_snapshot' => 'date',
             'invoice_total' => 'decimal:6',
             'invoice_balance_before' => 'decimal:6',
