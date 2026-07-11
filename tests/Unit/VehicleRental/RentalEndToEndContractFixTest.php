@@ -117,7 +117,9 @@ final class RentalEndToEndContractFixTest extends TestCase
         self::assertStringContainsString("'fingerprint' => \$this->linkFingerprint", $depositService);
         self::assertStringContainsString('linkFingerprint', $depositService);
         self::assertStringContainsString('A deposit reversal link cannot be reversed again.', $depositService);
-        self::assertStringContainsString('reverseRentalDepositLink(link.id, selected.row_version)', $depositPage);
+        self::assertStringContainsString('expected_payment_version: expectedPaymentVersion', $api);
+        self::assertStringContainsString('link.payment.row_version', $depositPage);
+        self::assertStringContainsString('reversalReason.trim()', $depositPage);
     }
 
     public function test_reservation_conversion_and_lookup_contracts_use_real_rental_semantics(): void
