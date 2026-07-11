@@ -26,7 +26,8 @@ final class JournalEntryCreationService
         [$totalDebit, $totalCredit] = $this->validator->journalTotals($data->lines);
 
         return DB::transaction(function () use ($data, $totalDebit, $totalCredit): FinanceJournalEntry {
-            $journal = FinanceJournalEntry::query()->create([
+            $journal = new FinanceJournalEntry();
+            $journal->forceFill([
                 'tenant_id' => $data->tenantId,
                 'organization_unit_id' => $data->organizationUnitId,
                 'journal_number' => $this->numbers->resolve($data),
@@ -50,6 +51,7 @@ final class JournalEntryCreationService
                 'reversal_of_id' => $data->reversalOfId,
                 'reversal_reason' => $data->reversalReason,
             ]);
+            $journal->save();
 
             $this->saveLines($journal, $data);
 
