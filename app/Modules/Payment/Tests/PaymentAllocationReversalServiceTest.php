@@ -19,15 +19,24 @@ use Modules\Payment\Enums\AllocationStatus;
 use Modules\Payment\Enums\PaymentAllocationState;
 use Modules\Payment\Enums\PaymentDirection;
 use Modules\Payment\Enums\PaymentDocumentStatus;
+use Modules\Payment\Enums\PaymentInstrumentStatus;
+use Modules\Payment\Enums\PaymentMethodDirection;
+use Modules\Payment\Enums\PaymentMethodType;
 use Modules\Payment\Enums\PaymentPostingStatus;
 use Modules\Payment\Enums\PaymentType;
 use Modules\Payment\Models\Payment;
 use Modules\Payment\Services\PaymentAllocationReversalService;
+use Modules\Tenant\Constants\TenantStatus;
 use Tests\TestCase;
 
 final class PaymentAllocationReversalServiceTest extends TestCase
 {
     use RefreshDatabase;
+
+    private const PAYMENT_DATE = '2026-07-11';
+    private const PAYMENT_METHOD_CODE = 'TEST-CASH';
+    private const PAYMENT_METHOD_NAME = 'Test Cash';
+    private const ALLOCATION_METHOD = 'specific_invoice';
 
     public function test_it_reverses_one_invoice_allocation_and_restores_payment_and_invoice_balances(): void
     {
@@ -37,7 +46,7 @@ final class PaymentAllocationReversalServiceTest extends TestCase
                 tenantId: $tenantId,
                 invoiceType: InvoiceType::Manual,
                 direction: InvoiceDirection::Outbound,
-                invoiceDate: '2026-07-11',
+                invoiceDate: self::PAYMENT_DATE,
                 invoiceNumber: 'INV-ALLOC-REVERSAL',
                 lines: [new InvoiceLineData(
                     lineNumber: 1,
@@ -58,10 +67,10 @@ final class PaymentAllocationReversalServiceTest extends TestCase
         $paymentMethodId = (int) DB::table('payment_methods')->insertGetId([
             'tenant_id' => $tenantId,
             'scope_key' => 'tenant:'.$tenantId,
-            'code' => 'TEST-CASH',
-            'name' => 'Test Cash',
-            'method_type' => 'cash',
-            'direction_allowed' => 'both',
+            'code' => self::PAYMENT_METHOD_CODE,
+            'name' => self::PAYMENT_METHOD_NAME,
+            'method_type' => PaymentMethodType::Cash->value,
+            'direction_allowed' => PaymentMethodDirection::Both->value,
             'is_active' => true,
             'created_at' => now(),
             'updated_at' => now(),
@@ -74,7 +83,7 @@ final class PaymentAllocationReversalServiceTest extends TestCase
             'document_status' => PaymentDocumentStatus::Approved->value,
             'allocation_status' => PaymentAllocationState::FullyAllocated->value,
             'posting_status' => PaymentPostingStatus::Posted->value,
-            'payment_date' => '2026-07-11',
+            'payment_date' => self::PAYMENT_DATE,
             'exchange_rate' => '1.000000',
             'total_amount' => '400.000000',
             'allocated_amount' => '400.000000',
@@ -88,11 +97,11 @@ final class PaymentAllocationReversalServiceTest extends TestCase
             'payment_id' => $paymentId,
             'line_number' => 1,
             'payment_method_id' => $paymentMethodId,
-            'payment_method_code_snapshot' => 'TEST-CASH',
-            'payment_method_name_snapshot' => 'Test Cash',
-            'payment_method_type_snapshot' => 'cash',
+            'payment_method_code_snapshot' => self::PAYMENT_METHOD_CODE,
+            'payment_method_name_snapshot' => self::PAYMENT_METHOD_NAME,
+            'payment_method_type_snapshot' => PaymentMethodType::Cash->value,
             'amount' => '400.000000',
-            'status' => 'cleared',
+            'status' => PaymentInstrumentStatus::Cleared->value,
             'created_at' => now(),
             'updated_at' => now(),
         ]);
@@ -107,8 +116,8 @@ final class PaymentAllocationReversalServiceTest extends TestCase
             'previously_allocated_amount' => '0.000000',
             'allocated_amount' => '400.000000',
             'invoice_balance_after' => '600.000000',
-            'allocation_date' => '2026-07-11',
-            'allocation_method' => 'specific_invoice',
+            'allocation_date' => self::PAYMENT_DATE,
+            'allocation_method' => self::ALLOCATION_METHOD,
             'status' => AllocationStatus::Active->value,
             'created_at' => now(),
             'updated_at' => now(),
@@ -155,7 +164,7 @@ final class PaymentAllocationReversalServiceTest extends TestCase
             'code' => 'TEN-PAR-'.$suffix,
             'name' => 'Payment Allocation Reversal '.$suffix,
             'slug' => 'payment-allocation-reversal-'.Str::lower($suffix),
-            'status' => 'active',
+            'status' => TenantStatus::ACTIVE,
             'status_changed_at' => now(),
             'created_at' => now(),
             'updated_at' => now(),
