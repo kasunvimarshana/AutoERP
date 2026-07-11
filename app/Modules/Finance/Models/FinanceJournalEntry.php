@@ -21,8 +21,6 @@ final class FinanceJournalEntry extends TenantOwnedModel
 
     protected $table = 'finance_journal_entries';
 
-    protected $guarded = ['id'];
-
     protected function casts(): array
     {
         return array_merge(parent::casts(), [
