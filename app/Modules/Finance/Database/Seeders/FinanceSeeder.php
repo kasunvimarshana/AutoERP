@@ -9,6 +9,8 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use Modules\Finance\Enums\FinanceAccountRoleCode;
+use Modules\Finance\Enums\FinancePostingProfileCode;
 use Modules\Finance\Models\FinanceAccount;
 use Modules\Finance\Models\FinanceAccountAssignment;
 use Modules\Finance\Models\FinanceAccountCategory;
@@ -36,13 +38,16 @@ final class FinanceSeeder extends Seeder
     private const ACCOUNT_TAX_RECEIVABLE = '1300';
     private const ACCOUNT_SUPPLIER_ADVANCE = '1400';
     private const ACCOUNT_PAYABLE = '2100';
+    private const ACCOUNT_GRNI = '2150';
     private const ACCOUNT_TAX_PAYABLE = '2200';
     private const ACCOUNT_CUSTOMER_ADVANCE = '2300';
     private const ACCOUNT_CUSTOMER_DEPOSIT = '2310';
     private const ACCOUNT_SALES_REVENUE = '4100';
     private const ACCOUNT_SERVICE_REVENUE = '4200';
+    private const ACCOUNT_RENTAL_REVENUE = '4300';
     private const ACCOUNT_PURCHASE_EXPENSE = '5100';
     private const ACCOUNT_COST_OF_GOODS_SOLD = '5200';
+    private const ACCOUNT_RENTAL_EXPENSE = '5300';
 
     public function run(): void
     {
@@ -109,13 +114,16 @@ final class FinanceSeeder extends Seeder
             'TAX_RECEIVABLE' => ['Tax Receivable', self::TYPE_ASSET],
             'SUPPLIER_ADVANCE' => ['Supplier Advances', self::TYPE_ASSET],
             'AP' => ['Accounts Payable', self::TYPE_LIABILITY],
+            'GRNI' => ['Goods Received Not Invoiced', self::TYPE_LIABILITY],
             'TAX_PAYABLE' => ['Tax Payable', self::TYPE_LIABILITY],
             'CUSTOMER_ADVANCE' => ['Customer Advances', self::TYPE_LIABILITY],
             'CUSTOMER_DEPOSIT' => ['Customer Deposits', self::TYPE_LIABILITY],
             'SALES' => ['Sales Revenue', self::TYPE_REVENUE],
             'SERVICE' => ['Service Revenue', self::TYPE_REVENUE],
+            'RENTAL_REVENUE' => ['Rental Revenue', self::TYPE_REVENUE],
             'PURCHASE' => ['Purchase Expense', self::TYPE_EXPENSE],
             'COGS' => ['Cost of Goods Sold', self::TYPE_EXPENSE],
+            'RENTAL_EXPENSE' => ['Rental Expense', self::TYPE_EXPENSE],
         ];
 
         $categories = [];
@@ -177,15 +185,18 @@ final class FinanceSeeder extends Seeder
             [self::ACCOUNT_TAX_RECEIVABLE, 'Tax Receivable', self::TYPE_ASSET, 'TAX_RECEIVABLE', false, false, true],
             [self::ACCOUNT_SUPPLIER_ADVANCE, 'Supplier Advances', self::TYPE_ASSET, 'SUPPLIER_ADVANCE', false, false, false],
             [self::ACCOUNT_PAYABLE, 'Accounts Payable', self::TYPE_LIABILITY, 'AP', false, false, false],
+            [self::ACCOUNT_GRNI, 'Goods Received Not Invoiced', self::TYPE_LIABILITY, 'GRNI', false, false, false],
             [self::ACCOUNT_TAX_PAYABLE, 'Tax Payable', self::TYPE_LIABILITY, 'TAX_PAYABLE', false, false, true],
             [self::ACCOUNT_CUSTOMER_ADVANCE, 'Customer Advances', self::TYPE_LIABILITY, 'CUSTOMER_ADVANCE', false, false, false],
             [self::ACCOUNT_CUSTOMER_DEPOSIT, 'Rental Security Deposits', self::TYPE_LIABILITY, 'CUSTOMER_DEPOSIT', false, false, false],
             [self::ACCOUNT_SALES_REVENUE, 'Sales Revenue', self::TYPE_REVENUE, 'SALES', false, false, false],
             [self::ACCOUNT_SERVICE_REVENUE, 'Service Revenue', self::TYPE_REVENUE, 'SERVICE', false, false, false],
+            [self::ACCOUNT_RENTAL_REVENUE, 'Rental Revenue', self::TYPE_REVENUE, 'RENTAL_REVENUE', false, false, false],
             [self::ACCOUNT_PURCHASE_EXPENSE, 'Purchase Expense', self::TYPE_EXPENSE, 'PURCHASE', false, false, false],
             [self::ACCOUNT_COST_OF_GOODS_SOLD, 'Cost of Goods Sold', self::TYPE_EXPENSE, 'COGS', false, false, false],
+            [self::ACCOUNT_RENTAL_EXPENSE, 'Rental Expense', self::TYPE_EXPENSE, 'RENTAL_EXPENSE', false, false, false],
         ];
-        $controlCategories = ['AR', 'AP', 'INVENTORY', 'SUPPLIER_ADVANCE', 'CUSTOMER_ADVANCE', 'CUSTOMER_DEPOSIT'];
+        $controlCategories = ['AR', 'AP', 'GRNI', 'INVENTORY', 'SUPPLIER_ADVANCE', 'CUSTOMER_ADVANCE', 'CUSTOMER_DEPOSIT'];
 
         foreach ($accounts as [$code, $name, $typeCode, $categoryCode, $isCash, $isBank, $isTax]) {
             FinanceAccount::query()->updateOrCreate(
@@ -219,88 +230,123 @@ final class FinanceSeeder extends Seeder
         }
 
         $definitions = [
-            'sales_invoice' => [
+            FinancePostingProfileCode::SalesInvoice->value => [
                 'name' => 'Sales Invoice',
                 'rules' => [
-                    'receivable' => self::ACCOUNT_RECEIVABLE,
-                    'revenue' => self::ACCOUNT_SALES_REVENUE,
-                    'tax_payable' => self::ACCOUNT_TAX_PAYABLE,
-                    'withholding_receivable' => self::ACCOUNT_TAX_RECEIVABLE,
+                    FinanceAccountRoleCode::Receivable->value => self::ACCOUNT_RECEIVABLE,
+                    FinanceAccountRoleCode::Revenue->value => self::ACCOUNT_SALES_REVENUE,
+                    FinanceAccountRoleCode::TaxPayable->value => self::ACCOUNT_TAX_PAYABLE,
+                    FinanceAccountRoleCode::WithholdingReceivable->value => self::ACCOUNT_TAX_RECEIVABLE,
                 ],
             ],
-            'purchase_invoice' => [
+            FinancePostingProfileCode::PurchaseInvoice->value => [
                 'name' => 'Purchase Invoice',
                 'rules' => [
-                    'expense' => self::ACCOUNT_PURCHASE_EXPENSE,
-                    'payable' => self::ACCOUNT_PAYABLE,
-                    'tax_receivable' => self::ACCOUNT_TAX_RECEIVABLE,
-                    'withholding_payable' => self::ACCOUNT_TAX_PAYABLE,
+                    FinanceAccountRoleCode::Expense->value => self::ACCOUNT_PURCHASE_EXPENSE,
+                    FinanceAccountRoleCode::GoodsReceivedNotInvoiced->value => self::ACCOUNT_GRNI,
+                    FinanceAccountRoleCode::Payable->value => self::ACCOUNT_PAYABLE,
+                    FinanceAccountRoleCode::TaxReceivable->value => self::ACCOUNT_TAX_RECEIVABLE,
+                    FinanceAccountRoleCode::WithholdingPayable->value => self::ACCOUNT_TAX_PAYABLE,
                 ],
             ],
-            'customer_receipt' => [
+            FinancePostingProfileCode::CustomerReceipt->value => [
                 'name' => 'Customer Receipt',
                 'rules' => [
-                    'cash' => self::ACCOUNT_CASH,
-                    'bank' => self::ACCOUNT_BANK,
-                    'receivable' => self::ACCOUNT_RECEIVABLE,
-                    'customer_advance' => self::ACCOUNT_CUSTOMER_ADVANCE,
+                    FinanceAccountRoleCode::Cash->value => self::ACCOUNT_CASH,
+                    FinanceAccountRoleCode::Bank->value => self::ACCOUNT_BANK,
+                    FinanceAccountRoleCode::Receivable->value => self::ACCOUNT_RECEIVABLE,
+                    FinanceAccountRoleCode::CustomerAdvance->value => self::ACCOUNT_CUSTOMER_ADVANCE,
                 ],
             ],
-            'supplier_payment' => [
+            FinancePostingProfileCode::SupplierPayment->value => [
                 'name' => 'Supplier Payment',
                 'rules' => [
-                    'cash' => self::ACCOUNT_CASH,
-                    'bank' => self::ACCOUNT_BANK,
-                    'payable' => self::ACCOUNT_PAYABLE,
-                    'supplier_advance' => self::ACCOUNT_SUPPLIER_ADVANCE,
+                    FinanceAccountRoleCode::Cash->value => self::ACCOUNT_CASH,
+                    FinanceAccountRoleCode::Bank->value => self::ACCOUNT_BANK,
+                    FinanceAccountRoleCode::Payable->value => self::ACCOUNT_PAYABLE,
+                    FinanceAccountRoleCode::SupplierAdvance->value => self::ACCOUNT_SUPPLIER_ADVANCE,
                 ],
             ],
-            'customer_advance' => [
+            FinancePostingProfileCode::CustomerAdvance->value => [
                 'name' => 'Customer Advance Receipt',
                 'rules' => [
-                    'cash' => self::ACCOUNT_CASH,
-                    'bank' => self::ACCOUNT_BANK,
-                    'receivable' => self::ACCOUNT_RECEIVABLE,
-                    'customer_advance' => self::ACCOUNT_CUSTOMER_ADVANCE,
+                    FinanceAccountRoleCode::Cash->value => self::ACCOUNT_CASH,
+                    FinanceAccountRoleCode::Bank->value => self::ACCOUNT_BANK,
+                    FinanceAccountRoleCode::Receivable->value => self::ACCOUNT_RECEIVABLE,
+                    FinanceAccountRoleCode::CustomerAdvance->value => self::ACCOUNT_CUSTOMER_ADVANCE,
                 ],
             ],
-            'supplier_advance' => [
+            FinancePostingProfileCode::SupplierAdvance->value => [
                 'name' => 'Supplier Advance Payment',
                 'rules' => [
-                    'cash' => self::ACCOUNT_CASH,
-                    'bank' => self::ACCOUNT_BANK,
-                    'payable' => self::ACCOUNT_PAYABLE,
-                    'supplier_advance' => self::ACCOUNT_SUPPLIER_ADVANCE,
+                    FinanceAccountRoleCode::Cash->value => self::ACCOUNT_CASH,
+                    FinanceAccountRoleCode::Bank->value => self::ACCOUNT_BANK,
+                    FinanceAccountRoleCode::Payable->value => self::ACCOUNT_PAYABLE,
+                    FinanceAccountRoleCode::SupplierAdvance->value => self::ACCOUNT_SUPPLIER_ADVANCE,
                 ],
             ],
-            'rental_deposit' => [
+            FinancePostingProfileCode::RentalDeposit->value => [
                 'name' => 'Rental Security Deposit',
                 'rules' => [
-                    'cash' => self::ACCOUNT_CASH,
-                    'bank' => self::ACCOUNT_BANK,
-                    'receivable' => self::ACCOUNT_RECEIVABLE,
-                    'customer_deposit' => self::ACCOUNT_CUSTOMER_DEPOSIT,
+                    FinanceAccountRoleCode::Cash->value => self::ACCOUNT_CASH,
+                    FinanceAccountRoleCode::Bank->value => self::ACCOUNT_BANK,
+                    FinanceAccountRoleCode::Receivable->value => self::ACCOUNT_RECEIVABLE,
+                    FinanceAccountRoleCode::CustomerDeposit->value => self::ACCOUNT_CUSTOMER_DEPOSIT,
                 ],
             ],
-            'inventory_receipt' => [
+            FinancePostingProfileCode::InventoryReceipt->value => [
                 'name' => 'Inventory Receipt',
-                'rules' => ['inventory' => self::ACCOUNT_INVENTORY, 'payable' => self::ACCOUNT_PAYABLE],
+                'rules' => [
+                    FinanceAccountRoleCode::Inventory->value => self::ACCOUNT_INVENTORY,
+                    FinanceAccountRoleCode::GoodsReceivedNotInvoiced->value => self::ACCOUNT_GRNI,
+                ],
             ],
-            'inventory_issue' => [
+            FinancePostingProfileCode::InventoryIssue->value => [
                 'name' => 'Inventory Issue',
-                'rules' => ['cost_of_goods_sold' => self::ACCOUNT_COST_OF_GOODS_SOLD, 'inventory' => self::ACCOUNT_INVENTORY],
+                'rules' => [
+                    FinanceAccountRoleCode::CostOfGoodsSold->value => self::ACCOUNT_COST_OF_GOODS_SOLD,
+                    FinanceAccountRoleCode::Inventory->value => self::ACCOUNT_INVENTORY,
+                ],
             ],
-            'vehicle_service_invoice' => [
+            FinancePostingProfileCode::VehicleServiceInvoice->value => [
                 'name' => 'Vehicle Service Invoice',
-                'rules' => ['receivable' => self::ACCOUNT_RECEIVABLE, 'service_revenue' => self::ACCOUNT_SERVICE_REVENUE, 'tax_payable' => self::ACCOUNT_TAX_PAYABLE],
+                'rules' => [
+                    FinanceAccountRoleCode::Receivable->value => self::ACCOUNT_RECEIVABLE,
+                    FinanceAccountRoleCode::ServiceRevenue->value => self::ACCOUNT_SERVICE_REVENUE,
+                    FinanceAccountRoleCode::TaxPayable->value => self::ACCOUNT_TAX_PAYABLE,
+                ],
             ],
-            'sales_return' => [
+            FinancePostingProfileCode::CustomerRentalInvoice->value => [
+                'name' => 'Customer Rental Invoice',
+                'rules' => [
+                    FinanceAccountRoleCode::Receivable->value => self::ACCOUNT_RECEIVABLE,
+                    FinanceAccountRoleCode::RentalRevenue->value => self::ACCOUNT_RENTAL_REVENUE,
+                    FinanceAccountRoleCode::TaxPayable->value => self::ACCOUNT_TAX_PAYABLE,
+                    FinanceAccountRoleCode::WithholdingReceivable->value => self::ACCOUNT_TAX_RECEIVABLE,
+                ],
+            ],
+            FinancePostingProfileCode::SupplierRentalInvoice->value => [
+                'name' => 'Supplier Rental Invoice',
+                'rules' => [
+                    FinanceAccountRoleCode::Payable->value => self::ACCOUNT_PAYABLE,
+                    FinanceAccountRoleCode::RentalExpense->value => self::ACCOUNT_RENTAL_EXPENSE,
+                    FinanceAccountRoleCode::TaxReceivable->value => self::ACCOUNT_TAX_RECEIVABLE,
+                    FinanceAccountRoleCode::WithholdingPayable->value => self::ACCOUNT_TAX_PAYABLE,
+                ],
+            ],
+            FinancePostingProfileCode::SalesReturn->value => [
                 'name' => 'Sales Return',
-                'rules' => ['sales_revenue' => self::ACCOUNT_SALES_REVENUE, 'receivable' => self::ACCOUNT_RECEIVABLE],
+                'rules' => [
+                    FinanceAccountRoleCode::SalesRevenue->value => self::ACCOUNT_SALES_REVENUE,
+                    FinanceAccountRoleCode::Receivable->value => self::ACCOUNT_RECEIVABLE,
+                ],
             ],
-            'purchase_return' => [
+            FinancePostingProfileCode::PurchaseReturn->value => [
                 'name' => 'Purchase Return',
-                'rules' => ['payable' => self::ACCOUNT_PAYABLE, 'purchase_expense' => self::ACCOUNT_PURCHASE_EXPENSE],
+                'rules' => [
+                    FinanceAccountRoleCode::Payable->value => self::ACCOUNT_PAYABLE,
+                    FinanceAccountRoleCode::PurchaseExpense->value => self::ACCOUNT_PURCHASE_EXPENSE,
+                ],
             ],
         ];
 
