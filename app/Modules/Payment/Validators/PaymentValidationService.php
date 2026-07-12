@@ -8,10 +8,13 @@ use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Customer\Models\Customer;
 use Modules\Invoice\DTOs\BalanceResultData;
+use Modules\Payment\Constants\PaymentPostingMetadata;
 use Modules\Payment\DTOs\CreatePaymentData;
 use Modules\Payment\DTOs\PaymentAllocationData;
 use Modules\Payment\DTOs\PaymentLineData;
 use Modules\Payment\Enums\PaymentDirection;
+use Modules\Payment\Enums\PaymentPostingRole;
+use Modules\Payment\Enums\PaymentSourceType;
 use Modules\Payment\Enums\PaymentType;
 use Modules\Payment\Models\Payment;
 use Modules\Payment\Models\PaymentMethod;
@@ -39,6 +42,7 @@ final class PaymentValidationService
         }
 
         $this->validateTypeDirectionParty($data);
+        $this->validateSemanticPostingContract($data);
         $this->validateCurrency($data->currencyId, $data->exchangeRate);
 
         if ($data->lines === []) {
@@ -132,7 +136,7 @@ final class PaymentValidationService
         }
 
         $expectedParty = match ($data->paymentType) {
-            PaymentType::CustomerReceipt, PaymentType::ServiceReceipt => 'customer',
+            PaymentType::CustomerReceipt, PaymentType::ServiceReceipt, PaymentType::RentalReceipt => 'customer',
             PaymentType::SupplierPayment => 'supplier',
             default => $data->partyType,
         };
@@ -144,6 +148,73 @@ final class PaymentValidationService
                 throw new InvalidArgumentException('Payment party type and party id must be provided together.');
             }
             $this->validateParty($data->partyType, $data->partyId, $data->tenantId, $data->organizationUnitId);
+        }
+    }
+
+    private function validateSemanticPostingContract(CreatePaymentData $data): void
+    {
+        if ($data->paymentType === PaymentType::Advance) {
+            $isCustomerAdvance = $data->direction === PaymentDirection::Inbound && $data->partyType === 'customer';
+            $isSupplierAdvance = $data->direction === PaymentDirection::Outbound && $data->partyType === 'supplier';
+            if (! $isCustomerAdvance && ! $isSupplierAdvance) {
+                throw new InvalidArgumentException('Advance payment requires an inbound customer or outbound supplier party.');
+            }
+            if ($data->sourceType === PaymentSourceType::RentalDepositRequirement->value && $data->allocations !== []) {
+                throw new InvalidArgumentException('Rental deposit receipt cannot allocate invoices during payment creation.');
+            }
+        }
+
+        if ($data->paymentType === PaymentType::Refund) {
+            if ($data->originalPaymentId === null
+                || $data->sourceType !== PaymentSourceType::PaymentRefund->value
+                || $data->allocations !== []
+            ) {
+                throw new InvalidArgumentException('Refund payment requires an original payment, refund source identity, and no direct allocations.');
+            }
+            $this->validateOriginalRefundPayment($data);
+        } elseif ($data->originalPaymentId !== null) {
+            throw new InvalidArgumentException('Only refund payments can reference an original payment.');
+        }
+
+        if ($data->paymentType === PaymentType::Manual) {
+            $metadata = is_array($data->metadata) ? $data->metadata : [];
+            $profileCode = trim((string) ($metadata[PaymentPostingMetadata::PROFILE_CODE] ?? ''));
+            $counterpartyRole = PaymentPostingRole::tryFrom(
+                trim((string) ($metadata[PaymentPostingMetadata::COUNTERPARTY_ROLE] ?? '')),
+            );
+            if ($profileCode === '' || ! $counterpartyRole instanceof PaymentPostingRole) {
+                throw new InvalidArgumentException(
+                    'Manual payment requires posting_profile_code and a supported counterparty_profile_key in metadata.',
+                );
+            }
+        }
+    }
+
+    private function validateOriginalRefundPayment(CreatePaymentData $data): void
+    {
+        $original = Payment::query()->find($data->originalPaymentId);
+        if (! $original instanceof Payment) {
+            throw new InvalidArgumentException('Original payment was not found for refund.');
+        }
+        $originalType = $original->payment_type instanceof PaymentType
+            ? $original->payment_type
+            : PaymentType::from((string) $original->payment_type);
+        if ($originalType === PaymentType::Refund) {
+            throw new InvalidArgumentException('A refund payment cannot be refunded again.');
+        }
+        if ((int) $original->tenant_id !== $data->tenantId
+            || $original->organization_unit_id !== $data->organizationUnitId
+            || $original->party_type !== $data->partyType
+            || $original->party_id !== $data->partyId
+            || $original->currency_id !== $data->currencyId
+        ) {
+            throw new InvalidArgumentException('Refund payment scope, party, and currency must match the original payment.');
+        }
+        $originalDirection = $original->direction instanceof PaymentDirection
+            ? $original->direction
+            : PaymentDirection::from((string) $original->direction);
+        if ($originalDirection === $data->direction) {
+            throw new InvalidArgumentException('Refund payment direction must reverse the original payment direction.');
         }
     }
 
