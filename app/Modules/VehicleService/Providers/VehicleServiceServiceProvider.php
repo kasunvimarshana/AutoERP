@@ -6,9 +6,9 @@ namespace Modules\VehicleService\Providers;
 
 use Illuminate\Support\ServiceProvider;
 use Modules\Core\Contracts\PermissionDefinitionRegistryInterface;
-use Modules\Invoice\Contracts\InvoiceSourceCancellationHandlerInterface;
+use Modules\Invoice\Contracts\InvoiceSourceRestorationHandlerInterface;
 use Modules\VehicleService\Constants\VehicleServicePermission;
-use Modules\VehicleService\Services\Invoice\VehicleServiceInvoiceCancellationHandler;
+use Modules\VehicleService\Services\Invoice\VehicleServiceInvoiceRestorationHandler;
 
 final class VehicleServiceServiceProvider extends ServiceProvider
 {
@@ -16,8 +16,8 @@ final class VehicleServiceServiceProvider extends ServiceProvider
     {
         $this->mergeConfigFrom(__DIR__.'/../Config/vehicle-service.php', 'vehicle-service');
         $this->app->tag(
-            [VehicleServiceInvoiceCancellationHandler::class],
-            InvoiceSourceCancellationHandlerInterface::TAG,
+            [VehicleServiceInvoiceRestorationHandler::class],
+            InvoiceSourceRestorationHandlerInterface::TAG,
         );
     }
 
