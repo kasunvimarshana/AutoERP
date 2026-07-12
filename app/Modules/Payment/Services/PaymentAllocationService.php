@@ -25,6 +25,7 @@ final class PaymentAllocationService
         private readonly PaymentBalanceSynchronizer $balances,
         private readonly InvoiceBalanceProviderInterface $invoiceBalances,
         private readonly InvoiceSettlementServiceInterface $invoiceSettlements,
+        private readonly PaymentAllocationFinanceService $allocationFinance,
     ) {}
 
     public function createPending(Payment $payment, array $allocations): Payment
@@ -254,7 +255,7 @@ final class PaymentAllocationService
             false,
         );
 
-        return PaymentAllocation::query()->create([
+        $created = PaymentAllocation::query()->create([
             'tenant_id' => $payment->tenant_id,
             'organization_unit_id' => $payment->organization_unit_id,
             'payment_id' => $payment->getKey(),
@@ -272,6 +273,9 @@ final class PaymentAllocationService
             'realized_by' => $actorId,
             'metadata' => $allocation->metadata,
         ]);
+        $this->allocationFinance->post($payment, $created, $actorId);
+
+        return $created;
     }
 
     private function invoiceSnapshot(int $invoiceId): array
