@@ -1,9 +1,11 @@
 import { apiClient } from '@/shared/api/apiClient';
 import { endpoints } from '@/shared/api/endpoints';
-import { createLocallyFilteredLookupLoader, createQueryCachedLookupLoader } from '@/shared/api/lookupCache';
+import { createLocallyFilteredLookupLoader, createQueryCachedLookupLoader, prefetchLocallyFilteredLookupDataset } from '@/shared/api/lookupCache';
 import { requestLookup } from '@/shared/api/lookupRequest';
+import type { NamedResource } from '@/shared/types/common';
 import type { ApiCollection, ApiResource, ListParams } from '@/shared/types/api';
 import type { LookupLoadParams, LookupResult } from '@/shared/types/lookup';
+import type { PaginationMeta } from '@/shared/types/pagination';
 import type {
     Vehicle,
     VehicleAttribute,
@@ -25,6 +27,14 @@ import type {
     VehicleTypePayload,
     VehicleWithRelationsPayload,
 } from './vehicleTypes';
+
+const VEHICLE_MAKES_LOOKUP_KEY = 'lookup:vehicle-makes';
+const VEHICLE_MODELS_LOOKUP_KEY = 'lookup:vehicle-models';
+const VEHICLE_TYPES_LOOKUP_KEY = 'lookup:vehicle-types';
+
+const loadVehicleMakes = (params: LookupLoadParams) => requestLookup<VehicleMake>(`${endpoints.vehicleMakes}/lookup`, params);
+const loadVehicleModels = (params: LookupLoadParams) => requestLookup<VehicleModel>(`${endpoints.vehicleModels}/lookup`, params);
+const loadVehicleTypes = (params: LookupLoadParams) => requestLookup<VehicleType>(`${endpoints.vehicleTypes}/lookup`, params);
 
 export const listVehicles = (params: ListParams, signal?: AbortSignal) =>
     apiClient.get<ApiCollection<VehicleSummary>>(endpoints.vehicles, { params, signal }).then((response) => response.data);
@@ -63,34 +73,55 @@ export function searchVehicles(params: LookupLoadParams, kind = 'active'): Promi
 
 export function searchVehicleMakes(params: LookupLoadParams): Promise<LookupResult<VehicleMake>> {
     const loader = createLocallyFilteredLookupLoader<VehicleMake>({
-        key: 'lookup:vehicle-makes',
-        load: (lookupParams) => requestLookup<VehicleMake>(`${endpoints.vehicleMakes}/lookup`, lookupParams),
+        key: VEHICLE_MAKES_LOOKUP_KEY,
+        load: loadVehicleMakes,
     });
 
     return loader(params);
+}
+
+export function preloadVehicleMakes(signal: AbortSignal): Promise<VehicleMake[]> {
+    return prefetchLocallyFilteredLookupDataset<VehicleMake>({
+        key: VEHICLE_MAKES_LOOKUP_KEY,
+        load: loadVehicleMakes,
+        signal,
+    });
 }
 
 export function searchVehicleModels(
     params: LookupLoadParams,
     vehicleMakeId?: number | null,
 ): Promise<LookupResult<VehicleModel>> {
-    const loader = createQueryCachedLookupLoader<VehicleModel>({
-        key: `lookup:vehicle-models:${vehicleMakeId ?? 'all'}`,
-        load: (lookupParams) => requestLookup<VehicleModel>(`${endpoints.vehicleModels}/lookup`, lookupParams, {
-            vehicle_make_id: vehicleMakeId ?? undefined,
-        }),
+    return prefetchLocallyFilteredLookupDataset<VehicleModel>({
+        key: VEHICLE_MODELS_LOOKUP_KEY,
+        load: loadVehicleModels,
+        signal: params.signal,
+    }).then((models) => paginateLocalVehicleModels(models, params, vehicleMakeId));
+}
+
+export function preloadVehicleModels(signal: AbortSignal): Promise<VehicleModel[]> {
+    return prefetchLocallyFilteredLookupDataset<VehicleModel>({
+        key: VEHICLE_MODELS_LOOKUP_KEY,
+        load: loadVehicleModels,
+        signal,
+    });
+}
+
+export function searchVehicleTypes(params: LookupLoadParams): Promise<LookupResult<VehicleType>> {
+    const loader = createLocallyFilteredLookupLoader<VehicleType>({
+        key: VEHICLE_TYPES_LOOKUP_KEY,
+        load: loadVehicleTypes,
     });
 
     return loader(params);
 }
 
-export function searchVehicleTypes(params: LookupLoadParams): Promise<LookupResult<VehicleType>> {
-    const loader = createLocallyFilteredLookupLoader<VehicleType>({
-        key: 'lookup:vehicle-types',
-        load: (lookupParams) => requestLookup<VehicleType>(`${endpoints.vehicleTypes}/lookup`, lookupParams),
+export function preloadVehicleTypes(signal: AbortSignal): Promise<VehicleType[]> {
+    return prefetchLocallyFilteredLookupDataset<VehicleType>({
+        key: VEHICLE_TYPES_LOOKUP_KEY,
+        load: loadVehicleTypes,
+        signal,
     });
-
-    return loader(params);
 }
 
 export function searchVehicleCategories(params: LookupLoadParams): Promise<LookupResult<VehicleCategory>> {
@@ -219,4 +250,40 @@ function appendValue(formData: FormData, field: string, entry: unknown) {
     }
 
     formData.append(field, String(entry));
+}
+
+function paginateLocalVehicleModels(
+    models: VehicleModel[],
+    params: LookupLoadParams,
+    vehicleMakeId?: number | null,
+): LookupResult<VehicleModel> {
+    const filtered = filterNamedResources(models, params.search).filter((model) => {
+        if (vehicleMakeId == null) return true;
+        return Number(model.make?.id) === Number(vehicleMakeId);
+    });
+    const currentPage = Math.max(params.page, 1);
+    const start = (currentPage - 1) * params.perPage;
+    const data = filtered.slice(start, start + params.perPage);
+    const from = data.length > 0 ? start + 1 : null;
+    const meta: PaginationMeta = {
+        current_page: currentPage,
+        from,
+        last_page: Math.max(1, Math.ceil(filtered.length / params.perPage)),
+        per_page: params.perPage,
+        to: from === null ? null : from + data.length - 1,
+        total: filtered.length,
+    };
+
+    return { data, meta, links: undefined };
+}
+
+function filterNamedResources<T extends NamedResource>(options: T[], search: string): T[] {
+    const term = search.trim().toLowerCase();
+    if (term === '') return options;
+
+    return options.filter((option) => [
+        option.code,
+        option.name,
+        option.symbol,
+    ].some((value) => typeof value === 'string' && value.toLowerCase().includes(term)));
 }

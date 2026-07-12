@@ -12,7 +12,7 @@ import { Select } from '@/shared/components/Select';
 import { Textarea } from '@/shared/components/Textarea';
 import { useApi } from '@/shared/hooks/useApi';
 import type { NamedResource } from '@/shared/types/common';
-import type { LookupLoadParams, LookupResult } from '@/shared/types/lookup';
+import type { LookupLoadParams } from '@/shared/types/lookup';
 import { useMutationFormGuard } from '@/shared/hooks/useMutationFormGuard';
 import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { createVehicleServiceJob, updateVehicleServiceJob } from '../vehicleServiceApi';
@@ -58,12 +58,7 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
     const formGuard = useMutationFormGuard(submitting);
-    const supervisors = useApi((signal) => lookupApi.availableEmployees({
-        search: '',
-        page: 1,
-        perPage: 500,
-        signal,
-    }), []);
+    useApi((signal) => lookupApi.preloadAvailableEmployees(signal), []);
     const updateForm = useCallback((next: Parameters<typeof setForm>[0]) => {
         formGuard.markDirty();
         setForm(next);
@@ -76,35 +71,9 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
     const searchVehicle = useCallback((params: LookupLoadParams) => {
         return lookupApi.serviceVehicles(params);
     }, []);
-    const searchSupervisor = useCallback((params: LookupLoadParams): Promise<LookupResult<NamedResource>> => {
-        if (supervisors.data === null) {
-            return lookupApi.availableEmployees(params);
-        }
-
-        const allSupervisors = mergeNamedResources(supervisors.data?.data ?? [], supervisor ? [supervisor] : []);
-        const term = params.search.trim().toLowerCase();
-        const filtered = term === ''
-            ? allSupervisors
-            : allSupervisors.filter((resource) =>
-                [resource.code, resource.name]
-                    .filter((value): value is string => typeof value === 'string' && value.trim() !== '')
-                    .some((value) => value.toLowerCase().includes(term)));
-        const start = (params.page - 1) * params.perPage;
-        const pageData = filtered.slice(start, start + params.perPage);
-        const from = pageData.length > 0 ? start + 1 : null;
-
-        return Promise.resolve({
-            data: pageData,
-            meta: {
-                current_page: params.page,
-                from,
-                last_page: Math.max(1, Math.ceil(filtered.length / params.perPage)),
-                per_page: params.perPage,
-                to: from === null ? null : from + pageData.length - 1,
-                total: filtered.length,
-            },
-        });
-    }, [supervisor, supervisors.data?.data]);
+    const searchSupervisor = useCallback((params: LookupLoadParams) => {
+        return lookupApi.availableEmployeesLocallyFiltered(params);
+    }, []);
 
     const payload = (): VehicleServiceJobPayload => ({
         expected_version: job?.row_version,
@@ -263,13 +232,4 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
 
 function VehicleContext({ label, value }: { label: string; value: string }) {
     return <div><span className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</span><strong className="mt-1 block text-slate-900">{value}</strong></div>;
-}
-
-function mergeNamedResources(primary: NamedResource[], additional: NamedResource[]) {
-    const seen = new Set<number>();
-    return [...primary, ...additional].filter((resource) => {
-        if (seen.has(resource.id)) return false;
-        seen.add(resource.id);
-        return true;
-    });
 }
