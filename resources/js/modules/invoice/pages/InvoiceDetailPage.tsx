@@ -1,5 +1,15 @@
+import { useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import { getInvoice, getInvoiceAdjustments, getInvoiceBalance, getInvoiceSignedPrintLink, getInvoiceSources } from '../invoiceApi';
+import {
+    approveInvoice,
+    cancelInvoice,
+    getInvoice,
+    getInvoiceAdjustments,
+    getInvoiceBalance,
+    getInvoiceSignedPrintLink,
+    getInvoiceSources,
+    postInvoice,
+} from '../invoiceApi';
 import { hasInvoicePermission, invoicePermissions } from '../invoicePermissions';
 import { useApi } from '@/shared/hooks/useApi';
 import { useOnDemandTab } from '@/shared/hooks/useOnDemandTab';
@@ -18,8 +28,10 @@ import { formatDate } from '@/shared/utils/formatDate';
 import { humanize, readableRelation } from '@/shared/utils/object';
 import { LinkButton } from '@/shared/components/Button';
 import { useAuth } from '@/modules/auth/AuthProvider';
+import { toApiError, type ApiError } from '@/shared/api/apiError';
 
 type Tab = 'summary' | 'balance' | 'sources' | 'lines' | 'adjustments';
+type InvoiceAction = 'approve' | 'post' | 'cancel';
 
 const summaryTab: TabItem<Tab> = { id: 'summary', label: 'Summary' };
 const linesTab: TabItem<Tab> = { id: 'lines', label: 'Lines' };
@@ -29,7 +41,12 @@ export default function InvoiceDetailPage() {
     const auth = useAuth();
     const canViewBalance = hasInvoicePermission(auth, invoicePermissions.balanceView);
     const canViewSources = hasInvoicePermission(auth, invoicePermissions.sourcesView);
+    const canApprove = hasInvoicePermission(auth, invoicePermissions.approve);
+    const canPost = hasInvoicePermission(auth, invoicePermissions.post);
+    const canCancel = hasInvoicePermission(auth, invoicePermissions.cancel);
     const [searchParams] = useSearchParams();
+    const [action, setAction] = useState<InvoiceAction | null>(null);
+    const [actionError, setActionError] = useState<ApiError | null>(null);
     const tabState = useOnDemandTab<Tab>('summary');
     const tabs: TabItem<Tab>[] = [
         summaryTab,
@@ -60,8 +77,35 @@ export default function InvoiceDetailPage() {
     if (!invoice.data) return <ErrorAlert error={invoice.error} />;
     const value = invoice.data;
     const fromPurchase = searchParams.get('from') === 'purchase';
+    const fromVehicleRental = searchParams.get('from') === 'vehicle-rental';
     const isSupplierInvoice = value.invoice_type === 'purchase' && value.direction === 'inbound';
+    const isRentalInvoice = value.invoice_type === 'rental';
     const printUrl = `/invoices/${id}/print`;
+
+    const runAction = async (nextAction: InvoiceAction) => {
+        let reason: string | undefined;
+        if (nextAction === 'cancel') {
+            const response = window.prompt('Enter the reason for cancelling this invoice.');
+            if (response === null) return;
+            reason = response.trim() || undefined;
+        }
+
+        setAction(nextAction);
+        setActionError(null);
+        try {
+            const updated = nextAction === 'approve'
+                ? await approveInvoice(id, value.row_version)
+                : nextAction === 'post'
+                    ? await postInvoice(id, value.row_version)
+                    : await cancelInvoice(id, value.row_version, reason);
+            invoice.setData(updated);
+            if (canViewBalance) balance.reload();
+        } catch (error: unknown) {
+            setActionError(toApiError(error));
+        } finally {
+            setAction(null);
+        }
+    };
 
     return (
         <>
@@ -75,6 +119,18 @@ export default function InvoiceDetailPage() {
                                 <LinkButton to="/purchase/invoices" variant="secondary">Back to Purchase</LinkButton>
                                 <LinkButton to={`/purchase/payments/create?invoice_id=${id}`}>Create Payment</LinkButton>
                             </>
+                        ) : null}
+                        {fromVehicleRental && isRentalInvoice ? (
+                            <LinkButton to="/vehicle-rental/billing" variant="secondary">Back to Rental Billing</LinkButton>
+                        ) : null}
+                        {value.status === 'draft' && canApprove ? (
+                            <Button loading={action === 'approve'} onClick={() => void runAction('approve')}>Approve</Button>
+                        ) : null}
+                        {value.status === 'approved' && canPost ? (
+                            <Button loading={action === 'post'} onClick={() => void runAction('post')}>Post</Button>
+                        ) : null}
+                        {['draft', 'approved'].includes(value.status ?? '') && canCancel ? (
+                            <Button variant="danger" loading={action === 'cancel'} onClick={() => void runAction('cancel')}>Cancel</Button>
                         ) : null}
                         <Button variant="secondary" onClick={async () => {
                             try {
@@ -105,6 +161,7 @@ export default function InvoiceDetailPage() {
                     </div>
                 )}
             />
+            <ErrorAlert error={actionError} />
             <Panel className="p-0">
                 <Tabs tabs={tabs} active={tabState.activeTab} onChange={tabState.openTab} />
                 <div className="p-5">
