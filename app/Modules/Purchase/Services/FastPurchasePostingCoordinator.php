@@ -126,7 +126,7 @@ final class FastPurchasePostingCoordinator
             $lines[] = new FinancePostingLine(accountName: 'Supplier payable', credit: $creditPayable, profileKey: 'payable');
         }
         if (! $this->math->isZero($withholding)) {
-            $lines[] = new FinancePostingLine(accountName: 'Withholding payable', credit: $withholding, profileKey: 'payable');
+            $lines[] = new FinancePostingLine(accountName: 'Withholding payable', credit: $withholding, profileKey: 'withholding_payable');
         }
         $lines = array_merge($lines, $nonTaxAdjustments);
 
