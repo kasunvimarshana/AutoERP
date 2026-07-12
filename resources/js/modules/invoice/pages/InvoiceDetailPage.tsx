@@ -12,6 +12,7 @@ import {
 } from '../invoiceApi';
 import { hasInvoicePermission, invoicePermissions } from '../invoicePermissions';
 import { paymentPermissions } from '@/modules/payment/paymentPermissions';
+import { vehicleServicePermissions } from '@/modules/vehicle-service/vehicleServicePermissions';
 import { useApi } from '@/shared/hooks/useApi';
 import { useOnDemandTab } from '@/shared/hooks/useOnDemandTab';
 import { ContentHeader } from '@/shared/components/ContentHeader';
@@ -49,6 +50,7 @@ export default function InvoiceDetailPage() {
     const canPost = hasInvoicePermission(auth, invoicePermissions.post);
     const canCancel = hasInvoicePermission(auth, invoicePermissions.cancel);
     const canCreatePayment = hasPermission(auth, paymentPermissions.create);
+    const canCreateVehicleServicePayment = hasPermission(auth, vehicleServicePermissions.paymentsCreate);
     const [searchParams] = useSearchParams();
     const [action, setAction] = useState<InvoiceAction | null>(null);
     const [actionError, setActionError] = useState<ApiError | null>(null);
@@ -83,8 +85,16 @@ export default function InvoiceDetailPage() {
     const value = invoice.data;
     const fromPurchase = searchParams.get('from') === 'purchase';
     const fromVehicleRental = searchParams.get('from') === 'vehicle-rental';
+    const vehicleServiceSource = (value.sources ?? []).find((source) => source.source_type === 'vehicle_service_job');
+    const vehicleServiceJobId = vehicleServiceSource?.source_id ?? Number(searchParams.get('job_id'));
+    const hasVehicleServiceJobContext = Number.isInteger(vehicleServiceJobId) && vehicleServiceJobId > 0;
+    const isServiceInvoice = value.invoice_type === 'service' && value.direction === 'outbound';
     const isSupplierInvoice = value.invoice_type === 'purchase' && value.direction === 'inbound';
     const isRentalInvoice = value.invoice_type === 'rental';
+    const canSettleServiceInvoice = hasVehicleServiceJobContext
+        && isServiceInvoice
+        && settlementStatuses.includes(value.status as typeof settlementStatuses[number])
+        && isPositiveDecimal(value.balance_due ?? '0');
     const canSettleRentalInvoice = fromVehicleRental
         && isRentalInvoice
         && settlementStatuses.includes(value.status as typeof settlementStatuses[number])
@@ -138,6 +148,11 @@ export default function InvoiceDetailPage() {
                                     </LinkButton>
                                 ) : null}
                             </>
+                        ) : null}
+                        {canSettleServiceInvoice && canCreateVehicleServicePayment ? (
+                            <LinkButton to={`/vehicle-service/jobs/${vehicleServiceJobId}/payment`}>
+                                Pay this invoice
+                            </LinkButton>
                         ) : null}
                         {value.status === 'draft' && canApprove ? (
                             <Button loading={action === 'approve'} onClick={() => void runAction('approve')}>Approve</Button>

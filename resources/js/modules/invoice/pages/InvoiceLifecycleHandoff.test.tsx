@@ -41,4 +41,22 @@ describe('invoice lifecycle handoff', () => {
         expect(paymentEntry).toContain('allocation_method: ALLOCATION_METHOD_SPECIFIC_INVOICE');
         expect(paymentEntry).toContain('currency_id: settlementInvoice.data?.currency?.id ?? undefined');
     });
+
+    it('hands posted vehicle service invoices back to the vehicle-service payment workflow', () => {
+        const detail = sourceFile('resources/js/modules/invoice/pages/InvoiceDetailPage.tsx');
+        const invoiceCreate = sourceFile('resources/js/modules/vehicle-service/pages/VehicleServiceInvoiceCreatePage.tsx');
+        const controller = sourceFile('app/Modules/Invoice/Http/Controllers/InvoiceController.php');
+        const types = sourceFile('resources/js/modules/invoice/invoiceTypes.ts');
+
+        expect(invoiceCreate).toContain('`/invoices/${invoiceId}?from=vehicle-service&job_id=${jobId}`');
+        expect(controller).toContain("->with(['lines', 'sources'])");
+        expect(types).toContain('source_id: number;');
+        expect(types).toContain('sources?: InvoiceSource[];');
+        expect(detail).toContain("const vehicleServiceSource = (value.sources ?? []).find((source) => source.source_type === 'vehicle_service_job');");
+        expect(detail).toContain("hasPermission(auth, vehicleServicePermissions.paymentsCreate)");
+        expect(detail).toContain("const isServiceInvoice = value.invoice_type === 'service' && value.direction === 'outbound';");
+        expect(detail).toContain('const canSettleServiceInvoice = hasVehicleServiceJobContext');
+        expect(detail).toContain('Pay this invoice');
+        expect(detail).toContain('to={`/vehicle-service/jobs/${vehicleServiceJobId}/payment`}');
+    });
 });

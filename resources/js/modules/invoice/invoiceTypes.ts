@@ -80,6 +80,7 @@ export interface InvoiceBalanceResult extends Record<string, unknown> {
 export interface InvoiceSource extends Record<string, unknown> {
     id: number;
     source_type: string;
+    source_id: number;
     source_document_number?: string | null;
     source_document_date?: string | null;
     source_subtotal: string;
@@ -150,6 +151,7 @@ export interface Invoice extends Record<string, unknown> {
     cancellation_reason?: string | null;
     balance?: InvoiceBalance | null;
     lines?: InvoiceLine[];
+    sources?: InvoiceSource[];
 }
 
 export interface InvoiceSourcesResult {

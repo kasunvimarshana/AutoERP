@@ -122,7 +122,9 @@ function VehicleServiceInvoiceEditor({ jobId, job, billableLines, loadError }: {
                                 try {
                                     const invoice = await createVehicleServiceInvoice(jobId, payload());
                                     const invoiceId = Number(invoice.id);
-                                    navigate(Number.isFinite(invoiceId) ? `/invoices/${invoiceId}` : `/vehicle-service/jobs/${jobId}`);
+                                    navigate(Number.isFinite(invoiceId)
+                                        ? `/invoices/${invoiceId}?from=vehicle-service&job_id=${jobId}`
+                                        : `/vehicle-service/jobs/${jobId}`);
                                 } catch (requestError) {
                                     setError(toApiError(requestError));
                                 } finally {

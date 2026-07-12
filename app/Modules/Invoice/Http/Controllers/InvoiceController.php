@@ -69,7 +69,7 @@ final class InvoiceController
     public function show(ListInvoiceRequest $request, int $invoice): InvoiceResource
     {
         return new InvoiceResource($this->scope(Invoice::query(), $request)
-            ->with('lines')
+            ->with(['lines', 'sources'])
             ->findOrFail($invoice));
     }
 
