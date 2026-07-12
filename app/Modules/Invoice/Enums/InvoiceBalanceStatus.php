@@ -10,6 +10,7 @@ enum InvoiceBalanceStatus: string
     case Partial = 'partial';
     case Paid = 'paid';
     case Overpaid = 'overpaid';
+    case Reversed = 'reversed';
     case Cancelled = 'cancelled';
     case Void = 'void';
 }
