@@ -30,6 +30,7 @@ use Modules\Payment\Models\PaymentAllocation;
 use Modules\Payment\Services\PaymentAllocationReversalService;
 use Modules\Payment\Services\PaymentAllocationService;
 use Modules\Tenant\Constants\TenantStatus;
+use Tests\Support\FinancePostingFixture;
 use Tests\TestCase;
 
 final class PaymentAllocationReversalServiceTest extends TestCase
@@ -44,6 +45,7 @@ final class PaymentAllocationReversalServiceTest extends TestCase
     public function test_it_reverses_one_invoice_allocation_and_allows_a_corrected_allocation_with_history(): void
     {
         $tenantId = $this->createTenant();
+        FinancePostingFixture::seedCustomerPaymentProfiles($tenantId);
         $customerId = (int) DB::table('customers')->insertGetId([
             'tenant_id' => $tenantId,
             'customer_number' => 'CUS-ALLOC-REVERSAL',
@@ -78,7 +80,6 @@ final class PaymentAllocationReversalServiceTest extends TestCase
 
         $this->withTenantExecutionContext($tenantId, fn () => app(InvoiceSettlementServiceInterface::class)
             ->applyPaymentAllocation((int) $invoice->getKey(), '400.000000'));
-
         $paymentMethodId = (int) DB::table('payment_methods')->insertGetId([
             'tenant_id' => $tenantId,
             'scope_key' => 'tenant:'.$tenantId,
