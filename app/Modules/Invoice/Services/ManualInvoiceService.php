@@ -9,6 +9,8 @@ use InvalidArgumentException;
 use JsonException;
 use LogicException;
 use Modules\Core\Services\DecimalMath;
+use Modules\Finance\Enums\FinanceAccountRoleCode;
+use Modules\Finance\Enums\FinancePostingProfileCode;
 use Modules\Idempotency\Enums\IdempotencyStatus;
 use Modules\Idempotency\Services\IdempotencyService;
 use Modules\Invoice\Constants\InvoiceTaxMetadata;
@@ -46,11 +48,14 @@ final class ManualInvoiceService
 
     private const WITHHOLDING_ADJUSTMENT_DESCRIPTION = 'Withholding calculated by the Tax module.';
 
+    private const ZERO = '0.000000';
+
     public function __construct(
         private readonly DecimalMath $math,
         private readonly TaxCalculationService $taxes,
         private readonly InvoiceCreationService $invoices,
         private readonly IdempotencyService $idempotency,
+        private readonly InvoicePostingPlanFactory $postingPlans,
     ) {}
 
     public function preview(ManualInvoiceData $data): InvoiceCalculationResult
@@ -120,6 +125,7 @@ final class ManualInvoiceService
         }
 
         $lines = [];
+        $baseAmount = self::ZERO;
         foreach (array_values($data->lines) as $index => $line) {
             if (! $line instanceof ManualInvoiceLineData) {
                 throw new InvalidArgumentException('Manual invoice lines must be ManualInvoiceLineData instances.');
@@ -131,17 +137,29 @@ final class ManualInvoiceService
                 throw new LogicException("Tax calculation result is missing for invoice line [{$lineNumber}].");
             }
 
+            $quantity = $this->math->normalize($line->quantity);
+            $unitPrice = $this->math->normalize($line->unitPrice);
+            $discount = $this->math->normalize($line->discountAmount);
+            $charge = $this->math->normalize($line->chargeAmount);
+            $baseAmount = $this->math->add(
+                $baseAmount,
+                $this->math->add(
+                    $this->math->sub($this->math->mul($quantity, $unitPrice), $discount),
+                    $charge,
+                ),
+            );
+
             $lines[] = new InvoiceLineData(
                 lineNumber: $lineNumber,
                 description: trim($line->description),
-                quantity: $this->math->normalize($line->quantity),
-                unitPrice: $this->math->normalize($line->unitPrice),
+                quantity: $quantity,
+                unitPrice: $unitPrice,
                 lineType: $line->lineType,
                 itemId: $line->itemId,
                 uomId: $line->uomId,
-                discountAmount: $this->math->normalize($line->discountAmount),
+                discountAmount: $discount,
                 taxAmount: $taxResult->taxAmount,
-                chargeAmount: $this->math->normalize($line->chargeAmount),
+                chargeAmount: $charge,
                 lineTotal: $this->math->add($taxResult->totalAmount, $taxResult->withholdingAmount),
                 metadata: [
                     InvoiceTaxMetadata::TAX_GROUP_ID => $line->taxGroupId,
@@ -165,6 +183,27 @@ final class ManualInvoiceService
             );
         }
 
+        $postingPlan = match ($data->direction) {
+            InvoiceDirection::Outbound => $this->postingPlans->outbound(
+                FinancePostingProfileCode::SalesInvoice,
+                $data->invoiceDate,
+                FinanceAccountRoleCode::Revenue,
+                $baseAmount,
+                $taxCalculation->taxAmount,
+                $taxCalculation->withholdingAmount,
+                'Manual sales invoice',
+            ),
+            InvoiceDirection::Inbound => $this->postingPlans->inbound(
+                FinancePostingProfileCode::PurchaseInvoice,
+                $data->invoiceDate,
+                FinanceAccountRoleCode::Expense,
+                $baseAmount,
+                $taxCalculation->taxAmount,
+                $taxCalculation->withholdingAmount,
+                'Manual purchase invoice',
+            ),
+        };
+
         return new CreateInvoiceData(
             tenantId: $data->tenantId,
             invoiceType: InvoiceType::Manual,
@@ -181,12 +220,11 @@ final class ManualInvoiceService
             lines: $lines,
             adjustments: $adjustments,
             taxCalculation: $taxCalculation,
+            postingPlan: $postingPlan,
         );
     }
 
-    /**
-     * @return list<TaxCalculationLineData>
-     */
+    /** @return list<TaxCalculationLineData> */
     private function taxLines(ManualInvoiceData $data): array
     {
         $lines = [];
@@ -239,9 +277,7 @@ final class ManualInvoiceService
         };
     }
 
-    /**
-     * @return array<string, int|string|bool>
-     */
+    /** @return array<string, int|string|bool> */
     private function taxSnapshot(TaxAmountData $tax): array
     {
         return [
@@ -267,7 +303,7 @@ final class ManualInvoiceService
         return Invoice::query()
             ->where('tenant_id', $data->tenantId)
             ->where('organization_unit_id', $data->organizationUnitId)
-            ->with(['lines', 'adjustments', 'balance'])
+            ->with(['lines', 'adjustments', 'balance', 'postingPlan'])
             ->findOrFail($invoiceId);
     }
 
