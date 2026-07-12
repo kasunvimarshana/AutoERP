@@ -30,7 +30,7 @@ final class RentalAgreementIntegrityContractTest extends TestCase
         self::assertStringContainsString("'row_version' =>", $resource);
         self::assertStringContainsString('$agreement->row_version = $expectedVersion + 1;', $service);
         self::assertStringContainsString('deleteDraft', $service);
-        self::assertMatchesRegularExpression("/(?:'expected_version'\\s*=>|\\$rules\\['expected_version'\\]\\s*=)\\s*\\['required',\\s*'integer',\\s*'min:1'\\]/", $updateRequest);
+        self::assertMatchesRegularExpression('/(?:\'expected_version\'\s*=>|\$rules\[\'expected_version\'\]\s*=)\s*\[\'required\',\s*\'integer\',\s*\'min:1\'\]/', $updateRequest);
         self::assertMatchesRegularExpression("/'expected_version'\\s*=>\\s*\\['required',\\s*'integer',\\s*'min:1'\\]/", $transitionRequest);
         self::assertStringContainsString("validated('expected_version')", $controller);
     }
