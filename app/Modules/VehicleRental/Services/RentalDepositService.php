@@ -34,6 +34,10 @@ use Modules\VehicleRental\Models\RentalDepositRequirement;
 
 final class RentalDepositService
 {
+    private const DEPOSIT_PARTY_TYPE = 'customer';
+
+    private const DEPOSIT_SOURCE_TYPE = 'rental_deposit_requirement';
+
     public function __construct(
         private readonly DecimalMath $math,
         private readonly PaymentCreationService $payments,
@@ -62,9 +66,9 @@ final class RentalDepositService
                 direction: PaymentDirection::Inbound,
                 paymentDate: (string) $data['payment_date'],
                 organizationUnitId: $requirement->organization_unit_id,
-                partyType: 'customer',
+                partyType: self::DEPOSIT_PARTY_TYPE,
                 partyId: (int) $requirement->agreement->customer_id,
-                sourceType: 'rental_deposit_requirement',
+                sourceType: self::DEPOSIT_SOURCE_TYPE,
                 sourceId: (int) $requirement->getKey(),
                 currencyId: (int) $requirement->currency_id,
                 exchangeRate: (string) ($data['exchange_rate'] ?? '1.000000'),
@@ -130,13 +134,13 @@ final class RentalDepositService
                 invoiceId: $invoiceId,
                 tenantId: (int) $requirement->tenant_id,
                 organizationUnitId: $requirement->organization_unit_id,
-                partyType: 'customer',
+                partyType: self::DEPOSIT_PARTY_TYPE,
                 partyId: (int) $requirement->agreement->customer_id,
                 currencyId: (int) $requirement->currency_id,
             );
             if ($invoice->tenantId !== (int) $requirement->tenant_id
                 || $invoice->organizationUnitId !== $requirement->organization_unit_id
-                || $invoice->partyType !== 'customer'
+                || $invoice->partyType !== self::DEPOSIT_PARTY_TYPE
                 || $invoice->partyId !== (int) $requirement->agreement->customer_id
                 || ($invoice->currencyId !== null && $invoice->currencyId !== (int) $requirement->currency_id)) {
                 throw new InvalidArgumentException('Deposit invoice must belong to the rental customer and currency.');
@@ -242,13 +246,13 @@ final class RentalDepositService
                 invoiceId: $invoiceId,
                 tenantId: (int) $requirement->tenant_id,
                 organizationUnitId: $requirement->organization_unit_id,
-                partyType: 'customer',
+                partyType: self::DEPOSIT_PARTY_TYPE,
                 partyId: (int) $requirement->agreement->customer_id,
                 currencyId: (int) $requirement->currency_id,
             );
             if ($invoice->tenantId !== (int) $requirement->tenant_id
                 || $invoice->organizationUnitId !== $requirement->organization_unit_id
-                || $invoice->partyType !== 'customer'
+                || $invoice->partyType !== self::DEPOSIT_PARTY_TYPE
                 || $invoice->partyId !== (int) $requirement->agreement->customer_id
                 || ($invoice->currencyId !== null && $invoice->currencyId !== (int) $requirement->currency_id)) {
                 throw new InvalidArgumentException('Forfeiture invoice must belong to the rental customer and currency.');
@@ -389,15 +393,8 @@ final class RentalDepositService
 
     private function assertReceiptForRequirement(RentalDepositRequirement $requirement, Payment $payment, int $expectedVersion): void
     {
-        if ((int) $payment->row_version !== $expectedVersion
-            || (int) $payment->tenant_id !== (int) $requirement->tenant_id
-            || $payment->organization_unit_id !== $requirement->organization_unit_id
-            || (int) $payment->party_id !== (int) $requirement->agreement->customer_id
-            || (int) $payment->currency_id !== (int) $requirement->currency_id
-            || (string) $payment->source_type !== 'rental_deposit_requirement'
-            || (int) $payment->source_id !== (int) $requirement->getKey()) {
-            throw new InvalidArgumentException('Selected payment is not the expected rental deposit receipt.');
-        }
+        $this->assertReceiptIdentity($requirement, $payment, $expectedVersion);
+
         $document = $payment->document_status instanceof PaymentDocumentStatus
             ? $payment->document_status
             : PaymentDocumentStatus::from((string) $payment->document_status);
@@ -413,6 +410,30 @@ final class RentalDepositService
             ->where('status', RentalDepositLinkStatus::Active->value)
             ->exists()) {
             throw new InvalidArgumentException('Selected payment is not linked as an active deposit receipt.');
+        }
+    }
+
+    private function assertReceiptIdentity(RentalDepositRequirement $requirement, Payment $payment, int $expectedVersion): void
+    {
+        $paymentType = $payment->payment_type instanceof PaymentType
+            ? $payment->payment_type
+            : PaymentType::from((string) $payment->payment_type);
+        $direction = $payment->direction instanceof PaymentDirection
+            ? $payment->direction
+            : PaymentDirection::from((string) $payment->direction);
+
+        if ($expectedVersion < 1
+            || (int) $payment->row_version !== $expectedVersion
+            || (int) $payment->tenant_id !== (int) $requirement->tenant_id
+            || $payment->organization_unit_id !== $requirement->organization_unit_id
+            || (string) $payment->party_type !== self::DEPOSIT_PARTY_TYPE
+            || (int) $payment->party_id !== (int) $requirement->agreement->customer_id
+            || (int) $payment->currency_id !== (int) $requirement->currency_id
+            || $paymentType !== PaymentType::Advance
+            || $direction !== PaymentDirection::Inbound
+            || (string) $payment->source_type !== self::DEPOSIT_SOURCE_TYPE
+            || (int) $payment->source_id !== (int) $requirement->getKey()) {
+            throw new InvalidArgumentException('Selected payment is not the expected rental deposit receipt.');
         }
     }
 
