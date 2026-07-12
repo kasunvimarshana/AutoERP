@@ -1,0 +1,30 @@
+﻿Issue ID,Severity,Area,Finding,Owning Module,Required Action,Evidence Status
+P0-FIN-001,P0,Invoice,Posted Invoice can exist without a Finance journal,Invoice/Finance,Implement atomic Invoice+Tax+Finance posting and prohibit Posted without journal,Confirmed
+P0-FIN-002,P0,Invoice,No coordinated posted-Invoice reversal,Invoice/Finance/source modules,Add source-aware Invoice reversal coordinator,Confirmed
+P0-FIN-003,P0,Payment,"Direction-only accounting misclassifies advances, deposits, and refunds",Payment,Select posting policy by payment type/direction/party/original source,Confirmed
+P0-FIN-004,P0,Finance,No accounting-period close/reopen controls,Finance,Implement Finance-owned accounting periods and enforce on post/reverse,Confirmed
+P0-DB-001,P0,Database,Persistent schema upgrade lifecycle unresolved,Core/Database,Establish released baseline and forward-only upgrade migrations,Confirmed
+P1-FIN-005,P1,Purchase,Generic GRN and supplier Invoice do not uniformly post Finance,Purchase,Add atomic generic Purchase posting coordinators,Confirmed
+P1-FIN-006,P1,Inventory,Stock value movements do not uniformly affect GL,Inventory/Finance,Add semantic Inventory posting and reversal contracts,Confirmed
+P1-FIN-007,P1,Vehicle Service,Posted service Invoice and parts issues can lack GL,VehicleService,Add service Invoice and Inventory/COGS Finance integration,Confirmed
+P1-FIN-008,P1,Vehicle Rental,Rental Invoice/payable/vehicle-finance documents can lack GL,VehicleRental,Add rental-side semantic posting plans and reversal,Confirmed
+P1-FIN-009,P1,Tax,Tax transactions can be posted independently from GL,Tax,Coordinate Tax and Finance in source transaction,Confirmed
+P1-FIN-010,P1,Fast Purchase,Withholding payable maps to ordinary AP,Purchase,Use withholding_payable semantic role,Confirmed
+P1-FIN-011,P1,Finance Configuration,Runtime fallback scope is not clearly visible/manageable,Finance,Expose effective scope and align profile/assignment management,Confirmed
+P1-FIN-012,P1,Finance Configuration,Posting configuration lacks optimistic concurrency,Finance,Add row versions and conflict-safe commands,Confirmed
+P1-OPS-001,P1,Tenant/Operations,Health check can return ready without proving infrastructure,Tenant/Platform,Add behavioral worker/scheduler/mail/cache/storage/backup checks,Confirmed
+P1-REP-001,P1,Reporting,Financial reports depend on incomplete GL and lack source-to-GL exceptions,Reporting,Add reconciliation report after source posting correction,Confirmed
+P1-TEST-001,P1,Tests,Static source tests overstate behavioral guarantees,Tests/owner modules,Pair static guards with SQLite/MySQL behavioral integration tests,Confirmed
+P1-TEST-002,P1,Tests,"Missing source-to-journal, reversal, parallel and browser invariants",Tests,"Add financial invariants, parallel MySQL, and browser E2E",Confirmed
+P1-DOC-001,P1,Documentation,Production-readiness document is stale/overstated,Documentation,Supersede with exact current release status and evidence,Confirmed
+P2-FIN-013,P2,Finance,Manual journal can claim arbitrary source identity,Finance,Separate manual journals from registered business source identities,Confirmed
+P2-FIN-014,P2,Finance,Source key includes caller-controlled source_module,Finance,Use canonical registered source identity,Confirmed
+P2-FIN-015,P2,Finance,Duplicate obsolete posting-profile methods remain in FinanceController,Finance,Delete dead configuration logic from wrong controller,Confirmed
+P2-FIN-016,P2,Finance Configuration,Owner service can relocate an existing profile scope,Finance,Assert immutable tenant/organization identity in service,Confirmed
+P2-INV-001,P2,Invoice,Customer and supplier relationships share party_id without type guard,Invoice,Use type-aware party resolver/relationship boundary,Confirmed
+P2-UI-001,P2,Frontend Access,Feature policies still fall back to duplicated legacy registry,Frontend access,Complete feature-owned migration and delete duplicates,Confirmed
+P2-DOC-002,P2,Documentation,Historical change records lack a canonical supersession index,Documentation,Add current architecture/release index and superseded_by metadata,Confirmed
+P2-HR-001,P2,HR,Payroll is not implemented although some wording implies an owner,Product/HR,Confirm scope; implement separate Payroll module only if required,Decision required
+P2-SALES-001,P2,Sales,Quotation/order/delivery/counter-sales scope is absent,Product,Confirm whether Sales is intentionally out of scope,Decision required
+P2-VR-001,P2,Vehicle Rental,Replacement/downtime/free-KM/deposit-priority rules remain unconfirmed,Business/Product,Record stakeholder decisions before implementation,Decision required
+P2-SEC-001,P2,Private Object,Malware/MIME/retention/encryption behavior not verified,PrivateObject/Operations,Define policy and execute production storage/security tests,Not verified
