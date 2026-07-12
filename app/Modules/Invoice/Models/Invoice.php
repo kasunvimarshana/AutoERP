@@ -131,6 +131,11 @@ final class Invoice extends TenantOwnedModel
         return $this->hasOne(InvoiceBalance::class, 'invoice_id');
     }
 
+    public function postingPlan(): HasOne
+    {
+        return $this->hasOne(InvoicePostingPlan::class, 'invoice_id');
+    }
+
     public function creditAllocations(): HasMany
     {
         return $this->hasMany(InvoiceCreditAllocation::class, 'invoice_id');
