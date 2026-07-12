@@ -26,6 +26,7 @@ final class InvoicePostingPlan extends TenantOwnedModel
             'posting_date' => 'date',
             'lines' => 'array',
             'status' => InvoicePostingPlanStatus::class,
+            'created_by' => 'integer',
             'posted_by' => 'integer',
             'posted_at' => 'immutable_datetime',
             'reversed_by' => 'integer',
@@ -49,6 +50,7 @@ final class InvoicePostingPlan extends TenantOwnedModel
                 'posting_profile_code',
                 'posting_date',
                 'lines',
+                'description',
             ];
             if (array_intersect(array_keys($plan->getDirty()), $semanticFields) !== []) {
                 throw new LogicException('Invoice posting plan facts are immutable.');
