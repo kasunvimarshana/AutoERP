@@ -31,6 +31,7 @@ final class PaymentReversalService
         private readonly FinancePaymentReversalInterface $financeReversals,
         private readonly PaymentLifecycleEventRecorder $events,
         private readonly PaymentBalanceSynchronizer $balances,
+        private readonly PaymentAllocationFinanceService $allocationFinance,
     ) {}
 
     public function reverse(PaymentReversalData $data): PaymentReversal
@@ -71,6 +72,13 @@ final class PaymentReversalService
                 ->orderBy('invoice_id')
                 ->orderBy('id')
                 ->get() as $allocation) {
+                $this->allocationFinance->reverse(
+                    $payment,
+                    $allocation,
+                    $data->reversalDate,
+                    $data->reason,
+                    $data->reversedBy,
+                );
                 $this->invoiceSettlements->reversePaymentAllocation(
                     (int) $allocation->invoice_id,
                     (string) $allocation->allocated_amount,
