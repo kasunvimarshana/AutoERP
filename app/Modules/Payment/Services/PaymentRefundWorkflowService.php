@@ -13,6 +13,7 @@ use Modules\Payment\DTOs\PaymentRefundData;
 use Modules\Payment\Enums\PaymentDirection;
 use Modules\Payment\Enums\PaymentDocumentStatus;
 use Modules\Payment\Enums\PaymentPostingStatus;
+use Modules\Payment\Enums\PaymentSourceType;
 use Modules\Payment\Enums\PaymentType;
 use Modules\Payment\Models\Payment;
 use Modules\Payment\Models\PaymentMethod;
@@ -38,6 +39,12 @@ final class PaymentRefundWorkflowService
             if ($this->documentStatus($original) !== PaymentDocumentStatus::Approved
                 || $this->postingStatus($original) !== PaymentPostingStatus::Posted) {
                 throw new InvalidArgumentException('Only approved and posted payments can be refunded.');
+            }
+            $originalType = $original->payment_type instanceof PaymentType
+                ? $original->payment_type
+                : PaymentType::from((string) $original->payment_type);
+            if ($originalType === PaymentType::Refund) {
+                throw new InvalidArgumentException('A refund payment cannot be refunded again.');
             }
             $this->validator->assertPositive($data->amount, 'Refund amount');
             if ($this->math->compare($data->amount, (string) $original->unapplied_amount) > 0) {
@@ -67,7 +74,7 @@ final class PaymentRefundWorkflowService
                 organizationUnitId: $original->organization_unit_id,
                 partyType: $original->party_type,
                 partyId: $original->party_id,
-                sourceType: 'payment_refund',
+                sourceType: PaymentSourceType::PaymentRefund->value,
                 sourceId: (int) $original->getKey(),
                 originalPaymentId: (int) $original->getKey(),
                 currencyId: $original->currency_id,

@@ -47,10 +47,20 @@ final class PostingProfileService
             $rules,
             $profile,
         ): FinancePostingProfile {
-            $profile ??= new FinancePostingProfile();
+            if ($profile instanceof FinancePostingProfile) {
+                $profile = FinancePostingProfile::query()
+                    ->lockForUpdate()
+                    ->findOrFail($profile->getKey());
+                $this->assertProfileIdentity($profile, $tenantId, $organizationUnitId);
+            } else {
+                $profile = new FinancePostingProfile();
+                $profile->forceFill([
+                    'tenant_id' => $tenantId,
+                    'organization_unit_id' => $organizationUnitId,
+                ]);
+            }
+
             $profile->forceFill([
-                'tenant_id' => $tenantId,
-                'organization_unit_id' => $organizationUnitId,
                 'code' => $code,
                 'name' => $name,
                 'description' => $description,
@@ -78,7 +88,7 @@ final class PostingProfileService
                     throw new InvalidArgumentException('Posting profile rule effective-to date cannot be before effective-from date.');
                 }
 
-                $duplicateKey = $lineKey.'|'.$effectiveFrom;
+                $duplicateKey = $this->ruleIdentity($lineKey, $effectiveFrom);
                 if (isset($seen[$duplicateKey])) {
                     throw new InvalidArgumentException("Posting profile rule [{$lineKey}] has duplicate effective-from date [{$effectiveFrom}].");
                 }
@@ -113,6 +123,8 @@ final class PostingProfileService
                     'description' => $rule['description'] ?? null,
                 ])->save();
             }
+
+            $this->assertNoRulesRemovedByOmission($profile, $seen);
 
             return $profile->refresh()->load('rules.role');
         }, 3);
@@ -195,6 +207,47 @@ final class PostingProfileService
         }
 
         return $dimension;
+    }
+
+    private function assertProfileIdentity(
+        FinancePostingProfile $profile,
+        int $tenantId,
+        ?int $organizationUnitId,
+    ): void {
+        if ((int) $profile->tenant_id !== $tenantId
+            || ($profile->organization_unit_id === null ? null : (int) $profile->organization_unit_id) !== $organizationUnitId
+        ) {
+            throw new InvalidArgumentException('Posting profile tenant and organization scope cannot be changed.');
+        }
+    }
+
+    /**
+     * @param  array<string, true>  $seen
+     */
+    private function assertNoRulesRemovedByOmission(FinancePostingProfile $profile, array $seen): void
+    {
+        $omittedRule = FinancePostingProfileRule::query()
+            ->where('tenant_id', (int) $profile->tenant_id)
+            ->where('posting_profile_id', $profile->getKey())
+            ->where('is_active', true)
+            ->get(['line_key', 'effective_from'])
+            ->first(function (FinancePostingProfileRule $rule) use ($seen): bool {
+                $effectiveFrom = $rule->effective_from?->format('Y-m-d')
+                    ?? (string) $rule->getRawOriginal('effective_from');
+
+                return ! isset($seen[$this->ruleIdentity((string) $rule->line_key, $effectiveFrom)]);
+            });
+
+        if ($omittedRule instanceof FinancePostingProfileRule) {
+            throw new InvalidArgumentException(
+                'Posting profile rules cannot be removed by omission. Submit the existing rule with is_active=false or an effective_to date.',
+            );
+        }
+    }
+
+    private function ruleIdentity(string $lineKey, string $effectiveFrom): string
+    {
+        return $lineKey.'|'.$effectiveFrom;
     }
 
     private function assertNoOverlappingRule(
