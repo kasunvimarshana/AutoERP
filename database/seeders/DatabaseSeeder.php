@@ -7,6 +7,7 @@ use Illuminate\Database\Seeder;
 use Modules\Auth\Database\Seeders\AuthSeeder;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\Customer\Database\Seeders\CustomerSeeder;
+use Modules\Finance\Database\Seeders\FinanceInvoicePostingSeeder;
 use Modules\Finance\Database\Seeders\FinanceSeeder;
 use Modules\Hr\Database\Seeders\HrSeeder;
 use Modules\Item\Database\Seeders\ItemSeeder;
@@ -44,6 +45,7 @@ class DatabaseSeeder extends Seeder
                 UomSeeder::class,
                 WarehouseSeeder::class,
                 FinanceSeeder::class,
+                FinanceInvoicePostingSeeder::class,
                 PaymentSeeder::class,
                 ItemSeeder::class,
                 SupplierSeeder::class,
