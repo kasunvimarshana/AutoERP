@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { MemoryRouter } from 'react-router-dom';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import RentalBillingPage from './RentalBillingPage';
@@ -103,7 +103,8 @@ describe('Rental billing review workflow', () => {
             </MemoryRouter>,
         );
 
-        const review = await screen.findByRole('button', { name: 'Review' });
+        const table = await screen.findByRole('table');
+        const review = within(table).getByRole('button', { name: 'Review' });
         expect(screen.queryByRole('button', { name: 'Approve calculation' })).not.toBeInTheDocument();
 
         await userEvent.click(review);
