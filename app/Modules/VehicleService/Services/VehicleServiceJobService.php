@@ -40,7 +40,8 @@ final class VehicleServiceJobService
                 $this->validator->nonNegative($data->odometerReading, 'Odometer reading cannot be negative.');
             }
 
-            $job = VehicleServiceJob::query()->create($this->attributes($data, true, '0.000000'));
+            $job = new VehicleServiceJob();
+            $job->forceFill($this->attributes($data, true, '0.000000'))->save();
             $this->statuses->recordCreated($job, $data->createdBy);
             if ($data->customerComplaint !== null) {
                 $this->inspections->save($job, new VehicleServiceInspectionData(
@@ -75,7 +76,7 @@ final class VehicleServiceJobService
             }
 
             $versionBefore = (int) $job->row_version;
-            $job->fill($this->attributes($data, false, (string) $job->grand_total))->save();
+            $job->forceFill($this->attributes($data, false, (string) $job->grand_total))->save();
             $job->refresh()->load('inspection');
             $complaintChanged = $this->syncCustomerComplaint($job, $data);
             if ($complaintChanged && (int) $job->row_version === $versionBefore) {
