@@ -39,6 +39,7 @@ final class PaymentPostingPolicyService
             PaymentPostingProfile::CustomerSettlement->value,
             PaymentPostingRole::Receivable,
             PaymentPostingRole::CustomerAdvance,
+            PaymentPostingRole::Receivable,
         );
     }
 
@@ -48,6 +49,7 @@ final class PaymentPostingPolicyService
             PaymentPostingProfile::SupplierSettlement->value,
             PaymentPostingRole::Payable,
             PaymentPostingRole::SupplierAdvance,
+            PaymentPostingRole::Payable,
         );
     }
 
@@ -64,8 +66,9 @@ final class PaymentPostingPolicyService
 
             return new PaymentPostingPolicyData(
                 PaymentPostingProfile::RentalDeposit->value,
-                PaymentPostingRole::Receivable,
                 PaymentPostingRole::CustomerDeposit,
+                PaymentPostingRole::CustomerDeposit,
+                PaymentPostingRole::Receivable,
             );
         }
 
@@ -74,6 +77,7 @@ final class PaymentPostingPolicyService
                 PaymentPostingProfile::CustomerAdvance->value,
                 PaymentPostingRole::Receivable,
                 PaymentPostingRole::CustomerAdvance,
+                PaymentPostingRole::Receivable,
             );
         }
 
@@ -82,6 +86,7 @@ final class PaymentPostingPolicyService
                 PaymentPostingProfile::SupplierAdvance->value,
                 PaymentPostingRole::Payable,
                 PaymentPostingRole::SupplierAdvance,
+                PaymentPostingRole::Payable,
             );
         }
 
@@ -118,6 +123,7 @@ final class PaymentPostingPolicyService
             $originalPolicy->postingProfileCode,
             $originalPolicy->unappliedRole,
             $originalPolicy->unappliedRole,
+            $originalPolicy->allocationTargetRole,
         );
     }
 
@@ -132,7 +138,7 @@ final class PaymentPostingPolicyService
             );
         }
 
-        return new PaymentPostingPolicyData($profileCode, $role, $role);
+        return new PaymentPostingPolicyData($profileCode, $role, $role, $role);
     }
 
     private function direction(Payment $payment): PaymentDirection
