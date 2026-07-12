@@ -10,6 +10,7 @@ use Modules\Finance\Contracts\FinanceSourceReversalInterface;
 use Modules\Finance\DTOs\PostingContext;
 use Modules\Finance\DTOs\PostingLine;
 use Modules\Finance\DTOs\PostingSourceData;
+use Modules\Payment\Constants\PaymentAllocationFinanceMetadata;
 use Modules\Payment\Enums\AllocationStatus;
 use Modules\Payment\Enums\PaymentDirection;
 use Modules\Payment\Enums\PaymentPostingStatus;
@@ -89,7 +90,7 @@ final class PaymentAllocationFinanceService
                 ),
             ];
 
-        $this->postings->post(new PostingContext(
+        $result = $this->postings->post(new PostingContext(
             source: new PostingSourceData(
                 sourceType: PaymentSourceType::PaymentAllocation->value,
                 sourceId: (int) $allocation->getKey(),
@@ -108,6 +109,13 @@ final class PaymentAllocationFinanceService
             description: 'Payment allocation '.$payment->payment_number.' to '.$allocation->invoice_number_snapshot,
             postingProfileCode: $policy->postingProfileCode,
         ), $actorId);
+
+        $allocation->forceFill([
+            'metadata' => array_merge(is_array($allocation->metadata) ? $allocation->metadata : [], [
+                PaymentAllocationFinanceMetadata::POSTING_REFERENCE => $result->journalNumber,
+            ]),
+            'row_version' => (int) $allocation->row_version + 1,
+        ])->save();
     }
 
     public function reverse(
@@ -117,7 +125,15 @@ final class PaymentAllocationFinanceService
         string $reason,
         ?int $actorId = null,
     ): void {
-        $this->reversals->reverseSource(
+        $metadata = is_array($allocation->metadata) ? $allocation->metadata : [];
+        if (trim((string) ($metadata[PaymentAllocationFinanceMetadata::POSTING_REFERENCE] ?? '')) === '') {
+            return;
+        }
+        if (trim((string) ($metadata[PaymentAllocationFinanceMetadata::REVERSAL_REFERENCE] ?? '')) !== '') {
+            throw new InvalidArgumentException('Payment allocation Finance reclassification is already reversed.');
+        }
+
+        $result = $this->reversals->reverseSource(
             (int) $payment->tenant_id,
             $payment->organization_unit_id,
             self::SOURCE_MODULE,
@@ -127,5 +143,12 @@ final class PaymentAllocationFinanceService
             $actorId,
             $reason,
         );
+
+        $allocation->forceFill([
+            'metadata' => array_merge($metadata, [
+                PaymentAllocationFinanceMetadata::REVERSAL_REFERENCE => $result->journalNumber,
+            ]),
+            'row_version' => (int) $allocation->row_version + 1,
+        ])->save();
     }
 }
