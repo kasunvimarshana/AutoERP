@@ -47,7 +47,9 @@ interface InvoiceLookupFilters {
     direction?: 'inbound' | 'outbound' | null;
     status?: string | null;
     partyId?: number | null;
+    currencyId?: number | null;
     balanceStatus?: string | null;
+    settlementEligible?: boolean;
 }
 
 type AvailableVehicleOption = VehicleSummary & NamedResource;
@@ -171,7 +173,9 @@ export function RentalInvoiceLookupSelect({
     direction,
     status,
     partyId,
+    currencyId,
     balanceStatus,
+    settlementEligible,
     ...props
 }: LookupProps & InvoiceLookupFilters) {
     const search = useCallback(
@@ -180,9 +184,11 @@ export function RentalInvoiceLookupSelect({
             direction,
             status,
             partyId,
+            currencyId,
             balanceStatus,
+            settlementEligible,
         }),
-        [invoiceType, direction, status, partyId, balanceStatus],
+        [invoiceType, direction, status, partyId, currencyId, balanceStatus, settlementEligible],
     );
 
     return <LookupSelect label="Invoice" search={search} placeholder="Search invoice number or party..." {...props} />;
@@ -370,7 +376,9 @@ async function searchInvoices(
         direction: filters.direction ?? undefined,
         status: filters.status ?? undefined,
         party_id: filters.partyId ?? undefined,
+        currency_id: filters.currencyId ?? undefined,
         balance_status: filters.balanceStatus ?? undefined,
+        settlement_eligible: filters.settlementEligible,
     }, signal);
 
     return {
