@@ -72,52 +72,13 @@ final class FinancePaymentPostingSeeder extends Seeder
         $assetRoot = $this->account($tenantId, self::ASSET_ROOT_CODE);
         $liabilityRoot = $this->account($tenantId, self::LIABILITY_ROOT_CODE);
 
-        $supplierAdvanceCategory = $this->category(
-            $tenantId,
-            $assetType,
-            self::SUPPLIER_ADVANCE_CATEGORY,
-            'Supplier Advances',
-        );
-        $customerAdvanceCategory = $this->category(
-            $tenantId,
-            $liabilityType,
-            self::CUSTOMER_ADVANCE_CATEGORY,
-            'Customer Advances',
-        );
-        $customerDepositCategory = $this->category(
-            $tenantId,
-            $liabilityType,
-            self::CUSTOMER_DEPOSIT_CATEGORY,
-            'Customer Deposits',
-        );
+        $supplierAdvanceCategory = $this->category($tenantId, $assetType, self::SUPPLIER_ADVANCE_CATEGORY, 'Supplier Advances');
+        $customerAdvanceCategory = $this->category($tenantId, $liabilityType, self::CUSTOMER_ADVANCE_CATEGORY, 'Customer Advances');
+        $customerDepositCategory = $this->category($tenantId, $liabilityType, self::CUSTOMER_DEPOSIT_CATEGORY, 'Customer Deposits');
 
-        $supplierAdvance = $this->postingAccount(
-            $tenantId,
-            $organizationUnitId,
-            self::SUPPLIER_ADVANCE_ACCOUNT,
-            'Supplier Advances',
-            $assetType,
-            $supplierAdvanceCategory,
-            $assetRoot,
-        );
-        $customerAdvance = $this->postingAccount(
-            $tenantId,
-            $organizationUnitId,
-            self::CUSTOMER_ADVANCE_ACCOUNT,
-            'Customer Advances',
-            $liabilityType,
-            $customerAdvanceCategory,
-            $liabilityRoot,
-        );
-        $customerDeposit = $this->postingAccount(
-            $tenantId,
-            $organizationUnitId,
-            self::CUSTOMER_DEPOSIT_ACCOUNT,
-            'Rental Security Deposits',
-            $liabilityType,
-            $customerDepositCategory,
-            $liabilityRoot,
-        );
+        $supplierAdvance = $this->postingAccount($tenantId, $organizationUnitId, self::SUPPLIER_ADVANCE_ACCOUNT, 'Supplier Advances', $assetType, $supplierAdvanceCategory, $assetRoot);
+        $customerAdvance = $this->postingAccount($tenantId, $organizationUnitId, self::CUSTOMER_ADVANCE_ACCOUNT, 'Customer Advances', $liabilityType, $customerAdvanceCategory, $liabilityRoot);
+        $customerDeposit = $this->postingAccount($tenantId, $organizationUnitId, self::CUSTOMER_DEPOSIT_ACCOUNT, 'Rental Security Deposits', $liabilityType, $customerDepositCategory, $liabilityRoot);
 
         return [
             'cash' => $this->account($tenantId, self::CASH_ACCOUNT),
@@ -130,75 +91,33 @@ final class FinancePaymentPostingSeeder extends Seeder
         ];
     }
 
-    /**
-     * @param array<string, FinanceAccount> $accounts
-     */
-    private function seedPostingProfiles(
-        int $tenantId,
-        ?int $organizationUnitId,
-        array $accounts,
-    ): void {
+    /** @param array<string, FinanceAccount> $accounts */
+    private function seedPostingProfiles(int $tenantId, ?int $organizationUnitId, array $accounts): void
+    {
         $definitions = [
-            'customer_receipt' => [
-                'name' => 'Customer Receipt',
-                'roles' => ['cash', 'bank', 'receivable', 'customer_advance'],
-            ],
-            'supplier_payment' => [
-                'name' => 'Supplier Payment',
-                'roles' => ['cash', 'bank', 'payable', 'supplier_advance'],
-            ],
-            'customer_advance' => [
-                'name' => 'Customer Advance Receipt',
-                'roles' => ['cash', 'bank', 'receivable', 'customer_advance'],
-            ],
-            'supplier_advance' => [
-                'name' => 'Supplier Advance Payment',
-                'roles' => ['cash', 'bank', 'payable', 'supplier_advance'],
-            ],
-            'rental_deposit' => [
-                'name' => 'Rental Security Deposit',
-                'roles' => ['cash', 'bank', 'customer_deposit'],
-            ],
+            'payment_received' => ['name' => 'Payment Received', 'roles' => ['cash', 'bank', 'receivable', 'customer_advance']],
+            'payment_made' => ['name' => 'Payment Made', 'roles' => ['cash', 'bank', 'payable', 'supplier_advance']],
+            'customer_advance' => ['name' => 'Customer Advance Receipt', 'roles' => ['cash', 'bank', 'receivable', 'customer_advance']],
+            'supplier_advance' => ['name' => 'Supplier Advance Payment', 'roles' => ['cash', 'bank', 'payable', 'supplier_advance']],
+            'rental_deposit' => ['name' => 'Rental Security Deposit', 'roles' => ['cash', 'bank', 'receivable', 'customer_deposit']],
         ];
 
         foreach ($definitions as $profileCode => $definition) {
             $profile = FinancePostingProfile::query()->updateOrCreate(
-                [
-                    'tenant_id' => $tenantId,
-                    'organization_unit_id' => $organizationUnitId,
-                    'code' => $profileCode,
-                ],
-                [
-                    'name' => $definition['name'],
-                    'description' => 'Default semantic payment posting profile.',
-                    'is_active' => true,
-                ],
+                ['tenant_id' => $tenantId, 'organization_unit_id' => $organizationUnitId, 'code' => $profileCode],
+                ['name' => $definition['name'], 'description' => 'Default semantic payment posting profile.', 'is_active' => true],
             );
 
             foreach ($definition['roles'] as $roleCode) {
                 $account = $accounts[$roleCode];
                 $role = FinanceAccountRole::query()->updateOrCreate(
                     ['tenant_id' => $tenantId, 'code' => $roleCode],
-                    [
-                        'name' => Str::headline($roleCode),
-                        'description' => 'Default AutoERP semantic Finance account role.',
-                        'is_active' => true,
-                    ],
+                    ['name' => Str::headline($roleCode), 'description' => 'Default AutoERP semantic Finance account role.', 'is_active' => true],
                 );
                 $this->assign($tenantId, $organizationUnitId, $role, $account);
                 FinancePostingProfileRule::query()->updateOrCreate(
-                    [
-                        'tenant_id' => $tenantId,
-                        'posting_profile_id' => $profile->getKey(),
-                        'line_key' => $roleCode,
-                        'effective_from' => self::OPENING_EFFECTIVE_DATE,
-                    ],
-                    [
-                        'account_role_id' => $role->getKey(),
-                        'effective_to' => null,
-                        'is_active' => true,
-                        'description' => $definition['name'].' '.$roleCode,
-                    ],
+                    ['tenant_id' => $tenantId, 'posting_profile_id' => $profile->getKey(), 'line_key' => $roleCode, 'effective_from' => self::OPENING_EFFECTIVE_DATE],
+                    ['account_role_id' => $role->getKey(), 'effective_to' => null, 'is_active' => true, 'description' => $definition['name'].' '.$roleCode],
                 );
             }
         }
@@ -206,47 +125,24 @@ final class FinancePaymentPostingSeeder extends Seeder
 
     private function accountType(int $tenantId, string $code): FinanceAccountType
     {
-        return FinanceAccountType::query()
-            ->where('tenant_id', $tenantId)
-            ->where('code', $code)
-            ->firstOrFail();
+        return FinanceAccountType::query()->where('tenant_id', $tenantId)->where('code', $code)->firstOrFail();
     }
 
     private function account(int $tenantId, string $code): FinanceAccount
     {
-        return FinanceAccount::query()
-            ->where('tenant_id', $tenantId)
-            ->where('code', $code)
-            ->firstOrFail();
+        return FinanceAccount::query()->where('tenant_id', $tenantId)->where('code', $code)->firstOrFail();
     }
 
-    private function category(
-        int $tenantId,
-        FinanceAccountType $type,
-        string $code,
-        string $name,
-    ): FinanceAccountCategory {
+    private function category(int $tenantId, FinanceAccountType $type, string $code, string $name): FinanceAccountCategory
+    {
         return FinanceAccountCategory::query()->updateOrCreate(
             ['tenant_id' => $tenantId, 'code' => $code],
-            [
-                'account_type_id' => $type->getKey(),
-                'name' => $name,
-                'description' => 'Default payment control account category.',
-                'is_active' => true,
-                'sort_order' => 100,
-            ],
+            ['account_type_id' => $type->getKey(), 'name' => $name, 'description' => 'Default payment control account category.', 'is_active' => true, 'sort_order' => 100],
         );
     }
 
-    private function postingAccount(
-        int $tenantId,
-        ?int $organizationUnitId,
-        string $code,
-        string $name,
-        FinanceAccountType $type,
-        FinanceAccountCategory $category,
-        FinanceAccount $parent,
-    ): FinanceAccount {
+    private function postingAccount(int $tenantId, ?int $organizationUnitId, string $code, string $name, FinanceAccountType $type, FinanceAccountCategory $category, FinanceAccount $parent): FinanceAccount
+    {
         return FinanceAccount::query()->updateOrCreate(
             ['tenant_id' => $tenantId, 'code' => $code],
             [
@@ -268,24 +164,11 @@ final class FinancePaymentPostingSeeder extends Seeder
         );
     }
 
-    private function assign(
-        int $tenantId,
-        ?int $organizationUnitId,
-        FinanceAccountRole $role,
-        FinanceAccount $account,
-    ): void {
+    private function assign(int $tenantId, ?int $organizationUnitId, FinanceAccountRole $role, FinanceAccount $account): void
+    {
         FinanceAccountAssignment::query()->updateOrCreate(
-            [
-                'tenant_id' => $tenantId,
-                'organization_unit_id' => $organizationUnitId,
-                'account_role_id' => $role->getKey(),
-                'effective_from' => self::OPENING_EFFECTIVE_DATE,
-            ],
-            [
-                'account_id' => $account->getKey(),
-                'effective_to' => null,
-                'is_active' => true,
-            ],
+            ['tenant_id' => $tenantId, 'organization_unit_id' => $organizationUnitId, 'account_role_id' => $role->getKey(), 'effective_from' => self::OPENING_EFFECTIVE_DATE],
+            ['account_id' => $account->getKey(), 'effective_to' => null, 'is_active' => true],
         );
     }
 }
