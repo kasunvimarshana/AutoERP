@@ -10,6 +10,7 @@ enum FinanceAccountRoleCode: string
     case Bank = 'bank';
     case Receivable = 'receivable';
     case Payable = 'payable';
+    case GoodsReceivedNotInvoiced = 'goods_received_not_invoiced';
     case Revenue = 'revenue';
     case ServiceRevenue = 'service_revenue';
     case RentalRevenue = 'rental_revenue';
