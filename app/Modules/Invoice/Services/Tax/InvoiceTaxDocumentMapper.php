@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Invoice\Services\Tax;
 
 use BackedEnum;
+use Modules\Invoice\Constants\InvoiceFinanceSource;
 use Modules\Invoice\Constants\InvoiceTaxMetadata;
 use Modules\Invoice\Models\Invoice;
 use Modules\Tax\Data\TaxableDocumentData;
@@ -12,7 +13,7 @@ use Modules\Tax\Data\TaxableDocumentLineData;
 
 final class InvoiceTaxDocumentMapper
 {
-    public function map(Invoice $invoice): TaxableDocumentData
+    public function map(Invoice $invoice, ?string $transactionDate = null): TaxableDocumentData
     {
         $invoice->loadMissing('lines');
         $lines = [];
@@ -40,12 +41,14 @@ final class InvoiceTaxDocumentMapper
             tenantId: (int) $invoice->tenant_id,
             organizationUnitId: $invoice->organization_unit_id === null ? null : (int) $invoice->organization_unit_id,
             documentType: 'invoice_'.$direction.'_'.$type,
-            sourceModule: 'invoice',
-            sourceType: 'invoice',
+            sourceModule: InvoiceFinanceSource::MODULE,
+            sourceType: InvoiceFinanceSource::POSTING_TYPE,
             sourceId: (int) $invoice->getKey(),
             sourceNumber: (string) $invoice->invoice_number,
             sourceDate: $invoice->invoice_date->toDateString(),
-            transactionDate: $invoice->posted_at?->toDateString() ?? $invoice->invoice_date->toDateString(),
+            transactionDate: $transactionDate
+                ?? $invoice->posted_at?->toDateString()
+                ?? $invoice->invoice_date->toDateString(),
             partyType: $partyType,
             partyId: $invoice->party_id === null ? null : (int) $invoice->party_id,
             lines: $lines,
