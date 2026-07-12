@@ -20,9 +20,7 @@ final class InvoiceStatusService
         private readonly InvoicePostingPlanService $postingPlans,
     ) {}
 
-    /**
-     * @return array<string, list<string>>
-     */
+    /** @return array<string, list<string>> */
     private function transitions(): array
     {
         return [
@@ -44,6 +42,7 @@ final class InvoiceStatusService
                 InvoiceStatus::Paid->value,
             ],
             InvoiceStatus::Paid->value => [],
+            InvoiceStatus::Reversed->value => [],
             InvoiceStatus::Cancelled->value => [],
             InvoiceStatus::Void->value => [],
         ];
