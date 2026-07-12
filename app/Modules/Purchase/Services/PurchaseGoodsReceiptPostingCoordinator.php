@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Purchase\Services;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
+use InvalidArgumentException;
 use Modules\Purchase\Enums\GoodsReceiptNoteStatus;
 use Modules\Purchase\Models\GoodsReceiptNote;
 
@@ -35,8 +37,24 @@ final class PurchaseGoodsReceiptPostingCoordinator
         ?int $actorId = null,
         ?int $expectedVersion = null,
     ): GoodsReceiptNote {
+        $reason = trim($reason);
+        if ($reason === '') {
+            throw new InvalidArgumentException('Goods receipt reversal reason is required.');
+        }
+        try {
+            $normalizedDate = CarbonImmutable::parse($reversalDate)->toDateString();
+        } catch (\Throwable) {
+            throw new InvalidArgumentException('Goods receipt reversal date is invalid.');
+        }
+        if ($normalizedDate !== $reversalDate) {
+            throw new InvalidArgumentException('Goods receipt reversal date must use YYYY-MM-DD format.');
+        }
+
         return DB::transaction(function () use ($goodsReceipt, $reversalDate, $reason, $actorId, $expectedVersion): GoodsReceiptNote {
             $current = GoodsReceiptNote::query()->findOrFail($goodsReceipt->getKey());
+            if ($reversalDate < $current->received_date->toDateString()) {
+                throw new InvalidArgumentException('Goods receipt reversal date cannot be before the receipt date.');
+            }
             if ($current->status === GoodsReceiptNoteStatus::Reversed) {
                 return $current->load(['lines.inventoryMovement', 'adjustments']);
             }
