@@ -47,57 +47,50 @@ final class PostingProfileService
             $rules,
             $profile,
         ): FinancePostingProfile {
-            $profile ??= new FinancePostingProfile();
+            $profile = $this->lockProfile($tenantId, $organizationUnitId, $profile);
             $profile->forceFill([
-                'tenant_id' => $tenantId,
-                'organization_unit_id' => $organizationUnitId,
                 'code' => $code,
                 'name' => $name,
                 'description' => $description,
                 'is_active' => $isActive,
             ])->save();
 
-            $seen = [];
-            foreach ($rules as $rule) {
-                $lineKey = trim((string) ($rule['line_key'] ?? ''));
-                $accountRoleId = (int) ($rule['account_role_id'] ?? 0);
-                $effectiveFrom = $this->normalizeDate(
-                    $rule['effective_from'] ?? FinancePostingProfileRule::OPENING_EFFECTIVE_DATE,
-                    'Posting profile rule effective-from date',
-                );
-                $effectiveTo = $this->normalizeNullableDate(
-                    $rule['effective_to'] ?? null,
-                    'Posting profile rule effective-to date',
-                );
-                $ruleIsActive = (bool) ($rule['is_active'] ?? true);
+            $normalizedRules = $this->normalizeRules($rules);
+            $existingRules = FinancePostingProfileRule::query()
+                ->where('tenant_id', $tenantId)
+                ->where('posting_profile_id', $profile->getKey())
+                ->lockForUpdate()
+                ->get()
+                ->keyBy(fn (FinancePostingProfileRule $rule): string => $this->ruleIdentity(
+                    (string) $rule->line_key,
+                    $rule->effective_from?->toDateString() ?? FinancePostingProfileRule::OPENING_EFFECTIVE_DATE,
+                ));
 
-                if ($lineKey === '' || $accountRoleId < 1) {
-                    throw new InvalidArgumentException('Posting profile rules require a line key and account role.');
+            $submittedIdentities = array_fill_keys(
+                array_map(
+                    fn (array $rule): string => $this->ruleIdentity($rule['line_key'], $rule['effective_from']),
+                    $normalizedRules,
+                ),
+                true,
+            );
+
+            foreach ($existingRules as $identity => $existingRule) {
+                if (! isset($submittedIdentities[$identity]) && (bool) $existingRule->is_active) {
+                    $existingRule->forceFill(['is_active' => false])->save();
                 }
-                if ($effectiveTo !== null && strcmp($effectiveTo, $effectiveFrom) < 0) {
-                    throw new InvalidArgumentException('Posting profile rule effective-to date cannot be before effective-from date.');
-                }
+            }
 
-                $duplicateKey = $lineKey.'|'.$effectiveFrom;
-                if (isset($seen[$duplicateKey])) {
-                    throw new InvalidArgumentException("Posting profile rule [{$lineKey}] has duplicate effective-from date [{$effectiveFrom}].");
-                }
-                $seen[$duplicateKey] = true;
+            foreach ($normalizedRules as $rule) {
+                $identity = $this->ruleIdentity($rule['line_key'], $rule['effective_from']);
+                $existing = $existingRules->get($identity);
 
-                $existing = FinancePostingProfileRule::query()
-                    ->where('tenant_id', $tenantId)
-                    ->where('posting_profile_id', $profile->getKey())
-                    ->where('line_key', $lineKey)
-                    ->whereDate('effective_from', $effectiveFrom)
-                    ->first();
-
-                if ($ruleIsActive) {
+                if ($rule['is_active']) {
                     $this->assertNoOverlappingRule(
                         $tenantId,
                         (int) $profile->getKey(),
-                        $lineKey,
-                        $effectiveFrom,
-                        $effectiveTo,
+                        $rule['line_key'],
+                        $rule['effective_from'],
+                        $rule['effective_to'],
                         $existing?->getKey(),
                     );
                 }
@@ -105,12 +98,12 @@ final class PostingProfileService
                 ($existing ?? new FinancePostingProfileRule())->forceFill([
                     'tenant_id' => $tenantId,
                     'posting_profile_id' => $profile->getKey(),
-                    'line_key' => $lineKey,
-                    'account_role_id' => $accountRoleId,
-                    'effective_from' => $effectiveFrom,
-                    'effective_to' => $effectiveTo,
-                    'is_active' => $ruleIsActive,
-                    'description' => $rule['description'] ?? null,
+                    'line_key' => $rule['line_key'],
+                    'account_role_id' => $rule['account_role_id'],
+                    'effective_from' => $rule['effective_from'],
+                    'effective_to' => $rule['effective_to'],
+                    'is_active' => $rule['is_active'],
+                    'description' => $rule['description'],
                 ])->save();
             }
 
@@ -195,6 +188,88 @@ final class PostingProfileService
         }
 
         return $dimension;
+    }
+
+    private function lockProfile(
+        int $tenantId,
+        ?int $organizationUnitId,
+        ?FinancePostingProfile $profile,
+    ): FinancePostingProfile {
+        if (! $profile instanceof FinancePostingProfile || $profile->getKey() === null) {
+            $created = new FinancePostingProfile();
+            $created->forceFill([
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $organizationUnitId,
+            ]);
+
+            return $created;
+        }
+
+        $query = FinancePostingProfile::query()
+            ->whereKey($profile->getKey())
+            ->where('tenant_id', $tenantId);
+        $organizationUnitId === null
+            ? $query->whereNull('organization_unit_id')
+            : $query->where('organization_unit_id', $organizationUnitId);
+        $locked = $query->lockForUpdate()->first();
+
+        if (! $locked instanceof FinancePostingProfile) {
+            throw new InvalidArgumentException('Posting profile tenant and organization ownership cannot be changed.');
+        }
+
+        return $locked;
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $rules
+     * @return list<array{line_key: string, account_role_id: int, effective_from: string, effective_to: ?string, is_active: bool, description: ?string}>
+     */
+    private function normalizeRules(array $rules): array
+    {
+        $normalized = [];
+        $seen = [];
+
+        foreach ($rules as $rule) {
+            $lineKey = trim((string) ($rule['line_key'] ?? ''));
+            $accountRoleId = (int) ($rule['account_role_id'] ?? 0);
+            $effectiveFrom = $this->normalizeDate(
+                $rule['effective_from'] ?? FinancePostingProfileRule::OPENING_EFFECTIVE_DATE,
+                'Posting profile rule effective-from date',
+            );
+            $effectiveTo = $this->normalizeNullableDate(
+                $rule['effective_to'] ?? null,
+                'Posting profile rule effective-to date',
+            );
+
+            if ($lineKey === '' || $accountRoleId < 1) {
+                throw new InvalidArgumentException('Posting profile rules require a line key and account role.');
+            }
+            if ($effectiveTo !== null && strcmp($effectiveTo, $effectiveFrom) < 0) {
+                throw new InvalidArgumentException('Posting profile rule effective-to date cannot be before effective-from date.');
+            }
+
+            $identity = $this->ruleIdentity($lineKey, $effectiveFrom);
+            if (isset($seen[$identity])) {
+                throw new InvalidArgumentException("Posting profile rule [{$lineKey}] has duplicate effective-from date [{$effectiveFrom}].");
+            }
+            $seen[$identity] = true;
+
+            $normalized[] = [
+                'line_key' => $lineKey,
+                'account_role_id' => $accountRoleId,
+                'effective_from' => $effectiveFrom,
+                'effective_to' => $effectiveTo,
+                'is_active' => (bool) ($rule['is_active'] ?? true),
+                'description' => isset($rule['description']) ? (string) $rule['description'] : null,
+            ];
+        }
+
+        return $normalized;
+    }
+
+    private function ruleIdentity(string $lineKey, string $effectiveFrom): string
+    {
+        return $lineKey.'|'.$effectiveFrom;
     }
 
     private function assertNoOverlappingRule(
