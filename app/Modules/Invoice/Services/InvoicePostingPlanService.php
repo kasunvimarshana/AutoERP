@@ -61,6 +61,7 @@ final class InvoicePostingPlanService
                     static fn (InvoicePostingLineData $line): array => $line->toArray(),
                     $data->lines,
                 ),
+                'description' => $data->description,
                 'status' => InvoicePostingPlanStatus::Prepared->value,
                 'row_version' => 1,
                 'created_by' => $actorId,
@@ -200,7 +201,7 @@ final class InvoicePostingPlanService
             currencyId: $invoice->currency_id,
             exchangeRate: (string) $invoice->exchange_rate,
             lines: $lines,
-            description: 'Invoice posting '.$invoice->invoice_number,
+            description: $plan->description ?: 'Invoice posting '.$invoice->invoice_number,
             postingProfileCode: $profile->value,
         );
     }
