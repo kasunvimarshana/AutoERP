@@ -44,6 +44,8 @@ describe('VehicleServiceInvoiceCreatePage', () => {
             }),
         ));
         expect(await screen.findByText('Posted invoice')).toBeInTheDocument();
+        expect(window.location.pathname).toBe('/invoices/41');
+        expect(window.location.search).toBe('?from=vehicle-service&job_id=9');
     });
     it('clears an old preview when an invoice header value changes', async () => {
         const user = userEvent.setup();

@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
@@ -26,7 +26,7 @@ export default function VehicleServiceDocumentTab({
 }: {
     jobId: number;
     expectedVersion: number;
-    onChanged?: () => void;
+    onChanged?: (nextVersion: number) => void;
 }) {
     const result = useApi((signal) => listVehicleServiceDocuments(jobId, signal), [jobId]);
     const options = useApi((signal) => getVehicleServiceDocumentOptions(jobId, signal), [jobId]);
@@ -38,9 +38,14 @@ export default function VehicleServiceDocumentTab({
     const [busyId, setBusyId] = useState<number | null>(null);
     const [deleteTarget, setDeleteTarget] = useState<VehicleServiceDocument | null>(null);
     const [error, setError] = useState<ApiError | null>(null);
+    const [localExpectedVersion, setLocalExpectedVersion] = useState(expectedVersion);
     const formGuard = useMutationFormGuard(saving);
 
     const selectedType = type || options.data?.document_types[0] || '';
+
+    useEffect(() => {
+        setLocalExpectedVersion(expectedVersion);
+    }, [expectedVersion]);
 
     async function submit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
@@ -49,7 +54,7 @@ export default function VehicleServiceDocumentTab({
         setSaving(true);
         setError(null);
         const payload = new FormData();
-        payload.set('expected_version', String(expectedVersion));
+        payload.set('expected_version', String(localExpectedVersion));
         payload.set('document_type', selectedType);
         if (description.trim() !== '') payload.set('description', description.trim());
         payload.set('file', file);
@@ -61,7 +66,8 @@ export default function VehicleServiceDocumentTab({
             setFile(null);
             setFileInputKey((current) => current + 1);
             formGuard.markSaved();
-            onChanged?.();
+            setLocalExpectedVersion((current) => current + 1);
+            onChanged?.(localExpectedVersion + 1);
         } catch (requestError) {
             setError(toApiError(requestError));
         } finally {
@@ -86,10 +92,11 @@ export default function VehicleServiceDocumentTab({
         setBusyId(deleteTarget.id);
         setError(null);
         try {
-            await deleteVehicleServiceDocument(jobId, deleteTarget.id, expectedVersion);
+            await deleteVehicleServiceDocument(jobId, deleteTarget.id, localExpectedVersion);
             result.setData((result.data ?? []).filter((document) => document.id !== deleteTarget.id));
             setDeleteTarget(null);
-            onChanged?.();
+            setLocalExpectedVersion((current) => current + 1);
+            onChanged?.(localExpectedVersion + 1);
         } catch (requestError) {
             setError(toApiError(requestError));
         } finally {

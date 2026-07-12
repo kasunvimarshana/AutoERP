@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
@@ -17,6 +17,7 @@ import { formatMoney } from '@/shared/utils/formatMoney';
 import { approvePurchaseReturn, cancelPurchaseReturn, getPurchaseReturn, postPurchaseReturn, type PurchaseReturnLine } from '../purchaseApi';
 import { PurchaseDocumentShell, PurchasePageHeader } from '../components/PurchaseDocumentShell';
 import { hasPurchasePermission, purchasePermissions } from '../purchasePermissions';
+import { useDetailResourceStore } from '@/shared/state/useDetailResourceStore';
 
 type Tab = 'summary' | 'lines' | 'adjustments' | 'linked';
 
@@ -25,12 +26,20 @@ export default function PurchaseReturnDetailPage() {
     const id = Number(useParams().id);
     const auth = useAuth();
     const result = useApi((signal) => getPurchaseReturn(id, signal), [id]);
+    const returnState = useDetailResourceStore(result.data);
     const [tab, setTab] = useState<Tab>('summary');
     const [actionError, setActionError] = useState<ApiError | null>(null);
     const [busy, setBusy] = useState(false);
-    if (result.loading) return <LoadingState />;
-    if (!result.data) return <ErrorAlert error={result.error} />;
-    const row = result.data;
+
+    useEffect(() => {
+        if (result.data !== null) {
+            returnState.setData(result.data);
+        }
+    }, [result.data, returnState]);
+
+    if (result.loading && returnState.data === null) return <LoadingState />;
+    if (!returnState.data) return <ErrorAlert error={result.error} />;
+    const row = returnState.data;
     const capabilities = row.capabilities ?? {};
     const can = (permission: string) => hasPurchasePermission(auth.permissions, permission);
     const run = async (action: 'approve' | 'post' | 'cancel') => {
@@ -45,12 +54,12 @@ export default function PurchaseReturnDetailPage() {
         setActionError(null);
         try {
             const payload = { expected_version: row.row_version };
-            if (action === 'approve') result.setData(await approvePurchaseReturn(row.id, payload));
+            if (action === 'approve') returnState.setData(await approvePurchaseReturn(row.id, payload));
             if (action === 'post') {
                 await postPurchaseReturn(row.id, payload);
-                result.reload();
+                returnState.setData(await getPurchaseReturn(row.id));
             }
-            if (action === 'cancel') result.setData(await cancelPurchaseReturn(row.id, payload));
+            if (action === 'cancel') returnState.setData(await cancelPurchaseReturn(row.id, payload));
         } catch (requestError) {
             setActionError(toApiError(requestError));
         } finally {

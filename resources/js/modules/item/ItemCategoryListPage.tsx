@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button, LinkButton } from '@/shared/components/Button';
@@ -17,6 +17,7 @@ import { useAuth } from '@/modules/auth/AuthProvider';
 import { deleteItemCategory, listItemCategories, updateItemCategory } from './itemApi';
 import type { ItemCategory } from './itemTypes';
 import { hasItemPermission, itemPermissions } from './itemPermissions';
+import { notifySuccess } from '@/shared/notifications/appToast';
 
 export default function ItemCategoryListPage() {
     const auth = useAuth();
@@ -33,6 +34,13 @@ export default function ItemCategoryListPage() {
         page,
         per_page: 25,
     }, signal), [debounced, active, page]);
+    const [collection, setCollection] = useState(result.data);
+
+    useEffect(() => {
+        if (result.data) {
+            setCollection(result.data);
+        }
+    }, [result.data]);
 
     const columns: DataColumn<ItemCategory>[] = [
         { key: 'category', header: 'Category', render: (row) => <Link className="font-semibold text-sky-700 hover:underline" to={`/item-categories/${row.id}`}>{row.name}<span className="block text-xs font-normal text-slate-500">{row.code}</span></Link> },
@@ -50,15 +58,15 @@ export default function ItemCategoryListPage() {
             <Select label="Status" value={active} onChange={(event) => { setActive(event.target.value); setPage(1); }} placeholder="Any status" options={[{ value: 'true', label: 'Active' }, { value: 'false', label: 'Inactive' }]} />
         </div>
         <ErrorAlert error={actionError ?? result.error} />
-        {result.loading ? <LoadingState /> : <DataTable rows={result.data?.data ?? []} columns={columns} rowKey={(row) => row.id} emptyMessage="No item categories found." />}
-        <Pagination meta={result.data?.meta} onPageChange={setPage} />
+        {result.loading && !collection ? <LoadingState /> : <DataTable rows={collection?.data ?? []} columns={columns} rowKey={(row) => row.id} emptyMessage="No item categories found." />}
+        <Pagination meta={collection?.meta} onPageChange={setPage} />
         {confirmDialog}
     </>;
 
     async function toggle(row: ItemCategory) {
         setActionError(null);
         try {
-            await updateItemCategory(Number(row.id), {
+            const updated = await updateItemCategory(Number(row.id), {
                 code: row.code,
                 name: row.name,
                 parent_id: row.parent ? Number(row.parent.id) : null,
@@ -66,7 +74,8 @@ export default function ItemCategoryListPage() {
                 sort_order: row.sort_order,
                 is_active: !row.is_active,
             });
-            result.reload();
+            setCollection((current) => updateCategoryCollection(current, updated, active));
+            notifySuccess(updated.is_active ? 'Category activated successfully.' : 'Category deactivated successfully.');
         } catch (error) {
             setActionError(toApiError(error));
         }
@@ -77,9 +86,54 @@ export default function ItemCategoryListPage() {
         setActionError(null);
         try {
             await deleteItemCategory(Number(row.id));
-            result.reload();
+            setCollection((current) => removeCategoryFromCollection(current, row.id));
+            notifySuccess('Category deleted successfully.');
         } catch (error) {
             setActionError(toApiError(error));
         }
     }
+}
+
+function updateCategoryCollection(
+    collection: Awaited<ReturnType<typeof listItemCategories>> | null,
+    updated: ItemCategory,
+    activeFilter: string,
+) {
+    if (collection === null) return collection;
+
+    const rows = collection.data ?? [];
+    const currentIndex = rows.findIndex((row) => row.id === updated.id);
+    const matches = activeFilter === '' || (activeFilter === 'true' ? updated.is_active : !updated.is_active);
+
+    if (!matches) {
+        return removeCategoryFromCollection(collection, updated.id);
+    }
+
+    if (currentIndex === -1) return collection;
+
+    return {
+        ...collection,
+        data: rows.map((row) => row.id === updated.id ? updated : row),
+    };
+}
+
+function removeCategoryFromCollection(
+    collection: Awaited<ReturnType<typeof listItemCategories>> | null,
+    categoryId: number,
+) {
+    if (collection === null) return collection;
+
+    const rows = collection.data ?? [];
+    const nextRows = rows.filter((row) => row.id !== categoryId);
+    if (nextRows.length === rows.length) return collection;
+
+    return {
+        ...collection,
+        data: nextRows,
+        meta: collection.meta ? {
+            ...collection.meta,
+            total: Math.max(0, collection.meta.total - 1),
+            to: nextRows.length === 0 ? null : nextRows.length,
+        } : collection.meta,
+    };
 }

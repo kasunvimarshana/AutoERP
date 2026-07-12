@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button, LinkButton } from '@/shared/components/Button';
@@ -17,6 +17,7 @@ import { useAuth } from '@/modules/auth/AuthProvider';
 import { deleteItemBrand, listItemBrands, updateItemBrand } from './itemApi';
 import type { ItemBrand } from './itemTypes';
 import { hasItemPermission, itemPermissions } from './itemPermissions';
+import { notifySuccess } from '@/shared/notifications/appToast';
 
 export default function ItemBrandListPage() {
     const auth = useAuth();
@@ -33,6 +34,13 @@ export default function ItemBrandListPage() {
         page,
         per_page: 25,
     }, signal), [debounced, active, page]);
+    const [collection, setCollection] = useState(result.data);
+
+    useEffect(() => {
+        if (result.data) {
+            setCollection(result.data);
+        }
+    }, [result.data]);
 
     const columns: DataColumn<ItemBrand>[] = [
         { key: 'brand', header: 'Brand', render: (row) => <Link className="font-semibold text-sky-700 hover:underline" to={`/item-brands/${row.id}`}>{row.name}<span className="block text-xs font-normal text-slate-500">{row.code}</span></Link> },
@@ -50,21 +58,22 @@ export default function ItemBrandListPage() {
             <Select label="Status" value={active} onChange={(event) => { setActive(event.target.value); setPage(1); }} placeholder="Any status" options={[{ value: 'true', label: 'Active' }, { value: 'false', label: 'Inactive' }]} />
         </div>
         <ErrorAlert error={actionError ?? result.error} />
-        {result.loading ? <LoadingState /> : <DataTable rows={result.data?.data ?? []} columns={columns} rowKey={(row) => row.id} emptyMessage="No item brands found." />}
-        <Pagination meta={result.data?.meta} onPageChange={setPage} />
+        {result.loading && !collection ? <LoadingState /> : <DataTable rows={collection?.data ?? []} columns={columns} rowKey={(row) => row.id} emptyMessage="No item brands found." />}
+        <Pagination meta={collection?.meta} onPageChange={setPage} />
         {confirmDialog}
     </>;
 
     async function toggle(row: ItemBrand) {
         setActionError(null);
         try {
-            await updateItemBrand(Number(row.id), {
+            const updated = await updateItemBrand(Number(row.id), {
                 code: row.code,
                 name: row.name,
                 description: row.description ?? null,
                 is_active: !row.is_active,
             });
-            result.reload();
+            setCollection((current) => updateBrandCollection(current, updated, active));
+            notifySuccess(updated.is_active ? 'Brand activated successfully.' : 'Brand deactivated successfully.');
         } catch (error) {
             setActionError(toApiError(error));
         }
@@ -75,9 +84,54 @@ export default function ItemBrandListPage() {
         setActionError(null);
         try {
             await deleteItemBrand(Number(row.id));
-            result.reload();
+            setCollection((current) => removeBrandFromCollection(current, row.id));
+            notifySuccess('Brand deleted successfully.');
         } catch (error) {
             setActionError(toApiError(error));
         }
     }
+}
+
+function updateBrandCollection(
+    collection: Awaited<ReturnType<typeof listItemBrands>> | null,
+    updated: ItemBrand,
+    activeFilter: string,
+) {
+    if (collection === null) return collection;
+
+    const rows = collection.data ?? [];
+    const currentIndex = rows.findIndex((row) => row.id === updated.id);
+    const matches = activeFilter === '' || (activeFilter === 'true' ? updated.is_active : !updated.is_active);
+
+    if (!matches) {
+        return removeBrandFromCollection(collection, updated.id);
+    }
+
+    if (currentIndex === -1) return collection;
+
+    return {
+        ...collection,
+        data: rows.map((row) => row.id === updated.id ? updated : row),
+    };
+}
+
+function removeBrandFromCollection(
+    collection: Awaited<ReturnType<typeof listItemBrands>> | null,
+    brandId: number,
+) {
+    if (collection === null) return collection;
+
+    const rows = collection.data ?? [];
+    const nextRows = rows.filter((row) => row.id !== brandId);
+    if (nextRows.length === rows.length) return collection;
+
+    return {
+        ...collection,
+        data: nextRows,
+        meta: collection.meta ? {
+            ...collection.meta,
+            total: Math.max(0, collection.meta.total - 1),
+            to: nextRows.length === 0 ? null : nextRows.length,
+        } : collection.meta,
+    };
 }

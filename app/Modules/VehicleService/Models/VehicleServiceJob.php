@@ -24,7 +24,33 @@ final class VehicleServiceJob extends TenantOwnedModel
 
     protected $table = 'vehicle_service_jobs';
 
-    protected $guarded = ['id'];
+    protected $fillable = [
+        'tenant_id',
+        'organization_unit_id',
+        'job_number',
+        'job_date',
+        'expected_delivery_date',
+        'customer_id',
+        'bill_to_customer_id',
+        'vehicle_id',
+        'supervisor_employee_id',
+        'supervisor_commission_type',
+        'supervisor_commission_value',
+        'supervisor_commission_amount',
+        'status',
+        'odometer_reading',
+        'fuel_level',
+        'priority',
+        'notes',
+        'subtotal',
+        'discount_total',
+        'tax_total',
+        'charge_total',
+        'grand_total',
+        'approved_at',
+        'completed_at',
+        'created_by',
+    ];
 
     protected function casts(): array
     {

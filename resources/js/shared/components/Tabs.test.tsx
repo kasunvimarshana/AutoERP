@@ -21,9 +21,22 @@ describe('Tabs', () => {
         await waitFor(() => expect(screen.getByRole('tab', { name: 'History' })).toHaveFocus());
         expect(screen.getByRole('tabpanel')).toHaveTextContent('History content');
     });
+
+    it('keeps mounted tab content hidden instead of unmounting when requested', async () => {
+        const user = userEvent.setup();
+        render(<TabsHarness keepMounted />);
+
+        expect(screen.getByText('Summary content')).toBeVisible();
+        expect(screen.getByText('History content')).not.toBeVisible();
+
+        await user.click(screen.getByRole('tab', { name: 'History' }));
+
+        expect(screen.getByText('Summary content')).not.toBeVisible();
+        expect(screen.getByText('History content')).toBeVisible();
+    });
 });
 
-function TabsHarness() {
+function TabsHarness({ keepMounted = false }: { keepMounted?: boolean }) {
     const [active, setActive] = useState<Tab>('summary');
     return (
         <>
@@ -36,8 +49,8 @@ function TabsHarness() {
                 active={active}
                 onChange={setActive}
             />
-            <TabPanel tabsId="record-tabs" tabId="summary" active={active}>Summary content</TabPanel>
-            <TabPanel tabsId="record-tabs" tabId="history" active={active}>History content</TabPanel>
+            <TabPanel tabsId="record-tabs" tabId="summary" active={active} keepMounted={keepMounted}>Summary content</TabPanel>
+            <TabPanel tabsId="record-tabs" tabId="history" active={active} keepMounted={keepMounted}>History content</TabPanel>
         </>
     );
 }

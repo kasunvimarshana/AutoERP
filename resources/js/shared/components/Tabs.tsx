@@ -58,20 +58,24 @@ export function Tabs<T extends string>({ tabs, active, onChange, id }: {
     );
 }
 
-export function TabPanel<T extends string>({ tabsId, tabId, active, children }: {
+export function TabPanel<T extends string>({ tabsId, tabId, active, children, keepMounted = false }: {
     tabsId: string;
     tabId: T;
     active: T;
     children: ReactNode;
+    keepMounted?: boolean;
 }) {
-    if (active !== tabId) return null;
+    const isActive = active === tabId;
+
+    if (!isActive && !keepMounted) return null;
 
     return (
         <div
             id={`${tabsId}-${tabId}-panel`}
             role="tabpanel"
             aria-labelledby={`${tabsId}-${tabId}-tab`}
-            tabIndex={0}
+            tabIndex={isActive ? 0 : -1}
+            hidden={!isActive}
         >
             {children}
         </div>
