@@ -404,7 +404,7 @@ export default function RentalRunningChartPage() {
                         variant="ghost"
                         onClick={() => setSelectedUsageId(row.id)}
                     >
-                        Manage facts
+                        Review usage and facts
                     </Button>
                     {canRecord && row.status === "draft" && (
                         <Button
@@ -414,24 +414,6 @@ export default function RentalRunningChartPage() {
                         >
                             Submit physical usage
                         </Button>
-                    )}
-                    {canApprove && row.status === "submitted" && (
-                        <>
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                onClick={() => void transition(row, "approved")}
-                            >
-                                Approve physical usage
-                            </Button>
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                onClick={() => void transition(row, "rejected")}
-                            >
-                                Reject
-                            </Button>
-                        </>
                     )}
                 </div>
             ),
@@ -859,6 +841,36 @@ export default function RentalRunningChartPage() {
                                 </div>
                             </div>
                         </div>
+                        {canApprove && selectedUsage.status === "submitted" && (
+                            <div className="mt-4 grid gap-4 md:grid-cols-[1fr_auto] md:items-end">
+                                <Input
+                                    label="Physical approval or rejection note"
+                                    value={physicalTransitionReason}
+                                    onChange={(event) =>
+                                        setPhysicalTransitionReason(event.target.value)
+                                    }
+                                />
+                                <div className="flex flex-wrap justify-end gap-2">
+                                    <Button
+                                        type="button"
+                                        onClick={() =>
+                                            void transition(selectedUsage, "approved")
+                                        }
+                                    >
+                                        Approve physical usage
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant="secondary"
+                                        onClick={() =>
+                                            void transition(selectedUsage, "rejected")
+                                        }
+                                    >
+                                        Reject physical usage
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
                         {canApprove && selectedUsage.status === "approved" && (
                             <div className="mt-4 grid gap-4 md:grid-cols-[1fr_auto] md:items-end">
                                 <Input
