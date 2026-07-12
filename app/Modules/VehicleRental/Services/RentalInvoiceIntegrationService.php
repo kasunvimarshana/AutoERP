@@ -9,6 +9,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
+use Modules\Finance\Enums\FinanceAccountRoleCode;
+use Modules\Finance\Enums\FinancePostingProfileCode;
 use Modules\Invoice\DTOs\CreateInvoiceData;
 use Modules\Invoice\DTOs\InvoiceAdjustmentData;
 use Modules\Invoice\DTOs\InvoiceLineData;
@@ -25,6 +27,7 @@ use Modules\Invoice\Models\Invoice;
 use Modules\Invoice\Models\InvoiceAdjustment;
 use Modules\Invoice\Models\InvoiceSourceLine;
 use Modules\Invoice\Services\InvoiceCreationService;
+use Modules\Invoice\Services\InvoicePostingPlanFactory;
 use Modules\VehicleRental\Enums\RentalAgreementKind;
 use Modules\VehicleRental\Enums\RentalCalculationStatus;
 use Modules\VehicleRental\Enums\RentalDocumentStatus;
@@ -35,9 +38,12 @@ final class RentalInvoiceIntegrationService
 {
     private const DEFAULT_PAYMENT_TERM_DAYS = 0;
 
+    private const ZERO = '0.000000';
+
     public function __construct(
         private readonly DecimalMath $math,
         private readonly InvoiceCreationService $invoices,
+        private readonly InvoicePostingPlanFactory $postingPlans,
     ) {}
 
     /** @param list<int>|null $lineIds */
@@ -84,6 +90,7 @@ final class RentalInvoiceIntegrationService
             $invoiceLines = [];
             $sourceLines = [];
             $adjustments = [];
+            $withholdingTotal = self::ZERO;
             $lineNumber = 1;
             foreach ($selected as $line) {
                 $previouslyInvoiced = (string) InvoiceSourceLine::query()
@@ -154,11 +161,13 @@ final class RentalInvoiceIntegrationService
                 if ($isPositive
                     && $this->math->compare((string) $line->withholding_amount, '0') > 0
                     && ! $this->hasActiveAdjustment($line, AdjustmentType::Withholding)) {
+                    $withholding = (string) $line->withholding_amount;
+                    $withholdingTotal = $this->math->add($withholdingTotal, $withholding);
                     $adjustments[] = new InvoiceAdjustmentData(
                         name: 'Withholding tax - '.$line->description,
                         adjustmentType: AdjustmentType::Withholding,
                         effect: AdjustmentEffect::Decrease,
-                        amount: (string) $line->withholding_amount,
+                        amount: $withholding,
                         sourceType: 'rental_calculation_line',
                         sourceId: (int) $line->getKey(),
                         calculationType: 'fixed',
@@ -176,15 +185,38 @@ final class RentalInvoiceIntegrationService
             $sourceTax = $this->math->sum(array_map(fn (InvoiceLineData $line) => $line->taxAmount, $invoiceLines));
             $adjustmentTotal = $this->math->sum(array_map(fn (InvoiceAdjustmentData $adjustment) => $adjustment->amount, $adjustments));
             $sourceGrand = $this->math->sub($this->math->add($sourceSubtotal, $sourceTax), $adjustmentTotal);
-            if ($this->math->compare($sourceGrand, '0') < 0) {
+            if ($this->math->compare($sourceGrand, self::ZERO) < 0) {
                 throw new InvalidArgumentException('Rental deductions cannot exceed the positive payable or invoice amount.');
             }
 
+            $baseAmount = $this->math->sub(
+                $this->math->add($sourceGrand, $withholdingTotal),
+                $sourceTax,
+            );
             $direction = $agreement->agreement_kind === RentalAgreementKind::CustomerRental
                 ? InvoiceDirection::Outbound
                 : InvoiceDirection::Inbound;
             $partyType = $agreement->agreement_kind === RentalAgreementKind::CustomerRental ? 'customer' : 'supplier';
             $partyId = $agreement->agreement_kind === RentalAgreementKind::CustomerRental ? $agreement->customer_id : $agreement->supplier_id;
+            $postingPlan = $direction === InvoiceDirection::Outbound
+                ? $this->postingPlans->outbound(
+                    FinancePostingProfileCode::CustomerRentalInvoice,
+                    $invoiceDate,
+                    FinanceAccountRoleCode::RentalRevenue,
+                    $baseAmount,
+                    $sourceTax,
+                    $withholdingTotal,
+                    'Customer rental invoice',
+                )
+                : $this->postingPlans->inbound(
+                    FinancePostingProfileCode::SupplierRentalInvoice,
+                    $invoiceDate,
+                    FinanceAccountRoleCode::RentalExpense,
+                    $baseAmount,
+                    $sourceTax,
+                    $withholdingTotal,
+                    'Owner rental payable',
+                );
             $invoice = $this->invoices->create(new CreateInvoiceData(
                 tenantId: (int) $run->tenant_id,
                 invoiceType: InvoiceType::Rental,
@@ -212,6 +244,7 @@ final class RentalInvoiceIntegrationService
                 )],
                 sourceLines: $sourceLines,
                 adjustments: $adjustments,
+                postingPlan: $postingPlan,
             ));
 
             $uninvoiced = $run->lines->filter(fn (RentalCalculationLine $line): bool => ! $this->isConsumed($run, $line, $agreement->agreement_kind))->count();
