@@ -230,6 +230,7 @@ final class VehicleServiceInvoiceSourceMapper
             ->whereHas('invoice', fn ($query) => $query->whereNotIn('status', [
                 InvoiceStatus::Cancelled->value,
                 InvoiceStatus::Void->value,
+                InvoiceStatus::Reversed->value,
             ]))
             ->sum('invoiced_quantity'));
     }
