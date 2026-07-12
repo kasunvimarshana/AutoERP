@@ -74,7 +74,7 @@ final class InvoiceReversalService
                 InvoiceFinanceSource::REVERSAL_LINE_TYPE,
             );
             $this->postingPlans->reverse($invoice, $reversalDate, $actorId, $reason);
-            $this->sourceRestoration->restore($invoice);
+            $this->sourceRestoration->restore($invoice, InvoiceStatus::Reversed);
 
             $invoice->forceFill(['status' => InvoiceStatus::Reversed->value])->save();
             $this->balances->reverse($invoice);
