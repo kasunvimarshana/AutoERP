@@ -92,16 +92,16 @@ final class FinanceInvoicePostingSeeder extends Seeder
             );
 
             $this->profile($tenantId, $organizationUnitId, FinancePostingProfileCode::CustomerRentalInvoice, [
-                FinanceAccountRoleCode::Receivable => $this->requiredAccount($tenantId, '1100'),
-                FinanceAccountRoleCode::RentalRevenue => $rentalRevenue,
-                FinanceAccountRoleCode::TaxPayable => $this->requiredAccount($tenantId, '2200'),
-                FinanceAccountRoleCode::WithholdingReceivable => $this->requiredAccount($tenantId, '1300'),
+                FinanceAccountRoleCode::Receivable->value => $this->requiredAccount($tenantId, '1100'),
+                FinanceAccountRoleCode::RentalRevenue->value => $rentalRevenue,
+                FinanceAccountRoleCode::TaxPayable->value => $this->requiredAccount($tenantId, '2200'),
+                FinanceAccountRoleCode::WithholdingReceivable->value => $this->requiredAccount($tenantId, '1300'),
             ]);
             $this->profile($tenantId, $organizationUnitId, FinancePostingProfileCode::SupplierRentalInvoice, [
-                FinanceAccountRoleCode::Payable => $this->requiredAccount($tenantId, '2100'),
-                FinanceAccountRoleCode::RentalExpense => $rentalExpense,
-                FinanceAccountRoleCode::TaxReceivable => $this->requiredAccount($tenantId, '1300'),
-                FinanceAccountRoleCode::WithholdingPayable => $this->requiredAccount($tenantId, '2200'),
+                FinanceAccountRoleCode::Payable->value => $this->requiredAccount($tenantId, '2100'),
+                FinanceAccountRoleCode::RentalExpense->value => $rentalExpense,
+                FinanceAccountRoleCode::TaxReceivable->value => $this->requiredAccount($tenantId, '1300'),
+                FinanceAccountRoleCode::WithholdingPayable->value => $this->requiredAccount($tenantId, '2200'),
             ]);
         }, 3);
     }
@@ -204,7 +204,7 @@ final class FinanceInvoicePostingSeeder extends Seeder
         return $account;
     }
 
-    /** @param array<FinanceAccountRoleCode, FinanceAccount> $rules */
+    /** @param array<string, FinanceAccount> $rules */
     private function profile(
         int $tenantId,
         ?int $organizationUnitId,
@@ -231,7 +231,8 @@ final class FinanceInvoicePostingSeeder extends Seeder
             ]);
         }
 
-        foreach ($rules as $roleCode => $account) {
+        foreach ($rules as $roleValue => $account) {
+            $roleCode = FinanceAccountRoleCode::tryFrom($roleValue);
             if (! $roleCode instanceof FinanceAccountRoleCode || ! $account instanceof FinanceAccount) {
                 throw new InvalidArgumentException('Rental invoice posting rules are invalid.');
             }
