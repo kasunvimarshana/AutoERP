@@ -11,6 +11,7 @@ use InvalidArgumentException;
 use Modules\Item\Models\Item;
 use Modules\Item\Services\ItemAuthorizationService;
 use Modules\Item\Services\ItemPriceResolutionService;
+use Tests\Support\CurrencyFixture;
 use Tests\TestCase;
 
 final class ItemApiTest extends TestCase
@@ -555,17 +556,11 @@ final class ItemApiTest extends TestCase
         ]);
     }
 
-    private function createCurrency(string $code): int
+    private function createCurrency(string $label): int
     {
-        return (int) DB::table('currencies')->insertGetId([
-            'code' => $code.'-'.Str::upper(Str::random(4)),
-            'name' => $code.' Currency',
-            'symbol' => $code,
-            'decimal_places' => 2,
-            'is_active' => true,
-            'row_version' => 1,
-            'created_at' => now(),
-            'updated_at' => now(),
+        return CurrencyFixture::create([
+            'name' => $label.' Currency',
+            'symbol' => $label,
         ]);
     }
 
