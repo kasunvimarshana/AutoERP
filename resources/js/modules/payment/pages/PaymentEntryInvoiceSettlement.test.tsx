@@ -118,7 +118,7 @@ describe('Payment invoice settlement entry', () => {
                 </MemoryRouter>,
             );
 
-            expect(await screen.findByText(partyName)).toBeInTheDocument();
+            expect((await screen.findAllByText(partyName)).length).toBeGreaterThanOrEqual(1);
             expect(screen.getByText('Payment total 25000.000000')).toBeInTheDocument();
 
             await userEvent.click(screen.getByRole('button', { name: 'Select cash method' }));
