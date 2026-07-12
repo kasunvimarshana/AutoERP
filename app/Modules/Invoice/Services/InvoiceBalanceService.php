@@ -78,4 +78,9 @@ final class InvoiceBalanceService
     {
         return $this->updater->cancel($invoice);
     }
+
+    public function reverse(Invoice $invoice): InvoiceBalance
+    {
+        return $this->updater->reverse($invoice);
+    }
 }

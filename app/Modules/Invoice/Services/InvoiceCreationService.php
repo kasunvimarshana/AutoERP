@@ -34,6 +34,7 @@ final class InvoiceCreationService
         private readonly InvoiceIssuanceService $issuance,
         private readonly InvoiceReferenceSnapshotService $snapshots,
         private readonly TaxSnapshotService $taxSnapshots,
+        private readonly InvoicePostingPlanService $postingPlans,
     ) {}
 
     public function create(CreateInvoiceData $data): Invoice
@@ -90,6 +91,9 @@ final class InvoiceCreationService
             );
             $this->adjustments->createAdjustments($invoice, $preparedAdjustments);
             $this->balances->createBalance($invoice, $calculation->grandTotal);
+            if ($data->postingPlan !== null) {
+                $this->postingPlans->create($invoice, $data->postingPlan, $data->createdBy);
+            }
 
             $invoice = $invoice->refresh()->load('lines');
             $taxDocument = $this->taxDocumentMapper->map($invoice);
@@ -118,6 +122,7 @@ final class InvoiceCreationService
                 'adjustments',
                 'adjustmentAllocations',
                 'balance',
+                'postingPlan',
             ]);
         });
     }

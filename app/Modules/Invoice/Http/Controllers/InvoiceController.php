@@ -25,6 +25,7 @@ use Modules\Invoice\Http\Resources\InvoiceSourceResource;
 use Modules\Invoice\Models\Invoice;
 use Modules\Invoice\Services\InvoiceBalanceService;
 use Modules\Invoice\Services\InvoicePrintService;
+use Modules\Invoice\Services\InvoiceReversalService;
 use Modules\Invoice\Services\InvoiceStatusService;
 use Modules\Invoice\Services\ManualInvoiceService;
 
@@ -69,7 +70,7 @@ final class InvoiceController
     public function show(ListInvoiceRequest $request, int $invoice): InvoiceResource
     {
         return new InvoiceResource($this->scope(Invoice::query(), $request)
-            ->with(['lines', 'sources'])
+            ->with(['lines', 'sources', 'postingPlan'])
             ->findOrFail($invoice));
     }
 
@@ -101,6 +102,20 @@ final class InvoiceController
             $this->find($request, $invoice),
             InvoiceStatus::Posted,
             $request->expectedVersion(),
+            $request->currentUserId(),
+        ));
+    }
+
+    public function reverse(
+        InvoiceActionRequest $request,
+        int $invoice,
+        InvoiceReversalService $service,
+    ): InvoiceResource {
+        return new InvoiceResource($service->reverse(
+            $this->find($request, $invoice),
+            $request->expectedVersion(),
+            $request->reversalDate(),
+            $request->reason() ?? '',
             $request->currentUserId(),
         ));
     }
@@ -276,7 +291,6 @@ final class InvoiceController
     private function pdfResponse(Invoice $invoice): Response
     {
         $html = view('invoice.print', $this->prints->viewData($invoice, mode: 'pdf'))->render();
-
         $dompdf = new Dompdf;
         $dompdf->loadHtml($html);
         $dompdf->setPaper(InvoicePrintService::PDF_PAPER_SIZE, InvoicePrintService::PDF_ORIENTATION);
@@ -294,9 +308,7 @@ final class InvoiceController
         return route($route, ['invoice' => (int) $invoice->getKey()]);
     }
 
-    /**
-     * @return array<string, int>
-     */
+    /** @return array<string, int> */
     private function publicRouteParameters(Invoice $invoice): array
     {
         $parameters = [

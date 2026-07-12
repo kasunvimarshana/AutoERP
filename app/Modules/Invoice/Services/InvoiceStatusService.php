@@ -17,11 +17,10 @@ final class InvoiceStatusService
         private readonly TaxDocumentIntegrationService $taxDocuments,
         private readonly InvoiceSourceRestorationService $sourceRestoration,
         private readonly InvoiceTaxDocumentMapper $taxDocumentMapper,
+        private readonly InvoicePostingPlanService $postingPlans,
     ) {}
 
-    /**
-     * @return array<string, list<string>>
-     */
+    /** @return array<string, list<string>> */
     private function transitions(): array
     {
         return [
@@ -39,18 +38,15 @@ final class InvoiceStatusService
                 InvoiceStatus::PartiallyPaid->value,
                 InvoiceStatus::Paid->value,
             ],
-            InvoiceStatus::PartiallyPaid->value => [
-                InvoiceStatus::Paid->value,
-            ],
+            InvoiceStatus::PartiallyPaid->value => [InvoiceStatus::Paid->value],
             InvoiceStatus::Paid->value => [],
+            InvoiceStatus::Reversed->value => [],
             InvoiceStatus::Cancelled->value => [],
             InvoiceStatus::Void->value => [],
         ];
     }
 
-    /**
-     * @return list<string>
-     */
+    /** @return list<string> */
     public function settlementStatuses(): array
     {
         return [
@@ -64,7 +60,6 @@ final class InvoiceStatusService
     {
         $fromValue = $from instanceof InvoiceStatus ? $from->value : $from;
         $toValue = $to instanceof InvoiceStatus ? $to->value : $to;
-
         if (! in_array($toValue, $this->transitions()[$fromValue] ?? [], true)) {
             throw new InvalidArgumentException(sprintf('Invoice status cannot transition from %s to %s.', $fromValue, $toValue));
         }
@@ -101,10 +96,7 @@ final class InvoiceStatusService
         ?string $reason,
     ): Invoice {
         return DB::transaction(function () use ($invoice, $to, $expectedVersion, $actorId, $reason): Invoice {
-            $invoice = Invoice::query()
-                ->lockForUpdate()
-                ->findOrFail($invoice->getKey());
-
+            $invoice = Invoice::query()->lockForUpdate()->findOrFail($invoice->getKey());
             if ($expectedVersion !== null && $expectedVersion !== (int) $invoice->row_version) {
                 throw new InvalidArgumentException(
                     'Invoice was changed by another request. Reload it before performing this action.',
@@ -132,15 +124,13 @@ final class InvoiceStatusService
             }
 
             $invoice->forceFill($updates)->save();
-
             if (in_array($to, [InvoiceStatus::Cancelled, InvoiceStatus::Void], true)) {
-                $this->sourceRestoration->restore($invoice);
+                $this->sourceRestoration->restore($invoice, $to);
             }
             if ($to === InvoiceStatus::Posted) {
-                // TaxDocumentIntegrationService reuses the draft snapshot and only
-                // calculates one when no snapshot exists. Recalculating here could
-                // make posted tax differ from the immutable invoice totals.
-                $this->taxDocuments->post($this->taxDocumentMapper->map($invoice->refresh()));
+                $postedInvoice = $invoice->refresh();
+                $this->taxDocuments->post($this->taxDocumentMapper->map($postedInvoice));
+                $this->postingPlans->post($postedInvoice, $actorId);
             }
 
             return $invoice->refresh();
@@ -152,7 +142,6 @@ final class InvoiceStatusService
         $status = $invoice->status instanceof InvoiceStatus
             ? $invoice->status
             : InvoiceStatus::from((string) $invoice->status);
-
         if ($status !== InvoiceStatus::Draft) {
             throw new InvalidArgumentException('Only draft invoices can be edited directly.');
         }
@@ -163,7 +152,6 @@ final class InvoiceStatusService
         $status = $invoice->status instanceof InvoiceStatus
             ? $invoice->status
             : InvoiceStatus::from((string) $invoice->status);
-
         if (! in_array($status->value, $this->settlementStatuses(), true)) {
             throw new InvalidArgumentException('Only posted invoices can be settled.');
         }
@@ -174,7 +162,6 @@ final class InvoiceStatusService
         if ($reason === null) {
             return null;
         }
-
         $reason = trim($reason);
 
         return $reason === '' ? null : $reason;

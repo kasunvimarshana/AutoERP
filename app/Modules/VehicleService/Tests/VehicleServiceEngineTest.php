@@ -56,6 +56,7 @@ use Modules\VehicleService\Services\VehicleServiceJobService;
 use Modules\VehicleService\Services\VehicleServiceLineService;
 use Modules\VehicleService\Services\VehicleServicePaymentIntegrationService;
 use Modules\VehicleService\Services\VehicleServiceStatusService;
+use Tests\Support\FinancePostingFixture;
 use Tests\Support\TenantUserFixture;
 use Tests\TestCase;
 
@@ -1053,101 +1054,7 @@ final class VehicleServiceEngineTest extends TestCase
 
     private function paymentFinanceContext(int $tenantId): void
     {
-        $assetTypeId = (int) DB::table('finance_account_types')->insertGetId([
-            'tenant_id' => $tenantId,
-            'code' => 'ASSET',
-            'name' => 'Asset',
-            'normal_balance' => 'debit',
-            'statement_type' => 'balance_sheet',
-            'is_active' => true,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-        $cashAccountId = (int) DB::table('finance_accounts')->insertGetId([
-            'tenant_id' => $tenantId,
-            'account_type_id' => $assetTypeId,
-            'code' => '1010',
-            'name' => 'Cash',
-            'normal_balance' => 'debit',
-            'is_posting_account' => true,
-            'is_cash_account' => true,
-            'is_active' => true,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-        $receivableAccountId = (int) DB::table('finance_accounts')->insertGetId([
-            'tenant_id' => $tenantId,
-            'account_type_id' => $assetTypeId,
-            'code' => '1100',
-            'name' => 'Accounts Receivable',
-            'normal_balance' => 'debit',
-            'is_posting_account' => true,
-            'is_active' => true,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-        $profileId = (int) DB::table('finance_posting_profiles')->insertGetId([
-            'tenant_id' => $tenantId,
-            'code' => 'payment_received',
-            'name' => 'Payment Received',
-            'is_active' => true,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-        $cashRoleId = (int) DB::table('finance_account_roles')->insertGetId([
-            'tenant_id' => $tenantId,
-            'code' => 'cash',
-            'name' => 'Cash',
-            'is_active' => true,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-        $receivableRoleId = (int) DB::table('finance_account_roles')->insertGetId([
-            'tenant_id' => $tenantId,
-            'code' => 'receivable',
-            'name' => 'Receivable',
-            'is_active' => true,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-        DB::table('finance_account_assignments')->insert([
-            [
-                'tenant_id' => $tenantId,
-                'account_role_id' => $cashRoleId,
-                'account_id' => $cashAccountId,
-                'effective_from' => '2026-01-01',
-                'is_active' => true,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-            [
-                'tenant_id' => $tenantId,
-                'account_role_id' => $receivableRoleId,
-                'account_id' => $receivableAccountId,
-                'effective_from' => '2026-01-01',
-                'is_active' => true,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-        ]);
-        DB::table('finance_posting_profile_rules')->insert([
-            [
-                'tenant_id' => $tenantId,
-                'posting_profile_id' => $profileId,
-                'line_key' => 'cash',
-                'account_role_id' => $cashRoleId,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-            [
-                'tenant_id' => $tenantId,
-                'posting_profile_id' => $profileId,
-                'line_key' => 'receivable',
-                'account_role_id' => $receivableRoleId,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-        ]);
+        FinancePostingFixture::seedCustomerPaymentProfiles($tenantId);
     }
 
     private function receiveStock(array $context, string $quantity): void

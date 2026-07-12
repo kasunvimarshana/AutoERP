@@ -7,6 +7,8 @@ namespace Modules\VehicleService\Services;
 use Illuminate\Support\Collection;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
+use Modules\Finance\Enums\FinanceAccountRoleCode;
+use Modules\Finance\Enums\FinancePostingProfileCode;
 use Modules\Invoice\DTOs\CreateInvoiceData;
 use Modules\Invoice\DTOs\InvoiceLineData;
 use Modules\Invoice\DTOs\InvoiceSourceData;
@@ -16,6 +18,7 @@ use Modules\Invoice\Enums\InvoiceLineType;
 use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Enums\InvoiceType;
 use Modules\Invoice\Models\InvoiceSourceLine;
+use Modules\Invoice\Services\InvoicePostingPlanFactory;
 use Modules\VehicleService\Enums\VehicleServiceJobStatus;
 use Modules\VehicleService\Enums\VehicleServiceLineSourceType;
 use Modules\VehicleService\Enums\VehicleServiceLineStatus;
@@ -24,7 +27,12 @@ use Modules\VehicleService\Models\VehicleServiceJobLine;
 
 final class VehicleServiceInvoiceSourceMapper
 {
-    public function __construct(private readonly DecimalMath $math) {}
+    private const ZERO = '0.000000';
+
+    public function __construct(
+        private readonly DecimalMath $math,
+        private readonly InvoicePostingPlanFactory $postingPlans,
+    ) {}
 
     /** @return Collection<int, VehicleServiceJobLine> */
     public function billableLines(VehicleServiceJob $job): Collection
@@ -38,7 +46,7 @@ final class VehicleServiceInvoiceSourceMapper
                 $invoiced = $this->invoicedQuantity((int) $job->tenant_id, (int) $line->getKey());
                 $remaining = $this->math->sub((string) $line->quantity, $invoiced);
                 if ($this->math->isNegative($remaining)) {
-                    $remaining = '0.000000';
+                    $remaining = self::ZERO;
                 }
 
                 $line->setAttribute('invoiced_quantity', $invoiced);
@@ -69,7 +77,9 @@ final class VehicleServiceInvoiceSourceMapper
             ->get();
         $invoiceLines = [];
         $sourceLines = [];
-        $selectedTotal = '0.000000';
+        $selectedTotal = self::ZERO;
+        $baseAmount = self::ZERO;
+        $taxAmount = self::ZERO;
         $lineNumber = 1;
         $selectionProvided = $lineQuantities !== [];
         $validLineIds = $lines->pluck('id')->map(fn ($id): int => (int) $id)->all();
@@ -90,7 +100,7 @@ final class VehicleServiceInvoiceSourceMapper
                 (int) $line->getKey(),
             );
             $remaining = $this->math->sub((string) $line->quantity, $previouslyInvoiced);
-            if ($this->math->compare($remaining, '0.000000') <= 0) {
+            if ($this->math->compare($remaining, self::ZERO) <= 0) {
                 continue;
             }
 
@@ -110,14 +120,17 @@ final class VehicleServiceInvoiceSourceMapper
             $discount = $this->math->mul((string) $line->discount_amount, $ratio);
             $tax = $this->math->mul((string) $line->tax_amount, $ratio);
             $charge = $this->math->mul((string) $line->charge_amount, $ratio);
-            $lineTotal = $this->math->add(
+            $lineBase = $this->math->add(
                 $this->math->sub(
                     $this->math->mul($quantity, (string) $line->unit_price),
                     $discount,
                 ),
-                $this->math->add($tax, $charge),
+                $charge,
             );
+            $lineTotal = $this->math->add($lineBase, $tax);
             $selectedTotal = $this->math->add($selectedTotal, $lineTotal);
+            $baseAmount = $this->math->add($baseAmount, $lineBase);
+            $taxAmount = $this->math->add($taxAmount, $tax);
 
             $invoiceLines[] = new InvoiceLineData(
                 lineNumber: $lineNumber++,
@@ -180,6 +193,14 @@ final class VehicleServiceInvoiceSourceMapper
                 invoicedAmount: $selectedTotal,
             )],
             sourceLines: $sourceLines,
+            postingPlan: $this->postingPlans->outbound(
+                FinancePostingProfileCode::VehicleServiceInvoice,
+                $invoiceDate,
+                FinanceAccountRoleCode::ServiceRevenue,
+                $baseAmount,
+                $taxAmount,
+                description: 'Vehicle service invoice '.$job->job_number,
+            ),
         );
     }
 
@@ -209,6 +230,7 @@ final class VehicleServiceInvoiceSourceMapper
             ->whereHas('invoice', fn ($query) => $query->whereNotIn('status', [
                 InvoiceStatus::Cancelled->value,
                 InvoiceStatus::Void->value,
+                InvoiceStatus::Reversed->value,
             ]))
             ->sum('invoiced_quantity'));
     }

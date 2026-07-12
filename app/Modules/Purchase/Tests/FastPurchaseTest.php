@@ -44,6 +44,7 @@ use Modules\Purchase\Services\FastPurchaseService;
 use Modules\Purchase\Services\PurchaseAdjustmentAllocationLedger;
 use Modules\Purchase\Services\PurchasePricingService;
 use Modules\Supplier\Models\Supplier;
+use Tests\Support\FinancePostingFixture;
 use Tests\Support\TenantUserFixture;
 use Tests\TestCase;
 
@@ -1108,11 +1109,8 @@ final class FastPurchaseTest extends TestCase
                 'payable' => $this->accountRole($tenantId, 'purchase_payable', $payable),
                 'tax_receivable' => $this->accountRole($tenantId, 'tax_receivable', $tax),
             ]);
-            $this->profile($tenantId, 'payment_made', [
-                'payable' => $this->accountRole($tenantId, 'payment_payable', $payable),
-                'cash' => $this->accountRole($tenantId, 'payment_cash', $cash),
-                'bank' => $this->accountRole($tenantId, 'payment_bank', $bank),
-            ]);
+            FinancePostingFixture::seedPurchaseWithholdingRole($tenantId);
+            FinancePostingFixture::seedSupplierPaymentProfiles($tenantId);
             return [
                 'cash' => (int) $cash->getKey(),
                 'bank' => (int) $bank->getKey(),
@@ -1269,4 +1267,3 @@ final class FastPurchaseTest extends TestCase
         return (int) $group;
     }
 }
-

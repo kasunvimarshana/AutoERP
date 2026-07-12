@@ -6,6 +6,7 @@ namespace Modules\Purchase\Services;
 
 use Illuminate\Support\Facades\DB;
 use Modules\Core\Services\DecimalMath;
+use Modules\Invoice\DTOs\CreateInvoiceData;
 use Modules\Invoice\DTOs\InvoiceCalculationResult;
 use Modules\Invoice\Models\Invoice;
 use Modules\Invoice\Services\InvoiceCreationService;
@@ -20,6 +21,7 @@ final class PurchaseInvoiceIntegrationService
         private readonly DecimalMath $math,
         private readonly InvoiceCreationService $invoices,
         private readonly PurchaseInvoiceDtoFactory $invoiceData,
+        private readonly PurchaseInvoicePostingPlanFactory $postingPlans,
         private readonly PurchaseInvoiceQuantityUpdater $quantities,
         private readonly PurchaseAdjustmentAllocationService $adjustmentAllocations,
         private readonly PurchaseValidationService $validator,
@@ -30,6 +32,7 @@ final class PurchaseInvoiceIntegrationService
         return DB::transaction(function () use ($data): Invoice {
             $this->validateHeaderReferences($data);
             $prepared = $this->invoiceData->prepare($data, lockSources: true);
+            $prepared = $this->withPostingPlan($prepared);
             $invoice = $this->invoices->create($prepared->invoiceData);
 
             $this->createPurchaseLinks($data, $prepared, $invoice);
@@ -43,8 +46,43 @@ final class PurchaseInvoiceIntegrationService
     public function previewSupplierInvoice(CreatePurchaseInvoiceData $data): InvoiceCalculationResult
     {
         $this->validateHeaderReferences($data);
+        $prepared = $this->withPostingPlan($this->invoiceData->prepare($data));
 
-        return $this->invoices->preview($this->invoiceData->prepare($data)->invoiceData);
+        return $this->invoices->preview($prepared->invoiceData);
+    }
+
+    private function withPostingPlan(PreparedPurchaseInvoiceData $prepared): PreparedPurchaseInvoiceData
+    {
+        $data = $prepared->invoiceData;
+        $invoiceData = new CreateInvoiceData(
+            tenantId: $data->tenantId,
+            invoiceType: $data->invoiceType,
+            direction: $data->direction,
+            invoiceDate: $data->invoiceDate,
+            organizationUnitId: $data->organizationUnitId,
+            invoiceNumber: $data->invoiceNumber,
+            partyType: $data->partyType,
+            partyId: $data->partyId,
+            dueDate: $data->dueDate,
+            currencyId: $data->currencyId,
+            exchangeRate: $data->exchangeRate,
+            status: $data->status,
+            notes: $data->notes,
+            createdBy: $data->createdBy,
+            lines: $data->lines,
+            sources: $data->sources,
+            sourceLines: $data->sourceLines,
+            adjustments: $data->adjustments,
+            taxCalculation: $data->taxCalculation,
+            postingPlan: $this->postingPlans->build($data),
+        );
+
+        return new PreparedPurchaseInvoiceData(
+            invoiceData: $invoiceData,
+            sourceTotals: $prepared->sourceTotals,
+            lineQuantities: $prepared->lineQuantities,
+            goodsReceipts: $prepared->goodsReceipts,
+        );
     }
 
     private function validateHeaderReferences(CreatePurchaseInvoiceData $data): void

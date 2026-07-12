@@ -39,6 +39,8 @@ use Modules\Payment\Enums\PaymentType;
 use Modules\Payment\Models\Payment;
 use Modules\Payment\Services\PaymentAllocationService;
 use Modules\Payment\Services\PaymentCreationService;
+use Modules\Payment\Services\PaymentDocumentLifecycleService;
+use Modules\Payment\Services\PaymentPostingService;
 use Modules\Purchase\DTOs\CreateGoodsReceiptNoteData;
 use Modules\Purchase\DTOs\CreatePurchaseDebitNoteData;
 use Modules\Purchase\DTOs\CreatePurchaseInvoiceData;
@@ -72,6 +74,7 @@ use Modules\Purchase\Services\PurchaseInvoiceIntegrationService;
 use Modules\Purchase\Services\PurchaseOrderService;
 use Modules\Purchase\Services\PurchasePaymentIntegrationService;
 use Modules\Purchase\Services\PurchaseReturnService;
+use Tests\Support\FinancePostingFixture;
 use Tests\TestCase;
 
 final class PurchaseEngineTest extends TestCase
@@ -644,6 +647,7 @@ final class PurchaseEngineTest extends TestCase
     public function test_supplier_advance_can_be_allocated_after_purchase_invoice_creation(): void
     {
         [$tenantId, $warehouseId, $item, $supplierId] = $this->purchaseContext();
+        FinancePostingFixture::seedSupplierPaymentProfiles($tenantId);
         $advance = $this->createPayment(new CreatePaymentData(
             tenantId: $tenantId,
             paymentType: PaymentType::Advance,
@@ -657,13 +661,11 @@ final class PurchaseEngineTest extends TestCase
             )],
         ));
         $advance = $this->withTenantExecutionContext($tenantId, function () use ($advance): Payment {
-            $advance->forceFill([
-                'document_status' => PaymentDocumentStatus::Approved->value,
-                'posting_status' => PaymentPostingStatus::Posted->value,
-                'row_version' => (int) $advance->row_version + 1,
-            ])->save();
+            $lifecycle = app(PaymentDocumentLifecycleService::class);
+            $advance = $lifecycle->submit($advance, (int) $advance->row_version);
+            $advance = $lifecycle->approve($advance, (int) $advance->row_version);
 
-            return $advance->refresh();
+            return app(PaymentPostingService::class)->post($advance, (int) $advance->row_version);
         });
 
         $order = $this->createAdjustedOrder($tenantId, $warehouseId, $item);

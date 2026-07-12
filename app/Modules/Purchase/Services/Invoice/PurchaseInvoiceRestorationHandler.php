@@ -7,19 +7,23 @@ namespace Modules\Purchase\Services\Invoice;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Modules\Core\Services\DecimalMath;
-use Modules\Invoice\Contracts\InvoiceSourceCancellationHandlerInterface;
-use Modules\Invoice\Data\InvoiceSourceCancellationContext;
+use Modules\Invoice\Contracts\InvoiceSourceRestorationHandlerInterface;
+use Modules\Invoice\Data\InvoiceSourceRestorationContext;
 use Modules\Purchase\Models\GoodsReceiptNote;
 use Modules\Purchase\Models\PurchaseInvoiceLink;
 use Modules\Purchase\Services\PurchaseAdjustmentAllocationService;
 use Modules\Purchase\Services\PurchaseInvoiceQuantityUpdater;
 
-final class PurchaseInvoiceCancellationHandler implements InvoiceSourceCancellationHandlerInterface
+final class PurchaseInvoiceRestorationHandler implements InvoiceSourceRestorationHandlerInterface
 {
     private const SUPPORTED_LINE_TYPES = [
         'goods_receipt_note_line',
         'purchase_order_line',
     ];
+
+    private const CANCELLATION_RELEASE_SOURCE = 'purchase_invoice_cancel';
+
+    private const REVERSAL_RELEASE_SOURCE = 'purchase_invoice_reverse';
 
     public function __construct(
         private readonly DecimalMath $math,
@@ -27,7 +31,7 @@ final class PurchaseInvoiceCancellationHandler implements InvoiceSourceCancellat
         private readonly PurchaseAdjustmentAllocationService $adjustmentAllocations,
     ) {}
 
-    public function supports(InvoiceSourceCancellationContext $context): bool
+    public function supports(InvoiceSourceRestorationContext $context): bool
     {
         return PurchaseInvoiceLink::query()
             ->where('tenant_id', $context->tenantId)
@@ -36,7 +40,7 @@ final class PurchaseInvoiceCancellationHandler implements InvoiceSourceCancellat
             ->exists();
     }
 
-    public function restore(InvoiceSourceCancellationContext $context): void
+    public function restore(InvoiceSourceRestorationContext $context): void
     {
         $lineQuantities = [];
         $goodsReceiptIds = [];
@@ -62,21 +66,23 @@ final class PurchaseInvoiceCancellationHandler implements InvoiceSourceCancellat
         $this->adjustmentAllocations->releaseForTarget(
             'purchase_invoice',
             $context->invoiceId,
-            'purchase_invoice_cancel',
+            $context->isReversal()
+                ? self::REVERSAL_RELEASE_SOURCE
+                : self::CANCELLATION_RELEASE_SOURCE,
         );
 
         PurchaseInvoiceLink::query()
             ->where('tenant_id', $context->tenantId)
             ->where('invoice_id', $context->invoiceId)
             ->where('status', 'active')
-            ->update(['status' => 'cancelled']);
+            ->update(['status' => $context->linkStatus()]);
     }
 
     /**
      * @param list<int> $ids
      * @return Collection<int, GoodsReceiptNote>
      */
-    private function goodsReceipts(InvoiceSourceCancellationContext $context, array $ids): Collection
+    private function goodsReceipts(InvoiceSourceRestorationContext $context, array $ids): Collection
     {
         return $this->scope(GoodsReceiptNote::query(), $context)
             ->whereIn('id', array_values(array_unique($ids)))
@@ -84,7 +90,7 @@ final class PurchaseInvoiceCancellationHandler implements InvoiceSourceCancellat
             ->get();
     }
 
-    private function scope(Builder $query, InvoiceSourceCancellationContext $context): Builder
+    private function scope(Builder $query, InvoiceSourceRestorationContext $context): Builder
     {
         $query->where('tenant_id', $context->tenantId);
 

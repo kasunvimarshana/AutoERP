@@ -9,6 +9,7 @@ import {
     getInvoiceSignedPrintLink,
     getInvoiceSources,
     postInvoice,
+    reverseInvoice,
 } from '../invoiceApi';
 import { hasInvoicePermission, invoicePermissions } from '../invoicePermissions';
 import { paymentPermissions } from '@/modules/payment/paymentPermissions';
@@ -16,7 +17,8 @@ import { vehicleServicePermissions } from '@/modules/vehicle-service/vehicleServ
 import { useApi } from '@/shared/hooks/useApi';
 import { useOnDemandTab } from '@/shared/hooks/useOnDemandTab';
 import { ContentHeader } from '@/shared/components/ContentHeader';
-import { Button } from '@/shared/components/Button';
+import { Button, LinkButton } from '@/shared/components/Button';
+import { ReversalDialog, type ReversalFacts } from '@/shared/components/ReversalDialog';
 import { openSameOriginUrl } from '@/shared/utils/safeNavigation';
 import { Tabs, type TabItem } from '@/shared/components/Tabs';
 import { Panel } from '@/shared/components/Panel';
@@ -29,13 +31,12 @@ import { LoadingState } from '@/shared/components/LoadingState';
 import { formatDate } from '@/shared/utils/formatDate';
 import { isPositiveDecimal } from '@/shared/utils/decimal';
 import { humanize, readableRelation } from '@/shared/utils/object';
-import { LinkButton } from '@/shared/components/Button';
 import { useAuth } from '@/modules/auth/AuthProvider';
 import { hasPermission } from '@/modules/auth/accessControl';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 
 type Tab = 'summary' | 'balance' | 'sources' | 'lines' | 'adjustments';
-type InvoiceAction = 'approve' | 'post' | 'cancel';
+type InvoiceAction = 'approve' | 'post' | 'reverse' | 'cancel';
 
 const summaryTab: TabItem<Tab> = { id: 'summary', label: 'Summary' };
 const linesTab: TabItem<Tab> = { id: 'lines', label: 'Lines' };
@@ -48,12 +49,14 @@ export default function InvoiceDetailPage() {
     const canViewSources = hasInvoicePermission(auth, invoicePermissions.sourcesView);
     const canApprove = hasInvoicePermission(auth, invoicePermissions.approve);
     const canPost = hasInvoicePermission(auth, invoicePermissions.post);
+    const canReverse = hasInvoicePermission(auth, invoicePermissions.reverse);
     const canCancel = hasInvoicePermission(auth, invoicePermissions.cancel);
     const canCreatePayment = hasPermission(auth, paymentPermissions.create);
     const canCreateVehicleServicePayment = hasPermission(auth, vehicleServicePermissions.paymentsCreate);
     const [searchParams] = useSearchParams();
     const [action, setAction] = useState<InvoiceAction | null>(null);
     const [actionError, setActionError] = useState<ApiError | null>(null);
+    const [reversalOpen, setReversalOpen] = useState(false);
     const tabState = useOnDemandTab<Tab>('summary');
     const tabs: TabItem<Tab>[] = [
         summaryTab,
@@ -101,7 +104,7 @@ export default function InvoiceDetailPage() {
         && isPositiveDecimal(value.balance_due ?? '0');
     const printUrl = `/invoices/${id}/print`;
 
-    const runAction = async (nextAction: InvoiceAction) => {
+    const runAction = async (nextAction: Exclude<InvoiceAction, 'reverse'>) => {
         let reason: string | undefined;
         if (nextAction === 'cancel') {
             const response = window.prompt('Enter the reason for cancelling this invoice.');
@@ -116,8 +119,26 @@ export default function InvoiceDetailPage() {
                 ? await approveInvoice(id, value.row_version)
                 : nextAction === 'post'
                     ? await postInvoice(id, value.row_version)
-                    : await cancelInvoice(id, value.row_version, reason);
+                    : await cancelInvoice(id, value.row_version, reason ?? '');
             invoice.setData(updated);
+            if (canViewBalance) balance.reload();
+        } catch (error: unknown) {
+            setActionError(toApiError(error));
+        } finally {
+            setAction(null);
+        }
+    };
+
+    const reverse = async (facts: ReversalFacts) => {
+        setAction('reverse');
+        setActionError(null);
+        try {
+            const updated = await reverseInvoice(id, {
+                expected_version: value.row_version,
+                ...facts,
+            });
+            invoice.setData(updated);
+            setReversalOpen(false);
             if (canViewBalance) balance.reload();
         } catch (error: unknown) {
             setActionError(toApiError(error));
@@ -159,6 +180,9 @@ export default function InvoiceDetailPage() {
                         ) : null}
                         {value.status === 'approved' && canPost ? (
                             <Button loading={action === 'post'} onClick={() => void runAction('post')}>Post</Button>
+                        ) : null}
+                        {value.status === 'posted' && canReverse ? (
+                            <Button variant="danger" disabled={action !== null} onClick={() => setReversalOpen(true)}>Reverse</Button>
                         ) : null}
                         {['draft', 'approved'].includes(value.status ?? '') && canCancel ? (
                             <Button variant="danger" loading={action === 'cancel'} onClick={() => void runAction('cancel')}>Cancel</Button>
@@ -206,6 +230,9 @@ export default function InvoiceDetailPage() {
                         { label: 'Paid', value: <MoneyDisplay value={value.paid_total} /> },
                         { label: 'Credits', value: <MoneyDisplay value={value.credit_total} /> },
                         { label: 'Balance due', value: <MoneyDisplay value={value.balance_due} /> },
+                        { label: 'Finance profile', value: humanize(value.posting_plan?.posting_profile_code) },
+                        { label: 'Finance posting', value: value.posting_plan?.finance_posting_reference ?? '-' },
+                        { label: 'Finance reversal', value: value.posting_plan?.finance_reversal_reference ?? '-' },
                     ]} />}
                     {tabState.activeTab === 'lines' && <RecordTable rows={value.lines ?? []} fields={['line_number', 'item', 'description', 'quantity', 'unit_price', 'discount_amount', 'tax_amount', 'charge_amount', 'line_total']} rowKey={(row, index) => String(row.id ?? row.line_number ?? `invoice-line-${index}`)} />}
                     {canViewBalance && tabState.activeTab === 'balance' && <BalanceSummary loading={balance.loading} error={balance.error} balance={balance.data} />}
@@ -213,6 +240,14 @@ export default function InvoiceDetailPage() {
                     {canViewSources && tabState.activeTab === 'sources' && <SourceRecords loading={sources.loading} error={sources.error} data={sources.data} />}
                 </div>
             </Panel>
+            <ReversalDialog
+                open={reversalOpen}
+                title="Reverse invoice"
+                loading={action === 'reverse'}
+                defaultDate={value.posting_plan?.posting_date ?? value.invoice_date}
+                onCancel={() => setReversalOpen(false)}
+                onConfirm={reverse}
+            />
         </>
     );
 }

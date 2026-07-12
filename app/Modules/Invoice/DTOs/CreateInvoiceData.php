@@ -37,5 +37,6 @@ final readonly class CreateInvoiceData
         public array $sourceLines = [],
         public array $adjustments = [],
         public ?TaxCalculationResult $taxCalculation = null,
+        public ?InvoicePostingPlanData $postingPlan = null,
     ) {}
 }
