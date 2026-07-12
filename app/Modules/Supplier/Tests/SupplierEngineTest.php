@@ -40,6 +40,7 @@ use Modules\Supplier\Services\SupplierItemMappingService;
 use Modules\Supplier\Services\SupplierLookupService;
 use Modules\Supplier\Services\SupplierStatusService;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
+use Tests\Support\CurrencyFixture;
 use Tests\TestCase;
 
 final class SupplierEngineTest extends TestCase
@@ -247,7 +248,6 @@ final class SupplierEngineTest extends TestCase
     {
         [$tenantId] = $this->scopeContext();
         $supplier = $this->createSupplier($tenantId, 'CREDIT', status: SupplierStatus::Active);
-
         $this->runInTenant($tenantId, function () use ($tenantId, $supplier): void {
             app(SupplierCreditProfileService::class)->set($supplier, new SupplierCreditProfileData(
                 creditLimit: '10000.000000',
@@ -420,17 +420,11 @@ final class SupplierEngineTest extends TestCase
         return [$tenantId, $organizationUnitId, $currencyId];
     }
 
-    private function createCurrency(string $code): int
+    private function createCurrency(string $label): int
     {
-        return (int) DB::table('currencies')->insertGetId([
-            'row_version' => 1,
-            'code' => $code,
-            'name' => 'Currency '.$code,
-            'symbol' => $code,
-            'decimal_places' => 2,
-            'is_active' => true,
-            'created_at' => now(),
-            'updated_at' => now(),
+        return CurrencyFixture::create([
+            'name' => 'Currency '.$label,
+            'symbol' => $label,
         ]);
     }
 
