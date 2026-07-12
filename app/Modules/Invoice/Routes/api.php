@@ -40,6 +40,10 @@ Route::prefix('api/v1/invoices')->middleware($middleware)->name('api.v1.invoices
         ->whereNumber('invoice')
         ->middleware($requires(InvoicePermission::POST))
         ->name('post');
+    Route::post('{invoice}/reverse', [InvoiceController::class, 'reverse'])
+        ->whereNumber('invoice')
+        ->middleware($requires(InvoicePermission::REVERSE))
+        ->name('reverse');
     Route::post('{invoice}/cancel', [InvoiceController::class, 'cancel'])
         ->whereNumber('invoice')
         ->middleware($requires(InvoicePermission::CANCEL))
