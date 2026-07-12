@@ -109,12 +109,16 @@ describe('Rental billing review workflow', () => {
 
         await userEvent.click(review);
 
-        expect(screen.getByText('Lessee invoice calculation review')).toBeInTheDocument();
-        expect(screen.getByText('Excess kilometre recovery')).toBeInTheDocument();
-        expect(screen.getByText('RUL-0066')).toBeInTheDocument();
-        expect(screen.getByText('250.000000 km')).toBeInTheDocument();
+        const reviewHeading = screen.getByText('Lessee invoice calculation review');
+        const reviewPanel = reviewHeading.closest('section');
+        expect(reviewPanel).not.toBeNull();
+        const reviewContent = within(reviewPanel as HTMLElement);
 
-        await userEvent.click(screen.getByRole('button', { name: 'Approve calculation' }));
+        expect(reviewContent.getAllByText('Excess kilometre recovery').length).toBeGreaterThanOrEqual(1);
+        expect(reviewContent.getAllByText('RUL-0066').length).toBeGreaterThanOrEqual(1);
+        expect(reviewContent.getAllByText('250.000000 km').length).toBeGreaterThanOrEqual(1);
+
+        await userEvent.click(reviewContent.getByRole('button', { name: 'Approve calculation' }));
 
         await waitFor(() => expect(apiMocks.transitionRentalCalculationRun).toHaveBeenCalledWith(
             submittedRun.id,
