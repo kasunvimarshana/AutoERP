@@ -3,7 +3,10 @@ import { endpoints } from '@/shared/api/endpoints';
 import type { ApiCollection, ApiResource, ListParams } from '@/shared/types/api';
 import type { NamedResource } from '@/shared/types/common';
 import type { LookupLoadParams, LookupResult } from '@/shared/types/lookup';
+import type { ReversalFacts } from '@/shared/components/ReversalDialog';
 import type { GoodsReceipt, GoodsReceiptPayload, InvoiceableGoodsReceiptLine, PurchaseActionPayload, ReturnableLine } from '../purchaseTypes';
+
+export interface PurchaseReversalPayload extends PurchaseActionPayload, ReversalFacts {}
 
 export async function listGoodsReceipts(params: ListParams, signal?: AbortSignal) {
     const response = await apiClient.get<ApiCollection<GoodsReceipt>>(`${endpoints.purchase}/goods-receipts`, { params, signal });
@@ -41,7 +44,7 @@ export async function postGoodsReceipt(id: number, payload: PurchaseActionPayloa
     return response.data.data;
 }
 
-export async function reverseGoodsReceipt(id: number, payload: PurchaseActionPayload) {
+export async function reverseGoodsReceipt(id: number, payload: PurchaseReversalPayload) {
     const response = await apiClient.patch<ApiResource<GoodsReceipt>>(`${endpoints.purchase}/goods-receipts/${id}/reverse`, payload);
     return response.data.data;
 }
