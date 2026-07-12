@@ -32,7 +32,7 @@ vi.mock('../components/PaymentLineTable', () => ({
         onLineChange: (key: number, patch: { paymentMethodId: string }) => void;
     }) => (
         <div>
-            <div>Payment total {total}</div>
+            <div data-testid="payment-total">Payment total {total}</div>
             <button
                 type="button"
                 onClick={() => onLineChange(lines[0].key, { paymentMethodId: '9' })}
@@ -118,11 +118,15 @@ describe('Payment invoice settlement entry', () => {
                 </MemoryRouter>,
             );
 
-            expect((await screen.findAllByText(partyName)).length).toBeGreaterThanOrEqual(1);
-            expect(screen.getByText('Payment total 25000.000000')).toBeInTheDocument();
+            await waitFor(() => {
+                expect(screen.getByTestId('payment-total')).toHaveTextContent('25000.000000');
+                expect(screen.getAllByText(partyName).length).toBeGreaterThanOrEqual(2);
+            });
 
             await userEvent.click(screen.getByRole('button', { name: 'Select cash method' }));
-            await userEvent.click(screen.getByRole('button', { name: buttonName }));
+            const submitButton = screen.getByRole('button', { name: buttonName });
+            await waitFor(() => expect(submitButton).toBeEnabled());
+            await userEvent.click(submitButton);
 
             await waitFor(() => expect(paymentApiMocks.createPayment).toHaveBeenCalledWith(
                 expect.objectContaining({
