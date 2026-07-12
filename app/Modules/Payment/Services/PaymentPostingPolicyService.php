@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Payment\Services;
 
 use InvalidArgumentException;
+use Modules\Payment\Constants\PaymentPostingMetadata;
 use Modules\Payment\DTOs\PaymentPostingPolicyData;
 use Modules\Payment\Enums\PaymentDirection;
 use Modules\Payment\Enums\PaymentPostingProfile;
@@ -15,9 +16,6 @@ use Modules\Payment\Models\Payment;
 
 final class PaymentPostingPolicyService
 {
-    private const MANUAL_PROFILE_METADATA_KEY = 'posting_profile_code';
-    private const MANUAL_ROLE_METADATA_KEY = 'counterparty_profile_key';
-
     public function resolve(Payment $payment): PaymentPostingPolicyData
     {
         $type = $payment->payment_type instanceof PaymentType
@@ -126,8 +124,8 @@ final class PaymentPostingPolicyService
     private function manual(Payment $payment): PaymentPostingPolicyData
     {
         $metadata = is_array($payment->metadata) ? $payment->metadata : [];
-        $profileCode = trim((string) ($metadata[self::MANUAL_PROFILE_METADATA_KEY] ?? ''));
-        $role = PaymentPostingRole::tryFrom(trim((string) ($metadata[self::MANUAL_ROLE_METADATA_KEY] ?? '')));
+        $profileCode = trim((string) ($metadata[PaymentPostingMetadata::PROFILE_CODE] ?? ''));
+        $role = PaymentPostingRole::tryFrom(trim((string) ($metadata[PaymentPostingMetadata::COUNTERPARTY_ROLE] ?? '')));
         if ($profileCode === '' || ! $role instanceof PaymentPostingRole) {
             throw new InvalidArgumentException(
                 'Manual payment posting requires posting_profile_code and a supported counterparty_profile_key in metadata.',
