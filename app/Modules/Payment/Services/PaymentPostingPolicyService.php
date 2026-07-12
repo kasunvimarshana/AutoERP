@@ -66,7 +66,7 @@ final class PaymentPostingPolicyService
 
             return new PaymentPostingPolicyData(
                 PaymentPostingProfile::RentalDeposit->value,
-                PaymentPostingRole::Receivable,
+                PaymentPostingRole::CustomerDeposit,
                 PaymentPostingRole::CustomerDeposit,
                 PaymentPostingRole::Receivable,
             );
