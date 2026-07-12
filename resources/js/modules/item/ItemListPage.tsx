@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { LinkButton } from '@/shared/components/Button';
@@ -20,6 +20,7 @@ import { hasItemPermission, itemPermissions } from './itemPermissions';
 import { itemTypes, type ItemSummary } from './itemTypes';
 import { ItemBrandSelect } from './components/ItemBrandSelect';
 import { ItemCategorySelect } from './components/ItemCategorySelect';
+import { notifySuccess } from '@/shared/notifications/appToast';
 
 export default function ItemListPage() {
     const auth = useAuth();
@@ -44,6 +45,13 @@ export default function ItemListPage() {
         page,
         per_page: 25,
     }, signal), [debounced, category?.id, brand?.id, itemType, active, page]);
+    const [collection, setCollection] = useState(result.data);
+
+    useEffect(() => {
+        if (result.data) {
+            setCollection(result.data);
+        }
+    }, [result.data]);
 
     const columns: DataColumn<ItemSummary>[] = [
         { key: 'item', header: 'Item', render: (row) => <Link className="font-semibold text-sky-700 hover:underline" to={`/items/${row.id}`}>{row.name}<span className="block text-xs font-normal text-slate-500">{row.code}</span></Link> },
@@ -64,8 +72,14 @@ export default function ItemListPage() {
     async function toggle(item: ItemSummary) {
         setActionError(null);
         try {
-            await setItemActive(Number(item.id), !item.is_active);
-            result.reload();
+            const updated = await setItemActive(Number(item.id), !item.is_active);
+            setCollection((current) => updateItemCollection(current, updated, {
+                categoryId: category?.id ?? null,
+                brandId: brand?.id ?? null,
+                itemType,
+                active,
+            }));
+            notifySuccess(updated.is_active ? 'Item activated successfully.' : 'Item deactivated successfully.');
         } catch (error) {
             setActionError(toApiError(error));
         }
@@ -81,7 +95,63 @@ export default function ItemListPage() {
             <Select label="Status" value={active} onChange={(event) => { setActive(event.target.value); setPage(1); }} options={[{ value: 'true', label: 'Active' }, { value: 'false', label: 'Inactive' }]} />
         </div>
         <ErrorAlert error={actionError ?? result.error} />
-        {result.loading ? <LoadingState /> : <DataTable rows={result.data?.data ?? []} columns={columns} rowKey={(row) => row.id} />}
-        <Pagination meta={result.data?.meta} onPageChange={setPage} />
+        {result.loading && !collection ? <LoadingState /> : <DataTable rows={collection?.data ?? []} columns={columns} rowKey={(row) => row.id} />}
+        <Pagination meta={collection?.meta} onPageChange={setPage} />
     </>;
+}
+
+function updateItemCollection(
+    collection: Awaited<ReturnType<typeof listItems>> | null,
+    updated: ItemSummary,
+    filters: {
+        categoryId: number | null;
+        brandId: number | null;
+        itemType: string;
+        active: string;
+    },
+) {
+    if (collection === null) return collection;
+
+    const rows = collection.data ?? [];
+    const currentIndex = rows.findIndex((row) => row.id === updated.id);
+    const matches = matchesItemFilters(updated, filters);
+
+    if (!matches) {
+        if (currentIndex === -1) return collection;
+
+        const nextRows = rows.filter((row) => row.id !== updated.id);
+        return {
+            ...collection,
+            data: nextRows,
+            meta: collection.meta ? {
+                ...collection.meta,
+                total: Math.max(0, collection.meta.total - 1),
+                to: nextRows.length === 0 ? null : nextRows.length,
+            } : collection.meta,
+        };
+    }
+
+    if (currentIndex === -1) return collection;
+
+    return {
+        ...collection,
+        data: rows.map((row) => row.id === updated.id ? updated : row),
+    };
+}
+
+function matchesItemFilters(
+    item: ItemSummary,
+    filters: {
+        categoryId: number | null;
+        brandId: number | null;
+        itemType: string;
+        active: string;
+    },
+) {
+    if (filters.categoryId !== null && item.category?.id !== filters.categoryId) return false;
+    if (filters.brandId !== null && item.brand?.id !== filters.brandId) return false;
+    if (filters.itemType && item.item_type !== filters.itemType) return false;
+    if (filters.active === 'true' && !item.is_active) return false;
+    if (filters.active === 'false' && item.is_active) return false;
+    return true;
 }

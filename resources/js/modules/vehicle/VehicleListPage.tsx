@@ -23,6 +23,7 @@ import { LookupSelect } from '@/shared/components/LookupSelect';
 import { lookupApi } from '@/shared/api/lookupApi';
 import type { NamedResource } from '@/shared/types/common';
 import type { VehicleCategory, VehicleMake, VehicleModel, VehicleType } from './vehicleTypes';
+import { notifySuccess } from '@/shared/notifications/appToast';
 
 const statuses = ['', 'active', 'inactive', 'under_service', 'rented', 'reserved', 'sold', 'blocked', 'scrapped'];
 const currentOwnerName = (row: VehicleSummary, ownerType = 'customer') =>
@@ -86,7 +87,10 @@ export default function VehicleListPage() {
 
     const refreshStatus = (vehicle: VehicleSummary, active: boolean) => {
         setVehicleActive(vehicle.id, active)
-            .then((updated) => setRows((current) => current.map((row) => row.id === vehicle.id ? { ...row, status: updated.status } : row)))
+            .then((updated) => {
+                setRows((current) => updateVehicleRows(current, updated, status));
+                notifySuccess(updated.status === 'active' ? 'Vehicle activated successfully.' : 'Vehicle deactivated successfully.');
+            })
             .catch((requestError) => setError(toApiError(requestError)));
     };
 
@@ -145,4 +149,19 @@ export default function VehicleListPage() {
             )}
         </div>
     );
+}
+
+function updateVehicleRows(rows: VehicleSummary[], updated: VehicleSummary, statusFilter: string) {
+    const matchesFilter = statusFilter === '' || updated.status === statusFilter;
+    const currentIndex = rows.findIndex((row) => row.id === updated.id);
+
+    if (currentIndex === -1) {
+        return rows;
+    }
+
+    if (!matchesFilter) {
+        return rows.filter((row) => row.id !== updated.id);
+    }
+
+    return rows.map((row) => row.id === updated.id ? updated : row);
 }

@@ -27,7 +27,7 @@ describe('shared page states', () => {
             'infrastructure',
             {},
             { correlation_id: '01JSUPPORTREFERENCE', guidance: 'Retry after checking platform health.' },
-        )} />);
+        )} inline />);
         expect(screen.getByRole('alert')).toHaveTextContent('The network is unavailable.');
         expect(screen.getByRole('alert')).toHaveTextContent('Retry after checking platform health.');
         expect(screen.getByRole('alert')).toHaveTextContent('01JSUPPORTREFERENCE');
