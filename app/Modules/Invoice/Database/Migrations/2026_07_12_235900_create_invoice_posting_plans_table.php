@@ -24,6 +24,7 @@ return new class extends Migration
             $table->string('posting_profile_code', self::PROFILE_CODE_LENGTH);
             $table->date('posting_date');
             $table->json('lines');
+            $table->text('description')->nullable();
             $table->string('status', self::STATUS_LENGTH);
             $table->string('finance_posting_reference', self::REFERENCE_LENGTH)->nullable();
             $table->string('finance_reversal_reference', self::REFERENCE_LENGTH)->nullable();
