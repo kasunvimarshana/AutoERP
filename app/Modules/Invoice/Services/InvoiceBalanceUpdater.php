@@ -139,6 +139,32 @@ final class InvoiceBalanceUpdater
         });
     }
 
+    public function reverse(Invoice $invoice): InvoiceBalance
+    {
+        return DB::transaction(function () use ($invoice): InvoiceBalance {
+            $lockedInvoice = $this->lockInvoice($invoice);
+            $status = $lockedInvoice->status instanceof InvoiceStatus
+                ? $lockedInvoice->status
+                : InvoiceStatus::from((string) $lockedInvoice->status);
+            if ($status !== InvoiceStatus::Reversed) {
+                throw new InvalidArgumentException(
+                    'Invoice balance can only be reversed after the invoice is reversed.',
+                );
+            }
+
+            $balance = $lockedInvoice->balance()->lockForUpdate()->firstOrFail();
+            $balance->remaining_amount = '0.000000';
+            $balance->status = InvoiceBalanceStatus::Reversed->value;
+            $balance->save();
+
+            $lockedInvoice->forceFill([
+                'balance_due' => '0.000000',
+            ])->save();
+
+            return $balance->refresh();
+        });
+    }
+
     /**
      * @param  Closure(Invoice, InvoiceBalance): void  $mutation
      */
