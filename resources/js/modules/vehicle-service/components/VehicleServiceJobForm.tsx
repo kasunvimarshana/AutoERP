@@ -10,8 +10,9 @@ import { Input } from '@/shared/components/Input';
 import { Panel } from '@/shared/components/Panel';
 import { Select } from '@/shared/components/Select';
 import { Textarea } from '@/shared/components/Textarea';
+import { useApi } from '@/shared/hooks/useApi';
 import type { NamedResource } from '@/shared/types/common';
-import type { LookupLoadParams } from '@/shared/types/lookup';
+import type { LookupLoadParams, LookupResult } from '@/shared/types/lookup';
 import { useMutationFormGuard } from '@/shared/hooks/useMutationFormGuard';
 import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { createVehicleServiceJob, updateVehicleServiceJob } from '../vehicleServiceApi';
@@ -57,6 +58,12 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
     const formGuard = useMutationFormGuard(submitting);
+    const supervisors = useApi((signal) => lookupApi.availableEmployees({
+        search: '',
+        page: 1,
+        perPage: 500,
+        signal,
+    }), []);
     const updateForm = useCallback((next: Parameters<typeof setForm>[0]) => {
         formGuard.markDirty();
         setForm(next);
@@ -69,9 +76,35 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
     const searchVehicle = useCallback((params: LookupLoadParams) => {
         return lookupApi.serviceVehicles(params);
     }, []);
-    const searchSupervisor = useCallback((params: LookupLoadParams) => {
-        return lookupApi.availableEmployees(params);
-    }, []);
+    const searchSupervisor = useCallback((params: LookupLoadParams): Promise<LookupResult<NamedResource>> => {
+        if (supervisors.data === null) {
+            return lookupApi.availableEmployees(params);
+        }
+
+        const allSupervisors = mergeNamedResources(supervisors.data?.data ?? [], supervisor ? [supervisor] : []);
+        const term = params.search.trim().toLowerCase();
+        const filtered = term === ''
+            ? allSupervisors
+            : allSupervisors.filter((resource) =>
+                [resource.code, resource.name]
+                    .filter((value): value is string => typeof value === 'string' && value.trim() !== '')
+                    .some((value) => value.toLowerCase().includes(term)));
+        const start = (params.page - 1) * params.perPage;
+        const pageData = filtered.slice(start, start + params.perPage);
+        const from = pageData.length > 0 ? start + 1 : null;
+
+        return Promise.resolve({
+            data: pageData,
+            meta: {
+                current_page: params.page,
+                from,
+                last_page: Math.max(1, Math.ceil(filtered.length / params.perPage)),
+                per_page: params.perPage,
+                to: from === null ? null : from + pageData.length - 1,
+                total: filtered.length,
+            },
+        });
+    }, [supervisor, supervisors.data?.data]);
 
     const payload = (): VehicleServiceJobPayload => ({
         expected_version: job?.row_version,
@@ -176,7 +209,7 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
                         />
                         <Input label="Customer" value={customerLabel(customer)} error={errorFor('customer_id')} placeholder="Selected vehicle owner" readOnly />
                         <GenericLookupSelect label="Bill-to customer" value={billToCustomer} onChange={(value) => { formGuard.markDirty(); setBillToCustomer(value); }} search={searchCustomer} formatLabel={(value) => `${value.code ?? ''} ${value.name}`.trim()} error={errorFor('bill_to_customer_id')} placeholder="Defaults to vehicle owner" loadOnOpen minSearchLength={0} />
-                        <GenericLookupSelect label="Supervisor" value={supervisor} onChange={(value) => { formGuard.markDirty(); setSupervisor(value); }} search={searchSupervisor} formatLabel={(value) => `${value.code ?? ''} ${value.name}`.trim()} error={errorFor('supervisor_employee_id')} />
+                        <GenericLookupSelect label="Supervisor" value={supervisor} onChange={(value) => { formGuard.markDirty(); setSupervisor(value); }} search={searchSupervisor} formatLabel={(value) => `${value.code ?? ''} ${value.name}`.trim()} error={errorFor('supervisor_employee_id')} loadOnOpen minSearchLength={0} debounceMs={0} />
                         <Input label="Job date" type="date" value={form.job_date} error={errorFor('job_date')} onChange={(event) => updateForm({ ...form, job_date: event.target.value })} />
                         <Input label="Expected delivery" type="date" value={form.expected_delivery_date} error={errorFor('expected_delivery_date')} onChange={(event) => updateForm({ ...form, expected_delivery_date: event.target.value })} />
                         <DecimalInput label="Odometer" value={form.odometer_reading} error={errorFor('odometer_reading')} onChange={(event) => updateForm({ ...form, odometer_reading: event.target.value })} />
@@ -230,4 +263,13 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
 
 function VehicleContext({ label, value }: { label: string; value: string }) {
     return <div><span className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</span><strong className="mt-1 block text-slate-900">{value}</strong></div>;
+}
+
+function mergeNamedResources(primary: NamedResource[], additional: NamedResource[]) {
+    const seen = new Set<number>();
+    return [...primary, ...additional].filter((resource) => {
+        if (seen.has(resource.id)) return false;
+        seen.add(resource.id);
+        return true;
+    });
 }
