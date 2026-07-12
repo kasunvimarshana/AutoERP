@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -14,7 +15,7 @@ const apiMocks = vi.hoisted(() => ({
 vi.mock('../vehicleRentalApi', () => apiMocks);
 vi.mock('@/modules/auth/AuthProvider', () => ({ useAuth: () => ({}) }));
 vi.mock('@/modules/auth/accessControl', () => ({ hasPermission: () => true }));
-vi.mock('../components/RentalPage', () => ({ RentalPage: ({ children }: { children: React.ReactNode }) => children }));
+vi.mock('../components/RentalPage', () => ({ RentalPage: ({ children }: { children: ReactNode }) => children }));
 vi.mock('../components/RentalLookups', () => ({
     RentalAgreementLookupSelect: () => <div>Agreement lookup</div>,
 }));
