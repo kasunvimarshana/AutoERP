@@ -126,13 +126,13 @@ function invoiceSettlementIssue(invoice: Invoice): string | null {
 }
 
 function invoiceParty(invoice: Invoice): NamedResource | null {
-    const id = invoice.party?.id;
-    if (!id) return null;
+    const party = invoice.party;
+    if (!party?.id) return null;
 
     return {
-        id,
-        code: invoice.party.code ?? invoice.party.number ?? undefined,
-        name: invoice.party.name ?? invoice.party.legal_name ?? 'Invoice party',
+        id: party.id,
+        code: party.code ?? party.number ?? undefined,
+        name: party.name ?? party.legal_name ?? 'Invoice party',
     };
 }
 
