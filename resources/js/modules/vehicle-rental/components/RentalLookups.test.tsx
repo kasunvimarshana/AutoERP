@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -81,7 +82,7 @@ describe('RentalInvoiceLookupSelect', () => {
 
     it('deposit workflow binds the selected customer and currency to the eligible-invoice lookup', () => {
         const source = readFileSync(
-            new URL('../pages/RentalDepositPage.tsx', import.meta.url),
+            resolve(process.cwd(), 'resources/js/modules/vehicle-rental/pages/RentalDepositPage.tsx'),
             'utf8',
         );
 
@@ -90,5 +91,4 @@ describe('RentalInvoiceLookupSelect', () => {
         expect(source).toContain('settlementEligible');
         expect(source).toContain('disabled={!selected.customer?.id || !selected.currency?.id}');
     });
-
 });
