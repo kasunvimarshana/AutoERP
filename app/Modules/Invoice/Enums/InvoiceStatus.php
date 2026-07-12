@@ -11,6 +11,7 @@ enum InvoiceStatus: string
     case Posted = 'posted';
     case PartiallyPaid = 'partially_paid';
     case Paid = 'paid';
+    case Reversed = 'reversed';
     case Cancelled = 'cancelled';
     case Void = 'void';
 }
