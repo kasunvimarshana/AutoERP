@@ -1,32 +1,46 @@
-import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { getInvoice } from '@/modules/invoice/invoiceApi';
+import type { Invoice } from '@/modules/invoice/invoiceTypes';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
+import { LoadingState } from '@/shared/components/LoadingState';
+import { MoneyDisplay } from '@/shared/components/MoneyDisplay';
 import { Panel } from '@/shared/components/Panel';
 import { Select } from '@/shared/components/Select';
+import { StatusBadge } from '@/shared/components/StatusBadge';
 import { useApi } from '@/shared/hooks/useApi';
 import type { NamedResource } from '@/shared/types/common';
-import { isPositiveDecimal, sumDecimals } from '@/shared/utils/decimal';
+import { compareDecimalStrings, isPositiveDecimal, sumDecimals } from '@/shared/utils/decimal';
 import { businessDateInputValue } from '@/shared/utils/businessDate';
+import { readableRelation } from '@/shared/utils/object';
+import { parsePositiveInteger } from '@/shared/utils/routeParams';
 import { CustomerLookupSelect } from '@/modules/customer/components/CustomerLookupSelect';
 import { SupplierLookupSelect } from '@/modules/supplier/components/SupplierLookupSelect';
 import { createPayment, listPaymentMethods, type PaymentLinePayload, type PaymentMethod } from '../paymentApi';
 import { PaymentLineTable, type PaymentLineDraft } from '../components/PaymentLineTable';
 
+const PAYMENT_TYPE_CUSTOMER_RECEIPT = 'customer_receipt';
+const PAYMENT_TYPE_SUPPLIER_PAYMENT = 'supplier_payment';
+const PAYMENT_DIRECTION_INBOUND = 'inbound';
+const PAYMENT_DIRECTION_OUTBOUND = 'outbound';
+const ALLOCATION_METHOD_SPECIFIC_INVOICE = 'specific_invoice';
+const SETTLEABLE_INVOICE_STATUSES = ['posted', 'partially_paid'] as const;
+
 const typeOptions = [
-    { value: 'customer_receipt', label: 'Customer receipt' },
-    { value: 'supplier_payment', label: 'Supplier payment' },
+    { value: PAYMENT_TYPE_CUSTOMER_RECEIPT, label: 'Customer receipt' },
+    { value: PAYMENT_TYPE_SUPPLIER_PAYMENT, label: 'Supplier payment' },
     { value: 'advance', label: 'Advance / deposit' },
     { value: 'refund', label: 'Refund' },
     { value: 'manual', label: 'Manual payment' },
 ];
 
 const directionOptions = [
-    { value: 'inbound', label: 'Inbound' },
-    { value: 'outbound', label: 'Outbound' },
+    { value: PAYMENT_DIRECTION_INBOUND, label: 'Inbound' },
+    { value: PAYMENT_DIRECTION_OUTBOUND, label: 'Outbound' },
 ];
 
 function today(): string {
@@ -50,7 +64,7 @@ function linePayload(line: PaymentLineDraft, method: PaymentMethod, direction: s
         payment_method_id: method.id,
         amount: line.amount,
         reference_number: line.reference.trim() || undefined,
-        instrument_direction: direction === 'outbound' ? 'issued' : 'received',
+        instrument_direction: direction === PAYMENT_DIRECTION_OUTBOUND ? 'issued' : 'received',
     };
 
     if (kind === 'cheque') {
@@ -91,10 +105,44 @@ function lineIsValid(line: PaymentLineDraft, method: PaymentMethod | undefined, 
         && (!method.requires_instrument_details || hasInstrumentDetails);
 }
 
+function invoiceSettlementIssue(invoice: Invoice): string | null {
+    if (!SETTLEABLE_INVOICE_STATUSES.includes(invoice.status as typeof SETTLEABLE_INVOICE_STATUSES[number])) {
+        return 'Only a posted invoice with an open balance can be settled.';
+    }
+    if (![PAYMENT_DIRECTION_INBOUND, PAYMENT_DIRECTION_OUTBOUND].includes(invoice.direction ?? '')) {
+        return 'The invoice direction is not supported for payment settlement.';
+    }
+    if (!invoice.party_type || !invoice.party?.id) {
+        return 'The invoice must have an authoritative settlement party.';
+    }
+    if (!invoice.currency?.id) {
+        return 'The invoice must have an authoritative settlement currency.';
+    }
+    if (!isPositiveDecimal(invoice.balance_due ?? '0')) {
+        return 'This invoice has no remaining balance to settle.';
+    }
+
+    return null;
+}
+
+function invoiceParty(invoice: Invoice): NamedResource | null {
+    const party = invoice.party;
+    if (!party?.id) return null;
+
+    return {
+        id: party.id,
+        code: party.code ?? party.number ?? undefined,
+        name: party.name ?? party.legal_name ?? 'Invoice party',
+    };
+}
+
 export default function PaymentEntryPage() {
     const navigate = useNavigate();
-    const [paymentType, setPaymentType] = useState('customer_receipt');
-    const [direction, setDirection] = useState('inbound');
+    const [searchParams] = useSearchParams();
+    const invoiceId = parsePositiveInteger(searchParams.get('invoice_id'));
+    const initializedInvoiceId = useRef<number | null>(null);
+    const [paymentType, setPaymentType] = useState(PAYMENT_TYPE_CUSTOMER_RECEIPT);
+    const [direction, setDirection] = useState(PAYMENT_DIRECTION_INBOUND);
     const [paymentDate, setPaymentDate] = useState(today());
     const [reference, setReference] = useState('');
     const [party, setParty] = useState<NamedResource | null>(null);
@@ -102,11 +150,45 @@ export default function PaymentEntryPage() {
     const [nextKey, setNextKey] = useState(2);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
+    const settlementInvoice = useApi(
+        (signal) => getInvoice(invoiceId ?? 0, signal),
+        [invoiceId],
+        invoiceId !== null,
+    );
+    const invoiceIssue = settlementInvoice.data ? invoiceSettlementIssue(settlementInvoice.data) : null;
+
+    useEffect(() => {
+        const invoice = settlementInvoice.data;
+        if (!invoice || invoiceIssue || initializedInvoiceId.current === invoice.id) return;
+
+        const nextPaymentType = invoice.direction === PAYMENT_DIRECTION_OUTBOUND
+            ? PAYMENT_TYPE_CUSTOMER_RECEIPT
+            : PAYMENT_TYPE_SUPPLIER_PAYMENT;
+        const nextDirection = invoice.direction === PAYMENT_DIRECTION_OUTBOUND
+            ? PAYMENT_DIRECTION_INBOUND
+            : PAYMENT_DIRECTION_OUTBOUND;
+        const balance = invoice.balance_due ?? '0.000000';
+
+        initializedInvoiceId.current = invoice.id;
+        setPaymentType(nextPaymentType);
+        setDirection(nextDirection);
+        setParty(invoiceParty(invoice));
+        setReference(`Settlement for ${invoice.invoice_number ?? 'rental invoice'}`);
+        setLines([{ ...emptyLine(1), amount: balance }]);
+        setNextKey(2);
+    }, [invoiceIssue, settlementInvoice.data]);
+
     const methods = useApi((signal) => listPaymentMethods({ direction, per_page: 100 }, signal), [direction]);
     const methodRows = methods.data?.data ?? [];
     const total = useMemo(() => sumDecimals(lines.map((line) => line.amount || '0.000000')), [lines]);
-    const partyType = paymentType === 'supplier_payment' ? 'supplier' : 'customer';
+    const partyType = settlementInvoice.data?.party_type
+        ?? (paymentType === PAYMENT_TYPE_SUPPLIER_PAYMENT ? 'supplier' : 'customer');
+    const invoiceAmountValid = !settlementInvoice.data
+        || compareDecimalStrings(total, settlementInvoice.data.balance_due ?? '0') <= 0;
     const canSubmit = !busy
+        && invoiceIssue === null
+        && invoiceAmountValid
+        && (invoiceId === null || party !== null)
         && lines.every((line) => lineIsValid(
             line,
             methodRows.find((method) => String(method.id) === line.paymentMethodId),
@@ -139,8 +221,18 @@ export default function PaymentEntryPage() {
                 payment_date: paymentDate,
                 party_type: party ? partyType : undefined,
                 party_id: party?.id,
+                currency_id: settlementInvoice.data?.currency?.id ?? undefined,
                 reference_number: reference.trim() || undefined,
+                notes: settlementInvoice.data
+                    ? `Settlement initiated from invoice ${settlementInvoice.data.invoice_number ?? settlementInvoice.data.id}.`
+                    : undefined,
                 lines: payloadLines,
+                allocations: settlementInvoice.data ? [{
+                    invoice_id: settlementInvoice.data.id,
+                    allocated_amount: total,
+                    allocation_date: paymentDate,
+                    allocation_method: ALLOCATION_METHOD_SPECIFIC_INVOICE,
+                }] : undefined,
             });
             navigate(`/payments/${payment.id}`);
         } catch (requestError) {
@@ -150,24 +242,81 @@ export default function PaymentEntryPage() {
         }
     }
 
+    if (invoiceId !== null && settlementInvoice.loading) return <LoadingState />;
+
     return (
         <>
-            <ContentHeader title="Payment entry" description="Create a payment with one or more configured settlement methods." />
-            <ErrorAlert error={error ?? methods.error} />
-            <form className="space-y-5" onSubmit={(event) => { event.preventDefault(); void submit(); }}>
+            <ContentHeader
+                title={settlementInvoice.data ? 'Invoice settlement' : 'Payment entry'}
+                description={settlementInvoice.data
+                    ? 'Create the matching receipt or owner payment and allocate it to this invoice atomically.'
+                    : 'Create a payment with one or more configured settlement methods.'}
+            />
+            <ErrorAlert error={error ?? methods.error ?? settlementInvoice.error} />
+            {settlementInvoice.data && (
+                <Panel title="Invoice to settle">
+                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+                        <div>
+                            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Invoice</div>
+                            <div className="mt-1 font-medium text-slate-900">
+                                {settlementInvoice.data.invoice_number ?? 'Rental invoice'}
+                            </div>
+                        </div>
+                        <div>
+                            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Party</div>
+                            <div className="mt-1 text-slate-900">{readableRelation(settlementInvoice.data.party)}</div>
+                        </div>
+                        <div>
+                            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Settlement</div>
+                            <div className="mt-1 text-slate-900">
+                                {settlementInvoice.data.direction === PAYMENT_DIRECTION_OUTBOUND
+                                    ? 'Lessee receipt'
+                                    : 'Vehicle owner payment'}
+                            </div>
+                        </div>
+                        <div>
+                            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Remaining</div>
+                            <div className="mt-1 text-slate-900">
+                                <MoneyDisplay
+                                    value={settlementInvoice.data.balance_due}
+                                    currency={settlementInvoice.data.currency?.code ?? undefined}
+                                />
+                            </div>
+                        </div>
+                        <div>
+                            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Status</div>
+                            <div className="mt-1"><StatusBadge status={settlementInvoice.data.status} /></div>
+                        </div>
+                    </div>
+                    {invoiceIssue && <p className="mt-4 text-sm font-medium text-rose-700">{invoiceIssue}</p>}
+                    {!invoiceAmountValid && (
+                        <p className="mt-4 text-sm font-medium text-rose-700">
+                            Payment total cannot exceed the invoice remaining balance.
+                        </p>
+                    )}
+                </Panel>
+            )}
+            <form className="mt-5 space-y-5" onSubmit={(event) => { event.preventDefault(); void submit(); }}>
                 <Panel title="Header">
                     <div className="grid gap-4 md:grid-cols-4">
-                        <Select label="Payment type" value={paymentType} options={typeOptions} onChange={(event) => {
+                        <Select label="Payment type" value={paymentType} options={typeOptions} disabled={invoiceId !== null} onChange={(event) => {
                             const value = event.target.value;
                             setPaymentType(value);
-                            if (value === 'supplier_payment') setDirection('outbound');
-                            if (value === 'customer_receipt' || value === 'advance') setDirection('inbound');
+                            if (value === PAYMENT_TYPE_SUPPLIER_PAYMENT) setDirection(PAYMENT_DIRECTION_OUTBOUND);
+                            if (value === PAYMENT_TYPE_CUSTOMER_RECEIPT || value === 'advance') setDirection(PAYMENT_DIRECTION_INBOUND);
                             setParty(null);
                         }} />
-                        <Select label="Direction" value={direction} options={directionOptions} onChange={(event) => setDirection(event.target.value)} />
+                        <Select label="Direction" value={direction} options={directionOptions} disabled={invoiceId !== null} onChange={(event) => setDirection(event.target.value)} />
                         <Input label="Payment date" type="date" value={paymentDate} onChange={(event) => setPaymentDate(event.target.value)} />
                         <Input label="Reference" value={reference} onChange={(event) => setReference(event.target.value)} />
-                        {partyType === 'customer'
+                        {invoiceId !== null ? (
+                            <div>
+                                <div className="mb-1.5 block text-sm font-medium text-slate-700">Settlement party</div>
+                                <div className="min-h-10 rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-900">
+                                    {readableRelation(party)}
+                                </div>
+                            </div>
+                        ) : partyType === 'customer'
                             ? <CustomerLookupSelect value={party as never} onChange={(next) => setParty(next as NamedResource | null)} />
                             : <SupplierLookupSelect value={party as never} onChange={(next) => setParty(next as NamedResource | null)} />}
                     </div>
@@ -190,7 +339,13 @@ export default function PaymentEntryPage() {
                 </Panel>
 
                 <div className="flex justify-end">
-                    <Button type="submit" loading={busy} disabled={!canSubmit}>Create payment</Button>
+                    <Button type="submit" loading={busy} disabled={!canSubmit}>
+                        {settlementInvoice.data?.direction === PAYMENT_DIRECTION_OUTBOUND
+                            ? 'Create lessee receipt'
+                            : settlementInvoice.data
+                                ? 'Create owner payment'
+                                : 'Create payment'}
+                    </Button>
                 </div>
             </form>
         </>

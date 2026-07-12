@@ -24,6 +24,7 @@ final class RentalDepositRequirementResource extends RentalResource
             'received_amount' => $this->decimal($this->received_amount),
             'applied_amount' => $this->decimal($this->applied_amount),
             'refunded_amount' => $this->decimal($this->refunded_amount),
+            'forfeited_amount' => $this->decimal($this->forfeited_amount),
             'balance_amount' => $this->decimal($this->balance_amount),
             'status' => $this->enumValue($this->status),
             'remarks' => $this->remarks,

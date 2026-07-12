@@ -11,6 +11,7 @@ import {
     postInvoice,
 } from '../invoiceApi';
 import { hasInvoicePermission, invoicePermissions } from '../invoicePermissions';
+import { paymentPermissions } from '@/modules/payment/paymentPermissions';
 import { useApi } from '@/shared/hooks/useApi';
 import { useOnDemandTab } from '@/shared/hooks/useOnDemandTab';
 import { ContentHeader } from '@/shared/components/ContentHeader';
@@ -25,9 +26,11 @@ import { MoneyDisplay } from '@/shared/components/MoneyDisplay';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { formatDate } from '@/shared/utils/formatDate';
+import { isPositiveDecimal } from '@/shared/utils/decimal';
 import { humanize, readableRelation } from '@/shared/utils/object';
 import { LinkButton } from '@/shared/components/Button';
 import { useAuth } from '@/modules/auth/AuthProvider';
+import { hasPermission } from '@/modules/auth/accessControl';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 
 type Tab = 'summary' | 'balance' | 'sources' | 'lines' | 'adjustments';
@@ -35,6 +38,7 @@ type InvoiceAction = 'approve' | 'post' | 'cancel';
 
 const summaryTab: TabItem<Tab> = { id: 'summary', label: 'Summary' };
 const linesTab: TabItem<Tab> = { id: 'lines', label: 'Lines' };
+const settlementStatuses = ['posted', 'partially_paid'] as const;
 
 export default function InvoiceDetailPage() {
     const id = Number(useParams().id);
@@ -44,6 +48,7 @@ export default function InvoiceDetailPage() {
     const canApprove = hasInvoicePermission(auth, invoicePermissions.approve);
     const canPost = hasInvoicePermission(auth, invoicePermissions.post);
     const canCancel = hasInvoicePermission(auth, invoicePermissions.cancel);
+    const canCreatePayment = hasPermission(auth, paymentPermissions.create);
     const [searchParams] = useSearchParams();
     const [action, setAction] = useState<InvoiceAction | null>(null);
     const [actionError, setActionError] = useState<ApiError | null>(null);
@@ -80,6 +85,10 @@ export default function InvoiceDetailPage() {
     const fromVehicleRental = searchParams.get('from') === 'vehicle-rental';
     const isSupplierInvoice = value.invoice_type === 'purchase' && value.direction === 'inbound';
     const isRentalInvoice = value.invoice_type === 'rental';
+    const canSettleRentalInvoice = fromVehicleRental
+        && isRentalInvoice
+        && settlementStatuses.includes(value.status as typeof settlementStatuses[number])
+        && isPositiveDecimal(value.balance_due ?? '0');
     const printUrl = `/invoices/${id}/print`;
 
     const runAction = async (nextAction: InvoiceAction) => {
@@ -121,7 +130,14 @@ export default function InvoiceDetailPage() {
                             </>
                         ) : null}
                         {fromVehicleRental && isRentalInvoice ? (
-                            <LinkButton to="/vehicle-rental/billing" variant="secondary">Back to Rental Billing</LinkButton>
+                            <>
+                                <LinkButton to="/vehicle-rental/billing" variant="secondary">Back to Rental Billing</LinkButton>
+                                {canSettleRentalInvoice && canCreatePayment ? (
+                                    <LinkButton to={`/payments/create?invoice_id=${id}`}>
+                                        {value.direction === 'outbound' ? 'Receive lessee payment' : 'Pay vehicle owner'}
+                                    </LinkButton>
+                                ) : null}
+                            </>
                         ) : null}
                         {value.status === 'draft' && canApprove ? (
                             <Button loading={action === 'approve'} onClick={() => void runAction('approve')}>Approve</Button>
