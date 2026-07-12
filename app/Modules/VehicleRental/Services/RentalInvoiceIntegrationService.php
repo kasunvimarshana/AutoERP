@@ -99,7 +99,7 @@ final class RentalInvoiceIntegrationService
                     ->where('source_id', $run->getKey())
                     ->where('source_line_type', 'rental_calculation_line')
                     ->where('source_line_id', $line->getKey())
-                    ->whereHas('invoice', fn ($query) => $query->whereNotIn('status', [InvoiceStatus::Cancelled->value, InvoiceStatus::Void->value]))
+                    ->whereHas('invoice', fn ($query) => $query->whereNotIn('status', $this->terminalInvoiceStatuses()))
                     ->sum('invoiced_quantity');
                 $net = (string) $line->net_amount;
                 $isPositive = $this->math->compare($net, '0') > 0;
@@ -271,10 +271,7 @@ final class RentalInvoiceIntegrationService
             ->where('source_type', 'rental_calculation_line')
             ->where('source_id', $line->getKey())
             ->where('adjustment_type', $type->value)
-            ->whereHas('invoice', fn ($query) => $query->whereNotIn('status', [
-                InvoiceStatus::Cancelled->value,
-                InvoiceStatus::Void->value,
-            ]))
+            ->whereHas('invoice', fn ($query) => $query->whereNotIn('status', $this->terminalInvoiceStatuses()))
             ->exists();
     }
 
@@ -300,19 +297,23 @@ final class RentalInvoiceIntegrationService
                 ->where('source_id', $run->getKey())
                 ->where('source_line_type', 'rental_calculation_line')
                 ->where('source_line_id', $line->getKey())
-                ->whereHas('invoice', fn ($query) => $query->whereNotIn('status', [
-                    InvoiceStatus::Cancelled->value,
-                    InvoiceStatus::Void->value,
-                ]))
+                ->whereHas('invoice', fn ($query) => $query->whereNotIn('status', $this->terminalInvoiceStatuses()))
                 ->sum('invoiced_quantity'), '1.000000') >= 0;
         }
         if ($this->math->compare($net, '0') < 0) {
-            return $this->hasActiveAdjustment(
-                $line,
-                AdjustmentType::CreditNote,
-            );
+            return $this->hasActiveAdjustment($line, AdjustmentType::CreditNote);
         }
 
         return true;
+    }
+
+    /** @return list<string> */
+    private function terminalInvoiceStatuses(): array
+    {
+        return [
+            InvoiceStatus::Cancelled->value,
+            InvoiceStatus::Void->value,
+            InvoiceStatus::Reversed->value,
+        ];
     }
 }
