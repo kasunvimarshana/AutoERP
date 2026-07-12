@@ -17,14 +17,13 @@ use Modules\Tax\Services\TaxDocumentIntegrationService;
 
 final class InvoiceReversalService
 {
-    private const ZERO = '0.000000';
-
     public function __construct(
         private readonly DecimalMath $math,
         private readonly InvoicePostingPlanService $postingPlans,
         private readonly TaxDocumentIntegrationService $taxDocuments,
         private readonly InvoiceTaxDocumentMapper $taxDocumentMapper,
         private readonly InvoiceSourceRestorationService $sourceRestoration,
+        private readonly InvoiceBalanceService $balances,
     ) {}
 
     public function reverse(
@@ -78,6 +77,7 @@ final class InvoiceReversalService
             $this->sourceRestoration->restore($invoice);
 
             $invoice->forceFill(['status' => InvoiceStatus::Reversed->value])->save();
+            $this->balances->reverse($invoice);
 
             return $invoice->refresh()->load([
                 'lines',
