@@ -1110,11 +1110,7 @@ final class FastPurchaseTest extends TestCase
                 'tax_receivable' => $this->accountRole($tenantId, 'tax_receivable', $tax),
             ]);
             FinancePostingFixture::seedPurchaseWithholdingRole($tenantId);
-            $this->profile($tenantId, 'payment_made', [
-                'payable' => $this->accountRole($tenantId, 'payment_payable', $payable),
-                'cash' => $this->accountRole($tenantId, 'payment_cash', $cash),
-                'bank' => $this->accountRole($tenantId, 'payment_bank', $bank),
-            ]);
+            FinancePostingFixture::seedSupplierPaymentProfiles($tenantId);
             return [
                 'cash' => (int) $cash->getKey(),
                 'bank' => (int) $bank->getKey(),
