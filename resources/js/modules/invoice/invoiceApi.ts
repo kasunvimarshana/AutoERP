@@ -1,5 +1,6 @@
 import { apiClient } from '@/shared/api/apiClient';
 import { endpoints } from '@/shared/api/endpoints';
+import type { ReversalFacts } from '@/shared/components/ReversalDialog';
 import type { ApiCollection, ApiResource, ListParams } from '@/shared/types/api';
 import type {
     Invoice,
@@ -14,6 +15,10 @@ export type {
     InvoiceBalanceResult,
     InvoiceSourcesResult,
 } from './invoiceTypes';
+
+export interface InvoiceReversalPayload extends ReversalFacts {
+    expected_version: number;
+}
 
 export async function listInvoices(params: ListParams, signal?: AbortSignal) {
     const response = await apiClient.get<ApiCollection<Invoice>>(endpoints.invoices, { params, signal });
@@ -39,10 +44,15 @@ export async function postInvoice(id: number, expectedVersion: number) {
     return response.data.data;
 }
 
-export async function cancelInvoice(id: number, expectedVersion: number, reason?: string) {
+export async function reverseInvoice(id: number, payload: InvoiceReversalPayload) {
+    const response = await apiClient.post<ApiResource<Invoice>>(`${endpoints.invoices}/${id}/reverse`, payload);
+    return response.data.data;
+}
+
+export async function cancelInvoice(id: number, expectedVersion: number, reason: string) {
     const response = await apiClient.post<ApiResource<Invoice>>(`${endpoints.invoices}/${id}/cancel`, {
         expected_version: expectedVersion,
-        reason: reason?.trim() || undefined,
+        reason: reason.trim(),
     });
     return response.data.data;
 }
