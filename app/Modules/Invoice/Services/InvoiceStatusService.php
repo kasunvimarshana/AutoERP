@@ -17,6 +17,7 @@ final class InvoiceStatusService
         private readonly TaxDocumentIntegrationService $taxDocuments,
         private readonly InvoiceSourceRestorationService $sourceRestoration,
         private readonly InvoiceTaxDocumentMapper $taxDocumentMapper,
+        private readonly InvoicePostingPlanService $postingPlans,
     ) {}
 
     /**
@@ -48,9 +49,7 @@ final class InvoiceStatusService
         ];
     }
 
-    /**
-     * @return list<string>
-     */
+    /** @return list<string> */
     public function settlementStatuses(): array
     {
         return [
@@ -137,10 +136,12 @@ final class InvoiceStatusService
                 $this->sourceRestoration->restore($invoice);
             }
             if ($to === InvoiceStatus::Posted) {
-                // TaxDocumentIntegrationService reuses the draft snapshot and only
-                // calculates one when no snapshot exists. Recalculating here could
-                // make posted tax differ from the immutable invoice totals.
-                $this->taxDocuments->post($this->taxDocumentMapper->map($invoice->refresh()));
+                // Tax and Finance use persisted immutable snapshots. Both postings
+                // share this transaction with the status transition and roll back
+                // together when either integration fails.
+                $postedInvoice = $invoice->refresh();
+                $this->taxDocuments->post($this->taxDocumentMapper->map($postedInvoice));
+                $this->postingPlans->post($postedInvoice, $actorId);
             }
 
             return $invoice->refresh();
