@@ -35,7 +35,7 @@ final class RentalAgreementOptionalTermsTest extends TestCase
                 'starts_at' => $startsAt,
                 'ends_at' => $endsAt,
                 'legal_context' => 'company',
-                'rental_mode' => 'without_driver',
+                'rental_mode' => 'self_drive',
                 'billing_cycle' => 'monthly',
                 'billing_basis' => 'calendar_month',
                 'proration_rule' => 'exact_day_count',

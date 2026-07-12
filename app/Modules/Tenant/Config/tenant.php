@@ -39,6 +39,12 @@ return [
         ),
         'local_fallback_tenant_code' => env('TENANT_LOCAL_FALLBACK_TENANT_CODE', env('AUTOERP_TENANT_CODE', 'AUTOERP')),
     ],
+    'seeding' => [
+        'tenant' => [
+            'code' => env('AUTOERP_TENANT_CODE', 'AUTOERP'),
+            'name' => env('AUTOERP_TENANT_NAME', 'AutoERP'),
+        ],
+    ],
     'event_outbox' => [
         'batch_size' => (int) env('TENANT_EVENT_OUTBOX_BATCH_SIZE', 100),
         'max_attempts' => (int) env('TENANT_EVENT_OUTBOX_MAX_ATTEMPTS', 10),

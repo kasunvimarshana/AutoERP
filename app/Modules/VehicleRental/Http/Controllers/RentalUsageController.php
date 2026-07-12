@@ -14,6 +14,7 @@ use Modules\VehicleRental\Http\Requests\StoreRentalUsageRequest;
 use Modules\VehicleRental\Http\Resources\RentalUsageLogResource;
 use Modules\VehicleRental\Models\RentalUsageLog;
 use Modules\VehicleRental\Models\RentalVehicleAllocation;
+use Modules\VehicleRental\Services\RentalUsageCreationService;
 use Modules\VehicleRental\Services\RentalUsageService;
 use Modules\VehicleRental\Services\VehicleRentalAuthorizationService;
 
@@ -39,8 +40,11 @@ final class RentalUsageController
         ));
     }
 
-    public function store(StoreRentalUsageRequest $request, int $allocation, RentalUsageService $service): JsonResponse
-    {
+    public function store(
+        StoreRentalUsageRequest $request,
+        int $allocation,
+        RentalUsageCreationService $creation,
+    ): JsonResponse {
         $this->authorization->assert(
             $request->currentUserId(),
             $request->tenantId(),
@@ -48,7 +52,7 @@ final class RentalUsageController
         );
         $allocationModel = $this->scope(RentalVehicleAllocation::query(), $request)->findOrFail($allocation);
 
-        return (new RentalUsageLogResource($service->create(
+        return (new RentalUsageLogResource($creation->create(
             $allocationModel,
             $request->validated(),
             $request->currentUserId(),

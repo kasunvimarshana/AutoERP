@@ -51,6 +51,7 @@ use Modules\Vehicle\Services\Ownership\VehicleOwnershipCommandService;
 use Modules\Vehicle\Services\VehicleStatusService;
 use Modules\Vehicle\Services\VehicleTypeService;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
+use Tests\Support\CurrencyFixture;
 use Tests\TestCase;
 
 final class VehicleEngineTest extends TestCase
@@ -610,15 +611,9 @@ final class VehicleEngineTest extends TestCase
     private function scopeContext(string $suffix = ''): array
     {
         $suffix = $suffix !== '' ? $suffix : Str::upper(Str::random(5));
-        $currencyId = (int) DB::table('currencies')->insertGetId([
-            'row_version' => 1,
-            'code' => 'V'.Str::upper(Str::random(4)),
+        $currencyId = CurrencyFixture::create([
             'name' => 'Vehicle Currency '.$suffix,
             'symbol' => 'VC',
-            'decimal_places' => 2,
-            'is_active' => true,
-            'created_at' => now(),
-            'updated_at' => now(),
         ]);
         $tenantId = (int) DB::table('tenants')->insertGetId([
             'uuid' => (string) Str::uuid(),

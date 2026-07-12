@@ -30,6 +30,7 @@ use Modules\Item\Services\ItemBundleService;
 use Modules\Item\Services\ItemCreationService;
 use Modules\Item\Services\ItemLookupService;
 use Modules\Item\Services\ItemQueryService;
+use Tests\Support\CurrencyFixture;
 use Tests\TestCase;
 
 final class ItemEngineTest extends TestCase
@@ -427,15 +428,9 @@ final class ItemEngineTest extends TestCase
 
     private function createCurrency(string $code): int
     {
-        return (int) DB::table('currencies')->insertGetId([
-            'code' => $code.'-'.Str::upper(Str::random(4)),
+        return CurrencyFixture::create([
             'name' => $code.' Currency',
             'symbol' => $code,
-            'decimal_places' => 2,
-            'is_active' => true,
-            'row_version' => 1,
-            'created_at' => now(),
-            'updated_at' => now(),
         ]);
     }
 

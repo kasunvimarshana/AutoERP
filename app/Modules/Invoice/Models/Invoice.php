@@ -25,8 +25,6 @@ final class Invoice extends TenantOwnedModel
 
     protected $table = 'invoices';
 
-    protected $guarded = ['id'];
-
     protected static function booted(): void
     {
         static::updating(static function (Invoice $invoice): void {

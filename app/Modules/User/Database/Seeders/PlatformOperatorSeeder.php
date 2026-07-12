@@ -18,6 +18,8 @@ use RuntimeException;
 
 final class PlatformOperatorSeeder extends Seeder
 {
+    private const CONFIG_PREFIX = 'user.seeding.platform_operator.';
+
     public function run(): void
     {
         if (! $this->enabled()) {
@@ -78,12 +80,12 @@ final class PlatformOperatorSeeder extends Seeder
 
     private function enabled(): bool
     {
-        return filter_var(env('AUTOERP_SEED_PLATFORM_OPERATOR', false), FILTER_VALIDATE_BOOL);
+        return (bool) config(self::CONFIG_PREFIX.'enabled', false);
     }
 
     private function requiredEmail(): string
     {
-        $email = strtolower(trim((string) env('AUTOERP_PLATFORM_ADMIN_EMAIL', '')));
+        $email = strtolower(trim((string) config(self::CONFIG_PREFIX.'email')));
         if (filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
             throw new RuntimeException('AUTOERP_PLATFORM_ADMIN_EMAIL must be valid when platform operator seeding is enabled.');
         }
@@ -93,7 +95,7 @@ final class PlatformOperatorSeeder extends Seeder
 
     private function requiredPassword(): string
     {
-        $password = (string) env('AUTOERP_PLATFORM_ADMIN_PASSWORD', '');
+        $password = (string) config(self::CONFIG_PREFIX.'password');
         if (trim($password) === '') {
             throw new RuntimeException('AUTOERP_PLATFORM_ADMIN_PASSWORD is required when platform operator seeding is enabled.');
         }

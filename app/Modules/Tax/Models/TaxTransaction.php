@@ -14,8 +14,6 @@ final class TaxTransaction extends TenantOwnedModel
 {
     protected $table = 'tax_transactions';
 
-    protected $guarded = ['id'];
-
     protected function casts(): array
     {
         return array_merge(parent::casts(), [

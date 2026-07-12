@@ -7,6 +7,13 @@ return [
     'platform' => [
         'permission_middleware_alias' => env('PLATFORM_PERMISSION_MIDDLEWARE_ALIAS', 'platform.permission'),
     ],
+    'seeding' => [
+        'platform_operator' => [
+            'enabled' => filter_var(env('AUTOERP_SEED_PLATFORM_OPERATOR', false), FILTER_VALIDATE_BOOL),
+            'email' => env('AUTOERP_PLATFORM_ADMIN_EMAIL'),
+            'password' => env('AUTOERP_PLATFORM_ADMIN_PASSWORD'),
+        ],
+    ],
     'storage' => [
         'documents' => [
             'max_size_kb' => (int) env('USER_DOCUMENT_MAX_SIZE_KB', 10240),

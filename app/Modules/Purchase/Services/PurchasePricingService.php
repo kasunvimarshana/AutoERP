@@ -18,6 +18,23 @@ use Modules\Supplier\Models\SupplierItemMapping;
 
 final class PurchasePricingService
 {
+    /**
+     * Mutable price-source metadata is intentionally excluded. The confirmation
+     * token represents the commercial dimensions named in the stale-price error.
+     *
+     * @var list<string>
+     */
+    private const PRICING_CONTEXT_KEYS = [
+        'tenant_id',
+        'organization_unit_id',
+        'supplier_id',
+        'item_id',
+        'item_variant_id',
+        'uom_id',
+        'currency_id',
+        'purchase_date',
+    ];
+
     public function __construct(
         private readonly DecimalMath $math,
         private readonly ItemPriceResolutionService $prices,
@@ -111,9 +128,12 @@ final class PurchasePricingService
      */
     public function contextHash(array $context): string
     {
-        ksort($context);
+        $hashContext = [];
+        foreach (self::PRICING_CONTEXT_KEYS as $key) {
+            $hashContext[$key] = $context[$key] ?? null;
+        }
 
-        return hash('sha256', json_encode($context, JSON_THROW_ON_ERROR));
+        return hash('sha256', json_encode($hashContext, JSON_THROW_ON_ERROR));
     }
 
     /**

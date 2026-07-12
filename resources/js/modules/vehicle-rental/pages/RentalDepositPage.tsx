@@ -349,7 +349,9 @@ export default function RentalDepositPage() {
                                 invoiceType="rental"
                                 direction="outbound"
                                 partyId={selected.customer?.id ?? null}
-                                disabled={!selected.customer?.id}
+                                currencyId={selected.currency?.id ?? null}
+                                settlementEligible
+                                disabled={!selected.customer?.id || !selected.currency?.id}
                                 required
                             />
                         )}

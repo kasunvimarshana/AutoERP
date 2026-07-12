@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/modules/auth/AuthProvider';
 import { hasPermission } from '@/modules/auth/accessControl';
 import { Button } from '@/shared/components/Button';
@@ -38,6 +38,7 @@ function defaultBillingPeriod() {
 
 export default function RentalBillingPage() {
     const auth = useAuth();
+    const navigate = useNavigate();
     const initialPeriod = defaultBillingPeriod();
     const [agreement, setAgreement] = useState<VersionedNamedResource | null>(null);
     const [financialSide, setFinancialSide] = useState<'revenue' | 'cost'>('revenue');
@@ -102,12 +103,13 @@ export default function RentalBillingPage() {
         setActionError(null);
         try {
             const documentDate = businessDateInputValue();
-            await createRentalInvoice(run.id, run.row_version, {
+            const invoice = await createRentalInvoice(run.id, run.row_version, {
                 invoice_date: documentDate,
                 status: 'draft',
                 notes: `${run.billing_period?.financial_side === 'cost' ? 'Owner rental payable' : 'Lessee rental invoice'} from approved rental calculation`,
             });
             runs.reload();
+            navigate(`/invoices/${invoice.id}?from=vehicle-rental`);
         } catch (error: unknown) {
             setActionError(toApiError(error));
         }

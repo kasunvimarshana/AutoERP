@@ -14,6 +14,10 @@ use Ramsey\Uuid\Uuid;
 
 final class TenantSeeder extends Seeder
 {
+    private const UUID_NAME_PREFIX = 'autoerp.local/tenant/';
+
+    private const INITIAL_STATUS_REASON = 'Awaiting platform onboarding.';
+
     public function run(): void
     {
         if (! Schema::hasTable('tenants')) {
@@ -21,20 +25,21 @@ final class TenantSeeder extends Seeder
         }
 
         DB::transaction(function (): void {
-            $code = strtoupper(trim((string) env('AUTOERP_TENANT_CODE', 'AUTOERP')));
+            $code = strtoupper(trim((string) config('tenant.seeding.tenant.code')));
+            $name = trim((string) config('tenant.seeding.tenant.name'));
 
             TenantModel::query()->updateOrCreate(
                 ['code' => $code],
                 [
                     'uuid' => Uuid::uuid5(
                         Uuid::NAMESPACE_DNS,
-                        'autoerp.local/tenant/'.$code,
+                        self::UUID_NAME_PREFIX.$code,
                     )->toString(),
-                    'name' => trim((string) env('AUTOERP_TENANT_NAME', 'AutoERP')),
+                    'name' => $name,
                     'slug' => Str::slug($code),
                     'status' => TenantStatus::DRAFT,
                     'status_changed_at' => now(),
-                    'status_reason' => 'Awaiting platform onboarding.',
+                    'status_reason' => self::INITIAL_STATUS_REASON,
                     'activated_at' => null,
                     'row_version' => 1,
                 ],

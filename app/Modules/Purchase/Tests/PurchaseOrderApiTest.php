@@ -17,6 +17,7 @@ use Modules\Purchase\Services\PurchaseAuthorizationService;
 use Modules\Purchase\Services\PurchaseOrderService;
 use Modules\Supplier\Services\SupplierAuthorizationService;
 use Modules\User\Services\UserAccessResolver;
+use Tests\Support\CurrencyFixture;
 use Tests\TestCase;
 
 final class PurchaseOrderApiTest extends TestCase
@@ -950,10 +951,10 @@ final class PurchaseOrderApiTest extends TestCase
             SupplierAuthorizationService::VIEW,
         ]);
         $other = $this->context('LOOKUPOTHER');
-        $activeCurrencyCode = 'LOOK-'.Str::upper(Str::random(4));
-        $inactiveCurrencyCode = 'NOLOOK-'.Str::upper(Str::random(4));
-        $this->createCurrency($activeCurrencyCode);
-        $this->createCurrency($inactiveCurrencyCode, active: false);
+        $activeCurrencyId = $this->createCurrency('LOOK-'.Str::upper(Str::random(4)));
+        $inactiveCurrencyId = $this->createCurrency('NOLOOK-'.Str::upper(Str::random(4)), active: false);
+        $activeCurrencyCode = (string) DB::table('currencies')->where('id', $activeCurrencyId)->value('code');
+        $inactiveCurrencyCode = (string) DB::table('currencies')->where('id', $inactiveCurrencyId)->value('code');
 
         $fastPurchaseContext = $this->withAuth($context)->getJson('/api/v1/purchase/fast-purchases/context');
         $fastPurchaseContext->assertOk();
@@ -1142,17 +1143,12 @@ final class PurchaseOrderApiTest extends TestCase
         ]);
     }
 
-    private function createCurrency(string $code, bool $active = true): int
+    private function createCurrency(string $label, bool $active = true): int
     {
-        return (int) DB::table('currencies')->insertGetId([
-            'row_version' => 1,
-            'code' => $code,
-            'name' => 'Currency '.$code,
-            'symbol' => substr($code, 0, 1),
-            'decimal_places' => 2,
+        return CurrencyFixture::create([
+            'name' => 'Currency '.$label,
+            'symbol' => substr($label, 0, 1),
             'is_active' => $active,
-            'created_at' => now(),
-            'updated_at' => now(),
         ]);
     }
 

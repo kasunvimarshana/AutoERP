@@ -19,6 +19,7 @@ use Modules\Vehicle\Services\VehicleAuthorizationService;
 use Modules\Vehicle\Services\VehicleCreationService;
 use Modules\Vehicle\Services\VehicleMakeService;
 use Modules\Vehicle\Services\VehicleModelService;
+use Tests\Support\CurrencyFixture;
 use Tests\TestCase;
 
 final class VehicleRowVersionTest extends TestCase
@@ -69,15 +70,9 @@ final class VehicleRowVersionTest extends TestCase
     private function scopeContext(): array
     {
         $suffix = Str::upper(Str::random(5));
-        $currencyId = (int) DB::table('currencies')->insertGetId([
-            'row_version' => 1,
-            'code' => 'V'.Str::upper(Str::random(4)),
+        $currencyId = CurrencyFixture::create([
             'name' => 'Vehicle Currency '.$suffix,
             'symbol' => 'VC',
-            'decimal_places' => 2,
-            'is_active' => true,
-            'created_at' => now(),
-            'updated_at' => now(),
         ]);
         $tenantId = (int) DB::table('tenants')->insertGetId([
             'uuid' => (string) Str::uuid(),

@@ -32,19 +32,29 @@ final class InvoiceController
 {
     public function __construct(private readonly InvoicePrintService $prints) {}
 
-    public function index(ListInvoiceRequest $request): AnonymousResourceCollection
-    {
+    public function index(
+        ListInvoiceRequest $request,
+        InvoiceStatusService $statuses,
+    ): AnonymousResourceCollection {
         $query = $this->scope(Invoice::query(), $request);
         if ($request->filled('search')) {
             $query->where('invoice_number', 'like', '%'.trim((string) $request->input('search')).'%');
         }
-        foreach (['invoice_type', 'direction', 'status', 'party_id'] as $filter) {
+        foreach (['invoice_type', 'direction', 'status', 'party_id', 'currency_id'] as $filter) {
             if ($request->filled($filter)) {
                 $query->where($filter, $request->input($filter));
             }
         }
         if ($request->filled('balance_status')) {
             $query->whereHas('balance', fn (Builder $scope): Builder => $scope->where('status', $request->input('balance_status')));
+        }
+        if ($request->boolean('settlement_eligible')) {
+            $query
+                ->whereIn('status', $statuses->settlementStatuses())
+                ->whereHas(
+                    'balance',
+                    fn (Builder $scope): Builder => $scope->where('remaining_amount', '>', 0),
+                );
         }
         if ($request->filled('date_from')) {
             $query->whereDate('invoice_date', '>=', $request->input('date_from'));

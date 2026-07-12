@@ -23,9 +23,16 @@ final class ListInvoiceRequest extends TenantScopedRequest
             'direction' => ['nullable', Rule::enum(InvoiceDirection::class)],
             'status' => ['nullable', Rule::enum(InvoiceStatus::class)],
             'party_id' => ['nullable', 'integer', 'min:1'],
+            'currency_id' => [
+                'nullable',
+                'integer',
+                'min:1',
+                Rule::exists('currencies', 'id'),
+            ],
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
             'balance_status' => ['nullable', Rule::enum(InvoiceBalanceStatus::class)],
+            'settlement_eligible' => ['nullable', 'boolean'],
             'page' => ['nullable', 'integer', 'min:1'],
             'per_page' => ['nullable', 'integer', 'between:1,100'],
         ];

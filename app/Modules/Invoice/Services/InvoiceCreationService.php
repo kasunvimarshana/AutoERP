@@ -52,7 +52,8 @@ final class InvoiceCreationService
 
             // Creation has exactly one persisted initial state. Requested approved
             // or posted targets are applied below through legal lifecycle commands.
-            $invoice = Invoice::query()->create([
+            $invoice = new Invoice();
+            $invoice->forceFill([
                 'tenant_id' => $data->tenantId,
                 'organization_unit_id' => $data->organizationUnitId,
                 'invoice_number' => $this->numbers->resolve($data),
@@ -78,6 +79,7 @@ final class InvoiceCreationService
                 'notes' => $data->notes,
                 'created_by' => $data->createdBy,
             ]);
+            $invoice->save();
 
             $this->lines->create($invoice, $data, $calculation, $sourceLineRows);
             $this->sources->createSources(

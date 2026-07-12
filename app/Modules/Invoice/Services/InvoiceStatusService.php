@@ -48,6 +48,18 @@ final class InvoiceStatusService
         ];
     }
 
+    /**
+     * @return list<string>
+     */
+    public function settlementStatuses(): array
+    {
+        return [
+            InvoiceStatus::Posted->value,
+            InvoiceStatus::PartiallyPaid->value,
+            InvoiceStatus::Paid->value,
+        ];
+    }
+
     public function assertCanTransition(InvoiceStatus|string $from, InvoiceStatus|string $to): void
     {
         $fromValue = $from instanceof InvoiceStatus ? $from->value : $from;
@@ -152,11 +164,7 @@ final class InvoiceStatusService
             ? $invoice->status
             : InvoiceStatus::from((string) $invoice->status);
 
-        if (! in_array($status, [
-            InvoiceStatus::Posted,
-            InvoiceStatus::PartiallyPaid,
-            InvoiceStatus::Paid,
-        ], true)) {
+        if (! in_array($status->value, $this->settlementStatuses(), true)) {
             throw new InvalidArgumentException('Only posted invoices can be settled.');
         }
     }
