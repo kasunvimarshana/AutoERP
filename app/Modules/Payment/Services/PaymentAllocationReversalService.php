@@ -17,6 +17,7 @@ final class PaymentAllocationReversalService
         private readonly PaymentAllocationStateService $allocationStates,
         private readonly PaymentBalanceSynchronizer $balances,
         private readonly InvoiceSettlementServiceInterface $invoiceSettlements,
+        private readonly PaymentAllocationFinanceService $allocationFinance,
     ) {}
 
     public function reverseForInvoice(
@@ -56,6 +57,13 @@ final class PaymentAllocationReversalService
                 throw new InvalidArgumentException('Active payment allocation was not found for the selected invoice.');
             }
 
+            $this->allocationFinance->reverse(
+                $payment,
+                $allocation,
+                now()->toDateString(),
+                $reason,
+                $actorId,
+            );
             $this->invoiceSettlements->reversePaymentAllocation(
                 $invoiceId,
                 (string) $allocation->allocated_amount,
