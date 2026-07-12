@@ -77,6 +77,19 @@ export interface InvoiceBalanceResult extends Record<string, unknown> {
     status: string;
 }
 
+export interface InvoicePostingPlan extends Record<string, unknown> {
+    row_version: number;
+    posting_profile_code: string;
+    posting_date: string;
+    description?: string | null;
+    status: 'prepared' | 'posted' | 'reversed' | string;
+    finance_posting_reference?: string | null;
+    finance_reversal_reference?: string | null;
+    posted_at?: string | null;
+    reversed_at?: string | null;
+    reversal_reason?: string | null;
+}
+
 export interface InvoiceSource extends Record<string, unknown> {
     id: number;
     source_type: string;
@@ -137,7 +150,7 @@ export interface Invoice extends Record<string, unknown> {
     due_date?: string | null;
     invoice_type?: string;
     direction?: string;
-    status?: string;
+    status?: 'draft' | 'approved' | 'posted' | 'partially_paid' | 'paid' | 'reversed' | 'cancelled' | 'void' | string;
     party_type?: string | null;
     party?: InvoicePartySnapshot | null;
     currency?: InvoiceCurrencySnapshot | null;
@@ -150,6 +163,7 @@ export interface Invoice extends Record<string, unknown> {
     cancelled_at?: string | null;
     cancellation_reason?: string | null;
     balance?: InvoiceBalance | null;
+    posting_plan?: InvoicePostingPlan | null;
     lines?: InvoiceLine[];
     sources?: InvoiceSource[];
 }
