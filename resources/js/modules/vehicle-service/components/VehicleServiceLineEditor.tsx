@@ -28,9 +28,11 @@ import { VehicleServiceLineForm } from './line-editor/VehicleServiceLineForm';
 export default function VehicleServiceLineEditor({
     jobId,
     expectedVersion,
+    onChanged,
 }: {
     jobId: number;
     expectedVersion: number;
+    onChanged?: (lines: VehicleServiceJobLine[], nextVersion: number) => void;
 }) {
     const result = useApi((signal) => listVehicleServiceLines(jobId, signal), [jobId], true, false);
     const [dialog, setDialog] = useState<LineDialog | null>(null);
@@ -48,6 +50,10 @@ export default function VehicleServiceLineEditor({
         return () => window.clearTimeout(timeout);
     }, [toast]);
 
+    useEffect(() => {
+        setLocalExpectedVersion(expectedVersion);
+    }, [expectedVersion]);
+
     const saveLine = async (value: VehicleServiceLineFormValue) => {
         if (!dialog || saving) return;
         setSaving(true);
@@ -56,12 +62,16 @@ export default function VehicleServiceLineEditor({
             const payload = { ...lineFormToPayload(value), expected_version: localExpectedVersion };
             if (dialog.mode === 'edit') {
                 const saved = await updateVehicleServiceLine(jobId, dialog.lineId, payload);
-                result.setData(replaceLine(result.data ?? [], saved));
+                const nextLines = replaceLine(result.data ?? [], saved);
+                result.setData(nextLines);
                 setToast('Job line updated.');
+                onChanged?.(nextLines, localExpectedVersion + 1);
             } else {
                 const saved = await createVehicleServiceLine(jobId, payload);
-                result.setData(appendLine(result.data ?? [], saved));
+                const nextLines = appendLine(result.data ?? [], saved);
+                result.setData(nextLines);
                 setToast('Job line added.');
+                onChanged?.(nextLines, localExpectedVersion + 1);
             }
             setDialog(null);
             setLocalExpectedVersion((current) => current + 1);
@@ -78,9 +88,11 @@ export default function VehicleServiceLineEditor({
         setError(null);
         try {
             await deleteVehicleServiceLine(jobId, line.id, localExpectedVersion);
-            result.setData(removeLineFromList(result.data ?? [], line.id));
+            const nextLines = removeLineFromList(result.data ?? [], line.id);
+            result.setData(nextLines);
             setToast('Job line removed.');
             setRemoveTarget(null);
+            onChanged?.(nextLines, localExpectedVersion + 1);
             setLocalExpectedVersion((current) => current + 1);
         } catch (requestError) {
             setError(toApiError(requestError));
@@ -137,7 +149,8 @@ export default function VehicleServiceLineEditor({
 }
 
 function appendLine(lines: VehicleServiceJobLine[], line: VehicleServiceJobLine): VehicleServiceJobLine[] {
-    return [...lines, line].sort((left, right) => left.line_number - right.line_number);
+    const additions = [line, ...(line.children ?? [])];
+    return [...lines, ...additions].sort((left, right) => left.line_number - right.line_number);
 }
 
 function replaceLine(lines: VehicleServiceJobLine[], line: VehicleServiceJobLine): VehicleServiceJobLine[] {
@@ -147,7 +160,7 @@ function replaceLine(lines: VehicleServiceJobLine[], line: VehicleServiceJobLine
 }
 
 function removeLineFromList(lines: VehicleServiceJobLine[], lineId: number): VehicleServiceJobLine[] {
-    return lines.filter((line) => line.id !== lineId)
+    return lines.filter((line) => line.id !== lineId && line.parent_line_id !== lineId)
         .map((line, index) => ({ ...line, line_number: index + 1 }));
 }
 

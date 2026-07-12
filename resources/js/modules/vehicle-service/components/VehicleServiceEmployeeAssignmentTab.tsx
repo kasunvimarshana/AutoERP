@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
@@ -9,6 +9,7 @@ import {
     listEmployeeAssignableLines,
     updateVehicleServiceEmployee,
 } from '../vehicleServiceApi';
+import type { VehicleServiceEmployeeAssignment, VehicleServiceJobLine } from '../vehicleServiceTypes';
 import {
     assignmentFormToPayload,
     assignmentToForm,
@@ -27,7 +28,7 @@ export default function VehicleServiceEmployeeAssignmentTab({
 }: {
     jobId: number;
     expectedVersion: number;
-    onChanged?: () => void;
+    onChanged?: (nextVersion: number) => void;
 }) {
     const result = useApi((signal) => listEmployeeAssignableLines(jobId, signal), [jobId]);
     const [dialog, setDialog] = useState<AssignmentDialogState | null>(null);
@@ -35,28 +36,35 @@ export default function VehicleServiceEmployeeAssignmentTab({
     const [saving, setSaving] = useState(false);
     const [removing, setRemoving] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
+    const [localExpectedVersion, setLocalExpectedVersion] = useState(expectedVersion);
     const assignments = (result.data ?? []).flatMap((line) =>
         (line.employee_assignments ?? []).map((assignment) => ({ ...assignment, line })));
+
+    useEffect(() => {
+        setLocalExpectedVersion(expectedVersion);
+    }, [expectedVersion]);
 
     const saveAssignment = async (value: AssignmentFormValue) => {
         if (!dialog || value.lineId === null || !value.employee || saving) return;
         setSaving(true);
         setError(null);
         try {
-            const payload = { ...assignmentFormToPayload(value), expected_version: expectedVersion };
+            const payload = { ...assignmentFormToPayload(value), expected_version: localExpectedVersion };
             if (dialog.mode === 'edit') {
-                await updateVehicleServiceEmployee(
+                const saved = await updateVehicleServiceEmployee(
                     jobId,
                     value.lineId,
                     dialog.assignmentId,
                     payload,
                 );
+                result.setData(replaceAssignment(result.data ?? [], value.lineId, saved));
             } else {
-                await createVehicleServiceEmployee(jobId, value.lineId, payload);
+                const saved = await createVehicleServiceEmployee(jobId, value.lineId, payload);
+                result.setData(appendAssignment(result.data ?? [], value.lineId, saved));
             }
             setDialog(null);
-            result.reload();
-            onChanged?.();
+            setLocalExpectedVersion((current) => current + 1);
+            onChanged?.(localExpectedVersion + 1);
         } catch (requestError) {
             setError(toApiError(requestError));
         } finally {
@@ -69,10 +77,11 @@ export default function VehicleServiceEmployeeAssignmentTab({
         setRemoving(true);
         setError(null);
         try {
-            await deleteVehicleServiceEmployee(jobId, row.line.id, row.id, expectedVersion);
+            await deleteVehicleServiceEmployee(jobId, row.line.id, row.id, localExpectedVersion);
             setRemoveTarget(null);
-            result.reload();
-            onChanged?.();
+            result.setData(removeAssignmentFromLines(result.data ?? [], row.line.id, row.id));
+            setLocalExpectedVersion((current) => current + 1);
+            onChanged?.(localExpectedVersion + 1);
         } catch (requestError) {
             setError(toApiError(requestError));
         } finally {
@@ -119,4 +128,32 @@ export default function VehicleServiceEmployeeAssignmentTab({
             />
         </div>
     );
+}
+
+function replaceAssignment(lines: VehicleServiceJobLine[], lineId: number, assignment: VehicleServiceEmployeeAssignment): VehicleServiceJobLine[] {
+    return lines.map((line) => line.id !== lineId
+        ? line
+        : {
+            ...line,
+            employee_assignments: (line.employee_assignments ?? []).map((current) =>
+                current.id === assignment.id ? assignment : current),
+        });
+}
+
+function appendAssignment(lines: VehicleServiceJobLine[], lineId: number, assignment: VehicleServiceEmployeeAssignment): VehicleServiceJobLine[] {
+    return lines.map((line) => line.id !== lineId
+        ? line
+        : {
+            ...line,
+            employee_assignments: [...(line.employee_assignments ?? []), assignment],
+        });
+}
+
+function removeAssignmentFromLines(lines: VehicleServiceJobLine[], lineId: number, assignmentId: number): VehicleServiceJobLine[] {
+    return lines.map((line) => line.id !== lineId
+        ? line
+        : {
+            ...line,
+            employee_assignments: (line.employee_assignments ?? []).filter((assignment) => assignment.id !== assignmentId),
+        });
 }

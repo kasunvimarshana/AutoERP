@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { ActionMenu } from '@/shared/components/ActionMenu';
@@ -19,7 +19,9 @@ import { readableRelation } from '@/shared/utils/object';
 import { compareDecimalStrings } from '@/shared/utils/decimal';
 import { VehicleServiceSummaryPanel } from '../components/VehicleServiceSummaryPanel';
 import { VehicleServiceStatusBadge } from '../components/VehicleServiceStatusBadge';
+import type { VehicleServiceInspection, VehicleServiceJob, VehicleServiceJobLine, VehicleServiceJobStatus } from '../vehicleServiceTypes';
 import { cancelVehicleServiceJob, completeVehicleServiceJob, deleteVehicleServiceJob, getVehicleServiceJob, inspectVehicleServiceJob, startVehicleServiceJob } from '../vehicleServiceApi';
+import { multiplyDecimal, sumDecimals } from '@/shared/utils/decimal';
 
 const InspectionTab = lazy(() => import('../components/VehicleServiceInspectionTab'));
 const LinesTab = lazy(() => import('../components/VehicleServiceLineEditor'));
@@ -39,9 +41,43 @@ export default function VehicleServiceJobDetailPage() {
     const tabs = useOnDemandTab<Tab>('summary');
     const [busy, setBusy] = useState(false);
     const [actionError, setActionError] = useState<ApiError | null>(null);
-    if (result.loading) return <LoadingState />;
-    if (!result.data) return <ErrorAlert error={result.error} />;
-    const job = result.data;
+    const [job, setJob] = useState<VehicleServiceJob | null>(result.data);
+    const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
+
+    useEffect(() => {
+        if (result.data !== null) {
+            setJob(result.data);
+        }
+    }, [result.data]);
+
+    const bumpHistory = useCallback(() => {
+        setHistoryRefreshKey((current) => current + 1);
+    }, []);
+
+    const refreshJobSilently = useCallback(async () => {
+        const fresh = await getVehicleServiceJob(id);
+        setJob(fresh);
+        return fresh;
+    }, [id]);
+
+    const updateJobVersion = useCallback((nextVersion: number) => {
+        setJob((current) => current ? { ...current, row_version: nextVersion } : current);
+    }, []);
+
+    const handleInspectionSaved = useCallback((inspection: VehicleServiceInspection, nextVersion: number) => {
+        setJob((current) => current ? {
+            ...current,
+            inspection,
+            row_version: nextVersion,
+        } : current);
+    }, []);
+
+    const handleLinesChanged = useCallback((lines: VehicleServiceJobLine[], nextVersion: number) => {
+        setJob((current) => current ? withJobLines(current, lines, nextVersion) : current);
+    }, []);
+
+    if (result.loading && job === null) return <LoadingState />;
+    if (!job) return <ErrorAlert error={result.error} />;
     const expectedVersion = job.row_version ?? 0;
     const currentCustomerOwner = job.vehicle?.current_ownerships?.find((ownership) => ownership.owner_type === 'customer')?.owner ?? job.customer;
 
@@ -49,16 +85,35 @@ export default function VehicleServiceJobDetailPage() {
         setBusy(true);
         setActionError(null);
         try {
-            if (name === 'inspect') await inspectVehicleServiceJob(job.id, { expected_version: expectedVersion });
-            if (name === 'start') await startVehicleServiceJob(job.id, expectedVersion);
-            if (name === 'complete') await completeVehicleServiceJob(job.id, expectedVersion);
-            if (name === 'cancel') await cancelVehicleServiceJob(job.id, expectedVersion);
+            if (name === 'inspect') {
+                await inspectVehicleServiceJob(job.id, { expected_version: expectedVersion });
+                await refreshJobSilently();
+                bumpHistory();
+                return;
+            }
+            if (name === 'start') {
+                const updated = await startVehicleServiceJob(job.id, expectedVersion);
+                setJob((current) => current ? withStatusUpdate(current, updated.status, updated.row_version ?? expectedVersion + 1, updated.completed_at ?? null) : current);
+                bumpHistory();
+                return;
+            }
+            if (name === 'complete') {
+                const updated = await completeVehicleServiceJob(job.id, expectedVersion);
+                setJob((current) => current ? withStatusUpdate(current, updated.status, updated.row_version ?? expectedVersion + 1, updated.completed_at ?? null) : current);
+                bumpHistory();
+                return;
+            }
+            if (name === 'cancel') {
+                const updated = await cancelVehicleServiceJob(job.id, expectedVersion);
+                setJob((current) => current ? withStatusUpdate(current, updated.status, updated.row_version ?? expectedVersion + 1, updated.completed_at ?? current.completed_at ?? null) : current);
+                bumpHistory();
+                return;
+            }
             if (name === 'delete') {
                 await deleteVehicleServiceJob(job.id, expectedVersion);
                 navigate('/vehicle-service/jobs');
                 return;
             }
-            result.reload();
         } catch (requestError) {
             setActionError(toApiError(requestError));
         } finally {
@@ -139,19 +194,63 @@ export default function VehicleServiceJobDetailPage() {
                     ]} active={tabs.activeTab} onChange={tabs.openTab} />
                     <div className="p-5">
                         <Suspense fallback={<LoadingState />}>
-                            <TabPanel tabsId="service-job-tabs" tabId="summary" active={tabs.activeTab}><VehicleServiceSummaryPanel job={job} /></TabPanel>
-                            {tabs.openedTabs.has('inspection') && <TabPanel tabsId="service-job-tabs" tabId="inspection" active={tabs.activeTab}><InspectionTab jobId={job.id} expectedVersion={expectedVersion} onChanged={result.reload} /></TabPanel>}
-                            {tabs.openedTabs.has('lines') && <TabPanel tabsId="service-job-tabs" tabId="lines" active={tabs.activeTab}><LinesTab key={`lines-${job.id}-${expectedVersion}`} jobId={job.id} expectedVersion={expectedVersion} /></TabPanel>}
-                            {tabs.openedTabs.has('workforce') && <TabPanel tabsId="service-job-tabs" tabId="workforce" active={tabs.activeTab}><WorkforceTab jobId={job.id} expectedVersion={expectedVersion} onChanged={result.reload} /></TabPanel>}
-                            {tabs.openedTabs.has('inventory') && <TabPanel tabsId="service-job-tabs" tabId="inventory" active={tabs.activeTab}><InventoryTab jobId={job.id} expectedVersion={expectedVersion} onChanged={result.reload} /></TabPanel>}
-                            {tabs.openedTabs.has('invoice') && <TabPanel tabsId="service-job-tabs" tabId="invoice" active={tabs.activeTab}><InvoiceTab job={job} /></TabPanel>}
-                            {tabs.openedTabs.has('payments') && <TabPanel tabsId="service-job-tabs" tabId="payments" active={tabs.activeTab}><PaymentTab job={job} /></TabPanel>}
-                            {tabs.openedTabs.has('documents') && <TabPanel tabsId="service-job-tabs" tabId="documents" active={tabs.activeTab}><DocumentTab jobId={job.id} expectedVersion={expectedVersion} onChanged={result.reload} /></TabPanel>}
-                            {tabs.openedTabs.has('history') && <TabPanel tabsId="service-job-tabs" tabId="history" active={tabs.activeTab}><StatusHistoryTab jobId={job.id} /></TabPanel>}
+                            <TabPanel tabsId="service-job-tabs" tabId="summary" active={tabs.activeTab} keepMounted><VehicleServiceSummaryPanel job={job} /></TabPanel>
+                            {tabs.openedTabs.has('inspection') && <TabPanel tabsId="service-job-tabs" tabId="inspection" active={tabs.activeTab} keepMounted><InspectionTab jobId={job.id} expectedVersion={expectedVersion} initialValue={job.inspection ?? null} onSaved={handleInspectionSaved} /></TabPanel>}
+                            {tabs.openedTabs.has('lines') && <TabPanel tabsId="service-job-tabs" tabId="lines" active={tabs.activeTab} keepMounted><LinesTab jobId={job.id} expectedVersion={expectedVersion} onChanged={handleLinesChanged} /></TabPanel>}
+                            {tabs.openedTabs.has('workforce') && <TabPanel tabsId="service-job-tabs" tabId="workforce" active={tabs.activeTab} keepMounted><WorkforceTab jobId={job.id} expectedVersion={expectedVersion} onChanged={updateJobVersion} /></TabPanel>}
+                            {tabs.openedTabs.has('inventory') && <TabPanel tabsId="service-job-tabs" tabId="inventory" active={tabs.activeTab} keepMounted><InventoryTab jobId={job.id} expectedVersion={expectedVersion} onChanged={updateJobVersion} /></TabPanel>}
+                            {tabs.openedTabs.has('invoice') && <TabPanel tabsId="service-job-tabs" tabId="invoice" active={tabs.activeTab} keepMounted><InvoiceTab job={job} /></TabPanel>}
+                            {tabs.openedTabs.has('payments') && <TabPanel tabsId="service-job-tabs" tabId="payments" active={tabs.activeTab} keepMounted><PaymentTab job={job} /></TabPanel>}
+                            {tabs.openedTabs.has('documents') && <TabPanel tabsId="service-job-tabs" tabId="documents" active={tabs.activeTab} keepMounted><DocumentTab jobId={job.id} expectedVersion={expectedVersion} onChanged={updateJobVersion} /></TabPanel>}
+                            {tabs.openedTabs.has('history') && <TabPanel tabsId="service-job-tabs" tabId="history" active={tabs.activeTab} keepMounted><StatusHistoryTab jobId={job.id} refreshKey={historyRefreshKey} /></TabPanel>}
                         </Suspense>
                     </div>
                 </Panel>
             </EntityDetailLayout>
         </>
     );
+}
+
+function withStatusUpdate(
+    job: VehicleServiceJob,
+    status: VehicleServiceJobStatus,
+    rowVersion: number,
+    completedAt: string | null,
+): VehicleServiceJob {
+    return {
+        ...job,
+        status,
+        status_label: humanizeStatus(status),
+        row_version: rowVersion,
+        completed_at: completedAt,
+        lines: status === 'completed'
+            ? (job.lines ?? []).map((line) => line.status === 'cancelled' ? line : { ...line, status: 'completed' })
+            : job.lines,
+    };
+}
+
+function withJobLines(job: VehicleServiceJob, lines: VehicleServiceJobLine[], rowVersion: number): VehicleServiceJob {
+    const subtotal = sumDecimals(lines.map((line) => multiplyDecimal(line.quantity, line.unit_price)));
+    const discountTotal = sumDecimals(lines.map((line) => line.discount_amount));
+    const taxTotal = sumDecimals(lines.map((line) => line.tax_amount));
+    const chargeTotal = sumDecimals(lines.map((line) => line.charge_amount));
+    const grandTotal = sumDecimals(lines.map((line) => line.line_total));
+
+    return {
+        ...job,
+        row_version: rowVersion,
+        lines,
+        subtotal,
+        discount_total: discountTotal,
+        tax_total: taxTotal,
+        charge_total: chargeTotal,
+        grand_total: grandTotal,
+    };
+}
+
+function humanizeStatus(status: VehicleServiceJobStatus): string {
+    return status
+        .split('_')
+        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+        .join(' ');
 }

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import {
     approvePayment,
@@ -32,6 +32,7 @@ import { Button, LinkButton } from '@/shared/components/Button';
 import { Input } from '@/shared/components/Input';
 import { DecimalInput } from '@/shared/components/DecimalInput';
 import { isPositiveDecimal } from '@/shared/utils/decimal';
+import { useDetailResourceStore } from '@/shared/state/useDetailResourceStore';
 
 type Tab = 'summary' | 'lines' | 'allocations' | 'unapplied' | 'refunds' | 'reversals' | 'history';
 const tabs = [
@@ -54,6 +55,7 @@ export default function PaymentDetailPage() {
     const payment = useApi((signal) => getPayment(id, signal), [id]);
     const allocations = useApi((signal) => getPaymentAllocations(id, signal), [id], tabState.openedTabs.has('allocations'));
     const unapplied = useApi((signal) => getPaymentUnappliedBalance(id, signal), [id], tabState.openedTabs.has('unapplied'));
+    const paymentState = useDetailResourceStore(payment.data);
     const [actionError, setActionError] = useState<ApiError | null>(null);
     const [busy, setBusy] = useState(false);
     const [refundAmount, setRefundAmount] = useState('0.000000');
@@ -63,10 +65,16 @@ export default function PaymentDetailPage() {
     const [reversalReason, setReversalReason] = useState('');
     const [voidReason, setVoidReason] = useState('');
 
-    if (payment.loading) return <LoadingState />;
-    if (!payment.data) return <ErrorAlert error={payment.error} />;
+    useEffect(() => {
+        if (payment.data !== null) {
+            paymentState.setData(payment.data);
+        }
+    }, [payment.data, paymentState]);
 
-    const value = payment.data;
+    if (payment.loading && paymentState.data === null) return <LoadingState />;
+    if (!paymentState.data) return <ErrorAlert error={payment.error} />;
+
+    const value = paymentState.data;
     const fromPurchase = searchParams.get('from') === 'purchase';
     const chequeLine = value.lines?.find((line) => line.payment_method?.method_type === 'cheque') ?? null;
     const capabilities = value.capabilities ?? {};
@@ -81,9 +89,15 @@ export default function PaymentDetailPage() {
     const reversalValid = reversalReason.trim() !== '';
 
     async function refreshPaymentState() {
-        payment.reload();
-        allocations.reload();
-        unapplied.reload();
+        const refreshed = await getPayment(id);
+        paymentState.setData(refreshed);
+
+        if (tabState.openedTabs.has('allocations')) {
+            allocations.reload();
+        }
+        if (tabState.openedTabs.has('unapplied')) {
+            unapplied.reload();
+        }
     }
 
     async function runPaymentAction(action: 'submit' | 'approve' | 'post' | 'void') {
@@ -91,11 +105,16 @@ export default function PaymentDetailPage() {
         setBusy(true);
         setActionError(null);
         try {
-            if (action === 'submit') await submitPayment(id, value.row_version);
-            if (action === 'approve') await approvePayment(id, value.row_version);
-            if (action === 'post') await postPayment(id, value.row_version);
-            if (action === 'void') await voidPaymentAction(id, value.row_version, voidReason.trim() || undefined);
-            await refreshPaymentState();
+            if (action === 'submit') paymentState.setData(await submitPayment(id, value.row_version));
+            if (action === 'approve') paymentState.setData(await approvePayment(id, value.row_version));
+            if (action === 'post') paymentState.setData(await postPayment(id, value.row_version));
+            if (action === 'void') paymentState.setData(await voidPaymentAction(id, value.row_version, voidReason.trim() || undefined));
+            if (tabState.openedTabs.has('allocations')) {
+                allocations.reload();
+            }
+            if (tabState.openedTabs.has('unapplied')) {
+                unapplied.reload();
+            }
         } catch (error) {
             setActionError(toApiError(error));
         } finally {
