@@ -29,7 +29,7 @@ final class PaymentPostingPolicyTest extends TestCase
         self::assertSame(PaymentPostingRole::CustomerAdvance, $policy->unappliedRole);
     }
 
-    public function test_rental_deposit_uses_customer_deposit_liability(): void
+    public function test_rental_deposit_uses_receivable_for_invoice_application_and_customer_deposit_for_unapplied_balance(): void
     {
         $policy = (new PaymentPostingPolicyService())->resolve($this->payment(
             PaymentType::Advance,
@@ -39,7 +39,7 @@ final class PaymentPostingPolicyTest extends TestCase
         ));
 
         self::assertSame(PaymentPostingProfile::RentalDeposit->value, $policy->postingProfileCode);
-        self::assertSame(PaymentPostingRole::CustomerDeposit, $policy->allocatedRole);
+        self::assertSame(PaymentPostingRole::Receivable, $policy->allocatedRole);
         self::assertSame(PaymentPostingRole::CustomerDeposit, $policy->unappliedRole);
     }
 
