@@ -44,8 +44,8 @@ final class PaymentAllocationFinanceService
         }
 
         $policy = $this->policies->resolve($payment);
-        if ($policy->allocatedRole === $policy->unappliedRole) {
-            throw new InvalidArgumentException('Payment allocation requires distinct allocated and unapplied Finance roles.');
+        if ($policy->allocationTargetRole === $policy->unappliedRole) {
+            throw new InvalidArgumentException('Payment allocation requires distinct target and unapplied Finance roles.');
         }
 
         $direction = $payment->direction instanceof PaymentDirection
@@ -66,7 +66,7 @@ final class PaymentAllocationFinanceService
                     debit: '0.000000',
                     credit: $amount,
                     description: 'Settle invoice '.$allocation->invoice_number_snapshot,
-                    profileKey: $policy->allocatedRole->value,
+                    profileKey: $policy->allocationTargetRole->value,
                     sourceLineType: PaymentSourceType::PaymentAllocation->value,
                     sourceLineId: (int) $allocation->getKey(),
                 ),
@@ -76,7 +76,7 @@ final class PaymentAllocationFinanceService
                     debit: $amount,
                     credit: '0.000000',
                     description: 'Settle supplier invoice '.$allocation->invoice_number_snapshot,
-                    profileKey: $policy->allocatedRole->value,
+                    profileKey: $policy->allocationTargetRole->value,
                     sourceLineType: PaymentSourceType::PaymentAllocation->value,
                     sourceLineId: (int) $allocation->getKey(),
                 ),
