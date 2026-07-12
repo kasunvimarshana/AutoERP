@@ -12,5 +12,6 @@ final readonly class PaymentPostingPolicyData
         public string $postingProfileCode,
         public PaymentPostingRole $allocatedRole,
         public PaymentPostingRole $unappliedRole,
+        public PaymentPostingRole $allocationTargetRole,
     ) {}
 }
