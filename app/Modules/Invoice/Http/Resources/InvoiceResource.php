@@ -74,6 +74,12 @@ final class InvoiceResource extends JsonResource
                     ? null
                     : (new InvoiceBalanceResource($this->balance))->resolve($request),
             ),
+            'posting_plan' => $this->whenLoaded(
+                'postingPlan',
+                fn () => $this->postingPlan === null
+                    ? null
+                    : (new InvoicePostingPlanResource($this->postingPlan))->resolve($request),
+            ),
             'credit_allocations' => $this->whenLoaded(
                 'creditAllocations',
                 fn () => InvoiceCreditAllocationResource::collection($this->creditAllocations)->resolve($request),
