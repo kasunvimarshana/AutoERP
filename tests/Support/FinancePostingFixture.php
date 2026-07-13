@@ -107,13 +107,6 @@ final class FinancePostingFixture
             FinanceAccountRoleCode::TaxPayable->value => $accounts[FinanceAccountRoleCode::TaxPayable->value],
             FinanceAccountRoleCode::WithholdingReceivable->value => $accounts[FinanceAccountRoleCode::WithholdingReceivable->value],
         ]);
-    }
-
-    public static function seedVehicleServiceProfiles(int $tenantId, ?int $organizationUnitId = null): void
-    {
-        self::seedCustomerInvoiceProfiles($tenantId, $organizationUnitId);
-
-        $accounts = self::accounts($tenantId, $organizationUnitId);
         self::seedInventoryIssueProfile($tenantId, $organizationUnitId, $accounts);
     }
 
