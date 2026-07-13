@@ -144,6 +144,7 @@ final class FinanceConfigurationController
             $request->boolean('is_active', true),
             $request->input('rules'),
             $model,
+            (int) $request->input('expected_version'),
         ));
     }
 
