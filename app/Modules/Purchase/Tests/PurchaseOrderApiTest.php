@@ -18,6 +18,7 @@ use Modules\Purchase\Services\PurchaseOrderService;
 use Modules\Supplier\Services\SupplierAuthorizationService;
 use Modules\User\Services\UserAccessResolver;
 use Tests\Support\CurrencyFixture;
+use Tests\Support\FinancePostingFixture;
 use Tests\TestCase;
 
 final class PurchaseOrderApiTest extends TestCase
@@ -1283,6 +1284,7 @@ final class PurchaseOrderApiTest extends TestCase
         $tenantId = $this->createTenant($suffix);
         \Tests\Support\ActiveTenantSubscriptionFixture::create($tenantId);
         $organizationUnitId = $this->createOrganizationUnit($tenantId, $suffix);
+        FinancePostingFixture::seedPurchasePostingProfiles($tenantId, $organizationUnitId);
         $user = $this->createAuthContext($tenantId, $organizationUnitId, $suffix, $permissions);
         $uomCode = 'PCS-'.$suffix;
         $supplierCode = 'SUP-'.$suffix;

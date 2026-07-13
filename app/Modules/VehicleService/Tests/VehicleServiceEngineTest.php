@@ -852,6 +852,7 @@ final class VehicleServiceEngineTest extends TestCase
     {
         $suffix = $suffix !== '' ? $suffix : Str::upper(Str::random(5));
         $tenantId = $this->tenant($suffix);
+        FinancePostingFixture::seedCustomerInvoiceProfiles($tenantId);
         $uomId = $this->uom($tenantId, 'PCS-'.$suffix);
         $warehouseId = $this->warehouse($tenantId, 'WH-'.$suffix);
         $warehouseLocationId = $this->warehouseLocation($tenantId, $warehouseId, 'BIN-'.$suffix);
