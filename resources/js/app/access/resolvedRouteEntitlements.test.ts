@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { financePermissions } from '@/modules/finance/financePermissions';
+import { vehicleServicePermissions } from '@/modules/vehicle-service/vehicleServicePermissions';
 import { resolveTenantRouteEntitlement } from './resolvedRouteEntitlements';
 
 const expectedFinanceRoutes = [
@@ -46,7 +47,7 @@ describe('resolved tenant route entitlements', () => {
         expect(resolveTenantRouteEntitlement('/payments')?.permissions).toContain('payments.view');
         expect(resolveTenantRouteEntitlement('/customers')?.permissions).toContain('customers.view');
         expect(resolveTenantRouteEntitlement('/purchase/orders')?.permissions).toContain('purchase.orders.view');
-        expect(resolveTenantRouteEntitlement('/vehicle-service/jobs')?.permissions).toContain('vehicle-service.jobs.view');
+        expect(resolveTenantRouteEntitlement('/vehicle-service/jobs')?.permissions).toContain(vehicleServicePermissions.jobsView);
     });
 
     it('protects the Inventory workspace route at its exact path', () => {
