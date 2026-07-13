@@ -7,7 +7,9 @@ namespace Modules\Finance\Tests;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Modules\User\Models\UserModel;
 use Tests\Support\OrganizationUnitFixture;
+use Tests\Support\TenantUserFixture;
 use Tests\TestCase;
 
 final class FinancePostingProfileScopeTest extends TestCase
@@ -24,6 +26,7 @@ final class FinancePostingProfileScopeTest extends TestCase
     public function test_organization_context_lists_exact_and_tenant_fallback_profiles_with_scope(): void
     {
         [$tenantId, $organizationUnitId] = $this->scope();
+        $this->actingAsTenantUser($tenantId);
         $tenantProfileId = $this->profile($tenantId, null, 'sales_invoice', 'Tenant Sales');
         $organizationProfileId = $this->profile($tenantId, $organizationUnitId, 'sales_invoice', 'Organization Sales');
         $query = http_build_query([
@@ -52,6 +55,7 @@ final class FinancePostingProfileScopeTest extends TestCase
     public function test_tenant_context_lists_only_tenant_default_profiles(): void
     {
         [$tenantId, $organizationUnitId] = $this->scope();
+        $this->actingAsTenantUser($tenantId);
         $tenantProfileId = $this->profile($tenantId, null, 'sales_invoice', 'Tenant Sales');
         $this->profile($tenantId, $organizationUnitId, 'sales_invoice', 'Organization Sales');
         $query = http_build_query([
@@ -108,5 +112,19 @@ final class FinancePostingProfileScopeTest extends TestCase
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+    }
+
+    private function actingAsTenantUser(int $tenantId): void
+    {
+        $userId = TenantUserFixture::create([
+            'tenant_id' => $tenantId,
+            'email' => 'finance-profile-scope-'.Str::lower(Str::random(8)).'@example.test',
+        ]);
+        $user = $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): UserModel => UserModel::query()->findOrFail($userId),
+        );
+
+        $this->actingAs($user, (string) config('module-auth.protected_route_guard', 'auth-api'));
     }
 }
