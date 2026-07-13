@@ -38,7 +38,7 @@ final class JournalPostingService
             $this->periods->assertPostingDateAllowed(
                 (int) $journal->tenant_id,
                 $journal->organization_unit_id === null ? null : (int) $journal->organization_unit_id,
-                (string) $journal->getRawOriginal('journal_date'),
+                $journal->journal_date->toDateString(),
             );
             $this->validator->validateForPosting($journal);
 
