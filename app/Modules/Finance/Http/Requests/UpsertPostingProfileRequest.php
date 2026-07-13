@@ -23,7 +23,7 @@ final class UpsertPostingProfileRequest extends TenantScopedRequest
             'description' => ['nullable', 'string'],
             'is_active' => ['required', 'boolean'],
             'rules' => ['required', 'array', 'min:1'],
-            'rules.*.line_key' => ['required', 'string', 'max:100', 'distinct'],
+            'rules.*.line_key' => ['required', 'string', 'max:100'],
             'rules.*.account_role_id' => ['required', 'integer', 'min:1'],
             'rules.*.effective_from' => ['nullable', 'date_format:Y-m-d'],
             'rules.*.effective_to' => ['nullable', 'date_format:Y-m-d'],
