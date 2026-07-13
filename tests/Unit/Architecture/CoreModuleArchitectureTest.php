@@ -58,7 +58,7 @@ final class CoreModuleArchitectureTest extends TestCase
         foreach (['Purchase', 'Sales', 'VehicleService'] as $module) {
             self::assertStringNotContainsString("use Modules\\{$module}\\", $invoiceRestoration);
         }
-        self::assertStringContainsString('InvoiceSourceCancellationRegistry', $invoiceRestoration);
+        self::assertStringContainsString('InvoiceSourceRestorationRegistry', $invoiceRestoration);
 
         $taxSources = $this->productionSources('Tax');
         foreach (['Customer', 'Supplier', 'Item', 'Invoice', 'Payment', 'Purchase', 'Sales'] as $module) {
