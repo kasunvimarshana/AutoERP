@@ -37,10 +37,6 @@ export function JournalForm({ value, onChange, lookups, error }: {
                     error={fieldError(error, 'posting_profile_id')}
                 />
                 <DecimalInput label="Exchange rate" value={value.exchange_rate} onChange={(event) => set('exchange_rate', event.target.value)} error={fieldError(error, 'exchange_rate')} required />
-                <Input label="Source module" value={value.source_module ?? ''} onChange={(event) => set('source_module', event.target.value || null)} />
-                <Input label="Source type" value={value.source_type ?? ''} onChange={(event) => set('source_type', event.target.value || null)} />
-                <Input label="Source number" value={value.source_number ?? ''} onChange={(event) => set('source_number', event.target.value || null)} />
-                <Input label="Source date" type="date" value={value.source_date ?? ''} onChange={(event) => set('source_date', event.target.value || null)} />
             </div>
             <div className="mt-4"><Textarea label="Description" value={value.description ?? ''} onChange={(event) => set('description', event.target.value || null)} error={fieldError(error, 'description')} /></div>
         </Panel>
