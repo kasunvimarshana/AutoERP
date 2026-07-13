@@ -146,7 +146,11 @@ export default function PostingProfilePage() {
             const rules = profileForm.rules.filter((rule) => rule.line_key.trim() && rule.account_role_id > 0);
             const payload = { ...profileForm, rules };
             if (selectedProfile) {
-                await updatePostingProfile(selectedProfile.id, payload);
+                const versionedPayload = {
+                    ...payload,
+                    expected_version: selectedProfile.row_version,
+                };
+                await updatePostingProfile(selectedProfile.id, versionedPayload);
             } else {
                 await createPostingProfile(payload);
             }
