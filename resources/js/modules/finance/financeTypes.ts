@@ -47,6 +47,7 @@ export interface FinanceAccountAssignment extends Record<string, unknown> {
 }
 
 export interface PostingProfile extends FinanceLookup {
+    row_version: number;
     organization_unit_id?: number | null;
     scope?: 'tenant_default' | 'organization';
     rules?: Array<{
