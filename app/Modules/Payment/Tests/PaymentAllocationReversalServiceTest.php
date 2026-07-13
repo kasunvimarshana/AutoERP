@@ -7,6 +7,8 @@ namespace Modules\Payment\Tests;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Modules\Finance\Enums\FinanceAccountRoleCode;
+use Modules\Finance\Enums\FinancePostingProfileCode;
 use Modules\Invoice\Contracts\InvoiceSettlementServiceInterface;
 use Modules\Invoice\DTOs\CreateInvoiceData;
 use Modules\Invoice\DTOs\InvoiceLineData;
@@ -14,6 +16,7 @@ use Modules\Invoice\Enums\InvoiceDirection;
 use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Enums\InvoiceType;
 use Modules\Invoice\Services\InvoiceCreationService;
+use Modules\Invoice\Services\InvoicePostingPlanFactory;
 use Modules\Invoice\Services\InvoiceStatusService;
 use Modules\Payment\DTOs\PaymentAllocationData;
 use Modules\Payment\Enums\AllocationStatus;
@@ -56,7 +59,14 @@ final class PaymentAllocationReversalServiceTest extends TestCase
             'created_at' => now(),
             'updated_at' => now(),
         ]);
-        $invoice = $this->withTenantExecutionContext($tenantId, function () use ($tenantId, $customerId) {
+        $postingPlan = app(InvoicePostingPlanFactory::class)->outbound(
+            FinancePostingProfileCode::SalesInvoice,
+            self::PAYMENT_DATE,
+            FinanceAccountRoleCode::Revenue,
+            '1000.000000',
+            description: 'Deposit allocation reversal invoice',
+        );
+        $invoice = $this->withTenantExecutionContext($tenantId, function () use ($tenantId, $customerId, $postingPlan) {
             $invoice = app(InvoiceCreationService::class)->create(new CreateInvoiceData(
                 tenantId: $tenantId,
                 invoiceType: InvoiceType::Manual,
@@ -71,6 +81,7 @@ final class PaymentAllocationReversalServiceTest extends TestCase
                     quantity: '1.000000',
                     unitPrice: '1000.000000',
                 )],
+                postingPlan: $postingPlan,
             ));
             $statuses = app(InvoiceStatusService::class);
             $invoice = $statuses->transition($invoice, InvoiceStatus::Approved);

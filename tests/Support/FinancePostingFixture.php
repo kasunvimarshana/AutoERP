@@ -37,6 +37,8 @@ final class FinancePostingFixture
 
     public static function seedCustomerPaymentProfiles(int $tenantId, ?int $organizationUnitId = null): void
     {
+        self::seedCustomerInvoiceProfiles($tenantId, $organizationUnitId);
+
         $accounts = self::accounts($tenantId, $organizationUnitId);
         self::profile($tenantId, $organizationUnitId, FinancePostingProfileCode::CustomerReceipt->value, [
             FinanceAccountRoleCode::Cash->value => $accounts[FinanceAccountRoleCode::Cash->value],
@@ -60,6 +62,8 @@ final class FinancePostingFixture
 
     public static function seedSupplierPaymentProfiles(int $tenantId, ?int $organizationUnitId = null): void
     {
+        self::seedSupplierInvoiceProfiles($tenantId, $organizationUnitId);
+
         $accounts = self::accounts($tenantId, $organizationUnitId);
         self::profile($tenantId, $organizationUnitId, FinancePostingProfileCode::SupplierPayment->value, [
             FinanceAccountRoleCode::Cash->value => $accounts[FinanceAccountRoleCode::Cash->value],
@@ -78,17 +82,8 @@ final class FinancePostingFixture
     public static function seedPurchasePostingProfiles(int $tenantId, ?int $organizationUnitId = null): void
     {
         $accounts = self::accounts($tenantId, $organizationUnitId);
-        self::profile($tenantId, $organizationUnitId, FinancePostingProfileCode::InventoryReceipt->value, [
-            FinanceAccountRoleCode::Inventory->value => $accounts[FinanceAccountRoleCode::Inventory->value],
-            FinanceAccountRoleCode::GoodsReceivedNotInvoiced->value => $accounts[FinanceAccountRoleCode::GoodsReceivedNotInvoiced->value],
-        ]);
-        self::profile($tenantId, $organizationUnitId, FinancePostingProfileCode::PurchaseInvoice->value, [
-            FinanceAccountRoleCode::Expense->value => $accounts[FinanceAccountRoleCode::Expense->value],
-            FinanceAccountRoleCode::GoodsReceivedNotInvoiced->value => $accounts[FinanceAccountRoleCode::GoodsReceivedNotInvoiced->value],
-            FinanceAccountRoleCode::Payable->value => $accounts[FinanceAccountRoleCode::Payable->value],
-            FinanceAccountRoleCode::TaxReceivable->value => $accounts[FinanceAccountRoleCode::TaxReceivable->value],
-            FinanceAccountRoleCode::WithholdingPayable->value => $accounts[FinanceAccountRoleCode::WithholdingPayable->value],
-        ]);
+        self::seedInventoryReceiptProfile($tenantId, $organizationUnitId, $accounts);
+        self::seedPurchaseInvoiceProfile($tenantId, $organizationUnitId, $accounts);
     }
 
     public static function seedCustomerInvoiceProfiles(int $tenantId, ?int $organizationUnitId = null): void
@@ -115,8 +110,9 @@ final class FinancePostingFixture
 
     public static function seedSupplierInvoiceProfiles(int $tenantId, ?int $organizationUnitId = null): void
     {
-        self::seedPurchasePostingProfiles($tenantId, $organizationUnitId);
         $accounts = self::accounts($tenantId, $organizationUnitId);
+        self::seedInventoryReceiptProfile($tenantId, $organizationUnitId, $accounts);
+        self::seedPurchaseInvoiceProfile($tenantId, $organizationUnitId, $accounts);
         self::profile($tenantId, $organizationUnitId, FinancePostingProfileCode::SupplierRentalInvoice->value, [
             FinanceAccountRoleCode::Payable->value => $accounts[FinanceAccountRoleCode::Payable->value],
             FinanceAccountRoleCode::RentalExpense->value => $accounts[FinanceAccountRoleCode::RentalExpense->value],
@@ -127,7 +123,35 @@ final class FinancePostingFixture
 
     public static function seedPurchaseWithholdingRole(int $tenantId, ?int $organizationUnitId = null): void
     {
-        self::seedPurchasePostingProfiles($tenantId, $organizationUnitId);
+        $accounts = self::accounts($tenantId, $organizationUnitId);
+        self::seedPurchaseInvoiceProfile($tenantId, $organizationUnitId, $accounts);
+    }
+
+    /** @param array<string, int> $accounts */
+    private static function seedInventoryReceiptProfile(
+        int $tenantId,
+        ?int $organizationUnitId,
+        array $accounts,
+    ): void {
+        self::profile($tenantId, $organizationUnitId, FinancePostingProfileCode::InventoryReceipt->value, [
+            FinanceAccountRoleCode::Inventory->value => $accounts[FinanceAccountRoleCode::Inventory->value],
+            FinanceAccountRoleCode::GoodsReceivedNotInvoiced->value => $accounts[FinanceAccountRoleCode::GoodsReceivedNotInvoiced->value],
+        ]);
+    }
+
+    /** @param array<string, int> $accounts */
+    private static function seedPurchaseInvoiceProfile(
+        int $tenantId,
+        ?int $organizationUnitId,
+        array $accounts,
+    ): void {
+        self::profile($tenantId, $organizationUnitId, FinancePostingProfileCode::PurchaseInvoice->value, [
+            FinanceAccountRoleCode::Expense->value => $accounts[FinanceAccountRoleCode::Expense->value],
+            FinanceAccountRoleCode::GoodsReceivedNotInvoiced->value => $accounts[FinanceAccountRoleCode::GoodsReceivedNotInvoiced->value],
+            FinanceAccountRoleCode::Payable->value => $accounts[FinanceAccountRoleCode::Payable->value],
+            FinanceAccountRoleCode::TaxReceivable->value => $accounts[FinanceAccountRoleCode::TaxReceivable->value],
+            FinanceAccountRoleCode::WithholdingPayable->value => $accounts[FinanceAccountRoleCode::WithholdingPayable->value],
+        ]);
     }
 
     /** @return array<string, int> */
@@ -345,24 +369,46 @@ final class FinancePostingFixture
         int $roleId,
         int $accountId,
     ): void {
-        $query = DB::table('finance_account_assignments')
+        $scope = DB::table('finance_account_assignments')
             ->where('tenant_id', $tenantId)
-            ->where('account_role_id', $roleId)
-            ->whereDate('effective_from', self::OPENING_EFFECTIVE_DATE);
+            ->where('account_role_id', $roleId);
         $organizationUnitId === null
-            ? $query->whereNull('organization_unit_id')
-            : $query->where('organization_unit_id', $organizationUnitId);
+            ? $scope->whereNull('organization_unit_id')
+            : $scope->where('organization_unit_id', $organizationUnitId);
+
+        $opening = (clone $scope)
+            ->whereDate('effective_from', self::OPENING_EFFECTIVE_DATE)
+            ->orderBy('id')
+            ->first();
         $values = [
             'account_id' => $accountId,
             'effective_to' => null,
             'is_active' => true,
             'updated_at' => now(),
         ];
-        if ($query->exists()) {
-            $query->update($values);
+
+        if ($opening !== null) {
+            DB::table('finance_account_assignments')
+                ->where('id', (int) $opening->id)
+                ->update($values);
+            (clone $scope)
+                ->where('id', '!=', (int) $opening->id)
+                ->where('is_active', true)
+                ->update([
+                    'is_active' => false,
+                    'updated_at' => now(),
+                ]);
 
             return;
         }
+
+        (clone $scope)
+            ->where('is_active', true)
+            ->update([
+                'is_active' => false,
+                'updated_at' => now(),
+            ]);
+
         DB::table('finance_account_assignments')->insert([
             'tenant_id' => $tenantId,
             'organization_unit_id' => $organizationUnitId,

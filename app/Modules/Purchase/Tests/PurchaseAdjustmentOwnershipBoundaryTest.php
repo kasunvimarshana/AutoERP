@@ -15,9 +15,11 @@ final class PurchaseAdjustmentOwnershipBoundaryTest extends TestCase
         $catalogue = $this->source('../Services/PurchaseAdjustmentCatalogueService.php');
         $policy = $this->source('../Services/PurchaseAdjustmentPolicyResolver.php');
         $persistence = $this->source('../Services/PurchaseHeaderAdjustmentService.php');
-        $posting = $this->source('../Services/FastPurchasePostingCoordinator.php');
+        $receiptPosting = $this->source('../Services/PurchaseGoodsReceiptFinanceService.php');
+        $invoicePosting = $this->source('../Services/PurchaseInvoicePostingPlanFactory.php');
 
         $domain = $dto.$model.$catalogue.$policy.$persistence;
+        $posting = $receiptPosting.$invoicePosting;
 
         self::assertStringNotContainsString('Modules\\Finance', $domain);
         self::assertStringNotContainsString('FinanceAccount', $domain);
@@ -26,8 +28,9 @@ final class PurchaseAdjustmentOwnershipBoundaryTest extends TestCase
         self::assertStringNotContainsString('finance_posting_profile_id', $domain);
         self::assertStringNotContainsString('override_reason', $domain);
         self::assertStringNotContainsString('accountCode:', $posting);
-        self::assertStringContainsString('profileKey:', $posting);
-        self::assertStringContainsString('invoiceProfileKeyFor', $posting);
+        self::assertStringContainsString('profileKey:', $receiptPosting);
+        self::assertStringContainsString('FinancePostingProfileCode::PurchaseInvoice', $invoicePosting);
+        self::assertStringContainsString('invoiceProfileKeyFor', $invoicePosting);
         self::assertStringContainsString('recognition_source', $persistence);
     }
 

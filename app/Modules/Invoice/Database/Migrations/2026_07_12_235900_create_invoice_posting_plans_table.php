@@ -38,6 +38,10 @@ return new class extends Migration
             $table->timestamps();
 
             $table->unique(
+                ['id', 'tenant_id'],
+                'invoice_posting_plans_id_tenant_uq',
+            );
+            $table->unique(
                 ['tenant_id', 'invoice_id'],
                 'invoice_posting_plans_tenant_invoice_uq',
             );

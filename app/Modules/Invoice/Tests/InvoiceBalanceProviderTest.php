@@ -8,6 +8,8 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Modules\Finance\Enums\FinanceAccountRoleCode;
+use Modules\Finance\Enums\FinancePostingProfileCode;
 use Modules\Invoice\Contracts\InvoiceBalanceProviderInterface;
 use Modules\Invoice\DTOs\CreateInvoiceData;
 use Modules\Invoice\DTOs\InvoiceLineData;
@@ -15,6 +17,8 @@ use Modules\Invoice\Enums\InvoiceDirection;
 use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Enums\InvoiceType;
 use Modules\Invoice\Services\InvoiceCreationService;
+use Modules\Invoice\Services\InvoicePostingPlanFactory;
+use Tests\Support\FinancePostingFixture;
 use Tests\TestCase;
 
 final class InvoiceBalanceProviderTest extends TestCase
@@ -57,6 +61,14 @@ final class InvoiceBalanceProviderTest extends TestCase
         $tenantId = $this->createTenant();
         $otherTenantId = $this->createTenant();
         $customerId = $this->createCustomer($tenantId, null);
+        FinancePostingFixture::seedCustomerInvoiceProfiles($tenantId);
+        $postingPlan = app(InvoicePostingPlanFactory::class)->outbound(
+            FinancePostingProfileCode::SalesInvoice,
+            '2026-06-07',
+            FinanceAccountRoleCode::Revenue,
+            '750.000000',
+            description: 'Scoped payable invoice',
+        );
         $invoice = $this->withTenantExecutionContext($tenantId, fn () => app(InvoiceCreationService::class)->create(new CreateInvoiceData(
             tenantId: $tenantId,
             invoiceType: InvoiceType::Manual,
@@ -74,6 +86,7 @@ final class InvoiceBalanceProviderTest extends TestCase
                     unitPrice: '750.000000',
                 ),
             ],
+            postingPlan: $postingPlan,
         )));
 
         $provider = app(InvoiceBalanceProviderInterface::class);

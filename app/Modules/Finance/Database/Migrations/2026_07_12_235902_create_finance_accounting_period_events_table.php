@@ -27,6 +27,10 @@ return new class extends Migration
             $table->timestamp('occurred_at');
             $table->timestamps();
 
+            $table->unique(
+                ['id', 'tenant_id'],
+                'finance_period_events_id_tenant_uq',
+            );
             $table->index(
                 ['tenant_id', 'accounting_period_id', 'occurred_at'],
                 'finance_period_events_period_time_ix',

@@ -10,7 +10,7 @@ use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Modules\Finance\DTOs\AccountingPeriodData;
 use Modules\Finance\DTOs\CreateAccountData;
-use Modules\Finance\DTOs\CreateJournalData;
+use Modules\Finance\DTOs\CreateJournalEntryData;
 use Modules\Finance\DTOs\JournalLineData;
 use Modules\Finance\Enums\JournalStatus;
 use Modules\Finance\Enums\NormalBalance;
@@ -18,9 +18,8 @@ use Modules\Finance\Enums\StatementType;
 use Modules\Finance\Models\FinanceAccountType;
 use Modules\Finance\Services\AccountingPeriodService;
 use Modules\Finance\Services\ChartOfAccountsService;
-use Modules\Finance\Services\JournalEntryService;
+use Modules\Finance\Services\JournalEntryCreationService;
 use Modules\Finance\Services\JournalPostingService;
-use Modules\Tenant\Models\TenantModel;
 use Tests\TestCase;
 
 final class AccountingPeriodServiceTest extends TestCase
@@ -150,16 +149,21 @@ final class AccountingPeriodServiceTest extends TestCase
             normalBalance: NormalBalance::Debit,
         ));
 
-        return app(JournalEntryService::class)->create(new CreateJournalData(
+        return app(JournalEntryCreationService::class)->create(new CreateJournalEntryData(
             tenantId: $tenantId,
-            postingDate: $postingDate,
-            sourceModule: 'finance',
-            sourceType: 'period_test',
-            sourceId: 1,
+            journalDate: $postingDate,
             description: 'Accounting period enforcement test.',
             lines: [
-                new JournalLineData((int) $cash->getKey(), '10.000000', '0.000000'),
-                new JournalLineData((int) $clearing->getKey(), '0.000000', '10.000000'),
+                new JournalLineData(
+                    accountId: (int) $cash->getKey(),
+                    lineNumber: 1,
+                    debit: '10.000000',
+                ),
+                new JournalLineData(
+                    accountId: (int) $clearing->getKey(),
+                    lineNumber: 2,
+                    credit: '10.000000',
+                ),
             ],
         ));
     }
@@ -168,19 +172,15 @@ final class AccountingPeriodServiceTest extends TestCase
     {
         $suffix = Str::upper(Str::random(6));
 
-        return (int) TenantModel::query()->create([
+        return (int) DB::table('tenants')->insertGetId([
+            'uuid' => (string) Str::uuid(),
             'code' => 'FIN-'.$suffix,
             'name' => 'Finance '.$suffix,
+            'slug' => 'finance-'.Str::lower($suffix),
             'status' => 'active',
-            'timezone' => 'UTC',
-            'locale' => 'en',
-            'currency' => 'USD',
-            'database_connection_name' => 'testing',
-            'database_strategy' => 'shared_schema',
-            'database_provisioning_status' => 'ready',
-            'database_provisioned_at' => now(),
-            'routing_status' => 'ready',
-            'row_version' => 1,
-        ])->getKey();
+            'status_changed_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
     }
 }

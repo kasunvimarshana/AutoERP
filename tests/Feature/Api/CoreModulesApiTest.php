@@ -164,6 +164,7 @@ final class CoreModulesApiTest extends TestCase
     public function test_invoice_preview_create_and_lifecycle_api(): void
     {
         [$tenantId, $organizationUnitId] = $this->scope();
+        FinancePostingFixture::seedCustomerInvoiceProfiles($tenantId, $organizationUnitId);
         $this->actingAsSuperAdministrator($tenantId, $organizationUnitId, [
             InvoicePermission::PREVIEW,
             InvoicePermission::CREATE,

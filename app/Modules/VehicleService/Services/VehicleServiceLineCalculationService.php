@@ -106,7 +106,7 @@ final class VehicleServiceLineCalculationService
             $grand = $this->math->add($grand, (string) $line->line_total);
         }
 
-        $job->fill([
+        $job->forceFill([
             'subtotal' => $subtotal,
             'discount_total' => $discount,
             'tax_total' => $tax,
