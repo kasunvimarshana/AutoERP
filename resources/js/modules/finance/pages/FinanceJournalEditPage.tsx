@@ -30,11 +30,6 @@ export default function FinanceJournalEditPage() {
                     journal_date: journal.journal_date,
                     journal_type: journal.journal_type,
                     posting_profile_id: journal.posting_profile?.id ?? null,
-                    source_module: journal.source_module,
-                    source_type: journal.source_type,
-                    source_id: journal.source_id,
-                    source_number: journal.source_number,
-                    source_date: journal.source_date,
                     description: journal.description,
                     exchange_rate: journal.exchange_rate ?? '1.000000',
                     lines: (journal.lines ?? []).map((line, index) => ({
