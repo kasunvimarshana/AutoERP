@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Finance\Http\Controllers;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Modules\Finance\Http\Requests\CreateAccountAssignmentRequest;
@@ -44,9 +45,13 @@ final class FinanceConfigurationController
         $accounts = $this->scopeOrganization(FinanceAccount::query()->where('tenant_id', $tenantId), $organizationUnitId)
             ->orderBy('code')
             ->get(['id', 'code', 'name', 'is_posting_account', 'is_active']);
-        $profiles = $this->scopeOrganization(FinancePostingProfile::query()->where('tenant_id', $tenantId), $organizationUnitId)
+        $profiles = $this->scopeOrganizationWithTenantFallback(
+            FinancePostingProfile::query()->where('tenant_id', $tenantId),
+            $organizationUnitId,
+        )
             ->where('is_active', true)
             ->with('rules.role:id,code,name,is_active')
+            ->orderByRaw('organization_unit_id IS NULL ASC')
             ->orderBy('code')
             ->get();
         $accountRoles = FinanceAccountRole::query()
@@ -57,13 +62,14 @@ final class FinanceConfigurationController
         $assignments = FinanceAccountAssignment::query()
             ->where('tenant_id', $tenantId)
             ->where('is_active', true)
-            ->where(function ($query) use ($organizationUnitId): void {
+            ->where(function (Builder $query) use ($organizationUnitId): void {
                 $query->whereNull('organization_unit_id');
                 if ($organizationUnitId !== null) {
                     $query->orWhere('organization_unit_id', $organizationUnitId);
                 }
             })
             ->with(['role:id,code,name', 'account:id,code,name'])
+            ->orderByRaw('organization_unit_id IS NULL ASC')
             ->orderBy('account_role_id')
             ->orderByDesc('effective_from')
             ->get();
@@ -93,11 +99,12 @@ final class FinanceConfigurationController
     public function postingProfiles(ListFinanceRequest $request): AnonymousResourceCollection
     {
         return PostingProfileResource::collection(
-            $this->scopeOrganization(
+            $this->scopeOrganizationWithTenantFallback(
                 FinancePostingProfile::query()->where('tenant_id', $request->tenantId()),
                 $request->organizationUnitId(),
             )
                 ->with('rules.role')
+                ->orderByRaw('organization_unit_id IS NULL ASC')
                 ->orderBy('code')
                 ->paginate($request->perPage()),
         );
@@ -187,13 +194,14 @@ final class FinanceConfigurationController
         return FinanceAccountAssignmentResource::collection(
             FinanceAccountAssignment::query()
                 ->where('tenant_id', $request->tenantId())
-                ->where(function ($query) use ($request): void {
+                ->where(function (Builder $query) use ($request): void {
                     $query->whereNull('organization_unit_id');
                     if ($request->organizationUnitId() !== null) {
                         $query->orWhere('organization_unit_id', $request->organizationUnitId());
                     }
                 })
                 ->with(['role', 'account'])
+                ->orderByRaw('organization_unit_id IS NULL ASC')
                 ->orderBy('account_role_id')
                 ->orderByDesc('effective_from')
                 ->paginate($request->perPage()),
@@ -232,10 +240,20 @@ final class FinanceConfigurationController
         ));
     }
 
-    private function scopeOrganization($query, ?int $organizationUnitId)
+    private function scopeOrganization(Builder $query, ?int $organizationUnitId): Builder
     {
         return $organizationUnitId === null
             ? $query->whereNull('organization_unit_id')
             : $query->where('organization_unit_id', $organizationUnitId);
+    }
+
+    private function scopeOrganizationWithTenantFallback(Builder $query, ?int $organizationUnitId): Builder
+    {
+        return $query->where(function (Builder $scope) use ($organizationUnitId): void {
+            $scope->whereNull('organization_unit_id');
+            if ($organizationUnitId !== null) {
+                $scope->orWhere('organization_unit_id', $organizationUnitId);
+            }
+        });
     }
 }
