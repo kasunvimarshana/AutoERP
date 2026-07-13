@@ -14,20 +14,15 @@ use Modules\Finance\Http\Requests\FinanceActionRequest;
 use Modules\Finance\Http\Requests\ListFinanceRequest;
 use Modules\Finance\Http\Requests\StoreFinanceAccountRequest;
 use Modules\Finance\Http\Requests\StoreJournalEntryRequest;
-use Modules\Finance\Http\Requests\UpsertPostingProfileRequest;
 use Modules\Finance\Http\Resources\AccountBalanceReportResource;
 use Modules\Finance\Http\Resources\FinanceAccountResource;
 use Modules\Finance\Http\Resources\JournalEntryResource;
 use Modules\Finance\Http\Resources\LedgerEntryResource;
-use Modules\Finance\Http\Resources\PostingProfileResource;
 use Modules\Finance\Models\FinanceAccount;
-use Modules\Finance\Models\FinanceAccountCategory;
-use Modules\Finance\Models\FinanceAccountType;
 use Modules\Finance\Models\FinanceBankReconciliation;
 use Modules\Finance\Models\FinanceBankStatementLine;
 use Modules\Finance\Models\FinanceBudget;
 use Modules\Finance\Models\FinanceJournalEntry;
-use Modules\Finance\Models\FinancePostingProfile;
 use Modules\Finance\Services\AccountBalanceService;
 use Modules\Finance\Services\AgingReportService;
 use Modules\Finance\Services\BankReconciliationService;
@@ -41,7 +36,6 @@ use Modules\Finance\Services\GeneralLedgerReportService;
 use Modules\Finance\Services\JournalEntryCreationService;
 use Modules\Finance\Services\JournalPostingService;
 use Modules\Finance\Services\JournalReversalService;
-use Modules\Finance\Services\PostingProfileService;
 use Modules\Finance\Services\TrialBalanceService;
 
 final class FinanceController
@@ -358,94 +352,6 @@ final class FinanceController
         ))]);
     }
 
-    public function lookups(ListFinanceRequest $request): JsonResponse
-    {
-        $tenantId = $request->tenantId();
-        $organizationUnitId = $request->organizationUnitId();
-
-        $types = FinanceAccountType::query()
-            ->where('tenant_id', $tenantId)
-            ->where('is_active', true)
-            ->orderBy('sort_order')
-            ->get(['id', 'code', 'name', 'normal_balance', 'statement_type']);
-        $categories = FinanceAccountCategory::query()
-            ->where('tenant_id', $tenantId)
-            ->where('is_active', true)
-            ->orderBy('sort_order')
-            ->get(['id', 'account_type_id', 'code', 'name']);
-        $accounts = $this->scope(FinanceAccount::query(), $request)
-            ->orderBy('code')
-            ->get(['id', 'code', 'name', 'is_posting_account', 'is_active']);
-        $profiles = FinancePostingProfile::query()
-            ->where('tenant_id', $tenantId)
-            ->where('is_active', true)
-            ->when(
-                $organizationUnitId === null,
-                fn ($query) => $query->whereNull('organization_unit_id'),
-                fn ($query) => $query->where('organization_unit_id', $organizationUnitId),
-            )
-            ->with('rules.account:id,code,name')
-            ->orderBy('code')
-            ->get();
-
-        $dimensions = $this->scope(\Modules\Finance\Models\FinanceDimension::query(), $request)
-            ->where('is_active', true)
-            ->orderBy('dimension_type')
-            ->orderBy('code')
-            ->get(['id', 'code', 'name', 'dimension_type']);
-        $bankAccounts = $this->scope(FinanceAccount::query(), $request)
-            ->where('is_bank_account', true)
-            ->where('is_active', true)
-            ->orderBy('code')
-            ->get(['id', 'code', 'name', 'is_posting_account', 'is_active']);
-
-        return response()->json(['data' => compact('types', 'categories', 'accounts', 'profiles', 'dimensions', 'bankAccounts')]);
-    }
-
-    public function postingProfiles(ListFinanceRequest $request): AnonymousResourceCollection
-    {
-        return PostingProfileResource::collection(
-            $this->scope(FinancePostingProfile::query(), $request)
-                ->with('rules.account')
-                ->orderBy('code')
-                ->paginate($request->perPage()),
-        );
-    }
-
-    public function createPostingProfile(
-        UpsertPostingProfileRequest $request,
-        PostingProfileService $service,
-    ): PostingProfileResource {
-        return new PostingProfileResource($service->save(
-            $request->tenantId(),
-            $request->organizationUnitId(),
-            (string) $request->input('code'),
-            (string) $request->input('name'),
-            $request->filled('description') ? (string) $request->input('description') : null,
-            $request->boolean('is_active', true),
-            $request->input('rules'),
-        ));
-    }
-
-    public function updatePostingProfile(
-        UpsertPostingProfileRequest $request,
-        int $profile,
-        PostingProfileService $service,
-    ): PostingProfileResource {
-        $model = $this->scope(FinancePostingProfile::query(), $request)->findOrFail($profile);
-
-        return new PostingProfileResource($service->save(
-            $request->tenantId(),
-            $request->organizationUnitId(),
-            (string) $request->input('code'),
-            (string) $request->input('name'),
-            $request->filled('description') ? (string) $request->input('description') : null,
-            $request->boolean('is_active', true),
-            $request->input('rules'),
-            $model,
-        ));
-    }
-
     public function bankReconciliations(ListFinanceRequest $request): AnonymousResourceCollection
     {
         $query = $this->scope(FinanceBankReconciliation::query(), $request)
@@ -639,7 +545,7 @@ final class FinanceController
 
     private function scope(
         Builder $query,
-        ListFinanceRequest|FinanceActionRequest|StoreFinanceAccountRequest|StoreJournalEntryRequest|UpsertPostingProfileRequest $request,
+        ListFinanceRequest|FinanceActionRequest|StoreFinanceAccountRequest|StoreJournalEntryRequest $request,
     ): Builder {
         $query->where('tenant_id', $request->tenantId());
 
