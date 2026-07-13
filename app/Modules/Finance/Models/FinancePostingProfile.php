@@ -16,15 +16,6 @@ final class FinancePostingProfile extends TenantOwnedModel
 
     protected $guarded = ['id'];
 
-    protected static function booted(): void
-    {
-        static::saving(static function (FinancePostingProfile $profile): void {
-            if ($profile->exists && ! $profile->isDirty('row_version')) {
-                $profile->row_version = ((int) $profile->getOriginal('row_version')) + 1;
-            }
-        });
-    }
-
     protected function casts(): array
     {
         return array_merge(parent::casts(), [
