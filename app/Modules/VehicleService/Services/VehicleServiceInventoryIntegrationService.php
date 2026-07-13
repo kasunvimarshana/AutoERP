@@ -33,6 +33,7 @@ final class VehicleServiceInventoryIntegrationService
         private readonly InventoryAvailabilityService $availability,
         private readonly InventoryFacade $inventory,
         private readonly InventoryUomService $uoms,
+        private readonly VehicleServiceInventoryFinanceService $finance,
     ) {}
 
     /** @return Collection<int, VehicleServiceJobLine> */
@@ -142,6 +143,8 @@ final class VehicleServiceInventoryIntegrationService
                     createdBy: $postedBy,
                     uomId: $line->uom_id,
                 ), $postedBy);
+
+                $this->finance->postIssue($job, $line, $movement, $postedBy);
 
                 $line->inventory_movement_id = $movement->getKey();
                 $line->status = VehicleServiceLineStatus::Issued;
