@@ -7,6 +7,8 @@ namespace Modules\Finance\Tests;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Modules\User\Models\UserModel;
+use Tests\Support\TenantUserFixture;
 use Tests\TestCase;
 
 final class ManualJournalSourceBoundaryTest extends TestCase
@@ -23,6 +25,7 @@ final class ManualJournalSourceBoundaryTest extends TestCase
     public function test_manual_journal_api_rejects_business_source_identity(): void
     {
         [$tenantId, $organizationUnitId, $cashId, $capitalId] = $this->context();
+        $this->actingAsTenantUser($tenantId);
         $scope = [
             'tenant_id' => $tenantId,
             'organization_unit_id' => $organizationUnitId,
@@ -54,6 +57,7 @@ final class ManualJournalSourceBoundaryTest extends TestCase
     public function test_manual_journal_is_persisted_without_business_source_identity(): void
     {
         [$tenantId, $organizationUnitId, $cashId, $capitalId] = $this->context();
+        $this->actingAsTenantUser($tenantId);
         $scope = [
             'tenant_id' => $tenantId,
             'organization_unit_id' => $organizationUnitId,
@@ -146,6 +150,20 @@ final class ManualJournalSourceBoundaryTest extends TestCase
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+    }
+
+    private function actingAsTenantUser(int $tenantId): void
+    {
+        $userId = TenantUserFixture::create([
+            'tenant_id' => $tenantId,
+            'email' => 'manual-journal-'.Str::lower(Str::random(8)).'@example.test',
+        ]);
+        $user = $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): UserModel => UserModel::query()->findOrFail($userId),
+        );
+
+        $this->actingAs($user, (string) config('module-auth.protected_route_guard', 'auth-api'));
     }
 
     /** @return array<string, mixed> */
