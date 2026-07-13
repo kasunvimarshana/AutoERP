@@ -33,6 +33,7 @@ final class FinancePostingFixture
     private const SERVICE_REVENUE_ACCOUNT = '4200';
     private const RENTAL_REVENUE_ACCOUNT = '4300';
     private const PURCHASE_EXPENSE_ACCOUNT = '5100';
+    private const COST_OF_GOODS_SOLD_ACCOUNT = '5200';
     private const RENTAL_EXPENSE_ACCOUNT = '5300';
 
     public static function seedCustomerPaymentProfiles(int $tenantId, ?int $organizationUnitId = null): void
@@ -108,6 +109,14 @@ final class FinancePostingFixture
         ]);
     }
 
+    public static function seedVehicleServiceProfiles(int $tenantId, ?int $organizationUnitId = null): void
+    {
+        self::seedCustomerInvoiceProfiles($tenantId, $organizationUnitId);
+
+        $accounts = self::accounts($tenantId, $organizationUnitId);
+        self::seedInventoryIssueProfile($tenantId, $organizationUnitId, $accounts);
+    }
+
     public static function seedSupplierInvoiceProfiles(int $tenantId, ?int $organizationUnitId = null): void
     {
         $accounts = self::accounts($tenantId, $organizationUnitId);
@@ -136,6 +145,18 @@ final class FinancePostingFixture
         self::profile($tenantId, $organizationUnitId, FinancePostingProfileCode::InventoryReceipt->value, [
             FinanceAccountRoleCode::Inventory->value => $accounts[FinanceAccountRoleCode::Inventory->value],
             FinanceAccountRoleCode::GoodsReceivedNotInvoiced->value => $accounts[FinanceAccountRoleCode::GoodsReceivedNotInvoiced->value],
+        ]);
+    }
+
+    /** @param array<string, int> $accounts */
+    private static function seedInventoryIssueProfile(
+        int $tenantId,
+        ?int $organizationUnitId,
+        array $accounts,
+    ): void {
+        self::profile($tenantId, $organizationUnitId, FinancePostingProfileCode::InventoryIssue->value, [
+            FinanceAccountRoleCode::CostOfGoodsSold->value => $accounts[FinanceAccountRoleCode::CostOfGoodsSold->value],
+            FinanceAccountRoleCode::Inventory->value => $accounts[FinanceAccountRoleCode::Inventory->value],
         ]);
     }
 
@@ -180,6 +201,7 @@ final class FinancePostingFixture
             FinanceAccountRoleCode::ServiceRevenue->value => self::account($tenantId, $organizationUnitId, $revenueTypeId, self::SERVICE_REVENUE_ACCOUNT, 'Service Revenue', 'credit'),
             FinanceAccountRoleCode::RentalRevenue->value => self::account($tenantId, $organizationUnitId, $revenueTypeId, self::RENTAL_REVENUE_ACCOUNT, 'Rental Revenue', 'credit'),
             FinanceAccountRoleCode::Expense->value => self::account($tenantId, $organizationUnitId, $expenseTypeId, self::PURCHASE_EXPENSE_ACCOUNT, 'Purchase Expense', 'debit'),
+            FinanceAccountRoleCode::CostOfGoodsSold->value => self::account($tenantId, $organizationUnitId, $expenseTypeId, self::COST_OF_GOODS_SOLD_ACCOUNT, 'Cost of Goods Sold', 'debit'),
             FinanceAccountRoleCode::RentalExpense->value => self::account($tenantId, $organizationUnitId, $expenseTypeId, self::RENTAL_EXPENSE_ACCOUNT, 'Rental Expense', 'debit'),
         ];
     }
