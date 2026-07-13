@@ -68,10 +68,10 @@ final class FinanceApiWorkflowTest extends TestCase
         $updatedProfile = $this->tenantPatchJson(
             $tenantId,
             '/api/v1/finance/posting-profiles/'.$profile['id'],
-            $scope + $profilePayload + [
+            array_replace($scope, $profilePayload, [
                 'expected_version' => $profile['row_version'],
                 'name' => 'Updated API Profile',
-            ],
+            ]),
         )->assertSuccessful()
             ->assertJsonPath('data.name', 'Updated API Profile')
             ->json('data');
@@ -80,10 +80,10 @@ final class FinanceApiWorkflowTest extends TestCase
         $this->tenantPatchJson(
             $tenantId,
             '/api/v1/finance/posting-profiles/'.$profile['id'],
-            $scope + $profilePayload + [
+            array_replace($scope, $profilePayload, [
                 'expected_version' => $profile['row_version'],
                 'name' => 'Stale overwrite',
-            ],
+            ]),
         )->assertStatus(422);
 
         $journal = $this->tenantPostJson($tenantId, '/api/v1/finance/journals', $scope + $this->journalPayload($cashId, $capitalId))
