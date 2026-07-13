@@ -59,8 +59,8 @@ final class FinancePostingIdempotencyBoundaryTest extends TestCase
     {
         $migration = $this->source('../Database/UpgradeMigrations/2026_07_13_000002_canonicalize_finance_journal_source_keys.php');
 
-        self::assertStringContainsString("'source_type' => \$sourceType", $migration);
-        self::assertStringContainsString("'source_id' => \$sourceId", $migration);
+        self::assertStringContainsString("\$identity['source_type'] = \$sourceType;", $migration);
+        self::assertStringContainsString("\$identity['source_id'] = \$sourceId;", $migration);
         self::assertStringContainsString('Multiple Finance journals use the same canonical source identity', $migration);
         self::assertStringContainsString("->update(['source_key' => null])", $migration);
         self::assertStringContainsString("->update(['source_key' => \$key])", $migration);
