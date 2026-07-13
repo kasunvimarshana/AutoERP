@@ -17,6 +17,7 @@ use Modules\Inventory\Services\InventoryAvailabilityService;
 use Modules\Inventory\Services\InventoryFacade;
 use Modules\Inventory\Services\InventoryUomService;
 use Modules\Item\Enums\TrackingType;
+use Modules\VehicleService\Constants\VehicleServiceFinanceSource;
 use Modules\VehicleService\Enums\VehicleServiceLineStatus;
 use Modules\VehicleService\Models\VehicleServiceJob;
 use Modules\VehicleService\Models\VehicleServiceJobLine;
@@ -135,9 +136,9 @@ final class VehicleServiceInventoryIntegrationService
                     itemVariantId: $line->item_variant_id,
                     warehouseLocationId: $warehouseLocationId,
                     unitCost: (string) $line->unit_cost,
-                    sourceType: 'vehicle_service_job',
+                    sourceType: VehicleServiceFinanceSource::JOB,
                     sourceId: (int) $job->getKey(),
-                    sourceLineType: 'vehicle_service_job_line',
+                    sourceLineType: VehicleServiceFinanceSource::JOB_LINE,
                     sourceLineId: (int) $line->getKey(),
                     description: 'Vehicle service job '.$job->job_number,
                     createdBy: $postedBy,
