@@ -9,6 +9,7 @@ import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { Pagination } from '@/shared/components/Pagination';
+import { ReversalDialog, type ReversalFacts } from '@/shared/components/ReversalDialog';
 import { Select } from '@/shared/components/Select';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { useApi } from '@/shared/hooks/useApi';
@@ -34,23 +35,42 @@ export default function GoodsReceiptListPage() {
     const debouncedSearch = useDebounce(search);
     const [actionError, setActionError] = useState<ApiError | null>(null);
     const [busyId, setBusyId] = useState<number | null>(null);
+    const [reversalTarget, setReversalTarget] = useState<GoodsReceipt | null>(null);
     const result = useApi((signal) => listGoodsReceipts({ page, search: debouncedSearch || undefined, status: status || undefined, per_page: 15 }, signal), [page, debouncedSearch, status]);
     const can = (permission: string) => hasPurchasePermission(auth.permissions, permission);
 
-    const run = async (row: GoodsReceipt, action: 'post' | 'reverse') => {
+    const post = async (row: GoodsReceipt) => {
         if (busyId !== null) return;
         if (!await confirm({
-            title: `${action[0].toUpperCase()}${action.slice(1)} goods receipt`,
-            message: `Confirm ${action} for this goods receipt?`,
-            confirmLabel: action[0].toUpperCase() + action.slice(1),
-            danger: action === 'reverse',
+            title: 'Post goods receipt',
+            message: 'Confirm post for this goods receipt?',
+            confirmLabel: 'Post',
         })) return;
+
         setBusyId(row.id);
         setActionError(null);
         try {
-            const payload = { expected_version: row.row_version };
-            if (action === 'post') await postGoodsReceipt(row.id, payload);
-            if (action === 'reverse') await reverseGoodsReceipt(row.id, payload);
+            await postGoodsReceipt(row.id, { expected_version: row.row_version });
+            result.reload();
+        } catch (requestError) {
+            setActionError(toApiError(requestError));
+        } finally {
+            setBusyId(null);
+        }
+    };
+
+    const reverse = async (facts: ReversalFacts) => {
+        const row = reversalTarget;
+        if (!row || busyId !== null) return;
+
+        setBusyId(row.id);
+        setActionError(null);
+        try {
+            await reverseGoodsReceipt(row.id, {
+                expected_version: row.row_version,
+                ...facts,
+            });
+            setReversalTarget(null);
             result.reload();
         } catch (requestError) {
             setActionError(toApiError(requestError));
@@ -70,23 +90,30 @@ export default function GoodsReceiptListPage() {
         { key: 'return', header: 'Return', render: (row) => row.return_status?.replaceAll('_', ' ') ?? '-' },
         { key: 'actions', header: 'Actions', render: (row) => {
             const capabilities = row.capabilities ?? {};
-            return <div className="flex gap-2"><LinkButton to={`/purchase/goods-receipts/${row.id}`} variant="ghost">View</LinkButton>{capabilities.can_post && can(purchasePermissions.goodsReceiptsPost) && <Button type="button" variant="secondary" loading={busyId === row.id} onClick={() => void run(row, 'post')}>Post</Button>}{capabilities.can_reverse && can(purchasePermissions.goodsReceiptsReverse) && <Button type="button" variant="secondary" loading={busyId === row.id} onClick={() => void run(row, 'reverse')}>Reverse</Button>}</div>;
+            return <div className="flex gap-2"><LinkButton to={`/purchase/goods-receipts/${row.id}`} variant="ghost">View</LinkButton>{capabilities.can_post && can(purchasePermissions.goodsReceiptsPost) && <Button type="button" variant="secondary" loading={busyId === row.id} onClick={() => void post(row)}>Post</Button>}{capabilities.can_reverse && can(purchasePermissions.goodsReceiptsReverse) && <Button type="button" variant="secondary" loading={busyId === row.id} onClick={() => setReversalTarget(row)}>Reverse</Button>}</div>;
         } },
     ];
 
     return (
         <>
-        <div className="space-y-5">
-            <ContentHeader title="Goods receipts" actions={can(purchasePermissions.goodsReceiptsCreate) ? <LinkButton to="/purchase/goods-receipts/create">New GRN</LinkButton> : null} />
-            <ErrorAlert error={result.error ?? actionError} />
-            <div className="grid gap-3 md:grid-cols-3">
-                <Input label="Search" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} />
-                <Select label="Status" value={status} options={goodsReceiptStatusOptions} onChange={(event) => { setStatus(event.target.value); setPage(1); }} />
+            <div className="space-y-5">
+                <ContentHeader title="Goods receipts" actions={can(purchasePermissions.goodsReceiptsCreate) ? <LinkButton to="/purchase/goods-receipts/create">New GRN</LinkButton> : null} />
+                <ErrorAlert error={result.error ?? actionError} />
+                <div className="grid gap-3 md:grid-cols-3">
+                    <Input label="Search" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} />
+                    <Select label="Status" value={status} options={goodsReceiptStatusOptions} onChange={(event) => { setStatus(event.target.value); setPage(1); }} />
+                </div>
+                {result.loading ? <LoadingState /> : <DataTable rows={result.data?.data ?? []} columns={columns} rowKey={(row) => row.id} />}
+                <Pagination meta={result.data?.meta} onPageChange={setPage} />
             </div>
-            {result.loading ? <LoadingState /> : <DataTable rows={result.data?.data ?? []} columns={columns} rowKey={(row) => row.id} />}
-            <Pagination meta={result.data?.meta} onPageChange={setPage} />
-        </div>
             {confirmDialog}
+            <ReversalDialog
+                open={reversalTarget !== null}
+                title="Reverse goods receipt"
+                loading={reversalTarget !== null && busyId === reversalTarget.id}
+                onCancel={() => setReversalTarget(null)}
+                onConfirm={reverse}
+            />
         </>
     );
 }
