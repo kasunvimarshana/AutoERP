@@ -50,6 +50,16 @@ final class VehicleFinanceProductionReadinessContractTest extends TestCase
         self::assertStringNotContainsString('canManage && !row.invoice', $financePage);
     }
 
+    public function test_vehicle_finance_payable_stays_draft_until_finance_policy_posts_it(): void
+    {
+        $request = $this->source('app/Modules/VehicleRental/Http/Requests/CreateVehicleFinancePayableRequest.php');
+        $page = $this->source('resources/js/modules/vehicle-rental/pages/VehicleFinancePage.tsx');
+
+        self::assertStringContainsString('Rule::in([InvoiceStatus::Draft->value])', $request);
+        self::assertStringContainsString('status: "draft"', $page);
+        self::assertStringNotContainsString('Rule::enum(InvoiceStatus::class)', $request);
+    }
+
     private function source(string $relativePath): string
     {
         $source = file_get_contents($this->root.'/'.$relativePath);
