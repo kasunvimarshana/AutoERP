@@ -62,6 +62,7 @@ export default function PostingProfilePage() {
     const auth = useAuth();
     const canManage = hasPermission(auth, financePermissions.postingProfilesManage);
     const canViewAccounts = hasPermission(auth, financePermissions.accountsView);
+    const hasOrganizationContext = auth.organizationUnit !== null;
     const [selectedProfile, setSelectedProfile] = useState<PostingProfile | null>(null);
     const [profileForm, setProfileForm] = useState<PostingProfilePayload>(emptyProfile);
     const [selectedRole, setSelectedRole] = useState<FinanceAccountRole | null>(null);
@@ -89,17 +90,22 @@ export default function PostingProfilePage() {
         () => (lookups.data?.accounts ?? []).filter((account) => account.is_active && account.is_posting_account),
         [lookups.data?.accounts],
     );
+    const isInherited = (organizationUnitId?: number | null) => hasOrganizationContext && organizationUnitId == null;
+    const scopeLabel = (organizationUnitId?: number | null) => organizationUnitId
+        ? `Organization ${organizationUnitId}`
+        : hasOrganizationContext ? 'Tenant fallback' : 'Tenant default';
 
     const profileColumns: DataColumn<PostingProfile>[] = [
         {
             key: 'code',
             header: 'Profile',
-            render: (row) => canManage ? (
+            render: (row) => canManage && !isInherited(row.organization_unit_id) ? (
                 <button type="button" className="font-semibold text-sky-700 hover:underline" onClick={() => editProfile(row)}>
                     {row.code} - {row.name}
                 </button>
             ) : <span className="font-semibold text-slate-700">{row.code} - {row.name}</span>,
         },
+        { key: 'scope', header: 'Scope', render: (row) => scopeLabel(row.organization_unit_id) },
         { key: 'lines', header: 'Semantic mappings', render: (row) => row.rules?.length ?? 0 },
         { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.is_active ? 'active' : 'inactive'} /> },
     ];
@@ -120,14 +126,14 @@ export default function PostingProfilePage() {
     const assignmentColumns: DataColumn<FinanceAccountAssignment>[] = [
         { key: 'role', header: 'Role', render: (row) => row.role ? `${row.role.code} - ${row.role.name}` : String(row.account_role_id) },
         { key: 'account', header: 'Account', render: (row) => row.account ? `${row.account.code} - ${row.account.name}` : String(row.account_id) },
-        { key: 'scope', header: 'Scope', render: (row) => row.organization_unit_id ? `Organization ${row.organization_unit_id}` : 'Tenant default' },
+        { key: 'scope', header: 'Scope', render: (row) => scopeLabel(row.organization_unit_id) },
         { key: 'effective_from', header: 'From', render: (row) => row.effective_from },
         { key: 'effective_to', header: 'To', render: (row) => row.effective_to ?? 'Open ended' },
         {
             key: 'actions',
             header: 'Actions',
             className: 'text-right',
-            render: (row) => row.effective_to || !canManage
+            render: (row) => row.effective_to || !canManage || isInherited(row.organization_unit_id)
                 ? null
                 : <Button type="button" variant="secondary" onClick={() => { setEndingAssignmentId(row.id); setEndingDate(todayDate()); }}>End</Button>,
         },
@@ -208,6 +214,7 @@ export default function PostingProfilePage() {
     }
 
     function editProfile(profile: PostingProfile) {
+        if (isInherited(profile.organization_unit_id)) return;
         setSelectedProfile(profile);
         setProfileForm({
             code: profile.code,
@@ -217,6 +224,9 @@ export default function PostingProfilePage() {
             rules: (profile.rules ?? []).map((rule) => ({
                 line_key: rule.line_key,
                 account_role_id: Number(rule.role?.id ?? rule.account_role_id),
+                effective_from: rule.effective_from,
+                effective_to: rule.effective_to ?? null,
+                is_active: rule.is_active,
                 description: typeof rule.description === 'string' ? rule.description : null,
             })),
         });
@@ -264,7 +274,7 @@ export default function PostingProfilePage() {
         <>
             <ContentHeader
                 title="Finance posting configuration"
-                description="Map business posting keys to semantic account roles, then assign effective accounts by scope and date."
+                description="Map business posting keys to semantic account roles, then assign effective accounts by scope and date. Tenant fallbacks are read-only while an organization context is active."
             />
 
             <div className="space-y-6">
