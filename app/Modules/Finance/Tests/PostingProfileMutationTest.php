@@ -47,6 +47,7 @@ final class PostingProfileMutationTest extends TestCase
                     true,
                     [$this->rule('receivable', $firstRoleId)],
                     $profile,
+                    (int) $profile->row_version,
                 );
                 self::fail('Expected omitted active rule validation to fail.');
             } catch (InvalidArgumentException $exception) {
@@ -92,7 +93,63 @@ final class PostingProfileMutationTest extends TestCase
                 true,
                 [$this->rule('receivable', $roleId)],
                 $profile,
+                (int) $profile->row_version,
             );
+        });
+    }
+
+    public function test_stale_profile_version_is_rejected_without_mutation(): void
+    {
+        $tenantId = $this->createTenant('STALE');
+        $roleId = $this->createAccountRole($tenantId, 'receivable');
+
+        $this->withTenantExecutionContext($tenantId, function () use ($tenantId, $roleId): void {
+            $service = app(PostingProfileService::class);
+            $profile = $service->save(
+                $tenantId,
+                null,
+                'sales_invoice',
+                'Sales Invoice',
+                null,
+                true,
+                [$this->rule('receivable', $roleId)],
+            );
+            $originalVersion = (int) $profile->row_version;
+            $updated = $service->save(
+                $tenantId,
+                null,
+                'sales_invoice',
+                'Sales Invoice Updated',
+                null,
+                true,
+                [$this->rule('receivable', $roleId)],
+                $profile,
+                $originalVersion,
+            );
+
+            self::assertGreaterThan($originalVersion, (int) $updated->row_version);
+
+            try {
+                $service->save(
+                    $tenantId,
+                    null,
+                    'sales_invoice',
+                    'Stale overwrite',
+                    null,
+                    true,
+                    [$this->rule('receivable', $roleId)],
+                    $updated,
+                    $originalVersion,
+                );
+                self::fail('Expected stale posting profile version to fail.');
+            } catch (InvalidArgumentException $exception) {
+                self::assertSame(
+                    'Posting profile was changed by another request. Reload it before updating.',
+                    $exception->getMessage(),
+                );
+            }
+
+            self::assertSame('Sales Invoice Updated', $updated->refresh()->name);
         });
     }
 
