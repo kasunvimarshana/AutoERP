@@ -36,6 +36,7 @@ final class PostingProfileService
         bool $isActive,
         array $rules,
         ?FinancePostingProfile $profile = null,
+        ?int $expectedVersion = null,
     ): FinancePostingProfile {
         return DB::transaction(function () use (
             $tenantId,
@@ -46,12 +47,14 @@ final class PostingProfileService
             $isActive,
             $rules,
             $profile,
+            $expectedVersion,
         ): FinancePostingProfile {
             if ($profile instanceof FinancePostingProfile) {
                 $profile = FinancePostingProfile::query()
                     ->lockForUpdate()
                     ->findOrFail($profile->getKey());
                 $this->assertProfileIdentity($profile, $tenantId, $organizationUnitId);
+                $this->assertExpectedVersion($profile, $expectedVersion);
             } else {
                 $profile = new FinancePostingProfile();
                 $profile->forceFill([
@@ -218,6 +221,15 @@ final class PostingProfileService
             || ($profile->organization_unit_id === null ? null : (int) $profile->organization_unit_id) !== $organizationUnitId
         ) {
             throw new InvalidArgumentException('Posting profile tenant and organization scope cannot be changed.');
+        }
+    }
+
+    private function assertExpectedVersion(
+        FinancePostingProfile $profile,
+        ?int $expectedVersion,
+    ): void {
+        if ($expectedVersion === null || (int) $profile->row_version !== $expectedVersion) {
+            throw new InvalidArgumentException('Posting profile was changed by another request. Reload it before updating.');
         }
     }
 
