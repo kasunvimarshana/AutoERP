@@ -82,16 +82,19 @@ final class FinanceAccountRoleBoundaryTest extends TestCase
     public function test_posting_profile_rule_validity_has_a_deployed_database_upgrade_path(): void
     {
         $provider = $this->source('../Providers/FinanceServiceProvider.php');
-        $upgrade = $this->source('../Database/UpgradeMigrations/2026_07_10_000001_add_validity_to_finance_posting_profile_rules_table.php');
+        $validityUpgrade = $this->source('../Database/UpgradeMigrations/2026_07_10_000001_add_validity_to_finance_posting_profile_rules_table.php');
+        $versionUpgrade = $this->source('../Database/UpgradeMigrations/2026_07_13_000001_add_row_version_to_finance_posting_profiles_table.php');
 
         self::assertStringContainsString('Database/UpgradeMigrations', $provider);
-        self::assertStringContainsString("private const TABLE = 'finance_posting_profile_rules'", $upgrade);
-        self::assertStringContainsString("private const OPENING_EFFECTIVE_DATE = '1900-01-01'", $upgrade);
-        self::assertStringContainsString("Schema::hasColumn(self::TABLE, 'effective_from')", $upgrade);
-        self::assertStringContainsString('Schema::hasIndex(self::TABLE, self::OLD_PROFILE_KEY_UNIQUE', $upgrade);
-        self::assertStringContainsString('Schema::hasIndex(self::TABLE, self::PROFILE_KEY_FROM_UNIQUE', $upgrade);
-        self::assertStringContainsString('Schema::hasIndex(self::TABLE, self::EFFECTIVE_LOOKUP_INDEX', $upgrade);
-        self::assertStringContainsString('$table->dropUnique(self::OLD_PROFILE_KEY_UNIQUE)', $upgrade);
+        self::assertStringContainsString("private const TABLE = 'finance_posting_profile_rules'", $validityUpgrade);
+        self::assertStringContainsString("private const OPENING_EFFECTIVE_DATE = '1900-01-01'", $validityUpgrade);
+        self::assertStringContainsString("Schema::hasColumn(self::TABLE, 'effective_from')", $validityUpgrade);
+        self::assertStringContainsString('Schema::hasIndex(self::TABLE, self::OLD_PROFILE_KEY_UNIQUE', $validityUpgrade);
+        self::assertStringContainsString('Schema::hasIndex(self::TABLE, self::PROFILE_KEY_FROM_UNIQUE', $validityUpgrade);
+        self::assertStringContainsString('Schema::hasIndex(self::TABLE, self::EFFECTIVE_LOOKUP_INDEX', $validityUpgrade);
+        self::assertStringContainsString('$table->dropUnique(self::OLD_PROFILE_KEY_UNIQUE)', $validityUpgrade);
+        self::assertStringContainsString("private const TABLE = 'finance_posting_profiles'", $versionUpgrade);
+        self::assertStringContainsString("private const COLUMN = 'row_version'", $versionUpgrade);
     }
 
     public function test_finance_posting_resolution_and_journal_creation_share_transaction(): void
@@ -131,13 +134,19 @@ final class FinanceAccountRoleBoundaryTest extends TestCase
     public function test_finance_configuration_routes_have_a_single_owner(): void
     {
         $routes = $this->source('../Routes/api.php');
-        $controller = $this->source('../Http/Controllers/FinanceConfigurationController.php');
+        $configurationController = $this->source('../Http/Controllers/FinanceConfigurationController.php');
+        $financeController = $this->source('../Http/Controllers/FinanceController.php');
         $frontendTypes = $this->externalSource(dirname(__DIR__, 4).'/resources/js/modules/finance/financeTypes.ts');
 
         self::assertStringContainsString('FinanceConfigurationController', $routes);
         self::assertStringContainsString('account-roles', $routes);
         self::assertStringContainsString('account-assignments', $routes);
-        self::assertStringContainsString("with('rules.role')", $controller);
+        self::assertStringContainsString("with('rules.role')", $configurationController);
+        self::assertStringNotContainsString('function lookups(', $financeController);
+        self::assertStringNotContainsString('function postingProfiles(', $financeController);
+        self::assertStringNotContainsString('function createPostingProfile(', $financeController);
+        self::assertStringNotContainsString('function updatePostingProfile(', $financeController);
+        self::assertStringNotContainsString('PostingProfileService', $financeController);
         self::assertStringContainsString('account_roles', $frontendTypes);
         self::assertStringContainsString('account_assignments', $frontendTypes);
         self::assertStringContainsString('effective_from', $frontendTypes);
