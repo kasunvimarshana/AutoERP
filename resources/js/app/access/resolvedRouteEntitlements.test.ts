@@ -42,9 +42,11 @@ describe('resolved tenant route entitlements', () => {
         expect(entitlement?.requiresOrganizationUnit).toBe(true);
     });
 
-    it('preserves existing non-Finance route policies through the feature-owned resolver', () => {
+    it('resolves non-Finance policies from their feature-owned registries', () => {
         expect(resolveTenantRouteEntitlement('/payments')?.permissions).toContain('payments.view');
         expect(resolveTenantRouteEntitlement('/customers')?.permissions).toContain('customers.view');
+        expect(resolveTenantRouteEntitlement('/purchase/orders')?.permissions).toContain('purchase.orders.view');
+        expect(resolveTenantRouteEntitlement('/vehicle-service/jobs')?.permissions).toContain('vehicle-service.jobs.view');
     });
 
     it('protects the Inventory workspace route at its exact path', () => {
@@ -52,5 +54,9 @@ describe('resolved tenant route entitlements', () => {
 
         expect(entitlement?.modules).toContain('inventory');
         expect(entitlement?.requiresOrganizationUnit).toBe(true);
+    });
+
+    it('returns no entitlement for an unregistered route', () => {
+        expect(resolveTenantRouteEntitlement('/unregistered-workspace')).toBeNull();
     });
 });
