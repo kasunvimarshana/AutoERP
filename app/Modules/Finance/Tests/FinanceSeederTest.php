@@ -80,7 +80,7 @@ final class FinanceSeederTest extends TestCase
             self::PROFILE_CUSTOMER_ADVANCE => ['cash', 'bank', 'receivable', 'customer_advance'],
             self::PROFILE_SUPPLIER_ADVANCE => ['cash', 'bank', 'payable', 'supplier_advance'],
             self::PROFILE_RENTAL_DEPOSIT => ['cash', 'bank', 'receivable', 'customer_deposit'],
-            self::PROFILE_PURCHASE_INVOICE => ['expense', 'payable', 'tax_receivable', 'withholding_payable'],
+            self::PROFILE_PURCHASE_INVOICE => ['expense', 'goods_received_not_invoiced', 'payable', 'tax_receivable', 'withholding_payable'],
         ] as $profileCode => $lineKeys) {
             $profileId = (int) DB::table('finance_posting_profiles')
                 ->where('tenant_id', $tenantId)
