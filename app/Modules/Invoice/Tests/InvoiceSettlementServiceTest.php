@@ -7,6 +7,8 @@ namespace Modules\Invoice\Tests;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Modules\Finance\Enums\FinanceAccountRoleCode;
+use Modules\Finance\Enums\FinancePostingProfileCode;
 use Modules\Invoice\Contracts\InvoiceSettlementServiceInterface;
 use Modules\Invoice\DTOs\CreateInvoiceData;
 use Modules\Invoice\DTOs\InvoiceLineData;
@@ -14,7 +16,9 @@ use Modules\Invoice\Enums\InvoiceDirection;
 use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Enums\InvoiceType;
 use Modules\Invoice\Services\InvoiceCreationService;
+use Modules\Invoice\Services\InvoicePostingPlanFactory;
 use Modules\Invoice\Services\InvoiceStatusService;
+use Tests\Support\FinancePostingFixture;
 use Tests\TestCase;
 
 final class InvoiceSettlementServiceTest extends TestCase
@@ -24,6 +28,14 @@ final class InvoiceSettlementServiceTest extends TestCase
     public function test_it_applies_and_reverses_payment_allocations_through_invoice_owned_service(): void
     {
         $tenantId = $this->createTenant();
+        FinancePostingFixture::seedCustomerInvoiceProfiles($tenantId);
+        $postingPlan = app(InvoicePostingPlanFactory::class)->outbound(
+            FinancePostingProfileCode::SalesInvoice,
+            '2026-06-06',
+            FinanceAccountRoleCode::Revenue,
+            '1000.000000',
+            description: 'Settlement invoice',
+        );
         $invoice = $this->withTenantExecutionContext($tenantId, fn () => app(InvoiceCreationService::class)->create(new CreateInvoiceData(
             tenantId: $tenantId,
             invoiceType: InvoiceType::Manual,
@@ -38,6 +50,7 @@ final class InvoiceSettlementServiceTest extends TestCase
                     unitPrice: '1000.000000',
                 ),
             ],
+            postingPlan: $postingPlan,
         )));
 
         $statuses = app(InvoiceStatusService::class);
@@ -68,6 +81,7 @@ final class InvoiceSettlementServiceTest extends TestCase
             'status' => 'active',
             'status_changed_at' => now(),
             'created_at' => now(),
-            'updated_at' => now()]);
+            'updated_at' => now(),
+        ]);
     }
 }
