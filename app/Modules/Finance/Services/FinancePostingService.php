@@ -88,28 +88,23 @@ final class FinancePostingService implements FinancePostingInterface
         if (trim($request->postingDate) === '') {
             throw new InvalidArgumentException('Posting date is required.');
         }
-
         if ($request->lines === []) {
             throw new InvalidArgumentException('Posting request requires at least one line.');
         }
-
         if ($request->source->tenantId === null) {
             throw new InvalidArgumentException('Posting source tenant is required.');
         }
-
         if (trim($request->source->sourceType) === '' || $request->source->sourceId < 1) {
             throw new InvalidArgumentException('Posting source type and ID are required.');
         }
 
         $profile ??= $this->profiles->resolveProfile($request);
-
         if ($this->math->isNegative($request->exchangeRate) || $this->math->isZero($request->exchangeRate)) {
             throw new InvalidArgumentException('Posting exchange rate must be greater than zero.');
         }
 
         $totalDebit = '0.000000';
         $totalCredit = '0.000000';
-
         foreach ($request->lines as $line) {
             if ($this->math->isNegative($line->debit) || $this->math->isNegative($line->credit)) {
                 throw new InvalidArgumentException('Posting line debit and credit cannot be negative.');
@@ -142,7 +137,6 @@ final class FinancePostingService implements FinancePostingInterface
     {
         $journal = FinanceJournalEntry::query()->lockForUpdate()->findOrFail($journalId);
         $status = $this->statusOf($journal);
-
         if (in_array($status, [JournalStatus::Posted, JournalStatus::Reversed], true)) {
             return $this->resultFromJournal($journal);
         }
@@ -178,9 +172,7 @@ final class FinancePostingService implements FinancePostingInterface
         return $this->resultFromJournal($reversal);
     }
 
-    /**
-     * @return list<JournalLineData>
-     */
+    /** @return list<JournalLineData> */
     private function journalLines(
         PostingContext $request,
         ?FinancePostingProfile $profile,
@@ -209,15 +201,12 @@ final class FinancePostingService implements FinancePostingInterface
         return hash('sha256', json_encode([
             'tenant_id' => $request->source->tenantId,
             'organization_unit_id' => $request->source->organizationUnitId,
-            'source_module' => $request->source->sourceModule ?: $request->source->sourceType,
             'source_type' => $request->source->sourceType,
             'source_id' => $request->source->sourceId,
         ], JSON_THROW_ON_ERROR));
     }
 
-    /**
-     * @param  list<JournalLineData>  $lines
-     */
+    /** @param list<JournalLineData> $lines */
     private function postingFingerprint(
         PostingContext $request,
         ?FinancePostingProfile $profile,
