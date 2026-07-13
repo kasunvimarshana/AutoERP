@@ -9,6 +9,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use LogicException;
+use Modules\Finance\Enums\FinanceAccountRoleCode;
+use Modules\Finance\Enums\FinancePostingProfileCode;
 use Modules\Invoice\DTOs\CreateInvoiceData;
 use Modules\Invoice\DTOs\InvoiceLineData;
 use Modules\Invoice\DTOs\ManualInvoiceData;
@@ -18,8 +20,10 @@ use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Enums\InvoiceType;
 use Modules\Invoice\Models\Invoice;
 use Modules\Invoice\Services\InvoiceCreationService;
+use Modules\Invoice\Services\InvoicePostingPlanFactory;
 use Modules\Invoice\Services\InvoiceStatusService;
 use Modules\Invoice\Services\ManualInvoiceService;
+use Tests\Support\FinancePostingFixture;
 use Tests\TestCase;
 
 final class ManualInvoiceServiceTest extends TestCase
@@ -89,6 +93,14 @@ final class ManualInvoiceServiceTest extends TestCase
     public function test_requested_posted_status_uses_governed_issuance_transitions(): void
     {
         $tenantId = $this->createTenant();
+        FinancePostingFixture::seedCustomerInvoiceProfiles($tenantId);
+        $postingPlan = app(InvoicePostingPlanFactory::class)->outbound(
+            FinancePostingProfileCode::SalesInvoice,
+            '2026-06-29',
+            FinanceAccountRoleCode::Revenue,
+            '100.000000',
+            description: 'Governed issuance',
+        );
 
         $invoice = $this->withTenantExecutionContext($tenantId, fn () => app(InvoiceCreationService::class)->create(new CreateInvoiceData(
             tenantId: $tenantId,
@@ -102,6 +114,7 @@ final class ManualInvoiceServiceTest extends TestCase
                 quantity: '1.000000',
                 unitPrice: '100.000000',
             )],
+            postingPlan: $postingPlan,
         )));
 
         $this->assertSame(InvoiceStatus::Posted, $invoice->status);
