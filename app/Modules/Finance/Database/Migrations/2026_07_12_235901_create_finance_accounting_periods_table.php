@@ -33,6 +33,10 @@ return new class extends Migration
             $table->timestamps();
 
             $table->unique(
+                ['id', 'tenant_id'],
+                'finance_periods_id_tenant_uq',
+            );
+            $table->unique(
                 ['tenant_id', 'organization_scope_key', 'code'],
                 'finance_periods_scope_code_uq',
             );
