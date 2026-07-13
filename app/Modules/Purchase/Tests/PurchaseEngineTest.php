@@ -1587,6 +1587,7 @@ final class PurchaseEngineTest extends TestCase
     private function purchaseContext(): array
     {
         $tenantId = $this->createTenant();
+        FinancePostingFixture::seedSupplierPaymentProfiles($tenantId);
         $uomId = $this->createUom($tenantId, 'PCS-'.Str::upper(Str::random(4)));
         $supplierId = $this->createSupplier($tenantId, 'SUP-'.Str::upper(Str::random(4)));
         $warehouseId = $this->createWarehouse($tenantId, 'WH-'.Str::upper(Str::random(4)));

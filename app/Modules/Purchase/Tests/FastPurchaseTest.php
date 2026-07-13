@@ -98,7 +98,7 @@ final class FastPurchaseTest extends TestCase
             $invoice = Invoice::query()->firstOrFail();
             $this->assertSame('500.000000', (string) $invoice->balance_due);
             $this->assertSame(1, PurchaseInvoiceLink::query()->where('invoice_id', $invoice->getKey())->count());
-            $this->assertSame(1, FinanceJournalEntry::query()->count());
+            $this->assertSame(2, FinanceJournalEntry::query()->count());
         });
     }
 
@@ -152,7 +152,7 @@ final class FastPurchaseTest extends TestCase
             $this->assertSame('0.000000', (string) Invoice::query()->firstOrFail()->balance_due);
             $this->assertSame(1, PaymentAllocation::query()->count());
             $this->assertSame('500.000000', (string) Payment::query()->firstOrFail()->allocated_amount);
-            $this->assertSame(2, FinanceJournalEntry::query()->count());
+            $this->assertSame(3, FinanceJournalEntry::query()->count());
         });
     }
 
@@ -218,7 +218,7 @@ final class FastPurchaseTest extends TestCase
             $this->assertSame('0.000000', app(DecimalMath::class)->normalize((string) DB::table('purchase_adjustment_allocations')->sum('recognized_at_invoice_amount')));
             $this->assertSame(2, DB::table('invoice_adjustments')->count());
             $this->assertSame(2, PaymentLine::query()->count());
-            $this->assertSame(2, FinanceJournalEntry::query()->count());
+            $this->assertSame(3, FinanceJournalEntry::query()->count());
         });
     }
 
