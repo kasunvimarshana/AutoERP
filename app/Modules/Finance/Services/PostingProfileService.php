@@ -63,12 +63,16 @@ final class PostingProfileService
                 ]);
             }
 
-            $profile->forceFill([
+            $profileAttributes = [
                 'code' => $code,
                 'name' => $name,
                 'description' => $description,
                 'is_active' => $isActive,
-            ])->save();
+            ];
+            if ($profile->exists) {
+                $profileAttributes['row_version'] = ((int) $profile->row_version) + 1;
+            }
+            $profile->forceFill($profileAttributes)->save();
 
             $seen = [];
             foreach ($rules as $rule) {
