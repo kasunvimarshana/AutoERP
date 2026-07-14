@@ -50,10 +50,10 @@ final class StoreVehicleServiceEmployeeRequest extends TenantScopedRequest
             roleType: (string) $this->input('role_type'),
             assignedHours: $this->stringOrNull('assigned_hours') ?? self::DEFAULT_DECIMAL_VALUE,
             rate: $this->stringOrNull('rate') ?? self::DEFAULT_DECIMAL_VALUE,
-            commissionType: $this->has('commission_type')
+            commissionType: $this->filled('commission_type')
                 ? VehicleServiceCommissionType::from((string) $this->input('commission_type'))
                 : null,
-            commissionValue: $this->has('commission_value')
+            commissionValue: $this->filled('commission_value')
                 ? (string) $this->input('commission_value')
                 : null,
             status: $this->stringOrNull('status') ?? self::DEFAULT_STATUS,
