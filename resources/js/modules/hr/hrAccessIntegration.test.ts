@@ -35,16 +35,32 @@ describe('HR frontend access integration', () => {
         ])).toEqual(['Employees', 'Create Employee']);
     });
 
+    it('renders HR master data without granting employee access', () => {
+        expect(visibleHrChildren([hrPermissions.masterDataView])).toEqual([
+            'Departments',
+            'Designations',
+            'Employment Types',
+            'Skills',
+            'Certifications',
+            'Licenses',
+        ]);
+    });
+
     it('hides HR navigation when the tenant plan does not enable HR', () => {
         expect(visibleHrChildren([hrPermissions.employeesView], [])).toEqual([]);
     });
 
     it('protects each HR page with its owning backend permission', () => {
-        expect(resolveTenantRouteEntitlement('/hr/employees')).toMatchObject({
+        const workspace = resolveTenantRouteEntitlement('/hr/employees');
+        expect(workspace).toMatchObject({
             modules: [TENANT_MODULE_CODE.HR],
-            permissions: [hrPermissions.employeesView],
             requiresOrganizationUnit: true,
         });
+        expect(workspace?.permissions).toEqual(expect.arrayContaining([
+            hrPermissions.employeesView,
+            hrPermissions.masterDataView,
+            hrPermissions.masterDataManage,
+        ]));
         expect(resolveTenantRouteEntitlement('/hr/employees/1')).toMatchObject({
             permissions: [hrPermissions.employeesView],
         });
