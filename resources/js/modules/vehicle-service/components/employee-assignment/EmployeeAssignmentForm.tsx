@@ -8,7 +8,14 @@ import { GenericLookupSelect } from '@/shared/components/GenericLookupSelect';
 import { Select } from '@/shared/components/Select';
 import type { LookupLoadParams } from '@/shared/types/lookup';
 import type { CommissionType, VehicleServiceJobLine } from '../../vehicleServiceTypes';
-import type { AssignmentFormValue } from './assignmentForm';
+import {
+    vehicleServiceWorkforceRoles,
+    type VehicleServiceWorkforceRole,
+} from '../../commissionTypes';
+import {
+    applyAssignmentCommissionDefault,
+    type AssignmentFormValue,
+} from './assignmentForm';
 
 export function EmployeeAssignmentForm({ value, mode, lines, error, saving, onSave, onCancel }: {
     value: AssignmentFormValue;
@@ -42,7 +49,7 @@ export function EmployeeAssignmentForm({ value, mode, lines, error, saving, onSa
                 <div>
                     <h3 className="font-semibold text-slate-900">Assignment details</h3>
                     <p className="text-sm text-slate-500">
-                        Select the service line, employee, role, hours, rate, and commission.
+                        Select the service line, employee, role, hours, rate, and commission. Labor-item defaults are applied when the line or role changes and remain editable before saving.
                     </p>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
@@ -54,10 +61,15 @@ export function EmployeeAssignmentForm({ value, mode, lines, error, saving, onSa
                             value: line.id,
                             label: `${line.line_number}. ${line.description}`,
                         }))}
-                        onChange={(event) => set(
-                            'lineId',
-                            event.target.value === '' ? null : Number(event.target.value),
-                        )}
+                        onChange={(event) => {
+                            const lineId = event.target.value === '' ? null : Number(event.target.value);
+                            setDraft((current) => applyAssignmentCommissionDefault(
+                                current,
+                                lines,
+                                lineId,
+                                current.role,
+                            ));
+                        }}
                     />
                     <GenericLookupSelect
                         label="Employee"
@@ -71,12 +83,17 @@ export function EmployeeAssignmentForm({ value, mode, lines, error, saving, onSa
                     <Select
                         label="Role"
                         value={draft.role}
-                        options={['technician', 'helper', 'inspector', 'custom'].map((role) => ({
+                        options={vehicleServiceWorkforceRoles.map((role) => ({
                             value: role,
-                            label: role,
+                            label: role.replaceAll('_', ' '),
                         }))}
                         error={fieldError(error, 'role_type')}
-                        onChange={(event) => set('role', event.target.value)}
+                        onChange={(event) => setDraft((current) => applyAssignmentCommissionDefault(
+                            current,
+                            lines,
+                            current.lineId,
+                            event.target.value as VehicleServiceWorkforceRole,
+                        ))}
                     />
                     <DecimalInput
                         label="Assigned hours"
@@ -106,6 +123,7 @@ export function EmployeeAssignmentForm({ value, mode, lines, error, saving, onSa
                     <DecimalInput
                         label="Commission value"
                         value={draft.commissionValue}
+                        disabled={draft.commissionType === 'none'}
                         error={fieldError(error, 'commission_value')}
                         onChange={(event) => set('commissionValue', event.target.value)}
                     />
