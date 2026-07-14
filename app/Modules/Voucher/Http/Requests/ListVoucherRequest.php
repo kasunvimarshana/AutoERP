@@ -6,6 +6,7 @@ namespace Modules\Voucher\Http\Requests;
 
 use Illuminate\Validation\Rule;
 use Modules\Core\Http\Requests\TenantScopedRequest;
+use Modules\Voucher\Enums\VoucherSourceKind;
 use Modules\Voucher\Enums\VoucherType;
 
 final class ListVoucherRequest extends TenantScopedRequest
@@ -18,7 +19,7 @@ final class ListVoucherRequest extends TenantScopedRequest
             'search' => ['nullable', 'string', 'max:150'],
             'voucher_type' => ['nullable', Rule::enum(VoucherType::class)],
             'source_module' => ['nullable', Rule::in(['Payment', 'Finance'])],
-            'source_kind' => ['nullable', Rule::in(['payment', 'payment_reversal', 'finance_journal'])],
+            'source_kind' => ['nullable', Rule::enum(VoucherSourceKind::class)],
             'payment_method' => ['nullable', 'string', 'max:50'],
             'document_status' => ['nullable', 'string', 'max:50'],
             'allocation_status' => ['nullable', 'string', 'max:50'],
