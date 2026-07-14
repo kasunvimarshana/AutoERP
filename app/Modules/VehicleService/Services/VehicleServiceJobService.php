@@ -176,7 +176,7 @@ final class VehicleServiceJobService
             throw new InvalidArgumentException('Supervisor commission type is required.');
         }
 
-        if ($existing instanceof VehicleServiceJob) {
+        if ($existing instanceof VehicleServiceJob && $existing->supervisor_employee_id !== null) {
             return [
                 'type' => $existing->supervisor_commission_type,
                 'value' => (string) $existing->supervisor_commission_value,
