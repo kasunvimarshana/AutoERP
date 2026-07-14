@@ -29,7 +29,7 @@ export default function PurchasePaymentWorkspacePage() {
         page,
         per_page: 25,
     }, signal), [debounced, page]);
-    const canCreatePayment = hasPurchasePermission(auth.permissions, purchasePermissions.paymentsExecute);
+    const canCreatePayment = hasPurchasePermission(auth, purchasePermissions.paymentsExecute);
 
     const columns: DataColumn<Payment>[] = [
         { key: 'payment', header: 'Payment', render: (row) => <Link className="font-semibold text-sky-700 hover:underline" to={`/payments/${row.id}?from=purchase`}>{row.payment_number ?? 'Payment number unavailable'}</Link> },
