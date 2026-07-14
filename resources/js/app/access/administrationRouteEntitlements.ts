@@ -63,6 +63,10 @@ export const administrationRouteEntitlements: readonly EntitlementRule[] = [
     operational('/customers/:id', ['customer'], [customerPermissions.view]),
     operational('/customers', ['customer'], [customerPermissions.view]),
 
+    operational('/vehicles/makes', ['vehicle'], [vehiclePermissions.update]),
+    operational('/vehicles/types', ['vehicle'], [vehiclePermissions.update]),
+    operational('/vehicles/categories', ['vehicle'], [vehiclePermissions.update]),
+    operational('/vehicles/models', ['vehicle'], [vehiclePermissions.update]),
     operational('/vehicles/create', ['vehicle'], [vehiclePermissions.create]),
     operational('/vehicles/:id/edit', ['vehicle'], [vehiclePermissions.update]),
     operational('/vehicles/:id', ['vehicle'], [vehiclePermissions.view]),
