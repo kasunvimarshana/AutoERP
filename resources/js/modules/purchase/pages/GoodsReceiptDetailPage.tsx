@@ -38,7 +38,7 @@ export default function GoodsReceiptDetailPage() {
     const grn = result.data;
     const capabilities = grn.capabilities ?? {};
     const reverseBlocker = capabilityDetail(capabilities, 'can_reverse');
-    const can = (permission: string) => hasPurchasePermission(auth.permissions, permission);
+    const can = (permission: string) => hasPurchasePermission(auth, permission);
 
     const post = async () => {
         if (!await confirm({
