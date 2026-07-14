@@ -13,8 +13,8 @@ final readonly class VehicleServiceEmployeeAssignmentData
         public string $roleType,
         public string $assignedHours = '0.000000',
         public string $rate = '0.000000',
-        public VehicleServiceCommissionType $commissionType = VehicleServiceCommissionType::None,
-        public string $commissionValue = '0.000000',
+        public ?VehicleServiceCommissionType $commissionType = null,
+        public ?string $commissionValue = null,
         public string $status = 'assigned',
     ) {}
 }
