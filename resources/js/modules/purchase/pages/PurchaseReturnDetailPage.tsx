@@ -41,7 +41,7 @@ export default function PurchaseReturnDetailPage() {
     if (!returnState.data) return <ErrorAlert error={result.error} />;
     const row = returnState.data;
     const capabilities = row.capabilities ?? {};
-    const can = (permission: string) => hasPurchasePermission(auth.permissions, permission);
+    const can = (permission: string) => hasPurchasePermission(auth, permission);
     const run = async (action: 'approve' | 'post' | 'cancel') => {
         if (busy) return;
         if (!await confirm({
