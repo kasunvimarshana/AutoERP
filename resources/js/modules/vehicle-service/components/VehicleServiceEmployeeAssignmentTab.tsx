@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
@@ -28,7 +28,7 @@ export default function VehicleServiceEmployeeAssignmentTab({
 }: {
     jobId: number;
     expectedVersion: number;
-    onChanged?: (nextVersion: number) => void;
+    onChanged: (nextVersion: number) => void;
 }) {
     const result = useApi((signal) => listEmployeeAssignableLines(jobId, signal), [jobId]);
     const [dialog, setDialog] = useState<AssignmentDialogState | null>(null);
@@ -36,20 +36,15 @@ export default function VehicleServiceEmployeeAssignmentTab({
     const [saving, setSaving] = useState(false);
     const [removing, setRemoving] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
-    const [localExpectedVersion, setLocalExpectedVersion] = useState(expectedVersion);
     const assignments = (result.data ?? []).flatMap((line) =>
         (line.employee_assignments ?? []).map((assignment) => ({ ...assignment, line })));
-
-    useEffect(() => {
-        setLocalExpectedVersion(expectedVersion);
-    }, [expectedVersion]);
 
     const saveAssignment = async (value: AssignmentFormValue) => {
         if (!dialog || value.lineId === null || !value.employee || saving) return;
         setSaving(true);
         setError(null);
         try {
-            const payload = { ...assignmentFormToPayload(value), expected_version: localExpectedVersion };
+            const payload = { ...assignmentFormToPayload(value), expected_version: expectedVersion };
             if (dialog.mode === 'edit') {
                 const saved = await updateVehicleServiceEmployee(
                     jobId,
@@ -57,14 +52,13 @@ export default function VehicleServiceEmployeeAssignmentTab({
                     dialog.assignmentId,
                     payload,
                 );
-                result.setData(replaceAssignment(result.data ?? [], value.lineId, saved));
+                result.setData((current) => replaceAssignment(current ?? [], value.lineId!, saved));
             } else {
                 const saved = await createVehicleServiceEmployee(jobId, value.lineId, payload);
-                result.setData(appendAssignment(result.data ?? [], value.lineId, saved));
+                result.setData((current) => appendAssignment(current ?? [], value.lineId!, saved));
             }
             setDialog(null);
-            setLocalExpectedVersion((current) => current + 1);
-            onChanged?.(localExpectedVersion + 1);
+            onChanged(expectedVersion + 1);
         } catch (requestError) {
             setError(toApiError(requestError));
         } finally {
@@ -77,11 +71,10 @@ export default function VehicleServiceEmployeeAssignmentTab({
         setRemoving(true);
         setError(null);
         try {
-            await deleteVehicleServiceEmployee(jobId, row.line.id, row.id, localExpectedVersion);
+            await deleteVehicleServiceEmployee(jobId, row.line.id, row.id, expectedVersion);
             setRemoveTarget(null);
-            result.setData(removeAssignmentFromLines(result.data ?? [], row.line.id, row.id));
-            setLocalExpectedVersion((current) => current + 1);
-            onChanged?.(localExpectedVersion + 1);
+            result.setData((current) => removeAssignmentFromLines(current ?? [], row.line.id, row.id));
+            onChanged(expectedVersion + 1);
         } catch (requestError) {
             setError(toApiError(requestError));
         } finally {
