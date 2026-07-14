@@ -58,10 +58,10 @@ final class StoreVehicleServiceJobRequest extends TenantScopedRequest
             jobNumber: $this->stringOrNull('job_number'),
             expectedDeliveryDate: $this->stringOrNull('expected_delivery_date'),
             supervisorEmployeeId: $this->intOrNull('supervisor_employee_id'),
-            supervisorCommissionType: $this->has('supervisor_commission_type')
+            supervisorCommissionType: $this->filled('supervisor_commission_type')
                 ? VehicleServiceCommissionType::from((string) $this->input('supervisor_commission_type'))
                 : null,
-            supervisorCommissionValue: $this->has('supervisor_commission_value')
+            supervisorCommissionValue: $this->filled('supervisor_commission_value')
                 ? (string) $this->input('supervisor_commission_value')
                 : null,
             odometerReading: $this->stringOrNull('odometer_reading'),
