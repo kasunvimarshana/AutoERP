@@ -14,6 +14,8 @@ export function PurchaseOrderActions({ order, busy, canUpdate = true, onSubmit, 
     onDelete?: () => void;
 }) {
     const { canEdit, canSubmit, canApprove, canCancel, canClose, canDelete, isReadOnly } = purchaseOrderCapabilities(order);
+    const showCancel = canCancel && onCancel !== undefined;
+    const showDelete = canDelete && onDelete !== undefined;
 
     return (
         <div className="flex flex-wrap justify-end gap-2">
@@ -21,10 +23,10 @@ export function PurchaseOrderActions({ order, busy, canUpdate = true, onSubmit, 
             {canSubmit && onSubmit && <Button type="button" variant="secondary" loading={busy} onClick={onSubmit}>Submit</Button>}
             {canApprove && onApprove && <Button type="button" loading={busy} onClick={onApprove}>Approve</Button>}
             {canClose && onClose && <Button type="button" variant="secondary" loading={busy} onClick={onClose}>Close</Button>}
-            {(canCancel || (canDelete && onDelete)) && (
+            {(showCancel || showDelete) && (
                 <ActionMenu>
-                    {canCancel && <Button className="w-full justify-start text-rose-700" type="button" variant="ghost" loading={busy} onClick={onCancel}>Cancel order</Button>}
-                    {canDelete && onDelete && <Button className="w-full justify-start text-rose-700" type="button" variant="ghost" loading={busy} onClick={onDelete}>Delete draft</Button>}
+                    {showCancel && <Button className="w-full justify-start text-rose-700" type="button" variant="ghost" loading={busy} onClick={onCancel}>Cancel order</Button>}
+                    {showDelete && <Button className="w-full justify-start text-rose-700" type="button" variant="ghost" loading={busy} onClick={onDelete}>Delete draft</Button>}
                 </ActionMenu>
             )}
             {isReadOnly && <span className="inline-flex min-h-10 items-center px-2 text-sm text-slate-500">Read-only</span>}
