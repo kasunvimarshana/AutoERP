@@ -18,7 +18,7 @@ import { readableRelation } from '@/shared/utils/object';
 import { listVehicleServiceJobs } from '../vehicleServiceApi';
 import { vehicleServicePermissions } from '../vehicleServicePermissions';
 import type { VehicleServiceJob } from '../vehicleServiceTypes';
-import VehicleServiceCommissionSettingsPanel from './VehicleServiceCommissionSettingsPage';
+import VehicleServiceCommissionSettingsPanel from './VehicleServiceCommissionSettingsPanel';
 import { VehicleServiceStatusBadge } from '../components/VehicleServiceStatusBadge';
 
 const editableStatuses = ['draft', 'inspected', 'in_progress'] as const;
@@ -64,11 +64,7 @@ export default function VehicleServiceJobListPage() {
                 actions={(
                     <div className="flex flex-wrap gap-2">
                         {canViewCommissions && (
-                            <Button
-                                type="button"
-                                variant="secondary"
-                                onClick={() => setShowCommissionDefaults((current) => !current)}
-                            >
+                            <Button type="button" variant="secondary" onClick={() => setShowCommissionDefaults((current) => !current)}>
                                 {showCommissionDefaults ? 'Hide commission defaults' : 'Commission defaults'}
                             </Button>
                         )}
