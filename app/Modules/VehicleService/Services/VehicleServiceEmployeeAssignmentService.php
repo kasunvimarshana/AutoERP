@@ -155,7 +155,7 @@ final class VehicleServiceEmployeeAssignmentService
             throw new InvalidArgumentException('Employee commission type is required.');
         }
 
-        if ($existing instanceof VehicleServiceLineEmployee) {
+        if ($existing instanceof VehicleServiceLineEmployee && $existing->role_type === $role->value) {
             return [
                 'type' => $existing->commission_type,
                 'value' => (string) $existing->commission_value,
