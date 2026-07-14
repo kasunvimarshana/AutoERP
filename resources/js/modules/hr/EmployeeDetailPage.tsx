@@ -1,5 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { hasPermission } from '@/modules/auth/accessControl';
+import { useAuth } from '@/modules/auth/AuthProvider';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button, LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
@@ -9,8 +11,9 @@ import { LoadingState } from '@/shared/components/LoadingState';
 import { Panel } from '@/shared/components/Panel';
 import { Tabs } from '@/shared/components/Tabs';
 import { useOnDemandTab } from '@/shared/hooks/useOnDemandTab';
-import { getEmployee } from './hrApi';
 import { EmployeeSummaryCard } from './components/EmployeeSummaryCard';
+import { getEmployee } from './hrApi';
+import { hrPermissions } from './hrPermissions';
 import type { Employee } from './hrTypes';
 
 const EmployeeContactTab = lazy(() => import('./components/EmployeeContactTab').then((module) => ({ default: module.EmployeeContactTab })));
@@ -39,6 +42,8 @@ const tabs = [
 ] satisfies Array<{ id: Tab; label: string }>;
 
 export default function EmployeeDetailPage() {
+    const auth = useAuth();
+    const canUpdate = hasPermission(auth, hrPermissions.employeesUpdate);
     const id = Number(useParams().id);
     const [employee, setEmployee] = useState<Employee | null>(null);
     const [loading, setLoading] = useState(true);
@@ -74,7 +79,7 @@ export default function EmployeeDetailPage() {
             <ContentHeader
                 title={employee.display_name}
                 description={`${employee.employee_number} / ${employee.designation?.name ?? 'No designation'}`}
-                actions={<LinkButton to={`/hr/employees/${id}/edit`}>Edit</LinkButton>}
+                actions={canUpdate ? <LinkButton to={`/hr/employees/${id}/edit`}>Edit</LinkButton> : undefined}
             />
             <ErrorAlert error={error} />
             <EntityDetailLayout actions={
