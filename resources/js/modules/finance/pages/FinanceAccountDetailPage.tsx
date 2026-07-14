@@ -1,5 +1,8 @@
 import { useParams } from 'react-router-dom';
+import { hasPermission } from '@/modules/auth/accessControl';
+import { useAuth } from '@/modules/auth/AuthProvider';
 import { getAccount, getAccountBalance, listLedgerEntries } from '../financeApi';
+import { financePermissions } from '../financePermissions';
 import { useApi } from '@/shared/hooks/useApi';
 import { useOnDemandTab } from '@/shared/hooks/useOnDemandTab';
 import { ContentHeader } from '@/shared/components/ContentHeader';
@@ -20,6 +23,7 @@ type Tab = 'summary' | 'balance' | 'ledger' | 'children';
 const tabs = [{ id: 'summary' as Tab, label: 'Summary' }, { id: 'balance' as Tab, label: 'Balance' }, { id: 'ledger' as Tab, label: 'Ledger' }, { id: 'children' as Tab, label: 'Child Accounts' }];
 
 export default function FinanceAccountDetailPage() {
+    const auth = useAuth();
     const id = Number(useParams().id);
     const tabState = useOnDemandTab<Tab>('summary');
     const account = useApi((signal) => getAccount(id, signal), [id]);
@@ -36,7 +40,7 @@ export default function FinanceAccountDetailPage() {
 
     return (
         <>
-            <ContentHeader title={`${value.code ?? ''} ${value.name ?? ''}`.trim()} description="Finance account detail" actions={<LinkButton to={`/finance/accounts/${id}/edit`} variant="secondary">Edit account</LinkButton>} />
+            <ContentHeader title={`${value.code ?? ''} ${value.name ?? ''}`.trim()} description="Finance account detail" actions={hasPermission(auth, financePermissions.accountsManage) ? <LinkButton to={`/finance/accounts/${id}/edit`} variant="secondary">Edit account</LinkButton> : undefined} />
             <Panel className="p-0">
                 <Tabs tabs={tabs} active={tabState.activeTab} onChange={tabState.openTab} />
                 <div className="p-5">
