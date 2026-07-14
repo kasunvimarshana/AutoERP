@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { hasPermission } from '@/modules/auth/accessControl';
+import { useAuth } from '@/modules/auth/AuthProvider';
 import { listAccounts, type FinanceAccount } from '../financeApi';
+import { financePermissions } from '../financePermissions';
 import { useApi } from '@/shared/hooks/useApi';
 import { useDebounce } from '@/shared/hooks/useDebounce';
 import { ContentHeader } from '@/shared/components/ContentHeader';
@@ -13,6 +16,9 @@ import { LoadingState } from '@/shared/components/LoadingState';
 import { readableRelation } from '@/shared/utils/object';
 
 export default function FinanceAccountsPage() {
+    const auth = useAuth();
+    const canManage = hasPermission(auth, financePermissions.accountsManage);
+    const canViewReports = hasPermission(auth, financePermissions.reportsView);
     const [search, setSearch] = useState('');
     const [page, setPage] = useState(1);
     const debounced = useDebounce(search);
@@ -24,9 +30,14 @@ export default function FinanceAccountsPage() {
         { key: 'normal', header: 'Normal balance', render: (row) => row.normal_balance ?? '-' },
         { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.is_active ? 'active' : 'inactive'} /> },
     ];
+    const actions = canManage || canViewReports ? <div className="flex gap-3 text-sm font-semibold">
+        {canViewReports && <Link className="text-sky-700 hover:underline" to="/finance/account-balances">Account balances</Link>}
+        {canManage && <Link className="rounded-lg bg-sky-600 px-4 py-2 text-white hover:bg-sky-700" to="/finance/accounts/create">New account</Link>}
+    </div> : undefined;
+
     return (
         <>
-            <ContentHeader title="Chart of accounts" description="Finance accounts with readable type and category resources." actions={<div className="flex gap-3 text-sm font-semibold"><Link className="text-sky-700 hover:underline" to="/finance/account-balances">Account balances</Link><Link className="rounded-lg bg-sky-600 px-4 py-2 text-white hover:bg-sky-700" to="/finance/accounts/create">New account</Link></div>} />
+            <ContentHeader title="Chart of accounts" description="Finance accounts with readable type and category resources." actions={actions} />
             <div className="mb-4 max-w-md"><Input type="search" placeholder="Search account code or name" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} /></div>
             <ErrorAlert error={result.error} />
             {result.loading ? <LoadingState /> : <DataTable rows={result.data?.data ?? []} columns={columns} rowKey={(row) => row.id} />}
