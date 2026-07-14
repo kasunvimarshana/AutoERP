@@ -54,7 +54,7 @@ export default function PurchaseOrderListPage() {
         per_page: 25,
     }, signal), [debounced, status, supplier?.id, dateFrom, dateTo, page]);
 
-    const canCreate = hasPurchasePermission(auth.permissions, purchasePermissions.ordersCreate);
+    const canCreate = hasPurchasePermission(auth, purchasePermissions.ordersCreate);
     const runAction = async (order: PurchaseOrder, action: 'submit' | 'approve' | 'cancel' | 'close') => {
         if (!await confirm({
             title: `${action[0].toUpperCase()}${action.slice(1)} purchase order`,
@@ -95,11 +95,11 @@ export default function PurchaseOrderListPage() {
                 return (
                     <div className="flex flex-wrap gap-2">
                         <LinkButton to={`/purchase/orders/${row.id}`} variant="ghost">View</LinkButton>
-                        {capabilities.canEdit && hasPurchasePermission(auth.permissions, purchasePermissions.ordersUpdate) && <LinkButton to={`/purchase/orders/${row.id}/edit`} variant="secondary">Edit</LinkButton>}
-                        {capabilities.canSubmit && hasPurchasePermission(auth.permissions, purchasePermissions.ordersSubmit) && <Button type="button" variant="secondary" loading={busyId === row.id} onClick={() => runAction(row, 'submit')}>Submit</Button>}
-                        {capabilities.canApprove && hasPurchasePermission(auth.permissions, purchasePermissions.ordersApprove) && <Button type="button" loading={busyId === row.id} onClick={() => runAction(row, 'approve')}>Approve</Button>}
-                        {capabilities.canCancel && hasPurchasePermission(auth.permissions, purchasePermissions.ordersCancel) && <Button type="button" variant="danger" loading={busyId === row.id} onClick={() => runAction(row, 'cancel')}>Cancel</Button>}
-                        {capabilities.canClose && hasPurchasePermission(auth.permissions, purchasePermissions.ordersClose) && <Button type="button" variant="secondary" loading={busyId === row.id} onClick={() => runAction(row, 'close')}>Close</Button>}
+                        {capabilities.canEdit && hasPurchasePermission(auth, purchasePermissions.ordersUpdate) && <LinkButton to={`/purchase/orders/${row.id}/edit`} variant="secondary">Edit</LinkButton>}
+                        {capabilities.canSubmit && hasPurchasePermission(auth, purchasePermissions.ordersSubmit) && <Button type="button" variant="secondary" loading={busyId === row.id} onClick={() => runAction(row, 'submit')}>Submit</Button>}
+                        {capabilities.canApprove && hasPurchasePermission(auth, purchasePermissions.ordersApprove) && <Button type="button" loading={busyId === row.id} onClick={() => runAction(row, 'approve')}>Approve</Button>}
+                        {capabilities.canCancel && hasPurchasePermission(auth, purchasePermissions.ordersCancel) && <Button type="button" variant="danger" loading={busyId === row.id} onClick={() => runAction(row, 'cancel')}>Cancel</Button>}
+                        {capabilities.canClose && hasPurchasePermission(auth, purchasePermissions.ordersClose) && <Button type="button" variant="secondary" loading={busyId === row.id} onClick={() => runAction(row, 'close')}>Close</Button>}
                     </div>
                 );
             },
