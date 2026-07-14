@@ -6,6 +6,8 @@ import { hrRouteEntitlements } from './hrRouteEntitlements';
 import { inventoryRouteEntitlements } from './inventoryRouteEntitlements';
 import { invoiceRouteEntitlements } from './invoiceRouteEntitlements';
 import type { EntitlementRule, TenantRouteEntitlement } from './routeEntitlementPolicy';
+import { uomRouteEntitlements } from './uomRouteEntitlements';
+import { voucherRouteEntitlements } from './voucherRouteEntitlements';
 
 export type { TenantRouteEntitlement } from './routeEntitlementPolicy';
 
@@ -16,6 +18,8 @@ const featureOwnedRules: readonly EntitlementRule[] = [
     ...hrRouteEntitlements,
     ...inventoryRouteEntitlements,
     ...invoiceRouteEntitlements,
+    ...uomRouteEntitlements,
+    ...voucherRouteEntitlements,
 ];
 
 export function resolveTenantRouteEntitlement(pathname: string): TenantRouteEntitlement | null {
