@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useAuth } from '@/modules/auth/AuthProvider';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { ActionMenu } from '@/shared/components/ActionMenu';
 import { Button, LinkButton } from '@/shared/components/Button';
@@ -24,12 +25,17 @@ import { lookupApi } from '@/shared/api/lookupApi';
 import type { NamedResource } from '@/shared/types/common';
 import type { VehicleCategory, VehicleMake, VehicleModel, VehicleType } from './vehicleTypes';
 import { notifySuccess } from '@/shared/notifications/appToast';
+import { hasVehiclePermission, vehiclePermissions } from './vehiclePermissions';
 
 const statuses = ['', 'active', 'inactive', 'under_service', 'rented', 'reserved', 'sold', 'blocked', 'scrapped'];
 const currentOwnerName = (row: VehicleSummary, ownerType = 'customer') =>
     (ownerType === 'customer' ? row.current_customer?.name : row.current_supplier?.name) ?? '-';
 
 export default function VehicleListPage() {
+    const auth = useAuth();
+    const canCreate = hasVehiclePermission(auth, vehiclePermissions.create);
+    const canUpdate = hasVehiclePermission(auth, vehiclePermissions.update);
+    const canChangeStatus = hasVehiclePermission(auth, vehiclePermissions.changeStatus);
     const [searchParams] = useSearchParams();
     const ownership = searchParams.get('ownership');
     const title = ownership === 'supplier' ? 'Supplier Vehicles' : ownership === 'customer' ? 'Customer Vehicles' : 'Vehicles';
@@ -86,6 +92,7 @@ export default function VehicleListPage() {
     }, [category, customer, debouncedSearch, make, model, ownership, page, status, type]);
 
     const refreshStatus = (vehicle: VehicleSummary, active: boolean) => {
+        if (!canChangeStatus) return;
         setVehicleActive(vehicle.id, active)
             .then((updated) => {
                 setRows((current) => updateVehicleRows(current, updated, status));
@@ -96,7 +103,7 @@ export default function VehicleListPage() {
 
     return (
         <div>
-            <ContentHeader title={title} description={description} actions={<LinkButton to="/vehicles/create">New vehicle</LinkButton>} />
+            <ContentHeader title={title} description={description} actions={canCreate ? <LinkButton to="/vehicles/create">New vehicle</LinkButton> : undefined} />
             <div className="mb-4 grid gap-3 md:grid-cols-3 xl:grid-cols-6">
                 <Input label="Search" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="Number, registration, chassis, engine, VIN" />
                 <Select label="Status" value={status} options={statuses.filter(Boolean).map((value) => ({ value, label: value.replaceAll('_', ' ') }))} onChange={(event) => { setStatus(event.target.value); setPage(1); }} />
@@ -134,14 +141,10 @@ export default function VehicleListPage() {
                             { key: 'type', header: 'Type', render: (row) => row.type?.name ?? '-' },
                             { key: 'customer', header: 'Current Customer', render: (row) => currentOwnerName(row) },
                             { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.status} /> },
-                            { key: 'actions', header: '', render: (row) => <div className="flex justify-end gap-2">
-                                <LinkButton to={`/vehicles/${row.id}/edit${detailQuery}`} variant="secondary">Edit</LinkButton>
-                                <ActionMenu>
-                                    <Button className="w-full justify-start" variant="ghost" onClick={() => refreshStatus(row, row.status !== 'active')}>
-                                        {row.status === 'active' ? 'Deactivate' : 'Activate'}
-                                    </Button>
-                                </ActionMenu>
-                            </div> },
+                            ...((canUpdate || canChangeStatus) ? [{ key: 'actions', header: '', render: (row: VehicleSummary) => <div className="flex justify-end gap-2">
+                                {canUpdate && <LinkButton to={`/vehicles/${row.id}/edit${detailQuery}`} variant="secondary">Edit</LinkButton>}
+                                {canChangeStatus && <ActionMenu><Button className="w-full justify-start" variant="ghost" onClick={() => refreshStatus(row, row.status !== 'active')}>{row.status === 'active' ? 'Deactivate' : 'Activate'}</Button></ActionMenu>}
+                            </div> }] : []),
                         ]}
                     />
                     <Pagination meta={meta} onPageChange={setPage} />
@@ -155,13 +158,8 @@ function updateVehicleRows(rows: VehicleSummary[], updated: VehicleSummary, stat
     const matchesFilter = statusFilter === '' || updated.status === statusFilter;
     const currentIndex = rows.findIndex((row) => row.id === updated.id);
 
-    if (currentIndex === -1) {
-        return rows;
-    }
-
-    if (!matchesFilter) {
-        return rows.filter((row) => row.id !== updated.id);
-    }
+    if (currentIndex === -1) return rows;
+    if (!matchesFilter) return rows.filter((row) => row.id !== updated.id);
 
     return rows.map((row) => row.id === updated.id ? updated : row);
 }
