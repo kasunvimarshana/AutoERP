@@ -70,12 +70,16 @@ export default function PurchaseReturnListPage() {
         { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.status} /> },
         { key: 'actions', header: 'Actions', render: (row) => {
             const capabilities = row.capabilities ?? {};
-            return <div className="flex gap-2"><LinkButton to={`/purchase/returns/${row.id}`} variant="ghost">View</LinkButton>{capabilities.can_approve && hasPurchasePermission(auth.permissions, purchasePermissions.returnsApprove) && <Button type="button" variant="secondary" loading={isBusy(row, 'approve')} disabled={busyAction !== null} onClick={() => void run(row, 'approve')}>Approve</Button>}{capabilities.can_post && hasPurchasePermission(auth.permissions, purchasePermissions.returnsPost) && <Button type="button" variant="secondary" loading={isBusy(row, 'post')} disabled={busyAction !== null} onClick={() => void run(row, 'post')}>Post</Button>}{capabilities.can_cancel && hasPurchasePermission(auth.permissions, purchasePermissions.returnsCancel) && <Button type="button" variant="ghost" loading={isBusy(row, 'cancel')} disabled={busyAction !== null} onClick={() => void run(row, 'cancel')}>Cancel</Button>}</div>;
+            return <div className="flex gap-2"><LinkButton to={`/purchase/returns/${row.id}`} variant="ghost">View</LinkButton>{capabilities.can_approve && hasPurchasePermission(auth, purchasePermissions.returnsApprove) && <Button type="button" variant="secondary" loading={isBusy(row, 'approve')} disabled={busyAction !== null} onClick={() => void run(row, 'approve')}>Approve</Button>}{capabilities.can_post && hasPurchasePermission(auth, purchasePermissions.returnsPost) && <Button type="button" variant="secondary" loading={isBusy(row, 'post')} disabled={busyAction !== null} onClick={() => void run(row, 'post')}>Post</Button>}{capabilities.can_cancel && hasPurchasePermission(auth, purchasePermissions.returnsCancel) && <Button type="button" variant="ghost" loading={isBusy(row, 'cancel')} disabled={busyAction !== null} onClick={() => void run(row, 'cancel')}>Cancel</Button>}</div>;
         } },
     ];
+    const canCreate = hasPurchasePermission(auth, purchasePermissions.returnsCreate);
+    const canCreateManual = hasPurchasePermission(auth, purchasePermissions.returnsCreateManual);
+    const actions = canCreate || canCreateManual ? <>{canCreate && <LinkButton to="/purchase/returns/create">Create Purchase Return</LinkButton>}{canCreateManual && <LinkButton to="/purchase/manual-supplier-returns/create" variant="secondary">Manual Return</LinkButton>}</> : undefined;
+
     return (
         <div className="space-y-5">
-            <ContentHeader title="Purchase Returns" actions={<>{hasPurchasePermission(auth.permissions, purchasePermissions.returnsCreate) && <LinkButton to="/purchase/returns/create">Create Purchase Return</LinkButton>}{hasPurchasePermission(auth.permissions, purchasePermissions.returnsCreateManual) && <LinkButton to="/purchase/manual-supplier-returns/create" variant="secondary">Manual Return</LinkButton>}</>} />
+            <ContentHeader title="Purchase Returns" actions={actions} />
             <ErrorAlert error={result.error ?? actionError} />
             <div className="grid gap-3 md:grid-cols-3">
                 <Input label="Search" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} />
