@@ -1,3 +1,5 @@
+import { hasPermission, type AccessSubject } from '@/modules/auth/accessControl';
+
 export const purchasePermissions = {
     ordersView: 'purchase.orders.view',
     ordersCreate: 'purchase.orders.create',
@@ -31,6 +33,6 @@ export const purchasePermissions = {
     fastPurchasesLookups: 'purchase.fast_purchases.lookups',
 } as const;
 
-export function hasPurchasePermission(permissions: string[], permission: string): boolean {
-    return permissions.includes(permission);
+export function hasPurchasePermission(subject: AccessSubject, permission: string): boolean {
+    return hasPermission(subject, permission);
 }
