@@ -2,6 +2,7 @@ import { matchPath } from 'react-router-dom';
 import { administrationRouteEntitlements } from './administrationRouteEntitlements';
 import { commerceRouteEntitlements } from './commerceRouteEntitlements';
 import { financeRouteEntitlements } from './financeRouteEntitlements';
+import { hrRouteEntitlements } from './hrRouteEntitlements';
 import { inventoryRouteEntitlements } from './inventoryRouteEntitlements';
 import { invoiceRouteEntitlements } from './invoiceRouteEntitlements';
 import type { EntitlementRule, TenantRouteEntitlement } from './routeEntitlementPolicy';
@@ -12,6 +13,7 @@ const featureOwnedRules: readonly EntitlementRule[] = [
     ...administrationRouteEntitlements,
     ...commerceRouteEntitlements,
     ...financeRouteEntitlements,
+    ...hrRouteEntitlements,
     ...inventoryRouteEntitlements,
     ...invoiceRouteEntitlements,
 ];
