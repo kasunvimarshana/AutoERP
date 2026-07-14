@@ -21,10 +21,6 @@ const tenantWorkspacePermissions = [
 
 export const administrationRouteEntitlements: readonly EntitlementRule[] = [
     rule(DASHBOARD_PATH),
-    operational('/uoms/*'),
-    operational('/uom-conversions/*'),
-    operational('/uom-convert'),
-    operational('/vouchers/*'),
 
     operational('/access/users/create', undefined, [accessPermissions.usersCreate]),
     operational('/access/users/:id/edit', undefined, [
@@ -86,5 +82,4 @@ export const administrationRouteEntitlements: readonly EntitlementRule[] = [
     operational('/warehouses/:id/edit', ['warehouse'], [warehousePermissions.warehousesUpdate]),
     operational('/warehouses/:id', ['warehouse'], [warehousePermissions.warehousesView]),
     operational('/warehouses', ['warehouse'], [warehousePermissions.warehousesView]),
-    operational('/inventory/*', ['inventory']),
 ];
