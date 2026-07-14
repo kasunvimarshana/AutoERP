@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { useConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { useApi } from '@/shared/hooks/useApi';
@@ -25,17 +25,9 @@ export function useItemRelationCrud<T extends { id: number }, P>({
     const [actionError, setActionError] = useState<ApiError | null>(null);
     const { confirm, confirmDialog } = useConfirmDialog();
     const result = useApi((signal) => list(itemId, page, signal), [itemId, page]);
-    const [collection, setCollection] = useState<ApiCollection<T> | null>(result.data);
-
-    useEffect(() => {
-        if (result.data !== null) {
-            setCollection(result.data);
-        }
-    }, [result.data]);
 
     return {
         ...result,
-        data: collection,
         page,
         setPage,
         editing,
@@ -65,7 +57,7 @@ export function useItemRelationCrud<T extends { id: number }, P>({
                     : await create(itemId, payload);
                 setOpen(false);
                 setEditing(null);
-                setCollection((current) => upsertRelationCollection(current, saved, !editing && page === 1));
+                result.setData((current) => upsertRelationCollection(current, saved, !editing && page === 1));
                 notifySuccess(editing ? 'Record updated successfully.' : 'Record created successfully.');
             } catch (error) {
                 setActionError(toApiError(error));
@@ -80,7 +72,7 @@ export function useItemRelationCrud<T extends { id: number }, P>({
             setActionError(null);
             try {
                 await remove(itemId, row.id);
-                setCollection((current) => removeRelationFromCollection(current, row.id));
+                result.setData((current) => removeRelationFromCollection(current, row.id));
                 notifySuccess('Record deleted successfully.');
             } catch (error) {
                 setActionError(toApiError(error));
