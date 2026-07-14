@@ -1,3 +1,5 @@
+import { hasPermission, type AccessSubject } from '@/modules/auth/accessControl';
+
 export const paymentPermissions = {
     view: 'payments.view',
     create: 'payments.create',
@@ -22,6 +24,6 @@ export const paymentPermissions = {
     chequesPrint: 'cheques.print',
 } as const;
 
-export function hasPaymentPermission(permissions: string[], permission: string): boolean {
-    return permissions.includes(permission);
+export function hasPaymentPermission(subject: AccessSubject, permission: string): boolean {
+    return hasPermission(subject, permission);
 }
