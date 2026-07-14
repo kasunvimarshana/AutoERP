@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { hasPermission } from '@/modules/auth/accessControl';
+import { useAuth } from '@/modules/auth/AuthProvider';
 import { ApiError } from '@/shared/api/apiError';
 import { LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
@@ -10,6 +12,7 @@ import { Panel } from '@/shared/components/Panel';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { Tabs } from '@/shared/components/Tabs';
 import { getUom, listUomConversions } from './uomApi';
+import { uomPermissions } from './uomPermissions';
 import type { UnitOfMeasure, UomConversion } from './uomTypes';
 
 type Tab = 'summary' | 'from' | 'to';
@@ -20,6 +23,7 @@ const tabs = [
 ];
 
 export default function UomDetailPage() {
+    const auth = useAuth();
     const { id } = useParams();
     const uomId = Number(id);
     const [uom, setUom] = useState<UnitOfMeasure | null>(null);
@@ -41,7 +45,7 @@ export default function UomDetailPage() {
 
     return (
         <>
-            <ContentHeader title={`${uom.code} - ${uom.name}`} description="Generic unit of measure detail." actions={<LinkButton to={`/uoms/${uom.id}/edit`}>Edit</LinkButton>} />
+            <ContentHeader title={`${uom.code} - ${uom.name}`} description="Generic unit of measure detail." actions={hasPermission(auth, uomPermissions.update) ? <LinkButton to={`/uoms/${uom.id}/edit`}>Edit</LinkButton> : undefined} />
             <Panel className="p-0">
                 <Tabs tabs={tabs} active={activeTab} onChange={setActiveTab} />
                 <div className="p-5">
