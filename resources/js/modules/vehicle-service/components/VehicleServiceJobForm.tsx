@@ -198,13 +198,22 @@ export function VehicleServiceJobForm({ job, defaultSupervisorCommission = null 
                             { value: 'high', label: 'High' },
                             { value: 'urgent', label: 'Urgent' },
                         ]} onChange={(event) => updateForm({ ...form, priority: event.target.value })} />
-                        <Select label="Supervisor commission" value={form.supervisor_commission_type} options={[
-                            { value: 'none', label: 'None' },
-                            { value: 'fixed', label: 'Fixed' },
-                            { value: 'percentage', label: 'Percentage of whole job' },
-                        ]} onChange={(event) => updateForm({ ...form, supervisor_commission_type: event.target.value as CommissionType })} />
-                        <DecimalInput label="Commission value" value={form.supervisor_commission_value} error={errorFor('supervisor_commission_value')} onChange={(event) => updateForm({ ...form, supervisor_commission_value: event.target.value })} />
+                        {job && (
+                            <>
+                                <Select label="Supervisor commission" value={form.supervisor_commission_type} options={[
+                                    { value: 'none', label: 'None' },
+                                    { value: 'fixed', label: 'Fixed' },
+                                    { value: 'percentage', label: 'Percentage of whole job' },
+                                ]} onChange={(event) => updateForm({ ...form, supervisor_commission_type: event.target.value as CommissionType })} />
+                                <DecimalInput label="Commission value" value={form.supervisor_commission_value} error={errorFor('supervisor_commission_value')} onChange={(event) => updateForm({ ...form, supervisor_commission_value: event.target.value })} />
+                            </>
+                        )}
                     </div>
+                    {!job && (
+                        <div className="mt-4 rounded-lg border border-sky-100 bg-sky-50 px-4 py-3 text-sm text-sky-900">
+                            The active organization supervisor commission default is applied by the server when this Job Card is saved. The stored job snapshot can be reviewed or explicitly overridden from Edit Job afterward.
+                        </div>
+                    )}
                     {vehicle && (
                         <div className="mt-4 grid gap-3 rounded-lg border border-sky-100 bg-sky-50 p-4 text-sm sm:grid-cols-2 xl:grid-cols-5">
                             <VehicleContext label="Registration" value={vehicle.registration_number ?? vehicle.name} />
