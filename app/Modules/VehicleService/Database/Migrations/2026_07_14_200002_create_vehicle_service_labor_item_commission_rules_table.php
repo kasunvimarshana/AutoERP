@@ -27,6 +27,10 @@ return new class extends Migration
             $table->timestamps();
 
             $table->unique(
+                ['id', 'tenant_id'],
+                'vs_labor_commission_id_tenant_uk',
+            );
+            $table->unique(
                 ['tenant_id', 'organization_unit_id', 'item_id', 'role_type'],
                 'vs_labor_commission_scope_item_role_uk',
             );
