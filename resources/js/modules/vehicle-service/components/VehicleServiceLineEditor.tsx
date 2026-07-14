@@ -25,6 +25,8 @@ import {
 import { SummaryValue } from './line-editor/LineSummary';
 import { VehicleServiceLineForm } from './line-editor/VehicleServiceLineForm';
 
+const TOAST_DURATION_MS = 2500;
+
 export default function VehicleServiceLineEditor({
     jobId,
     expectedVersion,
@@ -32,7 +34,7 @@ export default function VehicleServiceLineEditor({
 }: {
     jobId: number;
     expectedVersion: number;
-    onChanged?: (lines: VehicleServiceJobLine[], nextVersion: number) => void;
+    onChanged: (lines: VehicleServiceJobLine[], nextVersion: number) => void;
 }) {
     const result = useApi((signal) => listVehicleServiceLines(jobId, signal), [jobId], true, false);
     const [dialog, setDialog] = useState<LineDialog | null>(null);
@@ -41,40 +43,34 @@ export default function VehicleServiceLineEditor({
     const [removing, setRemoving] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
     const [toast, setToast] = useState('');
-    const [localExpectedVersion, setLocalExpectedVersion] = useState(expectedVersion);
 
     useEffect(() => {
         if (toast === '') return;
 
-        const timeout = window.setTimeout(() => setToast(''), 2500);
+        const timeout = window.setTimeout(() => setToast(''), TOAST_DURATION_MS);
         return () => window.clearTimeout(timeout);
     }, [toast]);
-
-    useEffect(() => {
-        setLocalExpectedVersion(expectedVersion);
-    }, [expectedVersion]);
 
     const saveLine = async (value: VehicleServiceLineFormValue) => {
         if (!dialog || saving) return;
         setSaving(true);
         setError(null);
         try {
-            const payload = { ...lineFormToPayload(value), expected_version: localExpectedVersion };
+            const payload = { ...lineFormToPayload(value), expected_version: expectedVersion };
             if (dialog.mode === 'edit') {
                 const saved = await updateVehicleServiceLine(jobId, dialog.lineId, payload);
                 const nextLines = replaceLine(result.data ?? [], saved);
                 result.setData(nextLines);
                 setToast('Job line updated.');
-                onChanged?.(nextLines, localExpectedVersion + 1);
+                onChanged(nextLines, expectedVersion + 1);
             } else {
                 const saved = await createVehicleServiceLine(jobId, payload);
                 const nextLines = appendLine(result.data ?? [], saved);
                 result.setData(nextLines);
                 setToast('Job line added.');
-                onChanged?.(nextLines, localExpectedVersion + 1);
+                onChanged(nextLines, expectedVersion + 1);
             }
             setDialog(null);
-            setLocalExpectedVersion((current) => current + 1);
         } catch (requestError) {
             setError(toApiError(requestError));
         } finally {
@@ -87,13 +83,12 @@ export default function VehicleServiceLineEditor({
         setRemoving(true);
         setError(null);
         try {
-            await deleteVehicleServiceLine(jobId, line.id, localExpectedVersion);
+            await deleteVehicleServiceLine(jobId, line.id, expectedVersion);
             const nextLines = removeLineFromList(result.data ?? [], line.id);
             result.setData(nextLines);
             setToast('Job line removed.');
             setRemoveTarget(null);
-            onChanged?.(nextLines, localExpectedVersion + 1);
-            setLocalExpectedVersion((current) => current + 1);
+            onChanged(nextLines, expectedVersion + 1);
         } catch (requestError) {
             setError(toApiError(requestError));
         } finally {
