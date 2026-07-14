@@ -18,11 +18,9 @@ export const getVehicleServiceJob = (id: number, signal?: AbortSignal) =>
         .then((response) => response.data.data);
 
 export const createVehicleServiceJob = (payload: VehicleServiceJobPayload) => {
-    const {
-        supervisor_commission_type: _supervisorCommissionType,
-        supervisor_commission_value: _supervisorCommissionValue,
-        ...createPayload
-    } = payload;
+    const createPayload = { ...payload };
+    delete createPayload.supervisor_commission_type;
+    delete createPayload.supervisor_commission_value;
 
     return apiClient.post<ApiResource<VehicleServiceJob>>(jobs, createPayload)
         .then((response) => response.data.data);
