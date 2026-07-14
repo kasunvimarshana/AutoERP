@@ -11,6 +11,7 @@ use Modules\Payment\Constants\PaymentPermission;
 use Modules\Tenant\Services\TenantEntitlementService;
 use Modules\Voucher\DTOs\VoucherAccessScope;
 use Modules\Voucher\Enums\VoucherSourceKind;
+use Modules\Voucher\Enums\VoucherSourceModule;
 use Modules\Voucher\Enums\VoucherType;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
@@ -54,6 +55,33 @@ final class VoucherAccessPolicy
                 return $scope->any();
             },
         ));
+    }
+
+    /**
+     * @param array<string, mixed> $filters
+     * @return array<string, mixed>
+     */
+    public function constrainListFilters(array $filters, VoucherAccessScope $scope): array
+    {
+        $this->assertAny($scope);
+        $requested = isset($filters['source_module'])
+            ? VoucherSourceModule::tryFrom((string) $filters['source_module'])
+            : null;
+
+        if ($requested === VoucherSourceModule::Payment && ! $scope->payments) {
+            throw new AccessDeniedHttpException('You do not have permission to view payment vouchers.');
+        }
+        if ($requested === VoucherSourceModule::Finance && ! $scope->finance) {
+            throw new AccessDeniedHttpException('You do not have permission to view Finance vouchers.');
+        }
+
+        if ($scope->payments && ! $scope->finance) {
+            $filters['source_module'] = VoucherSourceModule::Payment->value;
+        } elseif ($scope->finance && ! $scope->payments) {
+            $filters['source_module'] = VoucherSourceModule::Finance->value;
+        }
+
+        return $filters;
     }
 
     public function authorizedSourceKind(
