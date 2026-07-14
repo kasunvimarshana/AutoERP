@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { ActionMenu } from '@/shared/components/ActionMenu';
@@ -16,12 +16,11 @@ import { useApi } from '@/shared/hooks/useApi';
 import { useOnDemandTab } from '@/shared/hooks/useOnDemandTab';
 import { formatDate } from '@/shared/utils/formatDate';
 import { readableRelation } from '@/shared/utils/object';
-import { compareDecimalStrings } from '@/shared/utils/decimal';
+import { compareDecimalStrings, multiplyDecimal, sumDecimals } from '@/shared/utils/decimal';
 import { VehicleServiceSummaryPanel } from '../components/VehicleServiceSummaryPanel';
 import { VehicleServiceStatusBadge } from '../components/VehicleServiceStatusBadge';
 import type { VehicleServiceInspection, VehicleServiceJob, VehicleServiceJobLine, VehicleServiceJobStatus } from '../vehicleServiceTypes';
 import { cancelVehicleServiceJob, completeVehicleServiceJob, deleteVehicleServiceJob, getVehicleServiceJob, inspectVehicleServiceJob, startVehicleServiceJob } from '../vehicleServiceApi';
-import { multiplyDecimal, sumDecimals } from '@/shared/utils/decimal';
 
 const InspectionTab = lazy(() => import('../components/VehicleServiceInspectionTab'));
 const LinesTab = lazy(() => import('../components/VehicleServiceLineEditor'));
@@ -38,17 +37,12 @@ export default function VehicleServiceJobDetailPage() {
     const id = Number(useParams().id);
     const navigate = useNavigate();
     const result = useApi((signal) => getVehicleServiceJob(id, signal), [id], true, false);
+    const job = result.data;
+    const setJob = result.setData;
     const tabs = useOnDemandTab<Tab>('summary');
     const [busy, setBusy] = useState(false);
     const [actionError, setActionError] = useState<ApiError | null>(null);
-    const [job, setJob] = useState<VehicleServiceJob | null>(result.data);
     const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
-
-    useEffect(() => {
-        if (result.data !== null) {
-            setJob(result.data);
-        }
-    }, [result.data]);
 
     const bumpHistory = useCallback(() => {
         setHistoryRefreshKey((current) => current + 1);
@@ -58,11 +52,11 @@ export default function VehicleServiceJobDetailPage() {
         const fresh = await getVehicleServiceJob(id);
         setJob(fresh);
         return fresh;
-    }, [id]);
+    }, [id, setJob]);
 
     const updateJobVersion = useCallback((nextVersion: number) => {
         setJob((current) => current ? { ...current, row_version: nextVersion } : current);
-    }, []);
+    }, [setJob]);
 
     const handleInspectionSaved = useCallback((inspection: VehicleServiceInspection, nextVersion: number) => {
         setJob((current) => current ? {
@@ -70,11 +64,11 @@ export default function VehicleServiceJobDetailPage() {
             inspection,
             row_version: nextVersion,
         } : current);
-    }, []);
+    }, [setJob]);
 
     const handleLinesChanged = useCallback((lines: VehicleServiceJobLine[], nextVersion: number) => {
         setJob((current) => current ? withJobLines(current, lines, nextVersion) : current);
-    }, []);
+    }, [setJob]);
 
     if (result.loading && job === null) return <LoadingState />;
     if (!job) return <ErrorAlert error={result.error} />;
