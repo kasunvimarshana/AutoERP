@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace Modules\Voucher\Services;
 
 use Modules\Core\Contracts\PermissionCheckerInterface;
+use Modules\Core\Contracts\TenantEntitlementReaderInterface;
 use Modules\Core\Tenancy\TenantFeature;
 use Modules\Finance\Constants\FinancePermission;
 use Modules\Payment\Constants\PaymentPermission;
-use Modules\Tenant\Services\TenantEntitlementService;
 use Modules\Voucher\DTOs\VoucherAccessScope;
 use Modules\Voucher\Enums\VoucherSourceKind;
 use Modules\Voucher\Enums\VoucherSourceModule;
@@ -19,7 +19,7 @@ final class VoucherAccessPolicy
 {
     public function __construct(
         private readonly PermissionCheckerInterface $permissions,
-        private readonly TenantEntitlementService $entitlements,
+        private readonly TenantEntitlementReaderInterface $entitlements,
     ) {}
 
     public function scopeFor(int $userId, int $tenantId): VoucherAccessScope
