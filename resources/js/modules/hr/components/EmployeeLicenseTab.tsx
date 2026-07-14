@@ -27,7 +27,7 @@ function licenseDraft(row: EmployeeLicenseAssignment): EmployeeLicensePayload {
     };
 }
 
-export function EmployeeLicenseTab({ employeeId }: { employeeId: number }) {
+export function EmployeeLicenseTab({ employeeId, canManage }: { employeeId: number; canManage: boolean }) {
     const crud = useEmployeeRelationCrud(employeeId, licenseApi);
     const [master, setMaster] = useState<HrLicense | null>(null);
     const [draft, setDraft] = useState<EmployeeLicensePayload>(emptyLicense);
@@ -53,6 +53,7 @@ export function EmployeeLicenseTab({ employeeId }: { employeeId: number }) {
             editing={crud.editing}
             submitting={crud.submitting}
             actionError={crud.actionError}
+            canManage={canManage}
             onCreate={startCreate}
             onEdit={startEdit}
             onDelete={crud.destroy}
