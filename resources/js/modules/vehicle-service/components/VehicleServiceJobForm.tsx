@@ -14,12 +14,14 @@ import type { NamedResource } from '@/shared/types/common';
 import type { LookupLoadParams } from '@/shared/types/lookup';
 import { useMutationFormGuard } from '@/shared/hooks/useMutationFormGuard';
 import { businessDateInputValue } from '@/shared/utils/businessDate';
+import type { VehicleServiceSupervisorCommissionPolicy } from '../commissionTypes';
 import { createVehicleServiceJob, updateVehicleServiceJob } from '../vehicleServiceApi';
 import type { CommissionType, VehicleServiceJob, VehicleServiceJobPayload } from '../vehicleServiceTypes';
 import { VehicleServiceQuickVehicleModal } from './VehicleServiceQuickVehicleModal';
 
+const ZERO_AMOUNT = '0.000000';
 const today = businessDateInputValue;
-const decimal = (value: string, fallback = '0.000000') => value.trim() || fallback;
+const decimal = (value: string, fallback = ZERO_AMOUNT) => value.trim() || fallback;
 const customerLabel = (customer: NamedResource | null) => customer ? `${customer.code ?? ''} ${customer.name}`.trim() : '';
 const vehicleCustomer = (selectedVehicle: VehicleLookupResource | null, fallback: NamedResource | null): NamedResource | null => {
     if (selectedVehicle?.current_customer) {
@@ -35,7 +37,10 @@ const vehicleCustomer = (selectedVehicle: VehicleLookupResource | null, fallback
 const currentCustomerOwner = (vehicle: VehicleLookupResource | null, fallback: NamedResource | null) =>
     vehicle?.current_customer?.name ?? fallback?.name ?? '-';
 
-export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
+export function VehicleServiceJobForm({ job, defaultSupervisorCommission = null }: {
+    job?: VehicleServiceJob;
+    defaultSupervisorCommission?: VehicleServiceSupervisorCommissionPolicy | null;
+}) {
     const navigate = useNavigate();
     const [customer, setCustomer] = useState<NamedResource | null>(vehicleCustomer(job?.vehicle ?? null, job?.customer ?? null));
     const [billToCustomer, setBillToCustomer] = useState<NamedResource | null>(job?.bill_to_customer ?? vehicleCustomer(job?.vehicle ?? null, job?.customer ?? null));
@@ -43,11 +48,17 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
     const [supervisor, setSupervisor] = useState<NamedResource | null>(job?.supervisor ?? null);
     const [quickVehicleNumber, setQuickVehicleNumber] = useState('');
     const [quickVehicleModalOpen, setQuickVehicleModalOpen] = useState(false);
+    const defaultCommissionType = defaultSupervisorCommission?.is_active
+        ? defaultSupervisorCommission.commission_type
+        : 'none';
+    const defaultCommissionValue = defaultSupervisorCommission?.is_active
+        ? defaultSupervisorCommission.commission_value
+        : ZERO_AMOUNT;
     const [form, setForm] = useState({
         job_date: job?.job_date ?? today(),
         expected_delivery_date: job?.expected_delivery_date ?? '',
-        supervisor_commission_type: job?.supervisor_commission_type ?? 'none' as CommissionType,
-        supervisor_commission_value: job?.supervisor_commission_value ?? '0.000000',
+        supervisor_commission_type: job?.supervisor_commission_type ?? defaultCommissionType as CommissionType,
+        supervisor_commission_value: job?.supervisor_commission_value ?? defaultCommissionValue,
         odometer_reading: job?.odometer_reading ?? '',
         fuel_level: job?.fuel_level ?? '',
         priority: job?.priority ?? 'normal',
@@ -190,7 +201,7 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
                         <Select label="Supervisor commission" value={form.supervisor_commission_type} options={[
                             { value: 'none', label: 'None' },
                             { value: 'fixed', label: 'Fixed' },
-                            { value: 'percentage', label: 'Percentage' },
+                            { value: 'percentage', label: 'Percentage of whole job' },
                         ]} onChange={(event) => updateForm({ ...form, supervisor_commission_type: event.target.value as CommissionType })} />
                         <DecimalInput label="Commission value" value={form.supervisor_commission_value} error={errorFor('supervisor_commission_value')} onChange={(event) => updateForm({ ...form, supervisor_commission_value: event.target.value })} />
                     </div>
