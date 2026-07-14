@@ -4,6 +4,7 @@ import type { NavigationAccessRule, NavigationModuleItem } from './navigationTyp
 
 const HR_MODULES = [TENANT_MODULE_CODE.HR] as const;
 const HR_NAVIGATION_PERMISSIONS = Object.values(hrPermissions);
+const HR_EMPLOYEE_LIST_PATH = '/hr/employees?view=employees';
 
 function hrAccess(permissions: readonly string[]): NavigationAccessRule {
     return {
@@ -25,7 +26,7 @@ export const hrNavigationItem = {
             id: 'hr-employees',
             type: 'link',
             label: 'Employees',
-            to: '/hr/employees',
+            to: HR_EMPLOYEE_LIST_PATH,
             match: ['/hr/employees'],
             exclude: ['/hr/employees/create'],
             access: hrAccess([hrPermissions.employeesView]),
