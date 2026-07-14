@@ -97,9 +97,9 @@ export default function EmployeeDetailPage() {
                             {tab.openedTabs.has('contacts') && <div hidden={tab.activeTab !== 'contacts'}><EmployeeContactTab employeeId={id} /></div>}
                             {tab.openedTabs.has('addresses') && <div hidden={tab.activeTab !== 'addresses'}><EmployeeAddressTab employeeId={id} /></div>}
                             {tab.openedTabs.has('documents') && <div hidden={tab.activeTab !== 'documents'}><EmployeeDocumentTab employeeId={id} /></div>}
-                            {tab.openedTabs.has('skills') && <div hidden={tab.activeTab !== 'skills'}><EmployeeSkillTab employeeId={id} /></div>}
-                            {tab.openedTabs.has('certifications') && <div hidden={tab.activeTab !== 'certifications'}><EmployeeCertificationTab employeeId={id} /></div>}
-                            {tab.openedTabs.has('licenses') && <div hidden={tab.activeTab !== 'licenses'}><EmployeeLicenseTab employeeId={id} /></div>}
+                            {tab.openedTabs.has('skills') && <div hidden={tab.activeTab !== 'skills'}><EmployeeSkillTab employeeId={id} canManage={canUpdate} /></div>}
+                            {tab.openedTabs.has('certifications') && <div hidden={tab.activeTab !== 'certifications'}><EmployeeCertificationTab employeeId={id} canManage={canUpdate} /></div>}
+                            {tab.openedTabs.has('licenses') && <div hidden={tab.activeTab !== 'licenses'}><EmployeeLicenseTab employeeId={id} canManage={canUpdate} /></div>}
                             {tab.openedTabs.has('rates') && <div hidden={tab.activeTab !== 'rates'}><EmployeeRateTab employeeId={id} /></div>}
                             {tab.openedTabs.has('availability') && <div hidden={tab.activeTab !== 'availability'}><EmployeeAvailabilityTab employeeId={id} /></div>}
                             {tab.openedTabs.has('history') && <div hidden={tab.activeTab !== 'history'}><EmployeeStatusHistoryTab employeeId={id} /></div>}
