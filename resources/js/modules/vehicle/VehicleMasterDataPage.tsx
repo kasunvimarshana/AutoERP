@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { useCallback, useState, type FormEvent } from 'react';
 import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
@@ -47,6 +47,10 @@ import type {
     VehicleType,
     VehicleTypePayload,
 } from './vehicleTypes';
+
+const VEHICLE_MASTER_PAGE_SIZE = 25;
+const FIRST_PRODUCTION_CAR_YEAR = 1886;
+const INTEGER_RADIX = 10;
 
 export type VehicleMasterKind = 'makes' | 'types' | 'categories' | 'models';
 
@@ -143,15 +147,10 @@ function VehicleMasterDataContent({ kind }: { kind: VehicleMasterKind }) {
         is_active: active === '' ? undefined : active === 'true',
         vehicle_make_id: kind === 'models' ? makeFilter?.id : undefined,
         page,
-        per_page: 25,
+        per_page: VEHICLE_MASTER_PAGE_SIZE,
     }, signal), [active, debouncedSearch, kind, makeFilter?.id, page], true, true);
-    const [collection, setCollection] = useState<ApiCollection<VehicleMasterRow> | null>(result.data);
-
-    useEffect(() => {
-        if (result.data !== null) {
-            setCollection(result.data);
-        }
-    }, [result.data]);
+    const collection = result.data;
+    const setCollection = result.setData;
 
     const openCreate = () => {
         setFormDirty(false);
@@ -204,7 +203,7 @@ function VehicleMasterDataContent({ kind }: { kind: VehicleMasterKind }) {
             setEditing(null);
         }
         setFormOpen(false);
-    }, [active, api, editing, kind, makeFilter?.id, page]);
+    }, [active, api, editing, kind, makeFilter?.id, page, setCollection]);
 
     const toggleActive = async (row: VehicleMasterRow) => {
         setBusyId(row.id);
@@ -454,7 +453,7 @@ function VehicleMasterForm({
                         <Input
                             label="Year From"
                             type="number"
-                            min={1886}
+                            min={FIRST_PRODUCTION_CAR_YEAR}
                             value={form.year_from}
                             onChange={(event) => update('year_from', event.target.value)}
                             error={fieldError(error, 'year_from')}
@@ -462,7 +461,7 @@ function VehicleMasterForm({
                         <Input
                             label="Year To"
                             type="number"
-                            min={1886}
+                            min={FIRST_PRODUCTION_CAR_YEAR}
                             value={form.year_to}
                             onChange={(event) => update('year_to', event.target.value)}
                             error={fieldError(error, 'year_to')}
@@ -580,13 +579,13 @@ function nullableText(value: string): string | null {
 }
 
 function parsePositiveInteger(value: string): number {
-    const parsed = Number.parseInt(value, 10);
+    const parsed = Number.parseInt(value, INTEGER_RADIX);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
 }
 
 function parseNullableInteger(value: string): number | null {
     if (value.trim() === '') return null;
-    const parsed = Number.parseInt(value, 10);
+    const parsed = Number.parseInt(value, INTEGER_RADIX);
     return Number.isFinite(parsed) ? parsed : null;
 }
 
