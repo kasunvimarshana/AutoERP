@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
 use Modules\VehicleService\Constants\VehicleServicePermission;
+use Modules\VehicleService\Enums\VehicleServiceWorkforceRole;
+use Modules\VehicleService\Http\Controllers\VehicleServiceCommissionPolicyController;
 use Modules\VehicleService\Http\Controllers\VehicleServiceDocumentController;
 use Modules\VehicleService\Http\Controllers\VehicleServiceInventoryController;
 use Modules\VehicleService\Http\Controllers\VehicleServiceInvoiceController;
@@ -22,8 +24,9 @@ $middleware = [
 ];
 $permissionMiddleware = (string) config('user.tenant.permission_middleware_alias', 'tenant.permission');
 $requires = static fn (string $permission): string => $permissionMiddleware.':'.$permission;
+$workforceRolePattern = implode('|', VehicleServiceWorkforceRole::values());
 
-Route::prefix('api/v1/vehicle-service')->middleware($middleware)->name('api.v1.vehicle-service.')->group(function () use ($requires): void {
+Route::prefix('api/v1/vehicle-service')->middleware($middleware)->name('api.v1.vehicle-service.')->group(function () use ($requires, $workforceRolePattern): void {
     Route::middleware($requires(VehicleServicePermission::JOBS_VIEW))->group(function (): void {
         Route::get('jobs/lookup', [VehicleServiceJobController::class, 'lookup'])->name('jobs.lookup');
         Route::get('jobs', [VehicleServiceJobController::class, 'index'])->name('jobs.index');
@@ -62,6 +65,17 @@ Route::prefix('api/v1/vehicle-service')->middleware($middleware)->name('api.v1.v
         Route::post('jobs/{job}/lines/{line}/employees', [VehicleServiceWorkforceController::class, 'store'])->whereNumber('job')->whereNumber('line')->name('employees.store');
         Route::put('jobs/{job}/lines/{line}/employees/{assignment}', [VehicleServiceWorkforceController::class, 'update'])->whereNumber('job')->whereNumber('line')->whereNumber('assignment')->name('employees.update');
         Route::delete('jobs/{job}/lines/{line}/employees/{assignment}', [VehicleServiceWorkforceController::class, 'destroy'])->whereNumber('job')->whereNumber('line')->whereNumber('assignment')->name('employees.destroy');
+    });
+
+    Route::middleware($requires(VehicleServicePermission::COMMISSIONS_VIEW))->group(function () use ($workforceRolePattern): void {
+        Route::get('commission-policies/supervisor-default', [VehicleServiceCommissionPolicyController::class, 'supervisorDefault'])->name('commission-policies.supervisor-default.show');
+        Route::get('commission-policies/labor-items/{item}/{role}', [VehicleServiceCommissionPolicyController::class, 'laborItemRule'])
+            ->whereNumber('item')->where('role', $workforceRolePattern)->name('commission-policies.labor-items.show');
+    });
+    Route::middleware($requires(VehicleServicePermission::COMMISSIONS_MANAGE))->group(function () use ($workforceRolePattern): void {
+        Route::put('commission-policies/supervisor-default', [VehicleServiceCommissionPolicyController::class, 'saveSupervisorDefault'])->name('commission-policies.supervisor-default.update');
+        Route::put('commission-policies/labor-items/{item}/{role}', [VehicleServiceCommissionPolicyController::class, 'saveLaborItemRule'])
+            ->whereNumber('item')->where('role', $workforceRolePattern)->name('commission-policies.labor-items.update');
     });
 
     Route::get('jobs/{job}/inventory-issue-lines', [VehicleServiceInventoryController::class, 'lines'])->whereNumber('job')->middleware($requires(VehicleServicePermission::INVENTORY_VIEW))->name('inventory-issue-lines');
