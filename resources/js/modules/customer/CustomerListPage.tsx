@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button, LinkButton } from '@/shared/components/Button';
@@ -46,13 +46,7 @@ export default function CustomerListPage() {
         per_page: 25,
         sort, direction,
     }, signal), [debounced, type, status, category?.id, creditAllowed, page, sort, direction]);
-    const [customers, setCustomers] = useState(result.data);
-
-    useEffect(() => {
-        if (result.data) {
-            setCustomers(result.data);
-        }
-    }, [result.data]);
+    const customers = result.data;
 
     const columns: DataColumn<CustomerSummary>[] = [
         { key: 'customer', header: 'Customer', render: (row) => <Link className="font-semibold text-sky-700 hover:underline" to={`/customers/${row.id}`}>{row.name}<span className="block text-xs font-normal text-slate-500">{row.code} / {row.customer_number}</span></Link> },
@@ -67,7 +61,7 @@ export default function CustomerListPage() {
         setActionError(null);
         try {
             const updated = await setCustomerActive(Number(row.id), row.status !== 'active');
-            setCustomers((current) => updateCustomerCollection(current, updated, {
+            result.setData((current) => updateCustomerCollection(current, updated, {
                 type,
                 status,
                 categoryId: category?.id ?? null,
@@ -83,7 +77,7 @@ export default function CustomerListPage() {
         try {
             const updated = await changeCustomerStatus(Number(statusCustomer.id), nextStatus, reason || undefined);
             setStatusCustomer(null);
-            setCustomers((current) => updateCustomerCollection(current, updated, {
+            result.setData((current) => updateCustomerCollection(current, updated, {
                 type,
                 status,
                 categoryId: category?.id ?? null,
