@@ -32,7 +32,7 @@ final class VoucherAccessPolicyTest extends TestCase
             [7, 11, FinancePermission::JOURNALS_VIEW, true],
         ]);
 
-        $scope = new VoucherAccessPolicy($permissions, $entitlements)->scopeFor(7, 11);
+        $scope = (new VoucherAccessPolicy($permissions, $entitlements))->scopeFor(7, 11);
 
         self::assertTrue($scope->payments);
         self::assertFalse($scope->finance);
