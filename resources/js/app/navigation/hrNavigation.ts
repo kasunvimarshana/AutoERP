@@ -3,11 +3,7 @@ import { hrPermissions } from '@/modules/hr/hrPermissions';
 import type { NavigationAccessRule, NavigationModuleItem } from './navigationTypes';
 
 const HR_MODULES = [TENANT_MODULE_CODE.HR] as const;
-const HR_NAVIGATION_PERMISSIONS = [
-    hrPermissions.employeesView,
-    hrPermissions.employeesCreate,
-    hrPermissions.employeesUpdate,
-] as const;
+const HR_NAVIGATION_PERMISSIONS = Object.values(hrPermissions);
 
 function hrAccess(permissions: readonly string[]): NavigationAccessRule {
     return {
@@ -42,5 +38,25 @@ export const hrNavigationItem = {
             match: ['/hr/employees/create'],
             access: hrAccess([hrPermissions.employeesCreate]),
         },
+        ...masterDataLinks(),
     ],
 } satisfies NavigationModuleItem;
+
+function masterDataLinks(): NavigationModuleItem['children'] {
+    return [
+        ['departments', 'Departments'],
+        ['designations', 'Designations'],
+        ['employment-types', 'Employment Types'],
+        ['skills', 'Skills'],
+        ['certifications', 'Certifications'],
+        ['licenses', 'Licenses'],
+    ].map(([view, label]) => ({
+        id: `hr-${view}`,
+        type: 'link' as const,
+        label,
+        to: `/hr/employees?view=${view}`,
+        match: ['/hr/employees'],
+        exclude: ['/hr/employees/create'],
+        access: hrAccess([hrPermissions.masterDataView, hrPermissions.masterDataManage]),
+    }));
+}
