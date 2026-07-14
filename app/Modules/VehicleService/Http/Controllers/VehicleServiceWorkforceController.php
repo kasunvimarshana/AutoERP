@@ -11,6 +11,7 @@ use Modules\VehicleService\Http\Requests\StoreVehicleServiceEmployeeRequest;
 use Modules\VehicleService\Http\Requests\VehicleServiceActionRequest;
 use Modules\VehicleService\Http\Resources\VehicleServiceEmployeeAssignmentResource;
 use Modules\VehicleService\Http\Resources\VehicleServiceJobLineResource;
+use Modules\VehicleService\Services\VehicleServiceCommissionPolicyService;
 use Modules\VehicleService\Services\VehicleServiceEmployeeAssignmentService;
 
 final class VehicleServiceWorkforceController extends VehicleServiceController
@@ -79,12 +80,24 @@ final class VehicleServiceWorkforceController extends VehicleServiceController
     public function assignableLines(
         ListVehicleServiceJobRequest $request,
         int $job,
+        VehicleServiceCommissionPolicyService $commissionPolicies,
     ): AnonymousResourceCollection {
-        return VehicleServiceJobLineResource::collection(
-            $this->job($request, $job)->lines()
-                ->where('is_employee_assignable', true)
-                ->with(['item', 'variant', 'uom', 'employeeAssignments.employee'])
-                ->get(),
+        $jobModel = $this->job($request, $job);
+        $lines = $jobModel->lines()
+            ->where('is_employee_assignable', true)
+            ->with(['item', 'variant', 'uom', 'employeeAssignments.employee'])
+            ->get();
+        $itemIds = $lines->pluck('item_id')->filter()->map(static fn ($id): int => (int) $id)->values()->all();
+        $defaults = $commissionPolicies->laborDefaultsForItems(
+            $request->tenantId(),
+            (int) $request->organizationUnitId(),
+            $itemIds,
         );
+
+        foreach ($lines as $line) {
+            $line->setAttribute('commission_defaults', $defaults[(int) $line->item_id] ?? []);
+        }
+
+        return VehicleServiceJobLineResource::collection($lines);
     }
 }
