@@ -4,7 +4,6 @@ import { useAuth } from '@/modules/auth/AuthProvider';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { CapabilityNotice } from '@/shared/components/CapabilityNotice';
-import { ContentHeader } from '@/shared/components/ContentHeader';
 import { DecimalInput } from '@/shared/components/DecimalInput';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
@@ -21,19 +20,15 @@ import { vehicleServicePermissions } from '../vehicleServicePermissions';
 
 const ZERO_AMOUNT = '0.000000';
 
-export default function VehicleServiceCommissionSettingsPage() {
+export default function VehicleServiceCommissionSettingsPanel() {
     const auth = useAuth();
     const canManage = hasPermission(auth, vehicleServicePermissions.commissionsManage);
     const policy = useApi((signal) => getSupervisorCommissionDefault(signal), []);
 
-    if (policy.loading) return <LoadingState label="Loading commission settings..." />;
+    if (policy.loading) return <LoadingState label="Loading commission defaults..." />;
 
     return (
-        <div>
-            <ContentHeader
-                title="Vehicle Service Commission Settings"
-                description="Define the default supervisor commission applied when a new service job is created."
-            />
+        <div className="mb-5 space-y-4">
             <ErrorAlert error={policy.error} />
             {!canManage && (
                 <CapabilityNotice>
