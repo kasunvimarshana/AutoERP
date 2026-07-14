@@ -32,7 +32,7 @@ export default function PurchaseDebitNoteListPage() {
         { key: 'allocation', header: 'Allocation', render: (row) => row.allocation_status?.replaceAll('_', ' ') ?? '-' },
         { key: 'actions', header: 'Actions', render: (row) => <LinkButton to={`/purchase/debit-notes/${row.id}`} variant="ghost">View</LinkButton> },
     ];
-    const actions = hasPurchasePermission(auth.permissions, purchasePermissions.debitNotesCreate)
+    const actions = hasPurchasePermission(auth, purchasePermissions.debitNotesCreate)
         ? <LinkButton to="/purchase/debit-notes/create">New debit note</LinkButton>
         : undefined;
     return (
