@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react';
 import { useParams } from 'react-router-dom';
 import { hasPermission } from '@/modules/auth/accessControl';
 import { useAuth } from '@/modules/auth/AuthProvider';
+import { useTenantRouteAccess } from '@/modules/auth/useTenantRouteAccess';
 import { LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { EntityDetailLayout } from '@/shared/components/EntityDetailLayout';
@@ -33,6 +34,11 @@ export default function SupplierDetailPage() {
     const supplier = useApi((signal) => getSupplier(supplierId, signal), [supplierId], Number.isFinite(supplierId));
     const tab = useOnDemandTab<Tab>('summary');
     const canManage = hasPermission(auth, supplierPermissions.update);
+    const canCreateOrder = useTenantRouteAccess('/purchase/orders/create');
+    const canCreateInvoice = useTenantRouteAccess('/purchase/invoices/create');
+    const canCreatePayment = useTenantRouteAccess('/purchase/payments/create');
+    const hasRelatedActions = canCreateOrder || canCreateInvoice || canCreatePayment;
+
     if (supplier.loading) return <LoadingState />;
     if (!supplier.data) return <ErrorAlert error={supplier.error} />;
 
@@ -42,13 +48,11 @@ export default function SupplierDetailPage() {
             description="Supplier master data and relation-aware CRUD."
             actions={canManage ? <LinkButton to={`/suppliers/${supplierId}/edit`} variant="secondary">Edit supplier</LinkButton> : undefined}
         />
-        <EntityDetailLayout actions={
-            <>
-                <LinkButton to="/purchase/orders/create" variant="secondary" className="w-full">Create purchase order</LinkButton>
-                <LinkButton to="/purchase/invoices/create" variant="secondary" className="w-full">Create supplier invoice</LinkButton>
-                <LinkButton to="/purchase/payments/create" variant="secondary" className="w-full">Create payment</LinkButton>
-            </>
-        }>
+        <EntityDetailLayout actions={hasRelatedActions ? <>
+            {canCreateOrder && <LinkButton to="/purchase/orders/create" variant="secondary" className="w-full">Create purchase order</LinkButton>}
+            {canCreateInvoice && <LinkButton to="/purchase/invoices/create" variant="secondary" className="w-full">Create supplier invoice</LinkButton>}
+            {canCreatePayment && <LinkButton to="/purchase/payments/create" variant="secondary" className="w-full">Create payment</LinkButton>}
+        </> : undefined}>
             <Panel className="p-0">
                 <Tabs tabs={tabs} active={tab.activeTab} onChange={tab.openTab} />
                 <div className="p-5">
