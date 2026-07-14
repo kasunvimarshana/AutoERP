@@ -29,6 +29,10 @@ function inspectionPayload(inspection: VehicleServiceInspection | null): Vehicle
     };
 }
 
+function inspectionFormKey(inspection: VehicleServiceInspection | null): string {
+    return JSON.stringify(inspectionPayload(inspection));
+}
+
 export default function VehicleServiceInspectionTab({
     jobId,
     expectedVersion,
@@ -40,11 +44,14 @@ export default function VehicleServiceInspectionTab({
     initialValue?: VehicleServiceInspection | null;
     onSaved: (inspection: VehicleServiceInspection, nextVersion: number) => void;
 }) {
+    const resolvedInitialValue = initialValue ?? null;
+
     return (
         <VehicleServiceInspectionEditor
+            key={inspectionFormKey(resolvedInitialValue)}
             jobId={jobId}
             expectedVersion={expectedVersion}
-            initialValue={initialValue ?? null}
+            initialValue={resolvedInitialValue}
             onJobSaved={onSaved}
         />
     );
