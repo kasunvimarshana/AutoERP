@@ -6,6 +6,7 @@ namespace Modules\VehicleService\Services;
 
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
+use Modules\Core\Services\DecimalMath;
 use Modules\Item\Enums\ItemType;
 use Modules\Item\Models\Item;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
@@ -19,7 +20,10 @@ final class VehicleServiceCommissionPolicyService
     private const ZERO_AMOUNT = '0.000000';
     private const VALIDATION_BASE = '100.000000';
 
-    public function __construct(private readonly VehicleServiceCommissionService $commissions) {}
+    public function __construct(
+        private readonly DecimalMath $math,
+        private readonly VehicleServiceCommissionService $commissions,
+    ) {}
 
     public function supervisorDefault(
         int $tenantId,
@@ -87,6 +91,8 @@ final class VehicleServiceCommissionPolicyService
         int $itemId,
         VehicleServiceWorkforceRole $role,
     ): ?VehicleServiceLaborItemCommissionRule {
+        $this->laborItem($tenantId, $organizationUnitId, $itemId);
+
         return VehicleServiceLaborItemCommissionRule::query()
             ->where('tenant_id', $tenantId)
             ->where('organization_unit_id', $organizationUnitId)
@@ -243,7 +249,7 @@ final class VehicleServiceCommissionPolicyService
 
         return $type === VehicleServiceCommissionType::None
             ? self::ZERO_AMOUNT
-            : trim($value);
+            : $this->math->normalize($value);
     }
 
     private function assertExpectedVersion(int|string|null $currentVersion, ?int $expectedVersion): void
