@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { hasPermission } from '@/modules/auth/accessControl';
 import { useAuth } from '@/modules/auth/AuthProvider';
+import { useTenantRouteAccess } from '@/modules/auth/useTenantRouteAccess';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button, LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
@@ -44,6 +45,7 @@ const tabs = [
 export default function EmployeeDetailPage() {
     const auth = useAuth();
     const canUpdate = hasPermission(auth, hrPermissions.employeesUpdate);
+    const canOpenServiceJobs = useTenantRouteAccess('/vehicle-service/jobs');
     const id = Number(useParams().id);
     const [employee, setEmployee] = useState<Employee | null>(null);
     const [loading, setLoading] = useState(true);
@@ -82,13 +84,11 @@ export default function EmployeeDetailPage() {
                 actions={canUpdate ? <LinkButton to={`/hr/employees/${id}/edit`}>Edit</LinkButton> : undefined}
             />
             <ErrorAlert error={error} />
-            <EntityDetailLayout actions={
-                <>
-                    <LinkButton to="/vehicle-service/jobs" variant="secondary" className="w-full">Assign service job</LinkButton>
-                    <Button type="button" variant="secondary" className="w-full" onClick={() => tab.openTab('availability')}>Check availability</Button>
-                    <Button type="button" variant="secondary" className="w-full" onClick={() => tab.openTab('licenses')}>Review licenses</Button>
-                </>
-            }>
+            <EntityDetailLayout actions={<>
+                {canOpenServiceJobs && <LinkButton to="/vehicle-service/jobs" variant="secondary" className="w-full">Assign service job</LinkButton>}
+                <Button type="button" variant="secondary" className="w-full" onClick={() => tab.openTab('availability')}>Check availability</Button>
+                <Button type="button" variant="secondary" className="w-full" onClick={() => tab.openTab('licenses')}>Review licenses</Button>
+            </>}>
                 <Panel className="p-0">
                     <Tabs<Tab> active={tab.activeTab} onChange={tab.openTab} tabs={tabs} />
                     <div className="p-5">
