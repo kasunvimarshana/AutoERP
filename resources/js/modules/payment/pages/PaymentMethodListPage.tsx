@@ -24,9 +24,9 @@ export default function PaymentMethodListPage() {
     const [actionError, setActionError] = useState<ApiError | null>(null);
     const debounced = useDebounce(search);
     const result = useApi((signal) => listPaymentMethods({ search: debounced || undefined, include_overrides: true, page, per_page: 25 }, signal), [debounced, page]);
-    const canCreate = hasPaymentPermission(auth.permissions, paymentPermissions.methodsCreate);
-    const canUpdate = hasPaymentPermission(auth.permissions, paymentPermissions.methodsUpdate);
-    const canDelete = hasPaymentPermission(auth.permissions, paymentPermissions.methodsDelete);
+    const canCreate = hasPaymentPermission(auth, paymentPermissions.methodsCreate);
+    const canUpdate = hasPaymentPermission(auth, paymentPermissions.methodsUpdate);
+    const canDelete = hasPaymentPermission(auth, paymentPermissions.methodsDelete);
 
     async function run(row: PaymentMethod, action: 'activate' | 'deactivate' | 'delete') {
         if (busyId) return;
