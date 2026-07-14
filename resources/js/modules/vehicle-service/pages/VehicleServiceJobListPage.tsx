@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { hasPermission } from '@/modules/auth/accessControl';
 import { useAuth } from '@/modules/auth/AuthProvider';
-import { LinkButton } from '@/shared/components/Button';
+import { Button, LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
@@ -18,6 +18,7 @@ import { readableRelation } from '@/shared/utils/object';
 import { listVehicleServiceJobs } from '../vehicleServiceApi';
 import { vehicleServicePermissions } from '../vehicleServicePermissions';
 import type { VehicleServiceJob } from '../vehicleServiceTypes';
+import VehicleServiceCommissionSettingsPanel from './VehicleServiceCommissionSettingsPage';
 import { VehicleServiceStatusBadge } from '../components/VehicleServiceStatusBadge';
 
 const editableStatuses = ['draft', 'inspected', 'in_progress'] as const;
@@ -28,12 +29,14 @@ export default function VehicleServiceJobListPage() {
     const auth = useAuth();
     const canCreate = hasPermission(auth, vehicleServicePermissions.jobsCreate);
     const canUpdate = hasPermission(auth, vehicleServicePermissions.jobsUpdate);
+    const canViewCommissions = hasPermission(auth, vehicleServicePermissions.commissionsView);
     const [searchParams] = useSearchParams();
     const [search, setSearch] = useState('');
     const [status, setStatus] = useState(searchParams.get('status') ?? '');
     const [dateFrom, setDateFrom] = useState('');
     const [dateTo, setDateTo] = useState('');
     const [page, setPage] = useState(1);
+    const [showCommissionDefaults, setShowCommissionDefaults] = useState(false);
     const debounced = useDebounce(search);
     const result = useApi((signal) => listVehicleServiceJobs({
         search: debounced || undefined,
@@ -55,7 +58,25 @@ export default function VehicleServiceJobListPage() {
 
     return (
         <>
-            <ContentHeader title="Vehicle service jobs" description="Service workflow, mixed job lines, workforce, stock, invoicing, and payment preparation." actions={canCreate ? <LinkButton to="/vehicle-service/jobs/create">New service job</LinkButton> : undefined} />
+            <ContentHeader
+                title="Vehicle service jobs"
+                description="Service workflow, mixed job lines, workforce, stock, invoicing, and payment preparation."
+                actions={(
+                    <div className="flex flex-wrap gap-2">
+                        {canViewCommissions && (
+                            <Button
+                                type="button"
+                                variant="secondary"
+                                onClick={() => setShowCommissionDefaults((current) => !current)}
+                            >
+                                {showCommissionDefaults ? 'Hide commission defaults' : 'Commission defaults'}
+                            </Button>
+                        )}
+                        {canCreate && <LinkButton to="/vehicle-service/jobs/create">New service job</LinkButton>}
+                    </div>
+                )}
+            />
+            {canViewCommissions && showCommissionDefaults && <VehicleServiceCommissionSettingsPanel />}
             <div className="mb-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <Input label="Search" type="search" placeholder="Job, customer, or vehicle" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} />
                 <Select label="Status" value={status} options={statuses} onChange={(event) => { setStatus(event.target.value); setPage(1); }} />
