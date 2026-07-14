@@ -17,9 +17,16 @@ export const getVehicleServiceJob = (id: number, signal?: AbortSignal) =>
     apiClient.get<ApiResource<VehicleServiceJob>>(`${jobs}/${id}`, { signal })
         .then((response) => response.data.data);
 
-export const createVehicleServiceJob = (payload: VehicleServiceJobPayload) =>
-    apiClient.post<ApiResource<VehicleServiceJob>>(jobs, payload)
+export const createVehicleServiceJob = (payload: VehicleServiceJobPayload) => {
+    const {
+        supervisor_commission_type: _supervisorCommissionType,
+        supervisor_commission_value: _supervisorCommissionValue,
+        ...createPayload
+    } = payload;
+
+    return apiClient.post<ApiResource<VehicleServiceJob>>(jobs, createPayload)
         .then((response) => response.data.data);
+};
 
 export const updateVehicleServiceJob = (id: number, payload: VehicleServiceJobPayload) =>
     apiClient.put<ApiResource<VehicleServiceJob>>(`${jobs}/${id}`, payload)
