@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button, LinkButton } from '@/shared/components/Button';
@@ -34,13 +34,7 @@ export default function ItemBrandListPage() {
         page,
         per_page: 25,
     }, signal), [debounced, active, page]);
-    const [collection, setCollection] = useState(result.data);
-
-    useEffect(() => {
-        if (result.data) {
-            setCollection(result.data);
-        }
-    }, [result.data]);
+    const collection = result.data;
 
     const columns: DataColumn<ItemBrand>[] = [
         { key: 'brand', header: 'Brand', render: (row) => <Link className="font-semibold text-sky-700 hover:underline" to={`/item-brands/${row.id}`}>{row.name}<span className="block text-xs font-normal text-slate-500">{row.code}</span></Link> },
@@ -72,7 +66,7 @@ export default function ItemBrandListPage() {
                 description: row.description ?? null,
                 is_active: !row.is_active,
             });
-            setCollection((current) => updateBrandCollection(current, updated, active));
+            result.setData((current) => updateBrandCollection(current, updated, active));
             notifySuccess(updated.is_active ? 'Brand activated successfully.' : 'Brand deactivated successfully.');
         } catch (error) {
             setActionError(toApiError(error));
@@ -84,7 +78,7 @@ export default function ItemBrandListPage() {
         setActionError(null);
         try {
             await deleteItemBrand(Number(row.id));
-            setCollection((current) => removeBrandFromCollection(current, row.id));
+            result.setData((current) => removeBrandFromCollection(current, row.id));
             notifySuccess('Brand deleted successfully.');
         } catch (error) {
             setActionError(toApiError(error));
