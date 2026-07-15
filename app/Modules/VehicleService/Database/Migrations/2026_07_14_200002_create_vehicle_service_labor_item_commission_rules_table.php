@@ -6,7 +6,6 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use Modules\VehicleService\Enums\VehicleServiceCommissionType;
-use Modules\VehicleService\Enums\VehicleServiceWorkforceRole;
 
 return new class extends Migration
 {
@@ -18,7 +17,6 @@ return new class extends Migration
             $table->foreignId('tenant_id')->constrained('tenants', indexName: 'vs_labor_commission_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id');
             $table->foreignId('item_id');
-            $table->string('role_type', 30)->default(VehicleServiceWorkforceRole::Technician->value);
             $table->string('commission_type', 20)->default(VehicleServiceCommissionType::None->value);
             $table->decimal('commission_value', 20, 6)->default('0.000000');
             $table->boolean('is_active')->default(true);
@@ -31,8 +29,8 @@ return new class extends Migration
                 'vs_labor_commission_id_tenant_uk',
             );
             $table->unique(
-                ['tenant_id', 'organization_unit_id', 'item_id', 'role_type'],
-                'vs_labor_commission_scope_item_role_uk',
+                ['tenant_id', 'organization_unit_id', 'item_id'],
+                'vs_labor_commission_scope_item_uk',
             );
             $table->foreign(
                 ['organization_unit_id', 'tenant_id'],
