@@ -2,20 +2,14 @@ import { DecimalInput } from '@/shared/components/DecimalInput';
 import { Panel } from '@/shared/components/Panel';
 import { Select } from '@/shared/components/Select';
 import type { CommissionType } from '../vehicleServiceTypes';
-import {
-    vehicleServiceWorkforceRoles,
-    type VehicleServiceWorkforceRole,
-} from '../commissionTypes';
 
 export interface LaborItemCommissionDraft {
-    role_type: VehicleServiceWorkforceRole;
     commission_type: CommissionType;
     commission_value: string;
     is_active: boolean;
 }
 
 export const emptyLaborItemCommissionDraft: LaborItemCommissionDraft = {
-    role_type: 'technician',
     commission_type: 'none',
     commission_value: '0.000000',
     is_active: true,
@@ -29,22 +23,9 @@ export function LaborItemCommissionPanel({ value, onChange, disabled = false }: 
     return (
         <Panel title="Default labor commission">
             <p className="mb-4 text-sm text-slate-600">
-                This rule is copied into new employee assignments for this labor item and role. The item may use Hour, Unit, Job, Service, or any other valid UOM; commission is calculated from the resulting labor line total.
+                This item-level default is copied into new employee assignments for the labor item. The item may use Hour, Unit, Job, Service, or any other valid UOM; commission is calculated from the resulting labor line total.
             </p>
-            <div className="grid gap-4 md:grid-cols-4">
-                <Select
-                    label="Default role"
-                    value={value.role_type}
-                    disabled={disabled}
-                    options={vehicleServiceWorkforceRoles.map((role) => ({
-                        value: role,
-                        label: role.replaceAll('_', ' '),
-                    }))}
-                    onChange={(event) => onChange({
-                        ...value,
-                        role_type: event.target.value as VehicleServiceWorkforceRole,
-                    })}
-                />
+            <div className="grid gap-4 md:grid-cols-3">
                 <Select
                     label="Commission type"
                     value={value.commission_type}
