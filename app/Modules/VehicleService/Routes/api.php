@@ -32,6 +32,8 @@ Route::prefix('api/v1/vehicle-service')->middleware($middleware)->name('api.v1.v
         Route::get('jobs/{job}/inspection', [VehicleServiceJobController::class, 'inspection'])->whereNumber('job')->name('inspection.show');
         Route::get('jobs/{job}/status-history', [VehicleServiceJobController::class, 'statusHistory'])->whereNumber('job')->name('status-history.index');
     });
+    Route::get('jobs/create-defaults', [VehicleServiceJobController::class, 'createDefaults'])
+        ->middleware($requires(VehicleServicePermission::JOBS_CREATE))->name('jobs.create-defaults');
     Route::post('jobs', [VehicleServiceJobController::class, 'store'])->middleware($requires(VehicleServicePermission::JOBS_CREATE))->name('jobs.store');
     Route::middleware($requires(VehicleServicePermission::JOBS_UPDATE))->group(function (): void {
         Route::put('jobs/{job}', [VehicleServiceJobController::class, 'update'])->whereNumber('job')->name('jobs.update');
