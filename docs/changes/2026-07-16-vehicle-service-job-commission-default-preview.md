@@ -21,7 +21,7 @@ The New Job form now:
 - loads and displays the resolved organization default;
 - shows the resolved value in the disabled commission-value field while the default option is selected;
 - explains that the default applies only when a supervisor is selected;
-- blocks default-based submission while the preview is loading or has failed;
+- blocks default-based submission while the preview is loading or has failed when a supervisor is selected;
 - provides Retry and allows an explicit None, Fixed, or Percentage override after a preview failure;
 - continues to omit commission fields when the organization default is selected, so the backend confirms the active default again inside job creation.
 
@@ -44,7 +44,7 @@ Focused coverage verifies:
 - explicit create-time commission overrides are not stripped;
 - the New Job form displays the resolved default value;
 - organization-default submission still omits override fields;
-- a failed default load blocks blind default submission but permits an explicit override;
+- a failed default load blocks blind default submission for a selected supervisor but permits an explicit override or a job without a supervisor;
 - Edit Job does not load current defaults and continues to show its stored snapshot.
 
 Run:
