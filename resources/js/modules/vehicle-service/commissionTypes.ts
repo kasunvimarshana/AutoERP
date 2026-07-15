@@ -18,7 +18,6 @@ export interface VehicleServiceSupervisorCommissionPolicy extends VehicleService
 export interface VehicleServiceLaborItemCommissionRule extends VehicleServiceCommissionDefault {
     id: number;
     row_version: number;
-    role_type: VehicleServiceWorkforceRole;
     is_active: boolean;
     item: NamedResource | null;
 }
@@ -29,5 +28,5 @@ export interface VehicleServiceCommissionPolicyPayload extends VehicleServiceCom
 }
 
 export type CommissionAwareVehicleServiceJobLine = VehicleServiceJobLine & {
-    commission_defaults?: Partial<Record<VehicleServiceWorkforceRole, VehicleServiceCommissionDefault>>;
+    commission_default?: VehicleServiceCommissionDefault | null;
 };
