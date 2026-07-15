@@ -8,7 +8,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\Item\Models\Item;
 use Modules\VehicleService\Enums\VehicleServiceCommissionType;
-use Modules\VehicleService\Enums\VehicleServiceWorkforceRole;
 
 final class VehicleServiceLaborItemCommissionRule extends TenantOwnedModel
 {
@@ -23,7 +22,6 @@ final class VehicleServiceLaborItemCommissionRule extends TenantOwnedModel
             'organization_unit_id' => 'integer',
             'item_id' => 'integer',
             'row_version' => 'integer',
-            'role_type' => VehicleServiceWorkforceRole::class,
             'commission_type' => VehicleServiceCommissionType::class,
             'commission_value' => 'decimal:6',
             'is_active' => 'boolean',
