@@ -115,7 +115,7 @@ final class VehicleServiceEmployeeAssignmentService
         if (! $role instanceof VehicleServiceWorkforceRole) {
             throw new InvalidArgumentException('Invalid Vehicle Service workforce role.');
         }
-        $commission = $this->commission($line, $data, $role, $existing);
+        $commission = $this->commission($line, $data, $existing);
 
         return [
             'employee_id' => $data->employeeId,
@@ -137,7 +137,6 @@ final class VehicleServiceEmployeeAssignmentService
     private function commission(
         VehicleServiceJobLine $line,
         VehicleServiceEmployeeAssignmentData $data,
-        VehicleServiceWorkforceRole $role,
         ?VehicleServiceLineEmployee $existing,
     ): array {
         if ($data->commissionType !== null) {
@@ -155,7 +154,7 @@ final class VehicleServiceEmployeeAssignmentService
             throw new InvalidArgumentException('Employee commission type is required.');
         }
 
-        if ($existing instanceof VehicleServiceLineEmployee && $existing->role_type === $role->value) {
+        if ($existing instanceof VehicleServiceLineEmployee) {
             return [
                 'type' => $existing->commission_type,
                 'value' => (string) $existing->commission_value,
@@ -171,7 +170,6 @@ final class VehicleServiceEmployeeAssignmentService
             (int) $line->tenant_id,
             (int) $line->organization_unit_id,
             (int) $line->item_id,
-            $role,
         );
     }
 
