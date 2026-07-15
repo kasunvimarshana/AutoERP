@@ -95,7 +95,7 @@ final class VehicleServiceWorkforceController extends VehicleServiceController
         );
 
         foreach ($lines as $line) {
-            $line->setAttribute('commission_defaults', $defaults[(int) $line->item_id] ?? []);
+            $line->setAttribute('commission_default', $defaults[(int) $line->item_id] ?? null);
         }
 
         return VehicleServiceJobLineResource::collection($lines);
