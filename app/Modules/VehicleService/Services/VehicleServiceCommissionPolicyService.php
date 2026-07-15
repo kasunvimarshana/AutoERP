@@ -11,7 +11,6 @@ use Modules\Item\Enums\ItemType;
 use Modules\Item\Models\Item;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\VehicleService\Enums\VehicleServiceCommissionType;
-use Modules\VehicleService\Enums\VehicleServiceWorkforceRole;
 use Modules\VehicleService\Models\VehicleServiceLaborItemCommissionRule;
 use Modules\VehicleService\Models\VehicleServiceSupervisorCommissionPolicy;
 
@@ -89,7 +88,6 @@ final class VehicleServiceCommissionPolicyService
         int $tenantId,
         int $organizationUnitId,
         int $itemId,
-        VehicleServiceWorkforceRole $role,
     ): ?VehicleServiceLaborItemCommissionRule {
         $this->laborItem($tenantId, $organizationUnitId, $itemId);
 
@@ -97,7 +95,6 @@ final class VehicleServiceCommissionPolicyService
             ->where('tenant_id', $tenantId)
             ->where('organization_unit_id', $organizationUnitId)
             ->where('item_id', $itemId)
-            ->where('role_type', $role->value)
             ->with('item')
             ->first();
     }
@@ -106,7 +103,6 @@ final class VehicleServiceCommissionPolicyService
         int $tenantId,
         int $organizationUnitId,
         int $itemId,
-        VehicleServiceWorkforceRole $role,
         VehicleServiceCommissionType $type,
         string $value,
         bool $isActive,
@@ -117,7 +113,6 @@ final class VehicleServiceCommissionPolicyService
             $tenantId,
             $organizationUnitId,
             $itemId,
-            $role,
             $type,
             $value,
             $isActive,
@@ -130,7 +125,6 @@ final class VehicleServiceCommissionPolicyService
                 ->where('tenant_id', $tenantId)
                 ->where('organization_unit_id', $organizationUnitId)
                 ->where('item_id', $itemId)
-                ->where('role_type', $role->value)
                 ->lockForUpdate()
                 ->first();
             $this->assertExpectedVersion($rule?->row_version, $expectedVersion);
@@ -142,7 +136,6 @@ final class VehicleServiceCommissionPolicyService
                     'tenant_id' => $tenantId,
                     'organization_unit_id' => $organizationUnitId,
                     'item_id' => $item->getKey(),
-                    'role_type' => $role->value,
                     'row_version' => 1,
                     'created_by' => $actorId,
                 ]);
@@ -176,9 +169,8 @@ final class VehicleServiceCommissionPolicyService
         int $tenantId,
         int $organizationUnitId,
         int $itemId,
-        VehicleServiceWorkforceRole $role,
     ): array {
-        $rule = $this->laborRule($tenantId, $organizationUnitId, $itemId, $role);
+        $rule = $this->laborRule($tenantId, $organizationUnitId, $itemId);
 
         return $rule instanceof VehicleServiceLaborItemCommissionRule && $rule->is_active
             ? ['type' => $rule->commission_type, 'value' => (string) $rule->commission_value]
@@ -187,7 +179,7 @@ final class VehicleServiceCommissionPolicyService
 
     /**
      * @param list<int> $itemIds
-     * @return array<int, array<string, array{commission_type: string, commission_value: string}>>
+     * @return array<int, array{commission_type: string, commission_value: string}>
      */
     public function laborDefaultsForItems(
         int $tenantId,
@@ -207,7 +199,7 @@ final class VehicleServiceCommissionPolicyService
             ->get();
 
         foreach ($rules as $rule) {
-            $defaults[(int) $rule->item_id][$rule->role_type->value] = [
+            $defaults[(int) $rule->item_id] = [
                 'commission_type' => $rule->commission_type->value,
                 'commission_value' => (string) $rule->commission_value,
             ];
