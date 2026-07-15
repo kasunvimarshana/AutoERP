@@ -92,6 +92,7 @@ describe('VehicleServiceJobForm', () => {
 
         await user.click(screen.getByRole('button', { name: 'Choose Vehicle' }));
         await user.click(screen.getByRole('button', { name: 'Choose Bill-to customer' }));
+        await user.click(screen.getByRole('button', { name: 'Choose Supervisor' }));
         await user.click(screen.getByRole('button', { name: 'Save draft' }));
 
         await waitFor(() => expect(apiMocks.createVehicleServiceJob).toHaveBeenCalledTimes(1));
@@ -100,6 +101,7 @@ describe('VehicleServiceJobForm', () => {
             customer_id: 5,
             bill_to_customer_id: 8,
             vehicle_id: 14,
+            supervisor_employee_id: 21,
         }));
         expect(payload).not.toHaveProperty('supervisor_commission_type');
         expect(payload).not.toHaveProperty('supervisor_commission_value');
@@ -141,6 +143,9 @@ describe('VehicleServiceJobForm', () => {
         );
 
         expect(await screen.findByText(/Unable to load the organization commission default/)).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Save draft' })).toBeEnabled();
+
+        await user.click(screen.getByRole('button', { name: 'Choose Supervisor' }));
         expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled();
 
         await user.selectOptions(screen.getByLabelText('Supervisor commission'), 'fixed');
