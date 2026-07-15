@@ -49,7 +49,7 @@ export function EmployeeAssignmentForm({ value, mode, lines, error, saving, onSa
                 <div>
                     <h3 className="font-semibold text-slate-900">Assignment details</h3>
                     <p className="text-sm text-slate-500">
-                        Select the service line, employee, role, hours, rate, and commission. Labor-item defaults are applied when the line or role changes and remain editable before saving.
+                        Select the service line, employee, operational role, hours, rate, and commission. The labor-item commission default is applied when the line changes and remains editable before saving.
                     </p>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
@@ -67,7 +67,6 @@ export function EmployeeAssignmentForm({ value, mode, lines, error, saving, onSa
                                 current,
                                 lines,
                                 lineId,
-                                current.role,
                             ));
                         }}
                     />
@@ -88,12 +87,10 @@ export function EmployeeAssignmentForm({ value, mode, lines, error, saving, onSa
                             label: role.replaceAll('_', ' '),
                         }))}
                         error={fieldError(error, 'role_type')}
-                        onChange={(event) => setDraft((current) => applyAssignmentCommissionDefault(
-                            current,
-                            lines,
-                            current.lineId,
+                        onChange={(event) => set(
+                            'role',
                             event.target.value as VehicleServiceWorkforceRole,
-                        ))}
+                        )}
                     />
                     <DecimalInput
                         label="Assigned hours"
