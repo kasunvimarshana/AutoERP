@@ -26,10 +26,10 @@ export default function LaborItemCommissionEditor({ itemId, canManage }: {
     );
 
     if (rule.loading) return <LoadingState label="Loading labor commission..." />;
+    if (rule.error) return <ErrorAlert error={rule.error} />;
 
     return (
         <div className="space-y-4">
-            <ErrorAlert error={rule.error} />
             {!canManage && (
                 <CapabilityNotice>
                     You can review this labor commission, but you do not have permission to update it.
