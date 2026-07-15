@@ -5,7 +5,6 @@ import type {
     VehicleServiceCommissionPolicyPayload,
     VehicleServiceLaborItemCommissionRule,
     VehicleServiceSupervisorCommissionPolicy,
-    VehicleServiceWorkforceRole,
 } from '../commissionTypes';
 
 const policies = `${endpoints.vehicleService}/commission-policies`;
@@ -24,18 +23,16 @@ export const saveSupervisorCommissionDefault = (payload: VehicleServiceCommissio
 
 export const getLaborItemCommissionRule = (
     itemId: number,
-    role: VehicleServiceWorkforceRole,
     signal?: AbortSignal,
 ) => apiClient.get<ApiResource<VehicleServiceLaborItemCommissionRule | null>>(
-    `${policies}/labor-items/${itemId}/${role}`,
+    `${policies}/labor-items/${itemId}`,
     { signal },
 ).then((response) => response.data.data);
 
 export const saveLaborItemCommissionRule = (
     itemId: number,
-    role: VehicleServiceWorkforceRole,
     payload: VehicleServiceCommissionPolicyPayload,
 ) => apiClient.put<ApiResource<VehicleServiceLaborItemCommissionRule>>(
-    `${policies}/labor-items/${itemId}/${role}`,
+    `${policies}/labor-items/${itemId}`,
     payload,
 ).then((response) => response.data.data);
