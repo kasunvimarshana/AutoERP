@@ -9,7 +9,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Modules\VehicleService\Enums\VehicleServiceCommissionType;
-use Modules\VehicleService\Enums\VehicleServiceWorkforceRole;
 use Modules\VehicleService\Services\VehicleServiceCommissionPolicyService;
 use Tests\Support\OrganizationUnitFixture;
 use Tests\TestCase;
@@ -78,19 +77,18 @@ final class VehicleServiceCommissionPolicyTest extends TestCase
         );
     }
 
-    public function test_labor_item_defaults_are_role_specific_and_independent_of_uom_kind(): void
+    public function test_labor_item_has_one_versioned_default_independent_of_uom_kind(): void
     {
         $context = $this->context();
         $unitUomId = $this->uom($context, 'JOB', 'Job', 'service');
         $laborItemId = $this->item($context, 'LAB-JOB', 'Job-based labour', 'labour', $unitUomId);
 
-        $rule = $this->withTenantExecutionContext(
+        $first = $this->withTenantExecutionContext(
             $context['tenant_id'],
             fn () => app(VehicleServiceCommissionPolicyService::class)->saveLaborRule(
                 $context['tenant_id'],
                 $context['organization_unit_id'],
                 $laborItemId,
-                VehicleServiceWorkforceRole::Technician,
                 VehicleServiceCommissionType::Percentage,
                 '10',
                 true,
@@ -99,31 +97,48 @@ final class VehicleServiceCommissionPolicyTest extends TestCase
             ),
         );
 
-        $this->assertSame('10.000000', (string) $rule->commission_value);
-        $this->assertSame($unitUomId, (int) $rule->item->base_uom_id);
-        $technician = $this->withTenantExecutionContext(
-            $context['tenant_id'],
-            fn () => app(VehicleServiceCommissionPolicyService::class)->resolveLaborRule(
-                $context['tenant_id'],
-                $context['organization_unit_id'],
-                $laborItemId,
-                VehicleServiceWorkforceRole::Technician,
-            ),
-        );
-        $helper = $this->withTenantExecutionContext(
-            $context['tenant_id'],
-            fn () => app(VehicleServiceCommissionPolicyService::class)->resolveLaborRule(
-                $context['tenant_id'],
-                $context['organization_unit_id'],
-                $laborItemId,
-                VehicleServiceWorkforceRole::Helper,
-            ),
-        );
+        $this->assertSame(1, (int) $first->row_version);
+        $this->assertSame('10.000000', (string) $first->commission_value);
+        $this->assertSame($unitUomId, (int) $first->item->base_uom_id);
 
-        $this->assertSame(VehicleServiceCommissionType::Percentage, $technician['type']);
-        $this->assertSame('10.000000', $technician['value']);
-        $this->assertSame(VehicleServiceCommissionType::None, $helper['type']);
-        $this->assertSame('0.000000', $helper['value']);
+        $resolved = $this->withTenantExecutionContext(
+            $context['tenant_id'],
+            fn () => app(VehicleServiceCommissionPolicyService::class)->resolveLaborRule(
+                $context['tenant_id'],
+                $context['organization_unit_id'],
+                $laborItemId,
+            ),
+        );
+        $this->assertSame(VehicleServiceCommissionType::Percentage, $resolved['type']);
+        $this->assertSame('10.000000', $resolved['value']);
+
+        $second = $this->withTenantExecutionContext(
+            $context['tenant_id'],
+            fn () => app(VehicleServiceCommissionPolicyService::class)->saveLaborRule(
+                $context['tenant_id'],
+                $context['organization_unit_id'],
+                $laborItemId,
+                VehicleServiceCommissionType::Fixed,
+                '500',
+                true,
+                1,
+                null,
+            ),
+        );
+        $this->assertSame($first->getKey(), $second->getKey());
+        $this->assertSame(2, (int) $second->row_version);
+        $this->assertSame('500.000000', (string) $second->commission_value);
+
+        $defaults = $this->withTenantExecutionContext(
+            $context['tenant_id'],
+            fn () => app(VehicleServiceCommissionPolicyService::class)->laborDefaultsForItems(
+                $context['tenant_id'],
+                $context['organization_unit_id'],
+                [$laborItemId],
+            ),
+        );
+        $this->assertSame('fixed', $defaults[$laborItemId]['commission_type']);
+        $this->assertSame('500.000000', $defaults[$laborItemId]['commission_value']);
     }
 
     public function test_non_labor_items_cannot_own_labor_commission_rules(): void
@@ -140,7 +155,6 @@ final class VehicleServiceCommissionPolicyTest extends TestCase
                 $context['tenant_id'],
                 $context['organization_unit_id'],
                 $stockItemId,
-                VehicleServiceWorkforceRole::Technician,
                 VehicleServiceCommissionType::Fixed,
                 '100',
                 true,
