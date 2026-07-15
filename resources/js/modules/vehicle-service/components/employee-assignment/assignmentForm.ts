@@ -58,15 +58,13 @@ export function applyAssignmentCommissionDefault(
     current: AssignmentFormValue,
     lines: VehicleServiceJobLine[],
     lineId: number | null,
-    role: VehicleServiceWorkforceRole,
 ): AssignmentFormValue {
     const line = lines.find((candidate) => candidate.id === lineId) as CommissionAwareVehicleServiceJobLine | undefined;
-    const commission = line?.commission_defaults?.[role];
+    const commission = line?.commission_default;
 
     return {
         ...current,
         lineId,
-        role,
         commissionType: commission?.commission_type ?? 'none',
         commissionValue: commission?.commission_value ?? ZERO_AMOUNT,
     };
