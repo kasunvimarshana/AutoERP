@@ -118,6 +118,7 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
     const usesOrganizationDefault = isCreating
         && form.supervisor_commission_type === ORGANIZATION_DEFAULT_COMMISSION;
     const organizationDefaultUnavailable = usesOrganizationDefault
+        && supervisor !== null
         && (organizationDefault.loading || organizationDefault.error !== null || organizationDefault.data === null);
     const displayedCommissionValue = usesOrganizationDefault
         ? organizationDefault.data?.commission_value ?? ''
@@ -282,7 +283,7 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
                             <p className="font-semibold text-sky-950">Organization commission default</p>
                             {organizationDefault.loading && <p className="mt-1 text-sky-800">Loading the active organization default...</p>}
                             {organizationDefault.error && <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
-                                <p className="text-rose-700">Unable to load the organization commission default. Retry, or choose an explicit commission before saving.</p>
+                                <p className="text-rose-700">Unable to load the organization commission default. Retry, or choose an explicit commission before saving a job with a supervisor.</p>
                                 <Button type="button" variant="secondary" className="min-h-8 px-3 py-1" onClick={organizationDefault.reload}>Retry</Button>
                             </div>}
                             {organizationDefault.data && <>
