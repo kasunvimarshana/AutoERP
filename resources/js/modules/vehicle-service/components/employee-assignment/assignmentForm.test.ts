@@ -5,7 +5,7 @@ import {
     emptyAssignmentForm,
 } from './assignmentForm';
 
-const line = (uomCode: string): CommissionAwareVehicleServiceJobLine => ({
+const line = (uomCode: string, withDefault = true): CommissionAwareVehicleServiceJobLine => ({
     id: 15,
     line_number: 1,
     line_source_type: 'labour_item',
@@ -30,48 +30,50 @@ const line = (uomCode: string): CommissionAwareVehicleServiceJobLine => ({
     is_billable: true,
     is_employee_assignable: true,
     status: 'active',
-    commission_defaults: {
-        technician: {
-            commission_type: 'percentage',
-            commission_value: '10.000000',
-        },
-        helper: {
-            commission_type: 'fixed',
-            commission_value: '500.000000',
-        },
-    },
+    commission_default: withDefault ? {
+        commission_type: 'percentage',
+        commission_value: '10.000000',
+    } : null,
 });
 
 describe('Vehicle Service assignment commission defaults', () => {
-    it.each(['HOUR', 'JOB'])('applies the same labor rule independently of %s UOM', (uomCode) => {
+    it.each(['HOUR', 'JOB'])('applies the same labor-item rule independently of %s UOM', (uomCode) => {
         const result = applyAssignmentCommissionDefault(
             emptyAssignmentForm(),
             [line(uomCode)],
             15,
-            'technician',
         );
 
         expect(result.commissionType).toBe('percentage');
         expect(result.commissionValue).toBe('10.000000');
     });
 
-    it('switches to the exact role default and fails closed when none exists', () => {
-        const helper = applyAssignmentCommissionDefault(
-            emptyAssignmentForm(),
+    it('keeps the labor-item default independent of the operational assignment role', () => {
+        const helperAssignment = applyAssignmentCommissionDefault(
+            { ...emptyAssignmentForm(), role: 'helper' },
             [line('JOB')],
             15,
-            'helper',
         );
-        const inspector = applyAssignmentCommissionDefault(
-            helper,
+        const inspectorAssignment = applyAssignmentCommissionDefault(
+            { ...helperAssignment, role: 'inspector' },
             [line('JOB')],
             15,
-            'inspector',
         );
 
-        expect(helper.commissionType).toBe('fixed');
-        expect(helper.commissionValue).toBe('500.000000');
-        expect(inspector.commissionType).toBe('none');
-        expect(inspector.commissionValue).toBe('0.000000');
+        expect(helperAssignment.role).toBe('helper');
+        expect(inspectorAssignment.role).toBe('inspector');
+        expect(helperAssignment.commissionType).toBe('percentage');
+        expect(inspectorAssignment.commissionValue).toBe('10.000000');
+    });
+
+    it('fails closed when the selected labor item has no active default', () => {
+        const result = applyAssignmentCommissionDefault(
+            { ...emptyAssignmentForm(), commissionType: 'fixed', commissionValue: '500.000000' },
+            [line('JOB', false)],
+            15,
+        );
+
+        expect(result.commissionType).toBe('none');
+        expect(result.commissionValue).toBe('0.000000');
     });
 });
