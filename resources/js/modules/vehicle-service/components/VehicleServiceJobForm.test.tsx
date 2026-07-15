@@ -8,6 +8,7 @@ import { VehicleServiceJobForm } from './VehicleServiceJobForm';
 
 const apiMocks = vi.hoisted(() => ({
     createVehicleServiceJob: vi.fn(),
+    getVehicleServiceJobCreateDefaults: vi.fn(),
     updateVehicleServiceJob: vi.fn(),
 }));
 
@@ -60,6 +61,11 @@ const existingJob: VehicleServiceJob = {
     grand_total: '0.000000',
 };
 
+const organizationDefault = {
+    commission_type: 'percentage' as const,
+    commission_value: '7.500000',
+};
+
 describe('VehicleServiceJobForm', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -67,10 +73,11 @@ describe('VehicleServiceJobForm', () => {
             id: 91,
             job_number: 'VSJ-91',
         });
+        apiMocks.getVehicleServiceJobCreateDefaults.mockResolvedValue(organizationDefault);
         apiMocks.updateVehicleServiceJob.mockResolvedValue(existingJob);
     });
 
-    it('submits the vehicle owner and selected bill-to customer while preserving the server commission default', async () => {
+    it('shows the resolved organization default and preserves server-side default resolution', async () => {
         const user = userEvent.setup();
         render(
             <TestRouter initialEntries={['/vehicle-service/jobs/create']}>
@@ -79,6 +86,9 @@ describe('VehicleServiceJobForm', () => {
         );
 
         expect(screen.getByLabelText('Supervisor commission')).toHaveValue('organization_default');
+        expect(await screen.findByText('Percentage of whole job — 7.5%')).toBeInTheDocument();
+        expect(screen.getByLabelText('Commission value')).toHaveValue('7.500000');
+        expect(screen.getByLabelText('Commission value')).toBeDisabled();
 
         await user.click(screen.getByRole('button', { name: 'Choose Vehicle' }));
         await user.click(screen.getByRole('button', { name: 'Choose Bill-to customer' }));
@@ -103,6 +113,7 @@ describe('VehicleServiceJobForm', () => {
             </TestRouter>,
         );
 
+        await screen.findByText('Percentage of whole job — 7.5%');
         await user.click(screen.getByRole('button', { name: 'Choose Vehicle' }));
         await user.click(screen.getByRole('button', { name: 'Choose Supervisor' }));
         await user.selectOptions(screen.getByLabelText('Supervisor commission'), 'fixed');
@@ -119,7 +130,24 @@ describe('VehicleServiceJobForm', () => {
         ));
     });
 
-    it('shows the stored supervisor commission snapshot while editing', () => {
+    it('blocks organization-default submission after a load failure but permits an explicit override', async () => {
+        const user = userEvent.setup();
+        apiMocks.getVehicleServiceJobCreateDefaults.mockRejectedValueOnce(new Error('Network failure'));
+
+        render(
+            <TestRouter initialEntries={['/vehicle-service/jobs/create']}>
+                <VehicleServiceJobForm />
+            </TestRouter>,
+        );
+
+        expect(await screen.findByText(/Unable to load the organization commission default/)).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled();
+
+        await user.selectOptions(screen.getByLabelText('Supervisor commission'), 'fixed');
+        expect(screen.getByRole('button', { name: 'Save draft' })).toBeEnabled();
+    });
+
+    it('shows the stored supervisor commission snapshot while editing without loading current defaults', () => {
         render(
             <TestRouter initialEntries={['/vehicle-service/jobs/92/edit']}>
                 <VehicleServiceJobForm job={existingJob} />
@@ -129,6 +157,7 @@ describe('VehicleServiceJobForm', () => {
         expect(screen.getByLabelText('Supervisor commission')).toHaveValue('percentage');
         expect(screen.getByLabelText('Commission value')).toHaveValue('5.000000');
         expect(screen.getByRole('button', { name: 'Save job' })).toBeInTheDocument();
+        expect(apiMocks.getVehicleServiceJobCreateDefaults).not.toHaveBeenCalled();
     });
 });
 
