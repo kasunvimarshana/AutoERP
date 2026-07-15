@@ -19,6 +19,22 @@ import type { CommissionType, VehicleServiceJob, VehicleServiceJobPayload } from
 import { VehicleServiceQuickVehicleModal } from './VehicleServiceQuickVehicleModal';
 
 const ZERO_AMOUNT = '0.000000';
+const ORGANIZATION_DEFAULT_COMMISSION = 'organization_default' as const;
+const COMMISSION_TYPE = {
+    NONE: 'none',
+    FIXED: 'fixed',
+    PERCENTAGE: 'percentage',
+} as const satisfies Record<string, CommissionType>;
+type SupervisorCommissionSelection = CommissionType | typeof ORGANIZATION_DEFAULT_COMMISSION;
+const SUPERVISOR_COMMISSION_OPTIONS = [
+    { value: COMMISSION_TYPE.NONE, label: 'None' },
+    { value: COMMISSION_TYPE.FIXED, label: 'Fixed' },
+    { value: COMMISSION_TYPE.PERCENTAGE, label: 'Percentage of whole job' },
+];
+const SUPERVISOR_COMMISSION_CREATE_OPTIONS = [
+    { value: ORGANIZATION_DEFAULT_COMMISSION, label: 'Use organization default' },
+    ...SUPERVISOR_COMMISSION_OPTIONS,
+];
 const today = businessDateInputValue;
 const decimal = (value: string, fallback = ZERO_AMOUNT) => value.trim() || fallback;
 const customerLabel = (customer: NamedResource | null) => customer ? `${customer.code ?? ''} ${customer.name}`.trim() : '';
@@ -47,7 +63,7 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
     const [form, setForm] = useState({
         job_date: job?.job_date ?? today(),
         expected_delivery_date: job?.expected_delivery_date ?? '',
-        supervisor_commission_type: job?.supervisor_commission_type ?? 'none' as CommissionType,
+        supervisor_commission_type: (job?.supervisor_commission_type ?? ORGANIZATION_DEFAULT_COMMISSION) as SupervisorCommissionSelection,
         supervisor_commission_value: job?.supervisor_commission_value ?? ZERO_AMOUNT,
         odometer_reading: job?.odometer_reading ?? '',
         fuel_level: job?.fuel_level ?? '',
@@ -68,6 +84,22 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
     const searchVehicle = useCallback((params: LookupLoadParams) => lookupApi.serviceVehicles(params), []);
     const searchSupervisor = useCallback((params: LookupLoadParams) => lookupApi.availableEmployees(params), []);
 
+    const supervisorCommissionPayload = (): Partial<Pick<
+        VehicleServiceJobPayload,
+        'supervisor_commission_type' | 'supervisor_commission_value'
+    >> => {
+        if (form.supervisor_commission_type === ORGANIZATION_DEFAULT_COMMISSION) {
+            return {};
+        }
+
+        return {
+            supervisor_commission_type: form.supervisor_commission_type,
+            supervisor_commission_value: form.supervisor_commission_type === COMMISSION_TYPE.NONE
+                ? ZERO_AMOUNT
+                : decimal(form.supervisor_commission_value),
+        };
+    };
+
     const payload = (): VehicleServiceJobPayload => ({
         expected_version: job?.row_version,
         job_date: form.job_date,
@@ -76,8 +108,7 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
         bill_to_customer_id: billToCustomer?.id ?? customer?.id ?? 0,
         vehicle_id: vehicle?.id ?? 0,
         supervisor_employee_id: supervisor?.id,
-        supervisor_commission_type: form.supervisor_commission_type,
-        supervisor_commission_value: decimal(form.supervisor_commission_value),
+        ...supervisorCommissionPayload(),
         odometer_reading: form.odometer_reading || undefined,
         fuel_level: form.fuel_level || undefined,
         priority: form.priority || undefined,
@@ -95,6 +126,16 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
             updateForm((current) => ({ ...current, odometer_reading: value.odometer_reading ?? '' }));
         }
     }, [form.odometer_reading, formGuard, updateForm]);
+
+    const applySupervisorCommissionType = useCallback((next: SupervisorCommissionSelection) => {
+        updateForm((current) => ({
+            ...current,
+            supervisor_commission_type: next,
+            supervisor_commission_value: next === ORGANIZATION_DEFAULT_COMMISSION || next === COMMISSION_TYPE.NONE
+                ? ZERO_AMOUNT
+                : current.supervisor_commission_value,
+        }));
+    }, [updateForm]);
 
     return (
         <>
@@ -176,18 +217,24 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
                             { value: 'high', label: 'High' },
                             { value: 'urgent', label: 'Urgent' },
                         ]} onChange={(event) => updateForm({ ...form, priority: event.target.value })} />
-                        {job && <>
-                            <Select label="Supervisor commission" value={form.supervisor_commission_type} options={[
-                                { value: 'none', label: 'None' },
-                                { value: 'fixed', label: 'Fixed' },
-                                { value: 'percentage', label: 'Percentage of whole job' },
-                            ]} onChange={(event) => updateForm({ ...form, supervisor_commission_type: event.target.value as CommissionType })} />
-                            <DecimalInput label="Commission value" value={form.supervisor_commission_value} error={errorFor('supervisor_commission_value')} onChange={(event) => updateForm({ ...form, supervisor_commission_value: event.target.value })} />
-                        </>}
+                        <Select
+                            label="Supervisor commission"
+                            value={form.supervisor_commission_type}
+                            options={job ? SUPERVISOR_COMMISSION_OPTIONS : SUPERVISOR_COMMISSION_CREATE_OPTIONS}
+                            hint={job
+                                ? 'This stored whole-job commission snapshot can be explicitly updated.'
+                                : 'Use the active organization default or choose an explicit whole-job override.'}
+                            onChange={(event) => applySupervisorCommissionType(event.target.value as SupervisorCommissionSelection)}
+                        />
+                        <DecimalInput
+                            label="Commission value"
+                            value={form.supervisor_commission_value}
+                            error={errorFor('supervisor_commission_value')}
+                            disabled={form.supervisor_commission_type === ORGANIZATION_DEFAULT_COMMISSION
+                                || form.supervisor_commission_type === COMMISSION_TYPE.NONE}
+                            onChange={(event) => updateForm({ ...form, supervisor_commission_value: event.target.value })}
+                        />
                     </div>
-                    {!job && <div className="mt-4 rounded-lg border border-sky-100 bg-sky-50 px-4 py-3 text-sm text-sky-900">
-                        The active organization supervisor commission default is applied by the server when this Job Card is saved. The stored job snapshot can be reviewed or explicitly overridden from Edit Job afterward.
-                    </div>}
                     {vehicle && <div className="mt-4 grid gap-3 rounded-lg border border-sky-100 bg-sky-50 p-4 text-sm sm:grid-cols-2 xl:grid-cols-5">
                         <VehicleContext label="Registration" value={vehicle.registration_number ?? vehicle.name} />
                         <VehicleContext label="Make" value={vehicle.make?.name ?? '-'} />
