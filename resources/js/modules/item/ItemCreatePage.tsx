@@ -118,7 +118,7 @@ export default function ItemCreatePage() {
             if (item.item_type === 'labour'
                 && canManageLaborCommission
                 && laborCommission.commission_type !== 'none') {
-                await saveLaborItemCommissionRule(itemId, laborCommission.role_type, {
+                await saveLaborItemCommissionRule(itemId, {
                     commission_type: laborCommission.commission_type,
                     commission_value: laborCommission.commission_value.trim() || ZERO_AMOUNT,
                     is_active: laborCommission.is_active,
