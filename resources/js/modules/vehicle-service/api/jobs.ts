@@ -1,5 +1,6 @@
 import { apiClient } from '@/shared/api/apiClient';
 import type { ApiCollection, ApiResource, ListParams } from '@/shared/types/api';
+import type { VehicleServiceCommissionDefault } from '../commissionTypes';
 import type {
     VehicleServiceInspection,
     VehicleServiceInspectionPayload,
@@ -17,14 +18,13 @@ export const getVehicleServiceJob = (id: number, signal?: AbortSignal) =>
     apiClient.get<ApiResource<VehicleServiceJob>>(`${jobs}/${id}`, { signal })
         .then((response) => response.data.data);
 
-export const createVehicleServiceJob = (payload: VehicleServiceJobPayload) => {
-    const createPayload = { ...payload };
-    delete createPayload.supervisor_commission_type;
-    delete createPayload.supervisor_commission_value;
-
-    return apiClient.post<ApiResource<VehicleServiceJob>>(jobs, createPayload)
+export const getVehicleServiceJobCreateDefaults = (signal?: AbortSignal) =>
+    apiClient.get<ApiResource<VehicleServiceCommissionDefault>>(`${jobs}/create-defaults`, { signal })
         .then((response) => response.data.data);
-};
+
+export const createVehicleServiceJob = (payload: VehicleServiceJobPayload) =>
+    apiClient.post<ApiResource<VehicleServiceJob>>(jobs, payload)
+        .then((response) => response.data.data);
 
 export const updateVehicleServiceJob = (id: number, payload: VehicleServiceJobPayload) =>
     apiClient.put<ApiResource<VehicleServiceJob>>(`${jobs}/${id}`, payload)
