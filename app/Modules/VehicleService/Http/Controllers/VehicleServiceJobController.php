@@ -15,6 +15,7 @@ use Modules\VehicleService\Http\Resources\VehicleServiceInspectionResource;
 use Modules\VehicleService\Http\Resources\VehicleServiceJobResource;
 use Modules\VehicleService\Http\Resources\VehicleServiceStatusHistoryResource;
 use Modules\VehicleService\Models\VehicleServiceJob;
+use Modules\VehicleService\Services\VehicleServiceCommissionPolicyService;
 use Modules\VehicleService\Services\VehicleServiceInspectionService;
 use Modules\VehicleService\Services\VehicleServiceJobQueryService;
 use Modules\VehicleService\Services\VehicleServiceJobService;
@@ -50,6 +51,21 @@ final class VehicleServiceJobController extends VehicleServiceController
             'code' => $job->job_number,
             'name' => $job->job_number.' - '.($job->vehicle?->registration_number ?? $job->customer?->display_name ?? 'Service job'),
         ])->all()]);
+    }
+
+    public function createDefaults(
+        ListVehicleServiceJobRequest $request,
+        VehicleServiceCommissionPolicyService $commissionPolicies,
+    ): JsonResponse {
+        $default = $commissionPolicies->resolveSupervisorDefault(
+            $request->tenantId(),
+            (int) $request->organizationUnitId(),
+        );
+
+        return response()->json(['data' => [
+            'commission_type' => $default['type']->value,
+            'commission_value' => $default['value'],
+        ]]);
     }
 
     public function store(StoreVehicleServiceJobRequest $request, VehicleServiceJobService $service): JsonResponse
