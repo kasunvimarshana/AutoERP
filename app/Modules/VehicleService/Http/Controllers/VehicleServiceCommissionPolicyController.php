@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modules\VehicleService\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
-use Modules\VehicleService\Enums\VehicleServiceWorkforceRole;
 use Modules\VehicleService\Http\Requests\ListVehicleServiceCommissionPolicyRequest;
 use Modules\VehicleService\Http\Requests\SaveVehicleServiceCommissionPolicyRequest;
 use Modules\VehicleService\Models\VehicleServiceLaborItemCommissionRule;
@@ -50,14 +49,12 @@ final class VehicleServiceCommissionPolicyController
     public function laborItemRule(
         ListVehicleServiceCommissionPolicyRequest $request,
         int $item,
-        string $role,
         VehicleServiceCommissionPolicyService $service,
     ): JsonResponse {
         $rule = $service->laborRule(
             $request->tenantId(),
             (int) $request->organizationUnitId(),
             $item,
-            VehicleServiceWorkforceRole::from($role),
         );
 
         return response()->json([
@@ -70,14 +67,12 @@ final class VehicleServiceCommissionPolicyController
     public function saveLaborItemRule(
         SaveVehicleServiceCommissionPolicyRequest $request,
         int $item,
-        string $role,
         VehicleServiceCommissionPolicyService $service,
     ): JsonResponse {
         $rule = $service->saveLaborRule(
             $request->tenantId(),
             (int) $request->organizationUnitId(),
             $item,
-            VehicleServiceWorkforceRole::from($role),
             $request->commissionType(),
             $request->commissionValue(),
             $request->isActive(),
@@ -106,7 +101,6 @@ final class VehicleServiceCommissionPolicyController
         return [
             'id' => (int) $rule->getKey(),
             'row_version' => (int) $rule->row_version,
-            'role_type' => $rule->role_type->value,
             'commission_type' => $rule->commission_type->value,
             'commission_value' => (string) $rule->commission_value,
             'is_active' => (bool) $rule->is_active,
