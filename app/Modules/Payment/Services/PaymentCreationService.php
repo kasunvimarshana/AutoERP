@@ -14,6 +14,7 @@ use Modules\Idempotency\Models\IdempotencyRecord;
 use Modules\Idempotency\Services\IdempotencyService;
 use Modules\Payment\Constants\PaymentIdempotency;
 use Modules\Payment\DTOs\CreatePaymentData;
+use Modules\Payment\DTOs\PaymentLineData;
 use Modules\Payment\Enums\PaymentAllocationState;
 use Modules\Payment\Enums\PaymentDocumentStatus;
 use Modules\Payment\Enums\PaymentInstrumentStatus;
@@ -94,7 +95,8 @@ final class PaymentCreationService
                 if (! $method instanceof PaymentMethod) {
                     throw new InvalidArgumentException('Payment method was not found while creating payment lines.');
                 }
-                PaymentLine::query()->create([
+                $paymentLine = new PaymentLine();
+                $paymentLine->forceFill([
                     'tenant_id' => $data->tenantId,
                     'organization_unit_id' => $data->organizationUnitId,
                     'payment_id' => $payment->getKey(),
@@ -123,6 +125,7 @@ final class PaymentCreationService
                     'notes' => $line->notes,
                     'metadata' => $line->metadata,
                 ]);
+                $paymentLine->save();
             }
 
             if ($data->allocations !== []) {
@@ -187,7 +190,7 @@ final class PaymentCreationService
 
         $paymentMethodIds = [];
         foreach ($data->lines as $line) {
-            if ($line->paymentMethodId !== null) {
+            if ($line instanceof PaymentLineData && $line->paymentMethodId !== null) {
                 $paymentMethodIds[] = $line->paymentMethodId;
             }
         }
