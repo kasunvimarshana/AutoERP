@@ -18,7 +18,7 @@ final class RentalRateComponentCatalog
     {
         return [
             $this->definition(RentalRateComponentCode::BaseRental, RentalRateUnit::Month, self::GROUP_CORE, true),
-            $this->definition(RentalRateComponentCode::ExcessKm, RentalRateUnit::Km, self::GROUP_CORE),
+            $this->definition(RentalRateComponentCode::ExcessKm, RentalRateUnit::Kilometre, self::GROUP_CORE),
             $this->definition(RentalRateComponentCode::DriverSalary, RentalRateUnit::Month, self::GROUP_CORE),
             $this->definition(RentalRateComponentCode::NormalOvertime, RentalRateUnit::Hour, self::GROUP_CORE),
             $this->definition(RentalRateComponentCode::DoubleOvertime, RentalRateUnit::Hour, self::GROUP_CORE),
