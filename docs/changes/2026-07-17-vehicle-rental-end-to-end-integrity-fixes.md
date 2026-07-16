@@ -66,7 +66,13 @@ The videos/current evidence do not approve exact rules for partial-period prorat
 
 - `RentalExpenseReversalIntegrityTest`
 - `VehicleServiceRentalAvailabilityIntegrationTest`
-- Existing test suites and frontend checks must pass before merge.
+- `RentalAgreementDraftLifecycleTest`
+- `RentalRateComponentCatalogTest`
+- `VehicleFinanceInvoiceClassificationTest`
+- `VehicleFinanceOptionEnumTest`
+- Free repository-owned GitHub Actions workflow for full SQLite backend, full MySQL backend, frontend typecheck, lint, tests and production build.
+
+The PR is merged only after all workflow jobs pass.
 
 ## Deployment notes
 
