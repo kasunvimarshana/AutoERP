@@ -6,6 +6,7 @@ namespace Modules\Payment\Http\Requests;
 
 use Illuminate\Validation\Rule;
 use Modules\Core\Http\Requests\TenantScopedRequest;
+use Modules\Payment\Constants\PaymentIdempotency;
 use Modules\Payment\DTOs\CreatePaymentData;
 use Modules\Payment\DTOs\PaymentLineData;
 use Modules\Payment\Enums\PaymentDirection;
@@ -21,6 +22,11 @@ final class StorePaymentRequest extends TenantScopedRequest
         return [
             'tenant_id' => ['required', 'integer', 'min:1'],
             'organization_unit_id' => ['nullable', 'integer', 'min:1'],
+            PaymentIdempotency::REQUEST_ATTRIBUTE => [
+                'required',
+                'string',
+                'max:'.PaymentIdempotency::MAX_KEY_LENGTH,
+            ],
             'payment_type' => ['required', Rule::enum(PaymentType::class)],
             'direction' => ['required', Rule::enum(PaymentDirection::class)],
             'payment_date' => ['required', 'date'],
@@ -68,7 +74,17 @@ final class StorePaymentRequest extends TenantScopedRequest
             createdBy: $this->currentUserId(),
             lines: $this->paymentLineData(),
             allocations: $this->paymentAllocationData(),
+            idempotencyKey: trim((string) $this->input(PaymentIdempotency::REQUEST_ATTRIBUTE)),
         );
+    }
+
+    protected function prepareForValidation(): void
+    {
+        parent::prepareForValidation();
+
+        $this->merge([
+            PaymentIdempotency::REQUEST_ATTRIBUTE => $this->header(PaymentIdempotency::REQUEST_HEADER),
+        ]);
     }
 
     private function paymentLineRules(): array
