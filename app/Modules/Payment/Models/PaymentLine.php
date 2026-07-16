@@ -13,8 +13,6 @@ final class PaymentLine extends TenantOwnedModel
 {
     protected $table = 'payment_lines';
 
-    protected $guarded = ['id'];
-
     protected function casts(): array
     {
         return array_merge(parent::casts(), [
