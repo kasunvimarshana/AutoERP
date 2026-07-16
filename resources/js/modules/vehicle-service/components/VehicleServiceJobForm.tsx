@@ -15,7 +15,6 @@ import { useMutationFormGuard } from '@/shared/hooks/useMutationFormGuard';
 import type { NamedResource } from '@/shared/types/common';
 import type { LookupLoadParams } from '@/shared/types/lookup';
 import { businessDateInputValue } from '@/shared/utils/businessDate';
-import type { VehicleServiceCommissionDefault } from '../commissionTypes';
 import {
     createVehicleServiceJob,
     getVehicleServiceJobCreateDefaults,
@@ -25,26 +24,15 @@ import type { CommissionType, VehicleServiceJob, VehicleServiceJobPayload } from
 import { VehicleServiceQuickVehicleModal } from './VehicleServiceQuickVehicleModal';
 
 const ZERO_AMOUNT = '0.000000';
-const ORGANIZATION_DEFAULT_COMMISSION = 'organization_default' as const;
 const COMMISSION_TYPE = {
     NONE: 'none',
     FIXED: 'fixed',
     PERCENTAGE: 'percentage',
 } as const satisfies Record<string, CommissionType>;
-const COMMISSION_TYPE_LABELS = {
-    [COMMISSION_TYPE.NONE]: 'No commission',
-    [COMMISSION_TYPE.FIXED]: 'Fixed amount',
-    [COMMISSION_TYPE.PERCENTAGE]: 'Percentage of whole job',
-} as const satisfies Record<CommissionType, string>;
-type SupervisorCommissionSelection = CommissionType | typeof ORGANIZATION_DEFAULT_COMMISSION;
 const SUPERVISOR_COMMISSION_OPTIONS = [
     { value: COMMISSION_TYPE.NONE, label: 'None' },
     { value: COMMISSION_TYPE.FIXED, label: 'Fixed' },
     { value: COMMISSION_TYPE.PERCENTAGE, label: 'Percentage of whole job' },
-];
-const SUPERVISOR_COMMISSION_CREATE_OPTIONS = [
-    { value: ORGANIZATION_DEFAULT_COMMISSION, label: 'Use organization default' },
-    ...SUPERVISOR_COMMISSION_OPTIONS,
 ];
 const today = businessDateInputValue;
 const decimal = (value: string, fallback = ZERO_AMOUNT) => value.trim() || fallback;
@@ -62,20 +50,6 @@ const vehicleCustomer = (selectedVehicle: VehicleLookupResource | null, fallback
 };
 const currentCustomerOwner = (vehicle: VehicleLookupResource | null, fallback: NamedResource | null) =>
     vehicle?.current_customer?.name ?? fallback?.name ?? '-';
-const displayDecimal = (value: string): string => {
-    const [whole, fraction = ''] = value.split('.');
-    const trimmedFraction = fraction.replace(/0+$/, '');
-
-    return trimmedFraction ? `${whole}.${trimmedFraction}` : whole;
-};
-const commissionDefaultSummary = (value: VehicleServiceCommissionDefault): string => {
-    const label = COMMISSION_TYPE_LABELS[value.commission_type];
-
-    if (value.commission_type === COMMISSION_TYPE.NONE) return label;
-
-    const suffix = value.commission_type === COMMISSION_TYPE.PERCENTAGE ? '%' : '';
-    return `${label} — ${displayDecimal(value.commission_value)}${suffix}`;
-};
 
 export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
     const navigate = useNavigate();
@@ -94,8 +68,8 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
     const [form, setForm] = useState({
         job_date: job?.job_date ?? today(),
         expected_delivery_date: job?.expected_delivery_date ?? '',
-        supervisor_commission_type: (job?.supervisor_commission_type ?? ORGANIZATION_DEFAULT_COMMISSION) as SupervisorCommissionSelection,
-        supervisor_commission_value: job?.supervisor_commission_value ?? ZERO_AMOUNT,
+        supervisor_commission_type: (job?.supervisor_commission_type ?? null) as CommissionType | null,
+        supervisor_commission_value: (job?.supervisor_commission_value ?? null) as string | null,
         odometer_reading: job?.odometer_reading ?? '',
         fuel_level: job?.fuel_level ?? '',
         priority: job?.priority ?? 'normal',
@@ -116,32 +90,38 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
     const searchSupervisor = useCallback((params: LookupLoadParams) => lookupApi.availableEmployees(params), []);
 
     const usesOrganizationDefault = isCreating
-        && form.supervisor_commission_type === ORGANIZATION_DEFAULT_COMMISSION;
-    const organizationDefaultUnavailable = usesOrganizationDefault
-        && supervisor !== null
-        && (organizationDefault.loading || organizationDefault.error !== null || organizationDefault.data === null);
+        && form.supervisor_commission_type === null
+        && form.supervisor_commission_value === null;
+    const displayedCommissionType: CommissionType | '' = usesOrganizationDefault
+        ? organizationDefault.data?.commission_type ?? ''
+        : form.supervisor_commission_type ?? '';
     const displayedCommissionValue = usesOrganizationDefault
         ? organizationDefault.data?.commission_value ?? ''
-        : form.supervisor_commission_value;
+        : form.supervisor_commission_value ?? '';
+    const commissionUnavailable = supervisor !== null && displayedCommissionType === '';
     const supervisorCommissionHint = job
-        ? 'This stored whole-job commission snapshot can be explicitly updated.'
-        : usesOrganizationDefault
-            ? 'The resolved organization value is shown below.'
-            : 'This explicit whole-job override will be stored on the job.';
+        ? 'Stored job commission snapshot.'
+        : usesOrganizationDefault && organizationDefault.loading
+            ? 'Loading organization default...'
+            : usesOrganizationDefault && organizationDefault.error
+                ? 'Unable to load the organization default. Select a commission type or retry.'
+                : usesOrganizationDefault
+                    ? 'Loaded from organization default.'
+                    : 'Custom value for this job.';
 
     const supervisorCommissionPayload = (): Partial<Pick<
         VehicleServiceJobPayload,
         'supervisor_commission_type' | 'supervisor_commission_value'
     >> => {
-        if (form.supervisor_commission_type === ORGANIZATION_DEFAULT_COMMISSION) {
+        if (supervisor === null || displayedCommissionType === '') {
             return {};
         }
 
         return {
-            supervisor_commission_type: form.supervisor_commission_type,
-            supervisor_commission_value: form.supervisor_commission_type === COMMISSION_TYPE.NONE
+            supervisor_commission_type: displayedCommissionType,
+            supervisor_commission_value: displayedCommissionType === COMMISSION_TYPE.NONE
                 ? ZERO_AMOUNT
-                : decimal(form.supervisor_commission_value),
+                : decimal(displayedCommissionValue),
         };
     };
 
@@ -172,21 +152,29 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
         }
     }, [form.odometer_reading, formGuard, updateForm]);
 
-    const applySupervisorCommissionType = useCallback((next: SupervisorCommissionSelection) => {
+    const applySupervisorCommissionType = useCallback((next: CommissionType) => {
         updateForm((current) => ({
             ...current,
             supervisor_commission_type: next,
-            supervisor_commission_value: next === ORGANIZATION_DEFAULT_COMMISSION || next === COMMISSION_TYPE.NONE
-                ? ZERO_AMOUNT
-                : current.supervisor_commission_value,
+            supervisor_commission_value: ZERO_AMOUNT,
         }));
     }, [updateForm]);
+
+    const applySupervisorCommissionValue = useCallback((next: string) => {
+        if (displayedCommissionType === '') return;
+
+        updateForm((current) => ({
+            ...current,
+            supervisor_commission_type: displayedCommissionType,
+            supervisor_commission_value: next,
+        }));
+    }, [displayedCommissionType, updateForm]);
 
     return (
         <>
             <form className="space-y-5" onSubmit={async (event) => {
                 event.preventDefault();
-                if (organizationDefaultUnavailable) return;
+                if (commissionUnavailable) return;
 
                 setSubmitting(true);
                 setError(null);
@@ -264,33 +252,34 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
                             { value: 'high', label: 'High' },
                             { value: 'urgent', label: 'Urgent' },
                         ]} onChange={(event) => updateForm({ ...form, priority: event.target.value })} />
-                        <Select
-                            label="Supervisor commission"
-                            value={form.supervisor_commission_type}
-                            options={job ? SUPERVISOR_COMMISSION_OPTIONS : SUPERVISOR_COMMISSION_CREATE_OPTIONS}
-                            hint={supervisorCommissionHint}
-                            onChange={(event) => applySupervisorCommissionType(event.target.value as SupervisorCommissionSelection)}
-                        />
+                        <div>
+                            <Select
+                                label="Supervisor commission"
+                                value={displayedCommissionType}
+                                options={SUPERVISOR_COMMISSION_OPTIONS}
+                                placeholder={usesOrganizationDefault && organizationDefault.loading
+                                    ? 'Loading organization default...'
+                                    : 'Select commission type'}
+                                hint={supervisorCommissionHint}
+                                onChange={(event) => applySupervisorCommissionType(event.target.value as CommissionType)}
+                            />
+                            {isCreating && usesOrganizationDefault && organizationDefault.error && (
+                                <button
+                                    type="button"
+                                    className="mt-1 text-xs font-semibold text-sky-700 hover:text-sky-900"
+                                    onClick={organizationDefault.reload}
+                                >
+                                    Retry organization default
+                                </button>
+                            )}
+                        </div>
                         <DecimalInput
                             label="Commission value"
                             value={displayedCommissionValue}
                             error={errorFor('supervisor_commission_value')}
-                            disabled={form.supervisor_commission_type === ORGANIZATION_DEFAULT_COMMISSION
-                                || form.supervisor_commission_type === COMMISSION_TYPE.NONE}
-                            onChange={(event) => updateForm({ ...form, supervisor_commission_value: event.target.value })}
+                            disabled={displayedCommissionType === '' || displayedCommissionType === COMMISSION_TYPE.NONE}
+                            onChange={(event) => applySupervisorCommissionValue(event.target.value)}
                         />
-                        {isCreating && <div className="rounded-lg border border-sky-100 bg-sky-50 px-4 py-3 text-sm md:col-span-2 xl:col-span-4" aria-live="polite">
-                            <p className="font-semibold text-sky-950">Organization commission default</p>
-                            {organizationDefault.loading && <p className="mt-1 text-sky-800">Loading the active organization default...</p>}
-                            {organizationDefault.error && <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
-                                <p className="text-rose-700">Unable to load the organization commission default. Retry, or choose an explicit commission before saving a job with a supervisor.</p>
-                                <Button type="button" variant="secondary" className="min-h-8 px-3 py-1" onClick={organizationDefault.reload}>Retry</Button>
-                            </div>}
-                            {organizationDefault.data && <>
-                                <strong className="mt-1 block text-sky-950">{commissionDefaultSummary(organizationDefault.data)}</strong>
-                                <p className="mt-1 text-sky-800">This applies only when a supervisor is selected. The server confirms the active default again when the draft is saved.</p>
-                            </>}
-                        </div>}
                     </div>
                     {vehicle && <div className="mt-4 grid gap-3 rounded-lg border border-sky-100 bg-sky-50 p-4 text-sm sm:grid-cols-2 xl:grid-cols-5">
                         <VehicleContext label="Registration" value={vehicle.registration_number ?? vehicle.name} />
@@ -306,7 +295,7 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
                 </Panel>
                 <div className="flex justify-end gap-2">
                     <Button type="button" variant="secondary" onClick={() => navigate(-1)}>Cancel</Button>
-                    <Button type="submit" loading={submitting} disabled={organizationDefaultUnavailable}>{job ? 'Save job' : 'Save draft'}</Button>
+                    <Button type="submit" loading={submitting} disabled={commissionUnavailable}>{job ? 'Save job' : 'Save draft'}</Button>
                 </div>
             </form>
             <VehicleServiceQuickVehicleModal
