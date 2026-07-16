@@ -94,6 +94,35 @@ function editableDraftRate(agreement: RentalAgreement): RentalRateVersion | null
     return agreement.rate_versions?.find((version) => version.status === "draft") ?? null;
 }
 
+function resolveRateDefinitions(metadata: unknown): RateComponentDefinition[] {
+    const source = metadata as
+        | {
+              rate_component_definitions?: RateComponentDefinition[];
+              rate_component_codes?: string[];
+              rate_units?: string[];
+          }
+        | undefined;
+    if (source?.rate_component_definitions?.length) {
+        return source.rate_component_definitions;
+    }
+
+    if (
+        source?.rate_component_codes?.length === 1 &&
+        source.rate_units?.length === 1
+    ) {
+        return [
+            {
+                code: source.rate_component_codes[0],
+                unit: source.rate_units[0],
+                group: "core",
+                required: true,
+            },
+        ];
+    }
+
+    return [];
+}
+
 interface RentalAgreementCreatePageProps {
     mode?: RentalAgreementPageMode;
 }
@@ -162,14 +191,9 @@ export default function RentalAgreementCreatePage({
         setForm(next);
     };
 
-    const metadataWithDefinitions = metadata as
-        | (typeof metadata & {
-              rate_component_definitions?: RateComponentDefinition[];
-          })
-        | undefined;
     const componentDefinitions = useMemo(
-        () => metadataWithDefinitions?.rate_component_definitions ?? [],
-        [metadataWithDefinitions?.rate_component_definitions],
+        () => resolveRateDefinitions(metadata),
+        [metadata],
     );
     const coreComponents = useMemo(
         () => componentDefinitions.filter((definition) => definition.group === "core"),
@@ -370,6 +394,7 @@ export default function RentalAgreementCreatePage({
                 (loadedAgreement.deposit_requirement.links?.length ?? 0) > 0),
     );
     const rateEditable = !isEditing || Boolean(draftRate && !structuralFieldsLocked);
+    const showRatePanel = !isEditing || draftRate !== null || hasCommittedRate;
     const errorFor = (field: string) => fieldError(error, field);
     const partyValid = useMemo(
         () =>
@@ -449,17 +474,26 @@ export default function RentalAgreementCreatePage({
                 remarks: form.remarks,
                 terms: normalizedTerms,
             };
-            const updatePayload = {
+            const unlockedUpdatePayload = {
                 ...commonPayload,
                 ...(draftRate && rateEditable
                     ? { rate_version: rateVersionPayload(draftRate) }
                     : {}),
             };
+            const lockedUpdatePayload = {
+                agreement_date: form.agreement_date,
+                executed_at: form.executed_at || null,
+                legal_context: form.legal_context,
+                remarks: form.remarks,
+                terms: normalizedTerms,
+            };
             const row = isEditing
                 ? await updateRentalAgreement(
                       routeAgreementId,
                       loadedAgreement?.row_version ?? 0,
-                      updatePayload,
+                      structuralFieldsLocked
+                          ? lockedUpdatePayload
+                          : unlockedUpdatePayload,
                   )
                 : await createRentalAgreement({
                       ...commonPayload,
@@ -506,7 +540,18 @@ export default function RentalAgreementCreatePage({
               : isEditing
                 ? "Edit rental agreement"
                 : "New rental agreement";
-    const submitLabel = isEditing ? "Save draft" : "Create draft";
+    const submitLabel =
+        mode === "lessee"
+            ? isEditing
+                ? "Update lessee agreement"
+                : "Create lessee agreement"
+            : mode === "lessor"
+              ? isEditing
+                  ? "Update lessor agreement"
+                  : "Create lessor agreement"
+              : isEditing
+                ? "Update agreement"
+                : "Create agreement";
 
     if (loadingAgreement) {
         return (
@@ -759,35 +804,28 @@ export default function RentalAgreementCreatePage({
                     </div>
                 </Panel>
 
-                <Panel title={`${commercialSideLabel} rates`}>
-                    {!rateEditable ? (
-                        <p className="text-sm text-slate-600">
-                            Committed rate history is immutable. Create a governed successor
-                            rate version from the agreement details when a future rate change
-                            is required.
-                        </p>
-                    ) : componentDefinitions.length === 0 ? (
-                        <p className="text-sm text-rose-600">
-                            Rate definitions are unavailable. Reload before saving this draft.
-                        </p>
-                    ) : (
-                        <>
-                            <p className="mb-4 text-sm text-slate-600">
-                                These draft rates remain editable until agreement activation.
+                {showRatePanel && (
+                    <Panel title={`${commercialSideLabel} core rates`}>
+                        {!rateEditable ? (
+                            <p className="text-sm text-slate-600">
+                                Committed rate history is immutable. Create a governed
+                                successor rate version from the agreement details when a
+                                future rate change is required.
                             </p>
-                            <RateInputs
-                                title="Core rates"
-                                definitions={coreComponents}
-                                rates={rates}
-                                onChange={(code, value) => {
-                                    markDirty();
-                                    setRates((current) => ({ ...current, [code]: value }));
-                                }}
-                            />
-                            <div className="mt-5">
+                        ) : componentDefinitions.length === 0 ? (
+                            <p className="text-sm text-rose-600">
+                                Rate definitions are unavailable. Reload before saving this
+                                draft.
+                            </p>
+                        ) : (
+                            <>
+                                <p className="mb-4 text-sm text-slate-600">
+                                    These draft rates remain editable until agreement
+                                    activation.
+                                </p>
                                 <RateInputs
-                                    title="Event rates"
-                                    definitions={eventComponents}
+                                    title="Core rates"
+                                    definitions={coreComponents}
                                     rates={rates}
                                     onChange={(code, value) => {
                                         markDirty();
@@ -797,10 +835,26 @@ export default function RentalAgreementCreatePage({
                                         }));
                                     }}
                                 />
-                            </div>
-                        </>
-                    )}
-                </Panel>
+                                {eventComponents.length > 0 && (
+                                    <div className="mt-5">
+                                        <RateInputs
+                                            title="Event rates"
+                                            definitions={eventComponents}
+                                            rates={rates}
+                                            onChange={(code, value) => {
+                                                markDirty();
+                                                setRates((current) => ({
+                                                    ...current,
+                                                    [code]: value,
+                                                }));
+                                            }}
+                                        />
+                                    </div>
+                                )}
+                            </>
+                        )}
+                    </Panel>
+                )}
 
                 <Panel
                     title={
@@ -907,13 +961,13 @@ export default function RentalAgreementCreatePage({
                         disabled={
                             !partyValid ||
                             !currency ||
-                            componentDefinitions.length === 0 ||
+                            (!isEditing && componentDefinitions.length === 0) ||
                             !form.legal_context ||
                             !form.rental_mode ||
                             !form.billing_cycle ||
                             !form.billing_basis ||
                             !form.proration_rule ||
-                            !form.excess_km_method
+                            (!isEditing && !form.excess_km_method)
                         }
                     >
                         {submitLabel}
