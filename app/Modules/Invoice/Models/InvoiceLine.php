@@ -17,8 +17,6 @@ final class InvoiceLine extends TenantOwnedModel
 {
     protected $table = 'invoice_lines';
 
-    protected $guarded = ['id'];
-
     protected function casts(): array
     {
         return array_merge(parent::casts(), [
