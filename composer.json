@@ -62,6 +62,9 @@
             "@php artisan auth:readiness --no-interaction",
             "@php artisan platform:health --no-interaction"
         ],
+        "security:audit": [
+            "@composer audit --locked --no-interaction"
+        ],
         "dev": [
             "Composer\\Config::disableProcessTimeout",
             "@runtime:check",
