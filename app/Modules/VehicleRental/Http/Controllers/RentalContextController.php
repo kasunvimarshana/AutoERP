@@ -31,12 +31,16 @@ use Modules\VehicleRental\Models\RentalAgreement;
 use Modules\VehicleRental\Models\RentalCalculationRun;
 use Modules\VehicleRental\Models\RentalUsageLog;
 use Modules\VehicleRental\Models\RentalVehicleAllocation;
+use Modules\VehicleRental\Services\RentalRateComponentCatalog;
 use Modules\VehicleRental\Services\RentalUsageEventBillingMap;
 use Modules\VehicleRental\Services\VehicleRentalAuthorizationService;
 
 final class RentalContextController
 {
-    public function __construct(private readonly VehicleRentalAuthorizationService $authorization) {}
+    public function __construct(
+        private readonly VehicleRentalAuthorizationService $authorization,
+        private readonly RentalRateComponentCatalog $rateComponents,
+    ) {}
 
     public function metadata(ListRentalRequest $request): JsonResponse
     {
@@ -81,6 +85,7 @@ final class RentalContextController
             'financial_sides' => $values(RentalFinancialSide::cases()),
             'rate_component_codes' => $values(RentalRateComponentCode::cases()),
             'rate_units' => $values(RentalRateUnit::cases()),
+            'rate_component_definitions' => $this->rateComponents->definitions(),
         ]]);
     }
 
