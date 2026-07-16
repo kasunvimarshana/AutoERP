@@ -27,6 +27,8 @@ final class ReportDataFactory
         ?int $organizationUnitId,
         array $input = [],
         string $mode = 'preview',
+        ?int $rowLimit = null,
+        bool $truncated = false,
     ): ReportData {
         return new ReportData(
             definition: $definition,
@@ -37,6 +39,8 @@ final class ReportDataFactory
             generatedAt: new DateTimeImmutable,
             template: $this->templates->resolve($definition),
             mode: $mode,
+            rowLimit: $rowLimit,
+            truncated: $truncated,
         );
     }
 
