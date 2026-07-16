@@ -34,6 +34,8 @@ const SUPERVISOR_COMMISSION_OPTIONS = [
     { value: COMMISSION_TYPE.FIXED, label: 'Fixed' },
     { value: COMMISSION_TYPE.PERCENTAGE, label: 'Percentage of whole job' },
 ];
+const isCommissionType = (value: string): value is CommissionType =>
+    Object.values(COMMISSION_TYPE).includes(value as CommissionType);
 const today = businessDateInputValue;
 const decimal = (value: string, fallback = ZERO_AMOUNT) => value.trim() || fallback;
 const customerLabel = (customer: NamedResource | null) => customer ? `${customer.code ?? ''} ${customer.name}`.trim() : '';
@@ -152,7 +154,9 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
         }
     }, [form.odometer_reading, formGuard, updateForm]);
 
-    const applySupervisorCommissionType = useCallback((next: CommissionType) => {
+    const applySupervisorCommissionType = useCallback((next: string) => {
+        if (!isCommissionType(next)) return;
+
         updateForm((current) => ({
             ...current,
             supervisor_commission_type: next,
@@ -261,7 +265,7 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
                                     ? 'Loading organization default...'
                                     : 'Select commission type'}
                                 hint={supervisorCommissionHint}
-                                onChange={(event) => applySupervisorCommissionType(event.target.value as CommissionType)}
+                                onChange={(event) => applySupervisorCommissionType(event.target.value)}
                             />
                             {isCreating && usesOrganizationDefault && organizationDefault.error && (
                                 <button
