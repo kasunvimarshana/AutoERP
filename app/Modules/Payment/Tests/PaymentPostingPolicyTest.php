@@ -12,13 +12,14 @@ use Modules\Payment\Enums\PaymentSourceType;
 use Modules\Payment\Enums\PaymentType;
 use Modules\Payment\Models\Payment;
 use Modules\Payment\Services\PaymentPostingPolicyService;
+use Modules\Payment\Services\PaymentRefundPolicyService;
 use PHPUnit\Framework\TestCase;
 
 final class PaymentPostingPolicyTest extends TestCase
 {
     public function test_customer_receipt_splits_settlement_and_unapplied_advance_roles(): void
     {
-        $policy = (new PaymentPostingPolicyService())->resolve($this->payment(
+        $policy = $this->policy()->resolve($this->payment(
             PaymentType::CustomerReceipt,
             PaymentDirection::Inbound,
             'customer',
@@ -31,7 +32,7 @@ final class PaymentPostingPolicyTest extends TestCase
 
     public function test_rental_deposit_uses_receivable_for_invoice_application_and_customer_deposit_for_unapplied_balance(): void
     {
-        $policy = (new PaymentPostingPolicyService())->resolve($this->payment(
+        $policy = $this->policy()->resolve($this->payment(
             PaymentType::Advance,
             PaymentDirection::Inbound,
             'customer',
@@ -45,7 +46,7 @@ final class PaymentPostingPolicyTest extends TestCase
 
     public function test_supplier_advance_uses_supplier_advance_asset(): void
     {
-        $policy = (new PaymentPostingPolicyService())->resolve($this->payment(
+        $policy = $this->policy()->resolve($this->payment(
             PaymentType::Advance,
             PaymentDirection::Outbound,
             'supplier',
@@ -61,11 +62,16 @@ final class PaymentPostingPolicyTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Advance payment accounting requires an inbound customer or outbound supplier party.');
 
-        (new PaymentPostingPolicyService())->resolve($this->payment(
+        $this->policy()->resolve($this->payment(
             PaymentType::Advance,
             PaymentDirection::Inbound,
             null,
         ));
+    }
+
+    private function policy(): PaymentPostingPolicyService
+    {
+        return new PaymentPostingPolicyService(new PaymentRefundPolicyService());
     }
 
     private function payment(
