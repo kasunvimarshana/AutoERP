@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use LogicException;
 use Modules\Core\Services\DecimalMath;
+use Modules\Customer\Models\Customer;
 use Modules\Idempotency\Enums\IdempotencyStatus;
 use Modules\Idempotency\Models\IdempotencyRecord;
 use Modules\Idempotency\Services\IdempotencyService;
@@ -22,6 +23,8 @@ use Modules\Payment\Models\Payment;
 use Modules\Payment\Models\PaymentLine;
 use Modules\Payment\Models\PaymentMethod;
 use Modules\Payment\Validators\PaymentValidationService;
+use Modules\ReferenceData\Models\CurrencyModel;
+use Modules\Supplier\Models\Supplier;
 
 final class PaymentCreationService
 {
@@ -46,8 +49,7 @@ final class PaymentCreationService
                 return $this->replayCompletedPayment($idempotencyRecord, $data);
             }
 
-            // Authoritative mutable-reference validation belongs inside the same
-            // transaction as payment creation and idempotency completion.
+            $this->lockMutableReferences($data);
             $this->validator->validateForCreation($data);
 
             $calculation = $this->calculations->calculateForCreation($data);
@@ -88,7 +90,7 @@ final class PaymentCreationService
 
             $this->recordInitialEvents($payment, $instrumentStatus, $data->createdBy);
             foreach ($data->lines as $index => $line) {
-                $method = PaymentMethod::query()->lockForUpdate()->find($line->paymentMethodId);
+                $method = PaymentMethod::query()->find($line->paymentMethodId);
                 if (! $method instanceof PaymentMethod) {
                     throw new InvalidArgumentException('Payment method was not found while creating payment lines.');
                 }
@@ -155,9 +157,49 @@ final class PaymentCreationService
             PaymentIdempotency::CREATE_OPERATION,
             hash('sha256', $key),
             $this->payloadHasher->hash($data),
-            $key,
-            $data->createdBy,
+            createdBy: $data->createdBy,
         );
+    }
+
+    private function lockMutableReferences(CreatePaymentData $data): void
+    {
+        if ($data->originalPaymentId !== null) {
+            Payment::query()
+                ->whereKey($data->originalPaymentId)
+                ->lockForUpdate()
+                ->first();
+        }
+
+        if ($data->partyId !== null) {
+            match ($data->partyType) {
+                'customer' => Customer::query()->whereKey($data->partyId)->lockForUpdate()->first(),
+                'supplier' => Supplier::query()->whereKey($data->partyId)->lockForUpdate()->first(),
+                default => null,
+            };
+        }
+
+        if ($data->currencyId !== null) {
+            CurrencyModel::query()
+                ->whereKey($data->currencyId)
+                ->lockForUpdate()
+                ->first();
+        }
+
+        $paymentMethodIds = [];
+        foreach ($data->lines as $line) {
+            if ($line->paymentMethodId !== null) {
+                $paymentMethodIds[] = $line->paymentMethodId;
+            }
+        }
+        $paymentMethodIds = array_values(array_unique($paymentMethodIds));
+        sort($paymentMethodIds, SORT_NUMERIC);
+        if ($paymentMethodIds !== []) {
+            PaymentMethod::query()
+                ->whereIn('id', $paymentMethodIds)
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+        }
     }
 
     private function replayCompletedPayment(IdempotencyRecord $record, CreatePaymentData $data): Payment
