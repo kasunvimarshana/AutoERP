@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\VehicleService\Services;
 
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Vehicle\Enums\VehicleStatus;
@@ -45,7 +46,23 @@ final class VehicleServiceStatusService
         ?int $expectedVersion = null,
     ): VehicleServiceJob {
         return DB::transaction(function () use ($job, $status, $changedBy, $reason, $expectedVersion): VehicleServiceJob {
-            $job = VehicleServiceJob::query()->lockForUpdate()->findOrFail($job->getKey());
+            $snapshot = VehicleServiceJob::query()
+                ->select(['id', 'tenant_id', 'organization_unit_id', 'vehicle_id'])
+                ->findOrFail($job->getKey());
+            $vehicle = Vehicle::query()
+                ->where('tenant_id', $snapshot->tenant_id)
+                ->lockForUpdate()
+                ->findOrFail($snapshot->vehicle_id);
+            $vehicleJobs = VehicleServiceJob::query()
+                ->forContext((int) $snapshot->tenant_id, $snapshot->organization_unit_id)
+                ->where('vehicle_id', $snapshot->vehicle_id)
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+            $job = $vehicleJobs->firstWhere('id', $snapshot->getKey());
+            if (! $job instanceof VehicleServiceJob) {
+                throw new InvalidArgumentException('Vehicle service job changed while its vehicle timeline was being locked.');
+            }
             $this->assertExpectedVersion($job, $expectedVersion);
 
             $old = $job->status;
@@ -55,11 +72,6 @@ final class VehicleServiceStatusService
             if (! in_array($status->value, self::TRANSITIONS[$old->value] ?? [], true)) {
                 throw new InvalidArgumentException("Invalid service job status transition from {$old->value} to {$status->value}.");
             }
-
-            $vehicle = Vehicle::query()
-                ->where('tenant_id', $job->tenant_id)
-                ->lockForUpdate()
-                ->findOrFail($job->vehicle_id);
 
             if ($status === VehicleServiceJobStatus::InProgress) {
                 $this->assertVehicleCanEnterService($vehicle);
@@ -74,7 +86,14 @@ final class VehicleServiceStatusService
             }
             $job->save();
 
-            $this->synchronizeVehicleStatus($job, $vehicle, $old, $status, $changedBy);
+            $this->synchronizeVehicleStatus(
+                $job,
+                $vehicle,
+                $vehicleJobs,
+                $old,
+                $status,
+                $changedBy,
+            );
 
             VehicleServiceStatusHistory::query()->create([
                 'tenant_id' => $job->tenant_id,
@@ -111,9 +130,11 @@ final class VehicleServiceStatusService
         }
     }
 
+    /** @param Collection<int, VehicleServiceJob> $vehicleJobs */
     private function synchronizeVehicleStatus(
         VehicleServiceJob $job,
         Vehicle $vehicle,
+        Collection $vehicleJobs,
         VehicleServiceJobStatus $from,
         VehicleServiceJobStatus $to,
         ?int $changedBy,
@@ -135,16 +156,11 @@ final class VehicleServiceStatusService
             return;
         }
 
-        $otherInProgressJobs = VehicleServiceJob::query()
-            ->forContext((int) $job->tenant_id, $job->organization_unit_id)
-            ->where('vehicle_id', $job->vehicle_id)
-            ->whereKeyNot($job->getKey())
-            ->where('status', VehicleServiceJobStatus::InProgress->value)
-            ->orderBy('id')
-            ->lockForUpdate()
-            ->get(['id']);
-
-        if ($otherInProgressJobs->isNotEmpty()) {
+        $otherInProgressJobs = $vehicleJobs->contains(
+            fn (VehicleServiceJob $candidate): bool => (int) $candidate->getKey() !== (int) $job->getKey()
+                && $candidate->status === VehicleServiceJobStatus::InProgress,
+        );
+        if ($otherInProgressJobs) {
             return;
         }
 
