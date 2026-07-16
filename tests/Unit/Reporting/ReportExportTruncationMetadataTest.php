@@ -45,7 +45,7 @@ final class ReportExportTruncationMetadataTest extends TestCase
 
         self::assertStringContainsString('role="alert"', $html);
         self::assertStringContainsString(
-            'This report is limited to 1 rows. Refine the filters before using it as a complete operational or financial record.',
+            'This report is limited to 1 row. Refine the filters before using it as a complete operational or financial record.',
             $html,
         );
     }
