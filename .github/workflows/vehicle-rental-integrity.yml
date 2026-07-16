@@ -1,6 +1,9 @@
 name: Vehicle Rental Integrity
 
 on:
+  push:
+    branches:
+      - "agent/vehicle-rental-end-to-end-fixes"
   pull_request:
     branches:
       - worktree-0.0.8
