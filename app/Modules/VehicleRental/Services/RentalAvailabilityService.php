@@ -50,16 +50,12 @@ final class RentalAvailabilityService
             throw new InvalidArgumentException('Vehicle availability end must be after its start.');
         }
 
-        $vehicle = Vehicle::query()
-            ->where('tenant_id', $tenantId)
-            ->when(
-                $organizationUnitId === null,
-                fn (Builder $query) => $query->whereNull('organization_unit_id'),
-                fn (Builder $query) => $query->where('organization_unit_id', $organizationUnitId),
-            )
-            ->whereNotIn('status', self::BLOCKING_VEHICLE_STATUSES)
+        $vehicle = $this->scopedVehicleQuery($tenantId, $organizationUnitId)
             ->lockForUpdate()
             ->findOrFail($vehicleId);
+        if (in_array($vehicle->status->value, self::BLOCKING_VEHICLE_STATUSES, true)) {
+            throw new InvalidArgumentException('Vehicle is not available for rental in its current status.');
+        }
 
         $allocationConflict = RentalVehicleAllocation::query()
             ->forContext($tenantId, $organizationUnitId)
@@ -103,13 +99,7 @@ final class RentalAvailabilityService
             throw new InvalidArgumentException('Vehicle availability end must be after its start.');
         }
 
-        return Vehicle::query()
-            ->where('tenant_id', $tenantId)
-            ->when(
-                $organizationUnitId === null,
-                fn (Builder $query) => $query->whereNull('organization_unit_id'),
-                fn (Builder $query) => $query->where('organization_unit_id', $organizationUnitId),
-            )
+        return $this->scopedVehicleQuery($tenantId, $organizationUnitId)
             ->whereNotIn('status', self::BLOCKING_VEHICLE_STATUSES)
             ->when($categoryId !== null, fn (Builder $query) => $query->where('vehicle_category_id', $categoryId))
             ->when($search !== null && trim($search) !== '', function (Builder $query) use ($search): void {
@@ -133,5 +123,16 @@ final class RentalAvailabilityService
                 ->where('requested_start_at', '<', $endAt)
                 ->where('requested_end_at', '>', $startAt))
             ->with(['make', 'model', 'type', 'category']);
+    }
+
+    private function scopedVehicleQuery(int $tenantId, ?int $organizationUnitId): Builder
+    {
+        return Vehicle::query()
+            ->where('tenant_id', $tenantId)
+            ->when(
+                $organizationUnitId === null,
+                fn (Builder $query) => $query->whereNull('organization_unit_id'),
+                fn (Builder $query) => $query->where('organization_unit_id', $organizationUnitId),
+            );
     }
 }
