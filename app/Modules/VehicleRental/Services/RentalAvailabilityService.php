@@ -16,6 +16,15 @@ use Modules\VehicleRental\Models\RentalVehicleAllocation;
 final class RentalAvailabilityService
 {
     /** @var list<string> */
+    private const BLOCKING_VEHICLE_STATUSES = [
+        VehicleStatus::Inactive->value,
+        VehicleStatus::UnderService->value,
+        VehicleStatus::Sold->value,
+        VehicleStatus::Blocked->value,
+        VehicleStatus::Scrapped->value,
+    ];
+
+    /** @var list<string> */
     private const BLOCKING_ALLOCATION_STATUSES = [
         RentalAllocationStatus::Planned->value,
         RentalAllocationStatus::Active->value,
@@ -48,12 +57,7 @@ final class RentalAvailabilityService
                 fn (Builder $query) => $query->whereNull('organization_unit_id'),
                 fn (Builder $query) => $query->where('organization_unit_id', $organizationUnitId),
             )
-            ->whereNotIn('status', [
-                VehicleStatus::Inactive->value,
-                VehicleStatus::Sold->value,
-                VehicleStatus::Blocked->value,
-                VehicleStatus::Scrapped->value,
-            ])
+            ->whereNotIn('status', self::BLOCKING_VEHICLE_STATUSES)
             ->lockForUpdate()
             ->findOrFail($vehicleId);
 
@@ -106,12 +110,7 @@ final class RentalAvailabilityService
                 fn (Builder $query) => $query->whereNull('organization_unit_id'),
                 fn (Builder $query) => $query->where('organization_unit_id', $organizationUnitId),
             )
-            ->whereNotIn('status', [
-                VehicleStatus::Inactive->value,
-                VehicleStatus::Sold->value,
-                VehicleStatus::Blocked->value,
-                VehicleStatus::Scrapped->value,
-            ])
+            ->whereNotIn('status', self::BLOCKING_VEHICLE_STATUSES)
             ->when($categoryId !== null, fn (Builder $query) => $query->where('vehicle_category_id', $categoryId))
             ->when($search !== null && trim($search) !== '', function (Builder $query) use ($search): void {
                 $value = trim($search);
