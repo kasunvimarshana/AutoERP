@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { endpoints } from '@/shared/api/endpoints';
 import {
     createPayment,
@@ -27,6 +27,10 @@ const payload: PaymentPayload = {
 describe('payment create API idempotency', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+    });
+
+    afterEach(() => {
+        vi.restoreAllMocks();
     });
 
     it('reuses one idempotency key when an exact create request is retried after an uncertain failure', async () => {
