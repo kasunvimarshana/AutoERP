@@ -84,8 +84,9 @@
     <div class="report-content">
         @include('reports.shared.header')
         @if ($truncated)
+            @php($rowLabel = (int) $rowLimit === 1 ? 'row' : 'rows')
             <div class="report-warning" role="alert">
-                This report is limited to {{ number_format((int) $rowLimit) }} rows. Refine the filters before using it as a complete operational or financial record.
+                This report is limited to {{ number_format((int) $rowLimit) }} {{ $rowLabel }}. Refine the filters before using it as a complete operational or financial record.
             </div>
         @endif
         @section('report-content')
