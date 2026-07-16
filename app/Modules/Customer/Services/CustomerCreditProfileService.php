@@ -43,9 +43,13 @@ final class CustomerCreditProfileService
                 throw new ConflictHttpException('Customer credit profile no longer exists. Reload before saving.');
             }
 
-            return CustomerCreditProfile::query()->create($this->attributes($customer, $data) + [
+            $profile = new CustomerCreditProfile();
+            $profile->forceFill($this->attributes($customer, $data) + [
                 'row_version' => 1,
             ]);
+            $profile->save();
+
+            return $profile;
         }, 3);
     }
 
