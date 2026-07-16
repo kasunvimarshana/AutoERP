@@ -21,23 +21,30 @@ use Modules\Invoice\Enums\InvoiceType;
 use Modules\Invoice\Models\Invoice;
 use Modules\Invoice\Services\InvoiceCreationService;
 use Modules\VehicleRental\Enums\VehicleFinanceAgreementStatus;
+use Modules\VehicleRental\Enums\VehicleFinanceInstallmentFrequency;
 use Modules\VehicleRental\Enums\VehicleFinanceInstallmentStatus;
+use Modules\VehicleRental\Enums\VehicleFinanceInterestMethod;
 use Modules\VehicleRental\Models\VehicleFinanceAgreement;
 use Modules\VehicleRental\Models\VehicleFinanceInstallment;
 use Modules\VehicleRental\Models\VehicleFinanceStatusHistory;
 
 final class VehicleFinanceService
 {
-    private const INTEREST_METHOD_CUSTOM = 'custom';
-    private const INTEREST_METHOD_REDUCING_BALANCE = 'reducing_balance';
     private const DAYS_PER_YEAR = '365';
+
     private const PERCENT_DIVISOR = '100';
-    private const INSTALLMENT_PERIODS_PER_YEAR = [
-        'weekly' => '52',
-        'monthly' => '12',
-        'quarterly' => '4',
-        'yearly' => '1',
-    ];
+
+    private const SOURCE_TYPE_INSTALLMENT = 'vehicle_finance_installment';
+
+    private const SOURCE_LINE_TYPE_COMPONENT = 'vehicle_finance_installment_component';
+
+    private const PARTY_TYPE_SUPPLIER = 'supplier';
+
+    private const COMPONENT_PRINCIPAL = 'Principal';
+
+    private const COMPONENT_INTEREST = 'Interest';
+
+    private const COMPONENT_FINANCE_FEE = 'Finance fee';
 
     public function __construct(
         private readonly DecimalMath $math,
@@ -54,13 +61,17 @@ final class VehicleFinanceService
             if (! $maturesAt->greaterThan($startsAt)) {
                 throw new InvalidArgumentException('Vehicle finance maturity must be after its start.');
             }
+
+            $interestMethod = VehicleFinanceInterestMethod::from((string) $data['interest_method']);
+            $installmentFrequency = VehicleFinanceInstallmentFrequency::from((string) $data['installment_frequency']);
             $count = (int) $data['installment_count'];
             if ($count < 1) {
                 throw new InvalidArgumentException('Vehicle finance requires at least one installment.');
             }
-            if ($this->math->compare((string) ($data['initial_deposit_amount'] ?? '0'), (string) $data['principal_amount']) > 0) {
+            if ($this->math->compare((string) $data['initial_deposit_amount'], (string) $data['principal_amount']) > 0) {
                 throw new InvalidArgumentException('Initial finance deposit cannot exceed the principal amount.');
             }
+
             $this->references->supplier((int) $data['supplier_id'], $tenantId, $organizationUnitId);
             $this->references->vehicle((int) $data['vehicle_id'], $tenantId, $organizationUnitId);
             $this->references->currency((int) $data['currency_id']);
@@ -69,12 +80,17 @@ final class VehicleFinanceService
                 $tenantId,
                 $organizationUnitId,
             );
-            $this->validateCustomSchedule($data, $startsAt, $maturesAt);
+            $this->validateCustomSchedule($data, $interestMethod, $startsAt, $maturesAt);
 
             $agreement = VehicleFinanceAgreement::query()->create([
                 'tenant_id' => $tenantId,
                 'organization_unit_id' => $organizationUnitId,
-                'agreement_number' => $data['agreement_number'] ?? $this->numbers->next($tenantId, $organizationUnitId, 'vehicle_finance_agreement', 'VFA-'),
+                'agreement_number' => $data['agreement_number'] ?? $this->numbers->next(
+                    $tenantId,
+                    $organizationUnitId,
+                    'vehicle_finance_agreement',
+                    'VFA-',
+                ),
                 'supplier_id' => $data['supplier_id'],
                 'vehicle_id' => $data['vehicle_id'],
                 'agreement_date' => $data['agreement_date'],
@@ -82,13 +98,13 @@ final class VehicleFinanceService
                 'matures_at' => $maturesAt,
                 'currency_id' => $data['currency_id'],
                 'principal_amount' => $data['principal_amount'],
-                'initial_deposit_amount' => $data['initial_deposit_amount'] ?? '0.000000',
-                'residual_value' => $data['residual_value'] ?? '0.000000',
-                'interest_method' => $data['interest_method'] ?? 'flat',
-                'annual_interest_rate' => $data['annual_interest_rate'] ?? '0.000000',
-                'installment_frequency' => $data['installment_frequency'] ?? 'monthly',
+                'initial_deposit_amount' => $data['initial_deposit_amount'],
+                'residual_value' => $data['residual_value'],
+                'interest_method' => $interestMethod->value,
+                'annual_interest_rate' => $data['annual_interest_rate'],
+                'installment_frequency' => $installmentFrequency->value,
                 'installment_count' => $count,
-                'payment_term_days' => $data['payment_term_days'] ?? 0,
+                'payment_term_days' => $data['payment_term_days'],
                 'tax_group_id' => $data['tax_group_id'] ?? null,
                 'status' => VehicleFinanceAgreementStatus::Draft->value,
                 'remarks' => $data['remarks'] ?? null,
@@ -105,7 +121,10 @@ final class VehicleFinanceService
     public function activate(VehicleFinanceAgreement $agreement, int $expectedVersion, ?int $userId): VehicleFinanceAgreement
     {
         return DB::transaction(function () use ($agreement, $expectedVersion, $userId): VehicleFinanceAgreement {
-            $agreement = VehicleFinanceAgreement::query()->with('installments')->lockForUpdate()->findOrFail($agreement->getKey());
+            $agreement = VehicleFinanceAgreement::query()
+                ->with('installments')
+                ->lockForUpdate()
+                ->findOrFail($agreement->getKey());
             $this->assertAgreementExpectedVersion($agreement, $expectedVersion);
             if ($agreement->status !== VehicleFinanceAgreementStatus::Draft) {
                 throw new InvalidArgumentException('Only a draft vehicle finance agreement can be activated.');
@@ -113,13 +132,20 @@ final class VehicleFinanceService
             if ($agreement->installments->count() !== (int) $agreement->installment_count) {
                 throw new InvalidArgumentException('Installment schedule is incomplete.');
             }
-            $agreement->status = VehicleFinanceAgreementStatus::Active;
-            $agreement->approved_by = $userId;
-            $agreement->approved_at = now();
-            $agreement->row_version = $expectedVersion + 1;
-            $agreement->updated_by = $userId;
-            $agreement->save();
-            $this->history($agreement, VehicleFinanceAgreementStatus::Draft->value, VehicleFinanceAgreementStatus::Active->value, $userId);
+
+            $agreement->forceFill([
+                'status' => VehicleFinanceAgreementStatus::Active->value,
+                'approved_by' => $userId,
+                'approved_at' => now(),
+                'row_version' => $expectedVersion + 1,
+                'updated_by' => $userId,
+            ])->save();
+            $this->history(
+                $agreement,
+                VehicleFinanceAgreementStatus::Draft->value,
+                VehicleFinanceAgreementStatus::Active->value,
+                $userId,
+            );
 
             return $agreement->refresh()->load($this->relations());
         });
@@ -131,10 +157,12 @@ final class VehicleFinanceService
         string $invoiceDate,
         InvoiceStatus $status,
         ?int $userId,
-    ): Invoice
-    {
+    ): Invoice {
         return DB::transaction(function () use ($installment, $expectedVersion, $invoiceDate, $status, $userId): Invoice {
-            $installment = VehicleFinanceInstallment::query()->with('financeAgreement')->lockForUpdate()->findOrFail($installment->getKey());
+            $installment = VehicleFinanceInstallment::query()
+                ->with('financeAgreement')
+                ->lockForUpdate()
+                ->findOrFail($installment->getKey());
             $this->assertInstallmentExpectedVersion($installment, $expectedVersion);
             if ($installment->invoice_id !== null) {
                 $existing = Invoice::query()->findOrFail($installment->invoice_id);
@@ -150,50 +178,54 @@ final class VehicleFinanceService
             $lines = [];
             $sourceLines = [];
             $components = [
-                'Principal' => (string) $installment->principal_due,
-                'Interest' => (string) $installment->interest_due,
-                'Finance fee' => (string) $installment->fee_due,
+                self::COMPONENT_PRINCIPAL => (string) $installment->principal_due,
+                self::COMPONENT_INTEREST => (string) $installment->interest_due,
+                self::COMPONENT_FINANCE_FEE => (string) $installment->fee_due,
             ];
-            $number = 1;
+            $lineNumber = 1;
             foreach ($components as $description => $amount) {
                 if ($this->math->compare($amount, '0') <= 0) {
                     continue;
                 }
-                $sourceLineId = ((int) $installment->getKey() * 10) + $number;
+                $sourceLineId = ((int) $installment->getKey() * 10) + $lineNumber;
+                $taxAmount = $description === self::COMPONENT_FINANCE_FEE
+                    ? (string) $installment->tax_due
+                    : '0.000000';
+                $lineTotal = $this->math->add($amount, $taxAmount);
                 $lines[] = new InvoiceLineData(
-                    lineNumber: $number,
+                    lineNumber: $lineNumber,
                     description: $description.' - installment '.$installment->installment_number,
                     quantity: '1.000000',
                     unitPrice: $amount,
                     lineType: InvoiceLineType::Charge,
-                    taxAmount: $description === 'Finance fee' ? (string) $installment->tax_due : '0.000000',
-                    lineTotal: $this->math->add($amount, $description === 'Finance fee' ? (string) $installment->tax_due : '0.000000'),
-                    sourceLineType: 'vehicle_finance_installment_component',
+                    taxAmount: $taxAmount,
+                    lineTotal: $lineTotal,
+                    sourceLineType: self::SOURCE_LINE_TYPE_COMPONENT,
                     sourceLineId: $sourceLineId,
                 );
                 $sourceLines[] = new InvoiceSourceLineData(
                     tenantId: (int) $installment->tenant_id,
-                    sourceType: 'vehicle_finance_installment',
+                    sourceType: self::SOURCE_TYPE_INSTALLMENT,
                     sourceId: (int) $installment->getKey(),
-                    sourceLineType: 'vehicle_finance_installment_component',
+                    sourceLineType: self::SOURCE_LINE_TYPE_COMPONENT,
                     sourceLineId: $sourceLineId,
                     sourceQuantity: '1.000000',
                     invoicedQuantity: '1.000000',
                     sourceUnitPrice: $amount,
-                    sourceLineTotal: $this->math->add($amount, $description === 'Finance fee' ? (string) $installment->tax_due : '0.000000'),
+                    sourceLineTotal: $lineTotal,
                     organizationUnitId: $installment->organization_unit_id,
                 );
-                $number++;
+                $lineNumber++;
             }
 
             $agreement = $installment->financeAgreement;
             $invoice = $this->invoices->create(new CreateInvoiceData(
                 tenantId: (int) $installment->tenant_id,
-                invoiceType: InvoiceType::Rental,
+                invoiceType: InvoiceType::VehicleFinance,
                 direction: InvoiceDirection::Inbound,
                 invoiceDate: $invoiceDate,
                 organizationUnitId: $installment->organization_unit_id,
-                partyType: 'supplier',
+                partyType: self::PARTY_TYPE_SUPPLIER,
                 partyId: (int) $agreement->supplier_id,
                 dueDate: $installment->due_date->toDateString(),
                 currencyId: (int) $agreement->currency_id,
@@ -203,19 +235,26 @@ final class VehicleFinanceService
                 lines: $lines,
                 sources: [new InvoiceSourceData(
                     tenantId: (int) $installment->tenant_id,
-                    sourceType: 'vehicle_finance_installment',
+                    sourceType: self::SOURCE_TYPE_INSTALLMENT,
                     sourceId: (int) $installment->getKey(),
                     organizationUnitId: $installment->organization_unit_id,
                     sourceDocumentNumber: $agreement->agreement_number.'-'.$installment->installment_number,
                     sourceDocumentDate: $installment->due_date->toDateString(),
-                    sourceSubtotal: $this->math->add($this->math->add((string) $installment->principal_due, (string) $installment->interest_due), (string) $installment->fee_due),
+                    sourceSubtotal: $this->math->add(
+                        $this->math->add(
+                            (string) $installment->principal_due,
+                            (string) $installment->interest_due,
+                        ),
+                        (string) $installment->fee_due,
+                    ),
                     sourceGrandTotal: (string) $installment->total_due,
                 )],
                 sourceLines: $sourceLines,
             ));
-            $installment->invoice_id = $invoice->getKey();
-            $installment->row_version = $expectedVersion + 1;
-            $installment->save();
+            $installment->forceFill([
+                'invoice_id' => $invoice->getKey(),
+                'row_version' => $expectedVersion + 1,
+            ])->save();
 
             return $invoice;
         });
@@ -223,7 +262,9 @@ final class VehicleFinanceService
 
     public function paginate(int $tenantId, ?int $organizationUnitId, array $filters, int $perPage): LengthAwarePaginator
     {
-        $query = VehicleFinanceAgreement::query()->forContext($tenantId, $organizationUnitId)->with($this->relations());
+        $query = VehicleFinanceAgreement::query()
+            ->forContext($tenantId, $organizationUnitId)
+            ->with($this->relations());
         foreach (['supplier_id', 'vehicle_id', 'status'] as $key) {
             if (isset($filters[$key]) && $filters[$key] !== '') {
                 $query->where($key, $filters[$key]);
@@ -244,14 +285,17 @@ final class VehicleFinanceService
         return ['supplier', 'vehicle.make', 'vehicle.model', 'currency', 'taxGroup', 'installments.invoice'];
     }
 
-    private function validateCustomSchedule(array $data, CarbonImmutable $startsAt, CarbonImmutable $maturesAt): void
-    {
+    private function validateCustomSchedule(
+        array $data,
+        VehicleFinanceInterestMethod $interestMethod,
+        CarbonImmutable $startsAt,
+        CarbonImmutable $maturesAt,
+    ): void {
         $schedule = $data['schedule'] ?? null;
-        $interestMethod = (string) ($data['interest_method'] ?? 'flat');
-        if ($interestMethod === self::INTEREST_METHOD_CUSTOM && ($schedule === null || $schedule === [])) {
+        if ($interestMethod === VehicleFinanceInterestMethod::Custom && ($schedule === null || $schedule === [])) {
             throw new InvalidArgumentException('Custom finance schedules require explicit installment rows.');
         }
-        if ($interestMethod !== self::INTEREST_METHOD_CUSTOM && $schedule !== null && $schedule !== []) {
+        if ($interestMethod !== VehicleFinanceInterestMethod::Custom && $schedule !== null && $schedule !== []) {
             throw new InvalidArgumentException('Explicit installment rows require the custom interest method.');
         }
         if ($schedule === null || $schedule === []) {
@@ -278,7 +322,7 @@ final class VehicleFinanceService
 
         $financedPrincipal = $this->math->sub(
             (string) $data['principal_amount'],
-            (string) ($data['initial_deposit_amount'] ?? '0'),
+            (string) $data['initial_deposit_amount'],
         );
         if ($this->math->compare($principalTotal, $financedPrincipal) !== 0) {
             throw new InvalidArgumentException('Custom installment principal total must equal principal less initial deposit.');
@@ -291,10 +335,11 @@ final class VehicleFinanceService
             foreach (array_values($customSchedule) as $index => $row) {
                 $this->createInstallment($agreement, $index + 1, $row, $userId);
             }
+
             return;
         }
 
-        if ((string) $agreement->interest_method === self::INTEREST_METHOD_REDUCING_BALANCE) {
+        if ($agreement->interest_method === VehicleFinanceInterestMethod::ReducingBalance) {
             $this->generateReducingBalanceSchedule($agreement, $userId);
 
             return;
@@ -306,20 +351,41 @@ final class VehicleFinanceService
     private function generateFlatSchedule(VehicleFinanceAgreement $agreement, ?int $userId): void
     {
         $count = (int) $agreement->installment_count;
-        $principalAfterDeposit = $this->math->sub((string) $agreement->principal_amount, (string) $agreement->initial_deposit_amount);
+        $principalAfterDeposit = $this->math->sub(
+            (string) $agreement->principal_amount,
+            (string) $agreement->initial_deposit_amount,
+        );
         $principalPer = $this->math->div($principalAfterDeposit, (string) $count);
-        $years = $this->math->div((string) CarbonImmutable::parse($agreement->starts_at)->diffInDays(CarbonImmutable::parse($agreement->matures_at)), self::DAYS_PER_YEAR);
+        $years = $this->math->div(
+            (string) CarbonImmutable::parse($agreement->starts_at)
+                ->diffInDays(CarbonImmutable::parse($agreement->matures_at)),
+            self::DAYS_PER_YEAR,
+        );
         $totalInterest = $this->math->div(
-            $this->math->mul($this->math->mul($principalAfterDeposit, (string) $agreement->annual_interest_rate), $years),
+            $this->math->mul(
+                $this->math->mul(
+                    $principalAfterDeposit,
+                    (string) $agreement->annual_interest_rate,
+                ),
+                $years,
+            ),
             self::PERCENT_DIVISOR,
         );
         $interestPer = $this->math->div($totalInterest, (string) $count);
         $allocatedPrincipal = '0.000000';
         $allocatedInterest = '0.000000';
         for ($number = 1; $number <= $count; $number++) {
-            $principal = $number === $count ? $this->math->sub($principalAfterDeposit, $allocatedPrincipal) : $principalPer;
-            $interest = $number === $count ? $this->math->sub($totalInterest, $allocatedInterest) : $interestPer;
-            $dueDate = $this->installmentDueDate(CarbonImmutable::parse($agreement->starts_at), $number, (string) $agreement->installment_frequency);
+            $principal = $number === $count
+                ? $this->math->sub($principalAfterDeposit, $allocatedPrincipal)
+                : $principalPer;
+            $interest = $number === $count
+                ? $this->math->sub($totalInterest, $allocatedInterest)
+                : $interestPer;
+            $dueDate = $this->installmentDueDate(
+                CarbonImmutable::parse($agreement->starts_at),
+                $number,
+                $agreement->installment_frequency,
+            );
             $this->createInstallment($agreement, $number, [
                 'due_date' => $dueDate->toDateString(),
                 'principal_due' => $principal,
@@ -335,12 +401,17 @@ final class VehicleFinanceService
     private function generateReducingBalanceSchedule(VehicleFinanceAgreement $agreement, ?int $userId): void
     {
         $count = (int) $agreement->installment_count;
-        $principalAfterDeposit = $this->math->sub((string) $agreement->principal_amount, (string) $agreement->initial_deposit_amount);
+        $principalAfterDeposit = $this->math->sub(
+            (string) $agreement->principal_amount,
+            (string) $agreement->initial_deposit_amount,
+        );
         $principalPer = $this->math->div($principalAfterDeposit, (string) $count);
-        $periodsPerYear = self::INSTALLMENT_PERIODS_PER_YEAR[(string) $agreement->installment_frequency];
         $periodRate = $this->math->div(
-            $this->math->div((string) $agreement->annual_interest_rate, self::PERCENT_DIVISOR),
-            $periodsPerYear,
+            $this->math->div(
+                (string) $agreement->annual_interest_rate,
+                self::PERCENT_DIVISOR,
+            ),
+            $this->periodsPerYear($agreement->installment_frequency),
         );
         $allocatedPrincipal = '0.000000';
         $outstandingPrincipal = $principalAfterDeposit;
@@ -350,7 +421,11 @@ final class VehicleFinanceService
                 ? $this->math->sub($principalAfterDeposit, $allocatedPrincipal)
                 : $principalPer;
             $interest = $this->math->mul($outstandingPrincipal, $periodRate);
-            $dueDate = $this->installmentDueDate(CarbonImmutable::parse($agreement->starts_at), $number, (string) $agreement->installment_frequency);
+            $dueDate = $this->installmentDueDate(
+                CarbonImmutable::parse($agreement->starts_at),
+                $number,
+                $agreement->installment_frequency,
+            );
             $this->createInstallment($agreement, $number, [
                 'due_date' => $dueDate->toDateString(),
                 'principal_due' => $principal,
@@ -389,6 +464,29 @@ final class VehicleFinanceService
         ]);
     }
 
+    private function periodsPerYear(VehicleFinanceInstallmentFrequency $frequency): string
+    {
+        return match ($frequency) {
+            VehicleFinanceInstallmentFrequency::Weekly => '52',
+            VehicleFinanceInstallmentFrequency::Monthly => '12',
+            VehicleFinanceInstallmentFrequency::Quarterly => '4',
+            VehicleFinanceInstallmentFrequency::Yearly => '1',
+        };
+    }
+
+    private function installmentDueDate(
+        CarbonImmutable $start,
+        int $number,
+        VehicleFinanceInstallmentFrequency $frequency,
+    ): CarbonImmutable {
+        return match ($frequency) {
+            VehicleFinanceInstallmentFrequency::Weekly => $start->addWeeks($number),
+            VehicleFinanceInstallmentFrequency::Monthly => $start->addMonths($number),
+            VehicleFinanceInstallmentFrequency::Quarterly => $start->addMonths($number * 3),
+            VehicleFinanceInstallmentFrequency::Yearly => $start->addYears($number),
+        };
+    }
+
     private function assertAgreementExpectedVersion(VehicleFinanceAgreement $agreement, int $expectedVersion): void
     {
         if ((int) $agreement->row_version !== $expectedVersion) {
@@ -405,16 +503,6 @@ final class VehicleFinanceService
                 'expected_version' => ['The vehicle finance installment changed after it was loaded. Reload and review the latest version.'],
             ]);
         }
-    }
-
-    private function installmentDueDate(CarbonImmutable $start, int $number, string $frequency): CarbonImmutable
-    {
-        return match ($frequency) {
-            'weekly' => $start->addWeeks($number),
-            'quarterly' => $start->addMonths($number * 3),
-            'yearly' => $start->addYears($number),
-            default => $start->addMonths($number),
-        };
     }
 
     private function history(
