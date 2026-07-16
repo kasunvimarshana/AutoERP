@@ -74,7 +74,7 @@ final class StorePaymentRequest extends TenantScopedRequest
             createdBy: $this->currentUserId(),
             lines: $this->paymentLineData(),
             allocations: $this->paymentAllocationData(),
-            idempotencyKey: trim((string) $this->input(PaymentIdempotency::REQUEST_ATTRIBUTE)),
+            idempotencyKey: (string) $this->input(PaymentIdempotency::REQUEST_ATTRIBUTE),
         );
     }
 
@@ -82,8 +82,9 @@ final class StorePaymentRequest extends TenantScopedRequest
     {
         parent::prepareForValidation();
 
+        $header = $this->header(PaymentIdempotency::REQUEST_HEADER);
         $this->merge([
-            PaymentIdempotency::REQUEST_ATTRIBUTE => $this->header(PaymentIdempotency::REQUEST_HEADER),
+            PaymentIdempotency::REQUEST_ATTRIBUTE => is_string($header) ? trim($header) : null,
         ]);
     }
 
