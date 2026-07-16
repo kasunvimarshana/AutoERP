@@ -86,7 +86,8 @@ final class VoucherWorkspaceTest extends TestCase
                 'finance_posting_reference' => 'JV-RV-2026-0001',
             ]);
             $payment->save();
-            PaymentLine::query()->create([
+            $line = new PaymentLine();
+            $line->forceFill([
                 'tenant_id' => $tenantId,
                 'payment_id' => $payment->getKey(),
                 'line_number' => 1,
@@ -100,6 +101,7 @@ final class VoucherWorkspaceTest extends TestCase
                 'cleared_amount' => '1000.000000',
                 'status' => 'cleared',
             ]);
+            $line->save();
 
             return $payment->refresh();
         });
