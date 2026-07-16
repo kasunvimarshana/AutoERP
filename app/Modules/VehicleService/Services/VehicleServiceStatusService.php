@@ -6,6 +6,9 @@ namespace Modules\VehicleService\Services;
 
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
+use Modules\Vehicle\Enums\VehicleStatus;
+use Modules\Vehicle\Models\Vehicle;
+use Modules\Vehicle\Services\VehicleStatusService;
 use Modules\VehicleService\Enums\VehicleServiceJobStatus;
 use Modules\VehicleService\Enums\VehicleServiceLineStatus;
 use Modules\VehicleService\Models\VehicleServiceJob;
@@ -15,6 +18,10 @@ use Modules\VehicleService\Services\Concerns\AssertsVehicleServiceExpectedVersio
 final class VehicleServiceStatusService
 {
     use AssertsVehicleServiceExpectedVersion;
+
+    private const VEHICLE_SERVICE_STARTED_REASON_PREFIX = 'Vehicle service started for job ';
+
+    private const VEHICLE_SERVICE_RELEASED_REASON_PREFIX = 'Vehicle service completed or cancelled for job ';
 
     /** @var array<string, list<string>> */
     private const TRANSITIONS = [
@@ -27,6 +34,8 @@ final class VehicleServiceStatusService
         'paid' => [],
         'cancelled' => [],
     ];
+
+    public function __construct(private readonly VehicleStatusService $vehicleStatuses) {}
 
     public function change(
         VehicleServiceJob $job,
@@ -47,6 +56,15 @@ final class VehicleServiceStatusService
                 throw new InvalidArgumentException("Invalid service job status transition from {$old->value} to {$status->value}.");
             }
 
+            $vehicle = Vehicle::query()
+                ->where('tenant_id', $job->tenant_id)
+                ->lockForUpdate()
+                ->findOrFail($job->vehicle_id);
+
+            if ($status === VehicleServiceJobStatus::InProgress) {
+                $this->assertVehicleCanEnterService($vehicle);
+            }
+
             $job->status = $status;
             if ($status === VehicleServiceJobStatus::Completed) {
                 $job->completed_by = $changedBy;
@@ -55,6 +73,8 @@ final class VehicleServiceStatusService
                     ->update(['status' => VehicleServiceLineStatus::Completed->value]);
             }
             $job->save();
+
+            $this->synchronizeVehicleStatus($job, $vehicle, $old, $status, $changedBy);
 
             VehicleServiceStatusHistory::query()->create([
                 'tenant_id' => $job->tenant_id,
@@ -82,5 +102,57 @@ final class VehicleServiceStatusService
             'changed_by' => $changedBy,
             'changed_at' => now(),
         ]);
+    }
+
+    private function assertVehicleCanEnterService(Vehicle $vehicle): void
+    {
+        if (! in_array($vehicle->status, [VehicleStatus::Active, VehicleStatus::UnderService], true)) {
+            throw new InvalidArgumentException('Only an active vehicle can enter an in-progress service job.');
+        }
+    }
+
+    private function synchronizeVehicleStatus(
+        VehicleServiceJob $job,
+        Vehicle $vehicle,
+        VehicleServiceJobStatus $from,
+        VehicleServiceJobStatus $to,
+        ?int $changedBy,
+    ): void {
+        if ($to === VehicleServiceJobStatus::InProgress && $vehicle->status === VehicleStatus::Active) {
+            $this->vehicleStatuses->changeTo(
+                $vehicle,
+                VehicleStatus::UnderService,
+                $changedBy,
+                self::VEHICLE_SERVICE_STARTED_REASON_PREFIX.$job->job_number,
+            );
+
+            return;
+        }
+
+        if ($from !== VehicleServiceJobStatus::InProgress
+            || ! in_array($to, [VehicleServiceJobStatus::Completed, VehicleServiceJobStatus::Cancelled], true)
+            || $vehicle->status !== VehicleStatus::UnderService) {
+            return;
+        }
+
+        $otherInProgressJobs = VehicleServiceJob::query()
+            ->forContext((int) $job->tenant_id, $job->organization_unit_id)
+            ->where('vehicle_id', $job->vehicle_id)
+            ->whereKeyNot($job->getKey())
+            ->where('status', VehicleServiceJobStatus::InProgress->value)
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get(['id']);
+
+        if ($otherInProgressJobs->isNotEmpty()) {
+            return;
+        }
+
+        $this->vehicleStatuses->changeTo(
+            $vehicle,
+            VehicleStatus::Active,
+            $changedBy,
+            self::VEHICLE_SERVICE_RELEASED_REASON_PREFIX.$job->job_number,
+        );
     }
 }
