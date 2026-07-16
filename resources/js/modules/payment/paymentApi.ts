@@ -2,6 +2,10 @@ import { apiClient } from '@/shared/api/apiClient';
 import { endpoints } from '@/shared/api/endpoints';
 import type { ApiCollection, ApiResource, ListParams } from '@/shared/types/api';
 
+export const PAYMENT_IDEMPOTENCY_HEADER = 'Idempotency-Key';
+const MAX_RETAINED_PAYMENT_CREATE_KEYS = 100;
+const paymentCreateKeys = new Map<string, string>();
+
 export interface PaymentPartySummary {
     id: number | null;
     type?: string | null;
@@ -161,7 +165,17 @@ export async function listPayments(params: ListParams, signal?: AbortSignal) {
 }
 
 export async function createPayment(payload: PaymentPayload) {
-    const response = await apiClient.post<ApiResource<Payment>>(endpoints.payments, payload);
+    const fingerprint = paymentPayloadFingerprint(payload);
+    const idempotencyKey = paymentCreateKeys.get(fingerprint) ?? createPaymentIdempotencyKey();
+    retainPaymentCreateKey(fingerprint, idempotencyKey);
+
+    const response = await apiClient.post<ApiResource<Payment>>(endpoints.payments, payload, {
+        headers: {
+            [PAYMENT_IDEMPOTENCY_HEADER]: idempotencyKey,
+        },
+    });
+    paymentCreateKeys.delete(fingerprint);
+
     return response.data.data;
 }
 
@@ -258,3 +272,37 @@ export const submitPayment = (id: number, expectedVersion: number) => paymentAct
 export const approvePayment = (id: number, expectedVersion: number) => paymentAction(id, 'approve', expectedVersion);
 export const postPayment = (id: number, expectedVersion: number) => paymentAction(id, 'post', expectedVersion);
 export const voidPayment = (id: number, expectedVersion: number, reason?: string) => paymentAction(id, 'void', expectedVersion, reason);
+
+function createPaymentIdempotencyKey(): string {
+    return globalThis.crypto.randomUUID();
+}
+
+function retainPaymentCreateKey(fingerprint: string, key: string): void {
+    if (!paymentCreateKeys.has(fingerprint) && paymentCreateKeys.size >= MAX_RETAINED_PAYMENT_CREATE_KEYS) {
+        const oldestFingerprint = paymentCreateKeys.keys().next().value;
+        if (typeof oldestFingerprint === 'string') {
+            paymentCreateKeys.delete(oldestFingerprint);
+        }
+    }
+
+    paymentCreateKeys.set(fingerprint, key);
+}
+
+function paymentPayloadFingerprint(payload: PaymentPayload): string {
+    return JSON.stringify(canonicalize(payload));
+}
+
+function canonicalize(value: unknown): unknown {
+    if (Array.isArray(value)) {
+        return value.map(canonicalize);
+    }
+    if (value === null || typeof value !== 'object') {
+        return value;
+    }
+
+    return Object.fromEntries(
+        Object.entries(value as Record<string, unknown>)
+            .sort(([left], [right]) => left.localeCompare(right))
+            .map(([key, item]) => [key, canonicalize(item)]),
+    );
+}
