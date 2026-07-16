@@ -16,6 +16,8 @@ use Modules\Payment\Models\Payment;
 
 final class PaymentPostingPolicyService
 {
+    public function __construct(private readonly PaymentRefundPolicyService $refundPolicy) {}
+
     public function resolve(Payment $payment): PaymentPostingPolicyData
     {
         $type = $payment->payment_type instanceof PaymentType
@@ -95,28 +97,7 @@ final class PaymentPostingPolicyService
 
     private function refund(Payment $payment): PaymentPostingPolicyData
     {
-        if ($payment->original_payment_id === null) {
-            throw new InvalidArgumentException('Refund payment accounting requires the original payment.');
-        }
-
-        $original = Payment::query()->findOrFail((int) $payment->original_payment_id);
-        $originalType = $original->payment_type instanceof PaymentType
-            ? $original->payment_type
-            : PaymentType::from((string) $original->payment_type);
-        if ($originalType === PaymentType::Refund) {
-            throw new InvalidArgumentException('A refund payment cannot be refunded again.');
-        }
-        if ((int) $original->tenant_id !== (int) $payment->tenant_id
-            || $original->organization_unit_id !== $payment->organization_unit_id
-            || $original->party_type !== $payment->party_type
-            || $original->party_id !== $payment->party_id
-        ) {
-            throw new InvalidArgumentException('Refund payment scope and party must match the original payment.');
-        }
-        if ($this->direction($payment) === $this->direction($original)) {
-            throw new InvalidArgumentException('Refund payment direction must reverse the original payment direction.');
-        }
-
+        $original = $this->refundPolicy->originalForPayment($payment);
         $originalPolicy = $this->resolve($original);
 
         return new PaymentPostingPolicyData(
