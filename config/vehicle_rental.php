@@ -15,16 +15,14 @@ return [
     'reservation_sources' => [
         'walk_in',
     ],
-    'finance_interest_methods' => [
-        'flat',
-        'reducing_balance',
-    ],
-    'finance_installment_frequencies' => [
-        'weekly',
-        'monthly',
-        'quarterly',
-        'yearly',
-    ],
+    'finance_interest_methods' => array_map(
+        static fn (\Modules\VehicleRental\Enums\VehicleFinanceInterestMethod $method): string => $method->value,
+        \Modules\VehicleRental\Enums\VehicleFinanceInterestMethod::cases(),
+    ),
+    'finance_installment_frequencies' => array_map(
+        static fn (\Modules\VehicleRental\Enums\VehicleFinanceInstallmentFrequency $frequency): string => $frequency->value,
+        \Modules\VehicleRental\Enums\VehicleFinanceInstallmentFrequency::cases(),
+    ),
     'public_custody_event_types' => [
         \Modules\VehicleRental\Enums\RentalCustodyEventType::OwnerToCompany->value,
         \Modules\VehicleRental\Enums\RentalCustodyEventType::CompanyToCustomer->value,
