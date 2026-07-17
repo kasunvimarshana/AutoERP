@@ -3,22 +3,16 @@ import { formatDate } from "@/shared/utils/formatDate";
 import { humanize } from "@/shared/utils/object";
 import { rentalAgreementKindLabel } from "../rentalAgreementPresentation";
 import { rentalAgreementRateLabel } from "../rentalAgreementUi";
-import type {
-    RentalAgreementDocumentSnapshot,
-    RentalRateComponent,
-    RentalRateVersion,
-} from "../vehicleRentalTypes";
+import type { RentalAgreementDocumentSnapshot } from "../vehicleRentalTypes";
 
 interface RentalAgreementPrintDocumentProps {
     snapshot: RentalAgreementDocumentSnapshot;
     backPath: string;
-    rateVersion?: RentalRateVersion | null;
 }
 
 export function RentalAgreementPrintDocument({
     snapshot,
     backPath,
-    rateVersion = null,
 }: RentalAgreementPrintDocumentProps) {
     const partyLabel =
         snapshot.party.type === "customer" ? "Lessee" : "Lessor";
@@ -26,12 +20,6 @@ export function RentalAgreementPrintDocument({
         snapshot.commercial_terms.currency.code ??
         snapshot.commercial_terms.currency.symbol ??
         "";
-    const taxByComponent = new Map(
-        (rateVersion?.components ?? []).map((component) => [
-            componentKey(component),
-            component.is_taxable,
-        ]),
-    );
 
     return (
         <div className="agreement-print-shell">
@@ -155,39 +143,28 @@ export function RentalAgreementPrintDocument({
                             </thead>
                             <tbody>
                                 {snapshot.rate_version.components.map(
-                                    (component) => {
-                                        const taxTreatment =
-                                            taxByComponent.get(
-                                                componentKey(component),
-                                            );
-
-                                        return (
-                                            <tr
-                                                key={componentKey(component)}
-                                                className="border-b border-slate-100"
-                                            >
-                                                <td className="py-2 pr-4">
-                                                    {rentalAgreementRateLabel(
-                                                        snapshot.agreement_kind,
-                                                        component.component_code,
-                                                    )}
-                                                </td>
-                                                <td className="py-2 pr-4">
-                                                    {humanize(component.unit)}
-                                                </td>
-                                                <td className="py-2 pr-4">
-                                                    {taxTreatment === undefined
-                                                        ? "Not captured"
-                                                        : taxTreatment
-                                                          ? "Taxable"
-                                                          : "Non-taxable"}
-                                                </td>
-                                                <td className="py-2 text-right font-semibold">
-                                                    {currency} {component.rate}
-                                                </td>
-                                            </tr>
-                                        );
-                                    },
+                                    (component) => (
+                                        <tr
+                                            key={componentKey(component)}
+                                            className="border-b border-slate-100"
+                                        >
+                                            <td className="py-2 pr-4">
+                                                {rentalAgreementRateLabel(
+                                                    snapshot.agreement_kind,
+                                                    component.component_code,
+                                                )}
+                                            </td>
+                                            <td className="py-2 pr-4">
+                                                {humanize(component.unit)}
+                                            </td>
+                                            <td className="py-2 pr-4">
+                                                {formatTaxTreatment(component)}
+                                            </td>
+                                            <td className="py-2 text-right font-semibold">
+                                                {currency} {component.rate}
+                                            </td>
+                                        </tr>
+                                    ),
                                 )}
                             </tbody>
                         </table>
@@ -196,12 +173,6 @@ export function RentalAgreementPrintDocument({
                             No commercial rates were captured.
                         </p>
                     )}
-                    {snapshot.rate_version?.components.length && !rateVersion ? (
-                        <p className="mt-3 text-xs text-slate-500">
-                            Tax treatment is shown as Not captured when the immutable
-                            rate-version projection is unavailable.
-                        </p>
-                    ) : null}
                 </section>
 
                 <section className="py-6">
@@ -279,10 +250,19 @@ function componentKey(component: {
     return `${component.component_code}:${component.unit}`;
 }
 
+function formatTaxTreatment(component: {
+    component_code: string;
+    unit: string;
+}): string {
+    const value = (
+        component as typeof component & { is_taxable?: boolean }
+    ).is_taxable;
+    if (value === undefined) return "Not captured";
+    return value ? "Taxable" : "Non-taxable";
+}
+
 function formatPaymentTerms(value?: number | null): string {
     if (value === null || value === undefined) return "Not specified";
     if (value === 0) return "Due immediately";
     return `${value} days`;
 }
-
-void (null as unknown as RentalRateComponent);
