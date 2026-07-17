@@ -86,7 +86,7 @@ describe("RentalAgreementRateBuilder", () => {
             screen.queryByRole("group", { name: "Customer driver charge" }),
         ).not.toBeInTheDocument();
         expect(
-            screen.queryByRole("group", { name: "parking" }),
+            screen.queryByRole("group", { name: "Parking" }),
         ).not.toBeInTheDocument();
     });
 
@@ -114,10 +114,10 @@ describe("RentalAgreementRateBuilder", () => {
         renderBuilder({ enabledOptionalCodes: new Set(["parking"]) });
 
         expect(
-            screen.getByRole("group", { name: "parking" }),
+            screen.getByRole("group", { name: "Parking" }),
         ).toBeInTheDocument();
         expect(
-            screen.getByRole("button", { name: "Remove parking" }),
+            screen.getByRole("button", { name: "Remove Parking" }),
         ).toBeInTheDocument();
     });
 });
