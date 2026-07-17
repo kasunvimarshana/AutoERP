@@ -114,8 +114,7 @@ final class RentalReservationService
         int $expectedVersion,
         ?int $userId = null,
         ?string $reason = null,
-    ): RentalReservation
-    {
+    ): RentalReservation {
         return DB::transaction(function () use ($reservation, $to, $expectedVersion, $userId, $reason): RentalReservation {
             $reservation = RentalReservation::query()->lockForUpdate()->findOrFail($reservation->getKey());
             $this->assertExpectedVersion($reservation, $expectedVersion);
@@ -126,7 +125,15 @@ final class RentalReservationService
             if (! in_array($to->value, self::TRANSITIONS[$from->value] ?? [], true)) {
                 throw new InvalidArgumentException("Invalid reservation transition from {$from->value} to {$to->value}.");
             }
-            if ($to === RentalReservationStatus::Confirmed && $reservation->requested_vehicle_id !== null) {
+            if ($to === RentalReservationStatus::Confirmed) {
+                if ($reservation->requested_vehicle_id === null) {
+                    throw ValidationException::withMessages([
+                        'requested_vehicle_id' => [
+                            'Select a specific available vehicle before confirming the reservation.',
+                        ],
+                    ]);
+                }
+
                 $this->availability->assertVehicle(
                     (int) $reservation->tenant_id,
                     $reservation->organization_unit_id,
