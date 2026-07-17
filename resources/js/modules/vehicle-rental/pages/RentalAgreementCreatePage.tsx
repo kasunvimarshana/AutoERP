@@ -45,6 +45,7 @@ import { rentalOptions } from "../hooks/useRentalMetadata";
 interface RateComponentDefinition {
     code: string;
     unit: string;
+    supported_units?: string[];
     group: "core" | "event";
     required: boolean;
 }
@@ -55,6 +56,17 @@ interface AgreementTermForm {
     title: string;
     content: string;
 }
+
+const TAX_TREATMENT = {
+    taxable: "taxable",
+    nonTaxable: "non_taxable",
+} as const;
+
+const TAX_TREATMENT_OPTIONS = [
+    { value: "", label: "Select tax treatment" },
+    { value: TAX_TREATMENT.taxable, label: "Taxable" },
+    { value: TAX_TREATMENT.nonTaxable, label: "Non-taxable" },
+] as const;
 
 const emptyAgreementTerm = (sequence?: number): AgreementTermForm => ({
     sequence,
@@ -90,8 +102,13 @@ function toDateTimeLocal(value: string | null | undefined): string {
     return businessDateTimeInputValue(date);
 }
 
-function editableDraftRate(agreement: RentalAgreement): RentalRateVersion | null {
-    return agreement.rate_versions?.find((version) => version.status === "draft") ?? null;
+function editableDraftRate(
+    agreement: RentalAgreement,
+): RentalRateVersion | null {
+    return (
+        agreement.rate_versions?.find((version) => version.status === "draft") ??
+        null
+    );
 }
 
 function resolveRateDefinitions(metadata: unknown): RateComponentDefinition[] {
@@ -103,7 +120,13 @@ function resolveRateDefinitions(metadata: unknown): RateComponentDefinition[] {
           }
         | undefined;
     if (source?.rate_component_definitions?.length) {
-        return source.rate_component_definitions;
+        return source.rate_component_definitions.map((definition) => ({
+            ...definition,
+            supported_units:
+                definition.supported_units?.length
+                    ? definition.supported_units
+                    : [definition.unit],
+        }));
     }
 
     if (
@@ -114,6 +137,7 @@ function resolveRateDefinitions(metadata: unknown): RateComponentDefinition[] {
             {
                 code: source.rate_component_codes[0],
                 unit: source.rate_units[0],
+                supported_units: [source.rate_units[0]],
                 group: "core",
                 required: true,
             },
@@ -121,6 +145,17 @@ function resolveRateDefinitions(metadata: unknown): RateComponentDefinition[] {
     }
 
     return [];
+}
+
+function selectedRateUnit(
+    definition: RateComponentDefinition,
+    selectedUnits: Record<string, string>,
+): string {
+    const explicit = selectedUnits[definition.code];
+    if (explicit) return explicit;
+
+    const supportedUnits = definition.supported_units ?? [definition.unit];
+    return supportedUnits.length === 1 ? supportedUnits[0] : "";
 }
 
 interface RentalAgreementCreatePageProps {
@@ -158,8 +193,10 @@ export default function RentalAgreementCreatePage({
         applyCurrencyDefault,
         metadata,
     } = useRentalCurrencyDefault({ initialTouched: isEditing });
-    const [reservation, setReservation] = useState<RentalReservation | null>(null);
-    const [loadedAgreement, setLoadedAgreement] = useState<RentalAgreement | null>(null);
+    const [reservation, setReservation] =
+        useState<RentalReservation | null>(null);
+    const [loadedAgreement, setLoadedAgreement] =
+        useState<RentalAgreement | null>(null);
     const [draftRate, setDraftRate] = useState<RentalRateVersion | null>(null);
     const [loadingAgreement, setLoadingAgreement] = useState(isEditing);
     const [form, setForm] = useState({
@@ -180,6 +217,10 @@ export default function RentalAgreementCreatePage({
         remarks: "",
     });
     const [rates, setRates] = useState<Record<string, string>>({});
+    const [rateUnits, setRateUnits] = useState<Record<string, string>>({});
+    const [taxTreatments, setTaxTreatments] = useState<
+        Record<string, string>
+    >({});
     const [terms, setTerms] = useState<AgreementTermForm[]>([
         emptyAgreementTerm(),
     ]);
@@ -196,12 +237,41 @@ export default function RentalAgreementCreatePage({
         [metadata],
     );
     const coreComponents = useMemo(
-        () => componentDefinitions.filter((definition) => definition.group === "core"),
+        () =>
+            componentDefinitions.filter(
+                (definition) => definition.group === "core",
+            ),
         [componentDefinitions],
     );
     const eventComponents = useMemo(
-        () => componentDefinitions.filter((definition) => definition.group === "event"),
+        () =>
+            componentDefinitions.filter(
+                (definition) => definition.group === "event",
+            ),
         [componentDefinitions],
+    );
+    const activeRateDefinitions = useMemo(
+        () =>
+            componentDefinitions.filter(
+                (definition) =>
+                    definition.required ||
+                    Number(rates[definition.code] ?? "0") > 0,
+            ),
+        [componentDefinitions, rates],
+    );
+    const rateSelectionsValid = useMemo(
+        () =>
+            activeRateDefinitions.every((definition) => {
+                const unit = selectedRateUnit(definition, rateUnits);
+                const taxTreatment = taxTreatments[definition.code] ?? "";
+
+                return (
+                    unit !== "" &&
+                    (taxTreatment === TAX_TREATMENT.taxable ||
+                        taxTreatment === TAX_TREATMENT.nonTaxable)
+                );
+            }),
+        [activeRateDefinitions, rateUnits, taxTreatments],
     );
     const metadataDefaults = metadata?.defaults;
     const legalContextOptions = useMemo(
@@ -238,15 +308,23 @@ export default function RentalAgreementCreatePage({
             setForm((current) => ({
                 ...current,
                 legal_context:
-                    current.legal_context || metadataDefaults.legal_context || "",
+                    current.legal_context ||
+                    metadataDefaults.legal_context ||
+                    "",
                 rental_mode:
                     current.rental_mode || metadataDefaults.rental_mode || "",
                 billing_cycle:
-                    current.billing_cycle || metadataDefaults.billing_cycle || "",
+                    current.billing_cycle ||
+                    metadataDefaults.billing_cycle ||
+                    "",
                 billing_basis:
-                    current.billing_basis || metadataDefaults.billing_basis || "",
+                    current.billing_basis ||
+                    metadataDefaults.billing_basis ||
+                    "",
                 proration_rule:
-                    current.proration_rule || metadataDefaults.proration_rule || "",
+                    current.proration_rule ||
+                    metadataDefaults.proration_rule ||
+                    "",
                 payment_term_days:
                     current.payment_term_days ||
                     String(metadataDefaults.payment_term_days ?? ""),
@@ -277,8 +355,12 @@ export default function RentalAgreementCreatePage({
                 const rate = editableDraftRate(resource);
                 setLoadedAgreement(resource);
                 setDraftRate(rate);
-                setCustomer((resource.customer ?? null) as CustomerSummary | null);
-                setSupplier((resource.supplier ?? null) as SupplierSummary | null);
+                setCustomer(
+                    (resource.customer ?? null) as CustomerSummary | null,
+                );
+                setSupplier(
+                    (resource.supplier ?? null) as SupplierSummary | null,
+                );
                 setAuthoritativeCurrency(resource.currency ?? null);
                 setForm({
                     agreement_kind: resource.agreement_kind,
@@ -310,6 +392,24 @@ export default function RentalAgreementCreatePage({
                         ]),
                     ),
                 );
+                setRateUnits(
+                    Object.fromEntries(
+                        (rate?.components ?? []).map((component) => [
+                            component.component_code,
+                            component.unit,
+                        ]),
+                    ),
+                );
+                setTaxTreatments(
+                    Object.fromEntries(
+                        (rate?.components ?? []).map((component) => [
+                            component.component_code,
+                            component.is_taxable
+                                ? TAX_TREATMENT.taxable
+                                : TAX_TREATMENT.nonTaxable,
+                        ]),
+                    ),
+                );
                 setTerms(
                     resource.terms?.length
                         ? resource.terms.map((term) => ({
@@ -323,14 +423,21 @@ export default function RentalAgreementCreatePage({
                 resetDirty();
             })
             .catch((requestError: unknown) => {
-                if (!controller.signal.aborted) setError(toApiError(requestError));
+                if (!controller.signal.aborted) {
+                    setError(toApiError(requestError));
+                }
             })
             .finally(() => {
                 if (!controller.signal.aborted) setLoadingAgreement(false);
             });
 
         return () => controller.abort();
-    }, [isEditing, resetDirty, routeAgreementId, setAuthoritativeCurrency]);
+    }, [
+        isEditing,
+        resetDirty,
+        routeAgreementId,
+        setAuthoritativeCurrency,
+    ]);
 
     useEffect(() => {
         if (!reservationId) return;
@@ -347,7 +454,9 @@ export default function RentalAgreementCreatePage({
                     const nextCustomer = resource.customer as CustomerSummary;
                     setCustomer(nextCustomer);
                     if (!resource.currency) {
-                        applyCurrencyDefault(nextCustomer.default_currency ?? null);
+                        applyCurrencyDefault(
+                            nextCustomer.default_currency ?? null,
+                        );
                     }
                 }
                 if (resource.currency) {
@@ -356,7 +465,8 @@ export default function RentalAgreementCreatePage({
                 setForm((current) => ({
                     ...current,
                     agreement_kind: RENTAL_AGREEMENT_KIND.customerRental,
-                    agreement_date: current.agreement_date || businessDateInputValue(),
+                    agreement_date:
+                        current.agreement_date || businessDateInputValue(),
                     starts_at: toDateTimeLocal(resource.requested_start_at),
                     ends_at: toDateTimeLocal(resource.requested_end_at),
                     rental_mode: resource.rental_mode,
@@ -364,24 +474,32 @@ export default function RentalAgreementCreatePage({
                 }));
             })
             .catch((requestError: unknown) => {
-                if (!controller.signal.aborted) setError(toApiError(requestError));
+                if (!controller.signal.aborted) {
+                    setError(toApiError(requestError));
+                }
             });
 
         return () => controller.abort();
     }, [reservationId, setAuthoritativeCurrency, applyCurrencyDefault]);
 
     const hasCommittedRate = Boolean(
-        loadedAgreement?.rate_versions?.some((version) => version.status !== "draft"),
+        loadedAgreement?.rate_versions?.some(
+            (version) => version.status !== "draft",
+        ),
     );
     const hasAllocation = (loadedAgreement?.allocations?.length ?? 0) > 0;
-    const structuralFieldsLocked = Boolean(isEditing && (hasCommittedRate || hasAllocation));
+    const structuralFieldsLocked = Boolean(
+        isEditing && (hasCommittedRate || hasAllocation),
+    );
     const depositIdentityLocked = Boolean(
         loadedAgreement?.deposit_requirement &&
             (loadedAgreement.deposit_requirement.status !== "pending" ||
                 (loadedAgreement.deposit_requirement.links?.length ?? 0) > 0),
     );
-    const rateEditable = !isEditing || Boolean(draftRate && !structuralFieldsLocked);
-    const showRatePanel = !isEditing || draftRate !== null || hasCommittedRate;
+    const rateEditable =
+        !isEditing || Boolean(draftRate && !structuralFieldsLocked);
+    const showRatePanel =
+        !isEditing || draftRate !== null || hasCommittedRate;
     const errorFor = (field: string) => fieldError(error, field);
     const partyValid = useMemo(
         () =>
@@ -404,24 +522,21 @@ export default function RentalAgreementCreatePage({
         excess_km_method: form.excess_km_method,
         included_km: form.included_km,
         currency_id: Number(currency?.id),
-        components: componentDefinitions
-            .filter(
-                (definition) =>
-                    definition.required || Number(rates[definition.code] ?? "0") > 0,
-            )
-            .map((definition, index) => ({
-                component_code: definition.code,
-                unit: definition.unit,
-                rate: rates[definition.code] ?? "0",
-                multiplier: "1",
-                calculation_order: index + 1,
-                is_taxable: true,
-            })),
+        components: activeRateDefinitions.map((definition, index) => ({
+            component_code: definition.code,
+            unit: selectedRateUnit(definition, rateUnits),
+            rate: rates[definition.code] ?? "0",
+            multiplier: "1",
+            calculation_order: index + 1,
+            is_taxable:
+                taxTreatments[definition.code] === TAX_TREATMENT.taxable,
+        })),
     });
 
     const submit = async (event: FormEvent) => {
         event.preventDefault();
         if (isEditing && (!loadedAgreement || routeAgreementId === null)) return;
+        if (rateEditable && !rateSelectionsValid) return;
 
         setSaving(true);
         setError(null);
@@ -446,7 +561,8 @@ export default function RentalAgreementCreatePage({
                 billing_basis: form.billing_basis,
                 proration_rule: form.proration_rule,
                 customer_id:
-                    form.agreement_kind === RENTAL_AGREEMENT_KIND.customerRental
+                    form.agreement_kind ===
+                    RENTAL_AGREEMENT_KIND.customerRental
                         ? customer?.id
                         : null,
                 supplier_id:
@@ -576,6 +692,9 @@ export default function RentalAgreementCreatePage({
                                     setCustomer(null);
                                     setSupplier(null);
                                     setTerms([emptyAgreementTerm()]);
+                                    setRates({});
+                                    setRateUnits({});
+                                    setTaxTreatments({});
                                     applyCurrencyDefault(null);
                                     updateForm({
                                         ...form,
@@ -589,12 +708,16 @@ export default function RentalAgreementCreatePage({
                             <CustomerLookupSelect
                                 value={customer}
                                 error={errorFor("customer_id")}
-                                disabled={structuralFieldsLocked || depositIdentityLocked}
+                                disabled={
+                                    structuralFieldsLocked || depositIdentityLocked
+                                }
                                 required
                                 onChange={(next) => {
                                     markDirty();
                                     setCustomer(next);
-                                    applyCurrencyDefault(next?.default_currency ?? null);
+                                    applyCurrencyDefault(
+                                        next?.default_currency ?? null,
+                                    );
                                 }}
                             />
                         ) : (
@@ -606,7 +729,9 @@ export default function RentalAgreementCreatePage({
                                 onChange={(next) => {
                                     markDirty();
                                     setSupplier(next);
-                                    applyCurrencyDefault(next?.default_currency ?? null);
+                                    applyCurrencyDefault(
+                                        next?.default_currency ?? null,
+                                    );
                                 }}
                             />
                         )}
@@ -631,7 +756,10 @@ export default function RentalAgreementCreatePage({
                             value={form.executed_at}
                             error={errorFor("executed_at")}
                             onChange={(event) =>
-                                updateForm({ ...form, executed_at: event.target.value })
+                                updateForm({
+                                    ...form,
+                                    executed_at: event.target.value,
+                                })
                             }
                             hint="Required before activation."
                         />
@@ -641,7 +769,10 @@ export default function RentalAgreementCreatePage({
                             error={errorFor("legal_context")}
                             required
                             onChange={(event) =>
-                                updateForm({ ...form, legal_context: event.target.value })
+                                updateForm({
+                                    ...form,
+                                    legal_context: event.target.value,
+                                })
                             }
                             options={legalContextOptions}
                         />
@@ -653,7 +784,10 @@ export default function RentalAgreementCreatePage({
                             error={errorFor("starts_at")}
                             disabled={structuralFieldsLocked}
                             onChange={(event) =>
-                                updateForm({ ...form, starts_at: event.target.value })
+                                updateForm({
+                                    ...form,
+                                    starts_at: event.target.value,
+                                })
                             }
                         />
                         <Input
@@ -664,7 +798,10 @@ export default function RentalAgreementCreatePage({
                             error={errorFor("ends_at")}
                             disabled={structuralFieldsLocked}
                             onChange={(event) =>
-                                updateForm({ ...form, ends_at: event.target.value })
+                                updateForm({
+                                    ...form,
+                                    ends_at: event.target.value,
+                                })
                             }
                         />
                         <Select
@@ -674,7 +811,10 @@ export default function RentalAgreementCreatePage({
                             disabled={structuralFieldsLocked}
                             required
                             onChange={(event) =>
-                                updateForm({ ...form, rental_mode: event.target.value })
+                                updateForm({
+                                    ...form,
+                                    rental_mode: event.target.value,
+                                })
                             }
                             options={rentalModeOptions}
                         />
@@ -685,7 +825,10 @@ export default function RentalAgreementCreatePage({
                             disabled={structuralFieldsLocked}
                             required
                             onChange={(event) =>
-                                updateForm({ ...form, billing_cycle: event.target.value })
+                                updateForm({
+                                    ...form,
+                                    billing_cycle: event.target.value,
+                                })
                             }
                             options={billingCycleOptions}
                         />
@@ -696,7 +839,10 @@ export default function RentalAgreementCreatePage({
                             disabled={structuralFieldsLocked}
                             required
                             onChange={(event) =>
-                                updateForm({ ...form, billing_basis: event.target.value })
+                                updateForm({
+                                    ...form,
+                                    billing_basis: event.target.value,
+                                })
                             }
                             options={billingBasisOptions}
                         />
@@ -707,7 +853,10 @@ export default function RentalAgreementCreatePage({
                             disabled={structuralFieldsLocked}
                             required
                             onChange={(event) =>
-                                updateForm({ ...form, proration_rule: event.target.value })
+                                updateForm({
+                                    ...form,
+                                    proration_rule: event.target.value,
+                                })
                             }
                             options={prorationRuleOptions}
                             hint="Select the contract-approved partial-period rule."
@@ -715,7 +864,9 @@ export default function RentalAgreementCreatePage({
                         <RentalCurrencyLookupSelect
                             value={currency}
                             error={errorFor("currency_id")}
-                            disabled={structuralFieldsLocked || depositIdentityLocked}
+                            disabled={
+                                structuralFieldsLocked || depositIdentityLocked
+                            }
                             onChange={(next) => {
                                 markDirty();
                                 selectCurrency(next);
@@ -745,13 +896,18 @@ export default function RentalAgreementCreatePage({
                             error={errorFor("rate_version.included_km")}
                             disabled={!rateEditable}
                             onChange={(event) =>
-                                updateForm({ ...form, included_km: event.target.value })
+                                updateForm({
+                                    ...form,
+                                    included_km: event.target.value,
+                                })
                             }
                         />
                         <Select
                             label="Excess KM method"
                             value={form.excess_km_method}
-                            error={errorFor("rate_version.excess_km_method")}
+                            error={errorFor(
+                                "rate_version.excess_km_method",
+                            )}
                             disabled={!rateEditable}
                             required
                             onChange={(event) =>
@@ -785,7 +941,10 @@ export default function RentalAgreementCreatePage({
                             value={form.remarks}
                             error={errorFor("remarks")}
                             onChange={(event) =>
-                                updateForm({ ...form, remarks: event.target.value })
+                                updateForm({
+                                    ...form,
+                                    remarks: event.target.value,
+                                })
                             }
                         />
                     </div>
@@ -807,16 +966,33 @@ export default function RentalAgreementCreatePage({
                         ) : (
                             <>
                                 <p className="mb-4 text-sm text-slate-600">
-                                    These draft rates remain editable until agreement
-                                    activation.
+                                    Enter each active rate, select its contract unit and
+                                    explicitly confirm whether the component is taxable.
+                                    These draft rates remain editable until activation.
                                 </p>
                                 <RateInputs
                                     title="Core rates"
                                     definitions={coreComponents}
                                     rates={rates}
-                                    onChange={(code, value) => {
+                                    units={rateUnits}
+                                    taxTreatments={taxTreatments}
+                                    onRateChange={(code, value) => {
                                         markDirty();
                                         setRates((current) => ({
+                                            ...current,
+                                            [code]: value,
+                                        }));
+                                    }}
+                                    onUnitChange={(code, value) => {
+                                        markDirty();
+                                        setRateUnits((current) => ({
+                                            ...current,
+                                            [code]: value,
+                                        }));
+                                    }}
+                                    onTaxTreatmentChange={(code, value) => {
+                                        markDirty();
+                                        setTaxTreatments((current) => ({
                                             ...current,
                                             [code]: value,
                                         }));
@@ -828,15 +1004,37 @@ export default function RentalAgreementCreatePage({
                                             title="Event rates"
                                             definitions={eventComponents}
                                             rates={rates}
-                                            onChange={(code, value) => {
+                                            units={rateUnits}
+                                            taxTreatments={taxTreatments}
+                                            onRateChange={(code, value) => {
                                                 markDirty();
                                                 setRates((current) => ({
                                                     ...current,
                                                     [code]: value,
                                                 }));
                                             }}
+                                            onUnitChange={(code, value) => {
+                                                markDirty();
+                                                setRateUnits((current) => ({
+                                                    ...current,
+                                                    [code]: value,
+                                                }));
+                                            }}
+                                            onTaxTreatmentChange={(code, value) => {
+                                                markDirty();
+                                                setTaxTreatments((current) => ({
+                                                    ...current,
+                                                    [code]: value,
+                                                }));
+                                            }}
                                         />
                                     </div>
+                                )}
+                                {!rateSelectionsValid && (
+                                    <p className="mt-4 text-sm text-amber-700">
+                                        Select a unit and Tax treatment for every required or
+                                        non-zero rate component before saving.
+                                    </p>
                                 )}
                             </>
                         )}
@@ -868,7 +1066,9 @@ export default function RentalAgreementCreatePage({
                                     <Input
                                         label={`Clause ${index + 1} title`}
                                         value={term.title}
-                                        error={errorFor(`terms.${index}.title`)}
+                                        error={errorFor(
+                                            `terms.${index}.title`,
+                                        )}
                                         onChange={(event) => {
                                             markDirty();
                                             setTerms((current) =>
@@ -891,7 +1091,8 @@ export default function RentalAgreementCreatePage({
                                                     markDirty();
                                                     setTerms((current) =>
                                                         current.filter(
-                                                            (_, rowIndex) => rowIndex !== index,
+                                                            (_, rowIndex) =>
+                                                                rowIndex !== index,
                                                         ),
                                                     );
                                                 }}
@@ -906,7 +1107,9 @@ export default function RentalAgreementCreatePage({
                                         label={`Clause ${index + 1} content`}
                                         maxLength={20000}
                                         value={term.content}
-                                        error={errorFor(`terms.${index}.content`)}
+                                        error={errorFor(
+                                            `terms.${index}.content`,
+                                        )}
                                         onChange={(event) => {
                                             markDirty();
                                             setTerms((current) =>
@@ -914,7 +1117,8 @@ export default function RentalAgreementCreatePage({
                                                     rowIndex === index
                                                         ? {
                                                               ...row,
-                                                              content: event.target.value,
+                                                              content:
+                                                                  event.target.value,
                                                           }
                                                         : row,
                                                 ),
@@ -932,7 +1136,9 @@ export default function RentalAgreementCreatePage({
                                 markDirty();
                                 setTerms((current) => [
                                     ...current,
-                                    emptyAgreementTerm(nextTermSequence(current)),
+                                    emptyAgreementTerm(
+                                        nextTermSequence(current),
+                                    ),
                                 ]);
                             }}
                         >
@@ -948,13 +1154,15 @@ export default function RentalAgreementCreatePage({
                         disabled={
                             !partyValid ||
                             !currency ||
-                            (!isEditing && componentDefinitions.length === 0) ||
+                            (!isEditing &&
+                                componentDefinitions.length === 0) ||
                             !form.legal_context ||
                             !form.rental_mode ||
                             !form.billing_cycle ||
                             !form.billing_basis ||
                             !form.proration_rule ||
-                            (!isEditing && !form.excess_km_method)
+                            (!isEditing && !form.excess_km_method) ||
+                            (rateEditable && !rateSelectionsValid)
                         }
                     >
                         {submitLabel}
@@ -969,31 +1177,102 @@ function RateInputs({
     title,
     definitions,
     rates,
-    onChange,
+    units,
+    taxTreatments,
+    onRateChange,
+    onUnitChange,
+    onTaxTreatmentChange,
 }: {
     title: string;
     definitions: RateComponentDefinition[];
     rates: Record<string, string>;
-    onChange: (code: string, value: string) => void;
+    units: Record<string, string>;
+    taxTreatments: Record<string, string>;
+    onRateChange: (code: string, value: string) => void;
+    onUnitChange: (code: string, value: string) => void;
+    onTaxTreatmentChange: (code: string, value: string) => void;
 }) {
     return (
         <section>
-            <h3 className="mb-3 text-sm font-semibold text-slate-800">{title}</h3>
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                {definitions.map((definition) => (
-                    <Input
-                        key={definition.code}
-                        label={`${definition.code.replaceAll("_", " ")} (${definition.unit})`}
-                        type="number"
-                        min="0"
-                        step="0.000001"
-                        required={definition.required}
-                        value={rates[definition.code] ?? "0"}
-                        onChange={(event) =>
-                            onChange(definition.code, event.target.value)
-                        }
-                    />
-                ))}
+            <h3 className="mb-3 text-sm font-semibold text-slate-800">
+                {title}
+            </h3>
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {definitions.map((definition) => {
+                    const supportedUnits =
+                        definition.supported_units ?? [definition.unit];
+                    const rate = rates[definition.code] ?? "0";
+                    const active =
+                        definition.required || Number(rate) > 0;
+                    const unit = selectedRateUnit(definition, units);
+
+                    return (
+                        <div
+                            key={definition.code}
+                            className="rounded-lg border border-slate-200 p-4"
+                        >
+                            <Input
+                                label={definition.code.replaceAll("_", " ")}
+                                type="number"
+                                min="0"
+                                step="0.000001"
+                                required={definition.required}
+                                value={rate}
+                                onChange={(event) =>
+                                    onRateChange(
+                                        definition.code,
+                                        event.target.value,
+                                    )
+                                }
+                            />
+                            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                                {supportedUnits.length === 1 ? (
+                                    <Input
+                                        label="Unit"
+                                        value={supportedUnits[0].replaceAll(
+                                            "_",
+                                            " ",
+                                        )}
+                                        readOnly
+                                    />
+                                ) : (
+                                    <Select
+                                        label="Unit"
+                                        value={unit}
+                                        required={active}
+                                        onChange={(event) =>
+                                            onUnitChange(
+                                                definition.code,
+                                                event.target.value,
+                                            )
+                                        }
+                                        options={[
+                                            {
+                                                value: "",
+                                                label: "Select unit",
+                                            },
+                                            ...rentalOptions(supportedUnits),
+                                        ]}
+                                    />
+                                )}
+                                <Select
+                                    label="Tax treatment"
+                                    value={
+                                        taxTreatments[definition.code] ?? ""
+                                    }
+                                    required={active}
+                                    onChange={(event) =>
+                                        onTaxTreatmentChange(
+                                            definition.code,
+                                            event.target.value,
+                                        )
+                                    }
+                                    options={[...TAX_TREATMENT_OPTIONS]}
+                                />
+                            </div>
+                        </div>
+                    );
+                })}
             </div>
         </section>
     );
