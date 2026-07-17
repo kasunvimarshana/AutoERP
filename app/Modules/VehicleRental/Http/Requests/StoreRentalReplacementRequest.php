@@ -27,7 +27,7 @@ final class StoreRentalReplacementRequest extends TenantScopedRequest
             'allocated_to' => ['nullable', 'date', 'after:replacement_at'],
             'reason_code' => ['nullable', 'string', 'max:50'],
             'reason' => ['nullable', 'string'],
-            'billing_continuity_rule' => ['nullable', Rule::in(['continue_period', 'split_period'])],
+            'billing_continuity_rule' => ['prohibited'],
             'remarks' => ['nullable', 'string'],
             'drivers' => ['nullable', 'array'],
             'drivers.*.employee_id' => ['required', 'integer', 'min:1'],
