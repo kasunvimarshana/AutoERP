@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { toApiError, type ApiError } from "@/shared/api/apiError";
 import { Button } from "@/shared/components/Button";
+import { DetailGrid } from "@/shared/components/DetailGrid";
 import { ErrorAlert } from "@/shared/components/ErrorAlert";
 import { Input } from "@/shared/components/Input";
 import { Panel } from "@/shared/components/Panel";
@@ -68,6 +69,7 @@ export function RentalUsageFactEditor({
     onSaved,
 }: RentalUsageFactEditorProps) {
     const [form, setForm] = useState<FactForm>(() => formFromFact(fact));
+    const [editingVariance, setEditingVariance] = useState(false);
     const [dirty, setDirty] = useState(false);
     const [transitionReason, setTransitionReason] = useState("");
     const [busy, setBusy] = useState(false);
@@ -81,7 +83,7 @@ export function RentalUsageFactEditor({
 
     const save = async (event: FormEvent) => {
         event.preventDefault();
-        if (!editable || !dirty) return;
+        if (!editable || !editingVariance || !dirty) return;
         setBusy(true);
         setError(null);
         try {
@@ -93,6 +95,7 @@ export function RentalUsageFactEditor({
                 triple_overtime_minutes: Number(form.triple_overtime_minutes),
             });
             setDirty(false);
+            setEditingVariance(false);
             onSaved();
         } catch (requestError) {
             setError(toApiError(requestError));
@@ -125,138 +128,213 @@ export function RentalUsageFactEditor({
             <Panel title={sideTitle(fact.financial_side)}>
                 <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                     <p className="text-sm text-slate-600">
-                        These values control only this commercial side. The physical
-                        running chart remains unchanged.
+                        Derived from the approved physical Running Chart. Edit only when
+                        this commercial side has a documented variance.
                     </p>
                     <StatusBadge status={fact.status} />
                 </div>
                 <ErrorAlert error={error} />
-                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                    <Input
-                        label="Commercial start"
-                        type="datetime-local"
-                        required
-                        disabled={!editable}
-                        value={form.started_at}
-                        onChange={(event) => change("started_at", event.target.value)}
-                    />
-                    <Input
-                        label="Commercial finish"
-                        type="datetime-local"
-                        required
-                        disabled={!editable}
-                        value={form.ended_at}
-                        onChange={(event) => change("ended_at", event.target.value)}
-                    />
-                    <Input
-                        label="Commercial start odometer"
-                        type="number"
-                        min="0"
-                        step="0.000001"
-                        required
-                        disabled={!editable}
-                        value={form.start_odometer}
-                        onChange={(event) =>
-                            change("start_odometer", event.target.value)
-                        }
-                    />
-                    <Input
-                        label="Commercial end odometer"
-                        type="number"
-                        min="0"
-                        step="0.000001"
-                        required
-                        disabled={!editable}
-                        value={form.end_odometer}
-                        onChange={(event) =>
-                            change("end_odometer", event.target.value)
-                        }
-                    />
-                    <Input
-                        label={
-                            fact.financial_side === "revenue"
-                                ? "Billable kilometres"
-                                : "Payable kilometres"
-                        }
-                        type="number"
-                        min="0"
-                        step="0.000001"
-                        required
-                        disabled={!editable}
-                        value={form.commercial_distance_km}
-                        onChange={(event) =>
-                            change("commercial_distance_km", event.target.value)
-                        }
-                    />
-                    <Input
-                        label="Normal OT minutes"
-                        type="number"
-                        min="0"
-                        disabled={!editable}
-                        value={form.normal_overtime_minutes}
-                        onChange={(event) =>
-                            change("normal_overtime_minutes", event.target.value)
-                        }
-                    />
-                    <Input
-                        label="Double OT minutes"
-                        type="number"
-                        min="0"
-                        disabled={!editable}
-                        value={form.double_overtime_minutes}
-                        onChange={(event) =>
-                            change("double_overtime_minutes", event.target.value)
-                        }
-                    />
-                    <Input
-                        label="Triple OT minutes"
-                        type="number"
-                        min="0"
-                        disabled={!editable}
-                        value={form.triple_overtime_minutes}
-                        onChange={(event) =>
-                            change("triple_overtime_minutes", event.target.value)
-                        }
-                    />
-                    <Input
-                        label="Night-outs"
-                        type="number"
-                        min="0"
-                        step="0.000001"
-                        disabled={!editable}
-                        value={form.night_out_count}
-                        onChange={(event) =>
-                            change("night_out_count", event.target.value)
-                        }
-                    />
-                    <Input
-                        label="Customer / owner reference"
-                        disabled={!editable}
-                        value={form.reference_number}
-                        onChange={(event) =>
-                            change("reference_number", event.target.value)
-                        }
-                    />
-                </div>
-                <div className="mt-4 grid gap-4 md:grid-cols-2">
-                    <Textarea
-                        label="Variance reason"
-                        disabled={!editable}
-                        value={form.variance_reason}
-                        onChange={(event) =>
-                            change("variance_reason", event.target.value)
-                        }
-                    />
-                    <Textarea
-                        label="Remarks"
-                        disabled={!editable}
-                        value={form.remarks}
-                        onChange={(event) => change("remarks", event.target.value)}
-                    />
-                </div>
+
+                {!editingVariance ? (
+                    <>
+                        <DetailGrid
+                            items={[
+                                {
+                                    label: "Commercial period",
+                                    value: `${fact.started_at} - ${fact.ended_at}`,
+                                },
+                                {
+                                    label: "Commercial odometer",
+                                    value: `${fact.start_odometer} - ${fact.end_odometer}`,
+                                },
+                                {
+                                    label:
+                                        fact.financial_side === "revenue"
+                                            ? "Billable kilometres"
+                                            : "Payable kilometres",
+                                    value: fact.commercial_distance_km,
+                                },
+                                {
+                                    label: "Normal OT minutes",
+                                    value: fact.normal_overtime_minutes,
+                                },
+                                {
+                                    label: "Double OT minutes",
+                                    value: fact.double_overtime_minutes,
+                                },
+                                {
+                                    label: "Triple OT minutes",
+                                    value: fact.triple_overtime_minutes,
+                                },
+                                {
+                                    label: "Night-outs",
+                                    value: fact.night_out_count,
+                                },
+                                {
+                                    label: "Customer / owner reference",
+                                    value: fact.reference_number ?? "-",
+                                },
+                                {
+                                    label: "Variance reason",
+                                    value: fact.variance_reason ?? "No variance recorded",
+                                },
+                            ]}
+                        />
+                        {editable && (
+                            <div className="mt-4 flex justify-end">
+                                <Button
+                                    type="button"
+                                    variant="secondary"
+                                    onClick={() => setEditingVariance(true)}
+                                >
+                                    Record commercial variance
+                                </Button>
+                            </div>
+                        )}
+                    </>
+                ) : (
+                    <>
+                        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                            <Input
+                                label="Commercial start"
+                                type="datetime-local"
+                                required
+                                value={form.started_at}
+                                onChange={(event) =>
+                                    change("started_at", event.target.value)
+                                }
+                            />
+                            <Input
+                                label="Commercial finish"
+                                type="datetime-local"
+                                required
+                                value={form.ended_at}
+                                onChange={(event) =>
+                                    change("ended_at", event.target.value)
+                                }
+                            />
+                            <Input
+                                label="Commercial start odometer"
+                                type="number"
+                                min="0"
+                                step="0.000001"
+                                required
+                                value={form.start_odometer}
+                                onChange={(event) =>
+                                    change("start_odometer", event.target.value)
+                                }
+                            />
+                            <Input
+                                label="Commercial end odometer"
+                                type="number"
+                                min="0"
+                                step="0.000001"
+                                required
+                                value={form.end_odometer}
+                                onChange={(event) =>
+                                    change("end_odometer", event.target.value)
+                                }
+                            />
+                            <Input
+                                label={
+                                    fact.financial_side === "revenue"
+                                        ? "Billable kilometres"
+                                        : "Payable kilometres"
+                                }
+                                type="number"
+                                min="0"
+                                step="0.000001"
+                                required
+                                value={form.commercial_distance_km}
+                                onChange={(event) =>
+                                    change("commercial_distance_km", event.target.value)
+                                }
+                            />
+                            <Input
+                                label="Normal OT minutes"
+                                type="number"
+                                min="0"
+                                value={form.normal_overtime_minutes}
+                                onChange={(event) =>
+                                    change("normal_overtime_minutes", event.target.value)
+                                }
+                            />
+                            <Input
+                                label="Double OT minutes"
+                                type="number"
+                                min="0"
+                                value={form.double_overtime_minutes}
+                                onChange={(event) =>
+                                    change("double_overtime_minutes", event.target.value)
+                                }
+                            />
+                            <Input
+                                label="Triple OT minutes"
+                                type="number"
+                                min="0"
+                                value={form.triple_overtime_minutes}
+                                onChange={(event) =>
+                                    change("triple_overtime_minutes", event.target.value)
+                                }
+                            />
+                            <Input
+                                label="Night-outs"
+                                type="number"
+                                min="0"
+                                step="0.000001"
+                                value={form.night_out_count}
+                                onChange={(event) =>
+                                    change("night_out_count", event.target.value)
+                                }
+                            />
+                            <Input
+                                label="Customer / owner reference"
+                                value={form.reference_number}
+                                onChange={(event) =>
+                                    change("reference_number", event.target.value)
+                                }
+                            />
+                        </div>
+                        <div className="mt-4 grid gap-4 md:grid-cols-2">
+                            <Textarea
+                                label="Variance reason"
+                                required
+                                value={form.variance_reason}
+                                onChange={(event) =>
+                                    change("variance_reason", event.target.value)
+                                }
+                            />
+                            <Textarea
+                                label="Remarks"
+                                value={form.remarks}
+                                onChange={(event) =>
+                                    change("remarks", event.target.value)
+                                }
+                            />
+                        </div>
+                        <div className="mt-4 flex flex-wrap justify-end gap-2">
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                disabled={busy}
+                                onClick={() => {
+                                    setForm(formFromFact(fact));
+                                    setDirty(false);
+                                    setEditingVariance(false);
+                                }}
+                            >
+                                Cancel variance
+                            </Button>
+                            <Button type="submit" loading={busy} disabled={!dirty}>
+                                Save variance
+                            </Button>
+                        </div>
+                    </>
+                )}
+
                 {dirty && (
                     <p className="mt-3 text-sm font-medium text-amber-700">
-                        Save these changes before submitting or approving this side.
+                        Save or cancel the variance before changing this side&apos;s status.
                     </p>
                 )}
                 <div className="mt-4 grid gap-4 md:grid-cols-[1fr_auto] md:items-end">
@@ -266,11 +344,6 @@ export function RentalUsageFactEditor({
                         onChange={(event) => setTransitionReason(event.target.value)}
                     />
                     <div className="flex flex-wrap justify-end gap-2">
-                        {editable && (
-                            <Button type="submit" loading={busy} disabled={!dirty}>
-                                Save facts
-                            </Button>
-                        )}
                         {canRecord && fact.status === "draft" && (
                             <Button
                                 type="button"

@@ -356,11 +356,17 @@ final class RentalRateVersionService
             (int) $agreement->tenant_id,
             $agreement->organization_unit_id,
         );
-        foreach ($data['components'] as $component) {
-            $this->assertSupportedComponentUnit(
-                RentalRateComponentCode::from((string) $component['component_code']),
-                RentalRateUnit::from((string) $component['unit']),
-            );
+        foreach (array_values($data['components']) as $index => $component) {
+            $componentCode = RentalRateComponentCode::from((string) $component['component_code']);
+            $unit = RentalRateUnit::from((string) $component['unit']);
+            $this->assertSupportedComponentUnit($componentCode, $unit);
+            if (! array_key_exists('is_taxable', $component)) {
+                throw ValidationException::withMessages([
+                    "components.{$index}.is_taxable" => [
+                        'Select whether this Rental rate component is taxable.',
+                    ],
+                ]);
+            }
             $this->references->vehicleCategory(
                 isset($component['vehicle_category_id']) ? (int) $component['vehicle_category_id'] : null,
                 (int) $agreement->tenant_id,
@@ -393,7 +399,7 @@ final class RentalRateVersionService
                 'minimum_amount' => $component['minimum_amount'] ?? null,
                 'maximum_amount' => $component['maximum_amount'] ?? null,
                 'tax_group_override_id' => $component['tax_group_override_id'] ?? null,
-                'is_taxable' => $component['is_taxable'] ?? true,
+                'is_taxable' => (bool) $component['is_taxable'],
                 'calculation_order' => $component['calculation_order'] ?? ($index + 1),
                 'status' => self::COMPONENT_STATUS_ACTIVE,
                 'created_by' => $userId,
@@ -536,27 +542,8 @@ final class RentalRateVersionService
 
     private function assertSupportedComponentUnit(RentalRateComponentCode $component, RentalRateUnit $unit): void
     {
-        $supported = match ($component) {
-            RentalRateComponentCode::DriverSalary => [
-                RentalRateUnit::Fixed,
-                RentalRateUnit::Month,
-                RentalRateUnit::Week,
-                RentalRateUnit::Day,
-                RentalRateUnit::Hour,
-                RentalRateUnit::Minute,
-                RentalRateUnit::Trip,
-                RentalRateUnit::Count,
-            ],
-            RentalRateComponentCode::NormalOvertime,
-            RentalRateComponentCode::DoubleOvertime,
-            RentalRateComponentCode::TripleOvertime => [
-                RentalRateUnit::Hour,
-                RentalRateUnit::Minute,
-            ],
-            default => null,
-        };
-
-        if ($supported !== null && ! in_array($unit, $supported, true)) {
+        $supported = RentalRateComponentCatalog::supportedUnits($component);
+        if (! in_array($unit, $supported, true)) {
             throw new InvalidArgumentException(sprintf(
                 '%s does not support %s rates.',
                 ucwords(str_replace('_', ' ', $component->value)),
