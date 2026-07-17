@@ -25,21 +25,23 @@ final class RentalReservationConfirmationTest extends TestCase
 
         $reservation = $this->withTenantExecutionContext(
             $tenantId,
-            fn (): RentalReservation => RentalReservation::query()->create([
-                'tenant_id' => $tenantId,
-                'reservation_number' => 'RR-NO-VEHICLE-001',
-                'customer_id' => $customerId,
-                'requested_vehicle_id' => null,
-                'requested_vehicle_category_id' => null,
-                'rental_mode' => 'with_driver',
-                'billing_cycle' => 'daily',
-                'requested_start_at' => '2026-07-20 08:00:00',
-                'requested_end_at' => '2026-07-21 08:00:00',
-                'currency_id' => $currencyId,
-                'estimated_amount' => '0.000000',
-                'estimated_deposit_amount' => '0.000000',
-                'status' => RentalReservationStatus::Pending->value,
-            ]),
+            function () use ($tenantId, $customerId, $currencyId): RentalReservation {
+                return RentalReservation::query()->create([
+                    'tenant_id' => $tenantId,
+                    'reservation_number' => 'RR-NO-VEHICLE-001',
+                    'customer_id' => $customerId,
+                    'requested_vehicle_id' => null,
+                    'requested_vehicle_category_id' => null,
+                    'rental_mode' => 'with_driver',
+                    'billing_cycle' => 'daily',
+                    'requested_start_at' => '2026-07-20 08:00:00',
+                    'requested_end_at' => '2026-07-21 08:00:00',
+                    'currency_id' => $currencyId,
+                    'estimated_amount' => '0.000000',
+                    'estimated_deposit_amount' => '0.000000',
+                    'status' => RentalReservationStatus::Pending->value,
+                ])->refresh();
+            },
         );
 
         try {
@@ -59,10 +61,12 @@ final class RentalReservationConfirmationTest extends TestCase
             );
         }
 
-        self::assertSame(
-            RentalReservationStatus::Pending,
-            $reservation->refresh()->status,
+        $reservation = $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): RentalReservation => $reservation->refresh(),
         );
+
+        self::assertSame(RentalReservationStatus::Pending, $reservation->status);
         self::assertNull($reservation->confirmed_at);
     }
 
