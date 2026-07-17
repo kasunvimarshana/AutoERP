@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ApiError } from '@/shared/api/apiError';
@@ -118,14 +119,25 @@ async function submitNewAssignment() {
     await user.click(screen.getByRole('button', { name: 'Save assignment' }));
 }
 
-function renderTab(onChanged: (nextVersion: number) => void) {
+function WorkforceHarness({ onVersionChanged }: { onVersionChanged: (nextVersion: number) => void }) {
+    const [expectedVersion, setExpectedVersion] = useState(7);
+
+    return (
+        <VehicleServiceEmployeeAssignmentTab
+            jobId={7}
+            expectedVersion={expectedVersion}
+            onChanged={(nextVersion) => {
+                setExpectedVersion(nextVersion);
+                onVersionChanged(nextVersion);
+            }}
+        />
+    );
+}
+
+function renderTab(onVersionChanged: (nextVersion: number) => void) {
     return render(
         <TestRouter>
-            <VehicleServiceEmployeeAssignmentTab
-                jobId={7}
-                expectedVersion={7}
-                onChanged={onChanged}
-            />
+            <WorkforceHarness onVersionChanged={onVersionChanged} />
         </TestRouter>,
     );
 }
@@ -136,32 +148,38 @@ describe('VehicleServiceEmployeeAssignmentTab', () => {
         apiMocks.listEmployeeAssignableLines
             .mockResolvedValueOnce(initialLines)
             .mockResolvedValue(refreshedLines);
-        apiMocks.getVehicleServiceJob.mockResolvedValue(refreshedJob(9));
+        apiMocks.getVehicleServiceJob
+            .mockResolvedValueOnce(refreshedJob(9))
+            .mockResolvedValue(refreshedJob(10));
         apiMocks.createVehicleServiceEmployee.mockResolvedValue(secondAssignment);
         apiMocks.updateVehicleServiceEmployee.mockResolvedValue(secondAssignment);
         apiMocks.deleteVehicleServiceEmployee.mockResolvedValue(undefined);
     });
 
-    it('refreshes the authoritative job version and all recalculated assignments after a mutation', async () => {
-        const onChanged = vi.fn();
-        renderTab(onChanged);
+    it('synchronizes the job version before the first assignment mutation', async () => {
+        const onVersionChanged = vi.fn();
+        renderTab(onVersionChanged);
 
         await submitNewAssignment();
 
         await waitFor(() => expect(apiMocks.createVehicleServiceEmployee).toHaveBeenCalledWith(
             7,
             11,
-            expect.objectContaining({ expected_version: 7, employee_id: 22 }),
+            expect.objectContaining({ expected_version: 9, employee_id: 22 }),
         ));
-        await waitFor(() => expect(onChanged).toHaveBeenCalledWith(9));
+        expect(onVersionChanged).toHaveBeenNthCalledWith(1, 9);
+        await waitFor(() => expect(onVersionChanged).toHaveBeenLastCalledWith(10));
         expect(apiMocks.listEmployeeAssignableLines).toHaveBeenCalledTimes(2);
-        expect(apiMocks.getVehicleServiceJob).toHaveBeenCalledWith(7);
+        expect(apiMocks.getVehicleServiceJob).toHaveBeenCalledTimes(2);
         expect((await screen.findAllByText('fixed: 50.000000')).length).toBeGreaterThanOrEqual(2);
     });
 
-    it('reloads the latest state after a stale-version rejection and keeps the form retryable', async () => {
-        const onChanged = vi.fn();
-        apiMocks.getVehicleServiceJob.mockResolvedValue(refreshedJob(12));
+    it('reloads the latest state after a genuine stale-version rejection and keeps the form retryable', async () => {
+        const onVersionChanged = vi.fn();
+        apiMocks.getVehicleServiceJob
+            .mockReset()
+            .mockResolvedValueOnce(refreshedJob(9))
+            .mockResolvedValue(refreshedJob(12));
         apiMocks.createVehicleServiceEmployee.mockRejectedValueOnce(new ApiError(
             'Validation failed',
             422,
@@ -170,12 +188,17 @@ describe('VehicleServiceEmployeeAssignmentTab', () => {
             { expected_version: ['Vehicle service job was changed by another request.'] },
         ));
 
-        renderTab(onChanged);
+        renderTab(onVersionChanged);
         await submitNewAssignment();
 
         expect((await screen.findAllByText(/Latest job and workforce data has been loaded/)).length).toBeGreaterThanOrEqual(1);
-        expect(onChanged).toHaveBeenCalledWith(12);
-        expect(apiMocks.listEmployeeAssignableLines).toHaveBeenCalledTimes(2);
+        expect(onVersionChanged).toHaveBeenNthCalledWith(1, 9);
+        expect(onVersionChanged).toHaveBeenLastCalledWith(12);
+        expect(apiMocks.createVehicleServiceEmployee).toHaveBeenCalledWith(
+            7,
+            11,
+            expect.objectContaining({ expected_version: 9 }),
+        );
         expect(screen.getByRole('button', { name: 'Save assignment' })).toBeInTheDocument();
     });
 });
