@@ -2,6 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ApiError } from '@/shared/api/apiError';
 import type { NamedResource } from '@/shared/types/common';
+import { TestRouter } from '@/test/TestRouter';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type {
     VehicleServiceEmployeeAssignment,
@@ -117,6 +118,18 @@ async function submitNewAssignment() {
     await user.click(screen.getByRole('button', { name: 'Save assignment' }));
 }
 
+function renderTab(onChanged: (nextVersion: number) => void) {
+    return render(
+        <TestRouter>
+            <VehicleServiceEmployeeAssignmentTab
+                jobId={7}
+                expectedVersion={7}
+                onChanged={onChanged}
+            />
+        </TestRouter>,
+    );
+}
+
 describe('VehicleServiceEmployeeAssignmentTab', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -131,13 +144,7 @@ describe('VehicleServiceEmployeeAssignmentTab', () => {
 
     it('refreshes the authoritative job version and all recalculated assignments after a mutation', async () => {
         const onChanged = vi.fn();
-        render(
-            <VehicleServiceEmployeeAssignmentTab
-                jobId={7}
-                expectedVersion={7}
-                onChanged={onChanged}
-            />,
-        );
+        renderTab(onChanged);
 
         await submitNewAssignment();
 
@@ -163,14 +170,7 @@ describe('VehicleServiceEmployeeAssignmentTab', () => {
             { expected_version: ['Vehicle service job was changed by another request.'] },
         ));
 
-        render(
-            <VehicleServiceEmployeeAssignmentTab
-                jobId={7}
-                expectedVersion={7}
-                onChanged={onChanged}
-            />,
-        );
-
+        renderTab(onChanged);
         await submitNewAssignment();
 
         expect((await screen.findAllByText(/Latest job and workforce data has been loaded/)).length).toBeGreaterThanOrEqual(1);
