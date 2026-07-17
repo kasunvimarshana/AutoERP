@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { RouterProvider, createMemoryRouter } from "react-router-dom";
@@ -102,6 +102,12 @@ vi.mock("../components/RentalLookups", () => ({
 }));
 
 afterEach(() => configureBusinessTimeZone(null));
+
+async function selectRequiredRateTaxTreatment(): Promise<void> {
+    fireEvent.change(await screen.findByLabelText("Tax treatment"), {
+        target: { value: "taxable" },
+    });
+}
 
 describe("RentalAgreement list route changes", () => {
     beforeEach(() => {
@@ -246,6 +252,7 @@ describe("RentalAgreement lessor flow", () => {
             screen.getByLabelText("Clause 1 content"),
             "The lessor supplies the vehicle under the payable rates shown.",
         );
+        await selectRequiredRateTaxTreatment();
         await user.click(
             screen.getByRole("button", { name: "Create lessor agreement" }),
         );
@@ -258,6 +265,15 @@ describe("RentalAgreement lessor flow", () => {
                     customer_id: null,
                     currency_id: 1,
                     deposit: undefined,
+                    rate_version: expect.objectContaining({
+                        components: [
+                            expect.objectContaining({
+                                component_code: "base_rental",
+                                unit: "month",
+                                is_taxable: true,
+                            }),
+                        ],
+                    }),
                     terms: [
                         expect.objectContaining({
                             sequence: 1,
@@ -334,6 +350,7 @@ describe("RentalAgreement lessee flow", () => {
         );
         await user.clear(screen.getByLabelText("Security deposit"));
         await user.type(screen.getByLabelText("Security deposit"), "1000");
+        await selectRequiredRateTaxTreatment();
         await user.click(
             screen.getByRole("button", { name: "Create lessee agreement" }),
         );
@@ -389,6 +406,7 @@ describe("RentalAgreement lessee flow", () => {
         await user.type(screen.getByLabelText("Agreement date"), "2026-07-06");
         await user.type(screen.getByLabelText("Start"), "2026-07-06T08:00");
         await user.type(screen.getByLabelText("End"), "2026-08-06T08:00");
+        await selectRequiredRateTaxTreatment();
         await user.click(
             screen.getByRole("button", { name: "Create lessee agreement" }),
         );
@@ -422,6 +440,7 @@ describe("RentalAgreement lessee flow", () => {
         await user.type(screen.getByLabelText("Agreement date"), "2026-07-06");
         await user.type(screen.getByLabelText("Start"), "2026-07-06T08:00");
         await user.type(screen.getByLabelText("End"), "2026-08-06T08:00");
+        await selectRequiredRateTaxTreatment();
         await user.click(
             screen.getByRole("button", { name: "Create lessee agreement" }),
         );
@@ -454,6 +473,7 @@ describe("RentalAgreement lessee flow", () => {
         );
         await user.type(screen.getByLabelText("Start"), "2026-07-06T08:00");
         await user.type(screen.getByLabelText("End"), "2026-08-06T08:00");
+        await selectRequiredRateTaxTreatment();
         await user.click(
             screen.getByRole("button", { name: "Create lessee agreement" }),
         );
@@ -496,6 +516,7 @@ describe("RentalAgreement lessee flow", () => {
         await user.type(screen.getByLabelText("Agreement date"), "2026-07-06");
         await user.type(screen.getByLabelText("Start"), "2026-07-06T08:00");
         await user.type(screen.getByLabelText("End"), "2026-08-06T08:00");
+        await selectRequiredRateTaxTreatment();
         await user.click(
             screen.getByRole("button", { name: "Create lessee agreement" }),
         );
@@ -536,6 +557,7 @@ describe("RentalAgreement lessee flow", () => {
         );
 
         await screen.findByRole("button", { name: "Reservation Currency" });
+        await selectRequiredRateTaxTreatment();
         await user.click(
             screen.getByRole("button", { name: "Create lessee agreement" }),
         );
@@ -1073,6 +1095,15 @@ function rentalMetadata(defaultCurrency: NamedResource | null = null) {
         expense_types: [],
         expense_allocation_types: [],
         financial_sides: ["revenue", "cost"],
+        rate_component_definitions: [
+            {
+                code: "base_rental",
+                unit: "month",
+                supported_units: ["month"],
+                group: "core",
+                required: true,
+            },
+        ],
         rate_component_codes: ["base_rental"],
         rate_units: ["month"],
     };
