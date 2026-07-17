@@ -12,13 +12,24 @@ use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\VehicleRental\Enums\RentalAgreementKind;
+use Modules\VehicleRental\Enums\RentalCalculationSourceStatus;
+use Modules\VehicleRental\Enums\RentalCalculationStatus;
 use Modules\VehicleRental\Enums\RentalExpenseAllocationType;
 use Modules\VehicleRental\Enums\RentalExpenseStatus;
+use Modules\VehicleRental\Models\RentalCalculationSource;
 use Modules\VehicleRental\Models\RentalExpense;
 use Modules\VehicleRental\Models\RentalExpenseAllocation;
 
 final class RentalExpenseService
 {
+    private const ALLOCATION_STATUS_DRAFT = 'draft';
+
+    private const ALLOCATION_STATUS_APPROVED = 'approved';
+
+    private const ALLOCATION_STATUS_CONSUMED = 'consumed';
+
+    private const ALLOCATION_STATUS_REVERSED = 'reversed';
+
     /** @var array<string, list<string>> */
     private const TRANSITIONS = [
         'draft' => ['submitted', 'reversed'],
@@ -107,19 +118,22 @@ final class RentalExpenseService
             if ($to === RentalExpenseStatus::Approved) {
                 $this->assertAllocationTotal($expense, true);
                 $expense->allocations()->update([
-                    'status' => 'approved',
+                    'status' => self::ALLOCATION_STATUS_APPROVED,
                     'row_version' => DB::raw('row_version + 1'),
                     'updated_by' => $userId,
                     'updated_at' => now(),
                 ]);
             }
             if ($to === RentalExpenseStatus::Reversed) {
-                $expense->allocations()->where('status', '!=', 'reversed')->update([
-                    'status' => 'reversed',
-                    'row_version' => DB::raw('row_version + 1'),
-                    'updated_by' => $userId,
-                    'updated_at' => now(),
-                ]);
+                $this->assertReversalAllowed($expense, $reason);
+                $expense->allocations()
+                    ->where('status', '!=', self::ALLOCATION_STATUS_REVERSED)
+                    ->update([
+                        'status' => self::ALLOCATION_STATUS_REVERSED,
+                        'row_version' => DB::raw('row_version + 1'),
+                        'updated_by' => $userId,
+                        'updated_at' => now(),
+                    ]);
             }
 
             $expense->status = $to;
@@ -192,11 +206,13 @@ final class RentalExpenseService
                 ->get();
 
             foreach ($allocations as $allocation) {
-                if (! in_array((string) $allocation->status, ['approved', 'consumed'], true)) {
+                if (! in_array((string) $allocation->status, [self::ALLOCATION_STATUS_APPROVED, self::ALLOCATION_STATUS_CONSUMED], true)) {
                     continue;
                 }
 
-                $nextStatus = $consumed->has((int) $allocation->getKey()) ? 'consumed' : 'approved';
+                $nextStatus = $consumed->has((int) $allocation->getKey())
+                    ? self::ALLOCATION_STATUS_CONSUMED
+                    : self::ALLOCATION_STATUS_APPROVED;
                 if ((string) $allocation->status === $nextStatus) {
                     continue;
                 }
@@ -230,10 +246,10 @@ final class RentalExpenseService
                 }
 
                 $approvedAllocations = $expense->allocations->contains(
-                    fn (RentalExpenseAllocation $allocation): bool => (string) $allocation->status === 'approved',
+                    fn (RentalExpenseAllocation $allocation): bool => (string) $allocation->status === self::ALLOCATION_STATUS_APPROVED,
                 );
                 $consumedAllocations = $expense->allocations->contains(
-                    fn (RentalExpenseAllocation $allocation): bool => (string) $allocation->status === 'consumed',
+                    fn (RentalExpenseAllocation $allocation): bool => (string) $allocation->status === self::ALLOCATION_STATUS_CONSUMED,
                 );
                 $nextStatus = $consumedAllocations && ! $approvedAllocations
                     ? RentalExpenseStatus::Allocated
@@ -296,13 +312,52 @@ final class RentalExpenseService
             'withholding_amount' => $withholding,
             'markup_amount' => $markup,
             'total_amount' => $total,
-            'status' => 'draft',
+            'status' => self::ALLOCATION_STATUS_DRAFT,
             'fingerprint' => $fingerprint,
             'created_by' => $userId,
             'updated_by' => $userId,
         ]);
     }
 
+    private function assertReversalAllowed(RentalExpense $expense, ?string $reason): void
+    {
+        if (trim((string) $reason) === '') {
+            throw new InvalidArgumentException('A reversal reason is required.');
+        }
+
+        $allocationIds = $expense->allocations
+            ->pluck('id')
+            ->map(static fn ($id): int => (int) $id)
+            ->filter(static fn (int $id): bool => $id > 0)
+            ->unique()
+            ->values();
+        if ($allocationIds->isEmpty()) {
+            return;
+        }
+
+        $sources = RentalCalculationSource::query()
+            ->where('tenant_id', $expense->tenant_id)
+            ->whereIn('expense_allocation_id', $allocationIds->all())
+            ->with('run')
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get();
+
+        $expense->setRelation(
+            'allocations',
+            $expense->allocations()->orderBy('id')->lockForUpdate()->get(),
+        );
+
+        $hasApprovedConsumption = $sources->contains(static function (RentalCalculationSource $source): bool {
+            return $source->status === RentalCalculationSourceStatus::Approved
+                && $source->run?->calculation_status === RentalCalculationStatus::Approved;
+        });
+        if ($hasApprovedConsumption) {
+            throw new InvalidArgumentException(
+                'Reverse the approved rental calculation and its generated financial document before reversing this expense.',
+            );
+        }
+    }
 
     private function validateExpenseReferences(array $data, int $tenantId, ?int $organizationUnitId): void
     {

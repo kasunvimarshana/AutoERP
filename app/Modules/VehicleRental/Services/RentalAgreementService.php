@@ -14,8 +14,11 @@ use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use Modules\VehicleRental\Enums\RentalAgreementKind;
 use Modules\VehicleRental\Enums\RentalAgreementStatus;
+use Modules\VehicleRental\Enums\RentalDepositStatus;
+use Modules\VehicleRental\Enums\RentalRateVersionStatus;
 use Modules\VehicleRental\Enums\RentalReservationStatus;
 use Modules\VehicleRental\Models\RentalAgreement;
+use Modules\VehicleRental\Models\RentalDepositRequirement;
 use Modules\VehicleRental\Models\RentalReservation;
 use RuntimeException;
 
@@ -37,6 +40,16 @@ final class RentalAgreementService
         'billing_timezone',
         'payment_term_days',
         'currency_id',
+    ];
+
+    private const DEPOSIT_IDENTITY_FIELDS = [
+        'customer_id',
+        'currency_id',
+    ];
+
+    private const OPEN_ALLOCATION_STATUSES = [
+        'planned',
+        'active',
     ];
 
     private const TRANSITIONS = [
@@ -98,11 +111,11 @@ final class RentalAgreementService
                 'executed_at' => $data['executed_at'] ?? null,
                 'starts_at' => $data['starts_at'],
                 'ends_at' => $data['ends_at'],
-                'legal_context' => $data['legal_context'] ?? null,
+                'legal_context' => $data['legal_context'],
                 'rental_mode' => $data['rental_mode'],
                 'billing_cycle' => $data['billing_cycle'],
                 'billing_basis' => $data['billing_basis'],
-                'proration_rule' => $data['proration_rule'] ?? 'exact_day_count',
+                'proration_rule' => $data['proration_rule'],
                 'billing_timezone' => $data['billing_timezone'] ?? $this->defaultBillingTimezone(),
                 'payment_term_days' => $data['payment_term_days'] ?? null,
                 'currency_id' => $data['currency_id'],
@@ -116,7 +129,7 @@ final class RentalAgreementService
 
             if (! empty($data['rate_version'])) {
                 $version = $this->rates->createDraft($agreement, $data['rate_version'], $userId);
-                if (($data['activate_rate_version'] ?? true) === true) {
+                if (($data['activate_rate_version'] ?? false) === true) {
                     $this->rates->activate($version, (int) $version->row_version, $userId);
                 }
             }
@@ -134,7 +147,7 @@ final class RentalAgreementService
                     'due_date' => $deposit['due_date'] ?? null,
                     'is_refundable' => $deposit['is_refundable'] ?? true,
                     'balance_amount' => $required,
-                    'status' => 'pending',
+                    'status' => RentalDepositStatus::Pending->value,
                     'remarks' => $deposit['remarks'] ?? null,
                     'created_by' => $userId,
                     'updated_by' => $userId,
@@ -147,7 +160,12 @@ final class RentalAgreementService
                 $reservation->row_version = (int) $reservation->row_version + 1;
                 $reservation->updated_by = $userId;
                 $reservation->save();
-                $this->history->record($reservation, $previousReservationStatus->value, RentalReservationStatus::Converted->value, $userId);
+                $this->history->record(
+                    $reservation,
+                    $previousReservationStatus->value,
+                    RentalReservationStatus::Converted->value,
+                    $userId,
+                );
             }
             $this->history->record($agreement, null, RentalAgreementStatus::Draft->value, $userId);
 
@@ -194,10 +212,12 @@ final class RentalAgreementService
                 throw new InvalidArgumentException('Only draft agreements can be edited.');
             }
 
+            $originalAgreementValues = $agreement->only(self::STRUCTURAL_DRAFT_FIELDS);
             $kind = $agreement->agreement_kind;
             $merged = array_merge($agreement->toArray(), $data);
             $this->assertParty($kind, $merged);
-            $this->assertStructuralDraftChangesAllowed($agreement, $data);
+            $changedFields = $this->structuralDraftChanges($agreement, $data);
+            $this->assertStructuralDraftChangesAllowed($agreement, $changedFields);
             $this->validateReferences(
                 $kind,
                 $merged,
@@ -225,6 +245,19 @@ final class RentalAgreementService
             $agreement->row_version = $expectedVersion + 1;
             $agreement->updated_by = $userId;
             $agreement->save();
+
+            if (array_key_exists('rate_version', $data) && is_array($data['rate_version'])) {
+                $rateVersionData = $data['rate_version'];
+                $this->rates->replaceDraftForAgreement(
+                    $agreement,
+                    $rateVersionData,
+                    (int) $rateVersionData['expected_version'],
+                    $userId,
+                );
+            } else {
+                $this->rates->synchronizeDraftsWithAgreement($agreement, $originalAgreementValues, $userId);
+            }
+            $this->synchronizePendingDeposit($agreement, $originalAgreementValues, $changedFields, $userId);
 
             if (array_key_exists('terms', $data)) {
                 $this->syncTerms($agreement, $data['terms'] ?? [], $userId);
@@ -254,12 +287,10 @@ final class RentalAgreementService
             if (! in_array($to->value, self::TRANSITIONS[$from->value] ?? [], true)) {
                 throw new InvalidArgumentException("Invalid agreement transition from {$from->value} to {$to->value}.");
             }
-            if ($to === RentalAgreementStatus::Active
-                && ! $agreement->rateVersions()->where('status', 'active')->exists()) {
-                throw new InvalidArgumentException('An active rate version is required before agreement activation.');
-            }
             if ($to === RentalAgreementStatus::Active && $from === RentalAgreementStatus::Draft) {
                 $this->assertReadyForActivation($agreement);
+                $this->rates->activateSingleDraftForAgreement($agreement, $userId);
+                $agreement->unsetRelation('activeRateVersion');
                 $agreement->load([
                     'tenant',
                     'organizationUnit',
@@ -277,7 +308,7 @@ final class RentalAgreementService
                 RentalAgreementStatus::Completed,
                 RentalAgreementStatus::Terminated,
                 RentalAgreementStatus::Cancelled,
-            ], true) && $agreement->allocations()->whereIn('status', ['planned', 'active'])->exists()) {
+            ], true) && $agreement->allocations()->whereIn('status', self::OPEN_ALLOCATION_STATUSES)->exists()) {
                 throw new InvalidArgumentException('Close or cancel all planned and active vehicle allocations before ending the agreement.');
             }
             if (in_array($to, [RentalAgreementStatus::Completed, RentalAgreementStatus::Terminated], true)) {
@@ -501,30 +532,83 @@ final class RentalAgreementService
         ];
     }
 
-    private function assertStructuralDraftChangesAllowed(RentalAgreement $agreement, array $data): void
+    /** @return list<string> */
+    private function structuralDraftChanges(RentalAgreement $agreement, array $data): array
     {
-        $changedFields = array_values(array_filter(
+        return array_values(array_filter(
             self::STRUCTURAL_DRAFT_FIELDS,
             fn (string $field): bool => array_key_exists($field, $data)
                 && ! $this->fieldValueMatches($agreement->{$field}, $data[$field]),
         ));
+    }
 
+    /** @param list<string> $changedFields */
+    private function assertStructuralDraftChangesAllowed(RentalAgreement $agreement, array $changedFields): void
+    {
         if ($changedFields === []) {
             return;
         }
 
-        $hasDependentRecords = $agreement->allocations()->exists()
-            || $agreement->rateVersions()->exists()
-            || $agreement->depositRequirement()->exists();
-        if (! $hasDependentRecords) {
+        if ($agreement->allocations()->exists()
+            || $agreement->rateVersions()->where('status', '!=', RentalRateVersionStatus::Draft->value)->exists()) {
+            throw ValidationException::withMessages([
+                'agreement' => [
+                    'Agreement party, period, billing, payment term, and currency fields cannot be changed after an allocation or committed rate version exists.',
+                ],
+            ]);
+        }
+
+        if (array_intersect($changedFields, self::DEPOSIT_IDENTITY_FIELDS) === []) {
             return;
         }
 
-        throw ValidationException::withMessages([
-            'agreement' => [
-                'Agreement party, period, billing, payment term, and currency fields cannot be changed after allocations, rate versions, or deposit requirements exist.',
-            ],
-        ]);
+        $deposit = $agreement->depositRequirement()->with('links')->lockForUpdate()->first();
+        if ($deposit !== null
+            && ($deposit->status !== RentalDepositStatus::Pending || $deposit->links->isNotEmpty())) {
+            throw ValidationException::withMessages([
+                'agreement' => [
+                    'Agreement customer and currency cannot change after security-deposit activity exists.',
+                ],
+            ]);
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $originalAgreementValues
+     * @param list<string> $changedFields
+     */
+    private function synchronizePendingDeposit(
+        RentalAgreement $agreement,
+        array $originalAgreementValues,
+        array $changedFields,
+        ?int $userId,
+    ): void {
+        if (array_intersect($changedFields, self::DEPOSIT_IDENTITY_FIELDS) === []) {
+            return;
+        }
+
+        $deposit = $agreement->depositRequirement()->with('links')->lockForUpdate()->first();
+        if (! $deposit instanceof RentalDepositRequirement
+            || $deposit->status !== RentalDepositStatus::Pending
+            || $deposit->links->isNotEmpty()) {
+            return;
+        }
+
+        $updates = [];
+        if (in_array('customer_id', $changedFields, true)) {
+            $updates['customer_id'] = $agreement->customer_id;
+        }
+        if (in_array('currency_id', $changedFields, true)
+            && (int) $deposit->currency_id === (int) ($originalAgreementValues['currency_id'] ?? 0)) {
+            $updates['currency_id'] = $agreement->currency_id;
+        }
+        if ($updates === []) {
+            return;
+        }
+
+        $updates['row_version'] = (int) $deposit->row_version + 1;
+        $updates['updated_by'] = $userId;
+        $deposit->forceFill($updates)->save();
     }
 
     private function fieldValueMatches(mixed $current, mixed $next): bool
