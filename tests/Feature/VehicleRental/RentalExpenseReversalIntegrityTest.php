@@ -89,7 +89,10 @@ final class RentalExpenseReversalIntegrityTest extends TestCase
             RentalCalculationStatus::Approved,
         );
 
-        $consumedExpense = RentalExpense::query()->findOrFail($approvedExpense->getKey());
+        $consumedExpense = $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): RentalExpense => RentalExpense::query()->findOrFail($approvedExpense->getKey()),
+        );
         try {
             $this->withTenantExecutionContext(
                 $tenantId,
@@ -125,7 +128,10 @@ final class RentalExpenseReversalIntegrityTest extends TestCase
             'Incorrect repair allocation.',
         );
 
-        $releasedExpense = RentalExpense::query()->findOrFail($approvedExpense->getKey());
+        $releasedExpense = $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): RentalExpense => RentalExpense::query()->findOrFail($approvedExpense->getKey()),
+        );
         $reversedExpense = $this->withTenantExecutionContext(
             $tenantId,
             fn (): RentalExpense => app(RentalExpenseService::class)->transition(
@@ -149,15 +155,17 @@ final class RentalExpenseReversalIntegrityTest extends TestCase
         RentalExpense $expense,
         RentalExpenseStatus $status,
     ): RentalExpense {
-        $current = RentalExpense::query()->findOrFail($expense->getKey());
-
         return $this->withTenantExecutionContext(
             $tenantId,
-            fn (): RentalExpense => app(RentalExpenseService::class)->transition(
-                $current,
-                $status,
-                (int) $current->row_version,
-            ),
+            function () use ($expense, $status): RentalExpense {
+                $current = RentalExpense::query()->findOrFail($expense->getKey());
+
+                return app(RentalExpenseService::class)->transition(
+                    $current,
+                    $status,
+                    (int) $current->row_version,
+                );
+            },
         );
     }
 
@@ -167,17 +175,19 @@ final class RentalExpenseReversalIntegrityTest extends TestCase
         RentalCalculationStatus $status,
         ?string $reason = null,
     ): RentalCalculationRun {
-        $current = RentalCalculationRun::query()->findOrFail($run->getKey());
-
         return $this->withTenantExecutionContext(
             $tenantId,
-            fn (): RentalCalculationRun => app(RentalCalculationTransitionService::class)->transition(
-                $current,
-                $status,
-                (int) $current->row_version,
-                null,
-                $reason,
-            ),
+            function () use ($run, $status, $reason): RentalCalculationRun {
+                $current = RentalCalculationRun::query()->findOrFail($run->getKey());
+
+                return app(RentalCalculationTransitionService::class)->transition(
+                    $current,
+                    $status,
+                    (int) $current->row_version,
+                    null,
+                    $reason,
+                );
+            },
         );
     }
 
