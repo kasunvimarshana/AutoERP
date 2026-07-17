@@ -26,68 +26,72 @@ final class VehicleServiceRentalAvailabilityIntegrationTest extends TestCase
         $tenantId = $this->createTenant($currencyId);
         $customerId = $this->createCustomer($tenantId, $currencyId);
         $vehicleId = $this->createVehicle($tenantId);
-        $firstJob = $this->createServiceJob($tenantId, $customerId, $vehicleId, 'VSJ-AVAILABILITY-001');
-        $secondJob = $this->createServiceJob($tenantId, $customerId, $vehicleId, 'VSJ-AVAILABILITY-002');
 
-        $statusService = app(VehicleServiceStatusService::class);
-        $statusService->change($firstJob, VehicleServiceJobStatus::InProgress, reason: 'Workshop work started.');
+        $this->withTenantExecutionContext($tenantId, function () use ($tenantId, $customerId, $vehicleId): void {
+            $firstJob = $this->createServiceJob($tenantId, $customerId, $vehicleId, 'VSJ-AVAILABILITY-001');
+            $secondJob = $this->createServiceJob($tenantId, $customerId, $vehicleId, 'VSJ-AVAILABILITY-002');
+            $statusService = app(VehicleServiceStatusService::class);
 
-        self::assertSame(
-            VehicleStatus::UnderService,
-            Vehicle::query()->findOrFail($vehicleId)->status,
-        );
-        self::assertSame(0, app(RentalAvailabilityService::class)->queryAvailable(
-            $tenantId,
-            null,
-            '2026-07-20 08:00:00',
-            '2026-07-21 08:00:00',
-        )->count());
+            $statusService->change($firstJob, VehicleServiceJobStatus::InProgress, reason: 'Workshop work started.');
 
-        try {
-            app(RentalAvailabilityService::class)->assertVehicle(
+            self::assertSame(
+                VehicleStatus::UnderService,
+                Vehicle::query()->findOrFail($vehicleId)->status,
+            );
+            self::assertSame(0, app(RentalAvailabilityService::class)->queryAvailable(
                 $tenantId,
                 null,
-                $vehicleId,
                 '2026-07-20 08:00:00',
                 '2026-07-21 08:00:00',
+            )->count());
+
+            try {
+                app(RentalAvailabilityService::class)->assertVehicle(
+                    $tenantId,
+                    null,
+                    $vehicleId,
+                    '2026-07-20 08:00:00',
+                    '2026-07-21 08:00:00',
+                );
+                self::fail('An under-service vehicle should not be available for rental.');
+            } catch (InvalidArgumentException $exception) {
+                self::assertSame(
+                    'Vehicle is not available for rental in its current status.',
+                    $exception->getMessage(),
+                );
+            }
+
+            $statusService->change($secondJob, VehicleServiceJobStatus::InProgress, reason: 'Additional workshop work started.');
+            $statusService->change(
+                VehicleServiceJob::query()->findOrFail($firstJob->getKey()),
+                VehicleServiceJobStatus::Completed,
+                reason: 'First workshop job completed.',
             );
-            self::fail('An under-service vehicle should not be available for rental.');
-        } catch (InvalidArgumentException $exception) {
+
             self::assertSame(
-                'Vehicle is not available for rental in its current status.',
-                $exception->getMessage(),
+                VehicleStatus::UnderService,
+                Vehicle::query()->findOrFail($vehicleId)->status,
+                'Another in-progress service job still owns the vehicle unavailability.',
             );
-        }
 
-        $statusService->change($secondJob, VehicleServiceJobStatus::InProgress, reason: 'Additional workshop work started.');
-        $statusService->change(
-            VehicleServiceJob::query()->findOrFail($firstJob->getKey()),
-            VehicleServiceJobStatus::Completed,
-            reason: 'First workshop job completed.',
-        );
+            $statusService->change(
+                VehicleServiceJob::query()->findOrFail($secondJob->getKey()),
+                VehicleServiceJobStatus::Cancelled,
+                reason: 'Remaining workshop job cancelled.',
+            );
 
-        self::assertSame(
-            VehicleStatus::UnderService,
-            Vehicle::query()->findOrFail($vehicleId)->status,
-            'Another in-progress service job still owns the vehicle unavailability.',
-        );
+            self::assertSame(
+                VehicleStatus::Active,
+                Vehicle::query()->findOrFail($vehicleId)->status,
+            );
+            self::assertSame(1, app(RentalAvailabilityService::class)->queryAvailable(
+                $tenantId,
+                null,
+                '2026-07-20 08:00:00',
+                '2026-07-21 08:00:00',
+            )->count());
+        });
 
-        $statusService->change(
-            VehicleServiceJob::query()->findOrFail($secondJob->getKey()),
-            VehicleServiceJobStatus::Cancelled,
-            reason: 'Remaining workshop job cancelled.',
-        );
-
-        self::assertSame(
-            VehicleStatus::Active,
-            Vehicle::query()->findOrFail($vehicleId)->status,
-        );
-        self::assertSame(1, app(RentalAvailabilityService::class)->queryAvailable(
-            $tenantId,
-            null,
-            '2026-07-20 08:00:00',
-            '2026-07-21 08:00:00',
-        )->count());
         $this->assertDatabaseHas('vehicle_status_histories', [
             'vehicle_id' => $vehicleId,
             'old_status' => VehicleStatus::Active->value,
@@ -106,16 +110,19 @@ final class VehicleServiceRentalAvailabilityIntegrationTest extends TestCase
         $tenantId = $this->createTenant($currencyId);
         $customerId = $this->createCustomer($tenantId, $currencyId);
         $vehicleId = $this->createVehicle($tenantId, VehicleStatus::Rented);
-        $job = $this->createServiceJob($tenantId, $customerId, $vehicleId, 'VSJ-AVAILABILITY-003');
 
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Only an active vehicle can enter an in-progress service job.');
 
-        app(VehicleServiceStatusService::class)->change(
-            $job,
-            VehicleServiceJobStatus::InProgress,
-            reason: 'Invalid overlapping workshop start.',
-        );
+        $this->withTenantExecutionContext($tenantId, function () use ($tenantId, $customerId, $vehicleId): void {
+            $job = $this->createServiceJob($tenantId, $customerId, $vehicleId, 'VSJ-AVAILABILITY-003');
+
+            app(VehicleServiceStatusService::class)->change(
+                $job,
+                VehicleServiceJobStatus::InProgress,
+                reason: 'Invalid overlapping workshop start.',
+            );
+        });
     }
 
     private function createCurrency(): int
