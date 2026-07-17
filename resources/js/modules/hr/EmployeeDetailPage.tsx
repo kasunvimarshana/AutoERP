@@ -1,5 +1,8 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { hasPermission } from '@/modules/auth/accessControl';
+import { useAuth } from '@/modules/auth/AuthProvider';
+import { useTenantRouteAccess } from '@/modules/auth/useTenantRouteAccess';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button, LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
@@ -9,8 +12,9 @@ import { LoadingState } from '@/shared/components/LoadingState';
 import { Panel } from '@/shared/components/Panel';
 import { Tabs } from '@/shared/components/Tabs';
 import { useOnDemandTab } from '@/shared/hooks/useOnDemandTab';
-import { getEmployee } from './hrApi';
 import { EmployeeSummaryCard } from './components/EmployeeSummaryCard';
+import { getEmployee } from './hrApi';
+import { hrPermissions } from './hrPermissions';
 import type { Employee } from './hrTypes';
 
 const EmployeeContactTab = lazy(() => import('./components/EmployeeContactTab').then((module) => ({ default: module.EmployeeContactTab })));
@@ -39,6 +43,9 @@ const tabs = [
 ] satisfies Array<{ id: Tab; label: string }>;
 
 export default function EmployeeDetailPage() {
+    const auth = useAuth();
+    const canUpdate = hasPermission(auth, hrPermissions.employeesUpdate);
+    const canOpenServiceJobs = useTenantRouteAccess('/vehicle-service/jobs');
     const id = Number(useParams().id);
     const [employee, setEmployee] = useState<Employee | null>(null);
     const [loading, setLoading] = useState(true);
@@ -74,16 +81,14 @@ export default function EmployeeDetailPage() {
             <ContentHeader
                 title={employee.display_name}
                 description={`${employee.employee_number} / ${employee.designation?.name ?? 'No designation'}`}
-                actions={<LinkButton to={`/hr/employees/${id}/edit`}>Edit</LinkButton>}
+                actions={canUpdate ? <LinkButton to={`/hr/employees/${id}/edit`}>Edit</LinkButton> : undefined}
             />
             <ErrorAlert error={error} />
-            <EntityDetailLayout actions={
-                <>
-                    <LinkButton to="/vehicle-service/jobs" variant="secondary" className="w-full">Assign service job</LinkButton>
-                    <Button type="button" variant="secondary" className="w-full" onClick={() => tab.openTab('availability')}>Check availability</Button>
-                    <Button type="button" variant="secondary" className="w-full" onClick={() => tab.openTab('licenses')}>Review licenses</Button>
-                </>
-            }>
+            <EntityDetailLayout actions={<>
+                {canOpenServiceJobs && <LinkButton to="/vehicle-service/jobs" variant="secondary" className="w-full">Assign service job</LinkButton>}
+                <Button type="button" variant="secondary" className="w-full" onClick={() => tab.openTab('availability')}>Check availability</Button>
+                <Button type="button" variant="secondary" className="w-full" onClick={() => tab.openTab('licenses')}>Review licenses</Button>
+            </>}>
                 <Panel className="p-0">
                     <Tabs<Tab> active={tab.activeTab} onChange={tab.openTab} tabs={tabs} />
                     <div className="p-5">
@@ -92,9 +97,9 @@ export default function EmployeeDetailPage() {
                             {tab.openedTabs.has('contacts') && <div hidden={tab.activeTab !== 'contacts'}><EmployeeContactTab employeeId={id} /></div>}
                             {tab.openedTabs.has('addresses') && <div hidden={tab.activeTab !== 'addresses'}><EmployeeAddressTab employeeId={id} /></div>}
                             {tab.openedTabs.has('documents') && <div hidden={tab.activeTab !== 'documents'}><EmployeeDocumentTab employeeId={id} /></div>}
-                            {tab.openedTabs.has('skills') && <div hidden={tab.activeTab !== 'skills'}><EmployeeSkillTab employeeId={id} /></div>}
-                            {tab.openedTabs.has('certifications') && <div hidden={tab.activeTab !== 'certifications'}><EmployeeCertificationTab employeeId={id} /></div>}
-                            {tab.openedTabs.has('licenses') && <div hidden={tab.activeTab !== 'licenses'}><EmployeeLicenseTab employeeId={id} /></div>}
+                            {tab.openedTabs.has('skills') && <div hidden={tab.activeTab !== 'skills'}><EmployeeSkillTab employeeId={id} canManage={canUpdate} /></div>}
+                            {tab.openedTabs.has('certifications') && <div hidden={tab.activeTab !== 'certifications'}><EmployeeCertificationTab employeeId={id} canManage={canUpdate} /></div>}
+                            {tab.openedTabs.has('licenses') && <div hidden={tab.activeTab !== 'licenses'}><EmployeeLicenseTab employeeId={id} canManage={canUpdate} /></div>}
                             {tab.openedTabs.has('rates') && <div hidden={tab.activeTab !== 'rates'}><EmployeeRateTab employeeId={id} /></div>}
                             {tab.openedTabs.has('availability') && <div hidden={tab.activeTab !== 'availability'}><EmployeeAvailabilityTab employeeId={id} /></div>}
                             {tab.openedTabs.has('history') && <div hidden={tab.activeTab !== 'history'}><EmployeeStatusHistoryTab employeeId={id} /></div>}

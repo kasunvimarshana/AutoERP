@@ -1,0 +1,46 @@
+﻿Severity,Issue ID,Evidence Type,Finding,Owning Module,Recommended Root-Cause Fix
+P0,VR-001,Observed/Derived,No authoritative effective-dated vehicle allocation lifecycle is clearly demonstrated.,Vehicle Rental,Create separate lessor and lessee allocation aggregates with overlap enforcement.
+P0,VR-002,Observed,"Vehicle is selected directly in agreements, mixing commercial terms with operational assignment.",Vehicle Rental,Remove hard binding; connect agreements through effective-dated allocations.
+P0,VR-003,Derived,Same-vehicle overlapping allocation prevention is not proven.,Vehicle Rental / Vehicle,Enforce deterministic timeline locking and overlap constraints.
+P0,VR-004,Derived,Agreement and rate version snapshots are not proven.,Vehicle Rental,Use approved immutable effective-dated rate versions and transaction snapshots.
+P0,VR-005,Observed/Derived,Running Chart finalization and same-side duplicate consumption protection are unclear.,Vehicle Rental,"Introduce explicit lifecycle, customer/owner facts, and unique consumption records."
+P0,VR-006,Observed,Posted financial screens expose edit/delete-style controls.,Invoice / Payment / Finance,Make posted records immutable; correct only through governed reversals and adjustments.
+P0,VR-007,Observed,"Procedures/reports exist for allocation, double-entry, and source-to-GL mismatches.",Finance / Source modules,"Post source, Tax, and Finance atomically and enforce reconciliation invariants."
+P0,VR-008,Derived,Cross-module reversal coordination is unclear.,Invoice / Payment / Tax / Finance,Implement source-aware reversal coordinators with compensating history.
+P0,VR-009,Derived,Concurrency safety for allocation and payment consumption is not proven.,Vehicle Rental / Payment,"Use DB transactions, deterministic locks, idempotency, and expected versions."
+P0,VR-010,Observed,Password Register and opaque numeric user-level patterns are legacy security risks.,Auth / User / Permission,"Use secure hashing, named permissions, role policies, and audit logs."
+P1,VR-011,Observed,Vehicle-owner and leasing-company lessor flows are duplicated.,Party / Vehicle Rental,Use shared Lessor identity and role-specific policy without duplicating the lifecycle.
+P1,VR-012,Derived,Vehicle ownership history is not clearly effective-dated.,Vehicle,Create ownership-period history and validate allocations against it.
+P1,VR-013,Derived,"Unified vehicle availability across rental, workshop, accident, and document status is absent.",Vehicle / Vehicle Service / Vehicle Rental,Create a shared availability contract and timeline.
+P1,VR-014,Observed/Derived,Insurance and revenue-licence expiry are visible but enforcement is not proven.,Vehicle,Block handover/allocation when required documents are invalid.
+P1,VR-015,Observed/Derived,Handover and return appear as separate documents rather than authoritative custody events.,Vehicle Rental,"Use append-only custody events with odometer, fuel, condition, actors, and evidence."
+P1,VR-016,Unconfirmed,Replacement-vehicle charging and usage splitting are unclear.,Vehicle Rental,Obtain business sign-off; store explicit policy decision per replacement.
+P1,VR-017,Derived,Odometer continuity is not proven.,Vehicle Rental / Vehicle,Validate previous/next usage and custody readings.
+P1,VR-018,Unconfirmed,Driver overlap and multiple-driver split rules are unclear.,Vehicle Rental / HR,Confirm rules; enforce timeline conflicts and explicit assignments.
+P1,VR-019,Observed/Derived,Agreement approval/execution evidence is weak.,Vehicle Rental,"Use explicit approval, execution, legal snapshot, and state transitions."
+P1,VR-020,Unconfirmed,"Suspension, extension, renewal, termination, and penalty policies are unclear.",Vehicle Rental,Capture stakeholder decisions; do not infer defaults.
+P1,VR-021,Observed,GL and Tax mappings are embedded in agreement/invoice forms.,Finance / Tax,Move mappings to semantic effective-dated posting profiles.
+P1,VR-022,Observed,"Raw account, party, and vehicle codes dominate UI inputs.",Frontend / API,Use human-readable searchable selectors and related objects.
+P1,VR-023,Observed/Derived,Customer credit-limit and overdue enforcement is not proven.,Customer / Invoice,Enforce backend credit policy at approval/posting.
+P1,VR-024,Observed/Unconfirmed,Fuel and repair deductions exist but approval/evidence/responsibility rules are unclear.,Vehicle Rental,"Require source evidence, approval, agreement policy, and immutable adjustment."
+P1,VR-025,Observed/Derived,Security deposit lifecycle is incomplete or unclear.,Vehicle Rental / Payment,"Model requirement, receipt, apply, refund, forfeit, balance, and reversal."
+P1,VR-026,Observed/Derived,Generic debit/credit notes may bypass original commercial context.,Invoice / Payment,"Require source document, semantic reason, evidence, and approval."
+P1,VR-027,Derived,Refund identity and refund-of-refund behavior are unclear.,Payment,"Require original payment, opposite direction, scope/party/currency validation."
+P1,VR-028,Observed/Unconfirmed,"Cheque bounce, stop, cancel, and replacement lifecycle is unclear.",Payment / Finance,Use explicit cheque-status events and governed accounting.
+P1,VR-029,Derived,Accounting-period close and backdated-posting control are not evidenced.,Finance,Implement open/soft-close/close/reopen with posting and reversal validation.
+P1,VR-030,Observed/Derived,Financial reports may not be authoritative while source-to-GL mismatch can exist.,Reporting / Finance,Require source-to-journal completeness and drill-down reconciliation.
+P2,VR-031,Observed,"Dense forms mix commercial, Tax, and GL concerns.",Frontend / Module owners,Separate primary tasks from advanced accounting configuration.
+P2,VR-032,Observed/Derived,"Calculation inputs appear duplicated across agreements, invoices, and payables.",Vehicle Rental,Centralize policy and freeze calculation snapshots.
+P2,VR-033,Observed,Manual GL code selection creates drift and entry risk.,Finance,Use account roles and configured posting profiles.
+P2,VR-034,Observed,Checkbox/button lifecycle is ambiguous.,Vehicle Rental / Financial modules,Use explicit state machines and allowed-transition APIs.
+P2,VR-035,Observed/Derived,"Audit actor, reason, and previous-value visibility is weak.",Audit / All owners,Use append-only events and human-readable audit timeline.
+P2,VR-036,Derived,"Attachments, signatures, and condition evidence are incomplete.",Vehicle Rental,"Store handover/return documents, photos, checklists, and signatures."
+P2,VR-037,Observed,Search and selection are code-heavy.,Frontend,"Use autocomplete, labels, previews, and guided relationship controls."
+P2,VR-038,Derived,Report drill-down to source facts is unclear.,Reporting,"Link reports to immutable source, calculation, document, Tax, and journal records."
+P2,VR-039,Derived,Idempotency for repeated create/post commands is not proven.,Core / Owner services,Use source fingerprints and idempotency keys.
+P2,VR-040,Derived,Tenant/organization isolation is not visible in the legacy design.,Core / All modules,"Use tenant-scoped identities, FKs, queries, and authorization."
+P2,VR-041,Derived,Historical retention and correction explanations are unclear.,Audit / Financial modules,Preserve originals and record separate reversals/adjustments.
+P2,VR-042,Observed,Irreversible actions lack clear impact guidance.,Frontend,"Add previews, warnings, and reason capture for posting/reversal."
+P2,VR-043,Observed,Duplicated menus and flows increase maintenance risk.,Vehicle Rental / Frontend,Consolidate shared flows while retaining clear role-specific ownership.
+P2,VR-044,Observed/Derived,Workshop and rental availability are not integrated.,Vehicle / Vehicle Service / Vehicle Rental,Expose availability-blocking events through a shared contract.
+P2,VR-045,Unconfirmed,Important calculations may remain operator knowledge rather than explicit policy.,Vehicle Rental,Capture signed-off rules as effective-dated configuration and tests.

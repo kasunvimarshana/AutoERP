@@ -20,7 +20,7 @@ describe('invoice lifecycle handoff', () => {
         expect(detail).toContain('hasInvoicePermission(auth, invoicePermissions.cancel)');
         expect(detail).toContain('await approveInvoice(id, value.row_version)');
         expect(detail).toContain('await postInvoice(id, value.row_version)');
-        expect(detail).toContain('await cancelInvoice(id, value.row_version, reason)');
+        expect(detail).toContain("await cancelInvoice(id, value.row_version, reason ?? '')");
     });
 
     it('opens the authoritative invoice immediately after rental document creation', () => {
@@ -49,7 +49,7 @@ describe('invoice lifecycle handoff', () => {
         const types = sourceFile('resources/js/modules/invoice/invoiceTypes.ts');
 
         expect(invoiceCreate).toContain('`/invoices/${invoiceId}?from=vehicle-service&job_id=${jobId}`');
-        expect(controller).toContain("->with(['lines', 'sources'])");
+        expect(controller).toContain("->with(['lines', 'sources', 'postingPlan'])");
         expect(types).toContain('source_id: number;');
         expect(types).toContain('sources?: InvoiceSource[];');
         expect(detail).toContain("const vehicleServiceSource = (value.sources ?? []).find((source) => source.source_type === 'vehicle_service_job');");

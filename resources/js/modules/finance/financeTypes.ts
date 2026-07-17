@@ -47,6 +47,9 @@ export interface FinanceAccountAssignment extends Record<string, unknown> {
 }
 
 export interface PostingProfile extends FinanceLookup {
+    row_version: number;
+    organization_unit_id?: number | null;
+    scope?: 'tenant_default' | 'organization';
     rules?: Array<{
         id: number;
         line_key: string;
@@ -128,11 +131,6 @@ export interface JournalPayload {
     journal_date: string;
     journal_type: string;
     posting_profile_id?: number | null;
-    source_module?: string | null;
-    source_type?: string | null;
-    source_id?: number | null;
-    source_number?: string | null;
-    source_date?: string | null;
     description?: string | null;
     currency_id?: number | null;
     exchange_rate: string;

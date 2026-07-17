@@ -21,11 +21,6 @@ const tenantWorkspacePermissions = [
 
 export const administrationRouteEntitlements: readonly EntitlementRule[] = [
     rule(DASHBOARD_PATH),
-    operational('/uoms/*'),
-    operational('/uom-conversions/*'),
-    operational('/uom-convert'),
-    operational('/hr/*', ['hr']),
-    operational('/vouchers/*'),
 
     operational('/access/users/create', undefined, [accessPermissions.usersCreate]),
     operational('/access/users/:id/edit', undefined, [
@@ -68,6 +63,10 @@ export const administrationRouteEntitlements: readonly EntitlementRule[] = [
     operational('/customers/:id', ['customer'], [customerPermissions.view]),
     operational('/customers', ['customer'], [customerPermissions.view]),
 
+    operational('/vehicles/makes', ['vehicle'], [vehiclePermissions.update]),
+    operational('/vehicles/types', ['vehicle'], [vehiclePermissions.update]),
+    operational('/vehicles/categories', ['vehicle'], [vehiclePermissions.update]),
+    operational('/vehicles/models', ['vehicle'], [vehiclePermissions.update]),
     operational('/vehicles/create', ['vehicle'], [vehiclePermissions.create]),
     operational('/vehicles/:id/edit', ['vehicle'], [vehiclePermissions.update]),
     operational('/vehicles/:id', ['vehicle'], [vehiclePermissions.view]),
@@ -87,5 +86,4 @@ export const administrationRouteEntitlements: readonly EntitlementRule[] = [
     operational('/warehouses/:id/edit', ['warehouse'], [warehousePermissions.warehousesUpdate]),
     operational('/warehouses/:id', ['warehouse'], [warehousePermissions.warehousesView]),
     operational('/warehouses', ['warehouse'], [warehousePermissions.warehousesView]),
-    operational('/inventory/*', ['inventory']),
 ];

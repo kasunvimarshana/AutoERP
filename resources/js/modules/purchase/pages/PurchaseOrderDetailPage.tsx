@@ -92,17 +92,17 @@ export default function PurchaseOrderDetailPage() {
                 title={order.purchase_order_number ?? 'Purchase order'}
                 description={formatDate(order.purchase_order_date)}
                 actions={<div className="flex flex-wrap justify-end gap-2">
-                    {capabilities.canReceive && hasPurchasePermission(auth.permissions, purchasePermissions.goodsReceiptsCreate) && <LinkButton to={`/purchase/goods-receipts/create?purchase_order_id=${order.id}`} variant="secondary">Create Goods Receipt</LinkButton>}
-                    {capabilities.canInvoice && hasPurchasePermission(auth.permissions, purchasePermissions.supplierInvoicesCreate) && <LinkButton to={`/purchase/invoices/create?purchase_order_id=${order.id}`} variant="secondary">Create Supplier Invoice</LinkButton>}
+                    {capabilities.canReceive && hasPurchasePermission(auth, purchasePermissions.goodsReceiptsCreate) && <LinkButton to={`/purchase/goods-receipts/create?purchase_order_id=${order.id}`} variant="secondary">Create Goods Receipt</LinkButton>}
+                    {capabilities.canInvoice && hasPurchasePermission(auth, purchasePermissions.supplierInvoicesCreate) && <LinkButton to={`/purchase/invoices/create?purchase_order_id=${order.id}`} variant="secondary">Create Supplier Invoice</LinkButton>}
                     <PurchaseOrderActions
                         order={order}
                         busy={busy}
-                        canUpdate={hasPurchasePermission(auth.permissions, purchasePermissions.ordersUpdate)}
-                        onSubmit={hasPurchasePermission(auth.permissions, purchasePermissions.ordersSubmit) ? () => run('submit') : undefined}
-                        onApprove={hasPurchasePermission(auth.permissions, purchasePermissions.ordersApprove) ? () => run('approve') : undefined}
-                        onCancel={hasPurchasePermission(auth.permissions, purchasePermissions.ordersCancel) ? () => run('cancel') : undefined}
-                        onClose={hasPurchasePermission(auth.permissions, purchasePermissions.ordersClose) ? () => run('close') : undefined}
-                        onDelete={hasPurchasePermission(auth.permissions, purchasePermissions.ordersDelete) ? () => run('delete') : undefined}
+                        canUpdate={hasPurchasePermission(auth, purchasePermissions.ordersUpdate)}
+                        onSubmit={hasPurchasePermission(auth, purchasePermissions.ordersSubmit) ? () => run('submit') : undefined}
+                        onApprove={hasPurchasePermission(auth, purchasePermissions.ordersApprove) ? () => run('approve') : undefined}
+                        onCancel={hasPurchasePermission(auth, purchasePermissions.ordersCancel) ? () => run('cancel') : undefined}
+                        onClose={hasPurchasePermission(auth, purchasePermissions.ordersClose) ? () => run('close') : undefined}
+                        onDelete={hasPurchasePermission(auth, purchasePermissions.ordersDelete) ? () => run('delete') : undefined}
                     />
                 </div>}
             />

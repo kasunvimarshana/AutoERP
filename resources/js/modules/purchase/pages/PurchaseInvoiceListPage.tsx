@@ -6,7 +6,7 @@ import { hasPurchasePermission, purchasePermissions } from '../purchasePermissio
 
 export default function PurchaseInvoiceListPage() {
     const auth = useAuth();
-    const canCreateInvoice = hasPurchasePermission(auth.permissions, purchasePermissions.supplierInvoicesCreate);
+    const canCreateInvoice = hasPurchasePermission(auth, purchasePermissions.supplierInvoicesCreate);
 
     return (
         <div className="space-y-5">

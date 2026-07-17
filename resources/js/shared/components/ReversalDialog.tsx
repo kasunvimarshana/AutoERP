@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { Button } from './Button';
 import { Modal } from './Modal';
 
@@ -19,24 +19,37 @@ interface ReversalDialogProps {
     onConfirm: (facts: ReversalFacts) => void | Promise<void>;
 }
 
-export function ReversalDialog({
-    open,
+type ReversalDialogContentProps = Omit<ReversalDialogProps, 'open' | 'defaultDate'> & {
+    defaultDate: string;
+};
+
+export function ReversalDialog(props: ReversalDialogProps) {
+    if (!props.open) return null;
+
+    const defaultDate = props.defaultDate ?? todayLocalDate();
+
+    return (
+        <ReversalDialogContent
+            key={defaultDate}
+            title={props.title}
+            loading={props.loading}
+            defaultDate={defaultDate}
+            onCancel={props.onCancel}
+            onConfirm={props.onConfirm}
+        />
+    );
+}
+
+function ReversalDialogContent({
     title,
     loading = false,
-    defaultDate = todayLocalDate(),
+    defaultDate,
     onCancel,
     onConfirm,
-}: ReversalDialogProps) {
+}: ReversalDialogContentProps) {
     const [reversalDate, setReversalDate] = useState(defaultDate);
     const [reason, setReason] = useState('');
     const [error, setError] = useState<string | null>(null);
-
-    useEffect(() => {
-        if (!open) return;
-        setReversalDate(defaultDate);
-        setReason('');
-        setError(null);
-    }, [defaultDate, open]);
 
     async function submit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
@@ -56,7 +69,7 @@ export function ReversalDialog({
 
     return (
         <Modal
-            open={open}
+            open
             title={title}
             onClose={onCancel}
             closeDisabled={loading}

@@ -38,6 +38,7 @@
         .report-meta { margin-bottom: 14px; color: #64748b; }
         .report-meta span { display: inline-block; margin: 0 18px 5px 0; }
         .report-meta strong { color: #172033; }
+        .report-warning { margin: 0 0 14px; border: 1px solid #f59e0b; background: #fffbeb; color: #78350f; padding: 8px 10px; page-break-inside: avoid; }
         .summary-table { width: 100%; border-collapse: separate; border-spacing: 4px; margin: -4px -4px 10px; page-break-inside: avoid; }
         .summary-table td { width: 25%; vertical-align: top; }
         .summary-card { border: 1px solid #cbd5e1; border-left: 3px solid #0f3d5e; padding: 8px 10px; page-break-inside: avoid; }
@@ -82,6 +83,12 @@
     @include('reports.shared.actions')
     <div class="report-content">
         @include('reports.shared.header')
+        @if ($truncated)
+            @php($rowLabel = (int) $rowLimit === 1 ? 'row' : 'rows')
+            <div class="report-warning" role="alert">
+                This report is limited to {{ number_format((int) $rowLimit) }} {{ $rowLabel }}. Refine the filters before using it as a complete operational or financial record.
+            </div>
+        @endif
         @section('report-content')
             @include('reports.shared.summary')
             @include('reports.shared.table')

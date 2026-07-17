@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { DecimalInput } from '@/shared/components/DecimalInput';
@@ -29,6 +29,10 @@ function inspectionPayload(inspection: VehicleServiceInspection | null): Vehicle
     };
 }
 
+function inspectionFormKey(inspection: VehicleServiceInspection | null): string {
+    return JSON.stringify(inspectionPayload(inspection));
+}
+
 export default function VehicleServiceInspectionTab({
     jobId,
     expectedVersion,
@@ -38,13 +42,16 @@ export default function VehicleServiceInspectionTab({
     jobId: number;
     expectedVersion: number;
     initialValue?: VehicleServiceInspection | null;
-    onSaved?: (inspection: VehicleServiceInspection, nextVersion: number) => void;
+    onSaved: (inspection: VehicleServiceInspection, nextVersion: number) => void;
 }) {
+    const resolvedInitialValue = initialValue ?? null;
+
     return (
         <VehicleServiceInspectionEditor
+            key={inspectionFormKey(resolvedInitialValue)}
             jobId={jobId}
             expectedVersion={expectedVersion}
-            initialValue={initialValue ?? null}
+            initialValue={resolvedInitialValue}
             onJobSaved={onSaved}
         />
     );
@@ -54,15 +61,11 @@ function VehicleServiceInspectionEditor({ jobId, expectedVersion, initialValue, 
     jobId: number;
     expectedVersion: number;
     initialValue: VehicleServiceInspection | null;
-    onJobSaved?: (inspection: VehicleServiceInspection, nextVersion: number) => void;
+    onJobSaved: (inspection: VehicleServiceInspection, nextVersion: number) => void;
 }) {
     const [form, setForm] = useState<VehicleServiceInspectionPayload>(() => inspectionPayload(initialValue));
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
-
-    useEffect(() => {
-        setForm(inspectionPayload(initialValue));
-    }, [initialValue]);
 
     return (
         <form className="space-y-4" onSubmit={async (event) => {
@@ -71,7 +74,8 @@ function VehicleServiceInspectionEditor({ jobId, expectedVersion, initialValue, 
             setError(null);
             try {
                 const inspection = await saveVehicleServiceInspection(jobId, { ...form, expected_version: expectedVersion });
-                onJobSaved?.(inspection, expectedVersion + 1);
+                setForm(inspectionPayload(inspection));
+                onJobSaved(inspection, expectedVersion + 1);
             } catch (requestError) {
                 setError(toApiError(requestError));
             } finally {

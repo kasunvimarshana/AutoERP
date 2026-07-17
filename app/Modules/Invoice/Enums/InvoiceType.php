@@ -10,6 +10,7 @@ enum InvoiceType: string
     case Sales = 'sales';
     case Service = 'service';
     case Rental = 'rental';
+    case VehicleFinance = 'vehicle_finance';
     case Manual = 'manual';
     case Credit = 'credit';
     case Debit = 'debit';

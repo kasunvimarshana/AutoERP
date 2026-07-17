@@ -19,7 +19,7 @@ export default function VehicleServiceInventoryIssueTab({
 }: {
     jobId: number;
     expectedVersion: number;
-    onChanged?: (nextVersion: number) => void;
+    onChanged: (nextVersion: number) => void;
 }) {
     const [warehouse, setWarehouse] = useState<NamedResource | null>(null);
     const [warehouseLocation, setWarehouseLocation] = useState<NamedResource | null>(null);
@@ -38,12 +38,7 @@ export default function VehicleServiceInventoryIssueTab({
     const [selected, setSelected] = useState<number[]>([]);
     const [issuing, setIssuing] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
-    const [localExpectedVersion, setLocalExpectedVersion] = useState(expectedVersion);
     const exactLocationSelected = Boolean(warehouse && warehouseLocation);
-
-    useEffect(() => {
-        setLocalExpectedVersion(expectedVersion);
-    }, [expectedVersion]);
 
     useEffect(() => {
         if (warehouseTouched.current || warehouse !== null) {
@@ -134,15 +129,14 @@ export default function VehicleServiceInventoryIssueTab({
                         setError(null);
                         try {
                             await issueVehicleServiceInventory(jobId, {
-                                expected_version: localExpectedVersion,
+                                expected_version: expectedVersion,
                                 warehouse_id: warehouse.id,
                                 warehouse_location_id: warehouseLocation.id,
                                 line_ids: selected,
                             });
-                            result.setData((result.data ?? []).filter((line) => !selected.includes(line.id)));
+                            result.setData((current) => (current ?? []).filter((line) => !selected.includes(line.id)));
                             setSelected([]);
-                            setLocalExpectedVersion((current) => current + 1);
-                            onChanged?.(localExpectedVersion + 1);
+                            onChanged(expectedVersion + 1);
                         } catch (requestError) {
                             setError(toApiError(requestError));
                         } finally {

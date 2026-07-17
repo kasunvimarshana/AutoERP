@@ -26,7 +26,7 @@ const tabIds: FastPurchaseTab[] = ['details', 'lines', 'adjustments', 'payment',
 export default function FastPurchasePage() {
     const auth = useAuth();
     const [searchParams] = useSearchParams();
-    const can = (permission: string) => hasPurchasePermission(auth.permissions, permission);
+    const can = (permission: string) => hasPurchasePermission(auth, permission);
     const form = useFastPurchaseForm({
         canPreviewPermission: can(purchasePermissions.fastPurchasesView),
         canExecutePermission: can(purchasePermissions.fastPurchasesExecute),

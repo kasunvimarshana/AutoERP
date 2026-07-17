@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { useConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { useApi } from '@/shared/hooks/useApi';
@@ -19,16 +19,9 @@ export function useSupplierRelationCrud<T extends { id: number }, P>({ supplierI
     const [actionError, setActionError] = useState<ApiError | null>(null);
     const { confirm, confirmDialog } = useConfirmDialog();
     const result = useApi((signal) => list(supplierId, page, signal), [supplierId, page]);
-    const [collection, setCollection] = useState<ApiCollection<T> | null>(result.data);
-
-    useEffect(() => {
-        if (result.data !== null) {
-            setCollection(result.data);
-        }
-    }, [result.data]);
 
     return {
-        ...result, data: collection, page, setPage, editing, open, submitting, actionError, confirmDialog,
+        ...result, page, setPage, editing, open, submitting, actionError, confirmDialog,
         startCreate: () => { setEditing(null); setActionError(null); setOpen(true); },
         startEdit: (row: T) => { setEditing(row); setActionError(null); setOpen(true); },
         close: () => { if (!submitting) setOpen(false); },
@@ -37,7 +30,7 @@ export function useSupplierRelationCrud<T extends { id: number }, P>({ supplierI
             try {
                 const saved = editing ? await update(supplierId, editing.id, payload) : await create(supplierId, payload);
                 setOpen(false);
-                setCollection((current) => upsertCollection(current, saved, !editing && page === 1));
+                result.setData((current) => upsertCollection(current, saved, !editing && page === 1));
                 notifySuccess(editing ? 'Supplier record updated successfully.' : 'Supplier record created successfully.');
             } catch (error) {
                 setActionError(toApiError(error));
@@ -51,7 +44,7 @@ export function useSupplierRelationCrud<T extends { id: number }, P>({ supplierI
             setActionError(null);
             try {
                 await remove(supplierId, row.id);
-                setCollection((current) => removeFromCollection(current, row.id));
+                result.setData((current) => removeFromCollection(current, row.id));
                 notifySuccess('Supplier record deleted successfully.');
             }
             catch (error) { setActionError(toApiError(error)); }

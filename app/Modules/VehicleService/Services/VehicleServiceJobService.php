@@ -9,6 +9,7 @@ use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\VehicleService\DTOs\VehicleServiceInspectionData;
 use Modules\VehicleService\DTOs\VehicleServiceJobData;
+use Modules\VehicleService\Enums\VehicleServiceCommissionType;
 use Modules\VehicleService\Enums\VehicleServiceJobStatus;
 use Modules\VehicleService\Models\VehicleServiceInspection;
 use Modules\VehicleService\Models\VehicleServiceJob;
@@ -18,11 +19,14 @@ final class VehicleServiceJobService
 {
     use AssertsVehicleServiceExpectedVersion;
 
+    private const ZERO_AMOUNT = '0.000000';
+
     public function __construct(
         private readonly DecimalMath $math,
         private readonly VehicleServiceNumberService $numbers,
         private readonly VehicleServiceValidationService $validator,
         private readonly VehicleServiceCommissionService $commissions,
+        private readonly VehicleServiceCommissionPolicyService $commissionPolicies,
         private readonly VehicleServiceStatusService $statuses,
         private readonly VehicleServiceInspectionService $inspections,
     ) {}
@@ -41,7 +45,7 @@ final class VehicleServiceJobService
             }
 
             $job = new VehicleServiceJob();
-            $job->forceFill($this->attributes($data, true, '0.000000'))->save();
+            $job->forceFill($this->attributes($data, true, self::ZERO_AMOUNT))->save();
             $this->statuses->recordCreated($job, $data->createdBy);
             if ($data->customerComplaint !== null) {
                 $this->inspections->save($job, new VehicleServiceInspectionData(
@@ -76,7 +80,7 @@ final class VehicleServiceJobService
             }
 
             $versionBefore = (int) $job->row_version;
-            $job->forceFill($this->attributes($data, false, (string) $job->grand_total))->save();
+            $job->forceFill($this->attributes($data, false, (string) $job->grand_total, $job))->save();
             $job->refresh()->load('inspection');
             $complaintChanged = $this->syncCustomerComplaint($job, $data);
             if ($complaintChanged && (int) $job->row_version === $versionBefore) {
@@ -103,8 +107,13 @@ final class VehicleServiceJobService
     }
 
     /** @return array<string, mixed> */
-    private function attributes(VehicleServiceJobData $data, bool $creating, string $commissionBase): array
-    {
+    private function attributes(
+        VehicleServiceJobData $data,
+        bool $creating,
+        string $commissionBase,
+        ?VehicleServiceJob $existing = null,
+    ): array {
+        $commission = $this->supervisorCommission($data, $existing);
         $attributes = [
             'tenant_id' => $data->tenantId,
             'organization_unit_id' => $data->organizationUnitId,
@@ -114,11 +123,11 @@ final class VehicleServiceJobService
             'bill_to_customer_id' => $this->billToCustomerId($data),
             'vehicle_id' => $data->vehicleId,
             'supervisor_employee_id' => $data->supervisorEmployeeId,
-            'supervisor_commission_type' => $data->supervisorCommissionType->value,
-            'supervisor_commission_value' => $this->math->normalize($data->supervisorCommissionValue),
+            'supervisor_commission_type' => $commission['type']->value,
+            'supervisor_commission_value' => $commission['value'],
             'supervisor_commission_amount' => $this->commissions->calculate(
-                $data->supervisorCommissionType,
-                $data->supervisorCommissionValue,
+                $commission['type'],
+                $commission['value'],
                 $commissionBase,
             ),
             'odometer_reading' => $data->odometerReading === null ? null : $this->math->normalize($data->odometerReading),
@@ -131,16 +140,57 @@ final class VehicleServiceJobService
             $attributes += [
                 'job_number' => $data->jobNumber ?? $this->numbers->next($data->tenantId),
                 'status' => VehicleServiceJobStatus::Draft->value,
-                'subtotal' => '0.000000',
-                'discount_total' => '0.000000',
-                'tax_total' => '0.000000',
-                'charge_total' => '0.000000',
-                'grand_total' => '0.000000',
+                'subtotal' => self::ZERO_AMOUNT,
+                'discount_total' => self::ZERO_AMOUNT,
+                'tax_total' => self::ZERO_AMOUNT,
+                'charge_total' => self::ZERO_AMOUNT,
+                'grand_total' => self::ZERO_AMOUNT,
                 'created_by' => $data->createdBy,
             ];
         }
 
         return $attributes;
+    }
+
+    /** @return array{type: VehicleServiceCommissionType, value: string} */
+    private function supervisorCommission(
+        VehicleServiceJobData $data,
+        ?VehicleServiceJob $existing,
+    ): array {
+        if ($data->supervisorEmployeeId === null) {
+            return ['type' => VehicleServiceCommissionType::None, 'value' => self::ZERO_AMOUNT];
+        }
+
+        if ($data->supervisorCommissionType !== null) {
+            if ($data->supervisorCommissionValue === null) {
+                throw new InvalidArgumentException('Supervisor commission value is required.');
+            }
+
+            return [
+                'type' => $data->supervisorCommissionType,
+                'value' => $this->math->normalize($data->supervisorCommissionValue),
+            ];
+        }
+
+        if ($data->supervisorCommissionValue !== null) {
+            throw new InvalidArgumentException('Supervisor commission type is required.');
+        }
+
+        if ($existing instanceof VehicleServiceJob && $existing->supervisor_employee_id !== null) {
+            return [
+                'type' => $existing->supervisor_commission_type,
+                'value' => (string) $existing->supervisor_commission_value,
+            ];
+        }
+
+        if ($data->organizationUnitId === null) {
+            return ['type' => VehicleServiceCommissionType::None, 'value' => self::ZERO_AMOUNT];
+        }
+
+        return $this->commissionPolicies->resolveSupervisorDefault(
+            $data->tenantId,
+            $data->organizationUnitId,
+        );
     }
 
     private function billToCustomerId(VehicleServiceJobData $data): int

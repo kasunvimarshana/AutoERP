@@ -40,7 +40,7 @@ export default function PurchaseDebitNoteDetailPage() {
     if (!result.data) return <ErrorAlert error={result.error} />;
     const note = result.data;
     const capabilities = note.capabilities ?? {};
-    const can = (permission: string) => hasPurchasePermission(auth.permissions, permission);
+    const can = (permission: string) => hasPurchasePermission(auth, permission);
     return (
         <>
             <PurchaseDocumentShell

@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react';
 import { useParams } from 'react-router-dom';
 import { hasPermission } from '@/modules/auth/accessControl';
 import { useAuth } from '@/modules/auth/AuthProvider';
+import { useTenantRouteAccess } from '@/modules/auth/useTenantRouteAccess';
 import { LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { EntityDetailLayout } from '@/shared/components/EntityDetailLayout';
@@ -32,6 +33,11 @@ export default function CustomerDetailPage() {
     const customer = useApi((signal) => getCustomer(customerId, signal), [customerId], Number.isFinite(customerId));
     const tab = useOnDemandTab<Tab>('summary');
     const canManage = hasPermission(auth, customerPermissions.update);
+    const canCreateServiceJob = useTenantRouteAccess('/vehicle-service/jobs/create');
+    const canViewInvoices = useTenantRouteAccess('/invoices');
+    const canViewPayments = useTenantRouteAccess('/payments');
+    const hasRelatedActions = canCreateServiceJob || canViewInvoices || canViewPayments;
+
     if (customer.loading) return <LoadingState />;
     if (!customer.data) return <ErrorAlert error={customer.error} />;
 
@@ -41,13 +47,11 @@ export default function CustomerDetailPage() {
             description="Customer master data and relation-aware CRUD."
             actions={canManage ? <LinkButton to={`/customers/${customerId}/edit`} variant="secondary">Edit customer</LinkButton> : undefined}
         />
-        <EntityDetailLayout actions={
-            <>
-                <LinkButton to="/vehicle-service/jobs/create" variant="secondary" className="w-full">Create service job</LinkButton>
-                <LinkButton to="/invoices" variant="secondary" className="w-full">View invoices</LinkButton>
-                <LinkButton to="/payments" variant="secondary" className="w-full">View payments</LinkButton>
-            </>
-        }>
+        <EntityDetailLayout actions={hasRelatedActions ? <>
+            {canCreateServiceJob && <LinkButton to="/vehicle-service/jobs/create" variant="secondary" className="w-full">Create service job</LinkButton>}
+            {canViewInvoices && <LinkButton to="/invoices" variant="secondary" className="w-full">View invoices</LinkButton>}
+            {canViewPayments && <LinkButton to="/payments" variant="secondary" className="w-full">View payments</LinkButton>}
+        </> : undefined}>
             <Panel className="p-0">
                 <Tabs tabs={tabs} active={tab.activeTab} onChange={tab.openTab} />
                 <div className="p-5">

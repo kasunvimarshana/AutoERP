@@ -17,6 +17,7 @@ use Modules\Item\Enums\ItemType;
 use Modules\Item\Enums\TrackingType;
 use Modules\Item\Services\ItemAuthorizationService;
 use Modules\Item\Services\ItemCreationService;
+use Modules\Payment\Constants\PaymentIdempotency;
 use Modules\Payment\Constants\PaymentPermission;
 use Modules\Purchase\DTOs\CreateGoodsReceiptNoteData;
 use Modules\Purchase\DTOs\CreatePurchaseOrderData;
@@ -238,6 +239,8 @@ final class CoreModulesApiTest extends TestCase
                 'payment_method_id' => $paymentMethodId,
                 'amount' => '80.000000',
             ]],
+        ], [
+            PaymentIdempotency::REQUEST_HEADER => 'payment-'.Str::uuid()->toString(),
         ])->assertSuccessful()->json('data');
 
         $scope = ['tenant_id' => $tenantId, 'organization_unit_id' => $organizationUnitId];

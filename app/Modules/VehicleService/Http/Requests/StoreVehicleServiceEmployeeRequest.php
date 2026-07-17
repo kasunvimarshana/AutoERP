@@ -8,6 +8,7 @@ use Illuminate\Validation\Rule;
 use Modules\Core\Http\Requests\TenantScopedRequest;
 use Modules\VehicleService\DTOs\VehicleServiceEmployeeAssignmentData;
 use Modules\VehicleService\Enums\VehicleServiceCommissionType;
+use Modules\VehicleService\Enums\VehicleServiceWorkforceRole;
 use Modules\VehicleService\Http\Requests\Concerns\HasExpectedVehicleServiceJobVersion;
 
 final class StoreVehicleServiceEmployeeRequest extends TenantScopedRequest
@@ -24,11 +25,20 @@ final class StoreVehicleServiceEmployeeRequest extends TenantScopedRequest
             'organization_unit_id' => ['nullable', 'integer', 'min:1'],
             'expected_version' => $this->expectedVersionRules(),
             'employee_id' => ['required', 'integer', 'min:1'],
-            'role_type' => ['required', Rule::in(['technician', 'helper', 'inspector', 'custom'])],
+            'role_type' => ['required', Rule::enum(VehicleServiceWorkforceRole::class)],
             'assigned_hours' => ['nullable', 'decimal:0,6', 'min:0'],
             'rate' => ['nullable', 'decimal:0,6', 'min:0'],
-            'commission_type' => ['nullable', Rule::enum(VehicleServiceCommissionType::class)],
-            'commission_value' => ['nullable', 'decimal:0,6', 'min:0'],
+            'commission_type' => [
+                'nullable',
+                'required_with:commission_value',
+                Rule::enum(VehicleServiceCommissionType::class),
+            ],
+            'commission_value' => [
+                'nullable',
+                'required_with:commission_type',
+                'decimal:0,6',
+                'min:0',
+            ],
             'status' => ['nullable', Rule::in(['assigned', 'completed', 'cancelled'])],
         ];
     }
@@ -40,10 +50,12 @@ final class StoreVehicleServiceEmployeeRequest extends TenantScopedRequest
             roleType: (string) $this->input('role_type'),
             assignedHours: $this->stringOrNull('assigned_hours') ?? self::DEFAULT_DECIMAL_VALUE,
             rate: $this->stringOrNull('rate') ?? self::DEFAULT_DECIMAL_VALUE,
-            commissionType: VehicleServiceCommissionType::from(
-                $this->stringOrNull('commission_type') ?? VehicleServiceCommissionType::None->value,
-            ),
-            commissionValue: $this->stringOrNull('commission_value') ?? self::DEFAULT_DECIMAL_VALUE,
+            commissionType: $this->filled('commission_type')
+                ? VehicleServiceCommissionType::from((string) $this->input('commission_type'))
+                : null,
+            commissionValue: $this->filled('commission_value')
+                ? (string) $this->input('commission_value')
+                : null,
             status: $this->stringOrNull('status') ?? self::DEFAULT_STATUS,
         );
     }

@@ -51,6 +51,7 @@ return new class extends Migration
             $table->foreign(['agreement_id', 'tenant_id', 'agreement_kind', 'customer_id'], 'rental_deposit_req_agreement_kind_customer_fk')
                 ->references(['id', 'tenant_id', 'agreement_kind', 'customer_id'])
                 ->on('rental_agreements')
+                ->cascadeOnUpdate()
                 ->restrictOnDelete();
 
             $table->foreign(['created_by', 'tenant_id'], 'rental_deposit_requirements_created_by_tenant_fk')

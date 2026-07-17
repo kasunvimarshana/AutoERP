@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { LinkButton } from '@/shared/components/Button';
@@ -45,13 +45,7 @@ export default function ItemListPage() {
         page,
         per_page: 25,
     }, signal), [debounced, category?.id, brand?.id, itemType, active, page]);
-    const [collection, setCollection] = useState(result.data);
-
-    useEffect(() => {
-        if (result.data) {
-            setCollection(result.data);
-        }
-    }, [result.data]);
+    const collection = result.data;
 
     const columns: DataColumn<ItemSummary>[] = [
         { key: 'item', header: 'Item', render: (row) => <Link className="font-semibold text-sky-700 hover:underline" to={`/items/${row.id}`}>{row.name}<span className="block text-xs font-normal text-slate-500">{row.code}</span></Link> },
@@ -73,7 +67,7 @@ export default function ItemListPage() {
         setActionError(null);
         try {
             const updated = await setItemActive(Number(item.id), !item.is_active);
-            setCollection((current) => updateItemCollection(current, updated, {
+            result.setData((current) => updateItemCollection(current, updated, {
                 categoryId: category?.id ?? null,
                 brandId: brand?.id ?? null,
                 itemType,

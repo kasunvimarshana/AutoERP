@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button, LinkButton } from '@/shared/components/Button';
@@ -34,13 +34,7 @@ export default function ItemCategoryListPage() {
         page,
         per_page: 25,
     }, signal), [debounced, active, page]);
-    const [collection, setCollection] = useState(result.data);
-
-    useEffect(() => {
-        if (result.data) {
-            setCollection(result.data);
-        }
-    }, [result.data]);
+    const collection = result.data;
 
     const columns: DataColumn<ItemCategory>[] = [
         { key: 'category', header: 'Category', render: (row) => <Link className="font-semibold text-sky-700 hover:underline" to={`/item-categories/${row.id}`}>{row.name}<span className="block text-xs font-normal text-slate-500">{row.code}</span></Link> },
@@ -74,7 +68,7 @@ export default function ItemCategoryListPage() {
                 sort_order: row.sort_order,
                 is_active: !row.is_active,
             });
-            setCollection((current) => updateCategoryCollection(current, updated, active));
+            result.setData((current) => updateCategoryCollection(current, updated, active));
             notifySuccess(updated.is_active ? 'Category activated successfully.' : 'Category deactivated successfully.');
         } catch (error) {
             setActionError(toApiError(error));
@@ -86,7 +80,7 @@ export default function ItemCategoryListPage() {
         setActionError(null);
         try {
             await deleteItemCategory(Number(row.id));
-            setCollection((current) => removeCategoryFromCollection(current, row.id));
+            result.setData((current) => removeCategoryFromCollection(current, row.id));
             notifySuccess('Category deleted successfully.');
         } catch (error) {
             setActionError(toApiError(error));

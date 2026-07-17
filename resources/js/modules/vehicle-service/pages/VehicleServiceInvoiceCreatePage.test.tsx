@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Route, Routes } from 'react-router-dom';
+import { Route, Routes, useLocation } from 'react-router-dom';
 import { TestRouter } from '@/test/TestRouter';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import VehicleServiceInvoiceCreatePage from './VehicleServiceInvoiceCreatePage';
@@ -44,8 +44,7 @@ describe('VehicleServiceInvoiceCreatePage', () => {
             }),
         ));
         expect(await screen.findByText('Posted invoice')).toBeInTheDocument();
-        expect(window.location.pathname).toBe('/invoices/41');
-        expect(window.location.search).toBe('?from=vehicle-service&job_id=9');
+        expect(screen.getByTestId('location')).toHaveTextContent('/invoices/41?from=vehicle-service&job_id=9');
     });
     it('clears an old preview when an invoice header value changes', async () => {
         const user = userEvent.setup();
@@ -63,10 +62,14 @@ function renderPage() {
         <TestRouter initialEntries={['/vehicle-service/jobs/9/invoice']}>
             <Routes>
                 <Route path="/vehicle-service/jobs/:id/invoice" element={<VehicleServiceInvoiceCreatePage />} />
-                <Route path="/invoices/:id" element={<div>Posted invoice</div>} />
+                <Route path="/invoices/:id" element={<><div>Posted invoice</div><LocationProbe /></>} />
             </Routes>
         </TestRouter>,
     );
+}
+function LocationProbe() {
+    const location = useLocation();
+    return <span data-testid="location">{location.pathname}{location.search}</span>;
 }
 function job() {
     return {

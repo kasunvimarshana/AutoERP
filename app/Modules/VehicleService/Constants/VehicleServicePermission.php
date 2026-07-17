@@ -14,6 +14,8 @@ final class VehicleServicePermission
     public const LINES_MANAGE = 'vehicle_service.lines.manage';
     public const WORKFORCE_VIEW = 'vehicle_service.workforce.view';
     public const WORKFORCE_MANAGE = 'vehicle_service.workforce.manage';
+    public const COMMISSIONS_VIEW = 'vehicle_service.commissions.view';
+    public const COMMISSIONS_MANAGE = 'vehicle_service.commissions.manage';
     public const INVENTORY_VIEW = 'vehicle_service.inventory.view';
     public const INVENTORY_ISSUE = 'vehicle_service.inventory.issue';
     public const INVOICES_VIEW = 'vehicle_service.invoices.view';
@@ -34,6 +36,8 @@ final class VehicleServicePermission
             self::LINES_MANAGE => 'Create, update, and remove service job lines.',
             self::WORKFORCE_VIEW => 'View service workforce assignments.',
             self::WORKFORCE_MANAGE => 'Manage service workforce assignments.',
+            self::COMMISSIONS_VIEW => 'View Vehicle Service commission defaults.',
+            self::COMMISSIONS_MANAGE => 'Manage Vehicle Service commission defaults.',
             self::INVENTORY_VIEW => 'View inventory usage for service jobs.',
             self::INVENTORY_ISSUE => 'Issue inventory to service jobs.',
             self::INVOICES_VIEW => 'Preview and view service invoices.',

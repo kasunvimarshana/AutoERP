@@ -7,7 +7,10 @@ namespace Modules\VehicleService\Services;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
+use Modules\Item\Enums\ItemType;
 use Modules\VehicleService\DTOs\VehicleServiceEmployeeAssignmentData;
+use Modules\VehicleService\Enums\VehicleServiceCommissionType;
+use Modules\VehicleService\Enums\VehicleServiceWorkforceRole;
 use Modules\VehicleService\Models\VehicleServiceJob;
 use Modules\VehicleService\Models\VehicleServiceJobLine;
 use Modules\VehicleService\Models\VehicleServiceLineEmployee;
@@ -17,10 +20,13 @@ final class VehicleServiceEmployeeAssignmentService
 {
     use AssertsVehicleServiceExpectedVersion;
 
+    private const ZERO_AMOUNT = '0.000000';
+
     public function __construct(
         private readonly DecimalMath $math,
         private readonly VehicleServiceValidationService $validator,
         private readonly VehicleServiceCommissionService $commissions,
+        private readonly VehicleServiceCommissionPolicyService $commissionPolicies,
     ) {}
 
     public function create(
@@ -68,7 +74,7 @@ final class VehicleServiceEmployeeAssignmentService
             $this->validator->assertEmployeeAssignable($line);
             $this->validator->employee((int) $job->tenant_id, $job->organization_unit_id, $data->employeeId);
 
-            $assignment->fill($this->attributes($line, $data));
+            $assignment->fill($this->attributes($line, $data, $assignment));
             $assignment->completed_at = $data->status === 'completed' ? now() : null;
             $assignment->save();
             $this->bumpJobVersion($job);
@@ -97,26 +103,74 @@ final class VehicleServiceEmployeeAssignmentService
     }
 
     /** @return array<string, mixed> */
-    private function attributes(VehicleServiceJobLine $line, VehicleServiceEmployeeAssignmentData $data): array
-    {
-        foreach ([$data->assignedHours, $data->rate, $data->commissionValue] as $value) {
+    private function attributes(
+        VehicleServiceJobLine $line,
+        VehicleServiceEmployeeAssignmentData $data,
+        ?VehicleServiceLineEmployee $existing = null,
+    ): array {
+        foreach ([$data->assignedHours, $data->rate] as $value) {
             $this->validator->nonNegative($value, 'Employee assignment values cannot be negative.');
         }
+        $role = VehicleServiceWorkforceRole::tryFrom($data->roleType);
+        if (! $role instanceof VehicleServiceWorkforceRole) {
+            throw new InvalidArgumentException('Invalid Vehicle Service workforce role.');
+        }
+        $commission = $this->commission($line, $data, $existing);
 
         return [
             'employee_id' => $data->employeeId,
-            'role_type' => $data->roleType,
+            'role_type' => $role->value,
             'assigned_hours' => $this->math->normalize($data->assignedHours),
             'rate' => $this->math->normalize($data->rate),
-            'commission_type' => $data->commissionType->value,
-            'commission_value' => $this->math->normalize($data->commissionValue),
+            'commission_type' => $commission['type']->value,
+            'commission_value' => $commission['value'],
             'commission_amount' => $this->commissions->calculate(
-                $data->commissionType,
-                $data->commissionValue,
+                $commission['type'],
+                $commission['value'],
                 (string) $line->line_total,
             ),
             'status' => $data->status,
         ];
+    }
+
+    /** @return array{type: VehicleServiceCommissionType, value: string} */
+    private function commission(
+        VehicleServiceJobLine $line,
+        VehicleServiceEmployeeAssignmentData $data,
+        ?VehicleServiceLineEmployee $existing,
+    ): array {
+        if ($data->commissionType !== null) {
+            if ($data->commissionValue === null) {
+                throw new InvalidArgumentException('Employee commission value is required.');
+            }
+
+            return [
+                'type' => $data->commissionType,
+                'value' => $this->math->normalize($data->commissionValue),
+            ];
+        }
+
+        if ($data->commissionValue !== null) {
+            throw new InvalidArgumentException('Employee commission type is required.');
+        }
+
+        if ($existing instanceof VehicleServiceLineEmployee) {
+            return [
+                'type' => $existing->commission_type,
+                'value' => (string) $existing->commission_value,
+            ];
+        }
+
+        $line->loadMissing('item');
+        if ($line->item?->item_type !== ItemType::Labour || $line->organization_unit_id === null) {
+            return ['type' => VehicleServiceCommissionType::None, 'value' => self::ZERO_AMOUNT];
+        }
+
+        return $this->commissionPolicies->resolveLaborRule(
+            (int) $line->tenant_id,
+            (int) $line->organization_unit_id,
+            (int) $line->item_id,
+        );
     }
 
     private function assertLine(VehicleServiceJob $job, VehicleServiceJobLine $line): void

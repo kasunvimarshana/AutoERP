@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { useTenantRouteAccess } from '@/modules/auth/useTenantRouteAccess';
 import { listPayments, type Payment } from '../paymentApi';
 import { useApi } from '@/shared/hooks/useApi';
 import { useDebounce } from '@/shared/hooks/useDebounce';
@@ -46,6 +47,8 @@ export default function PaymentListPage() {
     const [searchParams] = useSearchParams();
     const viewKey = searchParams.get('view') as keyof typeof paymentViews | null;
     const view = viewKey ? paymentViews[viewKey] : undefined;
+    const action = view?.action ?? { to: '/payments/create', label: 'New payment' };
+    const canOpenAction = useTenantRouteAccess(action.to);
     const [search, setSearch] = useState('');
     const [page, setPage] = useState(1);
     const debounced = useDebounce(search);
@@ -70,9 +73,7 @@ export default function PaymentListPage() {
             <ContentHeader
                 title={view?.title ?? 'Payments'}
                 description={view?.description ?? 'Payment activity with independent document, posting, and allocation states.'}
-                actions={view?.action
-                    ? <LinkButton to={view.action.to}>{view.action.label}</LinkButton>
-                    : <LinkButton to="/payments/create">New payment</LinkButton>}
+                actions={canOpenAction ? <LinkButton to={action.to}>{action.label}</LinkButton> : undefined}
             />
             <div className="mb-4 max-w-md"><Input type="search" placeholder="Search payment or reference number" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} /></div>
             <ErrorAlert error={result.error} />

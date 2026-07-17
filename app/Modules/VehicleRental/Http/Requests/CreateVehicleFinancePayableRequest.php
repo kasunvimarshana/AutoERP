@@ -15,7 +15,7 @@ final class CreateVehicleFinancePayableRequest extends TenantScopedRequest
         return [
             'expected_version' => ['required', 'integer', 'min:1'],
             'invoice_date' => ['required', 'date'],
-            'status' => ['required', Rule::enum(InvoiceStatus::class)],
+            'status' => ['required', Rule::in([InvoiceStatus::Draft->value])],
         ];
     }
 }

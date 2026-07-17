@@ -7,6 +7,8 @@ export const vehicleServicePermissions = {
     linesManage: 'vehicle_service.lines.manage',
     workforceView: 'vehicle_service.workforce.view',
     workforceManage: 'vehicle_service.workforce.manage',
+    commissionsView: 'vehicle_service.commissions.view',
+    commissionsManage: 'vehicle_service.commissions.manage',
     inventoryView: 'vehicle_service.inventory.view',
     inventoryIssue: 'vehicle_service.inventory.issue',
     invoicesView: 'vehicle_service.invoices.view',

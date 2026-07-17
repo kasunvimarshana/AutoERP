@@ -8,10 +8,11 @@ use Database\Seeders\Concerns\ResolvesSeedContext;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Modules\Customer\DTOs\CustomerCreditProfileData;
 use Modules\Customer\Models\Customer;
 use Modules\Customer\Models\CustomerCategory;
 use Modules\Customer\Models\CustomerCategoryAssignment;
-use Modules\Customer\Models\CustomerCreditProfile;
+use Modules\Customer\Services\CustomerCreditProfileService;
 use Modules\Sequence\Models\SequenceModel;
 use Modules\Sequence\Services\Contracts\SequenceDomainServiceInterface;
 
@@ -63,21 +64,12 @@ final class CustomerSeeder extends Seeder
                 ],
             );
 
-            CustomerCreditProfile::query()->updateOrCreate(
-                ['tenant_id' => $tenant->getKey(), 'customer_id' => $customer->getKey()],
-                [
-                    'organization_unit_id' => $organizationUnit?->getKey(),
-                    'row_version' => 1,
-                    'credit_limit' => '0.000000',
-                    'credit_period_days' => null,
-                    'warning_threshold_percent' => '80.000000',
-                    'credit_allowed' => false,
-                    'advance_allowed' => true,
-                    'allow_over_credit' => false,
-                    'allow_partial_payment' => true,
-                    'is_active' => true,
-                ],
-            );
+            $creditProfiles = app(CustomerCreditProfileService::class);
+            if ($creditProfiles->get($customer) === null) {
+                $creditProfiles->set($customer, new CustomerCreditProfileData(
+                    creditAllowed: false,
+                ));
+            }
 
             if (Schema::hasTable('customer_category_assignments')) {
                 CustomerCategoryAssignment::query()->updateOrCreate(

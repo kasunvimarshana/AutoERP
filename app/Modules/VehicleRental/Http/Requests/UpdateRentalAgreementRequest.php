@@ -20,13 +20,14 @@ final class UpdateRentalAgreementRequest extends StoreRentalAgreementRequest
         }
 
         $rules['expected_version'] = ['required', 'integer', 'min:1'];
+        $rules['rate_version.id'] = ['required_with:rate_version', 'integer', 'min:1'];
+        $rules['rate_version.expected_version'] = ['required_with:rate_version', 'integer', 'min:1'];
         foreach ([
             'agreement_number',
             'agreement_kind',
             'reservation_id',
             'expected_reservation_version',
             'activate_rate_version',
-            'rate_version',
             'deposit',
         ] as $immutableOrSeparateAggregate) {
             $rules[$immutableOrSeparateAggregate] = ['prohibited'];

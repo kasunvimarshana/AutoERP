@@ -19,6 +19,7 @@ use Modules\Payment\Enums\PaymentType;
 use Modules\Payment\Models\Payment;
 use Modules\Payment\Models\PaymentMethod;
 use Modules\Payment\Services\PaymentMethodService;
+use Modules\Payment\Services\PaymentRefundPolicyService;
 use Modules\ReferenceData\Models\CurrencyModel;
 use Modules\Supplier\Models\Supplier;
 
@@ -27,6 +28,7 @@ final class PaymentValidationService
     public function __construct(
         private readonly DecimalMath $math,
         private readonly PaymentMethodService $paymentMethods,
+        private readonly PaymentRefundPolicyService $refundPolicy,
     ) {}
 
     public function validateForCreation(CreatePaymentData $data): void
@@ -171,7 +173,7 @@ final class PaymentValidationService
             ) {
                 throw new InvalidArgumentException('Refund payment requires an original payment, refund source identity, and no direct allocations.');
             }
-            $this->validateOriginalRefundPayment($data);
+            $this->refundPolicy->originalForCreation($data);
         } elseif ($data->originalPaymentId !== null) {
             throw new InvalidArgumentException('Only refund payments can reference an original payment.');
         }
@@ -187,34 +189,6 @@ final class PaymentValidationService
                     'Manual payment requires posting_profile_code and a supported counterparty_profile_key in metadata.',
                 );
             }
-        }
-    }
-
-    private function validateOriginalRefundPayment(CreatePaymentData $data): void
-    {
-        $original = Payment::query()->find($data->originalPaymentId);
-        if (! $original instanceof Payment) {
-            throw new InvalidArgumentException('Original payment was not found for refund.');
-        }
-        $originalType = $original->payment_type instanceof PaymentType
-            ? $original->payment_type
-            : PaymentType::from((string) $original->payment_type);
-        if ($originalType === PaymentType::Refund) {
-            throw new InvalidArgumentException('A refund payment cannot be refunded again.');
-        }
-        if ((int) $original->tenant_id !== $data->tenantId
-            || $original->organization_unit_id !== $data->organizationUnitId
-            || $original->party_type !== $data->partyType
-            || $original->party_id !== $data->partyId
-            || $original->currency_id !== $data->currencyId
-        ) {
-            throw new InvalidArgumentException('Refund payment scope, party, and currency must match the original payment.');
-        }
-        $originalDirection = $original->direction instanceof PaymentDirection
-            ? $original->direction
-            : PaymentDirection::from((string) $original->direction);
-        if ($originalDirection === $data->direction) {
-            throw new InvalidArgumentException('Refund payment direction must reverse the original payment direction.');
         }
     }
 

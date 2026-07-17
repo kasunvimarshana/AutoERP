@@ -10,9 +10,14 @@ final class UpsertPostingProfileRequest extends TenantScopedRequest
 {
     public function rules(): array
     {
+        $updating = $this->route('profile') !== null;
+
         return [
             'tenant_id' => ['required', 'integer', 'min:1'],
             'organization_unit_id' => ['nullable', 'integer', 'min:1'],
+            'expected_version' => $updating
+                ? ['required', 'integer', 'min:1']
+                : ['prohibited'],
             'code' => ['required', 'string', 'max:100'],
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],

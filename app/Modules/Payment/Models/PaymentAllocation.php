@@ -15,7 +15,6 @@ final class PaymentAllocation extends TenantOwnedModel
     public const ACTIVE_IDENTITY_SLOT = 1;
 
     protected $table = 'payment_allocations';
-    protected $guarded = ['id'];
 
     protected function casts(): array
     {

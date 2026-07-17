@@ -17,8 +17,8 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
     const selectId = id ?? props.name ?? generatedId;
     const messageId = `${selectId}-message`;
     return (
-        <label className="block text-sm text-slate-700" htmlFor={selectId}>
-            {label && <span className="mb-1.5 block font-medium">{label}</span>}
+        <div className="block text-sm text-slate-700">
+            {label ? <label className="mb-1.5 block font-medium" htmlFor={selectId}>{label}</label> : null}
             <select
                 ref={ref}
                 id={selectId}
@@ -31,6 +31,6 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
                 {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
             </select>
             {error ? <span id={messageId} className="mt-1 block text-xs text-rose-600">{error}</span> : hint ? <span id={messageId} className="mt-1 block text-xs text-slate-500">{hint}</span> : null}
-        </label>
+        </div>
     );
 });

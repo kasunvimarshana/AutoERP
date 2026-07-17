@@ -39,6 +39,7 @@ final class RentalAgreementCreateTest extends TestCase
             'rental_mode' => 'with_driver',
             'billing_cycle' => 'monthly',
             'billing_basis' => 'calendar_month',
+            'proration_rule' => 'exact_day_count',
             'currency_id' => 1,
         ];
 

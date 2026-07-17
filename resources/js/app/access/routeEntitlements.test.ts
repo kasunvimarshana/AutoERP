@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { DASHBOARD_PATH } from '@/app/routePaths';
-import { resolveTenantRouteEntitlement } from './routeEntitlements';
+import { resolveTenantRouteEntitlement } from './resolvedRouteEntitlements';
 
 function concretePath(routePath: string): string {
     return routePath

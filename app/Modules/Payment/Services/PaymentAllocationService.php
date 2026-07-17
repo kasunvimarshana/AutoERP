@@ -211,7 +211,7 @@ final class PaymentAllocationService
         $this->assertNoExistingPaymentInvoiceAllocation($payment, $allocation->invoiceId);
         $snapshot = $this->invoiceSnapshot($allocation->invoiceId);
 
-        return PaymentAllocation::query()->create([
+        return $this->createAllocation([
             'tenant_id' => $payment->tenant_id,
             'organization_unit_id' => $payment->organization_unit_id,
             'payment_id' => $payment->getKey(),
@@ -255,7 +255,7 @@ final class PaymentAllocationService
             false,
         );
 
-        $created = PaymentAllocation::query()->create([
+        $created = $this->createAllocation([
             'tenant_id' => $payment->tenant_id,
             'organization_unit_id' => $payment->organization_unit_id,
             'payment_id' => $payment->getKey(),
@@ -276,6 +276,15 @@ final class PaymentAllocationService
         $this->allocationFinance->post($payment, $created, $actorId);
 
         return $created;
+    }
+
+    private function createAllocation(array $attributes): PaymentAllocation
+    {
+        $allocation = new PaymentAllocation();
+        $allocation->forceFill($attributes);
+        $allocation->save();
+
+        return $allocation;
     }
 
     private function invoiceSnapshot(int $invoiceId): array

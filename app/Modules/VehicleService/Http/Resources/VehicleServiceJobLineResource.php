@@ -41,6 +41,11 @@ final class VehicleServiceJobLineResource extends JsonResource
             'is_external' => (bool) $this->is_external,
             'is_billable' => (bool) $this->is_billable,
             'is_employee_assignable' => (bool) $this->is_employee_assignable,
+            'commission_default' => $this->when(
+                $this->offsetExists('commission_default'),
+                fn () => $this->commission_default,
+                null,
+            ),
             'inventory_movement_id' => $this->inventory_movement_id,
             'stock_on_hand' => $this->when($this->offsetExists('stock_on_hand'), fn () => (string) $this->stock_on_hand),
             'stock_available' => $this->when($this->offsetExists('stock_available'), fn () => (string) $this->stock_available),

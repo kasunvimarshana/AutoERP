@@ -14,8 +14,6 @@ final class StoreVehicleServiceJobRequest extends TenantScopedRequest
 {
     use HasExpectedVehicleServiceJobVersion;
 
-    private const DEFAULT_SUPERVISOR_COMMISSION_VALUE = '0.000000';
-
     public function rules(): array
     {
         return [
@@ -29,8 +27,17 @@ final class StoreVehicleServiceJobRequest extends TenantScopedRequest
             'vehicle_id' => ['required', 'integer', 'min:1'],
             'bill_to_customer_id' => ['nullable', 'integer', 'min:1'],
             'supervisor_employee_id' => ['nullable', 'integer', 'min:1'],
-            'supervisor_commission_type' => ['nullable', Rule::enum(VehicleServiceCommissionType::class)],
-            'supervisor_commission_value' => ['nullable', 'decimal:0,6', 'min:0'],
+            'supervisor_commission_type' => [
+                'nullable',
+                'required_with:supervisor_commission_value',
+                Rule::enum(VehicleServiceCommissionType::class),
+            ],
+            'supervisor_commission_value' => [
+                'nullable',
+                'required_with:supervisor_commission_type',
+                'decimal:0,6',
+                'min:0',
+            ],
             'odometer_reading' => ['nullable', 'decimal:0,6', 'min:0'],
             'fuel_level' => ['nullable', 'string', 'max:100'],
             'priority' => ['nullable', 'string', 'max:30'],
@@ -51,10 +58,12 @@ final class StoreVehicleServiceJobRequest extends TenantScopedRequest
             jobNumber: $this->stringOrNull('job_number'),
             expectedDeliveryDate: $this->stringOrNull('expected_delivery_date'),
             supervisorEmployeeId: $this->intOrNull('supervisor_employee_id'),
-            supervisorCommissionType: VehicleServiceCommissionType::from(
-                $this->stringOrNull('supervisor_commission_type') ?? VehicleServiceCommissionType::None->value,
-            ),
-            supervisorCommissionValue: $this->stringOrNull('supervisor_commission_value') ?? self::DEFAULT_SUPERVISOR_COMMISSION_VALUE,
+            supervisorCommissionType: $this->filled('supervisor_commission_type')
+                ? VehicleServiceCommissionType::from((string) $this->input('supervisor_commission_type'))
+                : null,
+            supervisorCommissionValue: $this->filled('supervisor_commission_value')
+                ? (string) $this->input('supervisor_commission_value')
+                : null,
             odometerReading: $this->stringOrNull('odometer_reading'),
             fuelLevel: $this->stringOrNull('fuel_level'),
             priority: $this->stringOrNull('priority'),

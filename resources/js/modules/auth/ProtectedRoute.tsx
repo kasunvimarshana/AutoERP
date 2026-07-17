@@ -16,7 +16,7 @@ export function ProtectedRoute() {
         return (
             <main className="flex min-h-screen items-center justify-center bg-slate-100 px-4 py-10">
                 <section className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                    <ErrorAlert error={auth.bootstrapError} title="Unable to restore your session" />
+                    <ErrorAlert error={auth.bootstrapError} title="Unable to restore your session" inline />
                     <p className="mt-3 text-sm text-slate-600">
                         Your credentials were preserved because this may be a temporary network or service problem.
                     </p>

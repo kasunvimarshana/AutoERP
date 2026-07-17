@@ -2,12 +2,12 @@ import { matchPath } from 'react-router-dom';
 import { administrationRouteEntitlements } from './administrationRouteEntitlements';
 import { commerceRouteEntitlements } from './commerceRouteEntitlements';
 import { financeRouteEntitlements } from './financeRouteEntitlements';
+import { hrRouteEntitlements } from './hrRouteEntitlements';
 import { inventoryRouteEntitlements } from './inventoryRouteEntitlements';
 import { invoiceRouteEntitlements } from './invoiceRouteEntitlements';
-import {
-    resolveTenantRouteEntitlement as resolveLegacyRouteEntitlement,
-} from './routeEntitlements';
 import type { EntitlementRule, TenantRouteEntitlement } from './routeEntitlementPolicy';
+import { uomRouteEntitlements } from './uomRouteEntitlements';
+import { voucherRouteEntitlements } from './voucherRouteEntitlements';
 
 export type { TenantRouteEntitlement } from './routeEntitlementPolicy';
 
@@ -15,11 +15,13 @@ const featureOwnedRules: readonly EntitlementRule[] = [
     ...administrationRouteEntitlements,
     ...commerceRouteEntitlements,
     ...financeRouteEntitlements,
+    ...hrRouteEntitlements,
     ...inventoryRouteEntitlements,
     ...invoiceRouteEntitlements,
+    ...uomRouteEntitlements,
+    ...voucherRouteEntitlements,
 ];
 
 export function resolveTenantRouteEntitlement(pathname: string): TenantRouteEntitlement | null {
-    const matched = featureOwnedRules.find((candidate) => matchPath({ path: candidate.path, end: true }, pathname));
-    return matched ?? resolveLegacyRouteEntitlement(pathname);
+    return featureOwnedRules.find((candidate) => matchPath({ path: candidate.path, end: true }, pathname)) ?? null;
 }

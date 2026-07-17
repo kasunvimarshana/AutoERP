@@ -6,8 +6,15 @@ namespace Modules\Payment\Services;
 
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
+use LogicException;
 use Modules\Core\Services\DecimalMath;
+use Modules\Customer\Models\Customer;
+use Modules\Idempotency\Enums\IdempotencyStatus;
+use Modules\Idempotency\Models\IdempotencyRecord;
+use Modules\Idempotency\Services\IdempotencyService;
+use Modules\Payment\Constants\PaymentIdempotency;
 use Modules\Payment\DTOs\CreatePaymentData;
+use Modules\Payment\DTOs\PaymentLineData;
 use Modules\Payment\Enums\PaymentAllocationState;
 use Modules\Payment\Enums\PaymentDocumentStatus;
 use Modules\Payment\Enums\PaymentInstrumentStatus;
@@ -17,6 +24,8 @@ use Modules\Payment\Models\Payment;
 use Modules\Payment\Models\PaymentLine;
 use Modules\Payment\Models\PaymentMethod;
 use Modules\Payment\Validators\PaymentValidationService;
+use Modules\ReferenceData\Models\CurrencyModel;
+use Modules\Supplier\Models\Supplier;
 
 final class PaymentCreationService
 {
@@ -29,13 +38,21 @@ final class PaymentCreationService
         private readonly PaymentAllocationService $allocations,
         private readonly PaymentLifecycleEventRecorder $events,
         private readonly PaymentReferenceSnapshotService $snapshots,
+        private readonly IdempotencyService $idempotency,
+        private readonly PaymentCreatePayloadHasher $payloadHasher,
     ) {}
 
     public function create(CreatePaymentData $data): Payment
     {
-        $this->validator->validateForCreation($data);
-
         return DB::transaction(function () use ($data): Payment {
+            $idempotencyRecord = $this->acquireIdempotency($data);
+            if ($idempotencyRecord instanceof IdempotencyRecord && ! $idempotencyRecord->wasRecentlyCreated) {
+                return $this->replayCompletedPayment($idempotencyRecord, $data);
+            }
+
+            $this->lockMutableReferences($data);
+            $this->validator->validateForCreation($data);
+
             $calculation = $this->calculations->calculateForCreation($data);
             $instrumentStatus = $this->initialInstrumentStatus($data);
             $payment = new Payment();
@@ -78,7 +95,8 @@ final class PaymentCreationService
                 if (! $method instanceof PaymentMethod) {
                     throw new InvalidArgumentException('Payment method was not found while creating payment lines.');
                 }
-                PaymentLine::query()->create([
+                $paymentLine = new PaymentLine();
+                $paymentLine->forceFill([
                     'tenant_id' => $data->tenantId,
                     'organization_unit_id' => $data->organizationUnitId,
                     'payment_id' => $payment->getKey(),
@@ -107,6 +125,7 @@ final class PaymentCreationService
                     'notes' => $line->notes,
                     'metadata' => $line->metadata,
                 ]);
+                $paymentLine->save();
             }
 
             if ($data->allocations !== []) {
@@ -115,8 +134,116 @@ final class PaymentCreationService
                 $this->unappliedBalances->sync($payment->refresh());
             }
 
-            return $payment->refresh()->load(['lines', 'allocations', 'unappliedBalance', 'refunds', 'reversals', 'lifecycleEvents']);
+            $payment = $this->loadResult($payment);
+            if ($idempotencyRecord instanceof IdempotencyRecord) {
+                $this->idempotency->complete(
+                    $idempotencyRecord,
+                    [PaymentIdempotency::PAYMENT_ID_KEY => (int) $payment->getKey()],
+                    [PaymentIdempotency::PAYMENT_ID_KEY => (int) $payment->getKey()],
+                );
+            }
+
+            return $payment;
         });
+    }
+
+    private function acquireIdempotency(CreatePaymentData $data): ?IdempotencyRecord
+    {
+        $key = trim((string) $data->idempotencyKey);
+        if ($key === '') {
+            return null;
+        }
+
+        return $this->idempotency->acquire(
+            $data->tenantId,
+            $data->organizationUnitId,
+            PaymentIdempotency::CREATE_OPERATION,
+            hash('sha256', $key),
+            $this->payloadHasher->hash($data),
+            createdBy: $data->createdBy,
+        );
+    }
+
+    private function lockMutableReferences(CreatePaymentData $data): void
+    {
+        if ($data->originalPaymentId !== null) {
+            Payment::query()
+                ->whereKey($data->originalPaymentId)
+                ->lockForUpdate()
+                ->first();
+        }
+
+        if ($data->partyId !== null) {
+            match ($data->partyType) {
+                'customer' => Customer::query()->whereKey($data->partyId)->lockForUpdate()->first(),
+                'supplier' => Supplier::query()->whereKey($data->partyId)->lockForUpdate()->first(),
+                default => null,
+            };
+        }
+
+        if ($data->currencyId !== null) {
+            CurrencyModel::query()
+                ->whereKey($data->currencyId)
+                ->lockForUpdate()
+                ->first();
+        }
+
+        $paymentMethodIds = [];
+        foreach ($data->lines as $line) {
+            if ($line instanceof PaymentLineData && $line->paymentMethodId !== null) {
+                $paymentMethodIds[] = $line->paymentMethodId;
+            }
+        }
+        $paymentMethodIds = array_values(array_unique($paymentMethodIds));
+        sort($paymentMethodIds, SORT_NUMERIC);
+        if ($paymentMethodIds !== []) {
+            PaymentMethod::query()
+                ->whereIn('id', $paymentMethodIds)
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+        }
+    }
+
+    private function replayCompletedPayment(IdempotencyRecord $record, CreatePaymentData $data): Payment
+    {
+        if ($record->status !== IdempotencyStatus::Completed) {
+            throw new LogicException('Payment creation with this idempotency key is still in progress.');
+        }
+
+        $documentIds = is_array($record->document_ids) ? $record->document_ids : [];
+        $result = is_array($record->result) ? $record->result : [];
+        $paymentId = $documentIds[PaymentIdempotency::PAYMENT_ID_KEY]
+            ?? $result[PaymentIdempotency::PAYMENT_ID_KEY]
+            ?? null;
+        if (! is_numeric($paymentId) || (int) $paymentId < 1) {
+            throw new LogicException('Completed payment idempotency record does not contain a valid payment identifier.');
+        }
+
+        $query = Payment::query()
+            ->where('tenant_id', $data->tenantId)
+            ->whereKey((int) $paymentId);
+        $data->organizationUnitId === null
+            ? $query->whereNull('organization_unit_id')
+            : $query->where('organization_unit_id', $data->organizationUnitId);
+        $payment = $query->first();
+        if (! $payment instanceof Payment) {
+            throw new LogicException('The payment recorded for this idempotency key no longer exists in the active scope.');
+        }
+
+        return $this->loadResult($payment);
+    }
+
+    private function loadResult(Payment $payment): Payment
+    {
+        return $payment->refresh()->load([
+            'lines',
+            'allocations',
+            'unappliedBalance',
+            'refunds',
+            'reversals',
+            'lifecycleEvents',
+        ]);
     }
 
     private function recordInitialEvents(Payment $payment, PaymentInstrumentStatus $instrumentStatus, ?int $actorId): void

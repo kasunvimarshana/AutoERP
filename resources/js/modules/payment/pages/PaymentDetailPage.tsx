@@ -78,13 +78,13 @@ export default function PaymentDetailPage() {
     const fromPurchase = searchParams.get('from') === 'purchase';
     const chequeLine = value.lines?.find((line) => line.payment_method?.method_type === 'cheque') ?? null;
     const capabilities = value.capabilities ?? {};
-    const canRefund = Boolean(capabilities.can_refund) && hasPaymentPermission(auth.permissions, paymentPermissions.refund);
-    const canReverse = Boolean(capabilities.can_reverse) && hasPaymentPermission(auth.permissions, paymentPermissions.reverse);
-    const canSubmit = Boolean(capabilities.can_submit) && hasPaymentPermission(auth.permissions, paymentPermissions.submit);
-    const canApprove = Boolean(capabilities.can_approve) && hasPaymentPermission(auth.permissions, paymentPermissions.approve);
-    const canPost = Boolean(capabilities.can_post) && hasPaymentPermission(auth.permissions, paymentPermissions.post);
-    const canVoid = Boolean(capabilities.can_void) && hasPaymentPermission(auth.permissions, paymentPermissions.void);
-    const canPrintCheque = Boolean(capabilities.can_print_cheque) && chequeLine?.id && hasPaymentPermission(auth.permissions, paymentPermissions.chequesPrint);
+    const canRefund = Boolean(capabilities.can_refund) && hasPaymentPermission(auth, paymentPermissions.refund);
+    const canReverse = Boolean(capabilities.can_reverse) && hasPaymentPermission(auth, paymentPermissions.reverse);
+    const canSubmit = Boolean(capabilities.can_submit) && hasPaymentPermission(auth, paymentPermissions.submit);
+    const canApprove = Boolean(capabilities.can_approve) && hasPaymentPermission(auth, paymentPermissions.approve);
+    const canPost = Boolean(capabilities.can_post) && hasPaymentPermission(auth, paymentPermissions.post);
+    const canVoid = Boolean(capabilities.can_void) && hasPaymentPermission(auth, paymentPermissions.void);
+    const canPrintCheque = Boolean(capabilities.can_print_cheque) && chequeLine?.id && hasPaymentPermission(auth, paymentPermissions.chequesPrint);
     const refundValid = isPositiveDecimal(refundAmount) && refundReason.trim() !== '';
     const reversalValid = reversalReason.trim() !== '';
 

@@ -34,7 +34,6 @@ export function canAccessNavigation(rule: NavigationAccessRule | undefined, cont
     });
 }
 
-
 export function filterNavigation(
     sections: NavigationSection[],
     context: NavigationAccessContext,
@@ -80,13 +79,19 @@ function resolveLinkAccess(item: NavigationLinkItem): NavigationAccessRule | nul
 
     if (!hasEntitlement) return configured;
 
+    const querySpecific = item.to.includes('?');
+
     return {
         requiresTenant: configured?.requiresTenant ?? true,
         requiresPlatformOperator: configured?.requiresPlatformOperator,
         requiresOrganizationUnit: configured?.requiresOrganizationUnit || entitlement.requiresOrganizationUnit,
         modules: mergeAccessValues(configured?.modules, entitlement.modules),
-        permissions: entitlement.permissions ?? configured?.permissions,
-        roles: entitlement.roles ?? configured?.roles,
+        permissions: querySpecific && configured?.permissions?.length
+            ? configured.permissions
+            : entitlement.permissions ?? configured?.permissions,
+        roles: querySpecific && configured?.roles?.length
+            ? configured.roles
+            : entitlement.roles ?? configured?.roles,
     };
 }
 

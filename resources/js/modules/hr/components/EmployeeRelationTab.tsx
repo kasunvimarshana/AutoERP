@@ -9,9 +9,9 @@ import type { ApiError } from '@/shared/api/apiError';
 import type { ApiCollection } from '@/shared/types/api';
 import { humanize, readableRelation } from '@/shared/utils/object';
 
-export function EmployeeRelationTab<T extends { id: number }>({ title, fields, result, open, editing, submitting, actionError, onCreate, onEdit, onDelete, onClose, onSubmit, children }: {
+export function EmployeeRelationTab<T extends { id: number }>({ title, fields, result, open, editing, submitting, actionError, canManage, onCreate, onEdit, onDelete, onClose, onSubmit, children }: {
     title: string; fields: string[]; result: { data: ApiCollection<T> | null; loading: boolean; error: ApiError | null; page: number; setPage: (page: number) => void; confirmDialog?: ReactNode };
-    open: boolean; editing: T | null; submitting: boolean; actionError: ApiError | null; onCreate: () => void; onEdit?: (row: T) => void; onDelete?: (row: T) => void; onClose: () => void; onSubmit: () => void; children: ReactNode;
+    open: boolean; editing: T | null; submitting: boolean; actionError: ApiError | null; canManage: boolean; onCreate: () => void; onEdit?: (row: T) => void; onDelete?: (row: T) => void; onClose: () => void; onSubmit: () => void; children: ReactNode;
 }) {
     const columns: DataColumn<T>[] = fields.map((field) => ({
         key: field,
@@ -19,7 +19,7 @@ export function EmployeeRelationTab<T extends { id: number }>({ title, fields, r
         render: (row: T) => renderRelationValue((row as Record<string, unknown>)[field]),
     }));
 
-    if (onEdit || onDelete) {
+    if (canManage && (onEdit || onDelete)) {
         columns.push({
             key: 'actions',
             header: 'Actions',
@@ -29,13 +29,13 @@ export function EmployeeRelationTab<T extends { id: number }>({ title, fields, r
     }
 
     return <div className="space-y-4">
-        <div className="flex justify-end"><Button onClick={onCreate}>Add {title}</Button></div>
+        {canManage && <div className="flex justify-end"><Button onClick={onCreate}>Add {title}</Button></div>}
         <ErrorAlert error={result.error ?? actionError} />
         {result.loading ? <LoadingState label={`Loading ${title.toLowerCase()}...`} /> : <>
-            <DataTable rows={result.data?.data ?? []} columns={columns} rowKey={(row) => row.id} emptyMessage={`No ${title.toLowerCase()} records yet. Click Add ${title} to start.`} />
+            <DataTable rows={result.data?.data ?? []} columns={columns} rowKey={(row) => row.id} emptyMessage={`No ${title.toLowerCase()} records yet.`} />
             <Pagination meta={result.data?.meta} onPageChange={result.setPage} />
         </>}
-        <FormDrawer open={open} title={`${editing ? 'Edit' : 'Add'} ${title}`} onClose={onClose}><div className="space-y-4"><ErrorAlert error={actionError} />{children}<div className="flex justify-end"><Button loading={submitting} onClick={onSubmit}>Save {title.toLowerCase()}</Button></div></div></FormDrawer>
+        {canManage && <FormDrawer open={open} title={`${editing ? 'Edit' : 'Add'} ${title}`} onClose={onClose}><div className="space-y-4"><ErrorAlert error={actionError} />{children}<div className="flex justify-end"><Button loading={submitting} onClick={onSubmit}>Save {title.toLowerCase()}</Button></div></div></FormDrawer>}
         {result.confirmDialog}
     </div>;
 }

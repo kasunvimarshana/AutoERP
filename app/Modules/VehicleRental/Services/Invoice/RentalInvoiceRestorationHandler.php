@@ -10,17 +10,16 @@ use Modules\Invoice\Data\InvoiceSourceRestorationContext;
 use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Models\InvoiceAdjustment;
 use Modules\Invoice\Models\InvoiceSourceLine;
+use Modules\VehicleRental\Constants\VehicleRentalInvoiceSource;
 use Modules\VehicleRental\Enums\RentalDocumentStatus;
 use Modules\VehicleRental\Models\RentalCalculationRun;
 
 final class RentalInvoiceRestorationHandler implements InvoiceSourceRestorationHandlerInterface
 {
-    private const SOURCE_TYPE = 'rental_calculation_run';
-
     public function supports(InvoiceSourceRestorationContext $context): bool
     {
         foreach ($context->sourceLines as $sourceLine) {
-            if ($sourceLine->sourceType === self::SOURCE_TYPE) {
+            if ($sourceLine->sourceType === VehicleRentalInvoiceSource::RENTAL_CALCULATION_RUN) {
                 return true;
             }
         }
@@ -32,7 +31,7 @@ final class RentalInvoiceRestorationHandler implements InvoiceSourceRestorationH
     {
         $runIds = [];
         foreach ($context->sourceLines as $sourceLine) {
-            if ($sourceLine->sourceType === self::SOURCE_TYPE) {
+            if ($sourceLine->sourceType === VehicleRentalInvoiceSource::RENTAL_CALCULATION_RUN) {
                 $runIds[] = $sourceLine->sourceId;
             }
         }
@@ -59,7 +58,7 @@ final class RentalInvoiceRestorationHandler implements InvoiceSourceRestorationH
         ];
         $hasSourceLines = InvoiceSourceLine::query()
             ->where('tenant_id', $context->tenantId)
-            ->where('source_type', self::SOURCE_TYPE)
+            ->where('source_type', VehicleRentalInvoiceSource::RENTAL_CALCULATION_RUN)
             ->where('source_id', $runId)
             ->where('invoice_id', '!=', $context->invoiceId)
             ->whereHas('invoice', fn (Builder $query): Builder => $query->whereNotIn('status', $terminalStatuses))
@@ -78,7 +77,7 @@ final class RentalInvoiceRestorationHandler implements InvoiceSourceRestorationH
 
         return InvoiceAdjustment::query()
             ->where('tenant_id', $context->tenantId)
-            ->where('source_type', 'rental_calculation_line')
+            ->where('source_type', VehicleRentalInvoiceSource::RENTAL_CALCULATION_LINE)
             ->whereIn('source_id', $lineIds)
             ->where('invoice_id', '!=', $context->invoiceId)
             ->whereHas('invoice', fn (Builder $query): Builder => $query->whereNotIn('status', $terminalStatuses))

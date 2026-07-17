@@ -37,7 +37,7 @@ export default function GoodsReceiptListPage() {
     const [busyId, setBusyId] = useState<number | null>(null);
     const [reversalTarget, setReversalTarget] = useState<GoodsReceipt | null>(null);
     const result = useApi((signal) => listGoodsReceipts({ page, search: debouncedSearch || undefined, status: status || undefined, per_page: 15 }, signal), [page, debouncedSearch, status]);
-    const can = (permission: string) => hasPurchasePermission(auth.permissions, permission);
+    const can = (permission: string) => hasPurchasePermission(auth, permission);
 
     const post = async (row: GoodsReceipt) => {
         if (busyId !== null) return;
@@ -97,7 +97,7 @@ export default function GoodsReceiptListPage() {
     return (
         <>
             <div className="space-y-5">
-                <ContentHeader title="Goods receipts" actions={can(purchasePermissions.goodsReceiptsCreate) ? <LinkButton to="/purchase/goods-receipts/create">New GRN</LinkButton> : null} />
+                <ContentHeader title="Goods receipts" actions={can(purchasePermissions.goodsReceiptsCreate) ? <LinkButton to="/purchase/goods-receipts/create">New GRN</LinkButton> : undefined} />
                 <ErrorAlert error={result.error ?? actionError} />
                 <div className="grid gap-3 md:grid-cols-3">
                     <Input label="Search" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} />

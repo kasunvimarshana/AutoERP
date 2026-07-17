@@ -4,7 +4,11 @@ declare(strict_types=1);
 
 namespace Modules\Finance\Tests;
 
+use Modules\Finance\DTOs\PostingContext;
+use Modules\Finance\DTOs\PostingSourceData;
+use Modules\Finance\Services\FinancePostingService;
 use PHPUnit\Framework\TestCase;
+use ReflectionClass;
 
 final class FinancePostingIdempotencyBoundaryTest extends TestCase
 {
@@ -23,6 +27,43 @@ final class FinancePostingIdempotencyBoundaryTest extends TestCase
         self::assertStringContainsString('public ?string $sourceKey', $data);
         self::assertStringContainsString('public ?string $postingFingerprint', $data);
         self::assertStringContainsString('$table->unique(\'source_key\'', $migration);
+    }
+
+    public function test_source_identity_does_not_change_with_descriptive_module_alias(): void
+    {
+        $reflection = new ReflectionClass(FinancePostingService::class);
+        $service = $reflection->newInstanceWithoutConstructor();
+        $sourceKey = $reflection->getMethod('sourceKey');
+        $first = new PostingContext(source: new PostingSourceData(
+            sourceType: 'invoice',
+            sourceId: 91,
+            tenantId: 7,
+            organizationUnitId: 3,
+            sourceModule: 'invoice',
+        ));
+        $second = new PostingContext(source: new PostingSourceData(
+            sourceType: 'invoice',
+            sourceId: 91,
+            tenantId: 7,
+            organizationUnitId: 3,
+            sourceModule: 'vehicle_service',
+        ));
+
+        self::assertSame(
+            $sourceKey->invoke($service, $first),
+            $sourceKey->invoke($service, $second),
+        );
+    }
+
+    public function test_existing_source_keys_have_a_fail_closed_upgrade_path(): void
+    {
+        $migration = $this->source('../Database/UpgradeMigrations/2026_07_13_000002_canonicalize_finance_journal_source_keys.php');
+
+        self::assertStringContainsString("\$identity['source_type'] = \$sourceType;", $migration);
+        self::assertStringContainsString("\$identity['source_id'] = \$sourceId;", $migration);
+        self::assertStringContainsString('Multiple Finance journals use the same canonical source identity', $migration);
+        self::assertStringContainsString("->update(['source_key' => null])", $migration);
+        self::assertStringContainsString("->update(['source_key' => \$key])", $migration);
     }
 
     public function test_posted_or_reversed_journal_replay_does_not_repost_ledger(): void

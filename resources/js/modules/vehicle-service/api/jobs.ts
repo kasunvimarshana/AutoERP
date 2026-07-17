@@ -1,5 +1,6 @@
 import { apiClient } from '@/shared/api/apiClient';
 import type { ApiCollection, ApiResource, ListParams } from '@/shared/types/api';
+import type { VehicleServiceCommissionDefault } from '../commissionTypes';
 import type {
     VehicleServiceInspection,
     VehicleServiceInspectionPayload,
@@ -15,6 +16,10 @@ export const listVehicleServiceJobs = (params: ListParams, signal?: AbortSignal)
 
 export const getVehicleServiceJob = (id: number, signal?: AbortSignal) =>
     apiClient.get<ApiResource<VehicleServiceJob>>(`${jobs}/${id}`, { signal })
+        .then((response) => response.data.data);
+
+export const getVehicleServiceJobCreateDefaults = (signal?: AbortSignal) =>
+    apiClient.get<ApiResource<VehicleServiceCommissionDefault>>(`${jobs}/create-defaults`, { signal })
         .then((response) => response.data.data);
 
 export const createVehicleServiceJob = (payload: VehicleServiceJobPayload) =>

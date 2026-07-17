@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { itemPermissions } from '@/modules/item/itemPermissions';
 import { financePermissions } from '@/modules/finance/financePermissions';
+import { inventoryPermissions } from '@/modules/inventory/inventoryPermissions';
 import { invoicePermissions } from '@/modules/invoice/invoicePermissions';
 import { purchasePermissions } from '@/modules/purchase/purchasePermissions';
 import { vehicleRentalPermissions } from '@/modules/vehicle-rental/vehicleRentalPermissions';
@@ -176,8 +177,8 @@ describe('navigation access and matching', () => {
         ]);
     });
 
-    it('shows inventory navigation through the Inventory route entitlement', () => {
-        const sections = filterNavigation(tenantNavigationSections, {
+    it('requires an Inventory permission before showing Inventory navigation', () => {
+        const withoutPermission = filterNavigation(tenantNavigationSections, {
             tenantId: 10,
             isPlatformOperator: false,
             organizationUnitId: 20,
@@ -187,14 +188,24 @@ describe('navigation access and matching', () => {
             enabledModules: ['inventory'],
             enabledModulesLoaded: true,
         });
-        const inventoryModule = sections
+        expect(withoutPermission.flatMap((section) => section.items).some((item) => item.id === 'inventory')).toBe(false);
+
+        const withPermission = filterNavigation(tenantNavigationSections, {
+            tenantId: 10,
+            isPlatformOperator: false,
+            organizationUnitId: 20,
+            roles: [],
+            permissions: [inventoryPermissions.stockView],
+            permissionsLoaded: true,
+            enabledModules: ['inventory'],
+            enabledModulesLoaded: true,
+        });
+        const inventoryModule = withPermission
             .flatMap((section) => section.items)
             .find((item) => item.id === 'inventory');
 
         expect(inventoryModule?.type).toBe('module');
-        expect(inventoryModule?.type === 'module' ? inventoryModule.children.map((child) => child.label) : []).toEqual([
-            'Inventory',
-        ]);
+        expect(inventoryModule?.type === 'module' ? inventoryModule.children.map((child) => child.label) : []).toEqual(['Inventory']);
         expect(findNavigationMatch('/inventory', '', tenantNavigationSections)?.parent?.id).toBe('inventory');
     });
 

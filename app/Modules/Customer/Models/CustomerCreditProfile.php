@@ -11,8 +11,6 @@ final class CustomerCreditProfile extends TenantOwnedModel
 {
     protected $table = 'customer_credit_profiles';
 
-    protected $guarded = ['id'];
-
     protected function casts(): array
     {
         return array_merge(parent::casts(), [

@@ -5,7 +5,12 @@ import type {
     VehicleServiceEmployeeAssignmentPayload,
     VehicleServiceJobLine,
 } from '../../vehicleServiceTypes';
+import type {
+    CommissionAwareVehicleServiceJobLine,
+    VehicleServiceWorkforceRole,
+} from '../../commissionTypes';
 
+const ZERO_AMOUNT = '0.000000';
 export type AssignmentRow = VehicleServiceEmployeeAssignment & { line: VehicleServiceJobLine };
 
 export type AssignmentDialogState =
@@ -15,7 +20,7 @@ export type AssignmentDialogState =
 export interface AssignmentFormValue {
     lineId: number | null;
     employee: NamedResource | null;
-    role: string;
+    role: VehicleServiceWorkforceRole;
     hours: string;
     rate: string;
     commissionType: CommissionType;
@@ -28,10 +33,10 @@ export function emptyAssignmentForm(): AssignmentFormValue {
         lineId: null,
         employee: null,
         role: 'technician',
-        hours: '0.000000',
-        rate: '0.000000',
+        hours: ZERO_AMOUNT,
+        rate: ZERO_AMOUNT,
         commissionType: 'none',
-        commissionValue: '0.000000',
+        commissionValue: ZERO_AMOUNT,
         status: 'assigned',
     };
 }
@@ -40,12 +45,28 @@ export function assignmentToForm(row: AssignmentRow): AssignmentFormValue {
     return {
         lineId: row.line.id,
         employee: row.employee ?? null,
-        role: row.role_type,
+        role: isWorkforceRole(row.role_type) ? row.role_type : 'custom',
         hours: row.assigned_hours,
         rate: row.rate,
         commissionType: row.commission_type,
         commissionValue: row.commission_value,
         status: isAssignmentStatus(row.status) ? row.status : 'assigned',
+    };
+}
+
+export function applyAssignmentCommissionDefault(
+    current: AssignmentFormValue,
+    lines: VehicleServiceJobLine[],
+    lineId: number | null,
+): AssignmentFormValue {
+    const line = lines.find((candidate) => candidate.id === lineId) as CommissionAwareVehicleServiceJobLine | undefined;
+    const commission = line?.commission_default;
+
+    return {
+        ...current,
+        lineId,
+        commissionType: commission?.commission_type ?? 'none',
+        commissionValue: commission?.commission_value ?? ZERO_AMOUNT,
     };
 }
 
@@ -72,4 +93,8 @@ function isAssignmentStatus(
     value: string,
 ): value is AssignmentFormValue['status'] {
     return ['assigned', 'completed', 'cancelled'].includes(value);
+}
+
+function isWorkforceRole(value: string): value is VehicleServiceWorkforceRole {
+    return ['technician', 'helper', 'inspector', 'custom'].includes(value);
 }

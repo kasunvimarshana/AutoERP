@@ -47,7 +47,7 @@ final class FinanceApiWorkflowTest extends TestCase
         ])->assertStatus(422)
             ->assertJsonValidationErrors(['opening_balance']);
 
-        $profile = $this->tenantPostJson($tenantId, '/api/v1/finance/posting-profiles', $scope + [
+        $profilePayload = [
             'code' => 'api_profile',
             'name' => 'API Profile',
             'is_active' => true,
@@ -55,17 +55,36 @@ final class FinanceApiWorkflowTest extends TestCase
                 ['line_key' => 'cash', 'account_role_id' => $cashRoleId],
                 ['line_key' => 'capital', 'account_role_id' => $capitalRoleId],
             ],
-        ])->assertSuccessful()->assertJsonPath('data.code', 'api_profile')->json('data');
+        ];
+        $profile = $this->tenantPostJson(
+            $tenantId,
+            '/api/v1/finance/posting-profiles',
+            $scope + $profilePayload,
+        )->assertSuccessful()
+            ->assertJsonPath('data.code', 'api_profile')
+            ->assertJsonPath('data.row_version', 1)
+            ->json('data');
 
-        $this->tenantPatchJson($tenantId, '/api/v1/finance/posting-profiles/'.$profile['id'], $scope + [
-            'code' => 'api_profile',
-            'name' => 'Updated API Profile',
-            'is_active' => true,
-            'rules' => [
-                ['line_key' => 'cash', 'account_role_id' => $cashRoleId],
-                ['line_key' => 'capital', 'account_role_id' => $capitalRoleId],
-            ],
-        ])->assertSuccessful()->assertJsonPath('data.name', 'Updated API Profile');
+        $updatedProfile = $this->tenantPatchJson(
+            $tenantId,
+            '/api/v1/finance/posting-profiles/'.$profile['id'],
+            array_replace($scope, $profilePayload, [
+                'expected_version' => $profile['row_version'],
+                'name' => 'Updated API Profile',
+            ]),
+        )->assertSuccessful()
+            ->assertJsonPath('data.name', 'Updated API Profile')
+            ->json('data');
+        $this->assertGreaterThan($profile['row_version'], $updatedProfile['row_version']);
+
+        $this->tenantPatchJson(
+            $tenantId,
+            '/api/v1/finance/posting-profiles/'.$profile['id'],
+            array_replace($scope, $profilePayload, [
+                'expected_version' => $profile['row_version'],
+                'name' => 'Stale overwrite',
+            ]),
+        )->assertStatus(422);
 
         $journal = $this->tenantPostJson($tenantId, '/api/v1/finance/journals', $scope + $this->journalPayload($cashId, $capitalId))
             ->assertSuccessful()
@@ -122,7 +141,8 @@ final class FinanceApiWorkflowTest extends TestCase
             'status' => 'active',
             'status_changed_at' => now(),
             'created_at' => now(),
-            'updated_at' => now()]);
+            'updated_at' => now(),
+        ]);
         $organizationUnitId = (int) \Tests\Support\OrganizationUnitFixture::create([
             'tenant_id' => $tenantId,
             'name' => 'Finance API Org',
@@ -212,9 +232,7 @@ final class FinanceApiWorkflowTest extends TestCase
         $this->actingAs($user, (string) config('module-auth.protected_route_guard', 'auth-api'));
     }
 
-    /**
-     * @return array<string, mixed>
-     */
+    /** @return array<string, mixed> */
     private function journalPayload(
         int $cashId,
         int $capitalId,
