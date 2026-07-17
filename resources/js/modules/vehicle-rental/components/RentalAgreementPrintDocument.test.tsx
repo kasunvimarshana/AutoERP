@@ -1,8 +1,10 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { TestRouter } from "@/test/TestRouter";
-import type { RentalAgreementDocumentSnapshot } from "../vehicleRentalTypes";
-import { RentalAgreementPrintDocument } from "./RentalAgreementPrintDocument";
+import {
+    RentalAgreementPrintDocument,
+    type RentalAgreementPrintableSnapshot,
+} from "./RentalAgreementPrintDocument";
 
 describe("RentalAgreementPrintDocument", () => {
     it("shows the immutable component Tax treatment", () => {
@@ -21,7 +23,7 @@ describe("RentalAgreementPrintDocument", () => {
     });
 });
 
-function snapshot(): RentalAgreementDocumentSnapshot {
+function snapshot(): RentalAgreementPrintableSnapshot {
     return {
         version: 1,
         captured_at: "2026-07-17T08:00:00.000Z",
@@ -65,5 +67,5 @@ function snapshot(): RentalAgreementDocumentSnapshot {
                 },
             ],
         },
-    } as RentalAgreementDocumentSnapshot;
+    };
 }
