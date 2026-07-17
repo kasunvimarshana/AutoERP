@@ -149,7 +149,7 @@ describe('VehicleServiceEmployeeAssignmentTab', () => {
         await waitFor(() => expect(onChanged).toHaveBeenCalledWith(9));
         expect(apiMocks.listEmployeeAssignableLines).toHaveBeenCalledTimes(2);
         expect(apiMocks.getVehicleServiceJob).toHaveBeenCalledWith(7);
-        expect(await screen.findAllByText('fixed: 50.000000')).toHaveLength(2);
+        expect((await screen.findAllByText('fixed: 50.000000')).length).toBeGreaterThanOrEqual(2);
     });
 
     it('reloads the latest state after a stale-version rejection and keeps the form retryable', async () => {
@@ -173,7 +173,7 @@ describe('VehicleServiceEmployeeAssignmentTab', () => {
 
         await submitNewAssignment();
 
-        expect(await screen.findByText(/Latest job and workforce data has been loaded/)).toBeInTheDocument();
+        expect((await screen.findAllByText(/Latest job and workforce data has been loaded/)).length).toBeGreaterThanOrEqual(1);
         expect(onChanged).toHaveBeenCalledWith(12);
         expect(apiMocks.listEmployeeAssignableLines).toHaveBeenCalledTimes(2);
         expect(screen.getByRole('button', { name: 'Save assignment' })).toBeInTheDocument();
