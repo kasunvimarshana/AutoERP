@@ -17,9 +17,9 @@ import { Panel } from "@/shared/components/Panel";
 import { StatusBadge } from "@/shared/components/StatusBadge";
 import { useApi } from "@/shared/hooks/useApi";
 import { formatDate } from "@/shared/utils/formatDate";
-import { readableRelation } from "@/shared/utils/object";
-import { RentalPage } from "../components/RentalPage";
+import { humanize, readableRelation } from "@/shared/utils/object";
 import { RentalAgreementPrintDocument } from "../components/RentalAgreementPrintDocument";
+import { RentalPage } from "../components/RentalPage";
 import {
     RENTAL_AGREEMENT_KIND,
     agreementDetailPath,
@@ -31,13 +31,25 @@ import {
     type RentalAgreementFinancialSide,
     type RentalAgreementPageMode,
 } from "../rentalAgreementPresentation";
+import { rentalAgreementRateLabel } from "../rentalAgreementUi";
 import {
     deleteRentalAgreement,
     getRentalAgreement,
     listRentalUsageLogs,
     transitionRentalAgreement,
 } from "../vehicleRentalApi";
-import type { RentalUsageLog } from "../vehicleRentalTypes";
+import type {
+    RentalAgreement,
+    RentalRateVersion,
+    RentalUsageLog,
+} from "../vehicleRentalTypes";
+
+const AGREEMENT_STATUS = {
+    draft: "draft",
+    active: "active",
+} as const;
+const OPEN_ALLOCATION_STATUSES = new Set(["planned", "active"]);
+const RUNNING_CHART_PAGE_SIZE = 25;
 
 interface RentalAgreementDetailPageProps {
     mode?: RentalAgreementPageMode;
@@ -72,6 +84,7 @@ export default function RentalAgreementDetailPage({
             setBusy(false);
         }
     };
+
     const destroyDraft = async () => {
         if (!result.data) return;
 
@@ -95,13 +108,18 @@ export default function RentalAgreementDetailPage({
             setBusy(false);
         }
     };
+
     const confirmTransition = async (status: "active" | "terminated") => {
+        if (!result.data) return;
+        const row = result.data;
+        if (status === "active" && activationIssues(row).length > 0) return;
+
         const confirmed = await confirm(
             status === "active"
                 ? {
                       title: "Activate agreement?",
                       message:
-                          "Activation freezes the executed terms, parties and current rates into the printable agreement snapshot.",
+                          "Review the party, period, billing policy, rates, units, Tax treatment, deposit and printable terms shown on this page. Activation freezes them into the immutable agreement snapshot.",
                       confirmLabel: "Activate agreement",
                       danger: false,
                   }
@@ -128,7 +146,7 @@ export default function RentalAgreementDetailPage({
     if (!result.data) {
         return (
             <RentalPage>
-                <ErrorAlert error={result.error} />
+                <ErrorAlert error={result.error} inline />
             </RentalPage>
         );
     }
@@ -138,15 +156,32 @@ export default function RentalAgreementDetailPage({
         mode === "lessee"
             ? RENTAL_AGREEMENT_KIND.customerRental
             : mode === "lessor"
-                ? RENTAL_AGREEMENT_KIND.ownerSupply
-                : null;
+              ? RENTAL_AGREEMENT_KIND.ownerSupply
+              : null;
     const isExpectedAgreement =
         expectedAgreementKind === null ||
         row.agreement_kind === expectedAgreementKind;
     const correctAgreementMode = agreementModeForKind(row.agreement_kind);
     const correctAgreementLabel =
-        correctAgreementMode === "lessee" ? "lessee agreement" : "lessor agreement";
+        correctAgreementMode === "lessee"
+            ? "lessee agreement"
+            : "lessor agreement";
     const printRequested = searchParams.get("print") === "1";
+    const draftRate = draftRateVersion(row);
+    const displayedRate =
+        row.status === AGREEMENT_STATUS.draft
+            ? draftRate
+            : row.active_rate_version ?? null;
+    const issues = activationIssues(row);
+    const hasOpenAllocation = Boolean(
+        row.allocations?.some((allocation) =>
+            OPEN_ALLOCATION_STATUSES.has(allocation.status),
+        ),
+    );
+    const allocationActionLabel =
+        row.agreement_kind === RENTAL_AGREEMENT_KIND.customerRental
+            ? "Assign vehicle"
+            : "Register supplied vehicle";
 
     if (printRequested && isExpectedAgreement) {
         return (
@@ -162,7 +197,8 @@ export default function RentalAgreementDetailPage({
                         role="alert"
                     >
                         The immutable agreement document becomes available after
-                        the agreement is activated.
+                        the agreement is activated. Review the Draft commercial
+                        terms on the agreement page before activation.
                     </div>
                 )}
             </RentalPage>
@@ -174,44 +210,33 @@ export default function RentalAgreementDetailPage({
             <ContentHeader
                 title={row.agreement_number}
                 description={
-                    row.agreement_kind === RENTAL_AGREEMENT_KIND.customerRental
-                        ? "Lessee agreement, immutable billable rates, allocations and deposit obligation."
-                        : row.agreement_kind === RENTAL_AGREEMENT_KIND.ownerSupply
-                        ? "Lessor agreement, immutable payable rates and supplied vehicle allocations."
-                        : "Agreement, immutable rate versions, allocations and deposit obligation."
+                    row.agreement_kind ===
+                    RENTAL_AGREEMENT_KIND.customerRental
+                        ? "Customer contract, billable pricing, vehicle allocation and deposit obligation."
+                        : row.agreement_kind ===
+                            RENTAL_AGREEMENT_KIND.ownerSupply
+                          ? "Vehicle-owner contract, payable pricing and supplied-vehicle allocation."
+                          : "Rental agreement, governed pricing and vehicle allocations."
                 }
                 actions={
                     isExpectedAgreement ? (
                         <>
-                            <LinkButton
-                                variant="secondary"
-                                to={`/vehicle-rental/allocations?agreement_id=${id}`}
-                            >
-                                Allocations
-                            </LinkButton>
-                            {row.document_snapshot && (
-                                <LinkButton
-                                    variant="secondary"
-                                    to={`${agreementDetailPath(mode, row.id)}?print=1`}
-                                >
-                                    Print agreement
-                                </LinkButton>
-                            )}
-                            {row.status === "draft" && (
+                            {row.status === AGREEMENT_STATUS.draft && (
                                 <>
                                     <LinkButton
                                         variant="secondary"
                                         to={agreementEditPath(mode, row.id)}
                                     >
-                                        Edit
+                                        Edit draft
                                     </LinkButton>
                                     <Button
                                         loading={busy}
+                                        disabled={issues.length > 0}
                                         onClick={() =>
                                             void confirmTransition("active")
                                         }
                                     >
-                                        Activate
+                                        Review and activate
                                     </Button>
                                     <Button
                                         variant="danger"
@@ -222,22 +247,52 @@ export default function RentalAgreementDetailPage({
                                     </Button>
                                 </>
                             )}
-                            {row.status === "active" && (
-                                <Button
-                                    variant="danger"
-                                    loading={busy}
-                                    onClick={() =>
-                                        void confirmTransition("terminated")
-                                    }
-                                >
-                                    Terminate
-                                </Button>
+                            {row.status === AGREEMENT_STATUS.active && (
+                                <>
+                                    <LinkButton
+                                        to={`/vehicle-rental/allocations?agreement_id=${id}`}
+                                    >
+                                        {hasOpenAllocation
+                                            ? "View allocations"
+                                            : allocationActionLabel}
+                                    </LinkButton>
+                                    {row.document_snapshot && (
+                                        <LinkButton
+                                            variant="secondary"
+                                            to={`${agreementDetailPath(mode, row.id)}?print=1`}
+                                        >
+                                            Print agreement
+                                        </LinkButton>
+                                    )}
+                                    <Button
+                                        variant="danger"
+                                        loading={busy}
+                                        onClick={() =>
+                                            void confirmTransition("terminated")
+                                        }
+                                    >
+                                        Terminate
+                                    </Button>
+                                </>
                             )}
+                            {row.status !== AGREEMENT_STATUS.draft &&
+                                row.status !== AGREEMENT_STATUS.active &&
+                                row.document_snapshot && (
+                                    <LinkButton
+                                        variant="secondary"
+                                        to={`${agreementDetailPath(mode, row.id)}?print=1`}
+                                    >
+                                        Print agreement
+                                    </LinkButton>
+                                )}
                         </>
                     ) : (
                         <LinkButton
                             variant="secondary"
-                            to={agreementDetailPath(correctAgreementMode, row.id)}
+                            to={agreementDetailPath(
+                                correctAgreementMode,
+                                row.id,
+                            )}
                         >
                             Open {correctAgreementLabel}
                         </LinkButton>
@@ -256,9 +311,16 @@ export default function RentalAgreementDetailPage({
             )}
             {!isExpectedAgreement ? null : (
                 <>
-                    <ErrorAlert error={actionError ?? result.error} />
+                    <ErrorAlert
+                        error={actionError ?? result.error}
+                        title="Agreement action failed"
+                        inline
+                    />
+                    {row.status === AGREEMENT_STATUS.draft && (
+                        <ActivationReadinessPanel issues={issues} />
+                    )}
                     <div className="grid gap-5 lg:grid-cols-2">
-                        <Panel title="Agreement">
+                        <Panel title="Agreement overview">
                             <DetailGrid
                                 items={[
                                     {
@@ -277,7 +339,9 @@ export default function RentalAgreementDetailPage({
                                     },
                                     {
                                         label: "Status",
-                                        value: <StatusBadge status={row.status} />,
+                                        value: (
+                                            <StatusBadge status={row.status} />
+                                        ),
                                     },
                                     {
                                         label: "Agreement date",
@@ -287,32 +351,35 @@ export default function RentalAgreementDetailPage({
                                         label: "Executed",
                                         value: row.executed_at
                                             ? formatDate(row.executed_at)
-                                            : "-",
+                                            : "Not recorded",
                                     },
                                     {
                                         label: "Legal context",
-                                        value:
-                                            row.legal_context?.replaceAll(
-                                                "_",
-                                                " ",
-                                            ) ?? "-",
+                                        value: row.legal_context
+                                            ? humanize(row.legal_context)
+                                            : "Not selected",
                                     },
                                     {
-                                        label: "Start",
+                                        label: "Contract starts",
                                         value: formatDate(row.starts_at),
                                     },
-                                    { label: "End", value: formatDate(row.ends_at) },
                                     {
-                                        label: "Mode",
-                                        value: row.rental_mode.replaceAll("_", " "),
+                                        label: "Contract ends",
+                                        value: formatDate(row.ends_at),
                                     },
                                     {
-                                        label: "Billing",
-                                        value: `${row.billing_cycle} / ${row.billing_basis}`,
+                                        label: "Service type",
+                                        value: humanize(row.rental_mode),
+                                    },
+                                    {
+                                        label: "Billing policy",
+                                        value: `${humanize(row.billing_cycle)} / ${humanize(row.billing_basis)} / ${humanize(row.proration_rule)}`,
                                     },
                                     {
                                         label: "Payment terms",
-                                        value: `${row.payment_term_days ?? 0} days`,
+                                        value: formatPaymentTerms(
+                                            row.payment_term_days,
+                                        ),
                                     },
                                     {
                                         label: "Currency",
@@ -322,77 +389,20 @@ export default function RentalAgreementDetailPage({
                             />
                             {row.remarks && (
                                 <div className="mt-4 border-t border-slate-200 pt-4 text-sm">
-                                    <h3 className="font-semibold">Remarks</h3>
+                                    <h3 className="font-semibold">
+                                        Printed agreement remarks
+                                    </h3>
                                     <p className="mt-1 whitespace-pre-wrap text-slate-600">
                                         {row.remarks}
                                     </p>
                                 </div>
                             )}
                         </Panel>
-                        <Panel title="Active rate version">
-                            {row.active_rate_version ? (
-                                <>
-                                    <DetailGrid
-                                        items={[
-                                            {
-                                                label: "Version",
-                                                value: String(
-                                                    row.active_rate_version
-                                                        .version_number,
-                                                ),
-                                            },
-                                            {
-                                                label: "Effective",
-                                                value: formatDate(
-                                                    row.active_rate_version
-                                                        .effective_from,
-                                                ),
-                                            },
-                                            {
-                                                label: "Excess KM method",
-                                                value: row.active_rate_version.excess_km_method.replaceAll(
-                                                    "_",
-                                                    " ",
-                                                ),
-                                            },
-                                            {
-                                                label: "Included KM",
-                                                value: row.active_rate_version
-                                                    .included_km,
-                                            },
-                                        ]}
-                                    />
-                                    <div className="mt-4 space-y-2">
-                                        {row.active_rate_version.components.map(
-                                            (component) => (
-                                                <div
-                                                    key={
-                                                        component.id ??
-                                                        component.component_code
-                                                    }
-                                                    className="flex justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm"
-                                                >
-                                                    <span>
-                                                        {component.component_code.replaceAll(
-                                                            "_",
-                                                            " ",
-                                                        )}
-                                                    </span>
-                                                    <strong>
-                                                        {component.rate} /{" "}
-                                                        {component.unit}
-                                                    </strong>
-                                                </div>
-                                            ),
-                                        )}
-                                    </div>
-                                </>
-                            ) : (
-                                <p className="text-sm text-slate-500">
-                                    No active rate version.
-                                </p>
-                            )}
-                        </Panel>
+                        <CommercialTermsPanel
+                            agreement={row}
+                            rate={displayedRate}
+                            draft={row.status === AGREEMENT_STATUS.draft}
+                        />
                     </div>
                     <Panel title="Terms and conditions" className="mt-5">
                         {row.terms?.length ? (
@@ -415,7 +425,7 @@ export default function RentalAgreementDetailPage({
                             </ol>
                         ) : (
                             <p className="text-sm text-slate-500">
-                                No agreement terms have been recorded.
+                                No agreement-specific clauses have been recorded.
                             </p>
                         )}
                     </Panel>
@@ -430,17 +440,30 @@ export default function RentalAgreementDetailPage({
                                     items={[
                                         {
                                             label: "Required",
-                                            value: `${row.deposit_requirement.required_amount} ${row.deposit_requirement.currency?.code ?? ""}`.trim(),
+                                            value: money(
+                                                row.deposit_requirement
+                                                    .required_amount,
+                                                row.deposit_requirement.currency
+                                                    ?.code,
+                                            ),
                                         },
                                         {
                                             label: "Received",
-                                            value: row.deposit_requirement
-                                                .received_amount,
+                                            value: money(
+                                                row.deposit_requirement
+                                                    .received_amount,
+                                                row.deposit_requirement.currency
+                                                    ?.code,
+                                            ),
                                         },
                                         {
                                             label: "Balance",
-                                            value: row.deposit_requirement
-                                                .balance_amount,
+                                            value: money(
+                                                row.deposit_requirement
+                                                    .balance_amount,
+                                                row.deposit_requirement.currency
+                                                    ?.code,
+                                            ),
                                         },
                                         {
                                             label: "Status",
@@ -455,6 +478,14 @@ export default function RentalAgreementDetailPage({
                                         },
                                     ]}
                                 />
+                                <div className="mt-4 flex flex-wrap gap-2">
+                                    <LinkButton
+                                        variant="secondary"
+                                        to={`/vehicle-rental/deposits?agreement_id=${row.id}`}
+                                    >
+                                        View deposit activity
+                                    </LinkButton>
+                                </div>
                             </Panel>
                         )}
                     <Panel title="Vehicle allocations" className="mt-5">
@@ -464,25 +495,47 @@ export default function RentalAgreementDetailPage({
                                     <Link
                                         key={allocation.id}
                                         to={`/vehicle-rental/allocations/${allocation.id}`}
-                                        className="flex justify-between rounded-lg border p-3 hover:bg-slate-50"
+                                        className="flex flex-col justify-between gap-2 rounded-lg border p-3 hover:bg-slate-50 sm:flex-row sm:items-center"
                                     >
                                         <span>
                                             {allocation.allocation_number} -{" "}
-                                            {readableRelation(allocation.vehicle)}
+                                            {readableRelation(
+                                                allocation.vehicle,
+                                            )}
+                                            <span className="ml-2 text-slate-500">
+                                                {formatDate(
+                                                    allocation.allocated_from,
+                                                )}
+                                                {allocation.allocated_to
+                                                    ? ` – ${formatDate(allocation.allocated_to)}`
+                                                    : ""}
+                                            </span>
                                         </span>
                                         <StatusBadge status={allocation.status} />
                                     </Link>
                                 ))}
                             </div>
                         ) : (
-                            <p className="text-sm text-slate-500">
-                                No vehicle allocation yet.
-                            </p>
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                <p className="text-sm text-slate-500">
+                                    No vehicle allocation yet. Activate the agreement
+                                    before assigning its vehicle.
+                                </p>
+                                {row.status === AGREEMENT_STATUS.active && (
+                                    <LinkButton
+                                        to={`/vehicle-rental/allocations?agreement_id=${row.id}`}
+                                    >
+                                        {allocationActionLabel}
+                                    </LinkButton>
+                                )}
+                            </div>
                         )}
                     </Panel>
                     <AgreementRunningChartPanel
                         agreementId={row.id}
-                        side={rentalAgreementFinancialSide(row.agreement_kind)}
+                        side={rentalAgreementFinancialSide(
+                            row.agreement_kind,
+                        )}
                     />
                     {confirmDialog}
                 </>
@@ -491,7 +544,201 @@ export default function RentalAgreementDetailPage({
     );
 }
 
-function agreementModeForKind(kind: string): Exclude<RentalAgreementPageMode, "standard"> {
+function ActivationReadinessPanel({ issues }: { issues: string[] }) {
+    const ready = issues.length === 0;
+
+    return (
+        <Panel title="Activation review" className="mb-5">
+            <div
+                className={`rounded-lg border p-4 text-sm ${ready ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-amber-200 bg-amber-50 text-amber-800"}`}
+                role="status"
+            >
+                {ready ? (
+                    <>
+                        <p className="font-semibold">
+                            Ready for final activation review.
+                        </p>
+                        <p className="mt-1">
+                            Review the complete Draft commercial terms, deposit and
+                            printable clauses below. Activation makes this contract
+                            snapshot immutable.
+                        </p>
+                    </>
+                ) : (
+                    <>
+                        <p className="font-semibold">
+                            Complete before activation:
+                        </p>
+                        <ul className="mt-2 list-disc space-y-1 pl-5">
+                            {issues.map((issue) => (
+                                <li key={issue}>{issue}</li>
+                            ))}
+                        </ul>
+                    </>
+                )}
+            </div>
+        </Panel>
+    );
+}
+
+function CommercialTermsPanel({
+    agreement,
+    rate,
+    draft,
+}: {
+    agreement: RentalAgreement;
+    rate: RentalRateVersion | null;
+    draft: boolean;
+}) {
+    return (
+        <Panel title={draft ? "Draft commercial terms" : "Active rate version"}>
+            {rate ? (
+                <>
+                    <DetailGrid
+                        items={[
+                            {
+                                label: "Version",
+                                value: String(rate.version_number),
+                            },
+                            {
+                                label: "Effective from",
+                                value: formatDate(rate.effective_from),
+                            },
+                            {
+                                label: "Effective to",
+                                value: rate.effective_to
+                                    ? formatDate(rate.effective_to)
+                                    : "Open ended",
+                            },
+                            {
+                                label: "Billing policy",
+                                value: `${humanize(rate.billing_cycle)} / ${humanize(rate.billing_basis)}`,
+                            },
+                            {
+                                label: "Proration",
+                                value: humanize(rate.proration_rule),
+                            },
+                            {
+                                label: "Excess KM method",
+                                value: humanize(rate.excess_km_method),
+                            },
+                            {
+                                label: "Included KM",
+                                value: rate.included_km,
+                            },
+                            {
+                                label: "Currency",
+                                value: readableRelation(agreement.currency),
+                            },
+                        ]}
+                    />
+                    <div className="mt-4 overflow-x-auto">
+                        <table className="min-w-full text-left text-sm">
+                            <thead className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">
+                                <tr>
+                                    <th className="px-3 py-2">Component</th>
+                                    <th className="px-3 py-2 text-right">Rate</th>
+                                    <th className="px-3 py-2">Unit</th>
+                                    <th className="px-3 py-2">Tax</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {rate.components.map((component) => (
+                                    <tr
+                                        key={
+                                            component.id ??
+                                            `${component.component_code}-${component.unit}`
+                                        }
+                                    >
+                                        <td className="px-3 py-2 font-medium text-slate-900">
+                                            {rentalAgreementRateLabel(
+                                                agreement.agreement_kind,
+                                                component.component_code,
+                                            )}
+                                        </td>
+                                        <td className="px-3 py-2 text-right font-semibold">
+                                            {component.rate}
+                                        </td>
+                                        <td className="px-3 py-2">
+                                            {humanize(component.unit)}
+                                        </td>
+                                        <td className="px-3 py-2">
+                                            {component.is_taxable
+                                                ? "Taxable"
+                                                : "Non-taxable"}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                    {rate.components.length === 0 && (
+                        <p className="mt-4 text-sm text-rose-600">
+                            No rate components are available for review.
+                        </p>
+                    )}
+                </>
+            ) : (
+                <p className="text-sm text-rose-600" role="alert">
+                    {draft
+                        ? "No Draft rate version is available. Edit the agreement and add its contract rates before activation."
+                        : "No active rate version."}
+                </p>
+            )}
+        </Panel>
+    );
+}
+
+function activationIssues(agreement: RentalAgreement): string[] {
+    if (agreement.status !== AGREEMENT_STATUS.draft) return [];
+
+    const issues: string[] = [];
+    const party = agreement.customer ?? agreement.supplier;
+    const draftRates =
+        agreement.rate_versions?.filter(
+            (version) => version.status === AGREEMENT_STATUS.draft,
+        ) ?? [];
+
+    if (!party) issues.push("Select the agreement party.");
+    if (!agreement.starts_at || !agreement.ends_at) {
+        issues.push("Complete the contract period.");
+    }
+    if (!agreement.executed_at) {
+        issues.push("Record the signed/executed date.");
+    }
+    if (!agreement.legal_context) {
+        issues.push("Select the legal context.");
+    }
+    if (draftRates.length !== 1) {
+        issues.push("Provide exactly one Draft rate version.");
+    } else if (draftRates[0].components.length === 0) {
+        issues.push("Add at least one contract rate component.");
+    }
+
+    return issues;
+}
+
+function draftRateVersion(agreement: RentalAgreement): RentalRateVersion | null {
+    return (
+        agreement.rate_versions?.find(
+            (version) => version.status === AGREEMENT_STATUS.draft,
+        ) ?? null
+    );
+}
+
+function formatPaymentTerms(value: number | null | undefined): string {
+    if (value === null || value === undefined) return "Not specified";
+    if (value === 0) return "Due immediately";
+    return `${value} days`;
+}
+
+function money(value: string, currency?: string): string {
+    return [currency, value].filter(Boolean).join(" ");
+}
+
+function agreementModeForKind(
+    kind: string,
+): Exclude<RentalAgreementPageMode, "standard"> {
     return kind === RENTAL_AGREEMENT_KIND.ownerSupply ? "lessor" : "lessee";
 }
 
@@ -508,7 +755,7 @@ function AgreementRunningChartPanel({
                 {
                     agreement_id: agreementId,
                     financial_side: side,
-                    per_page: 25,
+                    per_page: RUNNING_CHART_PAGE_SIZE,
                 },
                 signal,
             ),
@@ -526,55 +773,57 @@ function AgreementRunningChartPanel({
         {
             key: "usage",
             header: "Running chart",
-            render: (row) =>
-                row.allocation ? (
+            render: (usage) =>
+                usage.allocation ? (
                     <Link
                         className="font-semibold text-blue-700 hover:underline"
-                        to={`/vehicle-rental/running-chart?allocation_id=${row.allocation.id}`}
+                        to={`/vehicle-rental/running-chart?allocation_id=${usage.allocation.id}`}
                     >
-                        {row.usage_number}
+                        {usage.usage_number}
                     </Link>
                 ) : (
-                    row.usage_number
+                    usage.usage_number
                 ),
         },
         {
             key: "date",
             header: "Date",
-            render: (row) => formatDate(row.usage_date),
+            render: (usage) => formatDate(usage.usage_date),
         },
         {
             key: "allocation",
             header: "Allocation",
-            render: (row) =>
+            render: (usage) =>
                 readableRelation(
-                    usageContextForSide(row, side)?.allocation ??
-                        row.allocation,
+                    usageContextForSide(usage, side)?.allocation ??
+                        usage.allocation,
                 ),
         },
         {
             key: "physical",
             header: "Physical KM",
-            render: (row) =>
-                `${row.distance_km} total / ${row.net_operational_distance_km} net`,
+            render: (usage) =>
+                `${usage.distance_km} total / ${usage.net_operational_distance_km} net`,
         },
         {
             key: "commercial",
             header: commercialDistanceLabel,
-            render: (row) =>
-                usageFactForSide(row, side)?.commercial_distance_km ?? "-",
+            render: (usage) =>
+                usageFactForSide(usage, side)?.commercial_distance_km ?? "-",
         },
         {
             key: "physical_status",
             header: "Physical",
-            render: (row) => <StatusBadge status={row.status} />,
+            render: (usage) => <StatusBadge status={usage.status} />,
         },
         {
             key: "fact_status",
             header: factLabel,
-            render: (row) => (
+            render: (usage) => (
                 <StatusBadge
-                    status={usageFactForSide(row, side)?.status ?? "missing"}
+                    status={
+                        usageFactForSide(usage, side)?.status ?? "missing"
+                    }
                 />
             ),
         },
@@ -582,14 +831,14 @@ function AgreementRunningChartPanel({
 
     return (
         <Panel title={title} className="mt-5">
-            <ErrorAlert error={result.error} />
+            <ErrorAlert error={result.error} inline />
             {result.loading ? (
                 <LoadingState />
             ) : (
                 <DataTable
                     rows={result.data?.data ?? []}
                     columns={columns}
-                    rowKey={(row) => row.id}
+                    rowKey={(usage) => usage.id}
                     emptyMessage="No running-chart data has been recorded for this agreement."
                 />
             )}
@@ -608,5 +857,7 @@ function usageContextForSide(
     usage: RentalUsageLog,
     side: RentalAgreementFinancialSide,
 ) {
-    return usage.contexts.find((context) => context.financial_side === side);
+    return usage.contexts.find(
+        (context) => context.financial_side === side,
+    );
 }
