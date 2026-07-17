@@ -675,20 +675,6 @@ export const tenantNavigationSections: NavigationSection[] = [
                         },
                     },
                     {
-                        id: "rental-agreements",
-                        type: "link",
-                        label: "Agreements",
-                        to: "/vehicle-rental/agreements",
-                        match: ["/vehicle-rental/agreements"],
-                        access: {
-                            ...operationalAccess(["vehicle-rental"]),
-                            permissions: [
-                                vehicleRentalPermissions.view,
-                                vehicleRentalPermissions.agreementsManage,
-                            ],
-                        },
-                    },
-                    {
                         id: "rental-lessee-agreements",
                         type: "link",
                         label: "Lessee Agreements",
@@ -733,7 +719,7 @@ export const tenantNavigationSections: NavigationSection[] = [
                     {
                         id: "rental-custody",
                         type: "link",
-                        label: "Handover & Return",
+                        label: "Handover & Return Queue",
                         to: "/vehicle-rental/custody",
                         match: ["/vehicle-rental/custody"],
                         access: {
@@ -777,7 +763,7 @@ export const tenantNavigationSections: NavigationSection[] = [
                     {
                         id: "rental-billing",
                         type: "link",
-                        label: "Billing & Owner Cost",
+                        label: "Billing & Settlement",
                         to: "/vehicle-rental/billing",
                         match: ["/vehicle-rental/billing"],
                         access: {
@@ -838,43 +824,6 @@ export const tenantNavigationSections: NavigationSection[] = [
                             ...operationalAccess(["vehicle-rental"]),
                             permissions: [vehicleRentalPermissions.view],
                         },
-                    },
-                    {
-                        id: "owner-payables",
-                        type: "link",
-                        label: "Owner Payables",
-                        to: "/invoices?view=rental-payable",
-                        match: ["/invoices"],
-                        access: operationalAccess([
-                            "invoice",
-                            "vehicle-rental",
-                        ]),
-                    },
-                    {
-                        id: "rental-invoices",
-                        type: "link",
-                        label: "Customer Invoices",
-                        to: "/invoices?view=rental-customer",
-                        match: ["/invoices"],
-                        access: operationalAccess([
-                            "invoice",
-                            "vehicle-rental",
-                        ]),
-                    },
-                    {
-                        id: "rental-settlements",
-                        type: "link",
-                        label: "Settlements",
-                        to: "/payments?view=rental",
-                        match: ["/payments"],
-                        exclude: [
-                            "/payments/create",
-                            "/payments/cheque-templates",
-                        ],
-                        access: operationalAccess([
-                            "payment",
-                            "vehicle-rental",
-                        ]),
                     },
                 ],
             },
