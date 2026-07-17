@@ -11,7 +11,16 @@ const FINANCE_SECTION_ID = 'finance';
 const INVENTORY_ITEM_ID = 'inventory';
 const VOUCHER_ITEM_ID = 'vouchers';
 const VEHICLE_RENTAL_ITEM_ID = 'vehicle-rental';
-const REDUNDANT_VEHICLE_RENTAL_CHILD_IDS = new Set(['rental-agreements']);
+const REDUNDANT_VEHICLE_RENTAL_CHILD_IDS = new Set([
+    'rental-agreements',
+    'owner-payables',
+    'rental-invoices',
+    'rental-settlements',
+]);
+const VEHICLE_RENTAL_CHILD_LABELS: Readonly<Record<string, string>> = {
+    'rental-custody': 'Handover & Return Queue',
+    'rental-billing': 'Billing & Settlement',
+};
 
 function inventoryNavigation(item: NavigationItem): NavigationItem {
     if (item.id !== INVENTORY_ITEM_ID || item.type !== 'module') return item;
@@ -31,9 +40,12 @@ function vehicleRentalNavigation(item: NavigationItem): NavigationItem {
 
     return {
         ...item,
-        children: item.children.filter(
-            (child) => !REDUNDANT_VEHICLE_RENTAL_CHILD_IDS.has(child.id),
-        ),
+        children: item.children
+            .filter((child) => !REDUNDANT_VEHICLE_RENTAL_CHILD_IDS.has(child.id))
+            .map((child) => ({
+                ...child,
+                label: VEHICLE_RENTAL_CHILD_LABELS[child.id] ?? child.label,
+            })),
     };
 }
 
