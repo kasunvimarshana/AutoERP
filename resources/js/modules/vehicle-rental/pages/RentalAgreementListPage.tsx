@@ -61,12 +61,6 @@ export default function RentalAgreementListPage({
     const debounced = useDebounce(search);
 
     useEffect(() => {
-        setPagination((current) =>
-            current.kind === kind ? current : { kind, page: 1 },
-        );
-    }, [kind]);
-
-    useEffect(() => {
         const next = new URLSearchParams();
         if (search) next.set("search", search);
         if (status) next.set("status", status);
