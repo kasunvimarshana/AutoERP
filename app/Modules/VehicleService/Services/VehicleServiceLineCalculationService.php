@@ -12,9 +12,13 @@ use Modules\VehicleService\Enums\VehicleServiceLineSourceType;
 use Modules\VehicleService\Enums\VehicleServiceLineStatus;
 use Modules\VehicleService\Models\VehicleServiceJob;
 use Modules\VehicleService\Models\VehicleServiceJobLine;
+use Modules\VehicleService\Models\VehicleServiceLineEmployee;
 
 final class VehicleServiceLineCalculationService
 {
+    private const CANCELLED_ASSIGNMENT_STATUS = 'cancelled';
+    private const ZERO_AMOUNT = '0.000000';
+
     public function __construct(
         private readonly DecimalMath $math,
         private readonly VehicleServiceCommissionService $commissions,
@@ -124,12 +128,57 @@ final class VehicleServiceLineCalculationService
 
     public function recalculateAssignments(VehicleServiceJobLine $line): void
     {
-        foreach ($line->employeeAssignments as $assignment) {
-            $assignment->commission_amount = $this->commissions->calculate(
-                $assignment->commission_type,
-                (string) $assignment->commission_value,
-                (string) $line->line_total,
-            );
+        $assignments = $line->employeeAssignments()->orderBy('id')->get();
+
+        foreach ($assignments->where('status', self::CANCELLED_ASSIGNMENT_STATUS) as $cancelledAssignment) {
+            if ($this->math->compare((string) $cancelledAssignment->commission_amount, self::ZERO_AMOUNT) === 0) {
+                continue;
+            }
+
+            $cancelledAssignment->commission_amount = self::ZERO_AMOUNT;
+            $cancelledAssignment->save();
+        }
+
+        $activeAssignments = $assignments
+            ->where('status', '!=', self::CANCELLED_ASSIGNMENT_STATUS)
+            ->values();
+        if ($activeAssignments->isEmpty()) {
+            return;
+        }
+
+        /** @var VehicleServiceLineEmployee $first */
+        $first = $activeAssignments->first();
+        $sharesOnePolicy = $activeAssignments->every(
+            fn (VehicleServiceLineEmployee $assignment): bool => $assignment->commission_type === $first->commission_type
+                && $this->math->compare(
+                    (string) $assignment->commission_value,
+                    (string) $first->commission_value,
+                ) === 0,
+        );
+
+        $amounts = $sharesOnePolicy
+            ? $this->commissions->splitEvenly(
+                $this->commissions->calculate(
+                    $first->commission_type,
+                    (string) $first->commission_value,
+                    (string) $line->line_total,
+                ),
+                $activeAssignments->count(),
+            )
+            : $activeAssignments->map(
+                fn (VehicleServiceLineEmployee $assignment): string => $this->commissions->calculate(
+                    $assignment->commission_type,
+                    (string) $assignment->commission_value,
+                    (string) $line->line_total,
+                ),
+            )->all();
+
+        foreach ($activeAssignments as $index => $assignment) {
+            if ($this->math->compare((string) $assignment->commission_amount, $amounts[$index]) === 0) {
+                continue;
+            }
+
+            $assignment->commission_amount = $amounts[$index];
             $assignment->save();
         }
     }

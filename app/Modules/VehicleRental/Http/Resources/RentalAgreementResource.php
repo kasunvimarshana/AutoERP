@@ -8,6 +8,8 @@ use Illuminate\Http\Request;
 
 final class RentalAgreementResource extends RentalResource
 {
+    private const DOCUMENT_SNAPSHOT_METADATA_KEY = 'document_snapshot';
+
     public function toArray(Request $request): array
     {
         return [
@@ -35,7 +37,7 @@ final class RentalAgreementResource extends RentalResource
             'termination_reason' => $this->termination_reason,
             'remarks' => $this->remarks,
             'document_snapshot' => $this->resource->relationLoaded('terms')
-                ? data_get($this->metadata, 'document_snapshot')
+                ? $this->documentSnapshot()
                 : null,
             'terms' => $this->resource->relationLoaded('terms')
                 ? $this->resource->getRelation('terms')
@@ -63,5 +65,66 @@ final class RentalAgreementResource extends RentalResource
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
         ];
+    }
+
+    /** @return array<string, mixed>|null */
+    private function documentSnapshot(): ?array
+    {
+        $snapshot = data_get($this->metadata, self::DOCUMENT_SNAPSHOT_METADATA_KEY);
+        if (! is_array($snapshot)) {
+            return null;
+        }
+
+        if (! $this->resource->relationLoaded('rateVersions')) {
+            return $snapshot;
+        }
+
+        $versionNumber = data_get($snapshot, 'rate_version.version_number');
+        if (! is_numeric($versionNumber)) {
+            return $snapshot;
+        }
+
+        $rateVersion = $this->resource->getRelation('rateVersions')->first(
+            fn ($version): bool => (int) $version->version_number === (int) $versionNumber,
+        );
+        if ($rateVersion === null || ! $rateVersion->relationLoaded('components')) {
+            return $snapshot;
+        }
+
+        $taxTreatmentByComponent = $rateVersion->components->mapWithKeys(
+            fn ($component): array => [
+                $this->componentKey(
+                    $this->enumValue($component->component_code),
+                    $this->enumValue($component->unit),
+                ) => (bool) $component->is_taxable,
+            ],
+        );
+
+        $components = data_get($snapshot, 'rate_version.components', []);
+        if (! is_array($components)) {
+            return $snapshot;
+        }
+
+        data_set($snapshot, 'rate_version.components', array_map(
+            function (array $component) use ($taxTreatmentByComponent): array {
+                $key = $this->componentKey(
+                    (string) ($component['component_code'] ?? ''),
+                    (string) ($component['unit'] ?? ''),
+                );
+                if ($taxTreatmentByComponent->has($key)) {
+                    $component['is_taxable'] = (bool) $taxTreatmentByComponent->get($key);
+                }
+
+                return $component;
+            },
+            $components,
+        ));
+
+        return $snapshot;
+    }
+
+    private function componentKey(string $componentCode, string $unit): string
+    {
+        return $componentCode.'|'.$unit;
     }
 }

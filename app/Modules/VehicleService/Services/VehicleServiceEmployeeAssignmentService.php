@@ -27,6 +27,7 @@ final class VehicleServiceEmployeeAssignmentService
         private readonly VehicleServiceValidationService $validator,
         private readonly VehicleServiceCommissionService $commissions,
         private readonly VehicleServiceCommissionPolicyService $commissionPolicies,
+        private readonly VehicleServiceLineCalculationService $calculations,
     ) {}
 
     public function create(
@@ -50,10 +51,11 @@ final class VehicleServiceEmployeeAssignmentService
                 'vehicle_service_job_id' => $job->getKey(),
                 'vehicle_service_job_line_id' => $line->getKey(),
                 'assigned_at' => now(),
-            ]))->load('employee');
+            ]));
+            $this->calculations->recalculateAssignments($line);
             $this->bumpJobVersion($job);
 
-            return $assignment;
+            return $assignment->refresh()->load('employee');
         });
     }
 
@@ -77,6 +79,7 @@ final class VehicleServiceEmployeeAssignmentService
             $assignment->fill($this->attributes($line, $data, $assignment));
             $assignment->completed_at = $data->status === 'completed' ? now() : null;
             $assignment->save();
+            $this->calculations->recalculateAssignments($line);
             $this->bumpJobVersion($job);
 
             return $assignment->refresh()->load('employee');
@@ -98,6 +101,7 @@ final class VehicleServiceEmployeeAssignmentService
             $this->assertAssignment($job, $line, $assignment);
             $this->validator->assertMutable($job);
             $assignment->delete();
+            $this->calculations->recalculateAssignments($line);
             $this->bumpJobVersion($job);
         });
     }
