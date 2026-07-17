@@ -230,19 +230,6 @@ export default function RentalAgreementCreatePage({
     );
 
     useEffect(() => {
-        if (componentDefinitions.length === 0) return;
-
-        setRates((current) => {
-            const next = { ...current };
-            for (const definition of componentDefinitions) {
-                next[definition.code] ??= "0";
-            }
-
-            return next;
-        });
-    }, [componentDefinitions]);
-
-    useEffect(() => {
         if (isEditing || !metadataDefaults) return;
 
         let cancelled = false;
