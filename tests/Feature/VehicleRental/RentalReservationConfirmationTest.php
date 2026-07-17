@@ -17,7 +17,7 @@ final class RentalReservationConfirmationTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_category_only_reservation_cannot_be_confirmed_without_a_specific_vehicle(): void
+    public function test_reservation_cannot_be_confirmed_without_a_specific_vehicle(): void
     {
         $currencyId = $this->createCurrency();
         $tenantId = $this->createTenant($currencyId);
@@ -27,7 +27,7 @@ final class RentalReservationConfirmationTest extends TestCase
             $tenantId,
             fn (): RentalReservation => RentalReservation::query()->create([
                 'tenant_id' => $tenantId,
-                'reservation_number' => 'RR-CATEGORY-001',
+                'reservation_number' => 'RR-NO-VEHICLE-001',
                 'customer_id' => $customerId,
                 'requested_vehicle_id' => null,
                 'requested_vehicle_category_id' => null,
