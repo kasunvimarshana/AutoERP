@@ -84,11 +84,15 @@ export function rentalAgreementRateLabel(kind: string, componentCode: string): s
     return isLesseeAgreementKind(kind) ? labels.lessee : labels.lessor;
 }
 
+export function isDriverRateComponent(componentCode: string): boolean {
+    return DRIVER_RATE_COMPONENTS.has(componentCode);
+}
+
 export function rateComponentAppliesToMode(
     componentCode: string,
     rentalMode: string,
 ): boolean {
-    return !DRIVER_RATE_COMPONENTS.has(componentCode)
+    return !isDriverRateComponent(componentCode)
         || rentalMode === RENTAL_MODE.withDriver;
 }
 
