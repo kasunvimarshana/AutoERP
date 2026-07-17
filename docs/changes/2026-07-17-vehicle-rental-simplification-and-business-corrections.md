@@ -21,6 +21,7 @@ Correct the Vehicle Rental workflows that were confirmed by the legacy-video/cur
 
 - A category/general request may remain Draft or Pending.
 - A reservation cannot transition to Confirmed until a specific available vehicle is selected.
+- The pending Confirm action is disabled until that vehicle exists, with the reason shown to the operator.
 - The lessee-agreement conversion action is visible only for Confirmed reservations.
 - No unimplemented category-capacity guarantee was invented.
 
@@ -67,7 +68,7 @@ Preserved as valid:
 
 The replacement lineage and Rental expense source/target schemas were not changed because removing one authority requires a released-schema migration and a complete historical-data migration. That work is not safe without an approved persistent-schema upgrade plan.
 
-## Intentionally blocked decisions
+## Intentionally blocked decisions and larger contracts
 
 The following were not guessed or implemented:
 
@@ -83,6 +84,7 @@ The following were not guessed or implemented:
 - General employee-reimbursement ownership.
 - Tax manual-override authority.
 - Persistent replacement-lineage and expense relationship migrations.
+- Driver `assignment_role` versus `is_primary` API consolidation. The database flag can become a derived projection, but the safe change must update request contracts, allocation service derivation, replacement-copy logic, resources, frontend forms, and all fixtures together. It is not safe to add without a runnable full regression environment.
 
 ## Verification gates
 
