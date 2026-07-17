@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button, LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
@@ -11,8 +11,10 @@ import { LoadingState } from '@/shared/components/LoadingState';
 import { Panel } from '@/shared/components/Panel';
 import { Select } from '@/shared/components/Select';
 import { useApi } from '@/shared/hooks/useApi';
+import { openSameOriginUrl } from '@/shared/utils/safeNavigation';
 import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { compareDecimalStrings } from '@/shared/utils/decimal';
+import { getInvoiceSignedPrintLink } from '@/modules/invoice/invoiceApi';
 import { PaymentMethodFields } from '@/modules/payment/components/PaymentMethodFields';
 import {
     createVehicleServicePayment,
@@ -22,6 +24,8 @@ import {
 } from '../vehicleServiceApi';
 import type {
     PreparedVehicleServicePayment,
+    VehicleServiceInvoiceLink,
+    VehicleServicePaymentCreated,
     VehicleServicePaymentMethod,
     VehicleServicePaymentPayload,
 } from '../vehicleServiceTypes';
@@ -106,7 +110,6 @@ function hasInstrumentDetails(payload: ReturnType<typeof methodPayload>): boolea
 
 export default function VehicleServicePaymentPreparePage() {
     const jobId = Number(useParams().id);
-    const navigate = useNavigate();
     const job = useApi((signal) => getVehicleServiceJob(jobId, signal), [jobId]);
     const options = useApi((signal) => getVehicleServicePaymentOptions(jobId, signal), [jobId]);
     const [invoiceId, setInvoiceId] = useState('');
@@ -116,6 +119,8 @@ export default function VehicleServicePaymentPreparePage() {
     const [reference, setReference] = useState('');
     const [methodDetails, setMethodDetails] = useState<Record<string, string>>({});
     const [prepared, setPrepared] = useState<PreparedVehicleServicePayment | null>(null);
+    const [createdPayment, setCreatedPayment] = useState<VehicleServicePaymentCreated | null>(null);
+    const [settledInvoice, setSettledInvoice] = useState<VehicleServiceInvoiceLink | null>(null);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
 
@@ -146,7 +151,11 @@ export default function VehicleServicePaymentPreparePage() {
         && !busy,
     );
 
-    const clearPrepared = () => setPrepared(null);
+    const clearPrepared = () => {
+        setPrepared(null);
+        setCreatedPayment(null);
+        setSettledInvoice(null);
+    };
     const payload = (): VehicleServicePaymentPayload => ({
         expected_version: options.data?.job_version ?? 0,
         invoice_id: Number(invoiceId),
@@ -268,20 +277,42 @@ export default function VehicleServicePaymentPreparePage() {
                         <Button type="submit" variant="secondary" loading={busy} disabled={!canSubmit}>
                             Review payment
                         </Button>
-                        <Button type="button" loading={busy} disabled={!canSubmit} onClick={async () => {
-                            setBusy(true);
-                            setError(null);
-                            try {
-                                const payment = await createVehicleServicePayment(jobId, payload());
-                                navigate(`/payments/${payment.id}`);
-                            } catch (requestError) {
-                                setError(toApiError(requestError));
-                            } finally {
-                                setBusy(false);
-                            }
-                        }}>
-                            Receive, post and allocate
-                        </Button>
+                        {createdPayment && settledInvoice ? (
+                            <Button type="button" onClick={async () => {
+                                const printUrl = `/invoices/${settledInvoice.invoice_id}/print`;
+                                try {
+                                    const json = await getInvoiceSignedPrintLink(settledInvoice.invoice_id);
+                                    if (json.print_url) {
+                                        openSameOriginUrl(json.print_url);
+                                        return;
+                                    }
+                                } catch {
+                                    // fall back to direct invoice print page
+                                }
+
+                                openSameOriginUrl(printUrl);
+                            }}>
+                                Print bill
+                            </Button>
+                        ) : (
+                            <Button type="button" loading={busy} disabled={!canSubmit} onClick={async () => {
+                                setBusy(true);
+                                setError(null);
+                                try {
+                                    const payment = await createVehicleServicePayment(jobId, payload());
+                                    setSettledInvoice(invoice ?? null);
+                                    setCreatedPayment(payment);
+                                    options.reload();
+                                    job.reload();
+                                } catch (requestError) {
+                                    setError(toApiError(requestError));
+                                } finally {
+                                    setBusy(false);
+                                }
+                            }}>
+                                Receive, post and allocate
+                            </Button>
+                        )}
                     </div>
                 </form>
 
@@ -297,6 +328,24 @@ export default function VehicleServicePaymentPreparePage() {
                             { label: 'Amount', value: prepared.lines[0]?.amount ?? amount },
                             { label: 'Invoice', value: invoice?.invoice_number ?? '-' },
                         ]} />
+                    </div>
+                )}
+
+                {createdPayment && settledInvoice && (
+                    <div className="mt-5 rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+                        <p className="text-sm font-semibold text-emerald-900">Payment created and allocated successfully</p>
+                        <p className="mt-1 text-sm text-emerald-800">
+                            {createdPayment.payment_number ?? 'Payment'} was posted for invoice {settledInvoice.invoice_number ?? settledInvoice.invoice_id}.
+                        </p>
+                        <div className="mt-4">
+                            <DetailGrid items={[
+                                { label: 'Payment', value: createdPayment.payment_number ?? '-' },
+                                { label: 'Document status', value: createdPayment.document_status ?? '-' },
+                                { label: 'Posting status', value: createdPayment.posting_status ?? '-' },
+                                { label: 'Allocation status', value: createdPayment.allocation_status ?? '-' },
+                                { label: 'Allocated amount', value: createdPayment.allocated_amount ?? amount },
+                            ]} />
+                        </div>
                     </div>
                 )}
             </Panel>
