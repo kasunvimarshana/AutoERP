@@ -1,15 +1,15 @@
 import { useState } from 'react';
-import { toApiError, type ApiError } from '@/shared/api/apiError';
+import { ApiError, hasFieldError, toApiError } from '@/shared/api/apiError';
 import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { useApi } from '@/shared/hooks/useApi';
 import {
     createVehicleServiceEmployee,
     deleteVehicleServiceEmployee,
+    getVehicleServiceJob,
     listEmployeeAssignableLines,
     updateVehicleServiceEmployee,
 } from '../vehicleServiceApi';
-import type { VehicleServiceEmployeeAssignment, VehicleServiceJobLine } from '../vehicleServiceTypes';
 import {
     assignmentFormToPayload,
     assignmentToForm,
@@ -20,6 +20,10 @@ import {
 } from './employee-assignment/assignmentForm';
 import { EmployeeAssignmentDialog } from './employee-assignment/EmployeeAssignmentDialog';
 import { EmployeeAssignmentTable } from './employee-assignment/EmployeeAssignmentTable';
+
+const STALE_VERSION_FIELD = 'expected_version';
+const STALE_VERSION_RECOVERY_MESSAGE = 'The service job changed while this request was open. Latest job and workforce data has been loaded. Review and try again.';
+const MISSING_JOB_VERSION_MESSAGE = 'The refreshed service job did not include its row version.';
 
 export default function VehicleServiceEmployeeAssignmentTab({
     jobId,
@@ -39,6 +43,39 @@ export default function VehicleServiceEmployeeAssignmentTab({
     const assignments = (result.data ?? []).flatMap((line) =>
         (line.employee_assignments ?? []).map((assignment) => ({ ...assignment, line })));
 
+    const synchronize = async () => {
+        const [lines, job] = await Promise.all([
+            listEmployeeAssignableLines(jobId),
+            getVehicleServiceJob(jobId),
+        ]);
+        if (typeof job.row_version !== 'number') {
+            throw new Error(MISSING_JOB_VERSION_MESSAGE);
+        }
+
+        result.setData(lines);
+        onChanged(job.row_version);
+    };
+
+    const handleMutationError = async (requestError: unknown) => {
+        const apiError = toApiError(requestError);
+        if (!hasFieldError(apiError, STALE_VERSION_FIELD)) {
+            setError(apiError);
+            return;
+        }
+
+        try {
+            await synchronize();
+            setError(new ApiError(
+                STALE_VERSION_RECOVERY_MESSAGE,
+                apiError.status,
+                apiError.code,
+                apiError.type,
+            ));
+        } catch (refreshError) {
+            setError(toApiError(refreshError));
+        }
+    };
+
     const saveAssignment = async (value: AssignmentFormValue) => {
         if (!dialog || value.lineId === null || !value.employee || saving) return;
         setSaving(true);
@@ -46,21 +83,19 @@ export default function VehicleServiceEmployeeAssignmentTab({
         try {
             const payload = { ...assignmentFormToPayload(value), expected_version: expectedVersion };
             if (dialog.mode === 'edit') {
-                const saved = await updateVehicleServiceEmployee(
+                await updateVehicleServiceEmployee(
                     jobId,
                     value.lineId,
                     dialog.assignmentId,
                     payload,
                 );
-                result.setData((current) => replaceAssignment(current ?? [], value.lineId!, saved));
             } else {
-                const saved = await createVehicleServiceEmployee(jobId, value.lineId, payload);
-                result.setData((current) => appendAssignment(current ?? [], value.lineId!, saved));
+                await createVehicleServiceEmployee(jobId, value.lineId, payload);
             }
             setDialog(null);
-            onChanged(expectedVersion + 1);
+            await synchronize();
         } catch (requestError) {
-            setError(toApiError(requestError));
+            await handleMutationError(requestError);
         } finally {
             setSaving(false);
         }
@@ -73,10 +108,9 @@ export default function VehicleServiceEmployeeAssignmentTab({
         try {
             await deleteVehicleServiceEmployee(jobId, row.line.id, row.id, expectedVersion);
             setRemoveTarget(null);
-            result.setData((current) => removeAssignmentFromLines(current ?? [], row.line.id, row.id));
-            onChanged(expectedVersion + 1);
+            await synchronize();
         } catch (requestError) {
-            setError(toApiError(requestError));
+            await handleMutationError(requestError);
         } finally {
             setRemoving(false);
         }
@@ -121,32 +155,4 @@ export default function VehicleServiceEmployeeAssignmentTab({
             />
         </div>
     );
-}
-
-function replaceAssignment(lines: VehicleServiceJobLine[], lineId: number, assignment: VehicleServiceEmployeeAssignment): VehicleServiceJobLine[] {
-    return lines.map((line) => line.id !== lineId
-        ? line
-        : {
-            ...line,
-            employee_assignments: (line.employee_assignments ?? []).map((current) =>
-                current.id === assignment.id ? assignment : current),
-        });
-}
-
-function appendAssignment(lines: VehicleServiceJobLine[], lineId: number, assignment: VehicleServiceEmployeeAssignment): VehicleServiceJobLine[] {
-    return lines.map((line) => line.id !== lineId
-        ? line
-        : {
-            ...line,
-            employee_assignments: [...(line.employee_assignments ?? []), assignment],
-        });
-}
-
-function removeAssignmentFromLines(lines: VehicleServiceJobLine[], lineId: number, assignmentId: number): VehicleServiceJobLine[] {
-    return lines.map((line) => line.id !== lineId
-        ? line
-        : {
-            ...line,
-            employee_assignments: (line.employee_assignments ?? []).filter((assignment) => assignment.id !== assignmentId),
-        });
 }
