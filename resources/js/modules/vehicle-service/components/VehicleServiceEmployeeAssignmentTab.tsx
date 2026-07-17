@@ -6,6 +6,7 @@ import { useApi } from '@/shared/hooks/useApi';
 import {
     createVehicleServiceEmployee,
     deleteVehicleServiceEmployee,
+    getVehicleServiceJob,
     listEmployeeAssignableLines,
     updateVehicleServiceEmployee,
 } from '../vehicleServiceApi';
@@ -22,6 +23,7 @@ import { EmployeeAssignmentTable } from './employee-assignment/EmployeeAssignmen
 
 const STALE_VERSION_FIELD = 'expected_version';
 const STALE_VERSION_RECOVERY_MESSAGE = 'The service job changed while this request was open. Latest job and workforce data has been loaded. Review and try again.';
+const MISSING_JOB_VERSION_MESSAGE = 'The refreshed service job did not include its row version.';
 
 export default function VehicleServiceEmployeeAssignmentTab({
     jobId,
@@ -30,7 +32,7 @@ export default function VehicleServiceEmployeeAssignmentTab({
 }: {
     jobId: number;
     expectedVersion: number;
-    onChanged: () => Promise<void>;
+    onChanged: (nextVersion: number) => void;
 }) {
     const result = useApi((signal) => listEmployeeAssignableLines(jobId, signal), [jobId]);
     const [dialog, setDialog] = useState<AssignmentDialogState | null>(null);
@@ -42,11 +44,16 @@ export default function VehicleServiceEmployeeAssignmentTab({
         (line.employee_assignments ?? []).map((assignment) => ({ ...assignment, line })));
 
     const synchronize = async () => {
-        const [lines] = await Promise.all([
+        const [lines, job] = await Promise.all([
             listEmployeeAssignableLines(jobId),
-            onChanged(),
+            getVehicleServiceJob(jobId),
         ]);
+        if (typeof job.row_version !== 'number') {
+            throw new Error(MISSING_JOB_VERSION_MESSAGE);
+        }
+
         result.setData(lines);
+        onChanged(job.row_version);
     };
 
     const handleMutationError = async (requestError: unknown) => {
