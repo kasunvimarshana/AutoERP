@@ -8,6 +8,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\VehicleRental\Enums\RentalAgreementStatus;
+use Modules\VehicleRental\Http\Resources\RentalAgreementResource;
 use Modules\VehicleRental\Models\RentalAgreement;
 use Modules\VehicleRental\Services\RentalAgreementService;
 use Tests\TestCase;
@@ -72,6 +73,11 @@ final class RentalAgreementOptionalTermsTest extends TestCase
         self::assertSame(RentalAgreementStatus::Active, $activated->status);
         self::assertSame([], $activated->metadata['document_snapshot']['terms'] ?? null);
         self::assertCount(0, $activated->terms);
+
+        $resource = (new RentalAgreementResource($activated))->resolve(request());
+        self::assertTrue(
+            data_get($resource, 'document_snapshot.rate_version.components.0.is_taxable'),
+        );
     }
 
     private function createCurrency(): int

@@ -1,10 +1,30 @@
 import { Button, LinkButton } from "@/shared/components/Button";
 import { formatDate } from "@/shared/utils/formatDate";
+import { humanize } from "@/shared/utils/object";
 import { rentalAgreementKindLabel } from "../rentalAgreementPresentation";
+import { rentalAgreementRateLabel } from "../rentalAgreementUi";
 import type { RentalAgreementDocumentSnapshot } from "../vehicleRentalTypes";
 
+type SnapshotRateVersion = NonNullable<
+    RentalAgreementDocumentSnapshot["rate_version"]
+>;
+type SnapshotRateComponent = SnapshotRateVersion["components"][number];
+
+export type RentalAgreementPrintableSnapshot = Omit<
+    RentalAgreementDocumentSnapshot,
+    "rate_version"
+> & {
+    rate_version?:
+        | (Omit<SnapshotRateVersion, "components"> & {
+              components: Array<
+                  SnapshotRateComponent & { is_taxable?: boolean }
+              >;
+          })
+        | null;
+};
+
 interface RentalAgreementPrintDocumentProps {
-    snapshot: RentalAgreementDocumentSnapshot;
+    snapshot: RentalAgreementPrintableSnapshot;
     backPath: string;
 }
 
@@ -75,7 +95,7 @@ export function RentalAgreementPrintDocument({
                         />
                         <DocumentField
                             label="Legal context"
-                            value={label(snapshot.legal_context)}
+                            value={humanize(snapshot.legal_context)}
                         />
                         <DocumentField
                             label="Agreement date"
@@ -87,23 +107,25 @@ export function RentalAgreementPrintDocument({
                         />
                         <DocumentField
                             label="Rental mode"
-                            value={label(
+                            value={humanize(
                                 snapshot.commercial_terms.rental_mode,
                             )}
                         />
                         <DocumentField
                             label="Billing"
-                            value={`${label(snapshot.commercial_terms.billing_cycle)} / ${label(snapshot.commercial_terms.billing_basis)}`}
+                            value={`${humanize(snapshot.commercial_terms.billing_cycle)} / ${humanize(snapshot.commercial_terms.billing_basis)}`}
                         />
                         <DocumentField
                             label="Proration"
-                            value={label(
+                            value={humanize(
                                 snapshot.commercial_terms.proration_rule,
                             )}
                         />
                         <DocumentField
                             label="Payment terms"
-                            value={`${snapshot.commercial_terms.payment_term_days ?? 0} days`}
+                            value={formatPaymentTerms(
+                                snapshot.commercial_terms.payment_term_days,
+                            )}
                         />
                         <DocumentField
                             label="Currency"
@@ -115,7 +137,9 @@ export function RentalAgreementPrintDocument({
                     </dl>
                     {snapshot.commercial_terms.remarks && (
                         <div className="mt-4 text-sm">
-                            <h3 className="font-semibold">Remarks</h3>
+                            <h3 className="font-semibold">
+                                Agreement remarks
+                            </h3>
                             <p className="mt-1 whitespace-pre-wrap">
                                 {snapshot.commercial_terms.remarks}
                             </p>
@@ -131,6 +155,7 @@ export function RentalAgreementPrintDocument({
                                 <tr className="border-b border-slate-300">
                                     <th className="py-2 pr-4">Component</th>
                                     <th className="py-2 pr-4">Unit</th>
+                                    <th className="py-2 pr-4">Tax</th>
                                     <th className="py-2 text-right">Rate</th>
                                 </tr>
                             </thead>
@@ -138,16 +163,20 @@ export function RentalAgreementPrintDocument({
                                 {snapshot.rate_version.components.map(
                                     (component) => (
                                         <tr
-                                            key={`${component.component_code}-${component.unit}`}
+                                            key={componentKey(component)}
                                             className="border-b border-slate-100"
                                         >
                                             <td className="py-2 pr-4">
-                                                {label(
+                                                {rentalAgreementRateLabel(
+                                                    snapshot.agreement_kind,
                                                     component.component_code,
                                                 )}
                                             </td>
                                             <td className="py-2 pr-4">
-                                                {label(component.unit)}
+                                                {humanize(component.unit)}
+                                            </td>
+                                            <td className="py-2 pr-4">
+                                                {formatTaxTreatment(component)}
                                             </td>
                                             <td className="py-2 text-right font-semibold">
                                                 {currency} {component.rate}
@@ -166,19 +195,26 @@ export function RentalAgreementPrintDocument({
 
                 <section className="py-6">
                     <h2 className="text-lg font-bold">Terms and conditions</h2>
-                    <ol className="mt-4 space-y-5">
-                        {snapshot.terms.map((term) => (
-                            <li key={term.sequence} className="text-sm">
-                                <h3 className="font-semibold">
-                                    {term.sequence}.{" "}
-                                    {term.title || `Clause ${term.sequence}`}
-                                </h3>
-                                <p className="mt-1 whitespace-pre-wrap leading-6">
-                                    {term.content}
-                                </p>
-                            </li>
-                        ))}
-                    </ol>
+                    {snapshot.terms.length ? (
+                        <ol className="mt-4 space-y-5">
+                            {snapshot.terms.map((term) => (
+                                <li key={term.sequence} className="text-sm">
+                                    <h3 className="font-semibold">
+                                        {term.sequence}.{" "}
+                                        {term.title ||
+                                            `Clause ${term.sequence}`}
+                                    </h3>
+                                    <p className="mt-1 whitespace-pre-wrap leading-6">
+                                        {term.content}
+                                    </p>
+                                </li>
+                            ))}
+                        </ol>
+                    ) : (
+                        <p className="mt-3 text-sm text-slate-600">
+                            No agreement-specific clauses were captured.
+                        </p>
+                    )}
                 </section>
 
                 <footer className="mt-8 border-t border-slate-300 pt-4 text-xs text-slate-500">
@@ -210,15 +246,34 @@ function DocumentParty({
     );
 }
 
-function DocumentField({ label: fieldLabel, value }: { label: string; value: string }) {
+function DocumentField({
+    label,
+    value,
+}: {
+    label: string;
+    value: string;
+}) {
     return (
         <div>
-            <dt className="text-slate-500">{fieldLabel}</dt>
+            <dt className="text-slate-500">{label}</dt>
             <dd className="font-semibold">{value}</dd>
         </div>
     );
 }
 
-function label(value: string): string {
-    return value.replaceAll("_", " ");
+function componentKey(component: SnapshotRateComponent): string {
+    return `${component.component_code}:${component.unit}`;
+}
+
+function formatTaxTreatment(
+    component: SnapshotRateComponent & { is_taxable?: boolean },
+): string {
+    if (component.is_taxable === undefined) return "Not captured";
+    return component.is_taxable ? "Taxable" : "Non-taxable";
+}
+
+function formatPaymentTerms(value?: number | null): string {
+    if (value === null || value === undefined) return "Not specified";
+    if (value === 0) return "Due immediately";
+    return `${value} days`;
 }
