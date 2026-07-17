@@ -7,7 +7,7 @@
         "dev": "vite",
         "lint": "eslint resources/js",
         "security:audit": "npm audit --audit-level=high",
-        "test": "vitest run --reporter=dot --silent",
+        "test": "vitest run --reporter=dot --silent=true",
         "typecheck": "tsc --noEmit"
     },
     "devDependencies": {
