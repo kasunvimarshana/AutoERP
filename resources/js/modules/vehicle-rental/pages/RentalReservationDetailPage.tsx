@@ -27,6 +27,7 @@ export default function RentalReservationDetailPage() {
         if (!result.data) return;
 
         setBusy(true);
+        setError(null);
         try {
             await transitionRentalReservation(id, result.data.row_version, status);
             navigate(0);
@@ -49,6 +50,8 @@ export default function RentalReservationDetailPage() {
             </RentalPage>
         );
     const row = result.data;
+    const canConfirm = row.status === "pending" && Boolean(row.requested_vehicle);
+
     return (
         <RentalPage>
             <ContentHeader
@@ -67,6 +70,7 @@ export default function RentalReservationDetailPage() {
                         {row.status === "pending" && (
                             <Button
                                 loading={busy}
+                                disabled={!canConfirm}
                                 onClick={() => void transition("confirmed")}
                             >
                                 Confirm
@@ -84,6 +88,15 @@ export default function RentalReservationDetailPage() {
                 }
             />
             <ErrorAlert error={error ?? result.error} />
+            {row.status === "pending" && !row.requested_vehicle && (
+                <div
+                    className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"
+                    role="status"
+                >
+                    Select a specific available vehicle before confirming this
+                    reservation.
+                </div>
+            )}
             <Panel>
                 <DetailGrid
                     items={[
