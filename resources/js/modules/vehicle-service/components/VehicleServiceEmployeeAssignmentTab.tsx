@@ -10,6 +10,7 @@ import {
     listEmployeeAssignableLines,
     updateVehicleServiceEmployee,
 } from '../vehicleServiceApi';
+import type { VehicleServiceJobLine } from '../vehicleServiceTypes';
 import {
     assignmentFormToPayload,
     assignmentToForm,
@@ -25,6 +26,11 @@ const STALE_VERSION_FIELD = 'expected_version';
 const STALE_VERSION_RECOVERY_MESSAGE = 'The service job changed while this request was open. Latest job and workforce data has been loaded. Review and try again.';
 const MISSING_JOB_VERSION_MESSAGE = 'The refreshed service job did not include its row version.';
 
+interface WorkforceSnapshot {
+    lines: VehicleServiceJobLine[];
+    rowVersion: number;
+}
+
 export default function VehicleServiceEmployeeAssignmentTab({
     jobId,
     expectedVersion,
@@ -34,7 +40,12 @@ export default function VehicleServiceEmployeeAssignmentTab({
     expectedVersion: number;
     onChanged: (nextVersion: number) => void;
 }) {
-    const result = useApi((signal) => listEmployeeAssignableLines(jobId, signal), [jobId]);
+    const result = useApi(async (signal) => {
+        const snapshot = await loadWorkforceSnapshot(jobId, signal);
+        onChanged(snapshot.rowVersion);
+
+        return snapshot.lines;
+    }, [jobId]);
     const [dialog, setDialog] = useState<AssignmentDialogState | null>(null);
     const [removeTarget, setRemoveTarget] = useState<AssignmentRow | null>(null);
     const [saving, setSaving] = useState(false);
@@ -44,16 +55,9 @@ export default function VehicleServiceEmployeeAssignmentTab({
         (line.employee_assignments ?? []).map((assignment) => ({ ...assignment, line })));
 
     const synchronize = async () => {
-        const [lines, job] = await Promise.all([
-            listEmployeeAssignableLines(jobId),
-            getVehicleServiceJob(jobId),
-        ]);
-        if (typeof job.row_version !== 'number') {
-            throw new Error(MISSING_JOB_VERSION_MESSAGE);
-        }
-
-        result.setData(lines);
-        onChanged(job.row_version);
+        const snapshot = await loadWorkforceSnapshot(jobId);
+        result.setData(snapshot.lines);
+        onChanged(snapshot.rowVersion);
     };
 
     const handleMutationError = async (requestError: unknown) => {
@@ -155,4 +159,16 @@ export default function VehicleServiceEmployeeAssignmentTab({
             />
         </div>
     );
+}
+
+async function loadWorkforceSnapshot(jobId: number, signal?: AbortSignal): Promise<WorkforceSnapshot> {
+    const [lines, job] = await Promise.all([
+        listEmployeeAssignableLines(jobId, signal),
+        getVehicleServiceJob(jobId, signal),
+    ]);
+    if (typeof job.row_version !== 'number') {
+        throw new Error(MISSING_JOB_VERSION_MESSAGE);
+    }
+
+    return { lines, rowVersion: job.row_version };
 }
