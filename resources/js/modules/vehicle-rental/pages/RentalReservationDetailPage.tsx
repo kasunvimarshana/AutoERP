@@ -72,12 +72,14 @@ export default function RentalReservationDetailPage() {
                                 Confirm
                             </Button>
                         )}
-                        <LinkButton
-                            variant="secondary"
-                            to={`/vehicle-rental/lessee-agreements/create?reservation_id=${row.id}`}
-                        >
-                            Create lessee agreement
-                        </LinkButton>
+                        {row.status === "confirmed" && (
+                            <LinkButton
+                                variant="secondary"
+                                to={`/vehicle-rental/lessee-agreements/create?reservation_id=${row.id}`}
+                            >
+                                Create lessee agreement
+                            </LinkButton>
+                        )}
                     </>
                 }
             />
