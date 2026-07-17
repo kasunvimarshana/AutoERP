@@ -46,6 +46,8 @@ use Modules\VehicleRental\Models\RentalUsageContext;
 
 final class RentalCalculationService
 {
+    private const DRAFT_TAXABLE_KEY = '_rental_is_taxable';
+
     public function __construct(
         private readonly DecimalMath $math,
         private readonly TaxCalculationService $taxes,
@@ -158,6 +160,7 @@ final class RentalCalculationService
             $this->sources->record($run, $contexts, $expenseAllocationIds, $userId);
 
             foreach ($drafts as $index => $line) {
+                unset($line[self::DRAFT_TAXABLE_KEY]);
                 $line['line_number'] = $index + 1;
                 $line['tenant_id'] = $agreement->tenant_id;
                 $line['organization_unit_id'] = $agreement->organization_unit_id;
@@ -553,6 +556,7 @@ final class RentalCalculationService
                     'expense_allocation_version' => (int) $allocation->row_version,
                     'allocation_type' => $allocationType->value,
                 ],
+                self::DRAFT_TAXABLE_KEY => true,
             ];
         }
 
@@ -629,6 +633,7 @@ final class RentalCalculationService
             'unit' => $component->unit->value,
             'rate' => (string) $component->rate,
             'multiplier' => (string) $component->multiplier,
+            'is_taxable' => (bool) $component->is_taxable,
             'quantity_strategy' => $this->quantityStrategyFor($component),
             'billing_basis' => $rate->billing_basis->value,
             'proration_rule' => $rate->proration_rule->value,
@@ -662,6 +667,7 @@ final class RentalCalculationService
             'total_amount' => $amount,
             'applied_rule' => $component->component_code->value,
             'rule_snapshot' => $ruleSnapshot,
+            self::DRAFT_TAXABLE_KEY => (bool) $component->is_taxable,
         ];
     }
 
@@ -1076,7 +1082,8 @@ final class RentalCalculationService
         $positiveIndexes = [];
         $taxLines = [];
         foreach ($lines as $index => $line) {
-            if ($this->math->compare((string) $line['net_amount'], '0') <= 0) {
+            if (! (bool) ($line[self::DRAFT_TAXABLE_KEY] ?? true)
+                || $this->math->compare((string) $line['net_amount'], '0') <= 0) {
                 continue;
             }
             $positiveIndexes[] = $index;
