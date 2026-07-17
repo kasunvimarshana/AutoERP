@@ -23,20 +23,28 @@ final class RentalRateComponentCatalogTest extends TestCase
             RentalRateUnit::Month->value,
             $byCode->get(RentalRateComponentCode::BaseRental->value)['unit'],
         );
+        self::assertContains(
+            RentalRateUnit::Day->value,
+            $byCode->get(RentalRateComponentCode::BaseRental->value)['supported_units'],
+        );
+        self::assertContains(
+            RentalRateUnit::Week->value,
+            $byCode->get(RentalRateComponentCode::BaseRental->value)['supported_units'],
+        );
         self::assertTrue(
             $byCode->get(RentalRateComponentCode::BaseRental->value)['required'],
         );
         self::assertSame(
-            RentalRateUnit::Kilometre->value,
-            $byCode->get(RentalRateComponentCode::ExcessKm->value)['unit'],
+            [RentalRateUnit::Kilometre->value],
+            $byCode->get(RentalRateComponentCode::ExcessKm->value)['supported_units'],
         );
         self::assertSame(
-            RentalRateUnit::Hour->value,
-            $byCode->get(RentalRateComponentCode::NormalOvertime->value)['unit'],
+            [RentalRateUnit::Hour->value, RentalRateUnit::Minute->value],
+            $byCode->get(RentalRateComponentCode::NormalOvertime->value)['supported_units'],
         );
         self::assertSame(
-            RentalRateUnit::Fixed->value,
-            $byCode->get(RentalRateComponentCode::Repair->value)['unit'],
+            [RentalRateUnit::Fixed->value],
+            $byCode->get(RentalRateComponentCode::Repair->value)['supported_units'],
         );
     }
 }
