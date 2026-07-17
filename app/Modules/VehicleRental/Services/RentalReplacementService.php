@@ -17,6 +17,8 @@ use Modules\VehicleRental\Models\RentalVehicleReplacement;
 
 final class RentalReplacementService
 {
+    private const PRESERVE_AGREEMENT_BILLING_PERIOD = 'continue_period';
+
     public function __construct(
         private readonly RentalNumberService $numbers,
         private readonly RentalAllocationService $allocations,
@@ -55,8 +57,10 @@ final class RentalReplacementService
                 'replacement_at' => $data['replacement_at'],
                 'reason_code' => $data['reason_code'] ?? null,
                 'reason' => $data['reason'] ?? null,
-                'billing_continuity_rule' => $data['billing_continuity_rule'] ?? 'continue_period',
-                'status' => RentalReplacementStatus::Draft->value,
+                'billing_continuity_rule' => self::PRESERVE_AGREEMENT_BILLING_PERIOD,
+                'status' => RentalReplacementStatus::Completed->value,
+                'completed_by' => $userId,
+                'completed_at' => now(),
                 'created_by' => $userId,
                 'updated_by' => $userId,
             ]);
@@ -112,12 +116,12 @@ final class RentalReplacementService
                 $userId,
             );
 
-            $replacement->status = RentalReplacementStatus::Completed;
-            $replacement->completed_by = $userId;
-            $replacement->completed_at = now();
-            $replacement->updated_by = $userId;
-            $replacement->save();
-            $this->history->record($replacement, RentalReplacementStatus::Draft->value, RentalReplacementStatus::Completed->value, $userId);
+            $this->history->record(
+                $replacement,
+                null,
+                RentalReplacementStatus::Completed->value,
+                $userId,
+            );
 
             return $replacement->refresh()->load([
                 'agreement.customer', 'oldAllocation.vehicle', 'newAllocation.vehicle',
