@@ -22,9 +22,15 @@ final class VehicleFinanceAgreement extends TenantOwnedModel
     use ScopesRentalContext;
     use SoftDeletes;
 
+    private const INITIAL_ROW_VERSION = 1;
+
     protected $table = 'vehicle_finance_agreements';
 
     protected $guarded = ['id'];
+
+    protected $attributes = [
+        'row_version' => self::INITIAL_ROW_VERSION,
+    ];
 
     protected function casts(): array
     {
