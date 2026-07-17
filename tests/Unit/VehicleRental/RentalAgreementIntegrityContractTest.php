@@ -55,6 +55,7 @@ final class RentalAgreementIntegrityContractTest extends TestCase
         self::assertStringContainsString('RentalAgreementKind::CustomerRental->value', $depositMigration);
         self::assertStringContainsString('rental_deposit_requirements_customer_id_tenant_fk', $depositMigration);
         self::assertStringContainsString('rental_deposit_req_agreement_kind_customer_fk', $depositMigration);
+        self::assertStringContainsString('cascadeOnUpdate()', $depositMigration);
         self::assertStringNotContainsString('Asia/Colombo', $migration.$service.$configuration);
         self::assertStringContainsString("'vehicle_rental.billing_timezone'", $service);
         self::assertStringContainsString('VEHICLE_RENTAL_BILLING_TIMEZONE', $configuration);
@@ -69,7 +70,7 @@ final class RentalAgreementIntegrityContractTest extends TestCase
 
         self::assertStringContainsString('assertExpectedVersion', $service);
         self::assertStringContainsString('active immutable rate version', $service);
-        self::assertStringContainsString('$version->row_version = $expectedVersion + 1;', $service);
+        self::assertStringContainsString("'row_version' => (int) \$version->row_version + 1", $service);
         self::assertStringContainsString('$this->bumpAgreementVersion($agreement, $userId);', $service);
         self::assertStringContainsString('Duplicate rate component for the same vehicle category is not allowed.', $service);
         self::assertStringContainsString("return \$version->refresh()->load('components');", $service);
