@@ -5,8 +5,26 @@ import { rentalAgreementKindLabel } from "../rentalAgreementPresentation";
 import { rentalAgreementRateLabel } from "../rentalAgreementUi";
 import type { RentalAgreementDocumentSnapshot } from "../vehicleRentalTypes";
 
+type SnapshotRateVersion = NonNullable<
+    RentalAgreementDocumentSnapshot["rate_version"]
+>;
+type SnapshotRateComponent = SnapshotRateVersion["components"][number];
+
+export type RentalAgreementPrintableSnapshot = Omit<
+    RentalAgreementDocumentSnapshot,
+    "rate_version"
+> & {
+    rate_version?:
+        | (Omit<SnapshotRateVersion, "components"> & {
+              components: Array<
+                  SnapshotRateComponent & { is_taxable?: boolean }
+              >;
+          })
+        | null;
+};
+
 interface RentalAgreementPrintDocumentProps {
-    snapshot: RentalAgreementDocumentSnapshot;
+    snapshot: RentalAgreementPrintableSnapshot;
     backPath: string;
 }
 
@@ -243,22 +261,15 @@ function DocumentField({
     );
 }
 
-function componentKey(component: {
-    component_code: string;
-    unit: string;
-}): string {
+function componentKey(component: SnapshotRateComponent): string {
     return `${component.component_code}:${component.unit}`;
 }
 
-function formatTaxTreatment(component: {
-    component_code: string;
-    unit: string;
-}): string {
-    const value = (
-        component as typeof component & { is_taxable?: boolean }
-    ).is_taxable;
-    if (value === undefined) return "Not captured";
-    return value ? "Taxable" : "Non-taxable";
+function formatTaxTreatment(
+    component: SnapshotRateComponent & { is_taxable?: boolean },
+): string {
+    if (component.is_taxable === undefined) return "Not captured";
+    return component.is_taxable ? "Taxable" : "Non-taxable";
 }
 
 function formatPaymentTerms(value?: number | null): string {
