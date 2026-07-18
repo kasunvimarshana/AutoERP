@@ -72,16 +72,6 @@ return new class extends Migration
         'customer_deposit',
     ];
 
-    /** @var list<string> */
-    private const FINANCE_ACCOUNT_CODES = ['2310', '4300', '5300'];
-
-    /** @var list<string> */
-    private const FINANCE_CATEGORY_CODES = [
-        'CUSTOMER_DEPOSIT',
-        'RENTAL_REVENUE',
-        'RENTAL_EXPENSE',
-    ];
-
     public function up(): void
     {
         $this->assertModuleDataIsEmpty();
@@ -163,9 +153,6 @@ return new class extends Migration
         $roleIds = Schema::hasTable('finance_account_roles')
             ? DB::table('finance_account_roles')->whereIn('code', self::FINANCE_ROLE_CODES)->pluck('id')->all()
             : [];
-        $accountIds = Schema::hasTable('finance_accounts')
-            ? DB::table('finance_accounts')->whereIn('code', self::FINANCE_ACCOUNT_CODES)->pluck('id')->all()
-            : [];
 
         if ($profileIds !== []
             && Schema::hasTable('finance_journal_entries')
@@ -180,23 +167,6 @@ return new class extends Migration
                 ->exists();
             if ($customRule) {
                 $this->blocked('finance_posting_profile_rules.account_role_id');
-            }
-        }
-
-        if ($accountIds !== []) {
-            foreach ([
-                ['finance_journal_lines', 'account_id'],
-                ['finance_ledger_entries', 'account_id'],
-                ['finance_account_balances', 'account_id'],
-                ['finance_bank_accounts', 'account_id'],
-                ['finance_budget_lines', 'account_id'],
-                ['tax_transactions', 'account_id'],
-            ] as [$table, $column]) {
-                if (Schema::hasTable($table)
-                    && Schema::hasColumn($table, $column)
-                    && DB::table($table)->whereIn($column, $accountIds)->exists()) {
-                    $this->blocked("{$table}.{$column}");
-                }
             }
         }
 
@@ -215,19 +185,8 @@ return new class extends Migration
                 ->delete();
         }
 
-        if (($roleIds !== [] || $accountIds !== []) && Schema::hasTable('finance_account_assignments')) {
-            DB::table('finance_account_assignments')
-                ->where(function ($query) use ($roleIds, $accountIds): void {
-                    if ($roleIds !== []) {
-                        $query->whereIn('account_role_id', $roleIds);
-                    }
-                    if ($accountIds !== []) {
-                        $roleIds === []
-                            ? $query->whereIn('account_id', $accountIds)
-                            : $query->orWhereIn('account_id', $accountIds);
-                    }
-                })
-                ->delete();
+        if ($roleIds !== [] && Schema::hasTable('finance_account_assignments')) {
+            DB::table('finance_account_assignments')->whereIn('account_role_id', $roleIds)->delete();
         }
 
         if ($profileIds !== []) {
@@ -235,12 +194,6 @@ return new class extends Migration
         }
         if ($roleIds !== [] && Schema::hasTable('finance_account_roles')) {
             DB::table('finance_account_roles')->whereIn('id', $roleIds)->delete();
-        }
-        if ($accountIds !== [] && Schema::hasTable('finance_accounts')) {
-            DB::table('finance_accounts')->whereIn('id', $accountIds)->delete();
-        }
-        if (Schema::hasTable('finance_account_categories')) {
-            DB::table('finance_account_categories')->whereIn('code', self::FINANCE_CATEGORY_CODES)->delete();
         }
     }
 
@@ -262,4 +215,4 @@ return new class extends Migration
             "Vehicle Rental cannot be removed while external financial history references [{$source}]. Archive or migrate those records before deploying this release.",
         );
     }
-}
+};
