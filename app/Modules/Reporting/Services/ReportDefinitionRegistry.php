@@ -13,7 +13,6 @@ final class ReportDefinitionRegistry
         private readonly ReportCatalog $catalog,
         private readonly DetailedPurchaseReportService $detailedPurchase,
         private readonly DetailedVehicleServiceReportService $detailedVehicleService,
-        private readonly VehicleRentalReportDefinitionService $vehicleRental,
     ) {}
 
     /**
@@ -51,12 +50,9 @@ final class ReportDefinitionRegistry
      */
     private function specializedDefinitions(): array
     {
-        return array_merge(
-            [
-                $this->detailedPurchase->definition(),
-                $this->detailedVehicleService->definition(),
-            ],
-            $this->vehicleRental->definitions(),
-        );
+        return [
+            $this->detailedPurchase->definition(),
+            $this->detailedVehicleService->definition(),
+        ];
     }
 }
