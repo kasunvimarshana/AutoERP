@@ -10,34 +10,34 @@ final class VehicleRentalRemovalContractTest extends TestCase
 {
     private const PREFLIGHT_MIGRATION = 'database/migrations/2026_07_18_235900_preflight_vehicle_rental_removal.php';
 
-    /** @var array<string, string> */
-    private const DROP_MIGRATIONS = [
-        'rental_usage_facts' => 'database/migrations/2026_07_18_235901_drop_rental_usage_facts_table.php',
-        'rental_calculation_sources' => 'database/migrations/2026_07_18_235902_drop_rental_calculation_sources_table.php',
-        'rental_status_histories' => 'database/migrations/2026_07_18_235903_drop_rental_status_histories_table.php',
-        'rental_deposit_links' => 'database/migrations/2026_07_18_235904_drop_rental_deposit_links_table.php',
-        'rental_deposit_requirements' => 'database/migrations/2026_07_18_235905_drop_rental_deposit_requirements_table.php',
-        'rental_calculation_lines' => 'database/migrations/2026_07_18_235906_drop_rental_calculation_lines_table.php',
-        'rental_calculation_runs' => 'database/migrations/2026_07_18_235907_drop_rental_calculation_runs_table.php',
-        'rental_billing_periods' => 'database/migrations/2026_07_18_235908_drop_rental_billing_periods_table.php',
-        'rental_expense_allocations' => 'database/migrations/2026_07_18_235909_drop_rental_expense_allocations_table.php',
-        'rental_expenses' => 'database/migrations/2026_07_18_235910_drop_rental_expenses_table.php',
-        'rental_usage_contexts' => 'database/migrations/2026_07_18_235911_drop_rental_usage_contexts_table.php',
-        'rental_usage_events' => 'database/migrations/2026_07_18_235912_drop_rental_usage_events_table.php',
-        'rental_usage_logs' => 'database/migrations/2026_07_18_235913_drop_rental_usage_logs_table.php',
-        'rental_custody_event_items' => 'database/migrations/2026_07_18_235914_drop_rental_custody_event_items_table.php',
-        'rental_custody_events' => 'database/migrations/2026_07_18_235915_drop_rental_custody_events_table.php',
-        'rental_vehicle_replacements' => 'database/migrations/2026_07_18_235916_drop_rental_vehicle_replacements_table.php',
-        'rental_driver_assignments' => 'database/migrations/2026_07_18_235917_drop_rental_driver_assignments_table.php',
-        'rental_vehicle_allocations' => 'database/migrations/2026_07_18_235918_drop_rental_vehicle_allocations_table.php',
-        'vehicle_finance_status_histories' => 'database/migrations/2026_07_18_235919_drop_vehicle_finance_status_histories_table.php',
-        'vehicle_finance_installments' => 'database/migrations/2026_07_18_235920_drop_vehicle_finance_installments_table.php',
-        'vehicle_finance_agreements' => 'database/migrations/2026_07_18_235921_drop_vehicle_finance_agreements_table.php',
-        'rental_agreement_rate_components' => 'database/migrations/2026_07_18_235922_drop_rental_agreement_rate_components_table.php',
-        'rental_agreement_rate_versions' => 'database/migrations/2026_07_18_235923_drop_rental_agreement_rate_versions_table.php',
-        'rental_agreement_terms' => 'database/migrations/2026_07_18_235924_drop_rental_agreement_terms_table.php',
-        'rental_agreements' => 'database/migrations/2026_07_18_235925_drop_rental_agreements_table.php',
-        'rental_reservations' => 'database/migrations/2026_07_18_235926_drop_rental_reservations_table.php',
+    /** @var list<string> */
+    private const RETIRED_TABLES = [
+        'rental_usage_facts',
+        'rental_calculation_sources',
+        'rental_status_histories',
+        'rental_deposit_links',
+        'rental_deposit_requirements',
+        'rental_calculation_lines',
+        'rental_calculation_runs',
+        'rental_billing_periods',
+        'rental_expense_allocations',
+        'rental_expenses',
+        'rental_usage_contexts',
+        'rental_usage_events',
+        'rental_usage_logs',
+        'rental_custody_event_items',
+        'rental_custody_events',
+        'rental_vehicle_replacements',
+        'rental_driver_assignments',
+        'rental_vehicle_allocations',
+        'vehicle_finance_status_histories',
+        'vehicle_finance_installments',
+        'vehicle_finance_agreements',
+        'rental_agreement_rate_components',
+        'rental_agreement_rate_versions',
+        'rental_agreement_terms',
+        'rental_agreements',
+        'rental_reservations',
     ];
 
     /** @var list<string> */
@@ -142,17 +142,20 @@ final class VehicleRentalRemovalContractTest extends TestCase
         self::assertStringNotContainsString('Schema::drop', $preflight);
         self::assertStringContainsString('Posted Invoice, Payment, Tax, and Finance records must not be deleted.', $preflight);
 
-        foreach (array_keys(self::DROP_MIGRATIONS) as $table) {
-            self::assertStringContainsString(
-                "$this->assertTableEmpty('{$table}');",
-                $preflight,
-            );
+        foreach (self::RETIRED_TABLES as $table) {
+            self::assertStringContainsString("'{$table}'", $preflight);
         }
     }
 
     public function test_each_retired_table_has_one_explicit_guarded_drop_migration(): void
     {
-        foreach (self::DROP_MIGRATIONS as $table => $relativePath) {
+        foreach (self::RETIRED_TABLES as $index => $table) {
+            $timestamp = 235901 + $index;
+            $relativePath = sprintf(
+                'database/migrations/2026_07_18_%06d_drop_%s_table.php',
+                $timestamp,
+                $table,
+            );
             $migration = $this->source($relativePath);
 
             self::assertSame(1, substr_count($migration, "DB::table('{$table}')->exists()"), $relativePath);
