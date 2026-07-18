@@ -12,7 +12,7 @@ final class SupplierBlockerService
 {
     public function delete(Supplier $supplier): void
     {
-        foreach (['purchase_orders', 'goods_receipt_notes', 'purchase_returns', 'purchase_debit_notes', 'supplier_tax_profiles', 'rental_agreements', 'vehicle_finance_agreements', 'rental_expenses', 'rental_usage_contexts', 'rental_expense_allocations'] as $table) {
+        foreach (['purchase_orders', 'goods_receipt_notes', 'purchase_returns', 'purchase_debit_notes', 'supplier_tax_profiles'] as $table) {
             if ($this->referenced($table, 'supplier_id', (int) $supplier->getKey(), (int) $supplier->tenant_id)) {
                 throw new ConflictHttpException('Supplier is referenced by business history and cannot be deleted. Deactivate the supplier instead.');
             }
@@ -35,17 +35,17 @@ final class SupplierBlockerService
     private function referenced(string $table, string $column, int $id, int $tenantId): bool
     {
         return DB::table($table)
-                ->where('tenant_id', $tenantId)
-                ->where($column, $id)
-                ->exists();
+            ->where('tenant_id', $tenantId)
+            ->where($column, $id)
+            ->exists();
     }
 
     private function partyReferenced(string $table, int $id, string $type, int $tenantId): bool
     {
         return DB::table($table)
-                ->where('tenant_id', $tenantId)
-                ->where('party_id', $id)
-                ->whereIn('party_type', [$type, Supplier::class])
-                ->exists();
+            ->where('tenant_id', $tenantId)
+            ->where('party_id', $id)
+            ->whereIn('party_type', [$type, Supplier::class])
+            ->exists();
     }
 }
