@@ -12,6 +12,7 @@ import { MoneyDisplay } from '@/shared/components/MoneyDisplay';
 import { Pagination } from '@/shared/components/Pagination';
 import { Select } from '@/shared/components/Select';
 import { useApi } from '@/shared/hooks/useApi';
+import { notifySuccess } from '@/shared/notifications/appToast';
 import { useDebounce } from '@/shared/hooks/useDebounce';
 import { formatDate } from '@/shared/utils/formatDate';
 import { readableRelation } from '@/shared/utils/object';
@@ -72,7 +73,14 @@ export default function VehicleServiceJobListPage() {
                     </div>
                 )}
             />
-            {canViewCommissions && showCommissionDefaults && <VehicleServiceCommissionSettingsPanel />}
+            {canViewCommissions && showCommissionDefaults && (
+                <VehicleServiceCommissionSettingsPanel
+                    onSaved={() => {
+                        notifySuccess('Commission defaults updated for new vehicle service jobs.', 'Commission defaults saved');
+                        setShowCommissionDefaults(false);
+                    }}
+                />
+            )}
             <div className="mb-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <Input label="Search" type="search" placeholder="Job, customer, or vehicle" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} />
                 <Select label="Status" value={status} options={statuses} onChange={(event) => { setStatus(event.target.value); setPage(1); }} />

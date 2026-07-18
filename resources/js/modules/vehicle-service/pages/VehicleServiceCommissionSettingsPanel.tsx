@@ -20,7 +20,9 @@ import { vehicleServicePermissions } from '../vehicleServicePermissions';
 
 const ZERO_AMOUNT = '0.000000';
 
-export default function VehicleServiceCommissionSettingsPanel() {
+export default function VehicleServiceCommissionSettingsPanel({ onSaved }: {
+    onSaved?: (policy: VehicleServiceSupervisorCommissionPolicy) => void;
+}) {
     const auth = useAuth();
     const canManage = hasPermission(auth, vehicleServicePermissions.commissionsManage);
     const policy = useApi((signal) => getSupervisorCommissionDefault(signal), []);
@@ -39,7 +41,10 @@ export default function VehicleServiceCommissionSettingsPanel() {
                 key={policy.data?.row_version ?? 'new'}
                 policy={policy.data ?? null}
                 canManage={canManage}
-                onSaved={policy.setData}
+                onSaved={(savedPolicy) => {
+                    policy.setData(savedPolicy);
+                    onSaved?.(savedPolicy);
+                }}
             />
         </div>
     );
