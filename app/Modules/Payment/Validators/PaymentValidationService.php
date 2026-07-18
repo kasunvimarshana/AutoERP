@@ -43,6 +43,15 @@ final class PaymentValidationService
             throw new InvalidArgumentException('Payment date is required.');
         }
 
+        if (
+            $data->paymentType === PaymentType::RentalReceipt
+            || $data->sourceType === PaymentSourceType::RentalDepositRequirement->value
+        ) {
+            throw new InvalidArgumentException(
+                'Vehicle Rental payments can no longer be created because the Vehicle Rental module has been removed.',
+            );
+        }
+
         $this->validateTypeDirectionParty($data);
         $this->validateSemanticPostingContract($data);
         $this->validateCurrency($data->currencyId, $data->exchangeRate);
