@@ -9,7 +9,7 @@ export interface DataColumn<T> {
     mobile?: boolean;
 }
 
-export function DataTable<T>({ rows, columns, rowKey, emptyMessage = 'No records found.', mobileSummary, mobileDetails, mobileActions, rowBadge, rowHref }: {
+export function DataTable<T>({ rows, columns, rowKey, emptyMessage = 'No records found.', mobileSummary, mobileDetails, mobileActions, rowBadge, rowHref, rowClassName }: {
     rows: T[];
     columns: DataColumn<T>[];
     rowKey: (row: T, index: number) => string | number;
@@ -19,6 +19,7 @@ export function DataTable<T>({ rows, columns, rowKey, emptyMessage = 'No records
     mobileActions?: (row: T) => ReactNode;
     rowBadge?: (row: T) => ReactNode;
     rowHref?: (row: T) => string;
+    rowClassName?: (row: T) => string | undefined;
 }) {
     const navigate = useNavigate();
     const openRow = (event: MouseEvent | KeyboardEvent, row: T) => {
@@ -45,7 +46,7 @@ export function DataTable<T>({ rows, columns, rowKey, emptyMessage = 'No records
                 {rows.map((row, index) => (
                     <article
                         key={rowKey(row, index)}
-                        className={`rounded-xl border border-slate-200 bg-white p-4 shadow-sm ${rowHref ? 'cursor-pointer focus:outline-none focus:ring-2 focus:ring-sky-500' : ''}`}
+                        className={`rounded-xl border border-slate-200 bg-white p-4 shadow-sm ${rowClassName?.(row) ?? ''} ${rowHref ? 'cursor-pointer focus:outline-none focus:ring-2 focus:ring-sky-500' : ''}`}
                         tabIndex={rowHref ? 0 : undefined}
                         role={rowHref ? 'link' : undefined}
                         onClick={(event) => openRow(event, row)}
@@ -76,7 +77,7 @@ export function DataTable<T>({ rows, columns, rowKey, emptyMessage = 'No records
                         {rows.map((row, index) => (
                             <tr
                                 key={rowKey(row, index)}
-                                className={`transition-colors hover:bg-blue-50/40 ${rowHref ? 'cursor-pointer focus:outline-none focus:ring-2 focus:ring-inset focus:ring-sky-500' : ''}`}
+                                className={`transition-colors hover:bg-blue-50/40 ${rowClassName?.(row) ?? ''} ${rowHref ? 'cursor-pointer focus:outline-none focus:ring-2 focus:ring-inset focus:ring-sky-500' : ''}`}
                                 tabIndex={rowHref ? 0 : undefined}
                                 onClick={(event) => openRow(event, row)}
                                 onKeyDown={(event) => openRow(event, row)}

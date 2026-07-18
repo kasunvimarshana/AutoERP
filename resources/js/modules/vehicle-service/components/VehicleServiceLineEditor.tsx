@@ -26,6 +26,16 @@ import { SummaryValue } from './line-editor/LineSummary';
 import { VehicleServiceLineForm } from './line-editor/VehicleServiceLineForm';
 
 const TOAST_DURATION_MS = 2500;
+const CHILD_LINE_INDENT_CLASS = 'pl-7 md:pl-9';
+
+interface VehicleServiceLineDisplayRow {
+    line: VehicleServiceJobLine;
+    depth: number;
+    parent: VehicleServiceJobLine | null;
+    isComboParent: boolean;
+    isComboChild: boolean;
+    childCount: number;
+}
 
 export default function VehicleServiceLineEditor({
     jobId,
@@ -166,18 +176,19 @@ function VehicleServiceLineTable({ lines, loading, onAdd, onEdit, onRemove }: {
     onEdit: (line: VehicleServiceJobLine) => void;
     onRemove: (line: VehicleServiceJobLine) => void;
 }) {
-    const columns: DataColumn<VehicleServiceJobLine>[] = [
-        { key: 'item', header: 'Item', render: formatLineItem },
-        { key: 'quantity', header: 'Qty', render: (line) => line.quantity, className: 'tabular-nums' },
-        { key: 'uom', header: 'UOM', render: (line) => line.uom?.code ?? '-' },
-        { key: 'price', header: 'Unit price', render: (line) => line.unit_price, className: 'tabular-nums' },
-        { key: 'total', header: 'Total', render: (line) => line.line_total, className: 'tabular-nums font-semibold' },
+    const rows = buildVehicleServiceLineDisplayRows(lines);
+    const columns: DataColumn<VehicleServiceLineDisplayRow>[] = [
+        { key: 'item', header: 'Item', render: renderLineItemCell },
+        { key: 'quantity', header: 'Qty', render: (row) => renderLineMetric(row, row.line.quantity), className: 'tabular-nums' },
+        { key: 'uom', header: 'UOM', render: (row) => renderLineMetric(row, row.line.uom?.code ?? '-') },
+        { key: 'price', header: 'Unit price', render: renderLineUnitPrice, className: 'tabular-nums' },
+        { key: 'total', header: 'Total', render: renderLineTotal, className: 'tabular-nums font-semibold' },
         {
             key: 'actions',
             header: 'Actions',
             className: 'text-right',
-            render: (line) => (
-                <LineActions onEdit={() => onEdit(line)} onRemove={() => onRemove(line)} />
+            render: (row) => row.isComboChild ? null : (
+                <LineActions line={row} onEdit={() => onEdit(row.line)} onRemove={() => onRemove(row.line)} />
             ),
         },
     ];
@@ -191,44 +202,68 @@ function VehicleServiceLineTable({ lines, loading, onAdd, onEdit, onRemove }: {
                 ? <LoadingState />
                 : (
                     <DataTable
-                        rows={lines}
+                        rows={rows}
                         columns={columns}
-                        rowKey={(line) => line.id}
+                        rowKey={(row) => row.line.id}
                         emptyMessage="No lines added yet. Click Add line to start."
-                        mobileSummary={formatLineItem}
-                        mobileDetails={(line) => <LineMobileDetails line={line} />}
-                        mobileActions={(line) => (
+                        mobileSummary={(row) => renderMobileSummary(row)}
+                        mobileDetails={(row) => <LineMobileDetails row={row} />}
+                        mobileActions={(row) => row.isComboChild ? null : (
                             <LineActions
-                                onEdit={() => onEdit(line)}
-                                onRemove={() => onRemove(line)}
+                                line={row}
+                                onEdit={() => onEdit(row.line)}
+                                onRemove={() => onRemove(row.line)}
                             />
                         )}
+                        rowClassName={lineRowClassName}
                     />
                 )}
         </div>
     );
 }
 
-function LineActions({ onEdit, onRemove }: { onEdit: () => void; onRemove: () => void }) {
+function LineActions({ line, onEdit, onRemove }: { line: VehicleServiceLineDisplayRow; onEdit: () => void; onRemove: () => void }) {
     return (
-        <div className="flex justify-end gap-3">
-            <button type="button" className="font-semibold text-sky-700" onClick={onEdit}>
-                Edit line
+        <div className="flex justify-end gap-2">
+            <button
+                type="button"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-sky-700 transition hover:border-sky-200 hover:bg-sky-50"
+                onClick={onEdit}
+                aria-label="Edit line"
+                title="Edit line"
+            >
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.9" className="h-5 w-5" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.75v2.5h2.5L14.5 8l-2.5-2.5-8.25 8.25Z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="m10.75 4.75 2.5 2.5" />
+                </svg>
             </button>
-            <button type="button" className="font-semibold text-rose-600" onClick={onRemove}>
-                Remove line
+            <button
+                type="button"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-rose-600 transition hover:border-rose-200 hover:bg-rose-50"
+                onClick={onRemove}
+                aria-label="Remove line"
+                title="Remove line"
+            >
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.9" className="h-5 w-5" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5.75 7.25h8.5" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M8 7.25V5.75a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1.5" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M7 7.25v6a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-6" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.75 9.25v3" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 9.25v3" />
+                </svg>
             </button>
         </div>
     );
 }
 
-function LineMobileDetails({ line }: { line: VehicleServiceJobLine }) {
+function LineMobileDetails({ row }: { row: VehicleServiceLineDisplayRow }) {
+    const { line } = row;
     return (
-        <div className="grid grid-cols-2 gap-2">
+        <div className={`grid grid-cols-2 gap-2 ${row.isComboChild ? CHILD_LINE_INDENT_CLASS : ''}`}>
             <SummaryValue label="Qty" value={line.quantity} />
             <SummaryValue label="UOM" value={line.uom?.code ?? '-'} />
-            <SummaryValue label="Price" value={line.unit_price} />
-            <SummaryValue label="Total" value={line.line_total} />
+            <SummaryValue label="Price" value={row.isComboChild && !line.is_billable ? 'Included in pack' : line.unit_price} />
+            <SummaryValue label="Total" value={row.isComboChild && !line.is_billable ? line.line_total : line.line_total} />
         </div>
     );
 }
@@ -241,4 +276,130 @@ function ToastNotice({ message }: { message: string }) {
             {message}
         </div>
     );
+}
+
+function buildVehicleServiceLineDisplayRows(lines: VehicleServiceJobLine[]): VehicleServiceLineDisplayRow[] {
+    const byId = new Map(lines.map((line) => [line.id, line]));
+    const childCountByParentId = new Map<number, number>();
+
+    lines.forEach((line) => {
+        if (typeof line.parent_line_id === 'number') {
+            childCountByParentId.set(line.parent_line_id, (childCountByParentId.get(line.parent_line_id) ?? 0) + 1);
+        }
+    });
+
+    return lines.map((line) => {
+        const parent = typeof line.parent_line_id === 'number' ? (byId.get(line.parent_line_id) ?? null) : null;
+        const depth = parent ? (typeof parent.parent_line_id === 'number' ? 2 : 1) : 0;
+
+        return {
+            line,
+            depth,
+            parent,
+            isComboParent: line.line_source_type === 'combo_parent',
+            isComboChild: line.line_source_type === 'combo_child',
+            childCount: childCountByParentId.get(line.id) ?? 0,
+        };
+    });
+}
+
+function renderLineItemCell(row: VehicleServiceLineDisplayRow) {
+    const itemLabel = formatLineItem(row.line);
+
+    if (row.isComboParent) {
+        return (
+            <div className="space-y-1">
+                <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-semibold text-slate-900">{itemLabel}</span>
+                    <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-sky-700">
+                        Combo pack
+                    </span>
+                </div>
+                <p className="text-xs text-slate-500">
+                    Bundle price covers {row.childCount} included item{row.childCount === 1 ? '' : 's'}.
+                </p>
+            </div>
+        );
+    }
+
+    if (row.isComboChild) {
+        return (
+            <div className={`${CHILD_LINE_INDENT_CLASS} relative space-y-1`}>
+                <span className="pointer-events-none absolute left-2 top-1 h-5 w-4 border-b border-l border-slate-300" aria-hidden="true" />
+                <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium text-slate-700">{itemLabel}</span>
+                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-slate-600">
+                        Included
+                    </span>
+                </div>
+                <p className="text-xs text-slate-500">
+                    Under {formatLineItem(row.parent ?? row.line)}
+                </p>
+            </div>
+        );
+    }
+
+    return <span className="text-slate-900">{itemLabel}</span>;
+}
+
+function renderLineMetric(row: VehicleServiceLineDisplayRow, value: string) {
+    return <span className={row.isComboChild ? 'text-slate-500' : ''}>{value}</span>;
+}
+
+function renderLineUnitPrice(row: VehicleServiceLineDisplayRow) {
+    if (row.isComboChild && !row.line.is_billable) {
+        return (
+            <div className="space-y-0.5">
+                <div className="text-xs font-medium uppercase tracking-wide text-slate-500">Included</div>
+                <div className="text-xs text-slate-400">{row.line.unit_price}</div>
+            </div>
+        );
+    }
+
+    return <span className={row.isComboChild ? 'text-slate-500' : ''}>{row.line.unit_price}</span>;
+}
+
+function renderLineTotal(row: VehicleServiceLineDisplayRow) {
+    if (row.isComboChild && !row.line.is_billable) {
+        return (
+            <div className="space-y-0.5">
+                <div className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Included</div>
+                <div className="text-xs font-medium text-slate-400">{row.line.line_total}</div>
+            </div>
+        );
+    }
+
+    return <span className={row.isComboChild ? 'text-slate-600' : 'text-slate-900'}>{row.line.line_total}</span>;
+}
+
+function renderMobileSummary(row: VehicleServiceLineDisplayRow) {
+    if (row.isComboParent) {
+        return (
+            <div className="space-y-1">
+                <div className="flex flex-wrap items-center gap-2">
+                    <span>{formatLineItem(row.line)}</span>
+                    <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-sky-700">
+                        Combo pack
+                    </span>
+                </div>
+            </div>
+        );
+    }
+
+    if (row.isComboChild) {
+        return (
+            <div className={`${CHILD_LINE_INDENT_CLASS} relative`}>
+                <span className="pointer-events-none absolute left-2 top-1 h-5 w-4 border-b border-l border-slate-300" aria-hidden="true" />
+                <span className="font-medium text-slate-700">{formatLineItem(row.line)}</span>
+            </div>
+        );
+    }
+
+    return formatLineItem(row.line);
+}
+
+function lineRowClassName(row: VehicleServiceLineDisplayRow): string | undefined {
+    if (row.isComboParent) return 'bg-sky-50/60';
+    if (row.isComboChild) return 'bg-slate-50/70';
+    return undefined;
 }

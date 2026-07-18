@@ -72,6 +72,28 @@ export function createLocallyFilteredLookupLoader<T extends NamedResource>({
     };
 }
 
+export async function prefetchLocallyFilteredLookupDataset<T extends NamedResource>({
+    key,
+    load,
+    signal,
+    ttlMs = DEFAULT_LOCAL_CACHE_TTL_MS,
+    pageSize = DEFAULT_FULL_LOAD_PAGE_SIZE,
+}: {
+    key: string;
+    load: LookupLoader<T>;
+    signal: AbortSignal;
+    ttlMs?: number;
+    pageSize?: number;
+}): Promise<T[]> {
+    const datasetKey = scopedKey(key);
+    const cached = useLookupCacheStore.getState().datasetEntries[datasetKey];
+    if (cached && !isExpired(cached.fetchedAt, ttlMs)) {
+        return cached.data as T[];
+    }
+
+    return ensureDataset(datasetKey, load, pageSize, signal);
+}
+
 function scopedKey(key: string): string {
     const context = getStoredApiContext();
     const scope = context.authMode === 'platform'
