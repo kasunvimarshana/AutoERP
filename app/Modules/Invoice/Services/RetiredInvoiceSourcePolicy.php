@@ -32,6 +32,17 @@ final class RetiredInvoiceSourcePolicy
         );
     }
 
+    public function assertEditable(Invoice $invoice): void
+    {
+        if (! $this->hasRetiredSource($invoice)) {
+            return;
+        }
+
+        throw new InvalidArgumentException(
+            'This historical invoice belongs to the retired Vehicle Rental module and is read-only.',
+        );
+    }
+
     public function assertReversalAllowed(Invoice $invoice): void
     {
         if (! $this->hasRetiredSource($invoice)) {
