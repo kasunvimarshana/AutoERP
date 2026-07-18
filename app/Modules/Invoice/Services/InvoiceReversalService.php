@@ -24,6 +24,7 @@ final class InvoiceReversalService
         private readonly InvoiceTaxDocumentMapper $taxDocumentMapper,
         private readonly InvoiceSourceRestorationService $sourceRestoration,
         private readonly InvoiceBalanceService $balances,
+        private readonly RetiredInvoiceSourcePolicy $retiredSources,
     ) {}
 
     public function reverse(
@@ -55,6 +56,8 @@ final class InvoiceReversalService
             if ($status !== InvoiceStatus::Posted) {
                 throw new InvalidArgumentException('Only an unsettled posted invoice can be reversed.');
             }
+            $this->retiredSources->assertReversalAllowed($invoice);
+
             $postingDate = $invoice->posted_at?->toDateString() ?? $invoice->invoice_date->toDateString();
             if ($reversalDate < $postingDate) {
                 throw new InvalidArgumentException('Invoice reversal date cannot be before the posting date.');
