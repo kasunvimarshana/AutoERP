@@ -178,6 +178,9 @@ export default function RentalAgreementDetailPage({
             OPEN_ALLOCATION_STATUSES.has(allocation.status),
         ),
     );
+    const canManageAllocations =
+        row.status === AGREEMENT_STATUS.draft ||
+        row.status === AGREEMENT_STATUS.active;
     const allocationActionLabel =
         row.agreement_kind === RENTAL_AGREEMENT_KIND.customerRental
             ? "Assign vehicle"
@@ -221,6 +224,15 @@ export default function RentalAgreementDetailPage({
                 actions={
                     isExpectedAgreement ? (
                         <>
+                            {canManageAllocations && (
+                                <LinkButton
+                                    to={`/vehicle-rental/allocations?agreement_id=${id}`}
+                                >
+                                    {hasOpenAllocation
+                                        ? "View allocations"
+                                        : allocationActionLabel}
+                                </LinkButton>
+                            )}
                             {row.status === AGREEMENT_STATUS.draft && (
                                 <>
                                     <LinkButton
@@ -249,13 +261,6 @@ export default function RentalAgreementDetailPage({
                             )}
                             {row.status === AGREEMENT_STATUS.active && (
                                 <>
-                                    <LinkButton
-                                        to={`/vehicle-rental/allocations?agreement_id=${id}`}
-                                    >
-                                        {hasOpenAllocation
-                                            ? "View allocations"
-                                            : allocationActionLabel}
-                                    </LinkButton>
                                     {row.document_snapshot && (
                                         <LinkButton
                                             variant="secondary"
@@ -518,10 +523,10 @@ export default function RentalAgreementDetailPage({
                         ) : (
                             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                                 <p className="text-sm text-slate-500">
-                                    No vehicle allocation yet. Activate the agreement
-                                    before assigning its vehicle.
+                                    No vehicle allocation yet. Create a planned
+                                    allocation for this agreement.
                                 </p>
-                                {row.status === AGREEMENT_STATUS.active && (
+                                {canManageAllocations && (
                                     <LinkButton
                                         to={`/vehicle-rental/allocations?agreement_id=${row.id}`}
                                     >
