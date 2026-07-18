@@ -2,7 +2,6 @@ import { financePermissions } from '@/modules/finance/financePermissions';
 import { paymentPermissions } from '@/modules/payment/paymentPermissions';
 import { reportingPermissions } from '@/modules/reporting/reportingPermissions';
 import { taxPermissions } from '@/modules/tax/taxPermissions';
-import { vehicleRentalPermissions } from '@/modules/vehicle-rental/vehicleRentalPermissions';
 import { operational, type EntitlementRule } from './routeEntitlementPolicy';
 
 export const financeRouteEntitlements: readonly EntitlementRule[] = [
@@ -44,28 +43,4 @@ export const financeRouteEntitlements: readonly EntitlementRule[] = [
     operational('/tax/reports', ['finance'], [taxPermissions.reportsView]),
 
     operational('/reports/*', ['reporting'], [reportingPermissions.view]),
-
-    operational('/vehicle-rental/reservations/create', ['vehicle-rental'], [vehicleRentalPermissions.reservationsManage]),
-    operational('/vehicle-rental/reservations/:id', ['vehicle-rental'], [vehicleRentalPermissions.view]),
-    operational('/vehicle-rental/reservations', ['vehicle-rental'], [vehicleRentalPermissions.view]),
-    operational('/vehicle-rental/agreements/create', ['vehicle-rental'], [vehicleRentalPermissions.agreementsManage]),
-    operational('/vehicle-rental/agreements/:id/edit', ['vehicle-rental'], [vehicleRentalPermissions.agreementsManage]),
-    operational('/vehicle-rental/agreements/:id', ['vehicle-rental'], [vehicleRentalPermissions.view]),
-    operational('/vehicle-rental/agreements', ['vehicle-rental'], [vehicleRentalPermissions.view]),
-    operational('/vehicle-rental/lessee-agreements/create', ['vehicle-rental'], [vehicleRentalPermissions.agreementsManage]),
-    operational('/vehicle-rental/lessee-agreements/:id/edit', ['vehicle-rental'], [vehicleRentalPermissions.agreementsManage]),
-    operational('/vehicle-rental/lessee-agreements/:id', ['vehicle-rental'], [vehicleRentalPermissions.view]),
-    operational('/vehicle-rental/lessee-agreements', ['vehicle-rental'], [vehicleRentalPermissions.view]),
-    operational('/vehicle-rental/lessor-agreements/create', ['vehicle-rental'], [vehicleRentalPermissions.agreementsManage]),
-    operational('/vehicle-rental/lessor-agreements/:id/edit', ['vehicle-rental'], [vehicleRentalPermissions.agreementsManage]),
-    operational('/vehicle-rental/lessor-agreements/:id', ['vehicle-rental'], [vehicleRentalPermissions.view]),
-    operational('/vehicle-rental/lessor-agreements', ['vehicle-rental'], [vehicleRentalPermissions.view]),
-    operational('/vehicle-rental/allocations/:id/replacement', ['vehicle-rental'], [vehicleRentalPermissions.replacementsManage]),
-    operational('/vehicle-rental/allocations/:id', ['vehicle-rental'], [vehicleRentalPermissions.view]),
-    operational('/vehicle-rental/allocations', ['vehicle-rental'], [vehicleRentalPermissions.view]),
-    operational('/vehicle-rental/expenses', ['vehicle-rental'], [vehicleRentalPermissions.financialView]),
-    operational('/vehicle-rental/billing', ['vehicle-rental'], [vehicleRentalPermissions.financialView]),
-    operational('/vehicle-rental/deposits', ['vehicle-rental'], [vehicleRentalPermissions.financialView]),
-    operational('/vehicle-rental/finance-agreements', ['vehicle-rental'], [vehicleRentalPermissions.financialView]),
-    operational('/vehicle-rental/*', ['vehicle-rental'], [vehicleRentalPermissions.view]),
 ];
