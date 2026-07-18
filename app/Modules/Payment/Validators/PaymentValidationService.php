@@ -129,7 +129,7 @@ final class PaymentValidationService
     private function validateTypeDirectionParty(CreatePaymentData $data): void
     {
         $expectedDirection = match ($data->paymentType) {
-            PaymentType::CustomerReceipt, PaymentType::ServiceReceipt, PaymentType::RentalReceipt => PaymentDirection::Inbound,
+            PaymentType::CustomerReceipt, PaymentType::ServiceReceipt => PaymentDirection::Inbound,
             PaymentType::SupplierPayment => PaymentDirection::Outbound,
             PaymentType::Refund, PaymentType::Advance, PaymentType::Manual => $data->direction,
         };
@@ -138,7 +138,7 @@ final class PaymentValidationService
         }
 
         $expectedParty = match ($data->paymentType) {
-            PaymentType::CustomerReceipt, PaymentType::ServiceReceipt, PaymentType::RentalReceipt => 'customer',
+            PaymentType::CustomerReceipt, PaymentType::ServiceReceipt => 'customer',
             PaymentType::SupplierPayment => 'supplier',
             default => $data->partyType,
         };
@@ -160,9 +160,6 @@ final class PaymentValidationService
             $isSupplierAdvance = $data->direction === PaymentDirection::Outbound && $data->partyType === 'supplier';
             if (! $isCustomerAdvance && ! $isSupplierAdvance) {
                 throw new InvalidArgumentException('Advance payment requires an inbound customer or outbound supplier party.');
-            }
-            if ($data->sourceType === PaymentSourceType::RentalDepositRequirement->value && $data->allocations !== []) {
-                throw new InvalidArgumentException('Rental deposit receipt cannot allocate invoices during payment creation.');
             }
         }
 
