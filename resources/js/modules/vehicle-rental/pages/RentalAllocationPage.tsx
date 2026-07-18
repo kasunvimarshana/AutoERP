@@ -49,6 +49,7 @@ const SOURCE_TYPE_COMPANY_OWNED = 'company_owned';
 const SOURCE_TYPE_OWNER_SUPPLIED = 'owner_supplied';
 const SOURCE_TYPE_FINANCED = 'financed';
 const OWNERSHIP_LOOKUP_PAGE_SIZE = 100;
+const SOURCE_ALLOCATION_MIN_SEARCH_LENGTH = 0;
 
 const emptyForm = (vehicleSourceType = ''): AllocationForm => ({
     vehicleSourceType,
@@ -86,7 +87,7 @@ function agreementLookupValue(agreement: RentalAgreement): NamedResource {
 
 function sourceTypeForAgreement(
     agreement: RentalAgreement | null,
-    defaultVehicleSourceType = SOURCE_TYPE_COMPANY_OWNED,
+    defaultVehicleSourceType = '',
 ): string {
     return agreement?.agreement_kind === AGREEMENT_KIND_OWNER_SUPPLY
         ? SOURCE_TYPE_OWNER_SUPPLIED
@@ -363,21 +364,19 @@ export default function RentalAllocationPage() {
         [agreement?.id, page, refresh],
     );
 
-    const changeSourceType = (vehicleSourceType: string) => {
-        setForm((current) => ({ ...current, vehicleSourceType }));
-        setSourceAllocation(null);
-        setFinanceAgreement(null);
-        setCompanyOwnership(null);
-        setCompanyOwnershipHint(null);
-    };
-
     const clearVehicleAndSources = () => {
         setVehicle(null);
         setSourceAllocation(null);
         setFinanceAgreement(null);
         setOwnerSupplyOwnership(null);
+        setOwnershipHint(null);
         setCompanyOwnership(null);
         setCompanyOwnershipHint(null);
+    };
+
+    const changeSourceType = (vehicleSourceType: string) => {
+        setForm((current) => ({ ...current, vehicleSourceType }));
+        clearVehicleAndSources();
     };
 
     const submit = async (event: FormEvent) => {
@@ -434,6 +433,7 @@ export default function RentalAllocationPage() {
             setSourceAllocation(null);
             setFinanceAgreement(null);
             setOwnerSupplyOwnership(null);
+            setOwnershipHint(null);
             setCompanyOwnership(null);
             setCompanyOwnershipHint(null);
             setForm({
@@ -486,7 +486,7 @@ export default function RentalAllocationPage() {
         if (form.vehicleSourceType === SOURCE_TYPE_OWNER_SUPPLIED) return sourceAllocation !== null;
         if (form.vehicleSourceType === SOURCE_TYPE_FINANCED) return financeAgreement !== null;
 
-        return true;
+        return false;
     })();
     const agreementStartsAt = agreementDetails ? toDateTimeLocal(agreementDetails.starts_at) : '';
     const agreementEndsAt = agreementDetails ? toDateTimeLocal(agreementDetails.ends_at) : '';
@@ -494,6 +494,9 @@ export default function RentalAllocationPage() {
     const allocationStartAt = form.allocatedFrom ? toIsoDateTime(form.allocatedFrom) : null;
     const allocationEndAt = form.allocatedTo ? toIsoDateTime(form.allocatedTo) : null;
     const usesOwnerSourceAllocation = !isOwnerSupplyAgreement && vehicleSourceType === SOURCE_TYPE_OWNER_SUPPLIED;
+    const usesDirectVehicleSelection = isOwnerSupplyAgreement
+        || vehicleSourceType === SOURCE_TYPE_COMPANY_OWNED
+        || vehicleSourceType === SOURCE_TYPE_FINANCED;
 
     return (
         <RentalPage>
@@ -515,6 +518,7 @@ export default function RentalAllocationPage() {
                                 setSourceAllocation(null);
                                 setFinanceAgreement(null);
                                 setOwnerSupplyOwnership(null);
+                                setOwnershipHint(null);
                                 setCompanyOwnership(null);
                                 setCompanyOwnershipHint(null);
                                 setPage(1);
@@ -522,15 +526,50 @@ export default function RentalAllocationPage() {
                             }}
                             required
                         />
-                        {usesOwnerSourceAllocation ? (
-                            <Input
-                                label="Vehicle"
-                                value={readableRelation(vehicle)}
-                                readOnly
-                                required
-                                hint="Selected from the owner source allocation."
-                            />
-                        ) : (
+                        <Select
+                            label="Vehicle source"
+                            value={vehicleSourceType}
+                            disabled={isOwnerSupplyAgreement}
+                            required
+                            placeholder="Select vehicle source..."
+                            hint={isOwnerSupplyAgreement
+                                ? 'Lessor agreements create the owner-supplied source allocation.'
+                                : 'Choose company-owned, owner-supplied, or financed before selecting the vehicle.'}
+                            onChange={(event) => changeSourceType(event.target.value)}
+                            options={isOwnerSupplyAgreement
+                                ? [{ value: SOURCE_TYPE_OWNER_SUPPLIED, label: humanize(SOURCE_TYPE_OWNER_SUPPLIED) }]
+                                : vehicleSourceOptions}
+                        />
+                        {usesOwnerSourceAllocation && (
+                            <div>
+                                <RentalAllocationLookupSelect
+                                    label="Lessor source allocation"
+                                    value={sourceAllocation}
+                                    onChange={(value) => {
+                                        const selected = value as AllocationLookupValue | null;
+                                        setSourceAllocation(selected);
+                                        setVehicle(selected?.vehicle ?? null);
+                                        setFinanceAgreement(null);
+                                        setOwnerSupplyOwnership(null);
+                                        setCompanyOwnership(null);
+                                        setCompanyOwnershipHint(null);
+                                    }}
+                                    agreementKind={AGREEMENT_KIND_OWNER_SUPPLY}
+                                    coversStartAt={allocationStartAt}
+                                    coversEndAt={allocationEndAt}
+                                    openOnly
+                                    loadOnOpen
+                                    minSearchLength={SOURCE_ALLOCATION_MIN_SEARCH_LENGTH}
+                                    disabled={!allocationStartAt || !allocationEndAt}
+                                    required
+                                    excludeId={null}
+                                />
+                                <p className="mt-1 text-xs text-slate-500">
+                                    Select the covering Lessor allocation. Its vehicle and ownership are inherited automatically.
+                                </p>
+                            </div>
+                        )}
+                        {usesDirectVehicleSelection ? (
                             <RentalAvailableVehicleLookupSelect
                                 value={vehicle}
                                 onChange={(value) => {
@@ -545,16 +584,23 @@ export default function RentalAllocationPage() {
                                 endAt={allocationEndAt}
                                 required
                             />
+                        ) : usesOwnerSourceAllocation ? (
+                            <Input
+                                label="Vehicle"
+                                value={readableRelation(vehicle)}
+                                readOnly
+                                required
+                                hint="Inherited from the selected Lessor source allocation."
+                            />
+                        ) : (
+                            <Input
+                                label="Vehicle"
+                                value=""
+                                readOnly
+                                disabled
+                                hint="Select the vehicle source first."
+                            />
                         )}
-                        <Select
-                            label="Vehicle source"
-                            value={vehicleSourceType}
-                            disabled={isOwnerSupplyAgreement}
-                            onChange={(event) => changeSourceType(event.target.value)}
-                            options={isOwnerSupplyAgreement
-                                ? [{ value: SOURCE_TYPE_OWNER_SUPPLIED, label: humanize(SOURCE_TYPE_OWNER_SUPPLIED) }]
-                                : vehicleSourceOptions}
-                        />
                         {isOwnerSupplyAgreement && (
                             <Input
                                 label="Owner vehicle ownership"
@@ -571,26 +617,6 @@ export default function RentalAllocationPage() {
                                 readOnly
                                 required
                                 hint={companyOwnershipHint ?? undefined}
-                            />
-                        )}
-                        {usesOwnerSourceAllocation && (
-                            <RentalAllocationLookupSelect
-                                value={sourceAllocation}
-                                onChange={(value) => {
-                                    const selected = value as AllocationLookupValue | null;
-                                    setSourceAllocation(selected);
-                                    setVehicle(selected?.vehicle ?? null);
-                                    setFinanceAgreement(null);
-                                    setCompanyOwnership(null);
-                                    setCompanyOwnershipHint(null);
-                                }}
-                                agreementKind={AGREEMENT_KIND_OWNER_SUPPLY}
-                                coversStartAt={allocationStartAt}
-                                coversEndAt={allocationEndAt}
-                                openOnly
-                                disabled={!allocationStartAt || !allocationEndAt}
-                                required
-                                excludeId={null}
                             />
                         )}
                         {!isOwnerSupplyAgreement && form.vehicleSourceType === SOURCE_TYPE_FINANCED && (
