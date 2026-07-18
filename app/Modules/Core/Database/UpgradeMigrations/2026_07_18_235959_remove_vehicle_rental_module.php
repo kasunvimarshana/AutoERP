@@ -52,6 +52,13 @@ return new class extends Migration
     ];
 
     /** @var list<string> */
+    private const SOURCE_MODULES = [
+        'vehicle_rental',
+        'vehicle-rental',
+        'VehicleRental',
+    ];
+
+    /** @var list<string> */
     private const FINANCE_PROFILE_CODES = [
         'customer_rental_invoice',
         'supplier_rental_invoice',
@@ -114,20 +121,13 @@ return new class extends Migration
         $this->assertNoValues('invoice_adjustments', 'source_type', self::SOURCE_TYPES);
         $this->assertNoValues('payments', 'payment_type', ['rental_receipt']);
         $this->assertNoValues('payments', 'source_type', self::SOURCE_TYPES);
+        $this->assertNoValues('tax_document_snapshots', 'source_type', self::SOURCE_TYPES);
         $this->assertNoValues('tax_transactions', 'source_type', self::SOURCE_TYPES);
         $this->assertNoValues('finance_journal_entries', 'source_type', self::SOURCE_TYPES);
 
-        if (Schema::hasTable('tax_transactions')
-            && Schema::hasColumn('tax_transactions', 'source_module')
-            && DB::table('tax_transactions')->where('source_module', 'vehicle_rental')->exists()) {
-            $this->blocked('tax_transactions.source_module');
-        }
-
-        if (Schema::hasTable('finance_journal_entries')
-            && Schema::hasColumn('finance_journal_entries', 'source_module')
-            && DB::table('finance_journal_entries')->where('source_module', 'vehicle_rental')->exists()) {
-            $this->blocked('finance_journal_entries.source_module');
-        }
+        $this->assertNoValues('tax_document_snapshots', 'source_module', self::SOURCE_MODULES);
+        $this->assertNoValues('tax_transactions', 'source_module', self::SOURCE_MODULES);
+        $this->assertNoValues('finance_journal_entries', 'source_module', self::SOURCE_MODULES);
     }
 
     private function removePermissionCatalogue(): void
@@ -200,14 +200,22 @@ return new class extends Migration
             }
         }
 
-        if (Schema::hasTable('finance_posting_profile_rules')) {
+        if (($profileIds !== [] || $roleIds !== []) && Schema::hasTable('finance_posting_profile_rules')) {
             DB::table('finance_posting_profile_rules')
-                ->when($profileIds !== [], fn ($query) => $query->whereIn('posting_profile_id', $profileIds))
-                ->when($profileIds === [] && $roleIds !== [], fn ($query) => $query->whereIn('account_role_id', $roleIds))
+                ->where(function ($query) use ($profileIds, $roleIds): void {
+                    if ($profileIds !== []) {
+                        $query->whereIn('posting_profile_id', $profileIds);
+                    }
+                    if ($roleIds !== []) {
+                        $profileIds === []
+                            ? $query->whereIn('account_role_id', $roleIds)
+                            : $query->orWhereIn('account_role_id', $roleIds);
+                    }
+                })
                 ->delete();
         }
 
-        if (Schema::hasTable('finance_account_assignments')) {
+        if (($roleIds !== [] || $accountIds !== []) && Schema::hasTable('finance_account_assignments')) {
             DB::table('finance_account_assignments')
                 ->where(function ($query) use ($roleIds, $accountIds): void {
                     if ($roleIds !== []) {
