@@ -5,8 +5,6 @@ declare(strict_types=1);
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use LogicException;
-use RuntimeException;
 
 return new class extends Migration
 {
@@ -56,7 +54,7 @@ return new class extends Migration
         }
 
         if ($nonEmptyTables !== []) {
-            throw new RuntimeException(
+            throw new \RuntimeException(
                 'Vehicle Rental removal stopped because operational data still exists in: '
                 .implode(', ', $nonEmptyTables)
                 .'. Export and verify the required archive, then explicitly purge the retired rental data before rerunning migrations. '
@@ -71,7 +69,7 @@ return new class extends Migration
 
     public function down(): void
     {
-        throw new LogicException(
+        throw new \LogicException(
             'Vehicle Rental removal is irreversible. Restore a verified database backup and deploy the prior application version.',
         );
     }
