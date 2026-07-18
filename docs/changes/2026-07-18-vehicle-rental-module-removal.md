@@ -16,6 +16,7 @@ This is a root-level removal. The application does not retain compatibility rout
 - Vehicle Rental scheduled installment processing
 - Vehicle Rental report definitions and report registry integration
 - Rental-specific payment list view and new rental payment creation paths
+- Fresh Finance seeding of rental-only accounts and posting profiles
 - Vehicle Rental implementation and validation documents that no longer describe active product behavior
 - Rental-owned operational and vehicle-finance database tables
 
@@ -30,6 +31,10 @@ The removal does **not** delete generic posted records owned by the financial mo
 - Voucher presentation records backed by Payment or Finance
 
 Historical `rental_receipt` and `rental_deposit_requirement` enum values remain readable so existing financial rows can still deserialize and be audited. `PaymentValidationService` explicitly blocks creation of new Vehicle Rental payments.
+
+Historical invoices with rental or vehicle-finance source identities remain available for audit and normal settlement of already-posted receivables/payables. They cannot be approved, posted, cancelled, voided, or reversed after removal because those actions depend on source-restoration workflows that no longer exist. The Invoice module owns and enforces this retired-source boundary.
+
+Historical immutable tenant-plan revisions may still contain the retired module code. Entitlement and resource read paths filter retired codes, while new plan writes remain strict and reject them.
 
 ## Database decommission safety
 
@@ -49,13 +54,17 @@ Do not run this migration against a persistent environment until the archive and
 
 ## Verification contract
 
-`VehicleRentalRemovalContractTest` prevents the retired module, routes, navigation, report registration, or implementation directories from being reintroduced. It also verifies the guarded decommission migration and the historical-payment compatibility boundary.
+`VehicleRentalRemovalContractTest` prevents the retired module, routes, navigation, report registration, or implementation directories from being reintroduced. It also verifies the guarded decommission migration, historical-payment compatibility boundary, and retired Invoice source lifecycle guard.
 
 ## Required release gates
 
 ```bash
 php -l database/migrations/2026_07_18_235959_remove_vehicle_rental_module.php
 php -l app/Modules/Payment/Validators/PaymentValidationService.php
+php -l app/Modules/Invoice/Constants/RetiredInvoiceSource.php
+php -l app/Modules/Invoice/Services/RetiredInvoiceSourcePolicy.php
+php -l app/Modules/Invoice/Services/InvoiceStatusService.php
+php -l app/Modules/Invoice/Services/InvoiceReversalService.php
 php -l app/Modules/Reporting/Services/ReportCatalog.php
 php artisan test --filter=VehicleRentalRemovalContractTest
 php artisan test
@@ -72,4 +81,5 @@ In addition, rehearse the migration against a disposable copy of the latest pers
 - non-empty rental tables block the migration before DDL;
 - the approved archive can be restored;
 - after explicit rental-data purge, the migration removes all retired tables;
-- posted financial history remains queryable through Invoice, Payment, Tax, Finance, Voucher, and generic Reporting screens.
+- posted financial history remains queryable through Invoice, Payment, Tax, Finance, Voucher, and generic Reporting screens;
+- already-posted historical rental invoices can still be settled, while source-dependent lifecycle mutations are rejected.
