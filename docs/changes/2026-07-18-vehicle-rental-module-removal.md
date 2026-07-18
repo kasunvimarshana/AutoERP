@@ -17,6 +17,7 @@ This is a root-level removal. The application does not retain compatibility rout
 - Vehicle Rental report definitions and report registry integration
 - Rental-specific payment list view and new rental payment creation paths
 - Fresh Finance seeding of rental-only accounts and posting profiles
+- Stale Customer and Supplier blocker queries against retired rental tables
 - Vehicle Rental implementation and validation documents that no longer describe active product behavior
 - Rental-owned operational and vehicle-finance database tables
 
@@ -34,7 +35,7 @@ Historical `rental_receipt` and `rental_deposit_requirement` enum values remain 
 
 Historical invoices with rental or vehicle-finance source identities remain available for audit and normal settlement of already-posted receivables/payables. They cannot be edited, approved, posted, cancelled, voided, or reversed after removal because those actions depend on source-restoration workflows that no longer exist. The Invoice module owns and enforces this retired-source boundary.
 
-Historical immutable tenant-plan revisions may still contain the retired module code. Entitlement and resource read paths filter retired codes, while new plan writes remain strict and reject them.
+Historical immutable tenant-plan revisions may still contain the retired module code. Entitlement and resource read paths filter retired codes, while new plan writes remain strict and reject them. Access provisioning deactivates permissions no longer present in the active registry while retaining inactive rows for audit history.
 
 ## Database decommission safety
 
@@ -47,12 +48,20 @@ The schema decommission follows the repository's explicit migration-history rule
 
 When any retired table contains data, the preflight stops before schema removal. The operational rental data must be exported, independently verified, and explicitly purged before rerunning migrations. Posted Invoice, Payment, Tax, and Finance records must not be included in that purge.
 
-All decommission migrations are intentionally irreversible. Rollback requires both:
+Run the decommission only in a controlled maintenance window:
 
-1. restoring a verified pre-removal database backup; and
+1. enable application maintenance mode;
+2. stop old web workers, queue workers, and the scheduler;
+3. create and verify a pre-removal database backup;
+4. complete and verify the operational rental archive and approved purge;
+5. run the preflight and explicit drop migrations;
+6. deploy and start only the new application version;
+7. execute post-deployment financial-history smoke tests.
+
+This prevents an old application process from writing to a retired table between preflight and DDL. The migrations are intentionally irreversible. Rollback requires both:
+
+1. restoring the verified pre-removal database backup; and
 2. deploying the prior application version.
-
-Do not run these migrations against a persistent environment until the archive and restore procedure has been rehearsed.
 
 ## Verification contract
 
@@ -63,6 +72,8 @@ Do not run these migrations against a persistent environment until the archive a
 - complete preflight coverage;
 - one explicit guarded drop migration per retired table;
 - removal of the earlier multi-table migration design.
+
+`VehicleRentalRuntimeReferenceTest` recursively scans active PHP and TypeScript runtime code for retired provider, route, module, and table references.
 
 ## Required release gates
 
@@ -76,6 +87,7 @@ php -l app/Modules/Invoice/Services/InvoiceStatusService.php
 php -l app/Modules/Invoice/Services/InvoiceReversalService.php
 php -l app/Modules/Reporting/Services/ReportCatalog.php
 php artisan test --filter=VehicleRentalRemovalContractTest
+php artisan test --filter=VehicleRentalRuntimeReferenceTest
 php artisan test
 composer test:mysql
 
@@ -97,4 +109,5 @@ In addition, rehearse the migration sequence against a disposable copy of the la
 - the approved archive can be restored;
 - after explicit rental-data purge, all retired tables are removed;
 - posted financial history remains queryable through Invoice, Payment, Tax, Finance, Voucher, and generic Reporting screens;
-- already-posted historical rental invoices can still be settled, while source-dependent lifecycle mutations are rejected.
+- already-posted historical rental invoices can still be settled, while source-dependent lifecycle mutations are rejected;
+- Customer and Supplier delete/deactivate workflows do not query retired tables.
