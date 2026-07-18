@@ -44,7 +44,7 @@ final class RentalAgreementIntegrityContractTest extends TestCase
 
         self::assertStringContainsString('rental_agreements_customer_id_tenant_fk', $migration);
         self::assertStringContainsString('rental_agreements_supplier_id_tenant_fk', $migration);
-        self::assertStringContainsString('rental_agreements_id_tenant_kind_customer_uk', $migration);
+        self::assertStringContainsString("unique(['tenant_id', 'agreement_kind', 'customer_id', 'id'], 'rental_agreements_tenant_kind_customer_id_uk')", $migration);
         self::assertStringContainsString('rental_agreements_terminated_by_tenant_fk', $migration);
         self::assertStringContainsString('Customer rental agreement requires only a customer.', $service);
         self::assertStringContainsString('Owner supply agreement requires only a supplier/vehicle owner.', $service);
@@ -55,6 +55,8 @@ final class RentalAgreementIntegrityContractTest extends TestCase
         self::assertStringContainsString('RentalAgreementKind::CustomerRental->value', $depositMigration);
         self::assertStringContainsString('rental_deposit_requirements_customer_id_tenant_fk', $depositMigration);
         self::assertStringContainsString('rental_deposit_req_agreement_kind_customer_fk', $depositMigration);
+        self::assertStringContainsString("foreign(['tenant_id', 'agreement_kind', 'customer_id', 'agreement_id']", $depositMigration);
+        self::assertStringContainsString("references(['tenant_id', 'agreement_kind', 'customer_id', 'id'])", $depositMigration);
         self::assertStringContainsString('cascadeOnUpdate()', $depositMigration);
         self::assertStringNotContainsString('Asia/Colombo', $migration.$service.$configuration);
         self::assertStringContainsString("'vehicle_rental.billing_timezone'", $service);

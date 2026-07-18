@@ -48,8 +48,8 @@ return new class extends Migration
                 ->references(['id', 'tenant_id'])
                 ->on('organization_units')
                 ->restrictOnDelete();
-            $table->foreign(['agreement_id', 'tenant_id', 'agreement_kind', 'customer_id'], 'rental_deposit_req_agreement_kind_customer_fk')
-                ->references(['id', 'tenant_id', 'agreement_kind', 'customer_id'])
+            $table->foreign(['tenant_id', 'agreement_kind', 'customer_id', 'agreement_id'], 'rental_deposit_req_agreement_kind_customer_fk')
+                ->references(['tenant_id', 'agreement_kind', 'customer_id', 'id'])
                 ->on('rental_agreements')
                 ->cascadeOnUpdate()
                 ->restrictOnDelete();
