@@ -54,6 +54,7 @@ final class RentalAgreementIntegrityContractTest extends TestCase
         self::assertStringNotContainsString("\$table->enum('agreement_kind'", $depositMigration);
         self::assertStringContainsString('RentalAgreementKind::CustomerRental->value', $depositMigration);
         self::assertStringContainsString('rental_deposit_requirements_customer_id_tenant_fk', $depositMigration);
+        self::assertStringContainsString("index(\n                ['tenant_id', 'agreement_kind', 'customer_id', 'agreement_id'],\n                'rental_deposit_requirements_agreement_party_ix'", $depositMigration);
         self::assertStringContainsString('rental_deposit_req_agreement_kind_customer_fk', $depositMigration);
         self::assertStringContainsString("foreign(['tenant_id', 'agreement_kind', 'customer_id', 'agreement_id']", $depositMigration);
         self::assertStringContainsString("references(['tenant_id', 'agreement_kind', 'customer_id', 'id'])", $depositMigration);

@@ -38,6 +38,10 @@ return new class extends Migration
 
             $table->unique('agreement_id', 'rental_deposit_requirements_agreement_uk');
             $table->index(['status', 'due_date'], 'rental_deposit_requirements_status_due_ix');
+            $table->index(
+                ['tenant_id', 'agreement_kind', 'customer_id', 'agreement_id'],
+                'rental_deposit_requirements_agreement_party_ix',
+            );
 
             $table->unique(['id', 'tenant_id'], 'rental_deposit_requirements_id_tenant_uk');
             $table->foreign(['customer_id', 'tenant_id'], 'rental_deposit_requirements_customer_id_tenant_fk')
