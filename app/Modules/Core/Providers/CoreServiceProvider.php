@@ -27,9 +27,9 @@ use Modules\Core\Support\LaravelTransactionManager;
 use Modules\Core\Support\LaravelUuidGenerator;
 use Modules\Core\Support\RequestCurrentOrganizationUnitContextAccessor;
 use Modules\Core\Support\RequestCurrentTenantContextAccessor;
-use Modules\Core\Support\TenantExecutionContext;
 use Modules\Core\Support\RequestCurrentUserContextAccessor;
 use Modules\Core\Support\SystemClock;
+use Modules\Core\Support\TenantExecutionContext;
 
 final class CoreServiceProvider extends ServiceProvider
 {
@@ -79,7 +79,10 @@ final class CoreServiceProvider extends ServiceProvider
     {
         Model::preventSilentlyDiscardingAttributes();
 
-        $this->loadMigrationsFrom(__DIR__.'/../Database/Migrations');
+        $this->loadMigrationsFrom([
+            __DIR__.'/../Database/Migrations',
+            __DIR__.'/../Database/UpgradeMigrations',
+        ]);
 
         $this->publishes([
             __DIR__.'/../Config/core.php' => config_path('core.php'),
