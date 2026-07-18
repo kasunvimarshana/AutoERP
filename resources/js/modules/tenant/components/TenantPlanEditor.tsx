@@ -34,7 +34,7 @@ const LIMIT_OPTIONS: Array<{ key: keyof TenantPlanLimits; label: string; hint: s
 const MODULE_GROUPS: Array<{ label: string; modules: TenantModuleCode[] }> = [
     { label: 'Master data', modules: [TENANT_MODULE_CODE.CUSTOMER, TENANT_MODULE_CODE.SUPPLIER, TENANT_MODULE_CODE.ITEM, TENANT_MODULE_CODE.WAREHOUSE, TENANT_MODULE_CODE.VEHICLE] },
     { label: 'People', modules: [TENANT_MODULE_CODE.HR] },
-    { label: 'Operations', modules: [TENANT_MODULE_CODE.INVENTORY, TENANT_MODULE_CODE.PURCHASE, TENANT_MODULE_CODE.VEHICLE_SERVICE, TENANT_MODULE_CODE.VEHICLE_RENTAL] },
+    { label: 'Operations', modules: [TENANT_MODULE_CODE.INVENTORY, TENANT_MODULE_CODE.PURCHASE, TENANT_MODULE_CODE.VEHICLE_SERVICE] },
     { label: 'Billing and finance', modules: [TENANT_MODULE_CODE.INVOICE, TENANT_MODULE_CODE.PAYMENT, TENANT_MODULE_CODE.FINANCE] },
     { label: 'Insights', modules: [TENANT_MODULE_CODE.REPORTING] },
 ];
@@ -418,25 +418,17 @@ function validatePlanForm(values: { name: string; slug: string; price: string; c
     };
 }
 
-function toLimitValue(value: number | undefined): string {
-    return value === undefined ? '' : String(value);
-}
-
-function mergeCurrentCurrency(currencies: ReferenceRecord[], current: NamedReference | null): ReferenceRecord[] {
-    if (!current || currencies.some((currency) => currency.id === current.id)) return currencies;
-    return [{
-        id: current.id,
-        code: current.code ?? undefined,
-        name: current.name,
-        symbol: current.symbol,
-        is_active: current.is_active ?? false,
-        row_version: 0,
-        updated_at: null,
-    }, ...currencies];
+function toLimitValue(value: number | null | undefined): string {
+    return value === null || value === undefined ? '' : String(value);
 }
 
 function currencyLabel(currencies: ReferenceRecord[], currencyId: number | null): string {
     if (currencyId === null) return '';
-    const currency = currencies.find((candidate) => candidate.id === currencyId);
-    return currency?.code ?? currency?.name ?? 'Selected currency';
+    const currency = currencies.find((item) => item.id === currencyId);
+    return currency?.code ?? currency?.name ?? '';
+}
+
+function mergeCurrentCurrency(currencies: ReferenceRecord[], current: NamedReference | null): ReferenceRecord[] {
+    if (!current || currencies.some((currency) => currency.id === current.id)) return currencies;
+    return [...currencies, { ...current, is_active: false }];
 }
