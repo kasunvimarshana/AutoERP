@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\VehicleService\DTOs;
 
 use Modules\VehicleService\Enums\VehicleServiceCommissionType;
+use Modules\VehicleService\Enums\VehicleServiceJobType;
 
 final readonly class VehicleServiceJobData
 {
@@ -13,6 +14,7 @@ final readonly class VehicleServiceJobData
         public string $jobDate,
         public int $customerId,
         public int $vehicleId,
+        public VehicleServiceJobType $type = VehicleServiceJobType::FullService,
         public ?int $billToCustomerId = null,
         public ?int $organizationUnitId = null,
         public ?string $jobNumber = null,

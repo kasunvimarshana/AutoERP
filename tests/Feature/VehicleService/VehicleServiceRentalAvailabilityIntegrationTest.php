@@ -191,6 +191,7 @@ final class VehicleServiceRentalAvailabilityIntegrationTest extends TestCase
             'tenant_id' => $tenantId,
             'job_number' => $jobNumber,
             'job_date' => '2026-07-17',
+            'type' => 'full_service',
             'customer_id' => $customerId,
             'bill_to_customer_id' => $customerId,
             'vehicle_id' => $vehicleId,

@@ -42,6 +42,7 @@ const existingJob: VehicleServiceJob = {
     row_version: 3,
     job_number: 'VSJ-92',
     job_date: '2026-07-15',
+    type: 'body_wash',
     customer_id: 5,
     customer: { id: 5, code: 'CUS-5', name: 'Vehicle Owner' },
     bill_to_customer_id: 5,
@@ -102,6 +103,7 @@ describe('VehicleServiceJobForm', () => {
                 customer_id: 5,
                 bill_to_customer_id: 8,
                 vehicle_id: 14,
+                type: 'full_service',
                 supervisor_employee_id: 21,
                 supervisor_commission_type: 'percentage',
                 supervisor_commission_value: '7.500000',
@@ -190,6 +192,7 @@ describe('VehicleServiceJobForm', () => {
         );
 
         expect(screen.getByLabelText('Supervisor commission')).toHaveValue('percentage');
+        expect(screen.getByLabelText('Type')).toHaveValue('body_wash');
         expect(screen.getByLabelText('Commission value')).toHaveValue('5.000000');
         expect(screen.getByText('Stored job commission snapshot.')).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Save job' })).toBeInTheDocument();

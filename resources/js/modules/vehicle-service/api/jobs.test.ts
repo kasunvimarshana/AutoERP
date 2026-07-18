@@ -32,6 +32,7 @@ describe('vehicle service job API', () => {
     it('preserves explicit supervisor commission overrides in create requests', async () => {
         const payload: VehicleServiceJobPayload = {
             job_date: '2026-07-16',
+            type: 'full_service',
             customer_id: 5,
             vehicle_id: 14,
             supervisor_employee_id: 21,

@@ -97,6 +97,7 @@ function refreshedJob(rowVersion: number): VehicleServiceJob {
         row_version: rowVersion,
         job_number: 'VSJ-7',
         job_date: '2026-07-17',
+        type: 'full_service',
         customer_id: 5,
         vehicle_id: 9,
         supervisor_commission_type: 'none',

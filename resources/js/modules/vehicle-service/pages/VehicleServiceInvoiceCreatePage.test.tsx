@@ -77,6 +77,7 @@ function job() {
         row_version: 7,
         job_number: 'JOB-1',
         job_date: '2026-06-20',
+        type: 'full_service',
         customer_id: 5,
         vehicle_id: 6,
         supervisor_commission_type: 'none',

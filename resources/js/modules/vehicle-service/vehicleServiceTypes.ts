@@ -10,6 +10,8 @@ export type VehicleServiceJobStatus =
     | 'paid'
     | 'cancelled';
 
+export type VehicleServiceJobType = 'full_service' | 'body_wash';
+
 export type VehicleServiceLineSourceType =
     | 'inventory_item'
     | 'external_item'
@@ -164,6 +166,8 @@ export interface VehicleServiceJob {
     job_number: string;
     job_date: string;
     expected_delivery_date?: string | null;
+    type: VehicleServiceJobType;
+    type_label?: string;
     customer_id: number;
     customer?: NamedResource | null;
     bill_to_customer_id?: number | null;
@@ -197,6 +201,7 @@ export interface VehicleServiceJobPayload {
     expected_version?: number;
     job_date: string;
     expected_delivery_date?: string;
+    type: VehicleServiceJobType;
     customer_id: number;
     bill_to_customer_id?: number;
     vehicle_id: number;

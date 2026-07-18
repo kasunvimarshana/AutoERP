@@ -21,6 +21,7 @@ export function VehicleServiceSummaryPanel({ job }: { job: VehicleServiceJob }) 
                 { label: 'Expected delivery', value: formatDate(job.expected_delivery_date) },
                 { label: 'Odometer', value: job.odometer_reading ?? '-' },
                 { label: 'Fuel level', value: job.fuel_level ?? '-' },
+                { label: 'Type', value: job.type_label ?? job.type.replaceAll('_', ' ') },
                 { label: 'Priority', value: job.priority ?? '-' },
                 { label: 'Subtotal', value: <MoneyDisplay value={job.subtotal} /> },
                 { label: 'Discount', value: <MoneyDisplay value={job.discount_total} /> },

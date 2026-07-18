@@ -558,6 +558,7 @@ final class VehicleServiceEngineTest extends TestCase
         $createdJobId = (int) $this->tenantPostJson($context['tenant_id'], '/api/v1/vehicle-service/jobs', [
             'tenant_id' => $context['tenant_id'],
             'job_date' => '2026-06-07',
+            'type' => 'full_service',
             'customer_id' => $context['customer_id'],
             'vehicle_id' => $context['vehicle_id'],
             'supervisor_employee_id' => $context['employee_id'],

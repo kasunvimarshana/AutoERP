@@ -119,6 +119,7 @@ final class VehicleServiceJobService
             'organization_unit_id' => $data->organizationUnitId,
             'job_date' => $data->jobDate,
             'expected_delivery_date' => $data->expectedDeliveryDate,
+            'type' => $data->type->value,
             'customer_id' => $data->customerId,
             'bill_to_customer_id' => $this->billToCustomerId($data),
             'vehicle_id' => $data->vehicleId,

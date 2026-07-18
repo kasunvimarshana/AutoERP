@@ -20,7 +20,7 @@ import {
     getVehicleServiceJobCreateDefaults,
     updateVehicleServiceJob,
 } from '../vehicleServiceApi';
-import type { CommissionType, VehicleServiceJob, VehicleServiceJobPayload } from '../vehicleServiceTypes';
+import type { CommissionType, VehicleServiceJob, VehicleServiceJobPayload, VehicleServiceJobType } from '../vehicleServiceTypes';
 import { VehicleServiceQuickVehicleModal } from './VehicleServiceQuickVehicleModal';
 
 const ZERO_AMOUNT = '0.000000';
@@ -33,6 +33,14 @@ const SUPERVISOR_COMMISSION_OPTIONS = [
     { value: COMMISSION_TYPE.NONE, label: 'None' },
     { value: COMMISSION_TYPE.FIXED, label: 'Fixed' },
     { value: COMMISSION_TYPE.PERCENTAGE, label: 'Percentage of whole job' },
+];
+const JOB_TYPE = {
+    FULL_SERVICE: 'full_service',
+    BODY_WASH: 'body_wash',
+} as const satisfies Record<string, VehicleServiceJobType>;
+const JOB_TYPE_OPTIONS = [
+    { value: JOB_TYPE.FULL_SERVICE, label: 'Full Service' },
+    { value: JOB_TYPE.BODY_WASH, label: 'Body Wash' },
 ];
 const isCommissionType = (value: string): value is CommissionType =>
     Object.values(COMMISSION_TYPE).includes(value as CommissionType);
@@ -70,6 +78,7 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
     const [form, setForm] = useState({
         job_date: job?.job_date ?? today(),
         expected_delivery_date: job?.expected_delivery_date ?? '',
+        type: job?.type ?? JOB_TYPE.FULL_SERVICE,
         supervisor_commission_type: (job?.supervisor_commission_type ?? null) as CommissionType | null,
         supervisor_commission_value: (job?.supervisor_commission_value ?? null) as string | null,
         odometer_reading: job?.odometer_reading ?? '',
@@ -138,6 +147,7 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
         expected_version: job?.row_version,
         job_date: form.job_date,
         expected_delivery_date: form.expected_delivery_date || undefined,
+        type: form.type,
         customer_id: customer?.id ?? 0,
         bill_to_customer_id: billToCustomer?.id ?? customer?.id ?? 0,
         vehicle_id: vehicle?.id ?? 0,
@@ -257,6 +267,7 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
                         <Input label="Expected delivery" type="date" value={form.expected_delivery_date} error={errorFor('expected_delivery_date')} onChange={(event) => updateForm({ ...form, expected_delivery_date: event.target.value })} />
                         <DecimalInput label="Odometer" value={form.odometer_reading} error={errorFor('odometer_reading')} onChange={(event) => updateForm({ ...form, odometer_reading: event.target.value })} />
                         <Input label="Fuel level" value={form.fuel_level} error={errorFor('fuel_level')} onChange={(event) => updateForm({ ...form, fuel_level: event.target.value })} />
+                        <Select label="Type" value={form.type} options={JOB_TYPE_OPTIONS} error={errorFor('type')} onChange={(event) => updateForm({ ...form, type: event.target.value as VehicleServiceJobType })} />
                         <Select label="Priority" value={form.priority} options={[
                             { value: 'low', label: 'Low' },
                             { value: 'normal', label: 'Normal' },

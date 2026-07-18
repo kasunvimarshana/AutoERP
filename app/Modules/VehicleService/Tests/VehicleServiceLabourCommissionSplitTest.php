@@ -164,6 +164,7 @@ final class VehicleServiceLabourCommissionSplitTest extends TestCase
             'tenant_id' => $tenantId,
             'job_number' => 'VS-'.$suffix,
             'job_date' => '2026-07-17',
+            'type' => 'full_service',
             'customer_id' => $customerId,
             'bill_to_customer_id' => $customerId,
             'vehicle_id' => $vehicleId,

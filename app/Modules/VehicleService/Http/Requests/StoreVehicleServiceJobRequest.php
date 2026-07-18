@@ -8,6 +8,7 @@ use Illuminate\Validation\Rule;
 use Modules\Core\Http\Requests\TenantScopedRequest;
 use Modules\VehicleService\DTOs\VehicleServiceJobData;
 use Modules\VehicleService\Enums\VehicleServiceCommissionType;
+use Modules\VehicleService\Enums\VehicleServiceJobType;
 use Modules\VehicleService\Http\Requests\Concerns\HasExpectedVehicleServiceJobVersion;
 
 final class StoreVehicleServiceJobRequest extends TenantScopedRequest
@@ -23,6 +24,7 @@ final class StoreVehicleServiceJobRequest extends TenantScopedRequest
             'job_number' => ['nullable', 'string', 'max:100'],
             'job_date' => ['required', 'date'],
             'expected_delivery_date' => ['nullable', 'date', 'after_or_equal:job_date'],
+            'type' => ['required', Rule::enum(VehicleServiceJobType::class)],
             'customer_id' => ['required', 'integer', 'min:1'],
             'vehicle_id' => ['required', 'integer', 'min:1'],
             'bill_to_customer_id' => ['nullable', 'integer', 'min:1'],
@@ -53,6 +55,7 @@ final class StoreVehicleServiceJobRequest extends TenantScopedRequest
             jobDate: (string) $this->input('job_date'),
             customerId: (int) $this->input('customer_id'),
             vehicleId: (int) $this->input('vehicle_id'),
+            type: VehicleServiceJobType::from((string) $this->input('type')),
             billToCustomerId: $this->intOrNull('bill_to_customer_id'),
             organizationUnitId: $this->organizationUnitId(),
             jobNumber: $this->stringOrNull('job_number'),

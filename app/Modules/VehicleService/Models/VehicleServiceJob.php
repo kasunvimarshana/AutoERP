@@ -15,6 +15,7 @@ use Modules\Hr\Models\HrEmployee;
 use Modules\Vehicle\Models\Vehicle;
 use Modules\VehicleService\Enums\VehicleServiceCommissionType;
 use Modules\VehicleService\Enums\VehicleServiceJobStatus;
+use Modules\VehicleService\Enums\VehicleServiceJobType;
 use Modules\VehicleService\Models\Concerns\HasVehicleServiceJobRowVersion;
 
 final class VehicleServiceJob extends TenantOwnedModel
@@ -34,6 +35,7 @@ final class VehicleServiceJob extends TenantOwnedModel
             'organization_unit_id' => 'integer',
             'job_date' => 'date',
             'expected_delivery_date' => 'date',
+            'type' => VehicleServiceJobType::class,
             'customer_id' => 'integer',
             'bill_to_customer_id' => 'integer',
             'vehicle_id' => 'integer',
