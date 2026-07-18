@@ -279,7 +279,6 @@ final class RentalAgreementCreateTest extends TestCase
         self::assertNull($agreement->supplier_id);
         self::assertNotNull($agreement->depositRequirement);
         self::assertSame('customer_rental', $agreement->depositRequirement->agreement_kind->value);
-        self::assertSame($customerId, (int) $agreement->depositRequirement->customer_id);
         self::assertSame('1000.000000', (string) $agreement->depositRequirement->required_amount);
         self::assertNotNull($agreement->activeRateVersion);
         self::assertSame(RentalRateVersionStatus::Active, $agreement->activeRateVersion->status);
@@ -348,7 +347,6 @@ final class RentalAgreementCreateTest extends TestCase
         DB::table('rental_deposit_requirements')->insert([
             'tenant_id' => $tenantId,
             'agreement_id' => $agreement->getKey(),
-            'customer_id' => $customerId,
             'required_amount' => '1000.000000',
             'currency_id' => $currencyId,
             'is_refundable' => true,

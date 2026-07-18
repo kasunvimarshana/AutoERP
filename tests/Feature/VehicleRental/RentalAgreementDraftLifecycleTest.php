@@ -112,7 +112,6 @@ final class RentalAgreementDraftLifecycleTest extends TestCase
         self::assertSame('120000.000000', (string) $updatedDraftRate->components->sole()->rate);
         self::assertSame($replacementCustomerId, (int) $updated->customer_id);
         self::assertSame($replacementCurrencyId, (int) $updated->currency_id);
-        self::assertSame($replacementCustomerId, (int) $updated->depositRequirement->customer_id);
         self::assertSame($replacementCurrencyId, (int) $updated->depositRequirement->currency_id);
 
         $activated = $this->withTenantExecutionContext(
