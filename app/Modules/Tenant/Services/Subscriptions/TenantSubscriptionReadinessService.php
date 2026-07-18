@@ -56,7 +56,7 @@ final class TenantSubscriptionReadinessService
         $limits = $revision === null ? [] : $this->schema->normalizeLimits($revision->get('limits'));
         $newModules = $revision === null
             ? []
-            : $this->schema->normalizeFeatures($revision->get('features'))['enabled_modules'];
+            : $this->schema->normalizePersistedFeatures($revision->get('features'))['enabled_modules'];
         $usage = [];
 
         if ($tenant !== null) {
@@ -93,7 +93,7 @@ final class TenantSubscriptionReadinessService
             );
         $currentModules = $current === null
             ? []
-            : $this->schema->normalizeFeatures($current->get('plan_features'))['enabled_modules'];
+            : $this->schema->normalizePersistedFeatures($current->get('plan_features'))['enabled_modules'];
         $removedModules = array_values(array_diff($currentModules, $newModules));
         sort($removedModules);
 
