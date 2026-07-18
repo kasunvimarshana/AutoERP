@@ -40,7 +40,6 @@ final class TenantPlanSchema
         TenantFeature::PURCHASE => 'Purchasing',
         TenantFeature::VEHICLE => 'Vehicles',
         TenantFeature::VEHICLE_SERVICE => 'Vehicle service',
-        TenantFeature::VEHICLE_RENTAL => 'Vehicle rental',
         TenantFeature::INVOICE => 'Invoicing',
         TenantFeature::PAYMENT => 'Payments',
         TenantFeature::FINANCE => 'Finance',
@@ -155,11 +154,13 @@ final class TenantPlanSchema
             if ($value === null || $value === '') {
                 continue;
             }
+
             if (! is_numeric($value) || (int) $value < 1 || (string) (int) $value !== trim((string) $value)) {
                 throw ValidationException::withMessages([
                     "limits.{$key}" => ['Plan limits must be positive whole numbers.'],
                 ]);
             }
+
             $normalized[(string) $key] = (int) $value;
         }
 
