@@ -4,10 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Services\Plans;
 
+use Illuminate\Validation\ValidationException;
 use Modules\Core\Tenancy\TenantFeature;
 use Modules\Core\Tenancy\TenantPlanLimit;
-
-use Illuminate\Validation\ValidationException;
 
 final class TenantPlanSchema
 {
@@ -40,7 +39,6 @@ final class TenantPlanSchema
         TenantFeature::PURCHASE => 'Purchasing',
         TenantFeature::VEHICLE => 'Vehicles',
         TenantFeature::VEHICLE_SERVICE => 'Vehicle service',
-        TenantFeature::VEHICLE_RENTAL => 'Vehicle rental',
         TenantFeature::INVOICE => 'Invoicing',
         TenantFeature::PAYMENT => 'Payments',
         TenantFeature::FINANCE => 'Finance',
@@ -54,7 +52,6 @@ final class TenantPlanSchema
         TenantPlanLimit::WAREHOUSES,
         TenantPlanLimit::STORAGE_MEGABYTES,
     ];
-
 
     /** @return list<array{code:string,label:string}> */
     public function commercialModuleCatalogue(): array
