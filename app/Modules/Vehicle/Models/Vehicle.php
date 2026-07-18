@@ -19,6 +19,16 @@ final class Vehicle extends TenantOwnedModel
 {
     use SoftDeletes;
 
+    /** @var list<string> */
+    private const SEARCHABLE_COLUMNS = [
+        'vehicle_number',
+        'code',
+        'registration_number',
+        'chassis_number',
+        'engine_number',
+        'vin_number',
+    ];
+
     protected $table = 'vehicles';
 
     protected $guarded = ['id'];
@@ -102,6 +112,20 @@ final class Vehicle extends TenantOwnedModel
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('status', VehicleStatus::Active);
+    }
+
+    public function scopeMatchingSearch(Builder $query, ?string $search): Builder
+    {
+        $value = trim((string) $search);
+        if ($value === '') {
+            return $query;
+        }
+
+        return $query->where(function (Builder $scope) use ($value): void {
+            foreach (self::SEARCHABLE_COLUMNS as $column) {
+                $scope->orWhere($column, 'like', "%{$value}%");
+            }
+        });
     }
 
     public function scopeForTenant(Builder $query, int $tenantId, ?int $organizationUnitId = null): Builder

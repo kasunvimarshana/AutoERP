@@ -102,13 +102,7 @@ final class RentalAvailabilityService
         return $this->scopedVehicleQuery($tenantId, $organizationUnitId)
             ->whereNotIn('status', self::BLOCKING_VEHICLE_STATUSES)
             ->when($categoryId !== null, fn (Builder $query) => $query->where('vehicle_category_id', $categoryId))
-            ->when($search !== null && trim($search) !== '', function (Builder $query) use ($search): void {
-                $value = trim($search);
-                $query->where(fn (Builder $scope) => $scope
-                    ->where('vehicle_number', 'like', "%{$value}%")
-                    ->orWhere('registration_number', 'like', "%{$value}%")
-                    ->orWhere('chassis_number', 'like', "%{$value}%"));
-            })
+            ->matchingSearch($search)
             ->whereNotIn('id', RentalVehicleAllocation::query()
                 ->forContext($tenantId, $organizationUnitId)
                 ->select('vehicle_id')
@@ -127,12 +121,6 @@ final class RentalAvailabilityService
 
     private function scopedVehicleQuery(int $tenantId, ?int $organizationUnitId): Builder
     {
-        return Vehicle::query()
-            ->where('tenant_id', $tenantId)
-            ->when(
-                $organizationUnitId === null,
-                fn (Builder $query) => $query->whereNull('organization_unit_id'),
-                fn (Builder $query) => $query->where('organization_unit_id', $organizationUnitId),
-            );
+        return Vehicle::query()->forTenant($tenantId, $organizationUnitId);
     }
 }

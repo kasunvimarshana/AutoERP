@@ -47,6 +47,10 @@ final class RentalAgreementService
         'currency_id',
     ];
 
+    private const DEPOSIT_SYNCHRONIZED_FIELDS = [
+        'currency_id',
+    ];
+
     private const OPEN_ALLOCATION_STATUSES = [
         'planned',
         'active',
@@ -141,7 +145,6 @@ final class RentalAgreementService
                     'tenant_id' => $tenantId,
                     'organization_unit_id' => $organizationUnitId,
                     'agreement_kind' => RentalAgreementKind::CustomerRental->value,
-                    'customer_id' => $agreement->customer_id,
                     'required_amount' => $required,
                     'currency_id' => $deposit['currency_id'] ?? $agreement->currency_id,
                     'due_date' => $deposit['due_date'] ?? null,
@@ -558,7 +561,7 @@ final class RentalAgreementService
             ]);
         }
 
-        if (array_intersect($changedFields, self::DEPOSIT_IDENTITY_FIELDS) === []) {
+        if (array_intersect($changedFields, self::DEPOSIT_SYNCHRONIZED_FIELDS) === []) {
             return;
         }
 
@@ -595,9 +598,6 @@ final class RentalAgreementService
         }
 
         $updates = [];
-        if (in_array('customer_id', $changedFields, true)) {
-            $updates['customer_id'] = $agreement->customer_id;
-        }
         if (in_array('currency_id', $changedFields, true)
             && (int) $deposit->currency_id === (int) ($originalAgreementValues['currency_id'] ?? 0)) {
             $updates['currency_id'] = $agreement->currency_id;
