@@ -18,6 +18,7 @@ final class InvoiceStatusService
         private readonly InvoiceSourceRestorationService $sourceRestoration,
         private readonly InvoiceTaxDocumentMapper $taxDocumentMapper,
         private readonly InvoicePostingPlanService $postingPlans,
+        private readonly RetiredInvoiceSourcePolicy $retiredSources,
     ) {}
 
     /** @return array<string, list<string>> */
@@ -107,6 +108,7 @@ final class InvoiceStatusService
                 ? $invoice->status
                 : InvoiceStatus::from((string) $invoice->status);
             $this->assertCanTransition($from, $to);
+            $this->retiredSources->assertTransitionAllowed($invoice, $to);
 
             $updates = ['status' => $to->value];
             if ($to === InvoiceStatus::Approved) {
