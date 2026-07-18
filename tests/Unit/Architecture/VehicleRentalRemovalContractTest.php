@@ -29,6 +29,10 @@ final class VehicleRentalRemovalContractTest extends TestCase
         'routes/console.php',
         'app/Modules/Core/Tenancy/TenantFeature.php',
         'app/Modules/Tenant/Services/Plans/TenantPlanSchema.php',
+        'app/Modules/Tenant/Services/TenantEntitlementService.php',
+        'app/Modules/Tenant/Http/Resources/TenantPlanResource.php',
+        'app/Modules/Item/Services/ItemUsageModuleCatalogue.php',
+        'app/Modules/Finance/Database/Seeders/FinanceSeeder.php',
         'app/Modules/Reporting/Services/ReportCatalog.php',
         'app/Modules/Reporting/Services/ReportDefinitionRegistry.php',
         'resources/js/app/router.tsx',
@@ -36,6 +40,9 @@ final class VehicleRentalRemovalContractTest extends TestCase
         'resources/js/app/access/tenantModules.ts',
         'resources/js/app/access/financeRouteEntitlements.ts',
         'resources/js/shared/api/endpoints.ts',
+        'resources/js/modules/invoice/pages/InvoiceListPage.tsx',
+        'resources/js/modules/invoice/pages/InvoiceDetailPage.tsx',
+        'resources/js/modules/payment/pages/PaymentListPage.tsx',
     ];
 
     /** @var list<string> */
@@ -71,8 +78,8 @@ final class VehicleRentalRemovalContractTest extends TestCase
     public function test_vehicle_rental_implementation_paths_are_absent(): void
     {
         foreach (self::RETIRED_PATHS as $relativePath) {
-            self::assertFileDoesNotExist(
-                $this->projectPath($relativePath),
+            self::assertFalse(
+                file_exists($this->projectPath($relativePath)),
                 "Retired Vehicle Rental path [{$relativePath}] must not be restored.",
             );
         }
