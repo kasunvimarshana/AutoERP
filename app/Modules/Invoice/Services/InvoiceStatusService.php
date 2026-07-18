@@ -147,6 +147,8 @@ final class InvoiceStatusService
         if ($status !== InvoiceStatus::Draft) {
             throw new InvalidArgumentException('Only draft invoices can be edited directly.');
         }
+
+        $this->retiredSources->assertEditable($invoice);
     }
 
     public function assertCanSettle(Invoice $invoice): void
