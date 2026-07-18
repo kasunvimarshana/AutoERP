@@ -15,6 +15,8 @@ import {
 } from '../vehicleRentalApi';
 import type { RentalParty, RentalVehicle } from '../vehicleRentalTypes';
 
+const AVAILABLE_VEHICLE_MIN_SEARCH_LENGTH = 0;
+
 interface LookupProps<T extends NamedResource = NamedResource> extends LookupBehaviorOptions {
     label?: string;
     value: T | null;
@@ -154,6 +156,8 @@ export function RentalAvailableVehicleLookupSelect({
             onChange={(resource) => onChange(resource)}
             placeholder="Search available vehicle..."
             disabled={disabled || !startAt || !endAt}
+            loadOnOpen
+            minSearchLength={AVAILABLE_VEHICLE_MIN_SEARCH_LENGTH}
             {...props}
         />
     );
