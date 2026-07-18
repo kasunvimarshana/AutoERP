@@ -12,7 +12,17 @@ const apiMocks = vi.hoisted(() => ({
     prepareVehicleServicePayment: vi.fn(),
 }));
 
+const invoiceApiMocks = vi.hoisted(() => ({
+    getInvoiceSignedPrintLink: vi.fn(),
+}));
+
+const navigationMocks = vi.hoisted(() => ({
+    openSameOriginUrl: vi.fn(),
+}));
+
 vi.mock('../vehicleServiceApi', () => apiMocks);
+vi.mock('@/modules/invoice/invoiceApi', () => invoiceApiMocks);
+vi.mock('@/shared/utils/safeNavigation', () => navigationMocks);
 
 describe('VehicleServicePaymentPreparePage', () => {
     beforeEach(() => {
@@ -43,6 +53,10 @@ describe('VehicleServicePaymentPreparePage', () => {
             posting_status: 'posted',
             allocation_status: 'fully_allocated',
         });
+        invoiceApiMocks.getInvoiceSignedPrintLink.mockResolvedValue({
+            print_url: '/signed/invoices/11/print',
+            pdf_url: '/signed/invoices/11/pdf',
+        });
     });
 
     it('submits the exact job version with the selected payment method', async () => {
@@ -61,7 +75,9 @@ describe('VehicleServicePaymentPreparePage', () => {
             payment_method_id: 3,
             amount: '100.000000',
         })));
-        expect(await screen.findByText('Payment created')).toBeInTheDocument();
+        expect(await screen.findByText('Payment created and allocated successfully')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Print bill' })).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Receive, post and allocate' })).not.toBeInTheDocument();
     });
 
     it('uses transaction instrument details without exposing an internal Finance account', async () => {
@@ -97,6 +113,23 @@ describe('VehicleServicePaymentPreparePage', () => {
         })));
         expect(await screen.findByText('Payment validation completed successfully')).toBeInTheDocument();
     });
+
+    it('prints the settled invoice from the same page after payment completion', async () => {
+        const user = userEvent.setup();
+        renderPage();
+
+        expect(await screen.findByText('Payment for JOB-1')).toBeInTheDocument();
+        const selects = screen.getAllByRole('combobox');
+        await user.selectOptions(selects[0], '11');
+        await user.selectOptions(selects[1], '3');
+        await user.click(screen.getByRole('button', { name: 'Receive, post and allocate' }));
+
+        await screen.findByText('Payment created and allocated successfully');
+        await user.click(screen.getByRole('button', { name: 'Print bill' }));
+
+        await waitFor(() => expect(invoiceApiMocks.getInvoiceSignedPrintLink).toHaveBeenCalledWith(11));
+        expect(navigationMocks.openSameOriginUrl).toHaveBeenCalledWith('/signed/invoices/11/print');
+    });
 });
 
 function renderPage() {
@@ -104,7 +137,6 @@ function renderPage() {
         <TestRouter initialEntries={['/vehicle-service/jobs/9/payment']}>
             <Routes>
                 <Route path="/vehicle-service/jobs/:id/payment" element={<VehicleServicePaymentPreparePage />} />
-                <Route path="/payments/:id" element={<div>Payment created</div>} />
             </Routes>
         </TestRouter>,
     );
