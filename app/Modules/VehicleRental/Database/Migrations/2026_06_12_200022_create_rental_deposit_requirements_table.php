@@ -20,7 +20,6 @@ return new class extends Migration
             $table->foreignId('agreement_id');
             $table->string('agreement_kind', 30)
                 ->default(RentalAgreementKind::CustomerRental->value);
-            $table->foreignId('customer_id');
             $table->decimal('required_amount', 20, 6);
             $table->foreignId('currency_id')->constrained('currencies', indexName: 'rental_deposit_requirements_currency_fk')->restrictOnDelete();
             $table->date('due_date')->nullable();
@@ -38,20 +37,19 @@ return new class extends Migration
 
             $table->unique('agreement_id', 'rental_deposit_requirements_agreement_uk');
             $table->index(['status', 'due_date'], 'rental_deposit_requirements_status_due_ix');
+            $table->index(
+                ['tenant_id', 'agreement_kind', 'agreement_id'],
+                'rental_deposit_requirements_agreement_kind_ix',
+            );
 
             $table->unique(['id', 'tenant_id'], 'rental_deposit_requirements_id_tenant_uk');
-            $table->foreign(['customer_id', 'tenant_id'], 'rental_deposit_requirements_customer_id_tenant_fk')
-                ->references(['id', 'tenant_id'])
-                ->on('customers')
-                ->restrictOnDelete();
             $table->foreign(['organization_unit_id', 'tenant_id'], 'rental_deposit_requirements_organization_unit_id_tenant_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('organization_units')
                 ->restrictOnDelete();
-            $table->foreign(['agreement_id', 'tenant_id', 'agreement_kind', 'customer_id'], 'rental_deposit_req_agreement_kind_customer_fk')
-                ->references(['id', 'tenant_id', 'agreement_kind', 'customer_id'])
+            $table->foreign(['tenant_id', 'agreement_kind', 'agreement_id'], 'rental_deposit_requirements_agreement_kind_fk')
+                ->references(['tenant_id', 'agreement_kind', 'id'])
                 ->on('rental_agreements')
-                ->cascadeOnUpdate()
                 ->restrictOnDelete();
 
             $table->foreign(['created_by', 'tenant_id'], 'rental_deposit_requirements_created_by_tenant_fk')

@@ -48,10 +48,46 @@ vi.mock('../components/RentalLookups', () => ({
             <input id="agreement-lookup" readOnly value={value?.name ?? ''} />
         </div>
     ),
-    RentalAllocationLookupSelect: ({ value }: { value: NamedResource | null }) => (
+    RentalAllocationLookupSelect: ({
+        value,
+        onChange,
+        label = 'Vehicle allocation',
+        disabled,
+        loadOnOpen,
+        minSearchLength,
+    }: {
+        value: NamedResource | null;
+        onChange: (value: NamedResource | null) => void;
+        label?: string;
+        disabled?: boolean;
+        loadOnOpen?: boolean;
+        minSearchLength?: number;
+    }) => (
         <div>
-            <label htmlFor="source-allocation-lookup">Vehicle allocation</label>
+            <label htmlFor="source-allocation-lookup">{label}</label>
             <input id="source-allocation-lookup" readOnly value={value?.name ?? ''} />
+            <button
+                type="button"
+                disabled={disabled}
+                data-load-on-open={String(Boolean(loadOnOpen))}
+                data-min-search-length={String(minSearchLength)}
+                onClick={() => onChange({
+                    id: 91,
+                    code: 'RVA-OWNER-91',
+                    name: 'RVA-OWNER-91 - CAR-1000 - planned',
+                    row_version: 3,
+                    vehicle: {
+                        id: 12,
+                        code: 'VEH-12',
+                        name: 'CAR-1000',
+                        vehicle_number: 'VEH-12',
+                        registration_number: 'CAR-1000',
+                        status: 'active',
+                    },
+                } as NamedResource)}
+            >
+                Select lessor allocation
+            </button>
         </div>
     ),
     RentalFinanceAgreementLookupSelect: ({ value }: { value: NamedResource | null }) => (
@@ -143,6 +179,52 @@ describe('RentalAllocationPage', () => {
             allocated_to: new Date(expectedTo).toISOString(),
             start_odometer: null,
         })));
+    });
+
+    it('creates a Lessee allocation from the covering Lessor source allocation', async () => {
+        apiMocks.getRentalMetadata.mockResolvedValue({
+            ...rentalMetadata(),
+            defaults: {},
+        });
+        const user = userEvent.setup();
+        const expectedFrom = localDateTime(rentalAgreement().starts_at);
+        const expectedTo = localDateTime(rentalAgreement().ends_at);
+        renderPage('/vehicle-rental/allocations?agreement_id=7');
+
+        const vehicleSource = await screen.findByLabelText('Vehicle source');
+        const initialVehicle = screen.getByLabelText('Vehicle');
+
+        expect(vehicleSource).toHaveValue('');
+        expect(initialVehicle).toBeDisabled();
+        expect(
+            vehicleSource.compareDocumentPosition(initialVehicle) & Node.DOCUMENT_POSITION_FOLLOWING,
+        ).toBeTruthy();
+
+        await user.selectOptions(vehicleSource, 'owner_supplied');
+
+        const selectLessorAllocation = await screen.findByRole('button', { name: 'Select lessor allocation' });
+        expect(screen.getByLabelText('Lessor source allocation')).toBeInTheDocument();
+        expect(selectLessorAllocation).toHaveAttribute('data-load-on-open', 'true');
+        expect(selectLessorAllocation).toHaveAttribute('data-min-search-length', '0');
+
+        await user.click(selectLessorAllocation);
+
+        expect(screen.getByLabelText('Vehicle')).toHaveValue('CAR-1000');
+        await user.click(screen.getByRole('button', { name: 'Create allocation' }));
+
+        await waitFor(() => expect(apiMocks.createRentalAllocation).toHaveBeenCalledWith(7, 1, expect.objectContaining({
+            vehicle_id: 12,
+            vehicle_ownership_id: null,
+            vehicle_source_type: 'owner_supplied',
+            source_allocation_id: 91,
+            expected_source_allocation_version: 3,
+            vehicle_finance_agreement_id: null,
+            expected_finance_agreement_version: null,
+            allocated_from: new Date(expectedFrom).toISOString(),
+            allocated_to: new Date(expectedTo).toISOString(),
+            start_odometer: null,
+        })));
+        expect(vehicleOwnershipApiMocks.listVehicleOwnerships).not.toHaveBeenCalled();
     });
 });
 
