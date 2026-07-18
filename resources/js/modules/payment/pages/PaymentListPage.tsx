@@ -35,12 +35,6 @@ const paymentViews = {
         params: { payment_type: 'service_receipt', direction: 'inbound' },
         action: { to: '/vehicle-service/jobs', label: 'Open service jobs' },
     },
-    rental: {
-        title: 'Rental Settlements',
-        description: 'Receipts and settlements created from vehicle rental agreements.',
-        params: { payment_type: 'rental_receipt' },
-        action: { to: '/vehicle-rental/agreements', label: 'Open rental agreements' },
-    },
 } as const;
 
 export default function PaymentListPage() {
