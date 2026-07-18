@@ -7,6 +7,7 @@ namespace Modules\Tenant\Http\Resources;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Modules\Core\DTOs\DataRecord;
+use Modules\Tenant\Services\Plans\TenantPlanSchema;
 
 final class TenantPlanResource extends JsonResource
 {
@@ -36,6 +37,9 @@ final class TenantPlanResource extends JsonResource
             'updated_at',
         ]));
 
+        $resource['current_revision'] = $this->sanitizeRevision($resource['current_revision'] ?? null);
+        $resource['latest_revision'] = $this->sanitizeRevision($resource['latest_revision'] ?? null);
+
         $current = is_array($resource['current_revision'] ?? null)
             ? $resource['current_revision']
             : null;
@@ -49,5 +53,18 @@ final class TenantPlanResource extends JsonResource
         }
 
         return $resource;
+    }
+
+    /** @return array<string, mixed>|null */
+    private function sanitizeRevision(mixed $revision): ?array
+    {
+        if (! is_array($revision)) {
+            return null;
+        }
+
+        $revision['features'] = app(TenantPlanSchema::class)
+            ->normalizePersistedFeatures($revision['features'] ?? []);
+
+        return $revision;
     }
 }
