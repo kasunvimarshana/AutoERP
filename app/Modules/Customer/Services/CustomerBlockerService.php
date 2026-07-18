@@ -12,7 +12,7 @@ final class CustomerBlockerService
 {
     public function delete(Customer $customer): void
     {
-        foreach (['vehicle_service_jobs', 'customer_tax_profiles', 'rental_reservations', 'rental_agreements', 'rental_usage_contexts', 'rental_expense_allocations'] as $table) {
+        foreach (['vehicle_service_jobs', 'customer_tax_profiles'] as $table) {
             if ($this->referenced($table, 'customer_id', (int) $customer->getKey(), (int) $customer->tenant_id)) {
                 throw new ConflictHttpException('Customer is referenced by business history and cannot be deleted. Deactivate the customer instead.');
             }
@@ -35,17 +35,17 @@ final class CustomerBlockerService
     private function referenced(string $table, string $column, int $id, int $tenantId): bool
     {
         return DB::table($table)
-                ->where('tenant_id', $tenantId)
-                ->where($column, $id)
-                ->exists();
+            ->where('tenant_id', $tenantId)
+            ->where($column, $id)
+            ->exists();
     }
 
     private function partyReferenced(string $table, int $id, string $type, int $tenantId): bool
     {
         return DB::table($table)
-                ->where('tenant_id', $tenantId)
-                ->where('party_id', $id)
-                ->whereIn('party_type', [$type, Customer::class])
-                ->exists();
+            ->where('tenant_id', $tenantId)
+            ->where('party_id', $id)
+            ->whereIn('party_type', [$type, Customer::class])
+            ->exists();
     }
 }
