@@ -1,5 +1,5 @@
 import { useMemo, useState, type FormEvent } from 'react';
-import { TENANT_MODULE_CODE, TENANT_MODULES, type TenantModuleCode } from '@/app/access/tenantModules';
+import { isTenantModuleCode, TENANT_MODULE_CODE, TENANT_MODULES, type TenantModuleCode } from '@/app/access/tenantModules';
 import type { ReferenceRecord } from '@/modules/reference-data/referenceDataTypes';
 import { ApiError, fieldError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
@@ -34,7 +34,7 @@ const LIMIT_OPTIONS: Array<{ key: keyof TenantPlanLimits; label: string; hint: s
 const MODULE_GROUPS: Array<{ label: string; modules: TenantModuleCode[] }> = [
     { label: 'Master data', modules: [TENANT_MODULE_CODE.CUSTOMER, TENANT_MODULE_CODE.SUPPLIER, TENANT_MODULE_CODE.ITEM, TENANT_MODULE_CODE.WAREHOUSE, TENANT_MODULE_CODE.VEHICLE] },
     { label: 'People', modules: [TENANT_MODULE_CODE.HR] },
-    { label: 'Operations', modules: [TENANT_MODULE_CODE.INVENTORY, TENANT_MODULE_CODE.PURCHASE, TENANT_MODULE_CODE.VEHICLE_SERVICE, TENANT_MODULE_CODE.VEHICLE_RENTAL] },
+    { label: 'Operations', modules: [TENANT_MODULE_CODE.INVENTORY, TENANT_MODULE_CODE.PURCHASE, TENANT_MODULE_CODE.VEHICLE_SERVICE] },
     { label: 'Billing and finance', modules: [TENANT_MODULE_CODE.INVOICE, TENANT_MODULE_CODE.PAYMENT, TENANT_MODULE_CODE.FINANCE] },
     { label: 'Insights', modules: [TENANT_MODULE_CODE.REPORTING] },
 ];
@@ -48,7 +48,7 @@ export function TenantPlanEditor({ plan, currencies, saving, error, onCancel, on
         price: revision?.price ?? '0.000000',
         currencyId: revision?.currency_id ? String(revision.currency_id) : '',
         interval: revision?.billing_interval ?? 'month',
-        enabledModules: revision?.features.enabled_modules ?? [],
+        enabledModules: (revision?.features.enabled_modules ?? []).filter(isTenantModuleCode),
         limits: {
             max_users: toLimitValue(revision?.limits.max_users),
             max_organization_units: toLimitValue(revision?.limits.max_organization_units),
@@ -130,7 +130,7 @@ export function TenantPlanEditor({ plan, currencies, saving, error, onCancel, on
                     422,
                     'INACTIVE_PLAN_CURRENCY',
                     'validation',
-                    { currency_id: ['Select an active billing currency for the new revision.'] },
+                    { currency_id: ['Select an active billing currency for the new plan revision.'] },
                 ));
                 return;
             }
