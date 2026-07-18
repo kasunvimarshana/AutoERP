@@ -32,34 +32,43 @@ The removal does **not** delete generic posted records owned by the financial mo
 
 Historical `rental_receipt` and `rental_deposit_requirement` enum values remain readable so existing financial rows can still deserialize and be audited. `PaymentValidationService` explicitly blocks creation of new Vehicle Rental payments.
 
-Historical invoices with rental or vehicle-finance source identities remain available for audit and normal settlement of already-posted receivables/payables. They cannot be approved, posted, cancelled, voided, or reversed after removal because those actions depend on source-restoration workflows that no longer exist. The Invoice module owns and enforces this retired-source boundary.
+Historical invoices with rental or vehicle-finance source identities remain available for audit and normal settlement of already-posted receivables/payables. They cannot be edited, approved, posted, cancelled, voided, or reversed after removal because those actions depend on source-restoration workflows that no longer exist. The Invoice module owns and enforces this retired-source boundary.
 
 Historical immutable tenant-plan revisions may still contain the retired module code. Entitlement and resource read paths filter retired codes, while new plan writes remain strict and reject them.
 
 ## Database decommission safety
 
-`2026_07_18_235959_remove_vehicle_rental_module.php` checks every retired table before performing any DDL.
+The schema decommission follows the repository's explicit migration-history rules:
 
-- When every existing rental-owned table is empty, the migration drops the schema in child-first foreign-key order.
-- When any retired table contains data, the migration stops before dropping anything and lists the non-empty tables.
-- The operational rental data must be exported, independently verified, and explicitly purged before rerunning the migration.
-- Posted Invoice, Payment, Tax, and Finance records must not be included in that purge.
+- `2026_07_18_235900_preflight_vehicle_rental_removal.php` checks every retired table before any drop migration runs.
+- One subsequent migration owns the removal of exactly one retired table.
+- Drop migrations execute in child-first foreign-key order.
+- Every drop migration rechecks its own table immediately before DDL.
 
-The migration is intentionally irreversible. Rollback requires both:
+When any retired table contains data, the preflight stops before schema removal. The operational rental data must be exported, independently verified, and explicitly purged before rerunning migrations. Posted Invoice, Payment, Tax, and Finance records must not be included in that purge.
+
+All decommission migrations are intentionally irreversible. Rollback requires both:
 
 1. restoring a verified pre-removal database backup; and
 2. deploying the prior application version.
 
-Do not run this migration against a persistent environment until the archive and restore procedure has been rehearsed.
+Do not run these migrations against a persistent environment until the archive and restore procedure has been rehearsed.
 
 ## Verification contract
 
-`VehicleRentalRemovalContractTest` prevents the retired module, routes, navigation, report registration, or implementation directories from being reintroduced. It also verifies the guarded decommission migration, historical-payment compatibility boundary, and retired Invoice source lifecycle guard.
+`VehicleRentalRemovalContractTest` prevents the retired module, routes, navigation, report registration, or implementation directories from being reintroduced. It also verifies:
+
+- historical Payment compatibility and rejection of new rental payments;
+- the retired Invoice source lifecycle boundary;
+- complete preflight coverage;
+- one explicit guarded drop migration per retired table;
+- removal of the earlier multi-table migration design.
 
 ## Required release gates
 
 ```bash
-php -l database/migrations/2026_07_18_235959_remove_vehicle_rental_module.php
+php -l database/migrations/2026_07_18_235900_preflight_vehicle_rental_removal.php
+find database/migrations -name '2026_07_18_2359*_drop_*_table.php' -print0 | xargs -0 -n1 php -l
 php -l app/Modules/Payment/Validators/PaymentValidationService.php
 php -l app/Modules/Invoice/Constants/RetiredInvoiceSource.php
 php -l app/Modules/Invoice/Services/RetiredInvoiceSourcePolicy.php
@@ -76,10 +85,16 @@ npm run test
 npm run build
 ```
 
-In addition, rehearse the migration against a disposable copy of the latest persistent database and verify that:
+On Windows PowerShell, validate the decommission migrations with:
 
-- non-empty rental tables block the migration before DDL;
+```powershell
+Get-ChildItem database/migrations/2026_07_18_2359*_*.php | ForEach-Object { php -l $_.FullName }
+```
+
+In addition, rehearse the migration sequence against a disposable copy of the latest persistent database and verify that:
+
+- non-empty rental tables block the preflight before DDL;
 - the approved archive can be restored;
-- after explicit rental-data purge, the migration removes all retired tables;
+- after explicit rental-data purge, all retired tables are removed;
 - posted financial history remains queryable through Invoice, Payment, Tax, Finance, Voucher, and generic Reporting screens;
 - already-posted historical rental invoices can still be settled, while source-dependent lifecycle mutations are rejected.
