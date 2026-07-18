@@ -10,7 +10,6 @@ use Modules\Payment\DTOs\PaymentPostingPolicyData;
 use Modules\Payment\Enums\PaymentDirection;
 use Modules\Payment\Enums\PaymentPostingProfile;
 use Modules\Payment\Enums\PaymentPostingRole;
-use Modules\Payment\Enums\PaymentSourceType;
 use Modules\Payment\Enums\PaymentType;
 use Modules\Payment\Models\Payment;
 
@@ -26,8 +25,7 @@ final class PaymentPostingPolicyService
 
         return match ($type) {
             PaymentType::CustomerReceipt,
-            PaymentType::ServiceReceipt,
-            PaymentType::RentalReceipt => $this->customerSettlement(),
+            PaymentType::ServiceReceipt => $this->customerSettlement(),
             PaymentType::SupplierPayment => $this->supplierSettlement(),
             PaymentType::Advance => $this->advance($payment),
             PaymentType::Refund => $this->refund($payment),
@@ -59,20 +57,6 @@ final class PaymentPostingPolicyService
     {
         $direction = $this->direction($payment);
         $partyType = trim((string) $payment->party_type);
-        $sourceType = trim((string) $payment->source_type);
-
-        if ($sourceType === PaymentSourceType::RentalDepositRequirement->value) {
-            if ($direction !== PaymentDirection::Inbound || $partyType !== 'customer') {
-                throw new InvalidArgumentException('Rental deposit payments must be inbound customer advances.');
-            }
-
-            return new PaymentPostingPolicyData(
-                PaymentPostingProfile::RentalDeposit->value,
-                PaymentPostingRole::Receivable,
-                PaymentPostingRole::CustomerDeposit,
-                PaymentPostingRole::Receivable,
-            );
-        }
 
         if ($direction === PaymentDirection::Inbound && $partyType === 'customer') {
             return new PaymentPostingPolicyData(
