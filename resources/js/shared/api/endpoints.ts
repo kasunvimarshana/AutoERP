@@ -14,7 +14,6 @@ export const endpoints = {
     vehicles: '/api/v1/vehicles',
     vehicleOwnerships: '/api/v1/vehicle-ownerships',
     vehicleService: '/api/v1/vehicle-service',
-    vehicleRental: '/api/v1/vehicle-rental',
     vehicleMakes: '/api/v1/vehicle-makes',
     vehicleModels: '/api/v1/vehicle-models',
     vehicleTypes: '/api/v1/vehicle-types',
