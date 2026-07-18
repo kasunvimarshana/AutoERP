@@ -1,12 +1,12 @@
 <?php
 
 declare(strict_types=1);
+
 namespace Modules\Tenant\Services\Plans;
 
+use Illuminate\Validation\ValidationException;
 use Modules\Core\Tenancy\TenantFeature;
 use Modules\Core\Tenancy\TenantPlanLimit;
-
-use Illuminate\Validation\ValidationException;
 
 final class TenantPlanSchema
 {
@@ -52,7 +52,6 @@ final class TenantPlanSchema
         TenantPlanLimit::WAREHOUSES,
         TenantPlanLimit::STORAGE_MEGABYTES,
     ];
-
 
     /** @return list<array{code:string,label:string}> */
     public function commercialModuleCatalogue(): array
@@ -111,6 +110,38 @@ final class TenantPlanSchema
             }
 
             $modules[] = $module;
+        }
+
+        return ['enabled_modules' => array_values(array_unique($modules))];
+    }
+
+    /**
+     * Reads immutable historical plan revisions without re-enabling retired
+     * modules. Writes remain strict through normalizeFeatures().
+     *
+     * @return array{enabled_modules:list<string>}
+     */
+    public function normalizePersistedFeatures(mixed $features): array
+    {
+        if (! is_array($features)) {
+            return ['enabled_modules' => []];
+        }
+
+        $configured = $features['enabled_modules'] ?? [];
+        if (! is_array($configured)) {
+            return ['enabled_modules' => []];
+        }
+
+        $modules = [];
+        foreach ($configured as $module) {
+            if (! is_string($module)) {
+                continue;
+            }
+
+            $module = strtolower(trim($module));
+            if (array_key_exists($module, self::SUPPORTED_MODULES)) {
+                $modules[] = $module;
+            }
         }
 
         return ['enabled_modules' => array_values(array_unique($modules))];
