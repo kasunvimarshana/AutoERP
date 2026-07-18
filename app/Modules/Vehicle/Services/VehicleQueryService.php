@@ -71,17 +71,7 @@ final class VehicleQueryService
 
     private function applyCriteria(Builder $query, array $criteria): void
     {
-        $search = trim((string) ($criteria['search'] ?? ''));
-        if ($search !== '') {
-            $query->where(function (Builder $scope) use ($search): void {
-                $scope->where('vehicle_number', 'like', "%{$search}%")
-                    ->orWhere('code', 'like', "%{$search}%")
-                    ->orWhere('registration_number', 'like', "%{$search}%")
-                    ->orWhere('chassis_number', 'like', "%{$search}%")
-                    ->orWhere('engine_number', 'like', "%{$search}%")
-                    ->orWhere('vin_number', 'like', "%{$search}%");
-            });
-        }
+        $query->matchingSearch($criteria['search'] ?? null);
         foreach (['status', 'vehicle_make_id', 'vehicle_model_id', 'vehicle_type_id', 'vehicle_category_id'] as $filter) {
             if (array_key_exists($filter, $criteria) && $criteria[$filter] !== null && $criteria[$filter] !== '') {
                 $query->where($filter, $criteria[$filter]);
