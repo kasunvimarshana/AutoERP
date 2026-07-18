@@ -1,7 +1,6 @@
 <?php
 
 declare(strict_types=1);
-
 namespace Modules\Tenant\Services\Plans;
 
 use Modules\Core\Tenancy\TenantFeature;
@@ -40,7 +39,6 @@ final class TenantPlanSchema
         TenantFeature::PURCHASE => 'Purchasing',
         TenantFeature::VEHICLE => 'Vehicles',
         TenantFeature::VEHICLE_SERVICE => 'Vehicle service',
-        TenantFeature::VEHICLE_RENTAL => 'Vehicle rental',
         TenantFeature::INVOICE => 'Invoicing',
         TenantFeature::PAYMENT => 'Payments',
         TenantFeature::FINANCE => 'Finance',
