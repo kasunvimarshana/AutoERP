@@ -223,12 +223,13 @@ function withStatusUpdate(
     };
 }
 
-function withJobLines(job: VehicleServiceJob, lines: VehicleServiceJobLine[], rowVersion: number): VehicleServiceJob {
-    const subtotal = sumDecimals(lines.map((line) => multiplyDecimal(line.quantity, line.unit_price)));
-    const discountTotal = sumDecimals(lines.map((line) => line.discount_amount));
-    const taxTotal = sumDecimals(lines.map((line) => line.tax_amount));
-    const chargeTotal = sumDecimals(lines.map((line) => line.charge_amount));
-    const grandTotal = sumDecimals(lines.map((line) => line.line_total));
+export function withJobLines(job: VehicleServiceJob, lines: VehicleServiceJobLine[], rowVersion: number): VehicleServiceJob {
+    const billableLines = lines.filter((line) => line.is_billable && line.status !== 'cancelled');
+    const subtotal = sumDecimals(billableLines.map((line) => multiplyDecimal(line.quantity, line.unit_price)));
+    const discountTotal = sumDecimals(billableLines.map((line) => line.discount_amount));
+    const taxTotal = sumDecimals(billableLines.map((line) => line.tax_amount));
+    const chargeTotal = sumDecimals(billableLines.map((line) => line.charge_amount));
+    const grandTotal = sumDecimals(billableLines.map((line) => line.line_total));
 
     return {
         ...job,

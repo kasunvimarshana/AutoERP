@@ -5,7 +5,11 @@ import { vehicleServiceJobsEndpoint as jobs } from './endpoint';
 
 export const listVehicleServiceLines = (jobId: number, signal?: AbortSignal) =>
     apiClient.get<ApiCollection<VehicleServiceJobLine>>(`${jobs}/${jobId}/lines`, { signal })
-        .then((response) => response.data.data);
+        .then((response) => flattenVehicleServiceLines(response.data.data));
+
+export function flattenVehicleServiceLines(lines: VehicleServiceJobLine[]): VehicleServiceJobLine[] {
+    return lines.flatMap((line) => [line, ...flattenVehicleServiceLines(line.children ?? [])]);
+}
 
 export const createVehicleServiceLine = (jobId: number, payload: VehicleServiceLinePayload) =>
     apiClient.post<ApiResource<VehicleServiceJobLine>>(`${jobs}/${jobId}/lines`, payload)

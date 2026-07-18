@@ -20,11 +20,14 @@ use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Models\Invoice;
 use Modules\Invoice\Models\InvoiceSourceLine;
 use Modules\Item\DTOs\CreateItemData;
+use Modules\Item\DTOs\ItemPriceData;
 use Modules\Item\Enums\CostingMethod;
+use Modules\Item\Enums\ItemPriceType;
 use Modules\Item\Enums\ItemType;
 use Modules\Item\Enums\TrackingType;
 use Modules\Item\Models\Item;
 use Modules\Item\Services\ItemCreationService;
+use Modules\Item\Services\ItemPriceService;
 use Modules\Payment\Enums\PaymentAllocationState;
 use Modules\Payment\Enums\PaymentDocumentStatus;
 use Modules\Payment\Enums\PaymentMethodDirection;
@@ -56,6 +59,7 @@ use Modules\VehicleService\Services\VehicleServiceJobService;
 use Modules\VehicleService\Services\VehicleServiceLineService;
 use Modules\VehicleService\Services\VehicleServicePaymentIntegrationService;
 use Modules\VehicleService\Services\VehicleServiceStatusService;
+use Tests\Support\CurrencyFixture;
 use Tests\Support\FinancePostingFixture;
 use Tests\Support\TenantUserFixture;
 use Tests\TestCase;
@@ -171,6 +175,8 @@ final class VehicleServiceEngineTest extends TestCase
     public function test_combo_parent_expands_children_with_inventory_and_workforce_flags(): void
     {
         $context = $this->context();
+        $currencyId = $this->setTenantBaseCurrency($context['tenant_id']);
+        $this->servicePrice($context['labour'], $currencyId, $context['uom_id'], '125.000000');
         $combo = $this->item($context['tenant_id'], 'COMBO', ItemType::Combo, false, $context['uom_id']);
         DB::table('item_bundles')->insert([
             [
@@ -188,10 +194,10 @@ final class VehicleServiceEngineTest extends TestCase
             [
                 'tenant_id' => $context['tenant_id'],
                 'parent_item_id' => $combo->getKey(),
-                'child_item_id' => $context['service']->getKey(),
+                'child_item_id' => $context['labour']->getKey(),
                 'quantity' => '1.000000',
                 'uom_id' => $context['uom_id'],
-                'line_type' => 'service',
+                'line_type' => 'labour',
                 'is_required' => true,
                 'sort_order' => 2,
                 'created_at' => now(),
@@ -211,6 +217,10 @@ final class VehicleServiceEngineTest extends TestCase
         $this->assertFalse((bool) $children[0]->is_employee_assignable);
         $this->assertFalse((bool) $children[0]->is_billable);
         $this->assertTrue((bool) $children[1]->is_employee_assignable);
+        $this->assertFalse((bool) $children[1]->is_billable);
+        $this->assertSame('125.000000', (string) $children[1]->unit_price);
+        $this->assertSame('375.000000', (string) $children[1]->line_total);
+        $this->assertSame('1500.000000', (string) $this->refreshJob($job)->grand_total);
 
         $assignment = $this->assignEmployee(
             $job,
@@ -225,6 +235,41 @@ final class VehicleServiceEngineTest extends TestCase
             $parent,
             new VehicleServiceEmployeeAssignmentData($context['employee_id'], 'technician'),
         );
+    }
+
+    public function test_combo_expansion_rejects_labour_child_without_an_effective_service_price_atomically(): void
+    {
+        $context = $this->context();
+        $this->setTenantBaseCurrency($context['tenant_id']);
+        $combo = $this->item($context['tenant_id'], 'COMBO-NO-PRICE', ItemType::Combo, false, $context['uom_id']);
+        DB::table('item_bundles')->insert([
+            'tenant_id' => $context['tenant_id'],
+            'parent_item_id' => $combo->getKey(),
+            'child_item_id' => $context['labour']->getKey(),
+            'quantity' => '1.000000',
+            'uom_id' => $context['uom_id'],
+            'line_type' => 'labour',
+            'is_required' => true,
+            'sort_order' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $job = $this->createJob($context);
+
+        try {
+            $this->line($job, VehicleServiceLineSourceType::ComboParent, $combo, '1.000000', '500.000000');
+            $this->fail('Expected combo expansion without a labour service price to fail.');
+        } catch (InvalidArgumentException $exception) {
+            $this->assertSame(
+                "Combo child item {$context['labour']->code} requires an effective service price for the selected UOM.",
+                $exception->getMessage(),
+            );
+        }
+
+        $this->assertSame(0, $this->withTenantExecutionContext(
+            (int) $context['tenant_id'],
+            fn (): int => $job->lines()->count(),
+        ));
     }
 
     public function test_inventory_issue_only_posts_inventory_lines_and_enforces_availability(): void
@@ -1094,6 +1139,29 @@ final class VehicleServiceEngineTest extends TestCase
                 costingMethod: $stockable ? CostingMethod::Fifo : CostingMethod::None,
                 baseUomId: $uomId,
                 isStockable: $stockable,
+            )),
+        );
+    }
+
+    private function setTenantBaseCurrency(int $tenantId): int
+    {
+        $currencyId = CurrencyFixture::create();
+        DB::table('tenants')->where('id', $tenantId)->update(['base_currency_id' => $currencyId]);
+
+        return $currencyId;
+    }
+
+    private function servicePrice(Item $item, int $currencyId, int $uomId, string $amount): void
+    {
+        $this->withTenantExecutionContext(
+            (int) $item->tenant_id,
+            fn () => app(ItemPriceService::class)->create($item, new ItemPriceData(
+                priceType: ItemPriceType::Service,
+                amount: $amount,
+                currencyId: $currencyId,
+                uomId: $uomId,
+                organizationUnitId: null,
+                effectiveFrom: '2026-01-01',
             )),
         );
     }
