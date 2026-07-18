@@ -110,6 +110,29 @@ final class VehicleRentalRemovalContractTest extends TestCase
         self::assertStringContainsString("case RentalDepositRequirement = 'rental_deposit_requirement';", $sourceType);
     }
 
+    public function test_historical_rental_invoices_allow_settlement_but_block_source_dependent_lifecycle_actions(): void
+    {
+        $sourceTypes = $this->source('app/Modules/Invoice/Constants/RetiredInvoiceSource.php');
+        $policy = $this->source('app/Modules/Invoice/Services/RetiredInvoiceSourcePolicy.php');
+        $statuses = $this->source('app/Modules/Invoice/Services/InvoiceStatusService.php');
+        $reversals = $this->source('app/Modules/Invoice/Services/InvoiceReversalService.php');
+
+        foreach ([
+            'rental_calculation_run',
+            'rental_calculation_line',
+            'vehicle_finance_installment',
+            'vehicle_finance_installment_component',
+        ] as $sourceType) {
+            self::assertStringContainsString("'{$sourceType}'", $sourceTypes);
+        }
+
+        self::assertStringContainsString('InvoiceStatus::PartiallyPaid', $policy);
+        self::assertStringContainsString('InvoiceStatus::Paid', $policy);
+        self::assertStringContainsString('cannot be approved, posted, cancelled, voided, or reversed', $policy);
+        self::assertStringContainsString('$this->retiredSources->assertTransitionAllowed($invoice, $to);', $statuses);
+        self::assertStringContainsString('$this->retiredSources->assertReversalAllowed($invoice);', $reversals);
+    }
+
     public function test_decommission_migration_guards_data_before_dropping_every_rental_table(): void
     {
         $migration = $this->source(self::REMOVAL_MIGRATION);
