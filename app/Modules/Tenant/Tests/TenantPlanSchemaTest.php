@@ -57,6 +57,23 @@ final class TenantPlanSchemaTest extends TestCase
         ]);
     }
 
+    public function test_retired_modules_are_filtered_from_persisted_revisions_but_rejected_on_new_writes(): void
+    {
+        $schema = new TenantPlanSchema();
+
+        self::assertSame(
+            ['enabled_modules' => ['inventory']],
+            $schema->normalizePersistedFeatures([
+                'enabled_modules' => ['inventory', 'vehicle-rental'],
+            ]),
+        );
+
+        $this->expectException(ValidationException::class);
+        $schema->normalizeFeatures([
+            'enabled_modules' => ['inventory', 'vehicle-rental'],
+        ]);
+    }
+
     public function test_zero_or_negative_limits_are_rejected(): void
     {
         $this->expectException(ValidationException::class);
