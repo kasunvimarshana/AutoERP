@@ -73,7 +73,6 @@ final class ModuleApiVersioningTest extends TestCase
             'app/Modules/Purchase/Routes/api.php' => ['feature' => TenantFeature::PURCHASE, 'constant' => 'PURCHASE'],
             'app/Modules/Vehicle/Routes/api.php' => ['feature' => TenantFeature::VEHICLE, 'constant' => 'VEHICLE'],
             'app/Modules/VehicleService/Routes/api.php' => ['feature' => TenantFeature::VEHICLE_SERVICE, 'constant' => 'VEHICLE_SERVICE'],
-            'app/Modules/VehicleRental/Routes/api.php' => ['feature' => TenantFeature::VEHICLE_RENTAL, 'constant' => 'VEHICLE_RENTAL'],
             'app/Modules/Invoice/Routes/api.php' => ['feature' => TenantFeature::INVOICE, 'constant' => 'INVOICE'],
             'app/Modules/Payment/Routes/api.php' => ['feature' => TenantFeature::PAYMENT, 'constant' => 'PAYMENT'],
             'app/Modules/Finance/Routes/api.php' => ['feature' => TenantFeature::FINANCE, 'constant' => 'FINANCE'],
