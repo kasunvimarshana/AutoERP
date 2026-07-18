@@ -32,12 +32,15 @@ final class RentalAvailabilityServiceTest extends TestCase
         $otherTenantVehicleId = $this->createVehicle($otherTenantId, null, 'OTHER-TENANT-VEHICLE');
 
         $service = app(RentalAvailabilityService::class);
-        $availableVehicleIds = $service->queryAvailable(
+        $availableVehicleIds = $this->withTenantExecutionContext(
             $tenantId,
-            $currentOrganizationUnitId,
-            self::AVAILABILITY_START,
-            self::AVAILABILITY_END,
-        )->pluck('id')->map(static fn (mixed $id): int => (int) $id)->all();
+            fn (): array => $service->queryAvailable(
+                $tenantId,
+                $currentOrganizationUnitId,
+                self::AVAILABILITY_START,
+                self::AVAILABILITY_END,
+            )->pluck('id')->map(static fn (mixed $id): int => (int) $id)->all(),
+        );
 
         self::assertContains($tenantVehicleId, $availableVehicleIds);
         self::assertContains($currentUnitVehicleId, $availableVehicleIds);
@@ -45,13 +48,16 @@ final class RentalAvailabilityServiceTest extends TestCase
         self::assertNotContains($otherTenantVehicleId, $availableVehicleIds);
         self::assertSame(
             $tenantVehicleId,
-            (int) $service->assertVehicle(
+            $this->withTenantExecutionContext(
                 $tenantId,
-                $currentOrganizationUnitId,
-                $tenantVehicleId,
-                self::AVAILABILITY_START,
-                self::AVAILABILITY_END,
-            )->getKey(),
+                fn (): int => (int) $service->assertVehicle(
+                    $tenantId,
+                    $currentOrganizationUnitId,
+                    $tenantVehicleId,
+                    self::AVAILABILITY_START,
+                    self::AVAILABILITY_END,
+                )->getKey(),
+            ),
         );
     }
 
@@ -79,13 +85,16 @@ final class RentalAvailabilityServiceTest extends TestCase
         $service = app(RentalAvailabilityService::class);
 
         foreach ($searchTerms as $searchTerm) {
-            $resultIds = $service->queryAvailable(
+            $resultIds = $this->withTenantExecutionContext(
                 $tenantId,
-                $organizationUnitId,
-                self::AVAILABILITY_START,
-                self::AVAILABILITY_END,
-                search: $searchTerm,
-            )->pluck('id')->map(static fn (mixed $id): int => (int) $id)->all();
+                fn (): array => $service->queryAvailable(
+                    $tenantId,
+                    $organizationUnitId,
+                    self::AVAILABILITY_START,
+                    self::AVAILABILITY_END,
+                    search: $searchTerm,
+                )->pluck('id')->map(static fn (mixed $id): int => (int) $id)->all(),
+            );
 
             self::assertSame([$vehicleId], $resultIds, "Vehicle search failed for {$searchTerm}.");
         }
