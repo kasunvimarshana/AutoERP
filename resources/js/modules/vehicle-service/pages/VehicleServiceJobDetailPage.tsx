@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { toApiError, type ApiError } from '@/shared/api/apiError';
+import { ApiError, toApiError, type ApiError as ApiErrorShape } from '@/shared/api/apiError';
 import { ActionMenu } from '@/shared/components/ActionMenu';
 import { Button, LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
@@ -20,7 +20,7 @@ import { compareDecimalStrings, multiplyDecimal, sumDecimals } from '@/shared/ut
 import { VehicleServiceSummaryPanel } from '../components/VehicleServiceSummaryPanel';
 import { VehicleServiceStatusBadge } from '../components/VehicleServiceStatusBadge';
 import type { VehicleServiceInspection, VehicleServiceJob, VehicleServiceJobLine, VehicleServiceJobStatus } from '../vehicleServiceTypes';
-import { cancelVehicleServiceJob, completeVehicleServiceJob, deleteVehicleServiceJob, getVehicleServiceJob, inspectVehicleServiceJob, startVehicleServiceJob } from '../vehicleServiceApi';
+import { cancelVehicleServiceJob, completeVehicleServiceJob, deleteVehicleServiceJob, getVehicleServiceJob, inspectVehicleServiceJob, listEmployeeAssignableLines, startVehicleServiceJob } from '../vehicleServiceApi';
 
 const InspectionTab = lazy(() => import('../components/VehicleServiceInspectionTab'));
 const LinesTab = lazy(() => import('../components/VehicleServiceLineEditor'));
@@ -32,6 +32,7 @@ const DocumentTab = lazy(() => import('../components/VehicleServiceDocumentTab')
 const StatusHistoryTab = lazy(() => import('../components/VehicleServiceStatusHistoryTab'));
 
 type Tab = 'summary' | 'inspection' | 'lines' | 'workforce' | 'inventory' | 'invoice' | 'payments' | 'documents' | 'history';
+const INSPECT_WORKFORCE_REQUIRED_MESSAGE = 'Assign at least one labour employee in Workforce before marking this job as inspected.';
 
 export default function VehicleServiceJobDetailPage() {
     const id = Number(useParams().id);
@@ -41,7 +42,7 @@ export default function VehicleServiceJobDetailPage() {
     const setJob = result.setData;
     const tabs = useOnDemandTab<Tab>('summary');
     const [busy, setBusy] = useState(false);
-    const [actionError, setActionError] = useState<ApiError | null>(null);
+    const [actionError, setActionError] = useState<ApiErrorShape | null>(null);
     const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
 
     const bumpHistory = useCallback(() => {
@@ -80,6 +81,17 @@ export default function VehicleServiceJobDetailPage() {
         setActionError(null);
         try {
             if (name === 'inspect') {
+                const workforceLines = await listEmployeeAssignableLines(job.id);
+                if (requiresWorkforceBeforeInspect(workforceLines)) {
+                    tabs.openTab('workforce');
+                    setActionError(new ApiError(
+                        INSPECT_WORKFORCE_REQUIRED_MESSAGE,
+                        422,
+                        'VEHICLE_SERVICE_WORKFORCE_REQUIRED',
+                        'validation',
+                    ));
+                    return;
+                }
                 await inspectVehicleServiceJob(job.id, { expected_version: expectedVersion });
                 await refreshJobSilently();
                 bumpHistory();
@@ -248,4 +260,9 @@ function humanizeStatus(status: VehicleServiceJobStatus): string {
         .split('_')
         .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
         .join(' ');
+}
+
+export function requiresWorkforceBeforeInspect(lines: VehicleServiceJobLine[]): boolean {
+    return lines.length > 0 && !lines.some((line) =>
+        (line.employee_assignments ?? []).some((assignment) => assignment.status !== 'cancelled'));
 }

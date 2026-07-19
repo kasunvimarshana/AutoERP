@@ -47,25 +47,10 @@ Implemented foundations include:
 - effective-dated posting profiles and account-role assignments;
 - posting-profile fallback visibility and optimistic concurrency;
 - Vehicle Service Invoice posting and parts-consumption COGS posting;
-- Vehicle Rental commercial Invoice posting and source restoration;
-- Vehicle Finance installment Invoice-link restoration.
 
 ## Open policy-dependent items
 
 The following items must not be implemented by assumption:
-
-### Vehicle Finance GL policy
-
-A stakeholder-approved accounting policy is required for:
-
-- vehicle asset recognition ownership;
-- initial deposit handling and Payment linkage;
-- financed principal liability recognition;
-- principal reduction at installment billing/payment;
-- interest and fee recognition timing;
-- tax treatment and reversal behavior.
-
-Until that policy exists, Vehicle Finance payable creation remains Draft-only. This prevents principal from being incorrectly treated as rental expense or the vehicle asset from being recognized twice.
 
 ### Product scope decisions
 
@@ -73,7 +58,6 @@ The following remain product decisions rather than coding defects:
 
 - Payroll module scope;
 - Sales quotation/order/delivery/counter-sales scope;
-- Vehicle Rental replacement, downtime, free-kilometre, and deposit-priority rules.
 
 ## Operational release gates
 
