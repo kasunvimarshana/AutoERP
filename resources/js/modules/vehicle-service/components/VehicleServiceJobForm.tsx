@@ -60,6 +60,12 @@ const vehicleCustomer = (selectedVehicle: VehicleLookupResource | null, fallback
 };
 const currentCustomerOwner = (vehicle: VehicleLookupResource | null, fallback: NamedResource | null) =>
     vehicle?.current_customer?.name ?? fallback?.name ?? '-';
+const vehicleLookupLabel = (vehicle: VehicleLookupResource): string => {
+    const modelName = vehicle.model?.name?.trim();
+    return [vehicle.code, modelName]
+        .filter((value): value is string => typeof value === 'string' && value.trim() !== '')
+        .join(' ');
+};
 
 export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
     const navigate = useNavigate();
@@ -229,9 +235,9 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
                             value={vehicle}
                             onChange={applyVehicle}
                             search={searchVehicle}
-                            formatLabel={(value) => `${value.code ?? ''} ${value.name}`.trim()}
+                            formatLabel={vehicleLookupLabel}
                             error={errorFor('vehicle_id')}
-                            placeholder="Search by vehicle number or registration"
+                            placeholder="Search by vehicle number or model"
                             loadOnOpen
                             minSearchLength={0}
                             debounceMs={1000}
