@@ -14,4 +14,9 @@ enum InvoiceType: string
     case Manual = 'manual';
     case Credit = 'credit';
     case Debit = 'debit';
+
+    public function belongsToRetiredSourceModule(): bool
+    {
+        return in_array($this, [self::Rental, self::VehicleFinance], true);
+    }
 }

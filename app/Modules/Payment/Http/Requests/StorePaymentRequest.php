@@ -27,7 +27,10 @@ final class StorePaymentRequest extends TenantScopedRequest
                 'string',
                 'max:'.PaymentIdempotency::MAX_KEY_LENGTH,
             ],
-            'payment_type' => ['required', Rule::enum(PaymentType::class)],
+            'payment_type' => [
+                'required',
+                Rule::enum(PaymentType::class)->except(PaymentType::RentalReceipt),
+            ],
             'direction' => ['required', Rule::enum(PaymentDirection::class)],
             'payment_date' => ['required', 'date'],
             'party_type' => ['nullable', 'string', 'max:150'],

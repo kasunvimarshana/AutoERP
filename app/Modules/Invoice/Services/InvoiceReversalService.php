@@ -10,6 +10,7 @@ use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Invoice\Constants\InvoiceFinanceSource;
 use Modules\Invoice\Enums\InvoiceStatus;
+use Modules\Invoice\Enums\InvoiceType;
 use Modules\Invoice\Models\Invoice;
 use Modules\Invoice\Models\InvoiceBalance;
 use Modules\Invoice\Services\Tax\InvoiceTaxDocumentMapper;
@@ -49,6 +50,15 @@ final class InvoiceReversalService
                     'Invoice was changed by another request. Reload it before performing this action.',
                 );
             }
+            $type = $invoice->invoice_type instanceof InvoiceType
+                ? $invoice->invoice_type
+                : InvoiceType::from((string) $invoice->invoice_type);
+            if ($type->belongsToRetiredSourceModule()) {
+                throw new InvalidArgumentException(
+                    'Historical rental and vehicle finance invoices cannot be reversed after their source module was retired.',
+                );
+            }
+
             $status = $invoice->status instanceof InvoiceStatus
                 ? $invoice->status
                 : InvoiceStatus::from((string) $invoice->status);

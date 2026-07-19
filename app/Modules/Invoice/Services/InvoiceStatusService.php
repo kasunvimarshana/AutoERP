@@ -7,6 +7,7 @@ namespace Modules\Invoice\Services;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Invoice\Enums\InvoiceStatus;
+use Modules\Invoice\Enums\InvoiceType;
 use Modules\Invoice\Models\Invoice;
 use Modules\Invoice\Services\Tax\InvoiceTaxDocumentMapper;
 use Modules\Tax\Services\TaxDocumentIntegrationService;
@@ -106,6 +107,18 @@ final class InvoiceStatusService
             $from = $invoice->status instanceof InvoiceStatus
                 ? $invoice->status
                 : InvoiceStatus::from((string) $invoice->status);
+            $type = $invoice->invoice_type instanceof InvoiceType
+                ? $invoice->invoice_type
+                : InvoiceType::from((string) $invoice->invoice_type);
+            if (
+                $type->belongsToRetiredSourceModule()
+                && ! in_array($to, [InvoiceStatus::PartiallyPaid, InvoiceStatus::Paid], true)
+            ) {
+                throw new InvalidArgumentException(
+                    'Historical rental and vehicle finance invoices are read-only except for settlement updates.',
+                );
+            }
+
             $this->assertCanTransition($from, $to);
 
             $updates = ['status' => $to->value];

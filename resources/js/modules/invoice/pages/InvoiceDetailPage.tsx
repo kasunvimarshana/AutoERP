@@ -12,7 +12,6 @@ import {
     reverseInvoice,
 } from '../invoiceApi';
 import { hasInvoicePermission, invoicePermissions } from '../invoicePermissions';
-import { paymentPermissions } from '@/modules/payment/paymentPermissions';
 import { vehicleServicePermissions } from '@/modules/vehicle-service/vehicleServicePermissions';
 import { useApi } from '@/shared/hooks/useApi';
 import { useOnDemandTab } from '@/shared/hooks/useOnDemandTab';
@@ -41,6 +40,7 @@ type InvoiceAction = 'approve' | 'post' | 'reverse' | 'cancel';
 const summaryTab: TabItem<Tab> = { id: 'summary', label: 'Summary' };
 const linesTab: TabItem<Tab> = { id: 'lines', label: 'Lines' };
 const settlementStatuses = ['posted', 'partially_paid'] as const;
+const retiredSourceInvoiceTypes = new Set(['rental', 'vehicle_finance']);
 
 export default function InvoiceDetailPage() {
     const id = Number(useParams().id);
@@ -51,7 +51,6 @@ export default function InvoiceDetailPage() {
     const canPost = hasInvoicePermission(auth, invoicePermissions.post);
     const canReverse = hasInvoicePermission(auth, invoicePermissions.reverse);
     const canCancel = hasInvoicePermission(auth, invoicePermissions.cancel);
-    const canCreatePayment = hasPermission(auth, paymentPermissions.create);
     const canCreateVehicleServicePayment = hasPermission(auth, vehicleServicePermissions.paymentsCreate);
     const [searchParams] = useSearchParams();
     const [action, setAction] = useState<InvoiceAction | null>(null);
@@ -87,19 +86,14 @@ export default function InvoiceDetailPage() {
     if (!invoice.data) return <ErrorAlert error={invoice.error} />;
     const value = invoice.data;
     const fromPurchase = searchParams.get('from') === 'purchase';
-    const fromVehicleRental = searchParams.get('from') === 'vehicle-rental';
     const vehicleServiceSource = (value.sources ?? []).find((source) => source.source_type === 'vehicle_service_job');
     const vehicleServiceJobId = vehicleServiceSource?.source_id ?? Number(searchParams.get('job_id'));
     const hasVehicleServiceJobContext = Number.isInteger(vehicleServiceJobId) && vehicleServiceJobId > 0;
     const isServiceInvoice = value.invoice_type === 'service' && value.direction === 'outbound';
     const isSupplierInvoice = value.invoice_type === 'purchase' && value.direction === 'inbound';
-    const isRentalInvoice = value.invoice_type === 'rental';
+    const isRetiredSourceInvoice = retiredSourceInvoiceTypes.has(value.invoice_type ?? '');
     const canSettleServiceInvoice = hasVehicleServiceJobContext
         && isServiceInvoice
-        && settlementStatuses.includes(value.status as typeof settlementStatuses[number])
-        && isPositiveDecimal(value.balance_due ?? '0');
-    const canSettleRentalInvoice = fromVehicleRental
-        && isRentalInvoice
         && settlementStatuses.includes(value.status as typeof settlementStatuses[number])
         && isPositiveDecimal(value.balance_due ?? '0');
     const printUrl = `/invoices/${id}/print`;
@@ -160,31 +154,21 @@ export default function InvoiceDetailPage() {
                                 <LinkButton to={`/purchase/payments/create?invoice_id=${id}`}>Create Payment</LinkButton>
                             </>
                         ) : null}
-                        {fromVehicleRental && isRentalInvoice ? (
-                            <>
-                                <LinkButton to="/vehicle-rental/billing" variant="secondary">Back to Rental Billing</LinkButton>
-                                {canSettleRentalInvoice && canCreatePayment ? (
-                                    <LinkButton to={`/payments/create?invoice_id=${id}`}>
-                                        {value.direction === 'outbound' ? 'Receive lessee payment' : 'Pay vehicle owner'}
-                                    </LinkButton>
-                                ) : null}
-                            </>
-                        ) : null}
                         {canSettleServiceInvoice && canCreateVehicleServicePayment ? (
                             <LinkButton to={`/vehicle-service/jobs/${vehicleServiceJobId}/payment`}>
                                 Pay this invoice
                             </LinkButton>
                         ) : null}
-                        {value.status === 'draft' && canApprove ? (
+                        {!isRetiredSourceInvoice && value.status === 'draft' && canApprove ? (
                             <Button loading={action === 'approve'} onClick={() => void runAction('approve')}>Approve</Button>
                         ) : null}
-                        {value.status === 'approved' && canPost ? (
+                        {!isRetiredSourceInvoice && value.status === 'approved' && canPost ? (
                             <Button loading={action === 'post'} onClick={() => void runAction('post')}>Post</Button>
                         ) : null}
-                        {value.status === 'posted' && canReverse ? (
+                        {!isRetiredSourceInvoice && value.status === 'posted' && canReverse ? (
                             <Button variant="danger" disabled={action !== null} onClick={() => setReversalOpen(true)}>Reverse</Button>
                         ) : null}
-                        {['draft', 'approved'].includes(value.status ?? '') && canCancel ? (
+                        {!isRetiredSourceInvoice && ['draft', 'approved'].includes(value.status ?? '') && canCancel ? (
                             <Button variant="danger" loading={action === 'cancel'} onClick={() => void runAction('cancel')}>Cancel</Button>
                         ) : null}
                         <Button variant="secondary" onClick={async () => {
@@ -217,6 +201,11 @@ export default function InvoiceDetailPage() {
                 )}
             />
             <ErrorAlert error={actionError} />
+            {isRetiredSourceInvoice ? (
+                <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                    This historical invoice is read-only because its source module has been retired.
+                </p>
+            ) : null}
             <Panel className="p-0">
                 <Tabs tabs={tabs} active={tabState.activeTab} onChange={tabState.openTab} />
                 <div className="p-5">
