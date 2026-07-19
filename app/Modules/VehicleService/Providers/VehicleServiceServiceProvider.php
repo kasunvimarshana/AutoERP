@@ -7,7 +7,9 @@ namespace Modules\VehicleService\Providers;
 use Illuminate\Support\ServiceProvider;
 use Modules\Core\Contracts\PermissionDefinitionRegistryInterface;
 use Modules\Invoice\Contracts\InvoiceSourceRestorationHandlerInterface;
+use Modules\Vehicle\Contracts\VehicleAvailabilityBlockerInterface;
 use Modules\VehicleService\Constants\VehicleServicePermission;
+use Modules\VehicleService\Services\Availability\VehicleServiceAvailabilityBlocker;
 use Modules\VehicleService\Services\Invoice\VehicleServiceInvoiceRestorationHandler;
 
 final class VehicleServiceServiceProvider extends ServiceProvider
@@ -18,6 +20,10 @@ final class VehicleServiceServiceProvider extends ServiceProvider
         $this->app->tag(
             [VehicleServiceInvoiceRestorationHandler::class],
             InvoiceSourceRestorationHandlerInterface::TAG,
+        );
+        $this->app->tag(
+            [VehicleServiceAvailabilityBlocker::class],
+            VehicleAvailabilityBlockerInterface::TAG,
         );
     }
 

@@ -48,6 +48,22 @@ final class TenantPlanSchemaTest extends TestCase
         self::assertNotContains(TenantFeature::HR, TenantPlanSchema::ALWAYS_ON_MODULES);
     }
 
+    public function test_vehicle_rental_requires_a_schema_two_plan_snapshot_to_reactivate(): void
+    {
+        $schema = new TenantPlanSchema();
+        $features = ['enabled_modules' => ['inventory', TenantFeature::VEHICLE_RENTAL]];
+
+        self::assertSame(
+            ['enabled_modules' => ['inventory']],
+            $schema->normalizePersistedFeatures($features, 1),
+        );
+        self::assertSame(
+            ['enabled_modules' => ['inventory', TenantFeature::VEHICLE_RENTAL]],
+            $schema->normalizePersistedFeatures($features, TenantPlanSchema::SCHEMA_VERSION),
+        );
+        self::assertContains(TenantFeature::VEHICLE_RENTAL, $schema->supportedModuleCodes());
+    }
+
     public function test_unknown_modules_are_rejected_instead_of_silently_enabled(): void
     {
         $this->expectException(ValidationException::class);
@@ -55,23 +71,6 @@ final class TenantPlanSchemaTest extends TestCase
         (new TenantPlanSchema())->normalizeFeatures([
             'enabled_modules' => ['inventory', 'unknown-module'],
         ]);
-    }
-
-    public function test_retired_modules_are_withheld_from_persisted_entitlements(): void
-    {
-        $schema = new TenantPlanSchema();
-        $retiredModule = TenantPlanSchema::RETIRED_MODULES[0];
-
-        self::assertSame(
-            ['enabled_modules' => ['inventory']],
-            $schema->normalizePersistedFeatures([
-                'enabled_modules' => ['inventory', $retiredModule],
-            ]),
-        );
-        self::assertNotContains($retiredModule, $schema->supportedModuleCodes());
-
-        $this->expectException(ValidationException::class);
-        $schema->normalizeFeatures(['enabled_modules' => [$retiredModule]]);
     }
 
     public function test_zero_or_negative_limits_are_rejected(): void
