@@ -28,10 +28,13 @@ final class FinancePostingFixture
     private const GRNI_ACCOUNT = '2150';
     private const TAX_PAYABLE_ACCOUNT = '2200';
     private const CUSTOMER_ADVANCE_ACCOUNT = '2300';
+    private const CUSTOMER_DEPOSIT_ACCOUNT = '2310';
     private const SALES_REVENUE_ACCOUNT = '4100';
     private const SERVICE_REVENUE_ACCOUNT = '4200';
+    private const RENTAL_REVENUE_ACCOUNT = '4300';
     private const PURCHASE_EXPENSE_ACCOUNT = '5100';
     private const COST_OF_GOODS_SOLD_ACCOUNT = '5200';
+    private const RENTAL_EXPENSE_ACCOUNT = '5300';
 
     public static function seedCustomerPaymentProfiles(int $tenantId, ?int $organizationUnitId = null): void
     {
@@ -49,6 +52,12 @@ final class FinancePostingFixture
             FinanceAccountRoleCode::Bank->value => $accounts[FinanceAccountRoleCode::Bank->value],
             FinanceAccountRoleCode::Receivable->value => $accounts[FinanceAccountRoleCode::Receivable->value],
             FinanceAccountRoleCode::CustomerAdvance->value => $accounts[FinanceAccountRoleCode::CustomerAdvance->value],
+        ]);
+        self::profile($tenantId, $organizationUnitId, FinancePostingProfileCode::RentalDeposit->value, [
+            FinanceAccountRoleCode::Cash->value => $accounts[FinanceAccountRoleCode::Cash->value],
+            FinanceAccountRoleCode::Bank->value => $accounts[FinanceAccountRoleCode::Bank->value],
+            FinanceAccountRoleCode::Receivable->value => $accounts[FinanceAccountRoleCode::Receivable->value],
+            FinanceAccountRoleCode::CustomerDeposit->value => $accounts[FinanceAccountRoleCode::CustomerDeposit->value],
         ]);
     }
 
@@ -92,6 +101,12 @@ final class FinancePostingFixture
             FinanceAccountRoleCode::ServiceRevenue->value => $accounts[FinanceAccountRoleCode::ServiceRevenue->value],
             FinanceAccountRoleCode::TaxPayable->value => $accounts[FinanceAccountRoleCode::TaxPayable->value],
         ]);
+        self::profile($tenantId, $organizationUnitId, FinancePostingProfileCode::CustomerRentalInvoice->value, [
+            FinanceAccountRoleCode::Receivable->value => $accounts[FinanceAccountRoleCode::Receivable->value],
+            FinanceAccountRoleCode::RentalRevenue->value => $accounts[FinanceAccountRoleCode::RentalRevenue->value],
+            FinanceAccountRoleCode::TaxPayable->value => $accounts[FinanceAccountRoleCode::TaxPayable->value],
+            FinanceAccountRoleCode::WithholdingReceivable->value => $accounts[FinanceAccountRoleCode::WithholdingReceivable->value],
+        ]);
         self::seedInventoryIssueProfile($tenantId, $organizationUnitId, $accounts);
     }
 
@@ -100,6 +115,12 @@ final class FinancePostingFixture
         $accounts = self::accounts($tenantId, $organizationUnitId);
         self::seedInventoryReceiptProfile($tenantId, $organizationUnitId, $accounts);
         self::seedPurchaseInvoiceProfile($tenantId, $organizationUnitId, $accounts);
+        self::profile($tenantId, $organizationUnitId, FinancePostingProfileCode::SupplierRentalInvoice->value, [
+            FinanceAccountRoleCode::Payable->value => $accounts[FinanceAccountRoleCode::Payable->value],
+            FinanceAccountRoleCode::RentalExpense->value => $accounts[FinanceAccountRoleCode::RentalExpense->value],
+            FinanceAccountRoleCode::TaxReceivable->value => $accounts[FinanceAccountRoleCode::TaxReceivable->value],
+            FinanceAccountRoleCode::WithholdingPayable->value => $accounts[FinanceAccountRoleCode::WithholdingPayable->value],
+        ]);
     }
 
     public static function seedPurchaseWithholdingRole(int $tenantId, ?int $organizationUnitId = null): void
@@ -168,10 +189,13 @@ final class FinancePostingFixture
             FinanceAccountRoleCode::TaxPayable->value => self::account($tenantId, $organizationUnitId, $liabilityTypeId, self::TAX_PAYABLE_ACCOUNT, 'Tax Payable', 'credit', isTax: true),
             FinanceAccountRoleCode::WithholdingPayable->value => self::account($tenantId, $organizationUnitId, $liabilityTypeId, self::TAX_PAYABLE_ACCOUNT, 'Tax Payable', 'credit', isTax: true),
             FinanceAccountRoleCode::CustomerAdvance->value => self::account($tenantId, $organizationUnitId, $liabilityTypeId, self::CUSTOMER_ADVANCE_ACCOUNT, 'Customer Advances', 'credit'),
+            FinanceAccountRoleCode::CustomerDeposit->value => self::account($tenantId, $organizationUnitId, $liabilityTypeId, self::CUSTOMER_DEPOSIT_ACCOUNT, 'Rental Security Deposits', 'credit'),
             FinanceAccountRoleCode::Revenue->value => self::account($tenantId, $organizationUnitId, $revenueTypeId, self::SALES_REVENUE_ACCOUNT, 'Sales Revenue', 'credit'),
             FinanceAccountRoleCode::ServiceRevenue->value => self::account($tenantId, $organizationUnitId, $revenueTypeId, self::SERVICE_REVENUE_ACCOUNT, 'Service Revenue', 'credit'),
+            FinanceAccountRoleCode::RentalRevenue->value => self::account($tenantId, $organizationUnitId, $revenueTypeId, self::RENTAL_REVENUE_ACCOUNT, 'Rental Revenue', 'credit'),
             FinanceAccountRoleCode::Expense->value => self::account($tenantId, $organizationUnitId, $expenseTypeId, self::PURCHASE_EXPENSE_ACCOUNT, 'Purchase Expense', 'debit'),
             FinanceAccountRoleCode::CostOfGoodsSold->value => self::account($tenantId, $organizationUnitId, $expenseTypeId, self::COST_OF_GOODS_SOLD_ACCOUNT, 'Cost of Goods Sold', 'debit'),
+            FinanceAccountRoleCode::RentalExpense->value => self::account($tenantId, $organizationUnitId, $expenseTypeId, self::RENTAL_EXPENSE_ACCOUNT, 'Rental Expense', 'debit'),
         ];
     }
 

@@ -188,7 +188,7 @@ function VehicleServiceLineTable({ lines, loading, onAdd, onEdit, onRemove }: {
             header: 'Actions',
             className: 'text-right',
             render: (row) => row.isComboChild ? null : (
-                <LineActions onEdit={() => onEdit(row.line)} onRemove={() => onRemove(row.line)} />
+                <LineActions line={row} onEdit={() => onEdit(row.line)} onRemove={() => onRemove(row.line)} />
             ),
         },
     ];
@@ -210,6 +210,7 @@ function VehicleServiceLineTable({ lines, loading, onAdd, onEdit, onRemove }: {
                         mobileDetails={(row) => <LineMobileDetails row={row} />}
                         mobileActions={(row) => row.isComboChild ? null : (
                             <LineActions
+                                line={row}
                                 onEdit={() => onEdit(row.line)}
                                 onRemove={() => onRemove(row.line)}
                             />
@@ -221,7 +222,7 @@ function VehicleServiceLineTable({ lines, loading, onAdd, onEdit, onRemove }: {
     );
 }
 
-function LineActions({ onEdit, onRemove }: { onEdit: () => void; onRemove: () => void }) {
+function LineActions({ line, onEdit, onRemove }: { line: VehicleServiceLineDisplayRow; onEdit: () => void; onRemove: () => void }) {
     return (
         <div className="flex justify-end gap-2">
             <button

@@ -5,8 +5,6 @@ import { TestRouter } from '@/test/TestRouter';
 import type { TenantPlan, TenantPlanRevision } from '../tenantTypes';
 import { TenantPlanEditor } from './TenantPlanEditor';
 
-const RETIRED_TENANT_MODULE_CODE = 'vehicle-rental';
-
 function createPlan(): TenantPlan {
     const revision: TenantPlanRevision = {
         id: 12,
@@ -108,15 +106,9 @@ describe('TenantPlanEditor', () => {
         expect(payload).not.toHaveProperty('is_active');
     });
 
-    it('sends only changed fields when a historical revision contains a retired module', async () => {
+    it('sends only changed fields when revising a plan with an inactive current currency', async () => {
         const onSubmit = vi.fn().mockResolvedValue(undefined);
         const plan = createPlan();
-        if (plan.latest_revision) {
-            plan.latest_revision.features.enabled_modules = [
-                TENANT_MODULE_CODE.INVENTORY,
-                RETIRED_TENANT_MODULE_CODE,
-            ] as TenantPlanRevision['features']['enabled_modules'];
-        }
 
         render(
             <TestRouter>

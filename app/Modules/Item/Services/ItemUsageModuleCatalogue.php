@@ -16,6 +16,7 @@ final class ItemUsageModuleCatalogue
         'purchase' => [ItemType::Stock, ItemType::NonStock, ItemType::Service, ItemType::Labour, ItemType::Asset, ItemType::Consumable],
         'invoice' => [ItemType::Stock, ItemType::NonStock, ItemType::Service, ItemType::Labour, ItemType::Asset, ItemType::Consumable, ItemType::Package, ItemType::Combo],
         'vehicle-service' => [ItemType::Stock, ItemType::Service, ItemType::Labour, ItemType::Consumable, ItemType::Package, ItemType::Combo],
+        'vehicle-rental' => [ItemType::Service, ItemType::Asset, ItemType::Package],
     ];
 
     /**

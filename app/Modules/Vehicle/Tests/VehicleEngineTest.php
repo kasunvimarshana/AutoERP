@@ -181,6 +181,7 @@ final class VehicleEngineTest extends TestCase
             $this->assertSame(VehicleStatus::UnderService, $vehicle->refresh()->status);
             $this->assertCount(2, $vehicle->statusHistories()->get());
             $this->assertTrue(app(VehicleLookupService::class)->vehiclesAvailableForService($tenantId, $organizationUnitId)->contains($vehicle));
+            $this->assertFalse(app(VehicleLookupService::class)->vehiclesAvailableForRental($tenantId, $organizationUnitId)->contains($vehicle));
             $this->assertTrue(app(VehicleLookupService::class)->vehiclesByType($tenantId, (int) $type->getKey(), $organizationUnitId)->contains($vehicle));
             $this->assertTrue(app(VehicleLookupService::class)->vehiclesByCategory($tenantId, (int) $category->getKey(), $organizationUnitId)->contains($vehicle));
         });

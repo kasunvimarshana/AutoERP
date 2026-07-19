@@ -173,7 +173,7 @@ export default function PaymentEntryPage() {
         setPaymentType(nextPaymentType);
         setDirection(nextDirection);
         setParty(invoiceParty(invoice));
-        setReference(`Settlement for ${invoice.invoice_number ?? 'invoice'}`);
+        setReference(`Settlement for ${invoice.invoice_number ?? 'rental invoice'}`);
         setLines([{ ...emptyLine(1), amount: balance }]);
         setNextKey(2);
     }, [invoiceIssue, settlementInvoice.data]);
@@ -249,7 +249,7 @@ export default function PaymentEntryPage() {
             <ContentHeader
                 title={settlementInvoice.data ? 'Invoice settlement' : 'Payment entry'}
                 description={settlementInvoice.data
-                    ? 'Create the matching customer receipt or supplier payment and allocate it to this invoice atomically.'
+                    ? 'Create the matching receipt or owner payment and allocate it to this invoice atomically.'
                     : 'Create a payment with one or more configured settlement methods.'}
             />
             <ErrorAlert error={error ?? methods.error ?? settlementInvoice.error} />
@@ -259,7 +259,7 @@ export default function PaymentEntryPage() {
                         <div>
                             <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Invoice</div>
                             <div className="mt-1 font-medium text-slate-900">
-                                {settlementInvoice.data.invoice_number ?? 'Invoice'}
+                                {settlementInvoice.data.invoice_number ?? 'Rental invoice'}
                             </div>
                         </div>
                         <div>
@@ -270,8 +270,8 @@ export default function PaymentEntryPage() {
                             <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Settlement</div>
                             <div className="mt-1 text-slate-900">
                                 {settlementInvoice.data.direction === PAYMENT_DIRECTION_OUTBOUND
-                                    ? 'Customer receipt'
-                                    : 'Supplier payment'}
+                                    ? 'Lessee receipt'
+                                    : 'Vehicle owner payment'}
                             </div>
                         </div>
                         <div>
@@ -341,9 +341,9 @@ export default function PaymentEntryPage() {
                 <div className="flex justify-end">
                     <Button type="submit" loading={busy} disabled={!canSubmit}>
                         {settlementInvoice.data?.direction === PAYMENT_DIRECTION_OUTBOUND
-                            ? 'Create customer receipt'
+                            ? 'Create lessee receipt'
                             : settlementInvoice.data
-                                ? 'Create supplier payment'
+                                ? 'Create owner payment'
                                 : 'Create payment'}
                     </Button>
                 </div>
