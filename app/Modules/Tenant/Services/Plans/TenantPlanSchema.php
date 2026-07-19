@@ -4,26 +4,20 @@ declare(strict_types=1);
 
 namespace Modules\Tenant\Services\Plans;
 
+use Illuminate\Validation\ValidationException;
 use Modules\Core\Tenancy\TenantFeature;
 use Modules\Core\Tenancy\TenantPlanLimit;
 
-use Illuminate\Validation\ValidationException;
-
 final class TenantPlanSchema
 {
-    public const SCHEMA_VERSION = 1;
+    public const SCHEMA_VERSION = 2;
 
-    /** Immutable snapshots may contain these module codes, but they never grant an entitlement. @var list<string> */
-    public const RETIRED_MODULES = [
-        'vehicle-rental',
+    /** @var array<int, list<string>> */
+    private const RETIRED_MODULES_BY_SCHEMA_VERSION = [
+        1 => [TenantFeature::VEHICLE_RENTAL],
     ];
 
-    /**
-     * Foundation capabilities are required for every tenant workspace and are
-     * never toggled by commercial subscriptions.
-     *
-     * @var list<string>
-     */
+    /** @var list<string> */
     public const ALWAYS_ON_MODULES = [
         'auth',
         'tenant',
@@ -34,7 +28,7 @@ final class TenantPlanSchema
         'audit',
     ];
 
-    /** Plan-controlled commercial feature modules. @var array<string, string> */
+    /** @var array<string, string> */
     public const SUPPORTED_MODULES = [
         TenantFeature::CUSTOMER => 'Customers',
         TenantFeature::SUPPLIER => 'Suppliers',
@@ -45,6 +39,7 @@ final class TenantPlanSchema
         TenantFeature::PURCHASE => 'Purchasing',
         TenantFeature::VEHICLE => 'Vehicles',
         TenantFeature::VEHICLE_SERVICE => 'Vehicle service',
+        TenantFeature::VEHICLE_RENTAL => 'Vehicle rental',
         TenantFeature::INVOICE => 'Invoicing',
         TenantFeature::PAYMENT => 'Payments',
         TenantFeature::FINANCE => 'Finance',
@@ -58,7 +53,6 @@ final class TenantPlanSchema
         TenantPlanLimit::WAREHOUSES,
         TenantPlanLimit::STORAGE_MEGABYTES,
     ];
-
 
     /** @return list<array{code:string,label:string}> */
     public function commercialModuleCatalogue(): array
@@ -80,17 +74,20 @@ final class TenantPlanSchema
     /** @return array{enabled_modules:list<string>} */
     public function normalizeFeatures(mixed $features): array
     {
-        return $this->normalizeFeaturePayload($features, false);
+        return $this->normalizeFeaturePayload($features, []);
     }
 
     /** @return array{enabled_modules:list<string>} */
-    public function normalizePersistedFeatures(mixed $features): array
+    public function normalizePersistedFeatures(mixed $features, ?int $schemaVersion = null): array
     {
-        return $this->normalizeFeaturePayload($features, true);
+        return $this->normalizeFeaturePayload(
+            $features,
+            self::RETIRED_MODULES_BY_SCHEMA_VERSION[$schemaVersion ?? 1] ?? [],
+        );
     }
 
     /** @return array{enabled_modules:list<string>} */
-    private function normalizeFeaturePayload(mixed $features, bool $excludeRetiredModules): array
+    private function normalizeFeaturePayload(mixed $features, array $retiredModules): array
     {
         $features = $features ?? [];
         if (! is_array($features)) {
@@ -122,7 +119,7 @@ final class TenantPlanSchema
             }
 
             $module = strtolower(trim($module));
-            if ($excludeRetiredModules && in_array($module, self::RETIRED_MODULES, true)) {
+            if (in_array($module, $retiredModules, true)) {
                 continue;
             }
 
