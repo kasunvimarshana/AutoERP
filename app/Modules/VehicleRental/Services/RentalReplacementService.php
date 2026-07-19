@@ -17,6 +17,7 @@ use Modules\VehicleRental\Models\RentalAgreement;
 use Modules\VehicleRental\Models\RentalAssignment;
 use Modules\VehicleRental\Services\Validation\RentalAssignmentSourceGuard;
 use Modules\VehicleRental\Services\Validation\RentalAssignmentTimelineGuard;
+use Modules\VehicleRental\Services\Validation\RentalRunningChartTimelineGuard;
 
 final class RentalReplacementService
 {
@@ -25,6 +26,7 @@ final class RentalReplacementService
         private readonly RentalAssignmentTimelineGuard $timeline,
         private readonly RentalAssignmentSourceGuard $sources,
         private readonly RentalCustodyService $custody,
+        private readonly RentalRunningChartTimelineGuard $runningCharts,
     ) {}
 
     public function replace(
@@ -91,6 +93,8 @@ final class RentalReplacementService
                 && $this->math->compare($data->oldReturnOdometer, (string) $original->handover_odometer) < 0) {
                 throw new InvalidArgumentException('Replacement return odometer cannot be lower than the original handover odometer.');
             }
+            $this->runningCharts->assertNoChartsAfterClosure($original, $effectiveAt);
+            $this->runningCharts->assertClosureOdometer($original, $effectiveAt, $data->oldReturnOdometer);
 
             $agreement = RentalAgreement::query()
                 ->forContext($data->tenantId, $data->organizationUnitId)

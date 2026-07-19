@@ -59,7 +59,6 @@ final class RentalAgreement extends TenantOwnedModel
             : $query->where('organization_unit_id', $organizationUnitId);
     }
 
-
     public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class, 'customer_id')->withTrashed();
@@ -88,5 +87,10 @@ final class RentalAgreement extends TenantOwnedModel
     public function assignments(): HasMany
     {
         return $this->hasMany(RentalAssignment::class, 'agreement_id')->orderByDesc('starts_at');
+    }
+
+    public function calculations(): HasMany
+    {
+        return $this->hasMany(RentalCalculation::class, 'agreement_id')->orderByDesc('period_start');
     }
 }

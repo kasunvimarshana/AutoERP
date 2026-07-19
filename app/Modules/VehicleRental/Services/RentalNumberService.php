@@ -25,6 +25,26 @@ final class RentalNumberService
         );
     }
 
+    public function runningChart(int $tenantId, ?int $organizationUnitId): string
+    {
+        return $this->generate(
+            $tenantId,
+            $organizationUnitId,
+            VehicleRentalSource::RUNNING_CHART_DOCUMENT,
+            (string) config('vehicle-rental.running_chart_number_prefix', 'VRC').'-',
+        );
+    }
+
+    public function calculation(int $tenantId, ?int $organizationUnitId): string
+    {
+        return $this->generate(
+            $tenantId,
+            $organizationUnitId,
+            VehicleRentalSource::CALCULATION_DOCUMENT,
+            (string) config('vehicle-rental.calculation_number_prefix', 'VRCAL').'-',
+        );
+    }
+
     private function generate(int $tenantId, ?int $organizationUnitId, string $documentType, string $prefix): string
     {
         $result = $this->sequences->execute([

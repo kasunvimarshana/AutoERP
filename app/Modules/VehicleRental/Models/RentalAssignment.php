@@ -82,4 +82,8 @@ final class RentalAssignment extends TenantOwnedModel
         return $this->hasMany(RentalCustodyEvent::class, 'assignment_id')->orderBy('event_at');
     }
 
+    public function runningCharts(): HasMany
+    {
+        return $this->hasMany(RentalRunningChart::class, 'assignment_id')->orderBy('operational_date');
+    }
 }
