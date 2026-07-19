@@ -9,6 +9,7 @@ import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { MoneyDisplay } from '@/shared/components/MoneyDisplay';
+import { Modal } from '@/shared/components/Modal';
 import { Pagination } from '@/shared/components/Pagination';
 import { Select } from '@/shared/components/Select';
 import { Tabs } from '@/shared/components/Tabs';
@@ -90,7 +91,28 @@ export default function VehicleServiceJobListPage() {
         { key: 'vehicle', header: 'Vehicle', render: (job) => readableRelation(job.vehicle) },
         { key: 'total', header: 'Total', render: (job) => <MoneyDisplay value={job.grand_total} /> },
         { key: 'status', header: 'Status', render: (job) => <VehicleServiceStatusBadge status={job.status} /> },
-        { key: 'actions', header: '', render: (job) => <div className="flex gap-2"><LinkButton to={`/vehicle-service/jobs/${job.id}`} variant="ghost">View</LinkButton>{canUpdate && editableStatuses.includes(job.status as typeof editableStatuses[number]) && <LinkButton to={`/vehicle-service/jobs/${job.id}/edit`} variant="secondary">Edit</LinkButton>}</div> },
+        {
+            key: 'actions',
+            header: '',
+            render: (job) => (
+                <div className="flex items-center gap-2">
+                    <LinkButton to={`/vehicle-service/jobs/${job.id}`} variant="ghost">View</LinkButton>
+                    {canUpdate && editableStatuses.includes(job.status as typeof editableStatuses[number]) && (
+                        <Link
+                            to={`/vehicle-service/jobs/${job.id}/edit`}
+                            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-sky-700 transition hover:border-sky-200 hover:bg-sky-50"
+                            aria-label="Edit job"
+                            title="Edit job"
+                        >
+                            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.9" className="h-5 w-5" aria-hidden="true">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.75v2.5h2.5L14.5 8l-2.5-2.5-8.25 8.25Z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" d="m10.75 4.75 2.5 2.5" />
+                            </svg>
+                        </Link>
+                    )}
+                </div>
+            ),
+        },
     ];
 
     return (
@@ -101,21 +123,27 @@ export default function VehicleServiceJobListPage() {
                 actions={(
                     <div className="flex flex-wrap gap-2">
                         {canViewCommissions && (
-                            <Button type="button" variant="secondary" onClick={() => setShowCommissionDefaults((current) => !current)}>
-                                {showCommissionDefaults ? 'Hide commission defaults' : 'Commission defaults'}
+                            <Button type="button" variant="secondary" onClick={() => setShowCommissionDefaults(true)}>
+                                Commission defaults
                             </Button>
                         )}
                         {canCreate && <LinkButton to="/vehicle-service/jobs/create">New service job</LinkButton>}
                     </div>
                 )}
             />
-            {canViewCommissions && showCommissionDefaults && (
-                <VehicleServiceCommissionSettingsPanel
-                    onSaved={() => {
-                        notifySuccess('Commission defaults updated for new vehicle service jobs.', 'Commission defaults saved');
-                        setShowCommissionDefaults(false);
-                    }}
-                />
+            {canViewCommissions && (
+                <Modal
+                    open={showCommissionDefaults}
+                    title="Commission defaults"
+                    onClose={() => setShowCommissionDefaults(false)}
+                >
+                    <VehicleServiceCommissionSettingsPanel
+                        onSaved={() => {
+                            notifySuccess('Commission defaults updated for new vehicle service jobs.', 'Commission defaults saved');
+                            setShowCommissionDefaults(false);
+                        }}
+                    />
+                </Modal>
             )}
             <div className="mb-4 rounded-xl border border-slate-200 bg-white">
                 <Tabs
