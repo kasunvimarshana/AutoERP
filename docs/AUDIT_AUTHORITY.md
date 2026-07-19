@@ -30,7 +30,7 @@ New audit and remediation records should classify findings as:
 
 Legacy Vehicle Rental videos remain valuable business evidence for agreements, allocations, Running Charts, customer billing, owner settlements, payments, deductions, reconciliation, and reporting.
 
-The Vehicle Rental module is not part of the current AutoERP runtime. These materials are historical product evidence only and must not be interpreted as current routes, schema, or implemented behavior.
+They are not authoritative evidence that current AutoERP has the same architecture or defects. Every legacy issue must be mapped to current code before remediation.
 
 Rules that the videos do not prove—such as partial-month proration, replacement charging, downtime deductions, free-kilometre pooling, garage-mileage billing, accident excess, deposit priority, and multi-driver splits—remain decision-required. They must not be implemented by assumption.
 
@@ -54,5 +54,6 @@ The following categories cannot be closed by speculative code:
 - staging browser E2E and role accounts;
 - live queue-worker, scheduler, SMTP, cache, storage, backup, and restore verification;
 - Customer credit exposure and audited over-limit override policy;
+- unresolved Vehicle Rental commercial rules.
 
 These remain explicit release or decision gates until evidence is supplied.

@@ -30,6 +30,8 @@ final class VehicleQueryService
             throw new \InvalidArgumentException('Customer is required for vehicle by-customer lookup.');
         } elseif ($kind === 'service-available') {
             $criteria['available_for_service'] = true;
+        } elseif ($kind === 'rental-available') {
+            $criteria['available_for_rental'] = true;
         }
 
         return $this->paginate($criteria, $tenantId, $organizationUnitId, min($perPage, 50));
@@ -89,6 +91,9 @@ final class VehicleQueryService
         }
         if (! empty($criteria['available_for_service'])) {
             $query->whereIn('status', [VehicleStatus::Active->value, VehicleStatus::UnderService->value]);
+        }
+        if (! empty($criteria['available_for_rental'])) {
+            $query->where('status', VehicleStatus::Active->value);
         }
     }
 }

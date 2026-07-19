@@ -4,6 +4,7 @@ import { financePermissions } from '@/modules/finance/financePermissions';
 import { inventoryPermissions } from '@/modules/inventory/inventoryPermissions';
 import { invoicePermissions } from '@/modules/invoice/invoicePermissions';
 import { purchasePermissions } from '@/modules/purchase/purchasePermissions';
+import { vehicleRentalPermissions } from '@/modules/vehicle-rental/vehicleRentalPermissions';
 import { tenantNavigationSections } from './navigationConfig';
 import {
     filterNavigation,
@@ -32,16 +33,20 @@ describe('navigation access and matching', () => {
             isPlatformOperator: false,
             organizationUnitId: 20,
             roles: [],
-            permissions: [purchasePermissions.ordersView, invoicePermissions.view],
+            permissions: [
+                vehicleRentalPermissions.view,
+                vehicleRentalPermissions.reservationsManage,
+                invoicePermissions.view,
+            ],
             permissionsLoaded: true,
-            enabledModules: ['purchase', 'invoice', 'payment'],
+            enabledModules: ['vehicle-rental', 'invoice', 'payment'],
             enabledModulesLoaded: true,
         });
         const itemIds = sections.flatMap((section) => section.items).map((item) => item.id);
 
-        expect(itemIds).toContain('purchase');
+        expect(itemIds).toContain('vehicle-rental');
         expect(itemIds).toContain('invoices');
-        expect(itemIds).not.toContain('inventory');
+        expect(itemIds).not.toContain('purchase');
         expect(itemIds).not.toContain('users');
     });
 
@@ -61,6 +66,7 @@ describe('navigation access and matching', () => {
         expect(itemIds).toContain('dashboard');
         expect(itemIds).not.toContain('purchase');
         expect(itemIds).not.toContain('items');
+        expect(itemIds).not.toContain('vehicle-rental');
         expect(itemIds).not.toContain('vehicle');
         expect(itemIds).not.toContain('users');
         expect(itemIds).not.toContain('users-access');
@@ -217,7 +223,7 @@ describe('navigation access and matching', () => {
         const itemIds = sections.flatMap((section) => section.items).map((item) => item.id);
 
         expect(itemIds).toContain('invoices');
-        expect(itemIds).not.toContain('vehicle-service');
+        expect(itemIds).not.toContain('vehicle-rental');
     });
 
     it('selects the query-specific child for shared invoice routes', () => {
@@ -225,6 +231,39 @@ describe('navigation access and matching', () => {
 
         expect(match?.parent?.id).toBe('vehicle-service');
         expect(match?.item.id).toBe('service-invoices');
+    });
+
+    it('selects the requested agreement direction', () => {
+        const match = findNavigationMatch(
+            '/vehicle-rental/agreements',
+            '?direction=inbound',
+            tenantNavigationSections,
+        );
+
+        expect(match?.parent?.id).toBe('vehicle-rental');
+        expect(match?.item.id).toBe('rental-agreements');
+    });
+
+    it('selects the lessee agreement workflow', () => {
+        const match = findNavigationMatch(
+            '/vehicle-rental/lessee-agreements',
+            '',
+            tenantNavigationSections,
+        );
+
+        expect(match?.parent?.id).toBe('vehicle-rental');
+        expect(match?.item.id).toBe('rental-lessee-agreements');
+    });
+
+    it('selects the requested running chart mode', () => {
+        const match = findNavigationMatch(
+            '/vehicle-rental/running-chart',
+            '?mode=linked',
+            tenantNavigationSections,
+        );
+
+        expect(match?.parent?.id).toBe('vehicle-rental');
+        expect(match?.item.id).toBe('rental-running-chart');
     });
 
     it('keeps the primary business hierarchy without brittle duplicate snapshots', () => {

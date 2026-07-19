@@ -53,15 +53,15 @@ const settlementCases = [
         partyName: 'Metro Logistics',
         paymentType: 'customer_receipt',
         paymentDirection: 'inbound',
-        buttonName: 'Create customer receipt',
+        buttonName: 'Create lessee receipt',
     },
     {
         invoiceDirection: 'inbound',
         partyType: 'supplier',
-        partyName: 'Acme Supplies',
+        partyName: 'Vehicle Owner One',
         paymentType: 'supplier_payment',
         paymentDirection: 'outbound',
-        buttonName: 'Create supplier payment',
+        buttonName: 'Create owner payment',
     },
 ] as const;
 
@@ -90,7 +90,7 @@ describe('Payment invoice settlement entry', () => {
     });
 
     it.each(settlementCases)(
-        'maps a $invoiceDirection invoice to its authoritative payment direction',
+        'maps a $invoiceDirection rental invoice to its authoritative payment direction',
         async ({
             invoiceDirection,
             partyType,
@@ -102,8 +102,8 @@ describe('Payment invoice settlement entry', () => {
             invoiceApiMocks.getInvoice.mockResolvedValue({
                 id: 44,
                 row_version: 6,
-                invoice_number: 'INV-0044',
-                invoice_type: 'manual',
+                invoice_number: 'RNT-0044',
+                invoice_type: 'rental',
                 direction: invoiceDirection,
                 status: 'posted',
                 party_type: partyType,

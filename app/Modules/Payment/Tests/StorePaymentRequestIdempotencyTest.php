@@ -7,7 +7,6 @@ namespace Modules\Payment\Tests;
 use Illuminate\Routing\Redirector;
 use Illuminate\Validation\ValidationException;
 use Modules\Payment\Constants\PaymentIdempotency;
-use Modules\Payment\Enums\PaymentType;
 use Modules\Payment\Http\Requests\StorePaymentRequest;
 use Tests\TestCase;
 
@@ -36,28 +35,13 @@ final class StorePaymentRequestIdempotencyTest extends TestCase
         }
     }
 
-    public function test_request_rejects_the_retired_rental_receipt_type(): void
-    {
-        $request = $this->request(self::VALID_KEY, PaymentType::RentalReceipt->value);
-
-        try {
-            $request->validateResolved();
-            self::fail('Expected the retired rental receipt type to be rejected.');
-        } catch (ValidationException $exception) {
-            self::assertArrayHasKey('payment_type', $exception->errors());
-        }
-    }
-
-    private function request(
-        string $idempotencyKey,
-        string $paymentType = PaymentType::CustomerReceipt->value,
-    ): StorePaymentRequest
+    private function request(string $idempotencyKey): StorePaymentRequest
     {
         $request = StorePaymentRequest::create(
             '/api/v1/payments',
             'POST',
             [
-                'payment_type' => $paymentType,
+                'payment_type' => 'customer_receipt',
                 'direction' => 'inbound',
                 'payment_date' => '2026-07-16',
                 'party_type' => 'customer',

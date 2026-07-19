@@ -1,10 +1,5 @@
 import { useMemo, useState, type FormEvent } from 'react';
-import {
-    parseEnabledTenantModules,
-    TENANT_MODULE_CODE,
-    TENANT_MODULES,
-    type TenantModuleCode,
-} from '@/app/access/tenantModules';
+import { TENANT_MODULE_CODE, TENANT_MODULES, type TenantModuleCode } from '@/app/access/tenantModules';
 import type { ReferenceRecord } from '@/modules/reference-data/referenceDataTypes';
 import { ApiError, fieldError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
@@ -39,7 +34,7 @@ const LIMIT_OPTIONS: Array<{ key: keyof TenantPlanLimits; label: string; hint: s
 const MODULE_GROUPS: Array<{ label: string; modules: TenantModuleCode[] }> = [
     { label: 'Master data', modules: [TENANT_MODULE_CODE.CUSTOMER, TENANT_MODULE_CODE.SUPPLIER, TENANT_MODULE_CODE.ITEM, TENANT_MODULE_CODE.WAREHOUSE, TENANT_MODULE_CODE.VEHICLE] },
     { label: 'People', modules: [TENANT_MODULE_CODE.HR] },
-    { label: 'Operations', modules: [TENANT_MODULE_CODE.INVENTORY, TENANT_MODULE_CODE.PURCHASE, TENANT_MODULE_CODE.VEHICLE_SERVICE] },
+    { label: 'Operations', modules: [TENANT_MODULE_CODE.INVENTORY, TENANT_MODULE_CODE.PURCHASE, TENANT_MODULE_CODE.VEHICLE_SERVICE, TENANT_MODULE_CODE.VEHICLE_RENTAL] },
     { label: 'Billing and finance', modules: [TENANT_MODULE_CODE.INVOICE, TENANT_MODULE_CODE.PAYMENT, TENANT_MODULE_CODE.FINANCE] },
     { label: 'Insights', modules: [TENANT_MODULE_CODE.REPORTING] },
 ];
@@ -53,7 +48,7 @@ export function TenantPlanEditor({ plan, currencies, saving, error, onCancel, on
         price: revision?.price ?? '0.000000',
         currencyId: revision?.currency_id ? String(revision.currency_id) : '',
         interval: revision?.billing_interval ?? 'month',
-        enabledModules: [...(parseEnabledTenantModules(revision?.features.enabled_modules ?? null) ?? [])],
+        enabledModules: revision?.features.enabled_modules ?? [],
         limits: {
             max_users: toLimitValue(revision?.limits.max_users),
             max_organization_units: toLimitValue(revision?.limits.max_organization_units),
@@ -306,10 +301,7 @@ function buildPlanUpdatePayload(plan: TenantPlan, draft: DraftValues): Record<st
     if (!current || compareDecimalStrings(current.price, draft.price) !== 0) payload.price = draft.price;
     if (!current || current.currency_id !== draft.currencyId) payload.currency_id = draft.currencyId;
     if (!current || current.billing_interval !== draft.interval) payload.billing_interval = draft.interval;
-    const currentModules = current
-        ? [...(parseEnabledTenantModules(current.features.enabled_modules) ?? [])]
-        : [];
-    if (!current || !sameStringSet(currentModules, draft.enabledModules)) {
+    if (!current || !sameStringSet(current.features.enabled_modules, draft.enabledModules)) {
         payload.features = { enabled_modules: draft.enabledModules };
     }
     if (!current || !sameLimits(current.limits, draft.limits)) payload.limits = draft.limits;
@@ -345,7 +337,7 @@ function describeChanges(plan: TenantPlan | null, draft: DraftValues): ChangeSum
         };
     }
     const current = plan.latest_revision;
-    const currentModules = parseEnabledTenantModules(current.features.enabled_modules) ?? new Set<TenantModuleCode>();
+    const currentModules = new Set(current.features.enabled_modules);
     const nextModules = new Set(draft.enabledModules);
     const modulesAdded = [...nextModules].filter((module) => !currentModules.has(module)).map(humanize);
     const modulesRemoved = [...currentModules].filter((module) => !nextModules.has(module)).map(humanize);
