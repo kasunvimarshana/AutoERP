@@ -6,8 +6,13 @@ const informational = new Set(['submitted', 'processing', 'in_progress', 'open']
 const neutral = new Set(['draft', 'pending', 'pending_approval']);
 
 export function StatusBadge({ status }: { status?: string | null }) {
+    return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${statusBadgeClassName(status)}`}>{humanize(status)}</span>;
+}
+
+export function statusBadgeClassName(status?: string | null): string {
     const normalized = status?.toLowerCase();
-    const color = normalized && positive.has(normalized)
+
+    return normalized && positive.has(normalized)
         ? 'bg-emerald-100 text-emerald-700'
         : normalized && negative.has(normalized)
             ? 'bg-rose-100 text-rose-700'
@@ -16,5 +21,4 @@ export function StatusBadge({ status }: { status?: string | null }) {
                 : normalized && neutral.has(normalized)
                     ? 'bg-slate-100 text-slate-700'
                     : 'bg-amber-100 text-amber-800';
-    return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${color}`}>{humanize(status)}</span>;
 }
