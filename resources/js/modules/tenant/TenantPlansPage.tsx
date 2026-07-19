@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { parseEnabledTenantModules } from '@/app/access/tenantModules';
 import { PLATFORM_PERMISSION } from '@/app/access/platformPermissions';
 import { useAuth } from '@/modules/auth/AuthProvider';
 import { hasPermission } from '@/modules/auth/accessControl';
@@ -224,6 +225,9 @@ function PlanCard({ plan, canManage, canAssign, disabled, onRevise, onHistory, o
     onLifecycle: () => void;
 }) {
     const revision = plan.latest_revision;
+    const enabledModuleCount = revision
+        ? (parseEnabledTenantModules(revision.features.enabled_modules)?.size ?? 0)
+        : 0;
     return (
         <article className="rounded-lg border border-slate-200 p-4">
             <div className="flex flex-wrap items-start justify-between gap-4">
@@ -267,7 +271,7 @@ function PlanCard({ plan, canManage, canAssign, disabled, onRevise, onHistory, o
                 <span><strong>{plan.revisions_count}</strong> revision(s)</span>
                 <span><strong>{plan.assigned_subscription_count}</strong> assigned tenant pointer(s)</span>
                 <span><strong>{plan.historical_subscription_count}</strong> historical subscription(s)</span>
-                <span><strong>{revision?.features.enabled_modules.length ?? 0}</strong> enabled module(s)</span>
+                <span><strong>{enabledModuleCount}</strong> enabled module(s)</span>
             </div>
             {revision && Object.keys(revision.limits).length > 0 ? (
                 <p className="mt-3 text-xs text-slate-500">{Object.entries(revision.limits).map(([key, value]) => `${formatLimitLabel(key)}: ${value}`).join(' · ')}</p>

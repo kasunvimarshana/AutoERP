@@ -148,7 +148,7 @@ final class UpdateTenantPlanService
             'features_schema_version' => TenantPlanSchema::SCHEMA_VERSION,
             'features' => array_key_exists('features', $payload)
                 ? $this->schema->normalizeFeatures($payload['features'])
-                : $this->schema->normalizeFeatures($latest->get('features')),
+                : $this->schema->normalizePersistedFeatures($latest->get('features')),
             'limits_schema_version' => TenantPlanSchema::SCHEMA_VERSION,
             'limits' => array_key_exists('limits', $payload)
                 ? $this->schema->normalizeLimits($payload['limits'])
@@ -174,7 +174,7 @@ final class UpdateTenantPlanService
     /** @param array<string, mixed> $revision @param array<string, mixed> $payload */
     private function revisionChanged(DataRecord $latest, array $revision, array $payload): bool
     {
-        return $this->schema->normalizeFeatures($latest->get('features')) !== $revision['features']
+        return $this->schema->normalizePersistedFeatures($latest->get('features')) !== $revision['features']
             || $this->schema->normalizeLimits($latest->get('limits')) !== $revision['limits']
             || $this->schema->normalizePrice($latest->get('price')) !== $revision['price']
             || $this->positiveInt($latest->get('currency_id')) !== $revision['currency_id']

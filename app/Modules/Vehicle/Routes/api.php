@@ -54,7 +54,7 @@ Route::prefix('api/v1')->middleware($middleware)->name('api.v1.')->group(functio
     });
 
     Route::get('vehicles/lookup/{kind?}', [VehicleController::class, 'lookup'])
-        ->whereIn('kind', ['active', 'by-customer', 'service-available', 'rental-available'])
+        ->whereIn('kind', ['active', 'by-customer', 'service-available'])
         ->middleware($requires(VehicleAuthorizationService::VIEW))
         ->name('vehicles.lookup');
     Route::post('vehicles/with-relations', [VehicleController::class, 'storeWithRelations'])
