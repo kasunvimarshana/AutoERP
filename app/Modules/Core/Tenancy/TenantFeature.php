@@ -15,6 +15,7 @@ final class TenantFeature
     public const PURCHASE = 'purchase';
     public const VEHICLE = 'vehicle';
     public const VEHICLE_SERVICE = 'vehicle-service';
+    public const VEHICLE_RENTAL = 'vehicle-rental';
     public const INVOICE = 'invoice';
     public const PAYMENT = 'payment';
     public const FINANCE = 'finance';

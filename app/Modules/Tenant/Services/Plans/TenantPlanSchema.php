@@ -13,11 +13,6 @@ final class TenantPlanSchema
 {
     public const SCHEMA_VERSION = 1;
 
-    /** Immutable snapshots may contain these module codes, but they never grant an entitlement. @var list<string> */
-    public const RETIRED_MODULES = [
-        'vehicle-rental',
-    ];
-
     /**
      * Foundation capabilities are required for every tenant workspace and are
      * never toggled by commercial subscriptions.
@@ -45,6 +40,7 @@ final class TenantPlanSchema
         TenantFeature::PURCHASE => 'Purchasing',
         TenantFeature::VEHICLE => 'Vehicles',
         TenantFeature::VEHICLE_SERVICE => 'Vehicle service',
+        TenantFeature::VEHICLE_RENTAL => 'Vehicle rental',
         TenantFeature::INVOICE => 'Invoicing',
         TenantFeature::PAYMENT => 'Payments',
         TenantFeature::FINANCE => 'Finance',
@@ -80,18 +76,6 @@ final class TenantPlanSchema
     /** @return array{enabled_modules:list<string>} */
     public function normalizeFeatures(mixed $features): array
     {
-        return $this->normalizeFeaturePayload($features, false);
-    }
-
-    /** @return array{enabled_modules:list<string>} */
-    public function normalizePersistedFeatures(mixed $features): array
-    {
-        return $this->normalizeFeaturePayload($features, true);
-    }
-
-    /** @return array{enabled_modules:list<string>} */
-    private function normalizeFeaturePayload(mixed $features, bool $excludeRetiredModules): array
-    {
         $features = $features ?? [];
         if (! is_array($features)) {
             throw ValidationException::withMessages([
@@ -122,10 +106,6 @@ final class TenantPlanSchema
             }
 
             $module = strtolower(trim($module));
-            if ($excludeRetiredModules && in_array($module, self::RETIRED_MODULES, true)) {
-                continue;
-            }
-
             if (! array_key_exists($module, self::SUPPORTED_MODULES)) {
                 throw ValidationException::withMessages([
                     'features.enabled_modules' => ["Unsupported module [{$module}]."],

@@ -57,23 +57,6 @@ final class TenantPlanSchemaTest extends TestCase
         ]);
     }
 
-    public function test_retired_modules_are_withheld_from_persisted_entitlements(): void
-    {
-        $schema = new TenantPlanSchema();
-        $retiredModule = TenantPlanSchema::RETIRED_MODULES[0];
-
-        self::assertSame(
-            ['enabled_modules' => ['inventory']],
-            $schema->normalizePersistedFeatures([
-                'enabled_modules' => ['inventory', $retiredModule],
-            ]),
-        );
-        self::assertNotContains($retiredModule, $schema->supportedModuleCodes());
-
-        $this->expectException(ValidationException::class);
-        $schema->normalizeFeatures(['enabled_modules' => [$retiredModule]]);
-    }
-
     public function test_zero_or_negative_limits_are_rejected(): void
     {
         $this->expectException(ValidationException::class);

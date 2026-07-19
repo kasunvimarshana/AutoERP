@@ -1,4 +1,3 @@
-import { parseEnabledTenantModules } from '@/app/access/tenantModules';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import {
     formatLimitLabel,
@@ -46,8 +45,8 @@ export function SubscriptionComparison({ current, proposed, readiness }: {
     proposed: TenantPlanRevision;
     readiness: TenantSubscriptionReadiness | null;
 }) {
-    const currentModules = parseEnabledTenantModules(current?.plan_features.enabled_modules ?? null) ?? new Set();
-    const proposedModules = parseEnabledTenantModules(proposed.features.enabled_modules) ?? new Set();
+    const currentModules = new Set(current?.plan_features.enabled_modules ?? []);
+    const proposedModules = new Set(proposed.features.enabled_modules);
     const added = [...proposedModules].filter((module) => !currentModules.has(module));
     const removed = [...currentModules].filter((module) => !proposedModules.has(module));
     const currentLimits = current?.plan_limits ?? {};

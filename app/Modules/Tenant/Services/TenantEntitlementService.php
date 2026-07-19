@@ -51,7 +51,7 @@ final class TenantEntitlementService implements TenantEntitlementReaderInterface
         }
 
         return [
-            'modules' => $this->schema->normalizePersistedFeatures($subscription->get('plan_features'))['enabled_modules'],
+            'modules' => $this->schema->normalizeFeatures($subscription->get('plan_features'))['enabled_modules'],
             'limits' => $this->schema->normalizeLimits($subscription->get('plan_limits')),
         ];
     }

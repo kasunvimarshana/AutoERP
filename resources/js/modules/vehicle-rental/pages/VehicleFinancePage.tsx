@@ -1,0 +1,539 @@
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import type { SupplierSummary } from "@/modules/supplier/supplierTypes";
+import { SupplierLookupSelect } from "@/modules/supplier/components/SupplierLookupSelect";
+import type { VehicleSummary } from "@/modules/vehicle/vehicleTypes";
+import { VehicleLookupSelect } from "@/modules/vehicle/components/VehicleLookupSelect";
+import { useAuth } from "@/modules/auth/AuthProvider";
+import { hasPermission } from "@/modules/auth/accessControl";
+import { Button } from "@/shared/components/Button";
+import { ContentHeader } from "@/shared/components/ContentHeader";
+import { DataTable, type DataColumn } from "@/shared/components/DataTable";
+import { ErrorAlert } from "@/shared/components/ErrorAlert";
+import { Input } from "@/shared/components/Input";
+import { LoadingState } from "@/shared/components/LoadingState";
+import { Panel } from "@/shared/components/Panel";
+import { Select } from "@/shared/components/Select";
+import { StatusBadge } from "@/shared/components/StatusBadge";
+import { Textarea } from "@/shared/components/Textarea";
+import { toApiError, type ApiError } from "@/shared/api/apiError";
+import { useApi } from "@/shared/hooks/useApi";
+import { businessDateInputValue } from "@/shared/utils/businessDate";
+import { formatDate } from "@/shared/utils/formatDate";
+import { readableRelation } from "@/shared/utils/object";
+import { RentalPage } from "../components/RentalPage";
+import { RentalCurrencyLookupSelect } from "../components/RentalLookups";
+import { useRentalCurrencyDefault } from "../hooks/useRentalCurrencyDefault";
+import { rentalOptions } from "../hooks/useRentalMetadata";
+import {
+    activateVehicleFinanceAgreement,
+    createVehicleFinanceAgreement,
+    createVehicleFinancePayable,
+    listVehicleFinanceAgreements,
+} from "../vehicleRentalApi";
+import { vehicleRentalPermissions } from "../vehicleRentalPermissions";
+import type {
+    RentalMetadataDefaults,
+    VehicleFinanceAgreement,
+    VehicleFinanceInstallment,
+} from "../vehicleRentalTypes";
+
+interface FinanceForm {
+    agreement_number: string;
+    agreement_date: string;
+    starts_at: string;
+    matures_at: string;
+    principal_amount: string;
+    initial_deposit_amount: string;
+    residual_value: string;
+    interest_method: string;
+    annual_interest_rate: string;
+    installment_frequency: string;
+    installment_count: string;
+    payment_term_days: string;
+    remarks: string;
+}
+
+const emptyForm = (defaults?: RentalMetadataDefaults): FinanceForm => ({
+    agreement_number: "",
+    agreement_date: businessDateInputValue(),
+    starts_at: "",
+    matures_at: "",
+    principal_amount: "",
+    initial_deposit_amount: "0",
+    residual_value: "0",
+    interest_method: defaults?.finance_interest_method ?? "",
+    annual_interest_rate: "0",
+    installment_frequency: defaults?.finance_installment_frequency ?? "",
+    installment_count:
+        defaults?.finance_installment_count === undefined
+            ? ""
+            : String(defaults.finance_installment_count),
+    payment_term_days:
+        defaults?.finance_payment_term_days === undefined
+            ? ""
+            : String(defaults.finance_payment_term_days),
+    remarks: "",
+});
+
+export default function VehicleFinancePage() {
+    const auth = useAuth();
+    const [form, setForm] = useState<FinanceForm>(emptyForm);
+    const [supplier, setSupplier] = useState<SupplierSummary | null>(null);
+    const [vehicle, setVehicle] = useState<VehicleSummary | null>(null);
+    const {
+        currency,
+        error: currencyDefaultError,
+        selectCurrency,
+        applyCurrencyDefault,
+        resetCurrencyToDefault,
+        metadata,
+    } = useRentalCurrencyDefault();
+    const [saving, setSaving] = useState(false);
+    const [actionError, setActionError] = useState<ApiError | null>(null);
+    const [selected, setSelected] = useState<VehicleFinanceAgreement | null>(
+        null,
+    );
+
+    const result = useApi(
+        (signal) => listVehicleFinanceAgreements({ per_page: 50 }, signal),
+        [],
+    );
+    const canManage = hasPermission(
+        auth,
+        vehicleRentalPermissions.financeAgreementsManage,
+    );
+    const canCreateDocument = hasPermission(
+        auth,
+        vehicleRentalPermissions.financialCreate,
+    );
+    const metadataDefaults = metadata?.defaults;
+    const interestMethodOptions = useMemo(
+        () => rentalOptions(metadata?.finance_interest_methods),
+        [metadata?.finance_interest_methods],
+    );
+    const frequencyOptions = useMemo(
+        () => rentalOptions(metadata?.finance_installment_frequencies),
+        [metadata?.finance_installment_frequencies],
+    );
+
+    useEffect(() => {
+        if (!metadataDefaults) return;
+
+        let cancelled = false;
+        queueMicrotask(() => {
+            if (cancelled) return;
+
+            setForm((current) => ({
+                ...current,
+                interest_method:
+                    current.interest_method ||
+                    metadataDefaults.finance_interest_method ||
+                    "",
+                installment_frequency:
+                    current.installment_frequency ||
+                    metadataDefaults.finance_installment_frequency ||
+                    "",
+                installment_count:
+                    current.installment_count ||
+                    String(metadataDefaults.finance_installment_count ?? ""),
+                payment_term_days:
+                    current.payment_term_days ||
+                    String(metadataDefaults.finance_payment_term_days ?? ""),
+            }));
+        });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [metadataDefaults]);
+
+    const save = async (event: FormEvent) => {
+        event.preventDefault();
+        if (!supplier || !vehicle || !currency) return;
+        setSaving(true);
+        setActionError(null);
+        try {
+            await createVehicleFinanceAgreement({
+                ...form,
+                supplier_id: supplier.id,
+                vehicle_id: vehicle.id,
+                currency_id: Number(currency?.id),
+                installment_count: Number(form.installment_count),
+                payment_term_days: Number(form.payment_term_days),
+            });
+            setForm(emptyForm(metadataDefaults));
+            setSupplier(null);
+            setVehicle(null);
+            resetCurrencyToDefault();
+            result.reload();
+        } catch (error) {
+            setActionError(toApiError(error));
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const activate = async (row: VehicleFinanceAgreement) => {
+        setActionError(null);
+        try {
+            await activateVehicleFinanceAgreement(row.id, row.row_version);
+            result.reload();
+        } catch (error) {
+            setActionError(toApiError(error));
+        }
+    };
+
+    const createPayable = async (installment: VehicleFinanceInstallment) => {
+        setActionError(null);
+        try {
+            await createVehicleFinancePayable(installment.id, installment.row_version, {
+                invoice_date: installment.due_date,
+                status: "draft",
+            });
+            result.reload();
+        } catch (error) {
+            setActionError(toApiError(error));
+        }
+    };
+
+    const columns: DataColumn<VehicleFinanceAgreement>[] = [
+        {
+            key: "number",
+            header: "Finance agreement",
+            render: (row) => row.agreement_number,
+        },
+        {
+            key: "supplier",
+            header: "Leasing company",
+            render: (row) => readableRelation(row.supplier),
+        },
+        {
+            key: "vehicle",
+            header: "Vehicle",
+            render: (row) => readableRelation(row.vehicle),
+        },
+        {
+            key: "period",
+            header: "Period",
+            render: (row) =>
+                `${formatDate(row.starts_at)} - ${formatDate(row.matures_at)}`,
+        },
+        {
+            key: "principal",
+            header: "Principal",
+            render: (row) => row.principal_amount,
+        },
+        {
+            key: "installments",
+            header: "Installments",
+            render: (row) => String(row.installment_count),
+        },
+        {
+            key: "status",
+            header: "Status",
+            render: (row) => <StatusBadge status={row.status} />,
+        },
+        {
+            key: "actions",
+            header: "",
+            className: "text-right",
+            render: (row) => (
+                <div className="flex justify-end gap-2">
+                    <Button variant="ghost" onClick={() => setSelected(row)}>
+                        Schedule
+                    </Button>
+                    {canManage && row.status === "draft" && (
+                        <Button
+                            variant="secondary"
+                            onClick={() => void activate(row)}
+                        >
+                            Activate
+                        </Button>
+                    )}
+                </div>
+            ),
+        },
+    ];
+
+    const installmentColumns: DataColumn<VehicleFinanceInstallment>[] = [
+        { key: "number", header: "#", render: (row) => row.installment_number },
+        {
+            key: "due",
+            header: "Due date",
+            render: (row) => formatDate(row.due_date),
+        },
+        {
+            key: "principal",
+            header: "Principal",
+            render: (row) => row.principal_due,
+        },
+        {
+            key: "interest",
+            header: "Interest",
+            render: (row) => row.interest_due,
+        },
+        { key: "total", header: "Total", render: (row) => row.total_due },
+        { key: "balance", header: "Balance", render: (row) => row.balance_due },
+        {
+            key: "status",
+            header: "Status",
+            render: (row) => <StatusBadge status={row.status} />,
+        },
+        {
+            key: "action",
+            header: "",
+            className: "text-right",
+            render: (row) =>
+                canCreateDocument && !row.invoice ? (
+                    <Button
+                        variant="secondary"
+                        onClick={() => void createPayable(row)}
+                    >
+                        Create payable
+                    </Button>
+                ) : row.invoice ? (
+                    row.invoice.name ?? row.invoice.code ?? 'Invoice created'
+                ) : null,
+        },
+    ];
+
+    return (
+        <RentalPage>
+            <ContentHeader
+                title="Vehicle finance"
+                description="Track leasing-company agreements and installment schedules separately from usage-based owner payables."
+            />
+            <ErrorAlert error={actionError ?? result.error ?? currencyDefaultError} />
+            {canManage && (
+                <form onSubmit={save} className="mb-5">
+                    <Panel title="New finance agreement">
+                        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                            <SupplierLookupSelect
+                                value={supplier}
+                                required
+                                onChange={(next) => {
+                                    setSupplier(next);
+                                    applyCurrencyDefault(next?.default_currency ?? null);
+                                }}
+                            />
+                            <VehicleLookupSelect
+                                value={vehicle}
+                                onChange={setVehicle}
+                                required
+                            />
+                            <Input
+                                label="Agreement number"
+                                value={form.agreement_number}
+                                onChange={(event) =>
+                                    setForm({
+                                        ...form,
+                                        agreement_number: event.target.value,
+                                    })
+                                }
+                            />
+                            <Input
+                                label="Agreement date"
+                                type="date"
+                                required
+                                value={form.agreement_date}
+                                onChange={(event) =>
+                                    setForm({
+                                        ...form,
+                                        agreement_date: event.target.value,
+                                    })
+                                }
+                            />
+                            <Input
+                                label="Starts at"
+                                type="date"
+                                required
+                                value={form.starts_at}
+                                onChange={(event) =>
+                                    setForm({
+                                        ...form,
+                                        starts_at: event.target.value,
+                                    })
+                                }
+                            />
+                            <Input
+                                label="Matures at"
+                                type="date"
+                                required
+                                value={form.matures_at}
+                                onChange={(event) =>
+                                    setForm({
+                                        ...form,
+                                        matures_at: event.target.value,
+                                    })
+                                }
+                            />
+                            <RentalCurrencyLookupSelect
+                                value={currency}
+                                onChange={selectCurrency}
+                                required
+                            />
+                            <Input
+                                label="Principal"
+                                type="number"
+                                min="0.000001"
+                                step="0.000001"
+                                required
+                                value={form.principal_amount}
+                                onChange={(event) =>
+                                    setForm({
+                                        ...form,
+                                        principal_amount: event.target.value,
+                                    })
+                                }
+                            />
+                            <Input
+                                label="Initial deposit"
+                                type="number"
+                                min="0"
+                                step="0.000001"
+                                value={form.initial_deposit_amount}
+                                onChange={(event) =>
+                                    setForm({
+                                        ...form,
+                                        initial_deposit_amount:
+                                            event.target.value,
+                                    })
+                                }
+                            />
+                            <Input
+                                label="Residual value"
+                                type="number"
+                                min="0"
+                                step="0.000001"
+                                value={form.residual_value}
+                                onChange={(event) =>
+                                    setForm({
+                                        ...form,
+                                        residual_value: event.target.value,
+                                    })
+                                }
+                            />
+                            <Select
+                                label="Interest method"
+                                value={form.interest_method}
+                                required
+                                onChange={(event) =>
+                                    setForm({
+                                        ...form,
+                                        interest_method: event.target.value,
+                                    })
+                                }
+                                options={interestMethodOptions}
+                            />
+                            <Input
+                                label="Annual interest %"
+                                type="number"
+                                min="0"
+                                step="0.000001"
+                                value={form.annual_interest_rate}
+                                onChange={(event) =>
+                                    setForm({
+                                        ...form,
+                                        annual_interest_rate:
+                                            event.target.value,
+                                    })
+                                }
+                            />
+                            <Select
+                                label="Frequency"
+                                value={form.installment_frequency}
+                                required
+                                onChange={(event) =>
+                                    setForm({
+                                        ...form,
+                                        installment_frequency:
+                                            event.target.value,
+                                    })
+                                }
+                                options={frequencyOptions}
+                            />
+                            <Input
+                                label="Installment count"
+                                type="number"
+                                min="1"
+                                max="600"
+                                required
+                                value={form.installment_count}
+                                onChange={(event) =>
+                                    setForm({
+                                        ...form,
+                                        installment_count: event.target.value,
+                                    })
+                                }
+                            />
+                            <Input
+                                label="Payment term days"
+                                type="number"
+                                min="0"
+                                value={form.payment_term_days}
+                                onChange={(event) =>
+                                    setForm({
+                                        ...form,
+                                        payment_term_days: event.target.value,
+                                    })
+                                }
+                            />
+                        </div>
+                        <div className="mt-4">
+                            <Textarea
+                                label="Remarks"
+                                value={form.remarks}
+                                onChange={(event) =>
+                                    setForm({
+                                        ...form,
+                                        remarks: event.target.value,
+                                    })
+                                }
+                            />
+                        </div>
+                        <div className="mt-4 flex justify-end">
+                            <Button
+                                type="submit"
+                                loading={saving}
+                                disabled={!supplier || !vehicle || !currency}
+                            >
+                                Create finance agreement
+                            </Button>
+                        </div>
+                    </Panel>
+                </form>
+            )}
+            {selected && (
+                <Panel
+                    title={`Installment schedule - ${selected.agreement_number}`}
+                    className="mb-5"
+                >
+                    <div className="mb-3 flex justify-end">
+                        <Button
+                            variant="ghost"
+                            onClick={() => setSelected(null)}
+                        >
+                            Close
+                        </Button>
+                    </div>
+                    <DataTable
+                        rows={selected.installments ?? []}
+                        columns={installmentColumns}
+                        rowKey={(row) => row.id}
+                        emptyMessage="No installments generated."
+                    />
+                </Panel>
+            )}
+            {result.loading ? (
+                <LoadingState />
+            ) : (
+                <DataTable
+                    rows={result.data?.data ?? []}
+                    columns={columns}
+                    rowKey={(row) => row.id}
+                    emptyMessage="No vehicle finance agreements found."
+                />
+            )}
+        </RentalPage>
+    );
+}

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { flattenVehicleServiceLines } from '../api/lines';
 import type { VehicleServiceJob, VehicleServiceJobLine } from '../vehicleServiceTypes';
-import { requiresWorkforceBeforeInspect, withJobLines } from './VehicleServiceJobDetailPage';
+import { withJobLines } from './VehicleServiceJobDetailPage';
 
 describe('Vehicle Service job-line state', () => {
     it('keeps combo children visible when the line endpoint returns nested rows', () => {
@@ -48,40 +48,6 @@ describe('Vehicle Service job-line state', () => {
         expect(updated.tax_total).toBe('100.000000');
         expect(updated.charge_total).toBe('25.000000');
         expect(updated.grand_total).toBe('1075.000000');
-    });
-
-    it('blocks inspect when labour-assignable lines have no active workforce assignment', () => {
-        const labourLine = line({
-            id: 4,
-            line_source_type: 'labour_item',
-            is_employee_assignable: true,
-            employee_assignments: [],
-        });
-
-        expect(requiresWorkforceBeforeInspect([labourLine])).toBe(true);
-    });
-
-    it('allows inspect when at least one active workforce assignment exists', () => {
-        const labourLine = line({
-            id: 5,
-            line_source_type: 'labour_item',
-            is_employee_assignable: true,
-            employee_assignments: [{
-                id: 9,
-                vehicle_service_job_line_id: 5,
-                employee_id: 3,
-                employee: { id: 3, code: 'EMP-003', name: 'Alex' },
-                role_type: 'technician',
-                assigned_hours: '1.000000',
-                rate: '0.000000',
-                commission_type: 'none',
-                commission_value: '0.000000',
-                commission_amount: '0.000000',
-                status: 'assigned',
-            }],
-        });
-
-        expect(requiresWorkforceBeforeInspect([labourLine])).toBe(false);
     });
 });
 

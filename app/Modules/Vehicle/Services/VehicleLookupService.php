@@ -36,6 +36,11 @@ final class VehicleLookupService
         return $this->baseQuery($tenantId, $organizationUnitId)->whereIn('status', [VehicleStatus::Active->value, VehicleStatus::UnderService->value])->get();
     }
 
+    public function vehiclesAvailableForRental(int $tenantId, ?int $organizationUnitId = null): Collection
+    {
+        return $this->baseQuery($tenantId, $organizationUnitId)->where('status', VehicleStatus::Active->value)->get();
+    }
+
     public function vehiclesByStatus(int $tenantId, VehicleStatus $status, ?int $organizationUnitId = null): Collection
     {
         return $this->baseQuery($tenantId, $organizationUnitId)->where('status', $status->value)->get();
