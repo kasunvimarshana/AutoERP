@@ -68,6 +68,7 @@ const vehicleLookupLabel = (vehicle: VehicleLookupResource): string => {
 };
 
 export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
+    const supervisorRequiredMessage = 'Select a valid supervisor from the list.';
     const navigate = useNavigate();
     const isCreating = job === undefined;
     const organizationDefault = useApi(
@@ -95,6 +96,7 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
     });
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
+    const [attemptedSubmit, setAttemptedSubmit] = useState(false);
     const formGuard = useMutationFormGuard(submitting);
     useApi((signal) => lookupApi.preloadAvailableEmployees(signal), []);
     const updateForm = useCallback((next: Parameters<typeof setForm>[0]) => {
@@ -201,6 +203,8 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
         <>
             <form className="space-y-5" onSubmit={async (event) => {
                 event.preventDefault();
+                setAttemptedSubmit(true);
+                if (supervisor === null) return;
                 if (commissionUnavailable) return;
 
                 setSubmitting(true);
@@ -268,7 +272,24 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
                         />
                         <Input label="Customer" value={customerLabel(customer)} error={errorFor('customer_id')} placeholder="Selected vehicle owner" readOnly />
                         <GenericLookupSelect label="Bill-to customer" value={billToCustomer} onChange={(value) => { formGuard.markDirty(); setBillToCustomer(value); }} search={searchCustomer} formatLabel={(value) => `${value.code ?? ''} ${value.name}`.trim()} error={errorFor('bill_to_customer_id')} placeholder="Defaults to vehicle owner" loadOnOpen minSearchLength={0} />
-                        <GenericLookupSelect label="Supervisor" value={supervisor} onChange={(value) => { formGuard.markDirty(); setSupervisor(value); }} search={searchSupervisor} formatLabel={(value) => `${value.code ?? ''} ${value.name}`.trim()} error={errorFor('supervisor_employee_id')} loadOnOpen minSearchLength={0} debounceMs={0} />
+                        <GenericLookupSelect
+                            label="Supervisor"
+                            value={supervisor}
+                            onChange={(value) => {
+                                formGuard.markDirty();
+                                setSupervisor(value);
+                                if (value !== null) {
+                                    setAttemptedSubmit(false);
+                                }
+                            }}
+                            search={searchSupervisor}
+                            formatLabel={(value) => `${value.code ?? ''} ${value.name}`.trim()}
+                            error={errorFor('supervisor_employee_id') || (attemptedSubmit && supervisor === null ? supervisorRequiredMessage : undefined)}
+                            required
+                            loadOnOpen
+                            minSearchLength={0}
+                            debounceMs={0}
+                        />
                         <Input label="Job date" type="date" value={form.job_date} error={errorFor('job_date')} onChange={(event) => updateForm({ ...form, job_date: event.target.value })} />
                         <Input label="Expected delivery" type="date" value={form.expected_delivery_date} error={errorFor('expected_delivery_date')} onChange={(event) => updateForm({ ...form, expected_delivery_date: event.target.value })} />
                         <DecimalInput label="Odometer" value={form.odometer_reading} error={errorFor('odometer_reading')} onChange={(event) => updateForm({ ...form, odometer_reading: event.target.value })} />

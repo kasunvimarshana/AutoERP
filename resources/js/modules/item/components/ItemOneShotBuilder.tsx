@@ -23,6 +23,7 @@ import {
 import { ItemLookupSelect } from './ItemLookupSelect';
 import { ItemCurrencySelect } from './ItemCurrencySelect';
 import { ItemUomSelect } from './ItemUomSelect';
+type BundleLineType = (typeof bundleLineTypes)[number];
 
 export interface OneShotDraft {
     units: Array<ItemUnitPayload & { uom: NamedResource }>;
@@ -98,17 +99,28 @@ function VariantDraft({ value, onChange }: DraftProps) {
 function BundleDraft({ value, onChange }: DraftProps) {
     const [child, setChild] = useState<ItemSummary | null>(null);
     const [uom, setUom] = useState<NamedResource | null>(null);
-    const [quantity, setQuantity] = useState('1.000000');
-    const [lineType, setLineType] = useState('stock');
+    const [quantity, setQuantity] = useState(defaultBundleQuantity());
+    const [lineType, setLineType] = useState<BundleLineType>('labour');
     return <DraftSection title="Initial bundle lines" rows={value.bundles.map((row) => `${row.child_item.code} - ${row.child_item.name} / ${row.quantity}`)} remove={(index) => onChange({ ...value, bundles: value.bundles.filter((_, rowIndex) => rowIndex !== index) })}>
-        <ItemLookupSelect label="Child item" value={child} onChange={setChild} />
+        <ItemLookupSelect
+            label="Child item"
+            value={child}
+            onChange={(nextChild) => {
+                setChild(nextChild);
+                if (!nextChild) return;
+                setQuantity(defaultBundleQuantity());
+                setUom(nextChild.base_uom ?? null);
+                setLineType(resolveBundleLineType(nextChild));
+            }}
+            lookupKind="labour"
+        />
         <Input label="Quantity" value={quantity} onChange={(event) => setQuantity(event.target.value)} />
         <ItemUomSelect value={uom} onChange={setUom} />
-        <Select label="Line type" value={lineType} onChange={(event) => setLineType(event.target.value)} options={options(bundleLineTypes)} />
+        <Select label="Line type" value={lineType} onChange={(event) => setLineType(event.target.value as BundleLineType)} options={options(bundleLineTypes)} />
         <Button type="button" disabled={!child} onClick={() => {
             if (!child) return;
             onChange({ ...value, bundles: [...value.bundles, { child_item: child, child_item_id: Number(child.id), quantity, uom, uom_id: uom ? Number(uom.id) : null, line_type: lineType, is_required: true, sort_order: value.bundles.length }] });
-            setChild(null); setUom(null);
+            setChild(null); setUom(null); setQuantity(defaultBundleQuantity()); setLineType('labour');
         }}>Add bundle line</Button>
     </DraftSection>;
 }
@@ -195,6 +207,22 @@ function DraftSection({ title, rows, remove, children }: { title: string; rows: 
 
 function options(values: readonly string[]) {
     return values.map((value) => ({ value, label: value.replaceAll('_', ' ') }));
+}
+
+function resolveBundleLineType(item: ItemSummary): BundleLineType {
+    switch (item.item_type) {
+    case 'stock':
+    case 'service':
+    case 'labour':
+    case 'non_stock':
+        return item.item_type;
+    default:
+        return 'service';
+    }
+}
+
+function defaultBundleQuantity(): string {
+    return '1.000000';
 }
 
 interface DraftProps {
