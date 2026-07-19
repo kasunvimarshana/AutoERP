@@ -24,6 +24,10 @@ final class VehicleServiceStatusService
 
     private const VEHICLE_SERVICE_RELEASED_REASON_PREFIX = 'Vehicle service completed or cancelled for job ';
 
+    private const CANCELLED_ASSIGNMENT_STATUS = 'cancelled';
+
+    private const WORKFORCE_REQUIRED_MESSAGE = 'Assign at least one labour employee before marking this job as inspected.';
+
     /** @var array<string, list<string>> */
     private const TRANSITIONS = [
         'draft' => ['inspected', 'in_progress', 'cancelled'],
@@ -71,6 +75,10 @@ final class VehicleServiceStatusService
             }
             if (! in_array($status->value, self::TRANSITIONS[$old->value] ?? [], true)) {
                 throw new InvalidArgumentException("Invalid service job status transition from {$old->value} to {$status->value}.");
+            }
+
+            if ($status === VehicleServiceJobStatus::Inspected) {
+                $this->assertWorkforceReadyForInspection($job);
             }
 
             if ($status === VehicleServiceJobStatus::InProgress) {
@@ -121,6 +129,29 @@ final class VehicleServiceStatusService
             'changed_by' => $changedBy,
             'changed_at' => now(),
         ]);
+    }
+
+    private function assertWorkforceReadyForInspection(VehicleServiceJob $job): void
+    {
+        $hasAssignableLabour = $job->lines()
+            ->where('is_employee_assignable', true)
+            ->where('status', '!=', VehicleServiceLineStatus::Cancelled->value)
+            ->exists();
+
+        if (! $hasAssignableLabour) {
+            return;
+        }
+
+        $hasActiveAssignment = $job->lines()
+            ->where('is_employee_assignable', true)
+            ->where('status', '!=', VehicleServiceLineStatus::Cancelled->value)
+            ->whereHas('employeeAssignments', fn ($query) => $query
+                ->where('status', '!=', self::CANCELLED_ASSIGNMENT_STATUS))
+            ->exists();
+
+        if (! $hasActiveAssignment) {
+            throw new InvalidArgumentException(self::WORKFORCE_REQUIRED_MESSAGE);
+        }
     }
 
     private function assertVehicleCanEnterService(Vehicle $vehicle): void
