@@ -12,15 +12,6 @@ Status meanings:
 
 | Area | Finding | Status | Owner / next action |
 |---|---|---:|---|
-| Vehicle Rental | Draft agreement update was non-transactional and did not lock the aggregate | **Source-complete** | `VehicleRental/RentalAgreementService` now locks and updates inside one transaction; run the full Laravel/MySQL suite before closure. |
-| Vehicle Rental | Agreement update and lifecycle requests accepted `expected_version` without enforcing it | **Source-complete** | Update and transition commands validate the locked row version and increment it; concurrency runtime coverage remains required. |
-| Vehicle Rental | Customer/supplier exclusivity existed only in application code | **Source-complete** | `rental_agreements` installs a database party-kind invariant for MySQL/PostgreSQL/SQL Server and SQLite; MySQL migration verification remains required. |
-| Vehicle Rental | `terminated_by` lacked a tenant-scoped foreign key | **Source-complete** | Added the composite tenant foreign key in the owning migration; verify through `migrate:fresh` on MySQL. |
-| Vehicle Rental | Billing timezone was hardcoded to `Asia/Colombo` | **Source-complete** | Configuration now owns the default through `config/vehicle_rental.php`; the database stores the explicit value. |
-| Vehicle Rental | Rate activation rewrote prior active effective periods | **Source-complete** | Activation rejects overlaps and never mutates an existing active version; runtime overlap tests remain required. |
-| Vehicle Rental | Rate activation lacked optimistic concurrency and terminal-agreement checks | **Source-complete** | Activation requires `expected_version`, locks both records, increments the version, and rejects terminal agreements. |
-| Vehicle Rental | Destructive agreement-term replacement has no stable term command model | **Open** | Introduce explicit term create/update/archive commands only when term-level editing requirements are confirmed. |
-| Vehicle Rental | Full recorded-time correction lineage for rate versions is absent | **Open** | Add a dedicated supersede/correction command with lineage and recorded-time columns; do not overload activation. |
 | Tax | Legal rates and profiles are mutable current rows | **Open** | Implement immutable revisions with effective and recorded time in Tax. |
 | Tax | Snapshot recalculation delete/recreate path lacks aggregate serialization | **Open** | Lock a stable source aggregate/idempotency guard before recalculation. |
 | HR | Employee rates are mutable and replace-all | **Open** | Move rate history to immutable effective-dated revisions owned by HR. |
@@ -36,7 +27,7 @@ Status meanings:
 ## Verified existing foundations
 
 - Tenant-owned models use fail-closed tenant scoping.
-- Item Price provides an immutable revision pattern suitable as a reference for Tax, HR and Rental correction designs.
+- Item Price provides an immutable revision pattern suitable as a reference for Tax and HR correction designs.
 - Invoice has a draft-first lifecycle.
 - Audit events preserve before/after snapshots at the application layer.
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Modules\VehicleService\Enums\VehicleServiceJobType;
 
 return new class extends Migration
 {
@@ -18,6 +19,7 @@ return new class extends Migration
             $table->string('job_number', 100);
             $table->date('job_date');
             $table->date('expected_delivery_date')->nullable();
+            $table->string('type', 30)->default(VehicleServiceJobType::FullService->value);
             $table->foreignId('customer_id');
             $table->foreignId('bill_to_customer_id')->nullable();
             $table->foreignId('vehicle_id');

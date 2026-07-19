@@ -21,7 +21,6 @@ final class FinanceSeederTest extends TestCase
     private const PROFILE_SUPPLIER_PAYMENT = 'supplier_payment';
     private const PROFILE_CUSTOMER_ADVANCE = 'customer_advance';
     private const PROFILE_SUPPLIER_ADVANCE = 'supplier_advance';
-    private const PROFILE_RENTAL_DEPOSIT = 'rental_deposit';
     private const PROFILE_PURCHASE_INVOICE = 'purchase_invoice';
 
     public function test_default_posting_profiles_are_seeded_for_the_protected_root_organization_unit(): void
@@ -42,7 +41,6 @@ final class FinanceSeederTest extends TestCase
             self::PROFILE_SUPPLIER_PAYMENT,
             self::PROFILE_CUSTOMER_ADVANCE,
             self::PROFILE_SUPPLIER_ADVANCE,
-            self::PROFILE_RENTAL_DEPOSIT,
         ] as $profileCode) {
             $this->assertDatabaseHas('finance_posting_profiles', [
                 'tenant_id' => $tenantId,
@@ -53,7 +51,7 @@ final class FinanceSeederTest extends TestCase
         }
         $this->assertSame(0, DB::table('finance_posting_profiles')->whereNull('organization_unit_id')->count());
 
-        foreach (['1200', '1400', '2100', '2300', '2310'] as $accountCode) {
+        foreach (['1200', '1400', '2100', '2300'] as $accountCode) {
             $this->assertGreaterThan(0, $this->accountId($tenantId, $organizationUnitId, $accountCode));
         }
 
@@ -61,7 +59,6 @@ final class FinanceSeederTest extends TestCase
         $this->assertActiveAssignment($tenantId, $organizationUnitId, 'payable', '2100');
         $this->assertActiveAssignment($tenantId, $organizationUnitId, 'supplier_advance', '1400');
         $this->assertActiveAssignment($tenantId, $organizationUnitId, 'customer_advance', '2300');
-        $this->assertActiveAssignment($tenantId, $organizationUnitId, 'customer_deposit', '2310');
         $this->assertSame(0, DB::table('finance_account_assignments')->whereNull('organization_unit_id')->count());
     }
 
@@ -79,7 +76,6 @@ final class FinanceSeederTest extends TestCase
             self::PROFILE_SUPPLIER_PAYMENT => ['cash', 'bank', 'payable', 'supplier_advance'],
             self::PROFILE_CUSTOMER_ADVANCE => ['cash', 'bank', 'receivable', 'customer_advance'],
             self::PROFILE_SUPPLIER_ADVANCE => ['cash', 'bank', 'payable', 'supplier_advance'],
-            self::PROFILE_RENTAL_DEPOSIT => ['cash', 'bank', 'receivable', 'customer_deposit'],
             self::PROFILE_PURCHASE_INVOICE => ['expense', 'goods_received_not_invoiced', 'payable', 'tax_receivable', 'withholding_payable'],
         ] as $profileCode => $lineKeys) {
             $profileId = (int) DB::table('finance_posting_profiles')

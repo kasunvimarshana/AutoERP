@@ -35,18 +35,6 @@ const invoiceViews = {
         params: { invoice_type: 'service', direction: 'outbound' },
         action: { to: '/vehicle-service/jobs', label: 'Open service jobs' },
     },
-    'rental-payable': {
-        title: 'Owner / Supplier Payables',
-        description: 'Inbound rental payables from owner and supplier agreements.',
-        params: { invoice_type: 'rental', direction: 'inbound' },
-        action: { to: '/vehicle-rental/lessor-agreements', label: 'Open lessor agreements' },
-    },
-    'rental-customer': {
-        title: 'Customer Invoices',
-        description: 'Outbound invoices generated from customer rental agreements.',
-        params: { invoice_type: 'rental', direction: 'outbound' },
-        action: { to: '/vehicle-rental/lessee-agreements', label: 'Open lessee agreements' },
-    },
 } as const;
 
 type InvoiceViewKey = keyof typeof invoiceViews;
