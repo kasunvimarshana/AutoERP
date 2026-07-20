@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
@@ -36,27 +36,27 @@ interface RunningChartFormState {
     remarks: string;
 }
 
-export function RentalRunningChartDialog({
-    open,
-    chart,
-    onClose,
-    onSaved,
-}: {
+interface RentalRunningChartDialogProps {
     open: boolean;
     chart: RentalRunningChart | null;
     onClose: () => void;
     onSaved: (chart: RentalRunningChart) => void;
-}) {
-    const [state, setState] = useState<RunningChartFormState>(() => initialState(null));
+}
+
+export function RentalRunningChartDialog(props: RentalRunningChartDialogProps) {
+    const identity = `${props.open ? 'open' : 'closed'}:${props.chart?.id ?? 'new'}:${props.chart?.row_version ?? 0}`;
+    return <RentalRunningChartDialogForm key={identity} {...props} />;
+}
+
+function RentalRunningChartDialogForm({
+    open,
+    chart,
+    onClose,
+    onSaved,
+}: RentalRunningChartDialogProps) {
+    const [state, setState] = useState<RunningChartFormState>(() => initialState(chart));
     const [error, setError] = useState<ApiError | null>(null);
     const [submitting, setSubmitting] = useState(false);
-
-    useEffect(() => {
-        if (!open) return;
-        setState(initialState(chart));
-        setError(null);
-        setSubmitting(false);
-    }, [chart, open]);
 
     const submit = async (event: FormEvent) => {
         event.preventDefault();
