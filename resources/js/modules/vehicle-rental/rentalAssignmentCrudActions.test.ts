@@ -31,8 +31,8 @@ describe('Vehicle Operations CRUD actions', () => {
         expect(dialogSource).toContain('agreement: assignment.agreement ?? null');
         expect(dialogSource).toContain('vehicle: assignment.vehicle ?? null');
         expect(dialogSource).toContain('driver: assignment.driver ?? null');
-        expect(dialogSource).toContain('startsAt: toLocalDateTime(assignment.starts_at)');
-        expect(dialogSource).toContain('endsAt: toLocalDateTime(assignment.ends_at)');
+        expect(dialogSource).toContain('startsAt: utcDateTimeToLocalInput(assignment.starts_at)');
+        expect(dialogSource).toContain('endsAt: utcDateTimeToLocalInput(assignment.ends_at)');
         expect(dialogSource).toContain('handoverOdometer: assignment.handover_odometer ??');
     });
 
