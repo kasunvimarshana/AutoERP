@@ -11,6 +11,10 @@ const dialogsSource = readFileSync(
     resolve(cwd(), 'resources/js/modules/vehicle-rental/components/RentalAssignmentDialogs.tsx'),
     'utf8',
 );
+const workspaceSource = readFileSync(
+    resolve(cwd(), 'resources/js/modules/vehicle-rental/pages/VehicleRentalWorkspacePage.tsx'),
+    'utf8',
+);
 
 describe('Vehicle Rental assignment source selection', () => {
     it('requests only source assignments matching the selected vehicle and period', () => {
@@ -26,5 +30,16 @@ describe('Vehicle Rental assignment source selection', () => {
         expect(dialogsSource).not.toContain('useState<RentalReference | null>(() => assignment?.source_assignment ?? null)');
         expect(dialogsSource.match(/sourceAssignment: null/g)?.length ?? 0).toBeGreaterThanOrEqual(4);
         expect(dialogsSource).toContain('setSourceAssignment(null)');
+    });
+
+    it('starts vehicle selection from an active agreement without reselecting its side or identity', () => {
+        expect(workspaceSource).toContain("vehicleRentalPermissions.assignmentsManage");
+        expect(workspaceSource).toContain('onClick={() => setAssignmentAgreement(row)}>Select vehicle</Button>');
+        expect(workspaceSource).toContain('agreement={assignmentAgreement ? agreementReference(assignmentAgreement) : null}');
+        expect(workspaceSource).toContain("side={assignmentAgreement?.kind === 'owner' ? 'owner_supply' : 'customer_use'}");
+        expect(workspaceSource).toContain('lockAgreement');
+        expect(dialogsSource).toContain('initialAssignmentState(side, agreement)');
+        expect(dialogsSource).toContain('disabled={lockAgreement}');
+        expect(dialogsSource).toContain("{lockAgreement ? 'Select vehicle' : 'Create assignment'}");
     });
 });
