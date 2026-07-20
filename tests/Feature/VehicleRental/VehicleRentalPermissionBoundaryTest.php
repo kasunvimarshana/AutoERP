@@ -22,7 +22,7 @@ final class VehicleRentalPermissionBoundaryTest extends TestCase
         }
     }
 
-    public function test_running_chart_and_calculation_routes_require_granular_permissions(): void
+    public function test_running_chart_calculation_financial_and_report_routes_require_granular_permissions(): void
     {
         $expected = [
             'api.v1.vehicle-rental.running-charts.index' => VehicleRentalPermission::RUNNING_CHARTS_VIEW,
@@ -33,7 +33,9 @@ final class VehicleRentalPermissionBoundaryTest extends TestCase
             'api.v1.vehicle-rental.running-charts.reverse' => VehicleRentalPermission::RUNNING_CHARTS_MANAGE,
             'api.v1.vehicle-rental.calculations.index' => VehicleRentalPermission::CALCULATIONS_VIEW,
             'api.v1.vehicle-rental.calculations.show' => VehicleRentalPermission::CALCULATIONS_VIEW,
+            'api.v1.vehicle-rental.reports.summary' => VehicleRentalPermission::CALCULATIONS_VIEW,
             'api.v1.vehicle-rental.agreements.calculations.store' => VehicleRentalPermission::CALCULATIONS_MANAGE,
+            'api.v1.vehicle-rental.calculations.financial-document.store' => VehicleRentalPermission::CALCULATIONS_MANAGE,
             'api.v1.vehicle-rental.calculations.cancel' => VehicleRentalPermission::CALCULATIONS_MANAGE,
         ];
         $permissionMiddleware = (string) config('user.tenant.permission_middleware_alias', 'tenant.permission');
