@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { hasPermission } from '@/modules/auth/accessControl';
 import { useAuth } from '@/modules/auth/AuthProvider';
+import { invoicePermissions } from '@/modules/invoice/invoicePermissions';
+import { paymentPermissions } from '@/modules/payment/paymentPermissions';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button, LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
@@ -46,6 +48,8 @@ function dateLabel(value?: string | null): string {
 export function RentalFinancialDocumentsPage({ side }: RentalFinancialDocumentsPageProps) {
     const auth = useAuth();
     const canManage = hasPermission(auth, vehicleRentalPermissions.calculationsManage);
+    const canViewInvoice = hasPermission(auth, invoicePermissions.view);
+    const canCreatePayment = hasPermission(auth, paymentPermissions.create);
     const { confirm, confirmDialog } = useConfirmDialog();
     const [status, setStatus] = useState('calculated');
     const [page, setPage] = useState(1);
@@ -115,9 +119,11 @@ export function RentalFinancialDocumentsPage({ side }: RentalFinancialDocumentsP
             header: documentLabel,
             render: (row) => row.financial_document ? (
                 <div className="space-y-1">
-                    <Link className="font-medium text-sky-700 hover:underline" to={`/invoices/${row.financial_document.id}`}>
-                        {row.financial_document.invoice_number}
-                    </Link>
+                    {canViewInvoice ? (
+                        <Link className="font-medium text-sky-700 hover:underline" to={`/invoices/${row.financial_document.id}`}>
+                            {row.financial_document.invoice_number}
+                        </Link>
+                    ) : <span className="font-medium text-slate-900">{row.financial_document.invoice_number}</span>}
                     <StatusBadge status={row.financial_document.status} />
                 </div>
             ) : <span className="text-slate-500">Not created</span>,
@@ -132,12 +138,12 @@ export function RentalFinancialDocumentsPage({ side }: RentalFinancialDocumentsP
                             Create {documentLabel}
                         </Button>
                     )}
-                    {row.financial_document && (
+                    {canViewInvoice && row.financial_document && (
                         <LinkButton variant="secondary" className="min-h-9 px-3 py-1.5" to={`/invoices/${row.financial_document.id}`}>
                             View document
                         </LinkButton>
                     )}
-                    {row.financial_document && isPositiveDecimal(row.financial_document.balance_due) && (
+                    {canCreatePayment && row.financial_document && isPositiveDecimal(row.financial_document.balance_due) && (
                         <LinkButton className="min-h-9 px-3 py-1.5" to={`/payments/create?invoice_id=${row.financial_document.id}`}>
                             {settlementLabel}
                         </LinkButton>
