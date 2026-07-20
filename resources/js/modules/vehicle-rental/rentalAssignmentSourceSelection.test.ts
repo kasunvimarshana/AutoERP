@@ -17,10 +17,10 @@ const workspaceSource = readFileSync(
 );
 
 describe('Vehicle Rental assignment source selection', () => {
-    it('requests source assignments matching the selected vehicle and planning period', () => {
+    it('requests source assignments matching the selected vehicle and explicit planning period', () => {
         expect(lookupsSource).toContain('vehicle_id: isAssignmentSource ? vehicleId ?? undefined : undefined');
-        expect(lookupsSource).toContain('date_from: isAssignmentSource && startsAt ? startsAt : undefined');
-        expect(lookupsSource).toContain('date_to: isAssignmentSource && endsAt ? endsAt : undefined');
+        expect(lookupsSource).toContain('date_from: isAssignmentSource && startsAt ? localDateTimeToOffsetIso(startsAt) : undefined');
+        expect(lookupsSource).toContain('date_to: isAssignmentSource && endsAt ? localDateTimeToOffsetIso(endsAt) : undefined');
         expect(lookupsSource).not.toContain("assignment_status: 'active'");
     });
 
@@ -30,13 +30,15 @@ describe('Vehicle Rental assignment source selection', () => {
         expect(lookupsSource).toContain('<ReferenceLookup key={lookupContextKey}');
     });
 
-    it('clears stale source relationships when vehicle or period changes', () => {
-        expect(dialogsSource).toContain('vehicleId={state.vehicle?.id ?? null}');
-        expect(dialogsSource).toContain('startsAt={state.startsAt}');
-        expect(dialogsSource).toContain('endsAt={state.endsAt}');
-        expect(dialogsSource).not.toContain('useState<RentalReference | null>(() => assignment?.source_assignment ?? null)');
-        expect(dialogsSource.match(/sourceAssignment: null/g)?.length ?? 0).toBeGreaterThanOrEqual(4);
+    it('resolves customer owner sources from request-keyed vehicle data without stale effects', () => {
+        expect(dialogsSource).toContain("listRentalAssignmentLookup('assignment-source'");
+        expect(dialogsSource).toContain('vehicle_id: requestedVehicleId');
+        expect(dialogsSource).toContain('sourceLookup.vehicleId === selectedVehicleId');
+        expect(dialogsSource).toContain('const resolvedSourceAssignment = selectedSourceCandidate');
+        expect(dialogsSource).toContain('fitAssignmentDateTimes(state.startsAt, state.endsAt, bounds)');
+        expect(dialogsSource).toContain('sourceAssignment: null');
         expect(dialogsSource).toContain('setSourceAssignment(null)');
+        expect(dialogsSource).not.toContain('setSourceCandidates(null)');
     });
 
     it('starts vehicle selection from an active agreement without reselecting its side or identity', () => {
