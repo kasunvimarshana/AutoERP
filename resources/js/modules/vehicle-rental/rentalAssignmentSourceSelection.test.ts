@@ -1,12 +1,13 @@
 import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const lookupsSource = readFileSync(
-    new URL('./components/VehicleRentalLookups.tsx', import.meta.url),
+    resolve(process.cwd(), 'resources/js/modules/vehicle-rental/components/VehicleRentalLookups.tsx'),
     'utf8',
 );
 const dialogsSource = readFileSync(
-    new URL('./components/RentalAssignmentDialogs.tsx', import.meta.url),
+    resolve(process.cwd(), 'resources/js/modules/vehicle-rental/components/RentalAssignmentDialogs.tsx'),
     'utf8',
 );
 
