@@ -10,9 +10,9 @@ export const vehicleRentalNavigation: AppNavigationItem[] = [
         icon: 'truck',
         to: '/vehicle-rental',
         module: 'vehicle-rental',
-        anyPermissions: vehicleRentalViewPermissions,
+        anyPermissions: [...vehicleRentalViewPermissions],
         children: [
-            { label: 'Overview', to: '/vehicle-rental', permissions: vehicleRentalViewPermissions },
+            { label: 'Overview', to: '/vehicle-rental', permissions: [...vehicleRentalViewPermissions] },
             { label: 'Owner / Supplier Agreements', to: '/vehicle-rental/owner-agreements', permissions: [vehicleRentalPermissions.agreementsView] },
             { label: 'Customer Agreements', to: '/vehicle-rental/customer-agreements', permissions: [vehicleRentalPermissions.agreementsView] },
             { label: 'Daily Running Charts', to: '/vehicle-rental/running-charts', permissions: [vehicleRentalPermissions.runningChartsView] },
