@@ -161,6 +161,24 @@ export interface RentalCalculationSource {
     } | null;
 }
 
+export interface RentalFinancialDocument {
+    id: number;
+    row_version: number;
+    invoice_number: string;
+    invoice_type: string;
+    direction: 'outbound' | 'inbound';
+    status: string;
+    invoice_date?: string | null;
+    due_date?: string | null;
+    party_type?: 'customer' | 'supplier' | null;
+    party?: RentalReference | null;
+    currency?: RentalReference | null;
+    subtotal: string;
+    tax_total: string;
+    grand_total: string;
+    balance_due: string;
+}
+
 export interface RentalCalculation {
     id: number;
     row_version: number;
@@ -185,8 +203,35 @@ export interface RentalCalculation {
     subtotal_amount: string;
     lines?: RentalCalculationLine[];
     sources?: RentalCalculationSource[];
+    financial_document?: RentalFinancialDocument | null;
     cancelled_at?: string | null;
     cancellation_reason?: string | null;
+}
+
+export interface RentalReportSummary {
+    period: {
+        date_from?: string | null;
+        date_to?: string | null;
+    };
+    running_charts: {
+        count: number;
+        commercial_km: string;
+    };
+    customer: {
+        calculation_count: number;
+        subtotal_amount: string;
+        financial_document_count: number;
+        document_total: string;
+        outstanding_amount: string;
+    };
+    owner: {
+        calculation_count: number;
+        subtotal_amount: string;
+        financial_document_count: number;
+        document_total: string;
+        outstanding_amount: string;
+    };
+    gross_margin_before_tax: string;
 }
 
 export interface RentalAgreementPayload {
@@ -275,4 +320,11 @@ export interface RentalRunningChartPayload {
     odometer_variance_reason?: string | null;
     remarks?: string | null;
     expected_version?: number;
+}
+
+export interface RentalFinancialDocumentPayload {
+    invoice_date: string;
+    expected_version: number;
+    exchange_rate?: string;
+    notes?: string | null;
 }
