@@ -13,11 +13,24 @@ import type {
     RentalAgreementKind,
     RentalAssignment,
     RentalAssignmentSide,
+    RentalBillingBasis,
     RentalReference,
 } from '../vehicleRentalTypes';
 
 export interface RentalLookupOption extends NamedResource {
     subtitle?: string | null;
+    billingBasis?: RentalBillingBasis;
+    startsOn?: string | null;
+    endsOn?: string | null;
+    defaultCurrency?: RentalReference | null;
+    selfDrive?: boolean;
+    assignmentStartsAt?: string | null;
+    assignmentEndsAt?: string | null;
+    handoverOdometer?: string | null;
+    driver?: RentalReference | null;
+    vehicle?: RentalReference | null;
+    agreement?: RentalReference | null;
+    ownerAgreement?: RentalReference | null;
 }
 
 interface LookupProps {
@@ -45,7 +58,12 @@ const mapResult = <T,>(
 export function RentalCustomerLookup({ value, onChange, error, disabled, required }: LookupProps) {
     const search = useCallback(async (params: LookupLoadParams) => mapResult(
         await searchCustomers(params),
-        (item) => ({ id: item.id, code: item.code, name: item.name || item.display_name || item.code }),
+        (item) => ({
+            id: item.id,
+            code: item.code,
+            name: item.name || item.display_name || item.code,
+            defaultCurrency: namedReference(item.default_currency),
+        }),
     ), []);
 
     return <ReferenceLookup label="Customer" value={value} onChange={onChange} search={search} error={error} disabled={disabled} required={required} />;
@@ -54,7 +72,12 @@ export function RentalCustomerLookup({ value, onChange, error, disabled, require
 export function RentalSupplierLookup({ value, onChange, error, disabled, required }: LookupProps) {
     const search = useCallback(async (params: LookupLoadParams) => mapResult(
         await searchSuppliers(params),
-        (item) => ({ id: item.id, code: item.code, name: item.name || item.display_name || item.code }),
+        (item) => ({
+            id: item.id,
+            code: item.code,
+            name: item.name || item.display_name || item.code,
+            defaultCurrency: namedReference(item.default_currency),
+        }),
     ), []);
 
     return <ReferenceLookup label="Owner / supplier" value={value} onChange={onChange} search={search} error={error} disabled={disabled} required={required} />;
@@ -76,7 +99,7 @@ export function RentalVehicleLookup({ value, onChange, error, disabled, required
             id: item.id,
             code: item.vehicle_number,
             name: item.registration_number || item.vehicle_number,
-            subtitle: item.vehicle_number,
+            subtitle: [item.make?.name, item.model?.name, item.status].filter(Boolean).join(' • '),
         }),
     ), []);
 
@@ -196,6 +219,10 @@ function agreementOption(agreement: RentalAgreement): RentalLookupOption {
         code: agreement.agreement_number,
         name: party?.name || party?.code || agreement.agreement_number,
         subtitle: agreement.kind,
+        billingBasis: agreement.billing_basis,
+        startsOn: agreement.starts_on,
+        endsOn: agreement.ends_on,
+        defaultCurrency: agreement.currency ?? null,
     };
 }
 
@@ -206,6 +233,19 @@ function assignmentOption(assignment: RentalAssignment): RentalLookupOption {
         id: assignment.id,
         code: agreement,
         name: vehicle,
-        subtitle: assignment.side,
+        subtitle: assignment.side === 'customer_use' ? 'Customer vehicle' : 'Owner-supplied vehicle',
+        selfDrive: assignment.self_drive,
+        assignmentStartsAt: assignment.starts_at,
+        assignmentEndsAt: assignment.ends_at,
+        handoverOdometer: assignment.handover_odometer,
+        driver: assignment.driver ?? null,
+        vehicle: assignment.vehicle ?? null,
+        agreement: assignment.agreement ?? null,
+        ownerAgreement: assignment.source_assignment?.agreement ?? null,
     };
+}
+
+function namedReference(value?: NamedResource | null): RentalReference | null {
+    if (!value) return null;
+    return { id: value.id, code: value.code ?? null, name: value.name ?? null };
 }
