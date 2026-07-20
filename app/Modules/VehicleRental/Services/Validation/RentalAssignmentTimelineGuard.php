@@ -154,9 +154,24 @@ final class RentalAssignmentTimelineGuard
                     ->orWhere('source_assignment_id', '!=', $ignoreAssignmentId);
             });
         }
-        if ($query->exists()) {
-            throw new InvalidArgumentException('The selected driver already has an overlapping rental assignment.');
+
+        $conflict = $query
+            ->with('agreement:id,agreement_number')
+            ->first();
+        if ($conflict instanceof RentalAssignment) {
+            throw new InvalidArgumentException($this->driverConflictMessage($conflict));
         }
+    }
+
+    private function driverConflictMessage(RentalAssignment $conflict): string
+    {
+        $reference = $conflict->agreement?->agreement_number ?? 'Assignment #'.$conflict->getKey();
+        $side = str_replace('_', ' ', $conflict->side->value);
+        $status = $conflict->status->value;
+        $startsAt = $conflict->starts_at->toDateTimeString();
+        $endsAt = $conflict->ends_at?->toDateTimeString() ?? 'open-ended';
+
+        return "The selected driver already has an overlapping rental assignment: {$reference} ({$side}, {$status}) from {$startsAt} to {$endsAt}.";
     }
 
     private function overlaps(

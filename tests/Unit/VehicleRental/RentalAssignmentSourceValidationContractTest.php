@@ -27,23 +27,35 @@ final class RentalAssignmentSourceValidationContractTest extends TestCase
         self::assertStringContainsString('$scope->where(\'side\', \'!=\', RentalAssignmentSide::CustomerUse->value)', $source);
         self::assertStringContainsString('->orWhereNull(\'source_assignment_id\')', $source);
         self::assertStringContainsString('->orWhere(\'source_assignment_id\', \'!=\', $ignoreAssignmentId)', $source);
-        self::assertStringContainsString('The selected driver already has an overlapping rental assignment.', $source);
     }
 
-    public function test_owner_supply_lookup_uses_planning_statuses_and_calendar_date_coverage(): void
+    public function test_unrelated_driver_overlap_identifies_the_conflicting_assignment(): void
+    {
+        $source = $this->source(RentalAssignmentTimelineGuard::class);
+
+        self::assertStringContainsString("->with('agreement:id,agreement_number')", $source);
+        self::assertStringContainsString('driverConflictMessage', $source);
+        self::assertStringContainsString('The selected driver already has an overlapping rental assignment:', $source);
+        self::assertStringContainsString('$conflict->side->value', $source);
+        self::assertStringContainsString('$conflict->status->value', $source);
+        self::assertStringContainsString('$conflict->starts_at->toDateTimeString()', $source);
+    }
+
+    public function test_owner_supply_lookup_uses_planning_statuses_and_exact_timestamp_coverage(): void
     {
         $source = $this->source(RentalLookupController::class);
 
         self::assertStringContainsString('RentalAssignmentStatus::Planned->value', $source);
         self::assertStringContainsString('RentalAssignmentStatus::Active->value', $source);
         self::assertStringContainsString('$query->where(\'vehicle_id\'', $source);
-        self::assertStringContainsString('$query->whereDate(\'starts_at\', \'<=\'', $source);
-        self::assertStringContainsString('$scope->whereNull(\'ends_at\')', $source);
-        self::assertStringContainsString('->orWhereDate(\'ends_at\', \'>=\'', $source);
+        self::assertStringContainsString('$query->where(\'starts_at\', \'<=\', $startsAt)', $source);
+        self::assertStringContainsString('->orWhere(\'ends_at\', \'>=\', $endsAt)', $source);
         self::assertStringContainsString('$query->whereNull(\'ends_at\')', $source);
+        self::assertStringNotContainsString('whereDate(\'starts_at\'', $source);
+        self::assertStringNotContainsString('orWhereDate(\'ends_at\'', $source);
     }
 
-    public function test_planning_and_operational_source_eligibility_are_separate(): void
+    public function test_planning_and_operational_source_eligibility_share_one_exact_period_boundary(): void
     {
         $guard = $this->source(RentalAssignmentSourceGuard::class);
         $assignmentService = $this->source(RentalAssignmentService::class);
@@ -51,9 +63,12 @@ final class RentalAssignmentSourceValidationContractTest extends TestCase
         $replacementService = $this->source(RentalReplacementService::class);
 
         self::assertStringContainsString('sourceAssignmentForPlanning', $guard);
-        self::assertStringContainsString('periodContainsPlanningDates', $guard);
         self::assertStringContainsString('sourceAssignmentForOperation', $guard);
-        self::assertStringContainsString('periodContainsOperationalPeriod', $guard);
+        self::assertSame(3, substr_count($guard, 'periodContainsCompletePeriod'));
+        self::assertStringNotContainsString('periodContainsPlanningDates', $guard);
+        self::assertStringNotContainsString('periodContainsOperationalPeriod', $guard);
+        self::assertStringContainsString('Owner-supply assignment must cover the complete customer-use assignment period.', $guard);
+        self::assertStringContainsString('Active owner-supply assignment must cover the complete customer-use operational period.', $guard);
         self::assertStringContainsString('sourceAssignmentForPlanning', $assignmentService);
         self::assertStringContainsString('sourceAssignmentForOperation', $custodyService);
         self::assertStringContainsString('sourceAssignmentForOperation', $replacementService);
