@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
@@ -145,11 +145,19 @@ function RentalAssignmentDialogForm({
         return () => controller.abort();
     }, [open, state.side, state.vehicle?.id]);
 
-    const eligibleSources = (sourceCandidates ?? []).filter((candidate) => sourceOverlapsAgreement(candidate, agreementPeriod));
+    const eligibleSources = useMemo(
+        () => (sourceCandidates ?? []).filter((candidate) => sourceOverlapsAgreement(candidate, agreementPeriod)),
+        [agreementPeriod.endsOn, agreementPeriod.startsOn, sourceCandidates],
+    );
 
     useEffect(() => {
-        if (state.side !== 'customer_use' || eligibleSources.length !== 1) return;
-        const candidate = eligibleSources[0];
+        if (state.side !== 'customer_use') return;
+        const currentCandidate = state.sourceAssignment
+            ? eligibleSources.find((candidate) => candidate.id === state.sourceAssignment?.id) ?? null
+            : null;
+        const candidate = currentCandidate ?? (eligibleSources.length === 1 ? eligibleSources[0] : null);
+        if (!candidate) return;
+
         setState((current) => {
             if (current.sourceAssignment?.id === candidate.id
                 && current.sourceAssignment.assignmentStartsAt === candidate.assignmentStartsAt
@@ -159,7 +167,7 @@ function RentalAssignmentDialogForm({
 
             return applyOwnerSource(current, candidate, agreementPeriod);
         });
-    }, [agreementPeriod.endsOn, agreementPeriod.startsOn, eligibleSources, state.side]);
+    }, [agreementPeriod, eligibleSources, state.side, state.sourceAssignment?.id]);
 
     useEffect(() => {
         if (!agreementPeriod.startsOn && !agreementPeriod.endsOn) return;
