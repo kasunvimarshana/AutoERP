@@ -2,7 +2,7 @@ import { useId, useRef, type ReactNode } from 'react';
 
 export interface TabItem<T extends string> {
     id: T;
-    label: string;
+    label: ReactNode;
 }
 
 export function Tabs<T extends string>({ tabs, active, onChange, id }: {
