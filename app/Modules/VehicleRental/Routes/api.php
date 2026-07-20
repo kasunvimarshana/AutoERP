@@ -7,6 +7,7 @@ use Modules\VehicleRental\Constants\VehicleRentalPermission;
 use Modules\VehicleRental\Http\Controllers\RentalAgreementController;
 use Modules\VehicleRental\Http\Controllers\RentalAssignmentController;
 use Modules\VehicleRental\Http\Controllers\RentalCalculationController;
+use Modules\VehicleRental\Http\Controllers\RentalLookupController;
 use Modules\VehicleRental\Http\Controllers\RentalRunningChartController;
 
 $middleware = [
@@ -30,6 +31,8 @@ Route::prefix('api/v1/vehicle-rental')
                 ->whereNumber('agreement')->name('agreements.show');
         });
         Route::middleware($requires(VehicleRentalPermission::AGREEMENTS_MANAGE))->group(function (): void {
+            Route::get('lookups/agreement-form', [RentalLookupController::class, 'agreementForm'])
+                ->name('lookups.agreement-form');
             Route::post('agreements', [RentalAgreementController::class, 'store'])->name('agreements.store');
             Route::put('agreements/{agreement}', [RentalAgreementController::class, 'update'])
                 ->whereNumber('agreement')->name('agreements.update');
