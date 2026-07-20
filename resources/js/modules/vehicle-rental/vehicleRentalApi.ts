@@ -78,6 +78,17 @@ export const createRentalAssignment = (payload: RentalAssignmentPayload) =>
     apiClient.post<ApiResource<RentalAssignment>>(`${endpoint}/assignments`, payload)
         .then((response) => response.data.data);
 
+export const updateRentalAssignment = (id: number, payload: RentalAssignmentPayload, expectedVersion: number) =>
+    apiClient.put<ApiResource<RentalAssignment>>(`${endpoint}/assignments/${id}`, {
+        ...payload,
+        expected_version: expectedVersion,
+    }).then((response) => response.data.data);
+
+export const deleteRentalAssignment = (id: number, expectedVersion: number) =>
+    apiClient.delete(`${endpoint}/assignments/${id}`, {
+        data: { expected_version: expectedVersion },
+    });
+
 export const recordRentalCustody = (id: number, payload: RentalCustodyPayload) =>
     apiClient.post<ApiResource<RentalAssignment>>(`${endpoint}/assignments/${id}/custody`, payload)
         .then((response) => response.data.data);

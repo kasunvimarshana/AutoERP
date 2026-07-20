@@ -33,15 +33,18 @@ import {
     createRentalRateVersion,
     createRentalRunningChart,
     deleteRentalAgreement,
+    deleteRentalAssignment,
     finalizeRentalRunningChart,
     getRentalAgreement,
     getRentalAgreementFormLookups,
+    getRentalAssignment,
     listRentalAgreementLookup,
     listRentalAssignmentLookup,
     recordRentalCustody,
     replaceRentalAssignment,
     reverseRentalRunningChart,
     updateRentalAgreement,
+    updateRentalAssignment,
     updateRentalRunningChart,
 } from './vehicleRentalApi';
 
@@ -95,20 +98,26 @@ describe('Vehicle Rental CRUD workflow contracts', () => {
         expect(apiClientMocks.post).toHaveBeenCalledWith(`${endpoint}/agreements/11/close`, { expected_version: 4 });
     });
 
-    it('maps assignment custody, replacement, and cancellation to the backend lifecycle', async () => {
+    it('maps assignment read edit delete custody replacement and cancellation to the backend lifecycle', async () => {
         const assignment = {} as RentalAssignmentPayload;
         const custody = {} as RentalCustodyPayload;
         const replacement = {} as RentalReplacementPayload;
 
+        await getRentalAssignment(21);
         await createRentalAssignment(assignment);
+        await updateRentalAssignment(21, assignment, 4);
+        await deleteRentalAssignment(21, 5);
         await recordRentalCustody(21, custody);
         await replaceRentalAssignment(21, replacement);
-        await cancelRentalAssignment(21, 5);
+        await cancelRentalAssignment(21, 6);
 
+        expect(apiClientMocks.get).toHaveBeenCalledWith(`${endpoint}/assignments/21`, { signal: undefined });
         expect(apiClientMocks.post).toHaveBeenCalledWith(`${endpoint}/assignments`, assignment);
+        expect(apiClientMocks.put).toHaveBeenCalledWith(`${endpoint}/assignments/21`, { ...assignment, expected_version: 4 });
+        expect(apiClientMocks.delete).toHaveBeenCalledWith(`${endpoint}/assignments/21`, { data: { expected_version: 5 } });
         expect(apiClientMocks.post).toHaveBeenCalledWith(`${endpoint}/assignments/21/custody`, custody);
         expect(apiClientMocks.post).toHaveBeenCalledWith(`${endpoint}/assignments/21/replace`, replacement);
-        expect(apiClientMocks.post).toHaveBeenCalledWith(`${endpoint}/assignments/21/cancel`, { expected_version: 5 });
+        expect(apiClientMocks.post).toHaveBeenCalledWith(`${endpoint}/assignments/21/cancel`, { expected_version: 6 });
     });
 
     it('maps running-chart and calculation transitions without inventing delete endpoints', async () => {

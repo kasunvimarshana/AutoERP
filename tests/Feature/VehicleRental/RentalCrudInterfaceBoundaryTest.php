@@ -8,7 +8,9 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Validator;
 use Modules\VehicleRental\Constants\VehicleRentalPermission;
 use Modules\VehicleRental\Http\Requests\DeleteRentalAgreementRequest;
+use Modules\VehicleRental\Http\Requests\DeleteRentalAssignmentRequest;
 use Modules\VehicleRental\Http\Requests\ListRentalRequest;
+use Modules\VehicleRental\Http\Requests\UpdateRentalAssignmentRequest;
 use Tests\TestCase;
 
 final class RentalCrudInterfaceBoundaryTest extends TestCase
@@ -41,6 +43,40 @@ final class RentalCrudInterfaceBoundaryTest extends TestCase
         self::assertFalse(Validator::make(['expected_version' => 1], $rules)->fails());
         self::assertTrue(Validator::make([], $rules)->fails());
         self::assertTrue(Validator::make(['expected_version' => 0], $rules)->fails());
+    }
+
+    public function test_planned_assignment_update_and_delete_use_manage_permission_and_optimistic_version(): void
+    {
+        $permissionMiddleware = (string) config('user.tenant.permission_middleware_alias', 'tenant.permission');
+        $expectedRoutes = [
+            'api.v1.vehicle-rental.assignments.update' => 'PUT',
+            'api.v1.vehicle-rental.assignments.destroy' => 'DELETE',
+        ];
+
+        foreach ($expectedRoutes as $routeName => $method) {
+            $route = Route::getRoutes()->getByName($routeName);
+            self::assertNotNull($route, "Route [{$routeName}] must exist.");
+            self::assertContains($method, $route->methods());
+            self::assertContains(
+                $permissionMiddleware.':'.VehicleRentalPermission::ASSIGNMENTS_MANAGE,
+                $route->gatherMiddleware(),
+            );
+        }
+
+        $deleteRules = (new DeleteRentalAssignmentRequest())->rules();
+        self::assertFalse(Validator::make(['expected_version' => 1], $deleteRules)->fails());
+        self::assertTrue(Validator::make([], $deleteRules)->fails());
+        self::assertTrue(Validator::make(['expected_version' => 0], $deleteRules)->fails());
+
+        $updateRequest = new UpdateRentalAssignmentRequest();
+        $updateRequest->attributes->set(
+            (string) config('core.current_tenant.id_attribute', 'current_tenant_id'),
+            1,
+        );
+        $updateRules = $updateRequest->rules();
+        self::assertArrayHasKey('expected_version', $updateRules);
+        self::assertArrayHasKey('agreement_id', $updateRules);
+        self::assertArrayHasKey('vehicle_id', $updateRules);
     }
 
     public function test_workflow_lookups_use_their_owned_manage_permissions(): void

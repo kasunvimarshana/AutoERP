@@ -9,7 +9,7 @@ use Modules\Core\Http\Requests\TenantScopedRequest;
 use Modules\VehicleRental\DTOs\RentalAssignmentData;
 use Modules\VehicleRental\Enums\RentalAssignmentSide;
 
-final class StoreRentalAssignmentRequest extends TenantScopedRequest
+class StoreRentalAssignmentRequest extends TenantScopedRequest
 {
     public function rules(): array
     {
