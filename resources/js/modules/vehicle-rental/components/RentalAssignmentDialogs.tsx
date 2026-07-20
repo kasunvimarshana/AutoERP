@@ -42,27 +42,34 @@ interface AssignmentFormState {
 
 interface RentalAssignmentDialogProps {
     open: boolean;
+    agreement?: RentalReference | null;
+    side?: RentalAssignmentSide;
+    lockAgreement?: boolean;
     onClose: () => void;
     onSaved: (assignment: RentalAssignment) => void;
 }
 
 export function RentalAssignmentDialog(props: RentalAssignmentDialogProps) {
-    return <RentalAssignmentDialogForm key={props.open ? 'open' : 'closed'} {...props} />;
+    const identity = `${props.open ? 'open' : 'closed'}:${props.side ?? 'customer_use'}:${props.agreement?.id ?? 'none'}:${props.lockAgreement ? 'locked' : 'editable'}`;
+    return <RentalAssignmentDialogForm key={identity} {...props} />;
 }
 
 function RentalAssignmentDialogForm({
     open,
+    agreement = null,
+    side = 'customer_use',
+    lockAgreement = false,
     onClose,
     onSaved,
 }: RentalAssignmentDialogProps) {
-    const [state, setState] = useState<AssignmentFormState>(() => initialAssignmentState());
+    const [state, setState] = useState<AssignmentFormState>(() => initialAssignmentState(side, agreement));
     const [error, setError] = useState<ApiError | null>(null);
     const [submitting, setSubmitting] = useState(false);
 
-    const setSide = (side: RentalAssignmentSide) => {
+    const setSide = (nextSide: RentalAssignmentSide) => {
         setState((current) => ({
             ...current,
-            side,
+            side: nextSide,
             agreement: null,
             sourceAssignment: null,
         }));
@@ -95,23 +102,30 @@ function RentalAssignmentDialogForm({
         }
     };
 
+    const title = lockAgreement
+        ? `Select vehicle — ${state.agreement?.code ?? state.agreement?.name ?? ''}`
+        : 'New vehicle rental assignment';
+
     return (
-        <Modal open={open} title="New vehicle rental assignment" onClose={onClose} closeDisabled={submitting}>
+        <Modal open={open} title={title} onClose={onClose} closeDisabled={submitting}>
             <form className="space-y-5" onSubmit={(event) => void submit(event)}>
                 <ErrorAlert error={error} inline />
                 <div className="grid gap-4 md:grid-cols-2">
-                    <Select
-                        label="Assignment side"
-                        value={state.side}
-                        required
-                        options={[{ value: 'customer_use', label: 'Customer use' }, { value: 'owner_supply', label: 'Owner supply' }]}
-                        error={fieldError(error, 'side')}
-                        onChange={(event) => setSide(event.target.value as RentalAssignmentSide)}
-                    />
+                    {!lockAgreement && (
+                        <Select
+                            label="Assignment side"
+                            value={state.side}
+                            required
+                            options={[{ value: 'customer_use', label: 'Customer use' }, { value: 'owner_supply', label: 'Owner supply' }]}
+                            error={fieldError(error, 'side')}
+                            onChange={(event) => setSide(event.target.value as RentalAssignmentSide)}
+                        />
+                    )}
                     <RentalAgreementLookup
                         value={state.agreement}
                         kind={state.side === 'customer_use' ? 'customer' : 'owner'}
                         required
+                        disabled={lockAgreement}
                         onChange={(value: RentalLookupOption | null) => setState((current) => ({ ...current, agreement: value }))}
                         error={fieldError(error, 'agreement_id')}
                     />
@@ -183,7 +197,7 @@ function RentalAssignmentDialogForm({
                 </div>
                 <div className="flex justify-end gap-2">
                     <Button type="button" variant="secondary" disabled={submitting} onClick={onClose}>Cancel</Button>
-                    <Button type="submit" loading={submitting}>Create assignment</Button>
+                    <Button type="submit" loading={submitting}>{lockAgreement ? 'Select vehicle' : 'Create assignment'}</Button>
                 </div>
             </form>
         </Modal>
@@ -399,10 +413,10 @@ function RentalReplacementDialogForm({
     );
 }
 
-function initialAssignmentState(): AssignmentFormState {
+function initialAssignmentState(side: RentalAssignmentSide, agreement: RentalReference | null): AssignmentFormState {
     return {
-        side: 'customer_use',
-        agreement: null,
+        side,
+        agreement,
         vehicle: null,
         sourceAssignment: null,
         driver: null,
