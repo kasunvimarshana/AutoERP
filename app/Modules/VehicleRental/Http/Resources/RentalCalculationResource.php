@@ -62,6 +62,9 @@ final class RentalCalculationResource extends JsonResource
                     'operational_date' => $source->runningChart->operational_date?->toDateString(),
                 ] : null,
             ])->values()->all()),
+            'financial_document' => $this->relationLoaded('financialDocument') && $this->financialDocument !== null
+                ? (new RentalFinancialDocumentResource($this->financialDocument))->resolve($request)
+                : null,
             'cancelled_at' => $this->cancelled_at?->toISOString(),
             'cancellation_reason' => $this->cancellation_reason,
         ];
