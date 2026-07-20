@@ -57,8 +57,8 @@ final class RentalAssignmentSourceGuard
         if (! in_array($source->status, [RentalAssignmentStatus::Planned, RentalAssignmentStatus::Active], true)) {
             throw new InvalidArgumentException('Customer assignment source must be planned or active.');
         }
-        if (! $this->periodContainsPlanningDates($source, $startsAt, $endsAt)) {
-            throw new InvalidArgumentException('Owner-supply assignment must cover the complete customer-use planning dates.');
+        if (! $this->periodContainsCompletePeriod($source, $startsAt, $endsAt)) {
+            throw new InvalidArgumentException('Owner-supply assignment must cover the complete customer-use assignment period.');
         }
 
         return $source;
@@ -78,7 +78,7 @@ final class RentalAssignmentSourceGuard
                 'Owner-supply source must be active before customer vehicle handover or replacement.',
             );
         }
-        if (! $this->periodContainsOperationalPeriod($source, $startsAt, $endsAt)) {
+        if (! $this->periodContainsCompletePeriod($source, $startsAt, $endsAt)) {
             throw new InvalidArgumentException(
                 'Active owner-supply assignment must cover the complete customer-use operational period.',
             );
@@ -159,28 +159,7 @@ final class RentalAssignmentSourceGuard
         return $source;
     }
 
-    private function periodContainsPlanningDates(
-        RentalAssignment $assignment,
-        CarbonImmutable $startsAt,
-        ?CarbonImmutable $endsAt,
-    ): bool {
-        $sourceStartsOn = CarbonImmutable::instance($assignment->starts_at)->startOfDay();
-        if ($sourceStartsOn->gt($startsAt->startOfDay())) {
-            return false;
-        }
-        if ($assignment->ends_at === null) {
-            return true;
-        }
-        if ($endsAt === null) {
-            return false;
-        }
-
-        return CarbonImmutable::instance($assignment->ends_at)
-            ->startOfDay()
-            ->gte($endsAt->startOfDay());
-    }
-
-    private function periodContainsOperationalPeriod(
+    private function periodContainsCompletePeriod(
         RentalAssignment $assignment,
         CarbonImmutable $startsAt,
         ?CarbonImmutable $endsAt,
