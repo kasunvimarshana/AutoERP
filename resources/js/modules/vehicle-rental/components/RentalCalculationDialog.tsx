@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
@@ -9,29 +9,26 @@ import { createRentalCalculation } from '../vehicleRentalApi';
 import type { RentalCalculation, RentalReference } from '../vehicleRentalTypes';
 import { RentalAgreementLookup, type RentalLookupOption } from './VehicleRentalLookups';
 
-export function RentalCalculationDialog({
-    open,
-    onClose,
-    onSaved,
-}: {
+interface RentalCalculationDialogProps {
     open: boolean;
     onClose: () => void;
     onSaved: (calculation: RentalCalculation) => void;
-}) {
+}
+
+export function RentalCalculationDialog(props: RentalCalculationDialogProps) {
+    return <RentalCalculationDialogForm key={props.open ? 'open' : 'closed'} {...props} />;
+}
+
+function RentalCalculationDialogForm({
+    open,
+    onClose,
+    onSaved,
+}: RentalCalculationDialogProps) {
     const [agreement, setAgreement] = useState<RentalReference | null>(null);
     const [periodStart, setPeriodStart] = useState('');
     const [periodEnd, setPeriodEnd] = useState('');
     const [error, setError] = useState<ApiError | null>(null);
     const [submitting, setSubmitting] = useState(false);
-
-    useEffect(() => {
-        if (!open) return;
-        setAgreement(null);
-        setPeriodStart('');
-        setPeriodEnd('');
-        setError(null);
-        setSubmitting(false);
-    }, [open]);
 
     const submit = async (event: FormEvent) => {
         event.preventDefault();
