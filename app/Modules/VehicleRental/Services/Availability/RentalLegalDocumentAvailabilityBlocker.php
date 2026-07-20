@@ -12,7 +12,6 @@ use Modules\Vehicle\Models\VehicleDocument;
 final class RentalLegalDocumentAvailabilityBlocker implements VehicleAvailabilityBlockerInterface
 {
     private const REQUIRED_DOCUMENT_TYPES = [
-        VehicleDocumentType::Insurance,
         VehicleDocumentType::RevenueLicense,
     ];
 
