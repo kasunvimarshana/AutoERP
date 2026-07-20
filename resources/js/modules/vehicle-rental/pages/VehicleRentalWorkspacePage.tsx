@@ -243,7 +243,7 @@ function CalculationsPage() {
             <ContentHeader title="Vehicle rental calculations" description="Immutable customer and owner commercial snapshots. One side never blocks the other." />
             <div className="mb-4 grid gap-4 md:grid-cols-2">
                 <Select label="Side" value={side} options={[emptyOption, { value: 'customer', label: 'Customer' }, { value: 'owner', label: 'Owner' }]} onChange={(event) => { setSide(event.target.value); setPage(1); }} />
-                <Select label="Status" value={status} options={[emptyOption, { value: 'active', label: 'Active' }, { value: 'cancelled', label: 'Cancelled' }]} onChange={(event) => { setStatus(event.target.value); setPage(1); }} />
+                <Select label="Status" value={status} options={[emptyOption, { value: 'calculated', label: 'Calculated' }, { value: 'cancelled', label: 'Cancelled' }]} onChange={(event) => { setStatus(event.target.value); setPage(1); }} />
             </div>
             <ErrorAlert error={result.error} />
             {result.loading ? <LoadingState /> : <DataTable rows={result.data?.data ?? []} columns={columns} rowKey={(row) => row.id} />}
