@@ -40,13 +40,14 @@ describe('Vehicle Rental assignment source selection', () => {
     });
 
     it('starts vehicle selection from an active agreement without reselecting its side or identity', () => {
-        expect(workspaceSource).toContain("vehicleRentalPermissions.assignmentsManage");
+        expect(workspaceSource).toContain('vehicleRentalPermissions.assignmentsManage');
         expect(workspaceSource).toContain('onClick={() => setAssignmentAgreement(row)}>Select vehicle</Button>');
         expect(workspaceSource).toContain('agreement={assignmentAgreement ? agreementReference(assignmentAgreement) : null}');
         expect(workspaceSource).toContain("side={assignmentAgreement?.kind === 'owner' ? 'owner_supply' : 'customer_use'}");
         expect(workspaceSource).toContain('lockAgreement');
-        expect(dialogsSource).toContain('initialAssignmentState(side, agreement)');
+        expect(dialogsSource).toContain('initialAssignmentState(side, agreement, assignment)');
         expect(dialogsSource).toContain('disabled={lockAgreement}');
-        expect(dialogsSource).toContain("{lockAgreement ? 'Select vehicle' : 'Create assignment'}");
+        expect(dialogsSource).toContain("? 'Select vehicle'");
+        expect(dialogsSource).toContain("? 'Update assignment'");
     });
 });
