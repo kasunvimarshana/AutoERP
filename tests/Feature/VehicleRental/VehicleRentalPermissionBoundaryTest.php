@@ -35,7 +35,7 @@ final class VehicleRentalPermissionBoundaryTest extends TestCase
             'api.v1.vehicle-rental.calculations.show' => VehicleRentalPermission::CALCULATIONS_VIEW,
             'api.v1.vehicle-rental.reports.summary' => VehicleRentalPermission::CALCULATIONS_VIEW,
             'api.v1.vehicle-rental.agreements.calculations.store' => VehicleRentalPermission::CALCULATIONS_MANAGE,
-            'api.v1.vehicle-rental.calculations.financial-document.store' => VehicleRentalPermission::CALCULATIONS_MANAGE,
+            'api.v1.vehicle-rental.calculations.financial-document.store' => VehicleRentalPermission::FINANCIAL_DOCUMENTS_MANAGE,
             'api.v1.vehicle-rental.calculations.cancel' => VehicleRentalPermission::CALCULATIONS_MANAGE,
         ];
         $permissionMiddleware = (string) config('user.tenant.permission_middleware_alias', 'tenant.permission');
