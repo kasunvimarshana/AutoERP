@@ -15,7 +15,7 @@ final class StoreRentalCustodyRequest extends TenantScopedRequest
     {
         return [
             'event_type' => ['required', Rule::in([RentalCustodyEventType::Handover->value, RentalCustodyEventType::Return->value])],
-            'event_at' => ['required', 'date'],
+            'event_at' => RentalDateTimeRules::required(),
             'odometer' => ['required', 'numeric', 'min:0'],
             'fuel_level' => ['nullable', 'string', 'max:50'],
             'condition_notes' => ['nullable', 'string'],
