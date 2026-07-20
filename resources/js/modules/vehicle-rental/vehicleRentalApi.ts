@@ -1,5 +1,6 @@
 import { apiClient } from '@/shared/api/apiClient';
 import type { ApiCollection, ApiResource, ListParams } from '@/shared/types/api';
+import type { VehicleSummary } from '@/modules/vehicle/vehicleTypes';
 import { localDateTimeToOffsetIso } from './rentalDateTime';
 import type {
     RentalAgreement,
@@ -70,6 +71,12 @@ export const listRentalAssignmentLookup = (purpose: 'assignment-source' | 'runni
     return apiClient.get<ApiCollection<RentalAssignment>>(`${endpoint}/lookups/${path}`, { params, signal })
         .then((response) => response.data);
 };
+
+export const listRentalOwnerAgreementVehicles = (
+    params: ListParams & { agreement_id: number; date_from: string; date_to?: string },
+    signal?: AbortSignal,
+) => apiClient.get<ApiCollection<VehicleSummary>>(`${endpoint}/lookups/owner-agreement-vehicles`, { params, signal })
+    .then((response) => response.data);
 
 export const getRentalAssignment = (id: number, signal?: AbortSignal) =>
     apiClient.get<ApiResource<RentalAssignment>>(`${endpoint}/assignments/${id}`, { signal })

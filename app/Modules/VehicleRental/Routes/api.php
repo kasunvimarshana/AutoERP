@@ -1,6 +1,7 @@
 <?php
 
 declare(strict_types=1);
+
 use Illuminate\Support\Facades\Route;
 use Modules\VehicleRental\Constants\VehicleRentalPermission;
 use Modules\VehicleRental\Http\Controllers\RentalAgreementController;
@@ -55,6 +56,8 @@ Route::prefix('api/v1/vehicle-rental')
         Route::middleware($requires(VehicleRentalPermission::ASSIGNMENTS_MANAGE))->group(function (): void {
             Route::get('lookups/assignment-agreements', [RentalLookupController::class, 'assignmentAgreements'])
                 ->name('lookups.assignment-agreements');
+            Route::get('lookups/owner-agreement-vehicles', [RentalLookupController::class, 'ownerAgreementVehicles'])
+                ->name('lookups.owner-agreement-vehicles');
             Route::get('lookups/assignment-sources', [RentalLookupController::class, 'assignmentSources'])
                 ->name('lookups.assignment-sources');
             Route::post('assignments', [RentalAssignmentController::class, 'store'])->name('assignments.store');

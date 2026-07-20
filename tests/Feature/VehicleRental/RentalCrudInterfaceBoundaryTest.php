@@ -10,6 +10,7 @@ use Modules\VehicleRental\Constants\VehicleRentalPermission;
 use Modules\VehicleRental\Http\Requests\DeleteRentalAgreementRequest;
 use Modules\VehicleRental\Http\Requests\DeleteRentalAssignmentRequest;
 use Modules\VehicleRental\Http\Requests\ListRentalRequest;
+use Modules\VehicleRental\Http\Requests\RentalOwnerVehicleLookupRequest;
 use Modules\VehicleRental\Http\Requests\StoreRentalAssignmentRequest;
 use Modules\VehicleRental\Http\Requests\StoreRentalCustodyRequest;
 use Modules\VehicleRental\Http\Requests\UpdateRentalAssignmentRequest;
@@ -109,11 +110,35 @@ final class RentalCrudInterfaceBoundaryTest extends TestCase
         )->fails());
     }
 
+    public function test_owner_vehicle_lookup_requires_agreement_and_explicit_offset_period(): void
+    {
+        $request = new RentalOwnerVehicleLookupRequest();
+        $request->attributes->set(
+            (string) config('core.current_tenant.id_attribute', 'current_tenant_id'),
+            1,
+        );
+        $rules = $request->rules();
+
+        self::assertFalse(Validator::make([
+            'agreement_id' => 1,
+            'date_from' => '2026-07-21T10:55:00+05:30',
+            'date_to' => '2026-07-30T18:00:00+05:30',
+        ], $rules)->fails());
+        self::assertTrue(Validator::make([
+            'agreement_id' => 1,
+            'date_from' => '2026-07-21T10:55:00',
+        ], $rules)->fails());
+        self::assertTrue(Validator::make([
+            'date_from' => '2026-07-21T10:55:00+05:30',
+        ], $rules)->fails());
+    }
+
     public function test_workflow_lookups_use_their_owned_manage_permissions(): void
     {
         $permissionMiddleware = (string) config('user.tenant.permission_middleware_alias', 'tenant.permission');
         $expected = [
             'api.v1.vehicle-rental.lookups.assignment-agreements' => VehicleRentalPermission::ASSIGNMENTS_MANAGE,
+            'api.v1.vehicle-rental.lookups.owner-agreement-vehicles' => VehicleRentalPermission::ASSIGNMENTS_MANAGE,
             'api.v1.vehicle-rental.lookups.assignment-sources' => VehicleRentalPermission::ASSIGNMENTS_MANAGE,
             'api.v1.vehicle-rental.lookups.running-chart-assignments' => VehicleRentalPermission::RUNNING_CHARTS_MANAGE,
             'api.v1.vehicle-rental.lookups.calculation-agreements' => VehicleRentalPermission::CALCULATIONS_MANAGE,

@@ -8,12 +8,18 @@ use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use InvalidArgumentException;
 use Modules\Tax\Models\TaxGroup;
+use Modules\Vehicle\Enums\VehicleOwnerType;
+use Modules\Vehicle\Http\Resources\VehicleSummaryResource;
+use Modules\Vehicle\Models\Vehicle;
+use Modules\VehicleRental\Enums\RentalAgreementKind;
 use Modules\VehicleRental\Enums\RentalAgreementStatus;
 use Modules\VehicleRental\Enums\RentalAssignmentSide;
 use Modules\VehicleRental\Enums\RentalAssignmentStatus;
 use Modules\VehicleRental\Http\Requests\ListRentalRequest;
 use Modules\VehicleRental\Http\Requests\RentalAgreementFormLookupRequest;
+use Modules\VehicleRental\Http\Requests\RentalOwnerVehicleLookupRequest;
 use Modules\VehicleRental\Http\Resources\RentalAgreementResource;
 use Modules\VehicleRental\Http\Resources\RentalAssignmentResource;
 use Modules\VehicleRental\Models\RentalAgreement;
@@ -45,6 +51,58 @@ final class RentalLookupController
     public function assignmentAgreements(ListRentalRequest $request): AnonymousResourceCollection
     {
         return $this->agreements($request);
+    }
+
+    public function ownerAgreementVehicles(RentalOwnerVehicleLookupRequest $request): AnonymousResourceCollection
+    {
+        $agreement = RentalAgreement::query()
+            ->forContext($request->tenantId(), $request->organizationUnitId())
+            ->whereKey((int) $request->validated('agreement_id'))
+            ->where('status', RentalAgreementStatus::Active->value)
+            ->firstOrFail();
+
+        if ($agreement->kind !== RentalAgreementKind::Owner || $agreement->supplier_id === null) {
+            throw new InvalidArgumentException('An active owner agreement with a vehicle owner is required.');
+        }
+
+        $startsAt = CarbonImmutable::parse((string) $request->validated('date_from'))
+            ->utc()
+            ->seconds(0)
+            ->toDateTimeString();
+        $endsAt = $request->filled('date_to')
+            ? CarbonImmutable::parse((string) $request->validated('date_to'))
+                ->utc()
+                ->seconds(0)
+                ->toDateTimeString()
+            : null;
+        $supplierId = (int) $agreement->supplier_id;
+
+        $query = Vehicle::query()
+            ->forTenant($request->tenantId(), $request->organizationUnitId())
+            ->active()
+            ->with(['make', 'model', 'currentOwnerships'])
+            ->whereHas('ownerships', function (Builder $ownership) use ($request, $supplierId, $startsAt, $endsAt): void {
+                $ownership
+                    ->where('tenant_id', $request->tenantId())
+                    ->where('owner_type', VehicleOwnerType::Supplier->value)
+                    ->where('owner_id', $supplierId)
+                    ->where('started_at', '<=', $startsAt)
+                    ->where(function (Builder $period) use ($endsAt): void {
+                        if ($endsAt === null) {
+                            $period->whereNull('ended_at');
+
+                            return;
+                        }
+
+                        $period->whereNull('ended_at')
+                            ->orWhere('ended_at', '>=', $endsAt);
+                    });
+            })
+            ->matchingSearch($request->validated('search'))
+            ->orderBy('registration_number')
+            ->orderBy('vehicle_number');
+
+        return VehicleSummaryResource::collection($query->paginate($request->perPage()));
     }
 
     public function calculationAgreements(ListRentalRequest $request): AnonymousResourceCollection

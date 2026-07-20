@@ -176,12 +176,14 @@ function RentalAssignmentDialogForm({
     const sourceLoading = state.side === 'customer_use'
         && selectedVehicleId !== null
         && sourceCandidates === null;
+    const ownerVehicleContext = state.side === 'owner_supply' && agreementId !== null;
 
     const setSide = (nextSide: RentalAssignmentSide) => {
         setState((current) => ({
             ...current,
             side: nextSide,
             agreement: null,
+            vehicle: null,
             sourceAssignment: null,
             startsAt: '',
             endsAt: '',
@@ -254,6 +256,7 @@ function RentalAssignmentDialogForm({
                         onChange={(value: RentalLookupOption | null) => setState((current) => ({
                             ...current,
                             agreement: value,
+                            vehicle: null,
                             sourceAssignment: null,
                             startsAt: '',
                             endsAt: '',
@@ -262,6 +265,9 @@ function RentalAssignmentDialogForm({
                     />
                     <RentalVehicleLookup
                         value={state.vehicle}
+                        ownerAgreementId={ownerVehicleContext ? agreementId : null}
+                        startsAt={ownerVehicleContext ? fittedDates.startsAt : undefined}
+                        endsAt={ownerVehicleContext ? fittedDates.endsAt : undefined}
                         required
                         onChange={(value: RentalLookupOption | null) => setState((current) => ({
                             ...current,
@@ -278,7 +284,11 @@ function RentalAssignmentDialogForm({
                         max={bounds.maximum || undefined}
                         value={fittedDates.startsAt}
                         error={fieldError(error, 'starts_at')}
-                        onChange={(event) => setState((current) => ({ ...current, startsAt: event.target.value }))}
+                        onChange={(event) => setState((current) => ({
+                            ...current,
+                            startsAt: event.target.value,
+                            vehicle: current.side === 'owner_supply' ? null : current.vehicle,
+                        }))}
                     />
                     <Input
                         label="Planned end"
@@ -287,7 +297,11 @@ function RentalAssignmentDialogForm({
                         max={bounds.maximum || undefined}
                         value={fittedDates.endsAt}
                         error={fieldError(error, 'ends_at')}
-                        onChange={(event) => setState((current) => ({ ...current, endsAt: event.target.value }))}
+                        onChange={(event) => setState((current) => ({
+                            ...current,
+                            endsAt: event.target.value,
+                            vehicle: current.side === 'owner_supply' ? null : current.vehicle,
+                        }))}
                     />
                     {state.side === 'customer_use' && (
                         <OwnerSourceField
@@ -507,6 +521,8 @@ function RentalReplacementDialogForm({
     const [newDamageNotes, setNewDamageNotes] = useState('');
     const [error, setError] = useState<ApiError | null>(null);
     const [submitting, setSubmitting] = useState(false);
+    const replacementEndsAt = utcDateTimeToLocalInput(assignment?.ends_at);
+    const ownerReplacementContext = assignment?.side === 'owner_supply';
 
     const submit = async (event: FormEvent) => {
         event.preventDefault();
@@ -549,6 +565,9 @@ function RentalReplacementDialogForm({
                 <div className="grid gap-4 md:grid-cols-2">
                     <RentalVehicleLookup
                         value={vehicle}
+                        ownerAgreementId={ownerReplacementContext ? assignment?.agreement?.id ?? null : null}
+                        startsAt={ownerReplacementContext ? effectiveAt : undefined}
+                        endsAt={ownerReplacementContext ? replacementEndsAt : undefined}
                         required
                         onChange={(value) => {
                             setVehicle(value);
@@ -565,6 +584,7 @@ function RentalReplacementDialogForm({
                         onChange={(event) => {
                             setEffectiveAt(event.target.value);
                             setSourceAssignment(null);
+                            if (ownerReplacementContext) setVehicle(null);
                         }}
                     />
                     {assignment?.side === 'customer_use' && (
@@ -574,7 +594,7 @@ function RentalReplacementDialogForm({
                             value={sourceAssignment}
                             vehicleId={vehicle?.id ?? null}
                             startsAt={effectiveAt}
-                            endsAt={utcDateTimeToLocalInput(assignment.ends_at)}
+                            endsAt={replacementEndsAt}
                             disabled={!vehicle || !effectiveAt}
                             onChange={setSourceAssignment}
                             error={fieldError(error, 'source_assignment_id')}
