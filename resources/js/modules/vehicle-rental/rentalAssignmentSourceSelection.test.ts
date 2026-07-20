@@ -17,10 +17,17 @@ const workspaceSource = readFileSync(
 );
 
 describe('Vehicle Rental assignment source selection', () => {
-    it('requests only source assignments matching the selected vehicle and period', () => {
+    it('requests source assignments matching the selected vehicle and planning period', () => {
         expect(lookupsSource).toContain('vehicle_id: isAssignmentSource ? vehicleId ?? undefined : undefined');
         expect(lookupsSource).toContain('date_from: isAssignmentSource && startsAt ? startsAt : undefined');
         expect(lookupsSource).toContain('date_to: isAssignmentSource && endsAt ? endsAt : undefined');
+        expect(lookupsSource).not.toContain("assignment_status: 'active'");
+    });
+
+    it('invalidates loaded source options when vehicle or planning dates change', () => {
+        expect(lookupsSource).toContain('const lookupContextKey = isAssignmentSource');
+        expect(lookupsSource).toContain("[lookupPurpose, side ?? '', vehicleId ?? '', startsAt ?? '', endsAt ?? ''].join(':')");
+        expect(lookupsSource).toContain('<ReferenceLookup key={lookupContextKey}');
     });
 
     it('clears stale source relationships when vehicle or period changes', () => {
