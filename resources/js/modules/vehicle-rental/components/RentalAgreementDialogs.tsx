@@ -49,38 +49,40 @@ interface AgreementFormState {
 interface RentalAgreementDialogProps {
     open: boolean;
     agreement: RentalAgreement | null;
+    kind?: RentalAgreementKind;
     onClose: () => void;
     onSaved: (agreement: RentalAgreement) => void;
 }
 
 export function RentalAgreementDialog(props: RentalAgreementDialogProps) {
-    const identity = `${props.open ? 'open' : 'closed'}:${props.agreement?.id ?? 'new'}:${props.agreement?.row_version ?? 0}`;
+    const identity = `${props.open ? 'open' : 'closed'}:${props.agreement?.id ?? 'new'}:${props.agreement?.row_version ?? 0}:${props.kind ?? 'selectable'}`;
     return <RentalAgreementDialogForm key={identity} {...props} />;
 }
 
 function RentalAgreementDialogForm({
     open,
     agreement,
+    kind,
     onClose,
     onSaved,
 }: RentalAgreementDialogProps) {
-    const [state, setState] = useState<AgreementFormState>(() => initialAgreementState(agreement));
+    const [state, setState] = useState<AgreementFormState>(() => initialAgreementState(agreement, kind));
     const [error, setError] = useState<ApiError | null>(null);
     const [submitting, setSubmitting] = useState(false);
     const formLookups = useApi((signal) => getRentalAgreementFormLookups(signal), [], open);
-
+    const fixedKind = agreement?.kind ?? kind;
     const taxGroupOptions = (formLookups.data?.tax_groups ?? [])
         .map((group) => ({ value: group.id, label: [group.code, group.name].filter(Boolean).join(' - ') }));
 
-    const setKind = (kind: RentalAgreementKind) => {
+    const setKind = (nextKind: RentalAgreementKind) => {
         setState((current) => ({
             ...current,
-            kind,
-            customer: kind === 'customer' ? current.customer : null,
-            supplier: kind === 'owner' ? current.supplier : null,
-            depositRequired: kind === 'customer' ? current.depositRequired : false,
-            depositAmount: kind === 'customer' && current.depositRequired ? current.depositAmount : '0',
-            rates: normalizeRatesForAgreement(current.rates, kind, current.billingBasis),
+            kind: nextKind,
+            customer: nextKind === 'customer' ? current.customer : null,
+            supplier: nextKind === 'owner' ? current.supplier : null,
+            depositRequired: nextKind === 'customer' ? current.depositRequired : false,
+            depositAmount: nextKind === 'customer' && current.depositRequired ? current.depositAmount : '0',
+            rates: normalizeRatesForAgreement(current.rates, nextKind, current.billingBasis),
         }));
     };
 
@@ -111,20 +113,23 @@ function RentalAgreementDialogForm({
         }
     };
 
+    const sideLabel = state.kind === 'owner' ? 'Owner / supplier agreement' : 'Customer agreement';
+
     return (
-        <Modal open={open} title={agreement ? `Edit ${agreement.agreement_number}` : 'New rental agreement'} onClose={onClose} closeDisabled={submitting}>
+        <Modal open={open} title={agreement ? `Edit ${agreement.agreement_number}` : `New ${sideLabel.toLowerCase()}`} onClose={onClose} closeDisabled={submitting}>
             <form className="space-y-5" onSubmit={(event) => void submit(event)}>
                 <ErrorAlert error={error ?? formLookups.error} inline />
                 <div className="grid gap-4 md:grid-cols-2">
-                    <Select
-                        label="Agreement side"
-                        value={state.kind}
-                        required
-                        disabled={Boolean(agreement)}
-                        options={[{ value: 'customer', label: 'Customer agreement' }, { value: 'owner', label: 'Owner agreement' }]}
-                        error={fieldError(error, 'kind')}
-                        onChange={(event) => setKind(event.target.value as RentalAgreementKind)}
-                    />
+                    {!fixedKind && (
+                        <Select
+                            label="Agreement side"
+                            value={state.kind}
+                            required
+                            options={[{ value: 'customer', label: 'Customer agreement' }, { value: 'owner', label: 'Owner / supplier agreement' }]}
+                            error={fieldError(error, 'kind')}
+                            onChange={(event) => setKind(event.target.value as RentalAgreementKind)}
+                        />
+                    )}
                     <Input
                         label="Agreement number"
                         hint="Leave blank to use the configured Vehicle Rental number sequence."
@@ -254,9 +259,9 @@ function RentalRateVersionDialogForm({
     );
 }
 
-function initialAgreementState(agreement: RentalAgreement | null): AgreementFormState {
+function initialAgreementState(agreement: RentalAgreement | null, requestedKind?: RentalAgreementKind): AgreementFormState {
     const billingBasis = agreement?.billing_basis ?? 'daily';
-    const kind = agreement?.kind ?? 'customer';
+    const kind = agreement?.kind ?? requestedKind ?? 'customer';
     const existingRates = latestRateVersion(agreement)?.rates ?? [defaultRentalRate(billingBasis)];
     return {
         kind,
@@ -275,7 +280,7 @@ function initialAgreementState(agreement: RentalAgreement | null): AgreementForm
         paymentTermsDays: String(agreement?.payment_terms_days ?? 0),
         terms: agreement?.terms ?? '',
         notes: agreement?.notes ?? '',
-        rates: existingRates.map((rate) => ({ ...rate })),
+        rates: normalizeRatesForAgreement(existingRates.map((rate) => ({ ...rate })), kind, billingBasis),
     };
 }
 

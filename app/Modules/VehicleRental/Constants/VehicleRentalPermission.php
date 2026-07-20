@@ -14,6 +14,7 @@ final class VehicleRentalPermission
     public const RUNNING_CHARTS_MANAGE = 'vehicle_rental.running_charts.manage';
     public const CALCULATIONS_VIEW = 'vehicle_rental.calculations.view';
     public const CALCULATIONS_MANAGE = 'vehicle_rental.calculations.manage';
+    public const FINANCIAL_DOCUMENTS_MANAGE = 'vehicle_rental.financial_documents.manage';
 
     /** @return array<string, string> */
     public static function descriptions(): array
@@ -25,8 +26,9 @@ final class VehicleRentalPermission
             self::ASSIGNMENTS_MANAGE => 'Assign, hand over, return, cancel, and replace rental vehicles.',
             self::RUNNING_CHARTS_VIEW => 'View Vehicle Rental daily running charts and operational evidence.',
             self::RUNNING_CHARTS_MANAGE => 'Create, update, finalize, and reverse Vehicle Rental running charts.',
-            self::CALCULATIONS_VIEW => 'View immutable Vehicle Rental customer and owner calculation snapshots.',
+            self::CALCULATIONS_VIEW => 'View immutable Vehicle Rental customer and owner calculation snapshots and derived reports.',
             self::CALCULATIONS_MANAGE => 'Create and cancel Vehicle Rental customer and owner calculations.',
+            self::FINANCIAL_DOCUMENTS_MANAGE => 'Create and post Vehicle Rental customer invoices and owner payable vouchers.',
         ];
     }
 

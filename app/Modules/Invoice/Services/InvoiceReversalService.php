@@ -55,7 +55,7 @@ final class InvoiceReversalService
                 : InvoiceType::from((string) $invoice->invoice_type);
             if ($type->belongsToRetiredSourceModule()) {
                 throw new InvalidArgumentException(
-                    'Historical rental and vehicle finance invoices cannot be reversed after their source module was retired.',
+                    'Historical Vehicle Finance invoices cannot be reversed after their source module was retired.',
                 );
             }
 

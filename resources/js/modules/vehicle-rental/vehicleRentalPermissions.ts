@@ -7,6 +7,7 @@ export const vehicleRentalPermissions = {
     runningChartsManage: 'vehicle_rental.running_charts.manage',
     calculationsView: 'vehicle_rental.calculations.view',
     calculationsManage: 'vehicle_rental.calculations.manage',
+    financialDocumentsManage: 'vehicle_rental.financial_documents.manage',
 } as const;
 
 export const vehicleRentalViewPermissions = [

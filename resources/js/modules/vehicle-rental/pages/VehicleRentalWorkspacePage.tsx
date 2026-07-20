@@ -37,11 +37,15 @@ import {
 import { vehicleRentalPermissions } from '../vehicleRentalPermissions';
 import type {
     RentalAgreement,
+    RentalAgreementKind,
     RentalAssignment,
     RentalCalculation,
     RentalReference,
     RentalRunningChart,
 } from '../vehicleRentalTypes';
+import { RentalFinancialDocumentsPage } from './RentalFinancialDocumentsPage';
+import { RentalReportsPage } from './RentalReportsPage';
+import { RentalSettlementHandoffPage } from './RentalSettlementHandoffPage';
 
 const PAGE_SIZE = 25;
 
@@ -78,16 +82,23 @@ function periodLabel(start?: string | null, end?: string | null): string {
 function OverviewPage() {
     const auth = useAuth();
     const workspaces = [
-        { label: 'Agreements', description: 'Customer and owner agreements, vehicle selection, draft editing, activation, closure, and effective rate versions.', to: '/vehicle-rental/agreements', permission: vehicleRentalPermissions.agreementsView },
-        { label: 'Vehicle assignments', description: 'Review assignments and record handover, return, replacement, or cancellation.', to: '/vehicle-rental/assignments', permission: vehicleRentalPermissions.assignmentsView },
-        { label: 'Running charts', description: 'Create and edit daily drafts, then finalize or reverse physical usage evidence.', to: '/vehicle-rental/running-charts', permission: vehicleRentalPermissions.runningChartsView },
-        { label: 'Calculations', description: 'Create immutable customer and owner snapshots and cancel them to release their sources.', to: '/vehicle-rental/calculations', permission: vehicleRentalPermissions.calculationsView },
+        { label: 'Owner / supplier agreements', description: 'Define owner payable terms and select supplied vehicles.', to: '/vehicle-rental/owner-agreements', permission: vehicleRentalPermissions.agreementsView },
+        { label: 'Customer agreements', description: 'Define customer billing terms and select the rental vehicle.', to: '/vehicle-rental/customer-agreements', permission: vehicleRentalPermissions.agreementsView },
+        { label: 'Daily running charts', description: 'Record the physical usage shared by customer billing and owner settlement.', to: '/vehicle-rental/running-charts', permission: vehicleRentalPermissions.runningChartsView },
+        { label: 'Customer invoices', description: 'Prepare billing periods and create posted customer invoices.', to: '/vehicle-rental/customer-invoices', permission: vehicleRentalPermissions.calculationsView },
+        { label: 'Owner settlements', description: 'Prepare owner periods and create Owner Payable Vouchers.', to: '/vehicle-rental/owner-settlements', permission: vehicleRentalPermissions.calculationsView },
+        { label: 'Customer receipts', description: 'Record and allocate receipts through the shared Payment module.', to: '/vehicle-rental/customer-receipts', permission: vehicleRentalPermissions.calculationsView },
+        { label: 'Owner payments', description: 'Record and allocate owner payments through the shared Payment module.', to: '/vehicle-rental/owner-payments', permission: vehicleRentalPermissions.calculationsView },
+        { label: 'Reports', description: 'Review usage, revenue, owner costs, outstanding balances, and gross margin.', to: '/vehicle-rental/reports', permission: vehicleRentalPermissions.calculationsView },
     ].filter((workspace) => hasPermission(auth, workspace.permission));
 
     return (
         <>
-            <ContentHeader title="Vehicle rental" description="Operational rental agreements, effective vehicle assignments, daily running charts, and independent customer and owner calculations." />
-            <div className="grid gap-4 md:grid-cols-2">
+            <ContentHeader
+                title="Vehicle rental"
+                description="Owner agreement → Customer agreement → Select vehicle → Daily running chart → Invoice / Owner settlement → Receipt / Payment → Reports."
+            />
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                 {workspaces.map((workspace) => (
                     <Link key={workspace.to} to={workspace.to} className="rounded-xl border border-slate-200 bg-white p-5 transition hover:border-sky-300 hover:bg-sky-50">
                         <h2 className="font-semibold text-slate-900">{workspace.label}</h2>
@@ -100,14 +111,14 @@ function OverviewPage() {
     );
 }
 
-function AgreementsPage() {
+function AgreementsPage({ fixedKind }: { fixedKind?: RentalAgreementKind }) {
     const auth = useAuth();
     const canManage = hasPermission(auth, vehicleRentalPermissions.agreementsManage);
     const canAssign = hasPermission(auth, vehicleRentalPermissions.assignmentsManage);
     const canAct = canManage || canAssign;
     const { confirm, confirmDialog } = useConfirmDialog();
     const [search, setSearch] = useState('');
-    const [kind, setKind] = useState('');
+    const [kind, setKind] = useState(fixedKind ?? '');
     const [status, setStatus] = useState('');
     const [page, setPage] = useState(1);
     const [formOpen, setFormOpen] = useState(false);
@@ -117,7 +128,14 @@ function AgreementsPage() {
     const [busyId, setBusyId] = useState<number | null>(null);
     const [actionError, setActionError] = useState<ApiError | null>(null);
     const debouncedSearch = useDebounce(search);
-    const result = useApi((signal) => listRentalAgreements({ search: debouncedSearch || undefined, kind: kind || undefined, agreement_status: status || undefined, page, per_page: PAGE_SIZE }, signal), [debouncedSearch, kind, status, page]);
+    const effectiveKind = fixedKind ?? kind;
+    const result = useApi((signal) => listRentalAgreements({
+        search: debouncedSearch || undefined,
+        kind: effectiveKind || undefined,
+        agreement_status: status || undefined,
+        page,
+        per_page: PAGE_SIZE,
+    }, signal), [debouncedSearch, effectiveKind, status, page]);
 
     const activate = async (agreement: RentalAgreement) => {
         if (!await confirm({ title: 'Activate rental agreement?', message: `Activate ${agreement.agreement_number}? Draft commercial terms will become operational.`, confirmLabel: 'Activate', danger: false })) return;
@@ -142,10 +160,18 @@ function AgreementsPage() {
         }
     };
 
+    const sideTitle = fixedKind === 'owner' ? 'Owner / supplier agreements' : fixedKind === 'customer' ? 'Customer agreements' : 'Vehicle rental agreements';
+    const sideDescription = fixedKind === 'owner'
+        ? 'Owner payable terms and the vehicles supplied under each agreement.'
+        : fixedKind === 'customer'
+            ? 'Customer billing terms and the vehicles selected for each agreement.'
+            : 'Customer and owner agreements remain independent while sharing physical running-chart evidence.';
+    const partyHeader = fixedKind === 'owner' ? 'Owner / supplier' : fixedKind === 'customer' ? 'Customer' : 'Customer / owner';
+
     const columns: DataColumn<RentalAgreement>[] = [
         { key: 'number', header: 'Agreement', render: (row) => <span className="font-semibold">{row.agreement_number}</span> },
-        { key: 'kind', header: 'Side', render: (row) => row.kind },
-        { key: 'party', header: 'Customer / owner', render: (row) => relationLabel(row.customer ?? row.supplier) },
+        ...(!fixedKind ? [{ key: 'kind', header: 'Side', render: (row: RentalAgreement) => row.kind } as DataColumn<RentalAgreement>] : []),
+        { key: 'party', header: partyHeader, render: (row) => relationLabel(row.customer ?? row.supplier) },
         { key: 'period', header: 'Period', render: (row) => periodLabel(row.starts_on, row.ends_on) },
         { key: 'basis', header: 'Basis', render: (row) => row.billing_basis },
         { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.status} /> },
@@ -166,16 +192,16 @@ function AgreementsPage() {
 
     return (
         <>
-            <ContentHeader title="Vehicle rental agreements" description="Customer and owner agreements remain independent while sharing operational vehicle evidence." actions={canManage ? <Button onClick={() => { setEditing(null); setFormOpen(true); }}>New agreement</Button> : undefined} />
-            <div className="mb-4 grid gap-4 md:grid-cols-3">
-                <Input label="Search" type="search" placeholder="Agreement, customer, or owner" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} />
-                <Select label="Side" value={kind} placeholder="All sides" options={[{ value: 'customer', label: 'Customer' }, { value: 'owner', label: 'Owner' }]} onChange={(event) => { setKind(event.target.value); setPage(1); }} />
+            <ContentHeader title={sideTitle} description={sideDescription} actions={canManage ? <Button onClick={() => { setEditing(null); setFormOpen(true); }}>New agreement</Button> : undefined} />
+            <div className={`mb-4 grid gap-4 ${fixedKind ? 'md:grid-cols-2' : 'md:grid-cols-3'}`}>
+                <Input label="Search" type="search" placeholder="Agreement or party" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} />
+                {!fixedKind && <Select label="Side" value={kind} placeholder="All sides" options={[{ value: 'customer', label: 'Customer' }, { value: 'owner', label: 'Owner / supplier' }]} onChange={(event) => { setKind(event.target.value); setPage(1); }} />}
                 <Select label="Status" value={status} placeholder="All statuses" options={[{ value: 'draft', label: 'Draft' }, { value: 'active', label: 'Active' }, { value: 'closed', label: 'Closed' }]} onChange={(event) => { setStatus(event.target.value); setPage(1); }} />
             </div>
             <ErrorAlert error={actionError ?? result.error} inline />
             {result.loading ? <LoadingState /> : <DataTable rows={result.data?.data ?? []} columns={columns} rowKey={(row) => row.id} />}
             <Pagination meta={result.data?.meta} onPageChange={setPage} />
-            <RentalAgreementDialog open={formOpen} agreement={editing} onClose={() => { setFormOpen(false); setEditing(null); }} onSaved={() => result.reload()} />
+            <RentalAgreementDialog open={formOpen} agreement={editing} kind={fixedKind} onClose={() => { setFormOpen(false); setEditing(null); }} onSaved={() => result.reload()} />
             <RentalRateVersionDialog open={Boolean(rateAgreement)} agreement={rateAgreement} onClose={() => setRateAgreement(null)} onSaved={() => result.reload()} />
             <RentalAssignmentDialog
                 open={Boolean(assignmentAgreement)}
@@ -245,7 +271,7 @@ function AssignmentsPage() {
 
     return (
         <>
-            <ContentHeader title="Vehicle rental assignments" description="Effective-dated customer-use and owner-supply timelines with custody and replacement history." actions={canManage ? <Button onClick={() => setCreateOpen(true)}>New assignment</Button> : undefined} />
+            <ContentHeader title="Vehicle handover, return, and replacement" description="Operational assignment history. Normal vehicle selection starts from an active agreement." actions={canManage ? <Button onClick={() => setCreateOpen(true)}>New assignment</Button> : undefined} />
             <div className="mb-4 grid gap-4 md:grid-cols-3">
                 <Input label="Search" type="search" placeholder="Agreement or vehicle" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} />
                 <Select label="Side" value={side} placeholder="All sides" options={[{ value: 'customer_use', label: 'Customer use' }, { value: 'owner_supply', label: 'Owner supply' }]} onChange={(event) => { setSide(event.target.value); setPage(1); }} />
@@ -314,7 +340,7 @@ function RunningChartsPage() {
 
     return (
         <>
-            <ContentHeader title="Daily running charts" description="Physical usage evidence used independently by customer billing and owner settlement calculations." actions={canManage ? <Button onClick={() => { setEditing(null); setFormOpen(true); }}>New running chart</Button> : undefined} />
+            <ContentHeader title="Daily running charts" description="Physical usage evidence used independently by customer billing and owner settlement." actions={canManage ? <Button onClick={() => { setEditing(null); setFormOpen(true); }}>New running chart</Button> : undefined} />
             <div className="mb-4 grid gap-4 md:grid-cols-3">
                 <Select label="Status" value={status} placeholder="All statuses" options={[{ value: 'draft', label: 'Draft' }, { value: 'finalized', label: 'Finalized' }, { value: 'reversed', label: 'Reversed' }]} onChange={(event) => { setStatus(event.target.value); setPage(1); }} />
                 <Input label="From" type="date" value={dateFrom} onChange={(event) => { setDateFrom(event.target.value); setPage(1); }} />
@@ -327,7 +353,7 @@ function RunningChartsPage() {
             <RentalReasonDialog
                 open={Boolean(reversing)}
                 title={`Reverse ${reversing?.chart_number ?? 'running chart'}`}
-                message="Active customer and owner calculations consuming this chart must be cancelled first. A replacement draft can then be created for the same assignment and date."
+                message="Active customer and owner periods consuming this chart must be cancelled first. A corrected draft can then be created."
                 confirmLabel="Reverse chart"
                 onClose={() => setReversing(null)}
                 onConfirm={async (reason) => {
@@ -364,7 +390,7 @@ function CalculationsPage() {
         ...(canManage ? [{
             key: 'actions',
             header: 'Actions',
-            render: (row: RentalCalculation) => row.status === 'calculated'
+            render: (row: RentalCalculation) => row.status === 'calculated' && !row.financial_document
                 ? <Button variant="danger" className="min-h-9 px-3 py-1.5" onClick={() => setCancelling(row)}>Cancel</Button>
                 : null,
         } as DataColumn<RentalCalculation>] : []),
@@ -372,7 +398,7 @@ function CalculationsPage() {
 
     return (
         <>
-            <ContentHeader title="Vehicle rental calculations" description="Immutable customer and owner commercial snapshots. One side never blocks the other." actions={canManage ? <Button onClick={() => setCreateOpen(true)}>New calculation</Button> : undefined} />
+            <ContentHeader title="Rental calculation audit" description="Technical customer and owner commercial snapshots. Normal billing and settlement actions are available in their business workspaces." actions={canManage ? <Button onClick={() => setCreateOpen(true)}>New calculation</Button> : undefined} />
             <div className="mb-4 grid gap-4 md:grid-cols-2">
                 <Select label="Side" value={side} placeholder="All sides" options={[{ value: 'customer', label: 'Customer' }, { value: 'owner', label: 'Owner' }]} onChange={(event) => { setSide(event.target.value); setPage(1); }} />
                 <Select label="Status" value={status} placeholder="All statuses" options={[{ value: 'calculated', label: 'Calculated' }, { value: 'cancelled', label: 'Cancelled' }]} onChange={(event) => { setStatus(event.target.value); setPage(1); }} />
@@ -384,7 +410,7 @@ function CalculationsPage() {
             <RentalReasonDialog
                 open={Boolean(cancelling)}
                 title={`Cancel ${cancelling?.calculation_number ?? 'calculation'}`}
-                message="Cancelling releases the active source locks for this side. It does not alter or cancel the independent calculation on the other side."
+                message="Cancelling releases the active source locks for this side. It does not alter the independent calculation on the other side."
                 confirmLabel="Cancel calculation"
                 onClose={() => setCancelling(null)}
                 onConfirm={async (reason) => {
@@ -401,9 +427,16 @@ function CalculationsPage() {
 export default function VehicleRentalWorkspacePage() {
     const { pathname } = useLocation();
     const section = pathname.split('/').filter(Boolean)[1] ?? 'overview';
+    if (section === 'owner-agreements') return <AgreementsPage fixedKind="owner" />;
+    if (section === 'customer-agreements') return <AgreementsPage fixedKind="customer" />;
     if (section === 'agreements') return <AgreementsPage />;
     if (section === 'assignments') return <AssignmentsPage />;
     if (section === 'running-charts') return <RunningChartsPage />;
+    if (section === 'customer-invoices') return <RentalFinancialDocumentsPage side="customer" />;
+    if (section === 'owner-settlements') return <RentalFinancialDocumentsPage side="owner" />;
+    if (section === 'customer-receipts') return <RentalSettlementHandoffPage side="customer" />;
+    if (section === 'owner-payments') return <RentalSettlementHandoffPage side="owner" />;
+    if (section === 'reports') return <RentalReportsPage />;
     if (section === 'calculations') return <CalculationsPage />;
     return <OverviewPage />;
 }

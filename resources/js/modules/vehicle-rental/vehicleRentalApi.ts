@@ -8,8 +8,11 @@ import type {
     RentalAssignmentPayload,
     RentalCalculation,
     RentalCustodyPayload,
+    RentalFinancialDocument,
+    RentalFinancialDocumentPayload,
     RentalRateVersionPayload,
     RentalReplacementPayload,
+    RentalReportSummary,
     RentalRunningChart,
     RentalRunningChartPayload,
 } from './vehicleRentalTypes';
@@ -118,6 +121,14 @@ export const createRentalCalculation = (agreementId: number, payload: { period_s
     apiClient.post<ApiResource<RentalCalculation>>(`${endpoint}/agreements/${agreementId}/calculations`, payload)
         .then((response) => response.data.data);
 
+export const createRentalFinancialDocument = (calculationId: number, payload: RentalFinancialDocumentPayload) =>
+    apiClient.post<ApiResource<RentalFinancialDocument>>(`${endpoint}/calculations/${calculationId}/financial-document`, payload)
+        .then((response) => response.data.data);
+
 export const cancelRentalCalculation = (id: number, expectedVersion: number, reason: string) =>
     apiClient.post<ApiResource<RentalCalculation>>(`${endpoint}/calculations/${id}/cancel`, { expected_version: expectedVersion, reason })
+        .then((response) => response.data.data);
+
+export const getRentalReportSummary = (params: Pick<ListParams, 'date_from' | 'date_to'>, signal?: AbortSignal) =>
+    apiClient.get<ApiResource<RentalReportSummary>>(`${endpoint}/reports/summary`, { params, signal })
         .then((response) => response.data.data);

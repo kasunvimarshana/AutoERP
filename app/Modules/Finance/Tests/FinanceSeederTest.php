@@ -9,6 +9,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\Finance\Database\Seeders\FinanceSeeder;
+use Modules\Finance\Enums\FinanceAccountRoleCode;
+use Modules\Finance\Enums\FinancePostingProfileCode;
 use Modules\OrganizationUnit\Constants\OrganizationUnitHierarchy;
 use Modules\OrganizationUnit\Database\Seeders\OrganizationUnitSeeder;
 use Tests\TestCase;
@@ -17,11 +19,13 @@ final class FinanceSeederTest extends TestCase
 {
     use RefreshDatabase;
 
-    private const PROFILE_CUSTOMER_RECEIPT = 'customer_receipt';
-    private const PROFILE_SUPPLIER_PAYMENT = 'supplier_payment';
-    private const PROFILE_CUSTOMER_ADVANCE = 'customer_advance';
-    private const PROFILE_SUPPLIER_ADVANCE = 'supplier_advance';
-    private const PROFILE_PURCHASE_INVOICE = 'purchase_invoice';
+    private const ACCOUNT_INVENTORY = '1200';
+    private const ACCOUNT_SUPPLIER_ADVANCE = '1400';
+    private const ACCOUNT_PAYABLE = '2100';
+    private const ACCOUNT_CUSTOMER_ADVANCE = '2300';
+    private const ACCOUNT_CUSTOMER_DEPOSIT = '2350';
+    private const ACCOUNT_RENTAL_REVENUE = '4300';
+    private const ACCOUNT_RENTAL_EXPENSE = '5300';
 
     public function test_default_posting_profiles_are_seeded_for_the_protected_root_organization_unit(): void
     {
@@ -36,11 +40,14 @@ final class FinanceSeederTest extends TestCase
         self::assertGreaterThan(0, $organizationUnitId);
 
         foreach ([
-            'inventory_receipt',
-            self::PROFILE_CUSTOMER_RECEIPT,
-            self::PROFILE_SUPPLIER_PAYMENT,
-            self::PROFILE_CUSTOMER_ADVANCE,
-            self::PROFILE_SUPPLIER_ADVANCE,
+            FinancePostingProfileCode::InventoryReceipt->value,
+            FinancePostingProfileCode::CustomerReceipt->value,
+            FinancePostingProfileCode::SupplierPayment->value,
+            FinancePostingProfileCode::CustomerAdvance->value,
+            FinancePostingProfileCode::SupplierAdvance->value,
+            FinancePostingProfileCode::CustomerRentalInvoice->value,
+            FinancePostingProfileCode::SupplierRentalInvoice->value,
+            FinancePostingProfileCode::RentalDeposit->value,
         ] as $profileCode) {
             $this->assertDatabaseHas('finance_posting_profiles', [
                 'tenant_id' => $tenantId,
@@ -51,18 +58,29 @@ final class FinanceSeederTest extends TestCase
         }
         $this->assertSame(0, DB::table('finance_posting_profiles')->whereNull('organization_unit_id')->count());
 
-        foreach (['1200', '1400', '2100', '2300'] as $accountCode) {
+        foreach ([
+            self::ACCOUNT_INVENTORY,
+            self::ACCOUNT_SUPPLIER_ADVANCE,
+            self::ACCOUNT_PAYABLE,
+            self::ACCOUNT_CUSTOMER_ADVANCE,
+            self::ACCOUNT_CUSTOMER_DEPOSIT,
+            self::ACCOUNT_RENTAL_REVENUE,
+            self::ACCOUNT_RENTAL_EXPENSE,
+        ] as $accountCode) {
             $this->assertGreaterThan(0, $this->accountId($tenantId, $organizationUnitId, $accountCode));
         }
 
-        $this->assertActiveAssignment($tenantId, $organizationUnitId, 'inventory', '1200');
-        $this->assertActiveAssignment($tenantId, $organizationUnitId, 'payable', '2100');
-        $this->assertActiveAssignment($tenantId, $organizationUnitId, 'supplier_advance', '1400');
-        $this->assertActiveAssignment($tenantId, $organizationUnitId, 'customer_advance', '2300');
+        $this->assertActiveAssignment($tenantId, $organizationUnitId, FinanceAccountRoleCode::Inventory->value, self::ACCOUNT_INVENTORY);
+        $this->assertActiveAssignment($tenantId, $organizationUnitId, FinanceAccountRoleCode::Payable->value, self::ACCOUNT_PAYABLE);
+        $this->assertActiveAssignment($tenantId, $organizationUnitId, FinanceAccountRoleCode::SupplierAdvance->value, self::ACCOUNT_SUPPLIER_ADVANCE);
+        $this->assertActiveAssignment($tenantId, $organizationUnitId, FinanceAccountRoleCode::CustomerAdvance->value, self::ACCOUNT_CUSTOMER_ADVANCE);
+        $this->assertActiveAssignment($tenantId, $organizationUnitId, FinanceAccountRoleCode::CustomerDeposit->value, self::ACCOUNT_CUSTOMER_DEPOSIT);
+        $this->assertActiveAssignment($tenantId, $organizationUnitId, FinanceAccountRoleCode::RentalRevenue->value, self::ACCOUNT_RENTAL_REVENUE);
+        $this->assertActiveAssignment($tenantId, $organizationUnitId, FinanceAccountRoleCode::RentalExpense->value, self::ACCOUNT_RENTAL_EXPENSE);
         $this->assertSame(0, DB::table('finance_account_assignments')->whereNull('organization_unit_id')->count());
     }
 
-    public function test_semantic_payment_and_withholding_profiles_have_complete_role_mappings(): void
+    public function test_semantic_payment_withholding_and_rental_profiles_have_complete_role_mappings(): void
     {
         $tenantId = $this->createTenant('AUTOERP');
 
@@ -72,11 +90,54 @@ final class FinanceSeederTest extends TestCase
         });
 
         foreach ([
-            self::PROFILE_CUSTOMER_RECEIPT => ['cash', 'bank', 'receivable', 'customer_advance'],
-            self::PROFILE_SUPPLIER_PAYMENT => ['cash', 'bank', 'payable', 'supplier_advance'],
-            self::PROFILE_CUSTOMER_ADVANCE => ['cash', 'bank', 'receivable', 'customer_advance'],
-            self::PROFILE_SUPPLIER_ADVANCE => ['cash', 'bank', 'payable', 'supplier_advance'],
-            self::PROFILE_PURCHASE_INVOICE => ['expense', 'goods_received_not_invoiced', 'payable', 'tax_receivable', 'withholding_payable'],
+            FinancePostingProfileCode::CustomerReceipt->value => [
+                FinanceAccountRoleCode::Cash->value,
+                FinanceAccountRoleCode::Bank->value,
+                FinanceAccountRoleCode::Receivable->value,
+                FinanceAccountRoleCode::CustomerAdvance->value,
+            ],
+            FinancePostingProfileCode::SupplierPayment->value => [
+                FinanceAccountRoleCode::Cash->value,
+                FinanceAccountRoleCode::Bank->value,
+                FinanceAccountRoleCode::Payable->value,
+                FinanceAccountRoleCode::SupplierAdvance->value,
+            ],
+            FinancePostingProfileCode::CustomerAdvance->value => [
+                FinanceAccountRoleCode::Cash->value,
+                FinanceAccountRoleCode::Bank->value,
+                FinanceAccountRoleCode::Receivable->value,
+                FinanceAccountRoleCode::CustomerAdvance->value,
+            ],
+            FinancePostingProfileCode::SupplierAdvance->value => [
+                FinanceAccountRoleCode::Cash->value,
+                FinanceAccountRoleCode::Bank->value,
+                FinanceAccountRoleCode::Payable->value,
+                FinanceAccountRoleCode::SupplierAdvance->value,
+            ],
+            FinancePostingProfileCode::PurchaseInvoice->value => [
+                FinanceAccountRoleCode::Expense->value,
+                FinanceAccountRoleCode::GoodsReceivedNotInvoiced->value,
+                FinanceAccountRoleCode::Payable->value,
+                FinanceAccountRoleCode::TaxReceivable->value,
+                FinanceAccountRoleCode::WithholdingPayable->value,
+            ],
+            FinancePostingProfileCode::CustomerRentalInvoice->value => [
+                FinanceAccountRoleCode::Receivable->value,
+                FinanceAccountRoleCode::RentalRevenue->value,
+                FinanceAccountRoleCode::TaxPayable->value,
+                FinanceAccountRoleCode::WithholdingReceivable->value,
+            ],
+            FinancePostingProfileCode::SupplierRentalInvoice->value => [
+                FinanceAccountRoleCode::RentalExpense->value,
+                FinanceAccountRoleCode::TaxReceivable->value,
+                FinanceAccountRoleCode::Payable->value,
+                FinanceAccountRoleCode::WithholdingPayable->value,
+            ],
+            FinancePostingProfileCode::RentalDeposit->value => [
+                FinanceAccountRoleCode::Cash->value,
+                FinanceAccountRoleCode::Bank->value,
+                FinanceAccountRoleCode::CustomerDeposit->value,
+            ],
         ] as $profileCode => $lineKeys) {
             $profileId = (int) DB::table('finance_posting_profiles')
                 ->where('tenant_id', $tenantId)
@@ -106,8 +167,8 @@ final class FinanceSeederTest extends TestCase
         });
 
         $organizationUnitId = $this->rootOrganizationUnitId($tenantId);
-        $inventoryAccountId = $this->accountId($tenantId, $organizationUnitId, '1200');
-        $inventoryRoleId = $this->roleId($tenantId, 'inventory');
+        $inventoryAccountId = $this->accountId($tenantId, $organizationUnitId, self::ACCOUNT_INVENTORY);
+        $inventoryRoleId = $this->roleId($tenantId, FinanceAccountRoleCode::Inventory->value);
 
         $duplicateId = (int) DB::table('finance_account_assignments')->insertGetId([
             'tenant_id' => $tenantId,
