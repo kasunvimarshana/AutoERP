@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\VehicleRental\Services;
 
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
@@ -269,12 +270,14 @@ final class RentalAssignmentService
 
         $hasCustodyHistory = $assignment->custodyEvents()->lockForUpdate()->first() !== null;
         $hasRunningChartHistory = $assignment->runningCharts()->lockForUpdate()->first() !== null;
+        $hasOwnReplacementHistory = $assignment->replaces_assignment_id !== null
+            || $assignment->replacement_reason !== null;
         $hasAssignmentHistory = RentalAssignment::query()
             ->forContext(
                 (int) $assignment->tenant_id,
                 $assignment->organization_unit_id === null ? null : (int) $assignment->organization_unit_id,
             )
-            ->where(function ($query) use ($assignment): void {
+            ->where(function (Builder $query) use ($assignment): void {
                 $query->where('source_assignment_id', $assignment->getKey())
                     ->orWhere('replaces_assignment_id', $assignment->getKey());
             })
@@ -282,7 +285,10 @@ final class RentalAssignmentService
             ->lockForUpdate()
             ->first() !== null;
 
-        if ($hasCustodyHistory || $hasRunningChartHistory || $hasAssignmentHistory) {
+        if ($hasCustodyHistory
+            || $hasRunningChartHistory
+            || $hasOwnReplacementHistory
+            || $hasAssignmentHistory) {
             throw new InvalidArgumentException(
                 "A rental assignment with custody, running-chart, replacement, or dependent assignment history cannot be {$action}.",
             );
