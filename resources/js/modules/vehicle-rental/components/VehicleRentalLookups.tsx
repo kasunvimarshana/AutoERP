@@ -122,18 +122,7 @@ export function RentalVehicleLookup({
     const search = useCallback(async (params: LookupLoadParams): Promise<LookupResult<RentalLookupOption>> => {
         if (ownerAgreement !== null) {
             if (!startsAt) {
-                return {
-                    data: [],
-                    meta: {
-                        current_page: 1,
-                        from: null,
-                        last_page: 1,
-                        path: '',
-                        per_page: params.perPage,
-                        to: null,
-                        total: 0,
-                    },
-                };
+                throw new Error('Select the owner assignment start before choosing a vehicle.');
             }
 
             return mapResult(await listRentalOwnerAgreementVehicles({
