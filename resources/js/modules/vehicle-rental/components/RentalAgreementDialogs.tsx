@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
@@ -46,28 +46,28 @@ interface AgreementFormState {
     rates: RentalRateLine[];
 }
 
-export function RentalAgreementDialog({
-    open,
-    agreement,
-    onClose,
-    onSaved,
-}: {
+interface RentalAgreementDialogProps {
     open: boolean;
     agreement: RentalAgreement | null;
     onClose: () => void;
     onSaved: (agreement: RentalAgreement) => void;
-}) {
-    const [state, setState] = useState<AgreementFormState>(() => initialAgreementState(null));
+}
+
+export function RentalAgreementDialog(props: RentalAgreementDialogProps) {
+    const identity = `${props.open ? 'open' : 'closed'}:${props.agreement?.id ?? 'new'}:${props.agreement?.row_version ?? 0}`;
+    return <RentalAgreementDialogForm key={identity} {...props} />;
+}
+
+function RentalAgreementDialogForm({
+    open,
+    agreement,
+    onClose,
+    onSaved,
+}: RentalAgreementDialogProps) {
+    const [state, setState] = useState<AgreementFormState>(() => initialAgreementState(agreement));
     const [error, setError] = useState<ApiError | null>(null);
     const [submitting, setSubmitting] = useState(false);
     const formLookups = useApi((signal) => getRentalAgreementFormLookups(signal), [], open);
-
-    useEffect(() => {
-        if (!open) return;
-        setState(initialAgreementState(agreement));
-        setError(null);
-        setSubmitting(false);
-    }, [agreement, open]);
 
     const taxGroupOptions = (formLookups.data?.tax_groups ?? [])
         .map((group) => ({ value: group.id, label: [group.code, group.name].filter(Boolean).join(' - ') }));
@@ -193,30 +193,30 @@ export function RentalAgreementDialog({
     );
 }
 
-export function RentalRateVersionDialog({
-    open,
-    agreement,
-    onClose,
-    onSaved,
-}: {
+interface RentalRateVersionDialogProps {
     open: boolean;
     agreement: RentalAgreement | null;
     onClose: () => void;
     onSaved: (agreement: RentalAgreement) => void;
-}) {
+}
+
+export function RentalRateVersionDialog(props: RentalRateVersionDialogProps) {
+    const identity = `${props.open ? 'open' : 'closed'}:${props.agreement?.id ?? 'none'}:${props.agreement?.row_version ?? 0}`;
+    return <RentalRateVersionDialogForm key={identity} {...props} />;
+}
+
+function RentalRateVersionDialogForm({
+    open,
+    agreement,
+    onClose,
+    onSaved,
+}: RentalRateVersionDialogProps) {
     const [effectiveFrom, setEffectiveFrom] = useState('');
-    const [rates, setRates] = useState<RentalRateLine[]>([]);
+    const [rates, setRates] = useState<RentalRateLine[]>(() =>
+        (latestRateVersion(agreement)?.rates ?? []).map((rate) => ({ ...rate, id: undefined })),
+    );
     const [error, setError] = useState<ApiError | null>(null);
     const [submitting, setSubmitting] = useState(false);
-
-    const latestRates = useMemo(() => latestRateVersion(agreement)?.rates ?? [], [agreement]);
-    useEffect(() => {
-        if (!open || !agreement) return;
-        setEffectiveFrom('');
-        setRates(latestRates.map((rate) => ({ ...rate, id: undefined })));
-        setError(null);
-        setSubmitting(false);
-    }, [agreement, latestRates, open]);
 
     const submit = async (event: FormEvent) => {
         event.preventDefault();
