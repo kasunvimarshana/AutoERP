@@ -116,9 +116,12 @@ final class RentalAgreementService
     public function deleteDraft(RentalAgreement $agreement, int $expectedVersion): void
     {
         DB::transaction(function () use ($agreement, $expectedVersion): void {
+            $organizationUnitId = $agreement->organization_unit_id === null
+                ? null
+                : (int) $agreement->organization_unit_id;
             $agreement = RentalAgreement::query()
+                ->forContext((int) $agreement->tenant_id, $organizationUnitId)
                 ->whereKey($agreement->getKey())
-                ->where('tenant_id', $agreement->tenant_id)
                 ->lockForUpdate()
                 ->firstOrFail();
             $this->assertExpectedVersion($agreement, $expectedVersion);
@@ -130,8 +133,10 @@ final class RentalAgreementService
                 throw new InvalidArgumentException('A rental agreement with operational or financial history cannot be deleted.');
             }
 
-            $agreement->rateVersions()->lockForUpdate()->get();
-            $agreement->rateVersions()->delete();
+            $rateVersions = $agreement->rateVersions()->lockForUpdate()->get();
+            foreach ($rateVersions as $rateVersion) {
+                $rateVersion->delete();
+            }
             $agreement->delete();
         });
     }
