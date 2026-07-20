@@ -171,7 +171,7 @@ final class RentalCustodyService
         $this->timeline->lockVehicles($tenantId, $organizationUnitId, [(int) $assignment->vehicle_id]);
         $this->timeline->assertAvailable($tenantId, $organizationUnitId, (int) $assignment->vehicle_id, $eventAt, $endsAt);
         $this->timeline->assertDriverAvailable($assignmentData, $eventAt, $endsAt, (int) $assignment->getKey());
-        $source = $this->sources->sourceAssignment($assignmentData, $eventAt, $endsAt);
+        $source = $this->sources->sourceAssignmentForOperation($assignmentData, $eventAt, $endsAt);
         $this->sources->assertOwnershipSource($agreement, $assignmentData, $source, $eventAt, $endsAt);
     }
 }

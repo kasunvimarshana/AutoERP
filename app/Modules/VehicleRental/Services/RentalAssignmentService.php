@@ -72,7 +72,7 @@ final class RentalAssignmentService
             $this->timeline->assertNoVehicleOverlap($vehicleTimeline, $startsAt, $endsAt);
             $this->timeline->assertDriverAvailable($data, $startsAt, $endsAt);
 
-            $source = $this->sources->sourceAssignment($data, $startsAt, $endsAt);
+            $source = $this->sources->sourceAssignmentForPlanning($data, $startsAt, $endsAt);
             $this->sources->assertOwnershipSource($agreement, $data, $source, $startsAt, $endsAt);
 
             $assignment = new RentalAssignment();

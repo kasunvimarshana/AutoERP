@@ -56,14 +56,25 @@ final class RentalLookupController
         ListRentalRequest $request,
         RentalAssignmentService $service,
     ): AnonymousResourceCollection {
-        return $this->assignments($request, $service, RentalAssignmentSide::OwnerSupply, true);
+        return $this->assignments(
+            $request,
+            $service,
+            RentalAssignmentSide::OwnerSupply,
+            [RentalAssignmentStatus::Planned->value, RentalAssignmentStatus::Active->value],
+            true,
+        );
     }
 
     public function runningChartAssignments(
         ListRentalRequest $request,
         RentalAssignmentService $service,
     ): AnonymousResourceCollection {
-        return $this->assignments($request, $service, RentalAssignmentSide::CustomerUse);
+        return $this->assignments(
+            $request,
+            $service,
+            RentalAssignmentSide::CustomerUse,
+            [RentalAssignmentStatus::Active->value],
+        );
     }
 
     private function agreements(ListRentalRequest $request): AnonymousResourceCollection
@@ -89,15 +100,17 @@ final class RentalLookupController
         return RentalAgreementResource::collection($query->paginate($request->perPage()));
     }
 
+    /** @param list<string> $statuses */
     private function assignments(
         ListRentalRequest $request,
         RentalAssignmentService $service,
         RentalAssignmentSide $side,
+        array $statuses,
         bool $requireCompleteCoverage = false,
     ): AnonymousResourceCollection {
         $query = RentalAssignment::query()
             ->forContext($request->tenantId(), $request->organizationUnitId())
-            ->where('status', RentalAssignmentStatus::Active->value)
+            ->whereIn('status', $statuses)
             ->where('side', $side->value)
             ->with($service->relations())
             ->orderByDesc('starts_at');
@@ -105,14 +118,14 @@ final class RentalLookupController
             $query->where('vehicle_id', (int) $request->validated('vehicle_id'));
         }
         if ($requireCompleteCoverage && $request->filled('date_from')) {
-            $startsAt = CarbonImmutable::parse((string) $request->validated('date_from'))->seconds(0);
-            $query->where('starts_at', '<=', $startsAt->toDateTimeString());
+            $startsOn = CarbonImmutable::parse((string) $request->validated('date_from'))->toDateString();
+            $query->whereDate('starts_at', '<=', $startsOn);
 
             if ($request->filled('date_to')) {
-                $endsAt = CarbonImmutable::parse((string) $request->validated('date_to'))->seconds(0);
-                $query->where(function (Builder $scope) use ($endsAt): void {
+                $endsOn = CarbonImmutable::parse((string) $request->validated('date_to'))->toDateString();
+                $query->where(function (Builder $scope) use ($endsOn): void {
                     $scope->whereNull('ends_at')
-                        ->orWhere('ends_at', '>=', $endsAt->toDateTimeString());
+                        ->orWhereDate('ends_at', '>=', $endsOn);
                 });
             } else {
                 $query->whereNull('ends_at');

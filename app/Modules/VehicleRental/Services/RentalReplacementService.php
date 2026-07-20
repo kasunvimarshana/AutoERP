@@ -129,7 +129,7 @@ final class RentalReplacementService
             );
             $this->timeline->assertNoVehicleOverlap($newVehicleTimeline, $effectiveAt, $endsAt);
             $this->timeline->assertDriverAvailable($replacementData, $effectiveAt, $endsAt, (int) $original->getKey());
-            $source = $this->sources->sourceAssignment($replacementData, $effectiveAt, $endsAt);
+            $source = $this->sources->sourceAssignmentForOperation($replacementData, $effectiveAt, $endsAt);
             $this->sources->assertOwnershipSource($agreement, $replacementData, $source, $effectiveAt, $endsAt);
 
             $replacement = new RentalAssignment();
