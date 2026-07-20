@@ -58,6 +58,10 @@ Route::prefix('api/v1/vehicle-rental')
             Route::get('lookups/assignment-sources', [RentalLookupController::class, 'assignmentSources'])
                 ->name('lookups.assignment-sources');
             Route::post('assignments', [RentalAssignmentController::class, 'store'])->name('assignments.store');
+            Route::put('assignments/{assignment}', [RentalAssignmentController::class, 'update'])
+                ->whereNumber('assignment')->name('assignments.update');
+            Route::delete('assignments/{assignment}', [RentalAssignmentController::class, 'destroy'])
+                ->whereNumber('assignment')->name('assignments.destroy');
             Route::post('assignments/{assignment}/replace', [RentalAssignmentController::class, 'replace'])
                 ->whereNumber('assignment')->name('assignments.replace');
             Route::post('assignments/{assignment}/custody', [RentalAssignmentController::class, 'custody'])
