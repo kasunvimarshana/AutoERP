@@ -10,6 +10,8 @@ use Modules\VehicleRental\Constants\VehicleRentalPermission;
 use Modules\VehicleRental\Http\Requests\DeleteRentalAgreementRequest;
 use Modules\VehicleRental\Http\Requests\DeleteRentalAssignmentRequest;
 use Modules\VehicleRental\Http\Requests\ListRentalRequest;
+use Modules\VehicleRental\Http\Requests\StoreRentalAssignmentRequest;
+use Modules\VehicleRental\Http\Requests\StoreRentalCustodyRequest;
 use Modules\VehicleRental\Http\Requests\UpdateRentalAssignmentRequest;
 use Tests\TestCase;
 
@@ -77,6 +79,34 @@ final class RentalCrudInterfaceBoundaryTest extends TestCase
         self::assertArrayHasKey('expected_version', $updateRules);
         self::assertArrayHasKey('agreement_id', $updateRules);
         self::assertArrayHasKey('vehicle_id', $updateRules);
+    }
+
+    public function test_rental_operational_datetimes_require_an_explicit_timezone(): void
+    {
+        $assignmentRequest = new StoreRentalAssignmentRequest();
+        $assignmentRequest->attributes->set(
+            (string) config('core.current_tenant.id_attribute', 'current_tenant_id'),
+            1,
+        );
+        $startsAtRules = ['starts_at' => $assignmentRequest->rules()['starts_at']];
+        $eventAtRules = ['event_at' => (new StoreRentalCustodyRequest())->rules()['event_at']];
+
+        self::assertFalse(Validator::make(
+            ['starts_at' => '2026-07-21T10:55:00+05:30'],
+            $startsAtRules,
+        )->fails());
+        self::assertTrue(Validator::make(
+            ['starts_at' => '2026-07-21T10:55:00'],
+            $startsAtRules,
+        )->fails());
+        self::assertFalse(Validator::make(
+            ['event_at' => '2026-07-21T10:55:00Z'],
+            $eventAtRules,
+        )->fails());
+        self::assertTrue(Validator::make(
+            ['event_at' => '2026-07-21 10:55:00'],
+            $eventAtRules,
+        )->fails());
     }
 
     public function test_workflow_lookups_use_their_owned_manage_permissions(): void
