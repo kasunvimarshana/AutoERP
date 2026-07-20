@@ -30,6 +30,8 @@ final class ListRentalRequest extends TenantScopedRequest
             'agreement_id' => ['nullable', 'integer', 'min:1'],
             'assignment_id' => ['nullable', 'integer', 'min:1'],
             'vehicle_id' => ['nullable', 'integer', 'min:1'],
+            'has_financial_document' => ['nullable', 'boolean'],
+            'outstanding_only' => ['nullable', 'boolean'],
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
             'page' => ['nullable', 'integer', 'min:1'],
