@@ -45,25 +45,43 @@ final class RentalAssignmentSourceGuard
         }
     }
 
-    public function sourceAssignment(
+    public function sourceAssignmentForPlanning(
         RentalAssignmentData $data,
         CarbonImmutable $startsAt,
         ?CarbonImmutable $endsAt,
     ): ?RentalAssignment {
-        if ($data->sourceAssignmentId === null) {
+        $source = $this->sourceAssignment($data);
+        if (! $source instanceof RentalAssignment) {
             return null;
         }
-        $source = RentalAssignment::query()
-            ->forContext($data->tenantId, $data->organizationUnitId)
-            ->lockForUpdate()
-            ->findOrFail($data->sourceAssignmentId);
-        if ($source->side !== RentalAssignmentSide::OwnerSupply
-            || $source->status !== RentalAssignmentStatus::Active
-            || (int) $source->vehicle_id !== $data->vehicleId) {
-            throw new InvalidArgumentException('Customer assignment source must be an active owner-supply assignment for the same vehicle.');
+        if (! in_array($source->status, [RentalAssignmentStatus::Planned, RentalAssignmentStatus::Active], true)) {
+            throw new InvalidArgumentException('Customer assignment source must be planned or active.');
         }
-        if (! $this->periodContains($source, $startsAt, $endsAt)) {
-            throw new InvalidArgumentException('Owner-supply assignment must cover the complete customer-use period.');
+        if (! $this->periodContainsPlanningDates($source, $startsAt, $endsAt)) {
+            throw new InvalidArgumentException('Owner-supply assignment must cover the complete customer-use planning dates.');
+        }
+
+        return $source;
+    }
+
+    public function sourceAssignmentForOperation(
+        RentalAssignmentData $data,
+        CarbonImmutable $startsAt,
+        ?CarbonImmutable $endsAt,
+    ): ?RentalAssignment {
+        $source = $this->sourceAssignment($data);
+        if (! $source instanceof RentalAssignment) {
+            return null;
+        }
+        if ($source->status !== RentalAssignmentStatus::Active) {
+            throw new InvalidArgumentException(
+                'Owner-supply source must be active before customer vehicle handover or replacement.',
+            );
+        }
+        if (! $this->periodContainsOperationalPeriod($source, $startsAt, $endsAt)) {
+            throw new InvalidArgumentException(
+                'Active owner-supply assignment must cover the complete customer-use operational period.',
+            );
         }
 
         return $source;
@@ -122,7 +140,47 @@ final class RentalAssignmentSourceGuard
         }
     }
 
-    private function periodContains(
+    private function sourceAssignment(RentalAssignmentData $data): ?RentalAssignment
+    {
+        if ($data->sourceAssignmentId === null) {
+            return null;
+        }
+        $source = RentalAssignment::query()
+            ->forContext($data->tenantId, $data->organizationUnitId)
+            ->lockForUpdate()
+            ->findOrFail($data->sourceAssignmentId);
+        if ($source->side !== RentalAssignmentSide::OwnerSupply
+            || (int) $source->vehicle_id !== $data->vehicleId) {
+            throw new InvalidArgumentException(
+                'Customer assignment source must be an owner-supply assignment for the same vehicle.',
+            );
+        }
+
+        return $source;
+    }
+
+    private function periodContainsPlanningDates(
+        RentalAssignment $assignment,
+        CarbonImmutable $startsAt,
+        ?CarbonImmutable $endsAt,
+    ): bool {
+        $sourceStartsOn = CarbonImmutable::instance($assignment->starts_at)->startOfDay();
+        if ($sourceStartsOn->gt($startsAt->startOfDay())) {
+            return false;
+        }
+        if ($assignment->ends_at === null) {
+            return true;
+        }
+        if ($endsAt === null) {
+            return false;
+        }
+
+        return CarbonImmutable::instance($assignment->ends_at)
+            ->startOfDay()
+            ->gte($endsAt->startOfDay());
+    }
+
+    private function periodContainsOperationalPeriod(
         RentalAssignment $assignment,
         CarbonImmutable $startsAt,
         ?CarbonImmutable $endsAt,
