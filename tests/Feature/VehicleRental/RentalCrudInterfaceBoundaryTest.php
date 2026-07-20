@@ -24,6 +24,23 @@ final class RentalCrudInterfaceBoundaryTest extends TestCase
         );
     }
 
+    public function test_workflow_lookups_use_their_owned_manage_permissions(): void
+    {
+        $permissionMiddleware = (string) config('user.tenant.permission_middleware_alias', 'tenant.permission');
+        $expected = [
+            'api.v1.vehicle-rental.lookups.assignment-agreements' => VehicleRentalPermission::ASSIGNMENTS_MANAGE,
+            'api.v1.vehicle-rental.lookups.assignment-sources' => VehicleRentalPermission::ASSIGNMENTS_MANAGE,
+            'api.v1.vehicle-rental.lookups.running-chart-assignments' => VehicleRentalPermission::RUNNING_CHARTS_MANAGE,
+            'api.v1.vehicle-rental.lookups.calculation-agreements' => VehicleRentalPermission::CALCULATIONS_MANAGE,
+        ];
+
+        foreach ($expected as $routeName => $permission) {
+            $route = Route::getRoutes()->getByName($routeName);
+            self::assertNotNull($route, "Route [{$routeName}] must exist.");
+            self::assertContains($permissionMiddleware.':'.$permission, $route->gatherMiddleware());
+        }
+    }
+
     public function test_assignment_status_filter_accepts_only_domain_statuses(): void
     {
         $rules = (new ListRentalRequest())->rules();
