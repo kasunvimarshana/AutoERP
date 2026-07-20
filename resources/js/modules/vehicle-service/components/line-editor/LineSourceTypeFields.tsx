@@ -32,13 +32,18 @@ export function LineSourceTypeFields({ value, error, onChange }: {
                 value={value.source}
                 options={lineTypeOptions}
                 error={fieldError(error, 'line_source_type')}
-                onChange={(event) => onChange({
-                    ...value,
-                    source: event.target.value as VehicleServiceLineSourceType,
-                    item: null,
-                    description: lineTypeLabel(event.target.value as VehicleServiceLineSourceType),
-                    customer_supplied: false,
-                })}
+                onChange={(event) => {
+                    const source = event.target.value as VehicleServiceLineSourceType;
+                    onChange({
+                        ...value,
+                        source,
+                        item: null,
+                        description: lineTypeLabel(source),
+                        customer_supplied: false,
+                        issueWarehouse: source === 'inventory_item' ? value.issueWarehouse : null,
+                        issueLocation: source === 'inventory_item' ? value.issueLocation : null,
+                    });
+                }}
             />
             {!external && (
                 <div className="sm:col-span-2">
