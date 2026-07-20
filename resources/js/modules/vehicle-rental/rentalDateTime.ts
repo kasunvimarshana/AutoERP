@@ -1,7 +1,16 @@
 const LOCAL_DATE_TIME_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?$/;
+const EXPLICIT_TIMEZONE_PATTERN = /(?:Z|[+-]\d{2}:\d{2})$/;
 
 export function localDateTimeToOffsetIso(value: string): string {
     const input = value.trim();
+    if (EXPLICIT_TIMEZONE_PATTERN.test(input)) {
+        const explicitDate = new Date(input);
+        if (Number.isNaN(explicitDate.getTime())) {
+            throw new Error('A valid date and time is required.');
+        }
+
+        return input;
+    }
     if (!LOCAL_DATE_TIME_PATTERN.test(input)) {
         throw new Error('A valid local date and time is required.');
     }
