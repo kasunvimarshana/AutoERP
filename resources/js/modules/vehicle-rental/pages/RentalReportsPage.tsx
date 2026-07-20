@@ -1,3 +1,4 @@
+import { useState, type ReactNode } from 'react';
 import { LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
@@ -87,8 +88,6 @@ export function RentalReportsPage() {
     );
 }
 
-import { useState } from 'react';
-
 function Metric({ title, value, money }: { title: string; value?: string; money?: string }) {
     return (
         <Panel title={title}>
@@ -120,7 +119,7 @@ function ReportRows({
     );
 }
 
-function Row({ label, value }: { label: string; value: React.ReactNode }) {
+function Row({ label, value }: { label: string; value: ReactNode }) {
     return (
         <div className="flex items-center justify-between gap-4">
             <dt className="text-slate-600">{label}</dt>
