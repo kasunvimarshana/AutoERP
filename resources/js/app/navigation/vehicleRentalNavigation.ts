@@ -12,9 +12,10 @@ export const vehicleRentalNavigation: AppNavigationItem[] = [
             vehicleRentalPermissions.assignmentsView,
             vehicleRentalPermissions.runningChartsView,
             vehicleRentalPermissions.calculationsView,
+            vehicleRentalPermissions.reportsView,
         ],
         children: [
-            { label: 'Overview', to: '/vehicle-rental', permissions: [vehicleRentalPermissions.agreementsView] },
+            { label: 'Overview', to: '/vehicle-rental', permissions: vehicleRentalViewPermissions },
             { label: 'Owner / Supplier Agreements', to: '/vehicle-rental/owner-agreements', permissions: [vehicleRentalPermissions.agreementsView] },
             { label: 'Customer Agreements', to: '/vehicle-rental/customer-agreements', permissions: [vehicleRentalPermissions.agreementsView] },
             { label: 'Daily Running Charts', to: '/vehicle-rental/running-charts', permissions: [vehicleRentalPermissions.runningChartsView] },
@@ -22,7 +23,9 @@ export const vehicleRentalNavigation: AppNavigationItem[] = [
             { label: 'Owner Settlements', to: '/vehicle-rental/owner-settlements', permissions: [vehicleRentalPermissions.calculationsView] },
             { label: 'Customer Receipts', to: '/vehicle-rental/customer-receipts', permissions: [vehicleRentalPermissions.calculationsView] },
             { label: 'Owner Payments', to: '/vehicle-rental/owner-payments', permissions: [vehicleRentalPermissions.calculationsView] },
-            { label: 'Reports', to: '/vehicle-rental/reports', permissions: [vehicleRentalPermissions.calculationsView] },
+            { label: 'Reports', to: '/vehicle-rental/reports', permissions: [vehicleRentalPermissions.reportsView] },
         ],
     },
 ];
+
+import { vehicleRentalViewPermissions } from '@/modules/vehicle-rental/vehicleRentalPermissions';
