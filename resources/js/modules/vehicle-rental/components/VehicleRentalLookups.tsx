@@ -100,9 +100,10 @@ export function RentalAgreementLookup({
     error,
     disabled,
     required,
-}: LookupProps & { kind?: RentalAgreementKind; purpose: 'assignment' | 'calculation' }) {
+}: LookupProps & { kind?: RentalAgreementKind; purpose?: 'assignment' | 'calculation' }) {
+    const lookupPurpose = purpose ?? (kind ? 'assignment' : 'calculation');
     const search = useCallback(async (params: LookupLoadParams) => {
-        const result = await listRentalAgreementLookup(purpose, {
+        const result = await listRentalAgreementLookup(lookupPurpose, {
             search: params.search || undefined,
             kind,
             agreement_status: 'active',
@@ -111,7 +112,7 @@ export function RentalAgreementLookup({
         }, params.signal);
 
         return mapResult(result, agreementOption);
-    }, [kind, purpose]);
+    }, [kind, lookupPurpose]);
 
     return <ReferenceLookup label={kind === 'owner' ? 'Owner agreement' : kind === 'customer' ? 'Customer agreement' : 'Agreement'} value={value} onChange={onChange} search={search} error={error} disabled={disabled} required={required} loadOnOpen />;
 }
@@ -125,9 +126,10 @@ export function RentalAssignmentLookup({
     disabled,
     required,
     label = 'Assignment',
-}: LookupProps & { side?: RentalAssignmentSide; label?: string; purpose: 'assignment-source' | 'running-chart' }) {
+}: LookupProps & { side?: RentalAssignmentSide; label?: string; purpose?: 'assignment-source' | 'running-chart' }) {
+    const lookupPurpose = purpose ?? (side === 'owner_supply' ? 'assignment-source' : 'running-chart');
     const search = useCallback(async (params: LookupLoadParams) => {
-        const result = await listRentalAssignmentLookup(purpose, {
+        const result = await listRentalAssignmentLookup(lookupPurpose, {
             search: params.search || undefined,
             assignment_side: side,
             assignment_status: 'active',
@@ -136,7 +138,7 @@ export function RentalAssignmentLookup({
         }, params.signal);
 
         return mapResult(result, assignmentOption);
-    }, [purpose, side]);
+    }, [lookupPurpose, side]);
 
     return <ReferenceLookup label={label} value={value} onChange={onChange} search={search} error={error} disabled={disabled} required={required} loadOnOpen />;
 }
