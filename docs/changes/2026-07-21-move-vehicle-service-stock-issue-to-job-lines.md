@@ -26,7 +26,9 @@ The Job Lines UI orchestrates the existing Inventory issue API. It does not calc
 - Added a Stock column with `Pending issue` and `Issued` states.
 - Reused the existing exact warehouse-location readiness check before posting.
 - Removed the Vehicle Service Inventory tab and its replaced frontend component.
-- Kept all inventory endpoints, movement services, permissions, warehouse/location validation, and movement history unchanged.
+- Preserved inventory-only storekeeper access: users with Vehicle Service inventory permissions but without Job Line view permission see pending stock requirements inside the Job Lines tab without pricing or line-edit actions.
+- Kept line creation/edit/removal under Job Line permissions and stock status/issue actions under their existing Inventory permissions.
+- Kept all inventory endpoints, movement services, warehouse/location validation, and movement history unchanged.
 
 ## Version and failure behavior
 
@@ -69,6 +71,11 @@ Job Lines
 
 Combo/package
 → verify inventory child has Issue stock recovery
+
+Inventory-only role
+→ open Job Lines
+→ verify only pending stock requirements and Issue stock actions are visible
+→ verify prices and line edit/remove actions remain hidden
 ```
 
 No schema, backend Inventory rule, permission, invoice, payment, or accounting change is included.
