@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { hasPermission } from '@/modules/auth/accessControl';
 import { useAuth } from '@/modules/auth/AuthProvider';
+import { financePermissions } from '@/modules/finance/financePermissions';
 import { invoicePermissions } from '@/modules/invoice/invoicePermissions';
 import { paymentPermissions } from '@/modules/payment/paymentPermissions';
 import { LinkButton } from '@/shared/components/Button';
@@ -32,6 +33,7 @@ export function RentalSettlementHandoffPage({ side }: RentalSettlementHandoffPag
     const canCreatePayment = hasPermission(auth, paymentPermissions.create);
     const canViewPayments = hasPermission(auth, paymentPermissions.view);
     const canViewInvoice = hasPermission(auth, invoicePermissions.view);
+    const canViewBankReconciliation = hasPermission(auth, financePermissions.bankReconciliationsView);
     const [page, setPage] = useState(1);
     const customerSide = side === 'customer';
     const result = useApi(
@@ -98,7 +100,7 @@ export function RentalSettlementHandoffPage({ side }: RentalSettlementHandoffPag
                 </p>
                 <div className="mt-4 flex flex-wrap gap-2">
                     {canViewPayments && <LinkButton variant="secondary" to="/payments">View all payments</LinkButton>}
-                    <LinkButton variant="secondary" to="/finance/bank-reconciliations">Bank reconciliation</LinkButton>
+                    {canViewBankReconciliation && <LinkButton variant="secondary" to="/finance/bank-reconciliations">Bank reconciliation</LinkButton>}
                 </div>
             </Panel>
             <div className="mt-5">
