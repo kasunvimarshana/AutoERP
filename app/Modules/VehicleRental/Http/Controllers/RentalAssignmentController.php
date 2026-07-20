@@ -7,11 +7,14 @@ namespace Modules\VehicleRental\Http\Controllers;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Http\Response;
+use Modules\VehicleRental\Http\Requests\DeleteRentalAssignmentRequest;
 use Modules\VehicleRental\Http\Requests\ListRentalRequest;
 use Modules\VehicleRental\Http\Requests\RentalActionRequest;
 use Modules\VehicleRental\Http\Requests\ReplaceRentalAssignmentRequest;
 use Modules\VehicleRental\Http\Requests\StoreRentalAssignmentRequest;
 use Modules\VehicleRental\Http\Requests\StoreRentalCustodyRequest;
+use Modules\VehicleRental\Http\Requests\UpdateRentalAssignmentRequest;
 use Modules\VehicleRental\Http\Resources\RentalAssignmentResource;
 use Modules\VehicleRental\Models\RentalAssignment;
 use Modules\VehicleRental\Services\RentalAssignmentService;
@@ -61,6 +64,31 @@ final class RentalAssignmentController extends RentalController
     public function show(ListRentalRequest $request, int $assignment, RentalAssignmentService $service): RentalAssignmentResource
     {
         return new RentalAssignmentResource($this->assignment($request, $assignment)->load($service->relations()));
+    }
+
+    public function update(
+        UpdateRentalAssignmentRequest $request,
+        int $assignment,
+        RentalAssignmentService $service,
+    ): RentalAssignmentResource {
+        return new RentalAssignmentResource($service->update(
+            $this->assignment($request, $assignment),
+            $request->toData(),
+            $request->expectedVersion(),
+        ));
+    }
+
+    public function destroy(
+        DeleteRentalAssignmentRequest $request,
+        int $assignment,
+        RentalAssignmentService $service,
+    ): Response {
+        $service->deletePlanned(
+            $this->assignment($request, $assignment),
+            $request->expectedVersion(),
+        );
+
+        return response()->noContent();
     }
 
     public function custody(StoreRentalCustodyRequest $request, int $assignment, RentalCustodyService $service): RentalAssignmentResource
