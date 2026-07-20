@@ -122,7 +122,7 @@ final class RentalAssignmentSourceGuard
             ->exists();
         if (! $covers) {
             $message = $ownerType === VehicleOwnerType::Supplier
-                ? 'The vehicle ownership does not match the selected owner agreement for the assignment period.'
+                ? 'The selected vehicle is not registered to the owner-agreement supplier for the complete assignment period. Add or correct the Supplier Vehicle relationship before continuing.'
                 : 'A customer-use assignment without an owner source requires company ownership for the full period.';
             throw new InvalidArgumentException($message);
         }
