@@ -13,7 +13,7 @@ final class ReplaceRentalAssignmentRequest extends TenantScopedRequest
     {
         return [
             'vehicle_id' => ['required', 'integer', $this->tenantExists('vehicles')],
-            'effective_at' => ['required', 'date'],
+            'effective_at' => RentalDateTimeRules::required(),
             'old_return_odometer' => ['required', 'numeric', 'min:0'],
             'new_handover_odometer' => ['required', 'numeric', 'min:0'],
             'source_assignment_id' => ['nullable', 'integer', $this->tenantExists('vehicle_rental_assignments')],
