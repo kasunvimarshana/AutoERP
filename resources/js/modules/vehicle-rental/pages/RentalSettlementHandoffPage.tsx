@@ -1,9 +1,15 @@
+import { useState } from 'react';
+import { hasPermission } from '@/modules/auth/accessControl';
+import { useAuth } from '@/modules/auth/AuthProvider';
+import { invoicePermissions } from '@/modules/invoice/invoicePermissions';
+import { paymentPermissions } from '@/modules/payment/paymentPermissions';
 import { LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { MoneyDisplay } from '@/shared/components/MoneyDisplay';
+import { Pagination } from '@/shared/components/Pagination';
 import { Panel } from '@/shared/components/Panel';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { useApi } from '@/shared/hooks/useApi';
@@ -11,7 +17,7 @@ import { isPositiveDecimal } from '@/shared/utils/decimal';
 import { listRentalCalculations } from '../vehicleRentalApi';
 import type { RentalCalculation, RentalCalculationSide, RentalReference } from '../vehicleRentalTypes';
 
-const RECENT_DOCUMENT_LIMIT = 100;
+const PAGE_SIZE = 25;
 
 interface RentalSettlementHandoffPageProps {
     side: RentalCalculationSide;
@@ -22,14 +28,20 @@ function relationLabel(value?: RentalReference | null): string {
 }
 
 export function RentalSettlementHandoffPage({ side }: RentalSettlementHandoffPageProps) {
+    const auth = useAuth();
+    const canCreatePayment = hasPermission(auth, paymentPermissions.create);
+    const canViewPayments = hasPermission(auth, paymentPermissions.view);
+    const canViewInvoice = hasPermission(auth, invoicePermissions.view);
+    const [page, setPage] = useState(1);
     const customerSide = side === 'customer';
     const result = useApi(
         (signal) => listRentalCalculations({
             calculation_side: side,
             calculation_status: 'calculated',
-            per_page: RECENT_DOCUMENT_LIMIT,
+            page,
+            per_page: PAGE_SIZE,
         }, signal),
-        [side],
+        [side, page],
     );
     const rows = (result.data?.data ?? []).filter((row) => row.financial_document !== null && row.financial_document !== undefined);
     const title = customerSide ? 'Customer receipts' : 'Owner payments';
@@ -63,12 +75,12 @@ export function RentalSettlementHandoffPage({ side }: RentalSettlementHandoffPag
         {
             key: 'actions',
             header: 'Actions',
-            render: (row) => row.financial_document && isPositiveDecimal(row.financial_document.balance_due) ? (
+            render: (row) => row.financial_document && canCreatePayment && isPositiveDecimal(row.financial_document.balance_due) ? (
                 <LinkButton to={`/payments/create?invoice_id=${row.financial_document.id}`}>
                     {customerSide ? 'Record receipt' : 'Record payment'}
                 </LinkButton>
-            ) : row.financial_document ? (
-                <LinkButton variant="secondary" to={`/invoices/${row.financial_document.id}`}>View settled document</LinkButton>
+            ) : row.financial_document && canViewInvoice ? (
+                <LinkButton variant="secondary" to={`/invoices/${row.financial_document.id}`}>View document</LinkButton>
             ) : null,
         },
     ];
@@ -78,14 +90,14 @@ export function RentalSettlementHandoffPage({ side }: RentalSettlementHandoffPag
             <ContentHeader
                 title={title}
                 description={description}
-                actions={<LinkButton to="/payments/create">{actionLabel}</LinkButton>}
+                actions={canCreatePayment ? <LinkButton to="/payments/create">{actionLabel}</LinkButton> : undefined}
             />
             <Panel title="Shared settlement workspace">
                 <p className="text-sm text-slate-700">
                     Payment methods, cheque details, allocations, overpayment protection, posting, and reversal remain owned by the Payment module.
                 </p>
                 <div className="mt-4 flex flex-wrap gap-2">
-                    <LinkButton variant="secondary" to="/payments">View all payments</LinkButton>
+                    {canViewPayments && <LinkButton variant="secondary" to="/payments">View all payments</LinkButton>}
                     <LinkButton variant="secondary" to="/finance/bank-reconciliations">Bank reconciliation</LinkButton>
                 </div>
             </Panel>
@@ -94,6 +106,7 @@ export function RentalSettlementHandoffPage({ side }: RentalSettlementHandoffPag
                 {result.loading
                     ? <LoadingState />
                     : <DataTable rows={rows} columns={columns} rowKey={(row) => row.id} />}
+                <Pagination meta={result.data?.meta} onPageChange={setPage} />
             </div>
         </>
     );
