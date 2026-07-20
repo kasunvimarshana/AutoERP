@@ -25,13 +25,12 @@ import { cancelVehicleServiceJob, completeVehicleServiceJob, deleteVehicleServic
 const InspectionTab = lazy(() => import('../components/VehicleServiceInspectionTab'));
 const LinesTab = lazy(() => import('../components/VehicleServiceLineEditor'));
 const WorkforceTab = lazy(() => import('../components/VehicleServiceEmployeeAssignmentTab'));
-const InventoryTab = lazy(() => import('../components/VehicleServiceInventoryIssueTab'));
 const InvoiceTab = lazy(() => import('../components/VehicleServiceInvoiceTab'));
 const PaymentTab = lazy(() => import('../components/VehicleServicePaymentTab'));
 const DocumentTab = lazy(() => import('../components/VehicleServiceDocumentTab'));
 const StatusHistoryTab = lazy(() => import('../components/VehicleServiceStatusHistoryTab'));
 
-type Tab = 'summary' | 'inspection' | 'lines' | 'workforce' | 'inventory' | 'invoice' | 'payments' | 'documents' | 'history';
+type Tab = 'summary' | 'inspection' | 'lines' | 'workforce' | 'invoice' | 'payments' | 'documents' | 'history';
 const INSPECT_WORKFORCE_REQUIRED_MESSAGE = 'Assign at least one labour employee in Workforce before marking this job as inspected.';
 
 export default function VehicleServiceJobDetailPage() {
@@ -192,7 +191,6 @@ export default function VehicleServiceJobDetailPage() {
                         { id: 'inspection', label: 'Inspection' },
                         { id: 'lines', label: 'Job lines' },
                         { id: 'workforce', label: 'Workforce' },
-                        { id: 'inventory', label: 'Inventory' },
                         { id: 'invoice', label: 'Invoice' },
                         { id: 'payments', label: 'Payments' },
                         { id: 'documents', label: 'Documents' },
@@ -202,9 +200,8 @@ export default function VehicleServiceJobDetailPage() {
                         <Suspense fallback={<LoadingState />}>
                             <TabPanel tabsId="service-job-tabs" tabId="summary" active={tabs.activeTab} keepMounted><VehicleServiceSummaryPanel job={job} /></TabPanel>
                             {tabs.openedTabs.has('inspection') && <TabPanel tabsId="service-job-tabs" tabId="inspection" active={tabs.activeTab} keepMounted><InspectionTab jobId={job.id} expectedVersion={expectedVersion} initialValue={job.inspection ?? null} onSaved={handleInspectionSaved} /></TabPanel>}
-                            {tabs.openedTabs.has('lines') && <TabPanel tabsId="service-job-tabs" tabId="lines" active={tabs.activeTab} keepMounted><LinesTab jobId={job.id} expectedVersion={expectedVersion} onChanged={handleLinesChanged} /></TabPanel>}
+                            {tabs.openedTabs.has('lines') && <TabPanel tabsId="service-job-tabs" tabId="lines" active={tabs.activeTab} keepMounted><LinesTab jobId={job.id} expectedVersion={expectedVersion} onChanged={handleLinesChanged} onVersionChanged={updateJobVersion} /></TabPanel>}
                             {tabs.openedTabs.has('workforce') && <TabPanel tabsId="service-job-tabs" tabId="workforce" active={tabs.activeTab} keepMounted><WorkforceTab jobId={job.id} expectedVersion={expectedVersion} onChanged={updateJobVersion} /></TabPanel>}
-                            {tabs.openedTabs.has('inventory') && <TabPanel tabsId="service-job-tabs" tabId="inventory" active={tabs.activeTab} keepMounted><InventoryTab jobId={job.id} expectedVersion={expectedVersion} onChanged={updateJobVersion} /></TabPanel>}
                             {tabs.openedTabs.has('invoice') && <TabPanel tabsId="service-job-tabs" tabId="invoice" active={tabs.activeTab} keepMounted><InvoiceTab job={job} /></TabPanel>}
                             {tabs.openedTabs.has('payments') && <TabPanel tabsId="service-job-tabs" tabId="payments" active={tabs.activeTab} keepMounted><PaymentTab job={job} /></TabPanel>}
                             {tabs.openedTabs.has('documents') && <TabPanel tabsId="service-job-tabs" tabId="documents" active={tabs.activeTab} keepMounted><DocumentTab jobId={job.id} expectedVersion={expectedVersion} onChanged={updateJobVersion} /></TabPanel>}

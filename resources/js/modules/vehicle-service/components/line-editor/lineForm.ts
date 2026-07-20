@@ -25,6 +25,8 @@ export interface VehicleServiceLineFormValue {
     charge_value: string;
     customer_supplied: boolean;
     billable: boolean;
+    issueWarehouse: NamedResource | null;
+    issueLocation: NamedResource | null;
 }
 
 export type LineDialog =
@@ -61,6 +63,8 @@ export function emptyLineForm(): VehicleServiceLineFormValue {
         charge_value: '0.000000',
         customer_supplied: false,
         billable: true,
+        issueWarehouse: null,
+        issueLocation: null,
     };
 }
 
@@ -87,6 +91,8 @@ export function lineToForm(line: VehicleServiceJobLine): VehicleServiceLineFormV
             : line.charge_amount,
         customer_supplied: line.is_customer_supplied,
         billable: line.is_billable,
+        issueWarehouse: null,
+        issueLocation: null,
     };
 }
 
