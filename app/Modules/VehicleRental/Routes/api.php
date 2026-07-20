@@ -1,7 +1,6 @@
 <?php
 
 declare(strict_types=1);
-
 use Illuminate\Support\Facades\Route;
 use Modules\VehicleRental\Constants\VehicleRentalPermission;
 use Modules\VehicleRental\Http\Controllers\RentalAgreementController;
@@ -38,6 +37,8 @@ Route::prefix('api/v1/vehicle-rental')
             Route::post('agreements', [RentalAgreementController::class, 'store'])->name('agreements.store');
             Route::put('agreements/{agreement}', [RentalAgreementController::class, 'update'])
                 ->whereNumber('agreement')->name('agreements.update');
+            Route::delete('agreements/{agreement}', [RentalAgreementController::class, 'destroy'])
+                ->whereNumber('agreement')->name('agreements.destroy');
             Route::post('agreements/{agreement}/rate-versions', [RentalAgreementController::class, 'storeRateVersion'])
                 ->whereNumber('agreement')->name('agreements.rate-versions.store');
             Route::post('agreements/{agreement}/activate', [RentalAgreementController::class, 'activate'])
