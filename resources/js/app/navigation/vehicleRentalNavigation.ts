@@ -1,5 +1,8 @@
 import type { AppNavigationItem } from './types';
-import { vehicleRentalPermissions } from '@/modules/vehicle-rental/vehicleRentalPermissions';
+import {
+    vehicleRentalPermissions,
+    vehicleRentalViewPermissions,
+} from '@/modules/vehicle-rental/vehicleRentalPermissions';
 
 export const vehicleRentalNavigation: AppNavigationItem[] = [
     {
@@ -7,13 +10,7 @@ export const vehicleRentalNavigation: AppNavigationItem[] = [
         icon: 'truck',
         to: '/vehicle-rental',
         module: 'vehicle-rental',
-        anyPermissions: [
-            vehicleRentalPermissions.agreementsView,
-            vehicleRentalPermissions.assignmentsView,
-            vehicleRentalPermissions.runningChartsView,
-            vehicleRentalPermissions.calculationsView,
-            vehicleRentalPermissions.reportsView,
-        ],
+        anyPermissions: vehicleRentalViewPermissions,
         children: [
             { label: 'Overview', to: '/vehicle-rental', permissions: vehicleRentalViewPermissions },
             { label: 'Owner / Supplier Agreements', to: '/vehicle-rental/owner-agreements', permissions: [vehicleRentalPermissions.agreementsView] },
@@ -27,5 +24,3 @@ export const vehicleRentalNavigation: AppNavigationItem[] = [
         ],
     },
 ];
-
-import { vehicleRentalViewPermissions } from '@/modules/vehicle-rental/vehicleRentalPermissions';
