@@ -20,7 +20,7 @@ export const vehicleRentalNavigation: AppNavigationItem[] = [
             { label: 'Owner Settlements', to: '/vehicle-rental/owner-settlements', permissions: [vehicleRentalPermissions.calculationsView] },
             { label: 'Customer Receipts', to: '/vehicle-rental/customer-receipts', permissions: [vehicleRentalPermissions.calculationsView] },
             { label: 'Owner Payments', to: '/vehicle-rental/owner-payments', permissions: [vehicleRentalPermissions.calculationsView] },
-            { label: 'Reports', to: '/vehicle-rental/reports', permissions: [vehicleRentalPermissions.reportsView] },
+            { label: 'Reports', to: '/vehicle-rental/reports', permissions: [vehicleRentalPermissions.calculationsView] },
         ],
     },
 ];
