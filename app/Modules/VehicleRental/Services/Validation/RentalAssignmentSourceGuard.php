@@ -34,10 +34,14 @@ final class RentalAssignmentSourceGuard
         if ($agreement->kind !== $expectedKind) {
             throw new InvalidArgumentException('Vehicle assignment side does not match the selected agreement kind.');
         }
-        if ($startsAt->lt($agreement->starts_on->startOfDay())) {
+
+        $enteredStartsAt = CarbonImmutable::parse($data->startsAt);
+        $enteredEndsAt = $data->endsAt === null ? null : CarbonImmutable::parse($data->endsAt);
+        if ($enteredStartsAt->toDateString() < $agreement->starts_on->toDateString()) {
             throw new InvalidArgumentException('Vehicle assignment cannot start before the agreement period.');
         }
-        if ($agreement->ends_on !== null && ($endsAt === null || $endsAt->gt($agreement->ends_on->endOfDay()))) {
+        if ($agreement->ends_on !== null
+            && ($enteredEndsAt === null || $enteredEndsAt->toDateString() > $agreement->ends_on->toDateString())) {
             throw new InvalidArgumentException('Vehicle assignment must end within the agreement period.');
         }
         if ($data->selfDrive && $data->driverEmployeeId !== null) {

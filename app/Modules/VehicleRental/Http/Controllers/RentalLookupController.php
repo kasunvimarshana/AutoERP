@@ -119,12 +119,14 @@ final class RentalLookupController
         }
         if ($requireCompleteCoverage && $request->filled('date_from')) {
             $startsAt = CarbonImmutable::parse((string) $request->validated('date_from'))
+                ->utc()
                 ->seconds(0)
                 ->toDateTimeString();
             $query->where('starts_at', '<=', $startsAt);
 
             if ($request->filled('date_to')) {
                 $endsAt = CarbonImmutable::parse((string) $request->validated('date_to'))
+                    ->utc()
                     ->seconds(0)
                     ->toDateTimeString();
                 $query->where(function (Builder $scope) use ($endsAt): void {

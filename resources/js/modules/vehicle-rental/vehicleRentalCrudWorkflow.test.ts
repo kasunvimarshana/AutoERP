@@ -121,7 +121,10 @@ describe('Vehicle Rental CRUD workflow contracts', () => {
     });
 
     it('maps running-chart and calculation transitions without inventing delete endpoints', async () => {
-        const chart = {} as RentalRunningChartPayload;
+        const chart = {
+            starts_at: '2026-07-01T08:00:00+05:30',
+            ends_at: '2026-07-01T18:00:00+05:30',
+        } as RentalRunningChartPayload;
 
         await createRentalRunningChart(chart);
         await updateRentalRunningChart(31, chart);

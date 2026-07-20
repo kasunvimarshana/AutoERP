@@ -8,6 +8,7 @@ import { Select } from '@/shared/components/Select';
 import { Textarea } from '@/shared/components/Textarea';
 import { useApi } from '@/shared/hooks/useApi';
 import { notifySuccess } from '@/shared/notifications/appToast';
+import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { createRentalAgreement, createRentalRateVersion, getRentalAgreementFormLookups, updateRentalAgreement } from '../vehicleRentalApi';
 import type {
     RentalAgreement,
@@ -142,14 +143,22 @@ function RentalAgreementDialogForm({
                         <RentalCustomerLookup
                             value={state.customer}
                             required
-                            onChange={(value: RentalLookupOption | null) => setState((current) => ({ ...current, customer: value }))}
+                            onChange={(value: RentalLookupOption | null) => setState((current) => ({
+                                ...current,
+                                customer: value,
+                                currency: current.currency ?? value?.defaultCurrency ?? null,
+                            }))}
                             error={fieldError(error, 'customer_id')}
                         />
                     ) : (
                         <RentalSupplierLookup
                             value={state.supplier}
                             required
-                            onChange={(value: RentalLookupOption | null) => setState((current) => ({ ...current, supplier: value }))}
+                            onChange={(value: RentalLookupOption | null) => setState((current) => ({
+                                ...current,
+                                supplier: value,
+                                currency: current.currency ?? value?.defaultCurrency ?? null,
+                            }))}
                             error={fieldError(error, 'supplier_id')}
                         />
                     )}
@@ -159,7 +168,22 @@ function RentalAgreementDialogForm({
                         onChange={(value: RentalLookupOption | null) => setState((current) => ({ ...current, currency: value }))}
                         error={fieldError(error, 'currency_id')}
                     />
-                    <Input label="Executed on" type="date" value={state.executedAt} error={fieldError(error, 'executed_at')} onChange={(event) => setState((current) => ({ ...current, executedAt: event.target.value }))} />
+                    <Input
+                        label="Executed on"
+                        type="date"
+                        value={state.executedAt}
+                        error={fieldError(error, 'executed_at')}
+                        onChange={(event) => {
+                            const executedAt = event.target.value;
+                            setState((current) => ({
+                                ...current,
+                                executedAt,
+                                startsOn: current.startsOn === '' || current.startsOn === current.executedAt
+                                    ? executedAt
+                                    : current.startsOn,
+                            }));
+                        }}
+                    />
                     <Select label="Billing basis" value={state.billingBasis} required options={[{ value: 'daily', label: 'Daily' }, { value: 'monthly', label: 'Monthly' }]} error={fieldError(error, 'billing_basis')} onChange={(event) => setBillingBasis(event.target.value as RentalBillingBasis)} />
                     <Input label="Starts on" type="date" required value={state.startsOn} error={fieldError(error, 'starts_on')} onChange={(event) => setState((current) => ({ ...current, startsOn: event.target.value }))} />
                     <Input label="Ends on" type="date" min={state.startsOn || undefined} value={state.endsOn} error={fieldError(error, 'ends_on')} onChange={(event) => setState((current) => ({ ...current, endsOn: event.target.value }))} />
@@ -263,13 +287,14 @@ function initialAgreementState(agreement: RentalAgreement | null, requestedKind?
     const billingBasis = agreement?.billing_basis ?? 'daily';
     const kind = agreement?.kind ?? requestedKind ?? 'customer';
     const existingRates = latestRateVersion(agreement)?.rates ?? [defaultRentalRate(billingBasis)];
+    const businessDate = businessDateInputValue();
     return {
         kind,
         customer: agreement?.customer ?? null,
         supplier: agreement?.supplier ?? null,
         agreementNumber: agreement?.agreement_number ?? '',
-        executedAt: agreement?.executed_at ?? '',
-        startsOn: agreement?.starts_on ?? '',
+        executedAt: agreement?.executed_at ?? businessDate,
+        startsOn: agreement?.starts_on ?? businessDate,
         endsOn: agreement?.ends_on ?? '',
         billingBasis,
         currency: agreement?.currency ?? null,

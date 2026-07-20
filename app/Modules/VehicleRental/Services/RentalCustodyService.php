@@ -46,7 +46,7 @@ final class RentalCustodyService
             $eventAt = $this->timeline->dateTime($data->eventAt);
 
             if ($data->eventType === RentalCustodyEventType::Handover) {
-                $this->revalidateForHandover($assignment, $eventAt);
+                $this->revalidateForHandover($assignment, $eventAt, $data->eventAt);
             }
             if ($data->eventType === RentalCustodyEventType::Return) {
                 $this->runningCharts->assertNoChartsAfterClosure($assignment, $eventAt);
@@ -136,8 +136,11 @@ final class RentalCustodyService
         }
     }
 
-    private function revalidateForHandover(RentalAssignment $assignment, CarbonImmutable $eventAt): void
-    {
+    private function revalidateForHandover(
+        RentalAssignment $assignment,
+        CarbonImmutable $eventAt,
+        string $enteredEventAt,
+    ): void {
         $tenantId = (int) $assignment->tenant_id;
         $organizationUnitId = $assignment->organization_unit_id === null
             ? null
@@ -146,14 +149,20 @@ final class RentalCustodyService
             ->forContext($tenantId, $organizationUnitId)
             ->lockForUpdate()
             ->findOrFail($assignment->agreement_id);
+        $enteredEvent = CarbonImmutable::parse($enteredEventAt);
+        $enteredEndsAt = $assignment->ends_at === null
+            ? null
+            : CarbonImmutable::instance($assignment->ends_at)
+                ->setTimezone($enteredEvent->getTimezone())
+                ->toIso8601String();
         $assignmentData = new RentalAssignmentData(
             tenantId: $tenantId,
             organizationUnitId: $organizationUnitId,
             agreementId: (int) $assignment->agreement_id,
             vehicleId: (int) $assignment->vehicle_id,
             side: $assignment->side,
-            startsAt: $eventAt->toDateTimeString(),
-            endsAt: $assignment->ends_at?->toDateTimeString(),
+            startsAt: $enteredEvent->toIso8601String(),
+            endsAt: $enteredEndsAt,
             sourceAssignmentId: $assignment->source_assignment_id === null
                 ? null
                 : (int) $assignment->source_assignment_id,

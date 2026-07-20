@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\VehicleRental\Services;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -77,6 +78,41 @@ final class RentalFinancialDocumentService
                 'Reverse or cancel the Rental financial document before cancelling its calculation.',
             );
         }
+    }
+
+    public function constrainToActiveFinancialDocuments(Builder $query, bool $outstandingOnly): void
+    {
+        $terminalStatuses = self::terminalStatuses();
+        $query->whereExists(function ($documents) use ($outstandingOnly, $terminalStatuses): void {
+            $documents
+                ->selectRaw('1')
+                ->from('invoice_sources as rental_invoice_sources')
+                ->join('invoices as rental_invoices', function ($join): void {
+                    $join->on('rental_invoices.id', '=', 'rental_invoice_sources.invoice_id')
+                        ->on('rental_invoices.tenant_id', '=', 'rental_invoice_sources.tenant_id');
+                })
+                ->whereColumn('rental_invoice_sources.tenant_id', 'vehicle_rental_calculations.tenant_id')
+                ->whereColumn('rental_invoice_sources.source_id', 'vehicle_rental_calculations.id')
+                ->where('rental_invoice_sources.source_type', VehicleRentalSource::CALCULATION_DOCUMENT)
+                ->whereNotIn('rental_invoices.status', $terminalStatuses)
+                ->whereNull('rental_invoices.deleted_at')
+                ->where(function ($scope): void {
+                    $scope
+                        ->whereColumn(
+                            'rental_invoice_sources.organization_unit_id',
+                            'vehicle_rental_calculations.organization_unit_id',
+                        )
+                        ->orWhere(function ($nullScope): void {
+                            $nullScope
+                                ->whereNull('rental_invoice_sources.organization_unit_id')
+                                ->whereNull('vehicle_rental_calculations.organization_unit_id');
+                        });
+                });
+
+            if ($outstandingOnly) {
+                $documents->where('rental_invoices.balance_due', '>', 0);
+            }
+        });
     }
 
     public function attachFinancialDocuments(Collection $calculations): void

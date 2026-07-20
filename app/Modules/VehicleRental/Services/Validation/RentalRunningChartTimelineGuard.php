@@ -21,18 +21,18 @@ final class RentalRunningChartTimelineGuard
 
     public function startsAt(RentalRunningChartData $data): CarbonImmutable
     {
-        $startsAt = CarbonImmutable::parse($data->startsAt);
-        if ($startsAt->toDateString() !== CarbonImmutable::parse($data->operationalDate)->toDateString()) {
+        $enteredStartsAt = CarbonImmutable::parse($data->startsAt);
+        if ($enteredStartsAt->toDateString() !== CarbonImmutable::parse($data->operationalDate)->toDateString()) {
             throw new InvalidArgumentException('Operational date must match the running chart start date.');
         }
 
-        return $startsAt;
+        return $enteredStartsAt->utc();
     }
 
     public function endsAt(RentalRunningChartData $data): CarbonImmutable
     {
         $startsAt = $this->startsAt($data);
-        $endsAt = CarbonImmutable::parse($data->endsAt);
+        $endsAt = CarbonImmutable::parse($data->endsAt)->utc();
         if ($endsAt->lessThanOrEqualTo($startsAt)) {
             throw new InvalidArgumentException('Running chart end time must be after its start time.');
         }
@@ -64,7 +64,6 @@ final class RentalRunningChartTimelineGuard
             'commercial_km' => $this->math->sub($total, $garage),
         ];
     }
-
 
     public function assertDriverFacts(RentalAssignment $assignment, RentalRunningChartData $data): void
     {

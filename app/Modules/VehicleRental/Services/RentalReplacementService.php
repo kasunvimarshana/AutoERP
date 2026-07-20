@@ -81,6 +81,7 @@ final class RentalReplacementService
                 throw new InvalidArgumentException('Self-drive assignments cannot also have an assigned driver.');
             }
 
+            $enteredEffectiveAt = CarbonImmutable::parse($data->effectiveAt);
             $effectiveAt = $this->timeline->dateTime($data->effectiveAt);
             $endsAt = $original->ends_at === null ? null : CarbonImmutable::instance($original->ends_at);
             if ($effectiveAt->lt($original->starts_at)) {
@@ -99,14 +100,15 @@ final class RentalReplacementService
             $agreement = RentalAgreement::query()
                 ->forContext($data->tenantId, $data->organizationUnitId)
                 ->findOrFail($original->agreement_id);
+            $enteredEndsAt = $endsAt?->setTimezone($enteredEffectiveAt->getTimezone())->toIso8601String();
             $replacementData = new RentalAssignmentData(
                 tenantId: $data->tenantId,
                 organizationUnitId: $data->organizationUnitId,
                 agreementId: (int) $agreement->getKey(),
                 vehicleId: $data->vehicleId,
                 side: $original->side,
-                startsAt: $effectiveAt->toDateTimeString(),
-                endsAt: $endsAt?->toDateTimeString(),
+                startsAt: $enteredEffectiveAt->toIso8601String(),
+                endsAt: $enteredEndsAt,
                 sourceAssignmentId: $data->sourceAssignmentId,
                 handoverOdometer: $data->newHandoverOdometer,
                 driverEmployeeId: $data->driverEmployeeId,

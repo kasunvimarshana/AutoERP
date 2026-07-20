@@ -65,6 +65,21 @@ final class RentalRatePolicyTest extends TestCase
         }
     }
 
+    public function test_other_fixed_rate_is_rejected_before_agreement_activation_or_calculation(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Other fixed charges are not supported');
+
+        $this->policy()->validate(
+            RentalAgreementKind::Customer,
+            RentalBillingBasis::Daily,
+            [
+                $this->rate(RentalRateCode::BaseRental, RentalRateUnit::Day, '10000'),
+                $this->rate(RentalRateCode::Other, RentalRateUnit::Fixed, '500'),
+            ],
+        );
+    }
+
     private function policy(): RentalRatePolicy
     {
         return new RentalRatePolicy(new DecimalMath());

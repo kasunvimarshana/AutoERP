@@ -5,6 +5,11 @@ declare(strict_types=1);
 namespace Tests\Unit\VehicleRental;
 
 use Modules\VehicleRental\Http\Controllers\RentalLookupController;
+use Modules\VehicleRental\Http\Requests\RentalDateTimeRules;
+use Modules\VehicleRental\Http\Requests\RentalRunningChartMutationRequest;
+use Modules\VehicleRental\Http\Requests\ReplaceRentalAssignmentRequest;
+use Modules\VehicleRental\Http\Requests\StoreRentalAssignmentRequest;
+use Modules\VehicleRental\Http\Requests\StoreRentalCustodyRequest;
 use Modules\VehicleRental\Services\RentalAssignmentService;
 use Modules\VehicleRental\Services\RentalCustodyService;
 use Modules\VehicleRental\Services\RentalReplacementService;
@@ -51,6 +56,7 @@ final class RentalAssignmentSourceValidationContractTest extends TestCase
         self::assertStringContainsString('$query->where(\'starts_at\', \'<=\', $startsAt)', $source);
         self::assertStringContainsString('->orWhere(\'ends_at\', \'>=\', $endsAt)', $source);
         self::assertStringContainsString('$query->whereNull(\'ends_at\')', $source);
+        self::assertStringContainsString('->utc()', $source);
         self::assertStringNotContainsString('whereDate(\'starts_at\'', $source);
         self::assertStringNotContainsString('orWhereDate(\'ends_at\'', $source);
     }
@@ -72,6 +78,24 @@ final class RentalAssignmentSourceValidationContractTest extends TestCase
         self::assertStringContainsString('sourceAssignmentForPlanning', $assignmentService);
         self::assertStringContainsString('sourceAssignmentForOperation', $custodyService);
         self::assertStringContainsString('sourceAssignmentForOperation', $replacementService);
+    }
+
+    public function test_rental_datetime_mutations_require_explicit_offsets_and_normalize_instants_to_utc(): void
+    {
+        $rule = $this->source(RentalDateTimeRules::class);
+        $assignmentRequest = $this->source(StoreRentalAssignmentRequest::class);
+        $custodyRequest = $this->source(StoreRentalCustodyRequest::class);
+        $replacementRequest = $this->source(ReplaceRentalAssignmentRequest::class);
+        $runningChartRequest = $this->source(RentalRunningChartMutationRequest::class);
+        $timeline = $this->source(RentalAssignmentTimelineGuard::class);
+
+        self::assertStringContainsString('EXPLICIT_TIMEZONE_PATTERN', $rule);
+        self::assertStringContainsString('RentalDateTimeRules::required()', $assignmentRequest);
+        self::assertStringContainsString('RentalDateTimeRules::nullable()', $assignmentRequest);
+        self::assertStringContainsString('RentalDateTimeRules::required()', $custodyRequest);
+        self::assertStringContainsString('RentalDateTimeRules::required()', $replacementRequest);
+        self::assertSame(2, substr_count($runningChartRequest, 'RentalDateTimeRules::required()'));
+        self::assertStringContainsString('->utc()->seconds(0)', $timeline);
     }
 
     private function source(string $class): string

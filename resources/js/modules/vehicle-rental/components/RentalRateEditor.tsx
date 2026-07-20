@@ -10,7 +10,7 @@ import type {
     RentalRateUnit,
 } from '../vehicleRentalTypes';
 
-const RATE_CODES: Array<{ value: RentalRateCode; label: string }> = [
+const EDITABLE_RATE_CODES: Array<{ value: RentalRateCode; label: string }> = [
     { value: 'base_rental', label: 'Base rental' },
     { value: 'excess_km', label: 'Excess kilometre' },
     { value: 'non_ac', label: 'Non-AC day' },
@@ -21,8 +21,9 @@ const RATE_CODES: Array<{ value: RentalRateCode; label: string }> = [
     { value: 'double_overtime', label: 'Double overtime' },
     { value: 'triple_overtime', label: 'Triple overtime' },
     { value: 'night_out', label: 'Night out' },
-    { value: 'other', label: 'Other fixed charge' },
 ];
+
+const UNSUPPORTED_OTHER_RATE = { value: 'other' as const, label: 'Unsupported fixed charge — remove this row' };
 
 const UNITS_BY_CODE: Record<RentalRateCode, RentalRateUnit[]> = {
     base_rental: ['day', 'month'],
@@ -85,13 +86,14 @@ export function RentalRateEditor({
     disabled?: boolean;
 }) {
     const usedCodes = new Set(rates.map((rate) => rate.code));
-    const availableCodes = RATE_CODES.filter((option) => {
+    const availableCodes = EDITABLE_RATE_CODES.filter((option) => {
         if (usedCodes.has(option.value)) return false;
         if ((kind === 'owner' || billingBasis === 'monthly') && isAcCode(option.value)) return false;
         if (hasAcRate(rates) && option.value === 'base_rental') return false;
         if (hasBaseRate(rates) && isAcCode(option.value)) return false;
         return true;
     });
+    const hasUnsupportedRate = rates.some((rate) => rate.code === 'other');
 
     const update = (index: number, patch: Partial<RentalRateLine>) => {
         onChange(rates.map((rate, candidate) => candidate === index ? { ...rate, ...patch } : rate));
@@ -114,10 +116,15 @@ export function RentalRateEditor({
             <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                     <h3 className="font-semibold text-slate-900">Commercial rates</h3>
-                    <p className="text-sm text-slate-600">Rate codes are unique. Base rental and AC-mode day rates cannot be combined.</p>
+                    <p className="text-sm text-slate-600">Add only the charges that apply to this agreement. Base rental and AC-mode day rates cannot be combined.</p>
                 </div>
                 <Button type="button" variant="secondary" onClick={add} disabled={disabled || availableCodes.length === 0}>Add rate</Button>
             </div>
+            {hasUnsupportedRate && (
+                <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                    Fixed “Other” rates are not supported by automatic rental calculations. Remove the row and record approved extras through the governed adjustment workflow.
+                </p>
+            )}
             {rates.map((rate, index) => {
                 const codeOptions = rentalRateCodeOptions(rates, index, kind, billingBasis);
                 const units = UNITS_BY_CODE[rate.code];
@@ -128,7 +135,7 @@ export function RentalRateEditor({
                                 label="Rate type"
                                 value={rate.code}
                                 options={codeOptions}
-                                disabled={disabled}
+                                disabled={disabled || rate.code === 'other'}
                                 error={fieldError(error ?? null, `rates.${index}.code`)}
                                 onChange={(event) => {
                                     const code = event.target.value as RentalRateCode;
@@ -141,7 +148,7 @@ export function RentalRateEditor({
                                 label="Unit"
                                 value={rate.unit}
                                 options={units.map((unit) => ({ value: unit, label: unit.replaceAll('_', ' ') }))}
-                                disabled={disabled || units.length === 1}
+                                disabled={disabled || rate.code === 'other' || units.length === 1}
                                 error={fieldError(error ?? null, `rates.${index}.unit`)}
                                 onChange={(event) => update(index, { unit: event.target.value as RentalRateUnit })}
                             />
@@ -153,7 +160,7 @@ export function RentalRateEditor({
                                 min="0"
                                 step="0.000001"
                                 required
-                                disabled={disabled}
+                                disabled={disabled || rate.code === 'other'}
                                 value={rate.rate}
                                 error={fieldError(error ?? null, `rates.${index}.rate`)}
                                 onChange={(event) => update(index, { rate: event.target.value })}
@@ -163,7 +170,7 @@ export function RentalRateEditor({
                             <Input
                                 label="Description"
                                 maxLength={255}
-                                disabled={disabled}
+                                disabled={disabled || rate.code === 'other'}
                                 value={rate.description ?? ''}
                                 error={fieldError(error ?? null, `rates.${index}.description`)}
                                 onChange={(event) => update(index, { description: event.target.value || null })}
@@ -174,7 +181,7 @@ export function RentalRateEditor({
                                 <input
                                     type="checkbox"
                                     checked={rate.is_taxable}
-                                    disabled={disabled}
+                                    disabled={disabled || rate.code === 'other'}
                                     onChange={(event) => update(index, { is_taxable: event.target.checked })}
                                 />
                                 Taxable
@@ -219,8 +226,11 @@ export function rentalRateCodeOptions(
     const current = rates[index];
     const otherRates = rates.filter((_, candidate) => candidate !== index);
     const usedByOtherRows = new Set(otherRates.map((rate) => rate.code));
+    const options = current.code === 'other'
+        ? [UNSUPPORTED_OTHER_RATE, ...EDITABLE_RATE_CODES]
+        : EDITABLE_RATE_CODES;
 
-    return RATE_CODES.filter((option) => {
+    return options.filter((option) => {
         if (option.value === current.code) return true;
         if (usedByOtherRows.has(option.value)) return false;
         if ((kind === 'owner' || billingBasis === 'monthly') && isAcCode(option.value)) return false;

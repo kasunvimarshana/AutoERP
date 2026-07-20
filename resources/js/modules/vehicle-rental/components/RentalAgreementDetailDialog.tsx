@@ -72,7 +72,6 @@ export function RentalAgreementDetailDialog({
                                 ? <MoneyDisplay value={agreement.deposit_amount} currency={agreement.currency?.code ?? undefined} />
                                 : '—',
                         },
-                        { label: 'Version', value: agreement.row_version },
                     ]} />
                     <div>
                         <h3 className="text-sm font-semibold text-slate-900">Terms</h3>

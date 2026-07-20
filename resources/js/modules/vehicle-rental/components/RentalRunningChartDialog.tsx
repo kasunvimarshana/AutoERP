@@ -7,18 +7,17 @@ import { Modal } from '@/shared/components/Modal';
 import { Select } from '@/shared/components/Select';
 import { Textarea } from '@/shared/components/Textarea';
 import { notifySuccess } from '@/shared/notifications/appToast';
+import { compareDecimalStrings, isDecimalString, subtractDecimal } from '@/shared/utils/decimal';
 import { createRentalRunningChart, updateRentalRunningChart } from '../vehicleRentalApi';
 import type {
     RentalAcMode,
-    RentalReference,
     RentalRunningChart,
     RentalRunningChartPayload,
 } from '../vehicleRentalTypes';
 import { RentalAssignmentLookup, type RentalLookupOption } from './VehicleRentalLookups';
 
 interface RunningChartFormState {
-    assignment: RentalReference | null;
-    operationalDate: string;
+    assignment: RentalLookupOption | null;
     startsAt: string;
     endsAt: string;
     startOdometer: string;
@@ -57,6 +56,8 @@ function RentalRunningChartDialogForm({
     const [state, setState] = useState<RunningChartFormState>(() => initialState(chart));
     const [error, setError] = useState<ApiError | null>(null);
     const [submitting, setSubmitting] = useState(false);
+    const selfDrive = state.assignment?.selfDrive ?? (chart ? chart.driver == null : false);
+    const distance = distancePreview(state.startOdometer, state.endOdometer, state.garageKm);
 
     const submit = async (event: FormEvent) => {
         event.preventDefault();
@@ -65,16 +66,16 @@ function RentalRunningChartDialogForm({
         try {
             const payload: RentalRunningChartPayload = {
                 assignment_id: chart ? undefined : state.assignment?.id ?? 0,
-                operational_date: state.operationalDate,
+                operational_date: localDate(state.startsAt),
                 starts_at: state.startsAt,
                 ends_at: state.endsAt,
                 start_odometer: state.startOdometer,
                 end_odometer: state.endOdometer,
                 garage_km: state.garageKm || '0',
-                normal_overtime_hours: state.normalOvertimeHours || '0',
-                double_overtime_hours: state.doubleOvertimeHours || '0',
-                triple_overtime_hours: state.tripleOvertimeHours || '0',
-                night_out_count: Number.parseInt(state.nightOutCount || '0', 10),
+                normal_overtime_hours: selfDrive ? '0' : state.normalOvertimeHours || '0',
+                double_overtime_hours: selfDrive ? '0' : state.doubleOvertimeHours || '0',
+                triple_overtime_hours: selfDrive ? '0' : state.tripleOvertimeHours || '0',
+                night_out_count: selfDrive ? 0 : Number.parseInt(state.nightOutCount || '0', 10),
                 ac_mode: state.acMode || null,
                 trip_origin: nullable(state.tripOrigin),
                 trip_destination: nullable(state.tripDestination),
@@ -96,36 +97,92 @@ function RentalRunningChartDialogForm({
         }
     };
 
+    const selectAssignment = (value: RentalLookupOption | null) => {
+        setState((current) => ({
+            ...current,
+            assignment: value,
+            startOdometer: current.startOdometer || value?.handoverOdometer || '',
+            normalOvertimeHours: value?.selfDrive ? '0' : current.normalOvertimeHours,
+            doubleOvertimeHours: value?.selfDrive ? '0' : current.doubleOvertimeHours,
+            tripleOvertimeHours: value?.selfDrive ? '0' : current.tripleOvertimeHours,
+            nightOutCount: value?.selfDrive ? '0' : current.nightOutCount,
+        }));
+    };
+
     return (
         <Modal open={open} title={chart ? `Edit ${chart.chart_number}` : 'New running chart'} onClose={onClose} closeDisabled={submitting}>
             <form className="space-y-5" onSubmit={(event) => void submit(event)}>
                 <ErrorAlert error={error} inline />
                 <div className="grid gap-4 md:grid-cols-2">
                     <RentalAssignmentLookup
-                        label="Customer-use assignment"
+                        label="Customer vehicle"
                         side="customer_use"
                         value={state.assignment}
                         required
                         disabled={Boolean(chart)}
-                        onChange={(value: RentalLookupOption | null) => setState((current) => ({ ...current, assignment: value }))}
+                        onChange={selectAssignment}
                         error={fieldError(error, 'assignment_id')}
                     />
-                    <Input label="Operational date" type="date" required value={state.operationalDate} error={fieldError(error, 'operational_date')} onChange={(event) => setState((current) => ({ ...current, operationalDate: event.target.value }))} />
-                    <Input label="Starts at" type="datetime-local" required value={state.startsAt} error={fieldError(error, 'starts_at')} onChange={(event) => setState((current) => ({ ...current, startsAt: event.target.value }))} />
-                    <Input label="Ends at" type="datetime-local" required min={state.startsAt || undefined} value={state.endsAt} error={fieldError(error, 'ends_at')} onChange={(event) => setState((current) => ({ ...current, endsAt: event.target.value }))} />
+                    <Input
+                        label="Starts at"
+                        type="datetime-local"
+                        required
+                        min={state.assignment?.assignmentStartsAt ? toLocalDateTime(state.assignment.assignmentStartsAt) : undefined}
+                        max={state.assignment?.assignmentEndsAt ? toLocalDateTime(state.assignment.assignmentEndsAt) : undefined}
+                        value={state.startsAt}
+                        error={fieldError(error, 'starts_at') ?? fieldError(error, 'operational_date')}
+                        onChange={(event) => setState((current) => ({ ...current, startsAt: event.target.value }))}
+                    />
+                    <Input
+                        label="Ends at"
+                        type="datetime-local"
+                        required
+                        min={state.startsAt || undefined}
+                        max={state.assignment?.assignmentEndsAt ? toLocalDateTime(state.assignment.assignmentEndsAt) : undefined}
+                        value={state.endsAt}
+                        error={fieldError(error, 'ends_at')}
+                        onChange={(event) => setState((current) => ({ ...current, endsAt: event.target.value }))}
+                    />
                     <Input label="Start odometer" type="number" min="0" step="0.000001" required value={state.startOdometer} error={fieldError(error, 'start_odometer')} onChange={(event) => setState((current) => ({ ...current, startOdometer: event.target.value }))} />
                     <Input label="End odometer" type="number" min="0" step="0.000001" required value={state.endOdometer} error={fieldError(error, 'end_odometer')} onChange={(event) => setState((current) => ({ ...current, endOdometer: event.target.value }))} />
                     <Input label="Garage KM" type="number" min="0" step="0.000001" value={state.garageKm} error={fieldError(error, 'garage_km')} onChange={(event) => setState((current) => ({ ...current, garageKm: event.target.value }))} />
                     <Select label="AC mode" value={state.acMode} placeholder="Not applicable" options={[{ value: 'non_ac', label: 'Non-AC' }, { value: 'front_ac', label: 'Front AC' }, { value: 'dual_ac', label: 'Dual AC' }]} error={fieldError(error, 'ac_mode')} onChange={(event) => setState((current) => ({ ...current, acMode: event.target.value as RentalAcMode | '' }))} />
-                    <Input label="Normal overtime hours" type="number" min="0" step="0.000001" value={state.normalOvertimeHours} error={fieldError(error, 'normal_overtime_hours')} onChange={(event) => setState((current) => ({ ...current, normalOvertimeHours: event.target.value }))} />
-                    <Input label="Double overtime hours" type="number" min="0" step="0.000001" value={state.doubleOvertimeHours} error={fieldError(error, 'double_overtime_hours')} onChange={(event) => setState((current) => ({ ...current, doubleOvertimeHours: event.target.value }))} />
-                    <Input label="Triple overtime hours" type="number" min="0" step="0.000001" value={state.tripleOvertimeHours} error={fieldError(error, 'triple_overtime_hours')} onChange={(event) => setState((current) => ({ ...current, tripleOvertimeHours: event.target.value }))} />
-                    <Input label="Night-out count" type="number" min="0" step="1" value={state.nightOutCount} error={fieldError(error, 'night_out_count')} onChange={(event) => setState((current) => ({ ...current, nightOutCount: event.target.value }))} />
+                </div>
+
+                {state.assignment && (
+                    <div className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm md:grid-cols-2">
+                        <Summary label="Customer agreement" value={state.assignment.agreement?.code || state.assignment.code || '—'} />
+                        <Summary label="Vehicle" value={state.assignment.vehicle?.name || state.assignment.name || '—'} />
+                        <Summary label="Owner agreement" value={state.assignment.ownerAgreement?.code || state.assignment.ownerAgreement?.name || 'Company-owned / not linked'} />
+                        <Summary label="Driver" value={selfDrive ? 'Self-drive' : state.assignment.driver?.name || state.assignment.driver?.code || 'Not assigned'} />
+                    </div>
+                )}
+
+                <div className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 md:grid-cols-2">
+                    <Summary label="Total KM" value={distance?.total ?? '—'} />
+                    <Summary label="Commercial KM" value={distance?.commercial ?? '—'} />
+                    {distance?.error && <p className="text-sm text-rose-600 md:col-span-2">{distance.error}</p>}
+                </div>
+
+                {selfDrive ? (
+                    <p className="rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900">
+                        This is a self-drive assignment. Driver overtime and night-out fields are not applicable.
+                    </p>
+                ) : (
+                    <div className="grid gap-4 md:grid-cols-2">
+                        <Input label="Normal overtime hours" type="number" min="0" step="0.000001" value={state.normalOvertimeHours} error={fieldError(error, 'normal_overtime_hours')} onChange={(event) => setState((current) => ({ ...current, normalOvertimeHours: event.target.value }))} />
+                        <Input label="Double overtime hours" type="number" min="0" step="0.000001" value={state.doubleOvertimeHours} error={fieldError(error, 'double_overtime_hours')} onChange={(event) => setState((current) => ({ ...current, doubleOvertimeHours: event.target.value }))} />
+                        <Input label="Triple overtime hours" type="number" min="0" step="0.000001" value={state.tripleOvertimeHours} error={fieldError(error, 'triple_overtime_hours')} onChange={(event) => setState((current) => ({ ...current, tripleOvertimeHours: event.target.value }))} />
+                        <Input label="Night-out count" type="number" min="0" step="1" value={state.nightOutCount} error={fieldError(error, 'night_out_count')} onChange={(event) => setState((current) => ({ ...current, nightOutCount: event.target.value }))} />
+                    </div>
+                )}
+
+                <div className="grid gap-4 md:grid-cols-2">
                     <Input label="Trip origin" maxLength={255} value={state.tripOrigin} error={fieldError(error, 'trip_origin')} onChange={(event) => setState((current) => ({ ...current, tripOrigin: event.target.value }))} />
                     <Input label="Trip destination" maxLength={255} value={state.tripDestination} error={fieldError(error, 'trip_destination')} onChange={(event) => setState((current) => ({ ...current, tripDestination: event.target.value }))} />
                     <Input label="Purpose" maxLength={255} value={state.purpose} error={fieldError(error, 'purpose')} onChange={(event) => setState((current) => ({ ...current, purpose: event.target.value }))} />
                 </div>
-                <Textarea label="Odometer variance reason" maxLength={500} hint="Required by the backend when the start odometer intentionally differs from the previous finalized chart." value={state.odometerVarianceReason} error={fieldError(error, 'odometer_variance_reason')} onChange={(event) => setState((current) => ({ ...current, odometerVarianceReason: event.target.value }))} />
+                <Textarea label="Odometer variance reason" maxLength={500} hint="Required when the start odometer intentionally differs from the previous finalized chart." value={state.odometerVarianceReason} error={fieldError(error, 'odometer_variance_reason')} onChange={(event) => setState((current) => ({ ...current, odometerVarianceReason: event.target.value }))} />
                 <Textarea label="Remarks" maxLength={5000} value={state.remarks} error={fieldError(error, 'remarks')} onChange={(event) => setState((current) => ({ ...current, remarks: event.target.value }))} />
                 <div className="flex justify-end gap-2">
                     <Button type="button" variant="secondary" disabled={submitting} onClick={onClose}>Cancel</Button>
@@ -136,15 +193,28 @@ function RentalRunningChartDialogForm({
     );
 }
 
+function Summary({ label, value }: { label: string; value: string }) {
+    return (
+        <div>
+            <p className="text-slate-500">{label}</p>
+            <p className="font-medium text-slate-900">{value}</p>
+        </div>
+    );
+}
+
 function initialState(chart: RentalRunningChart | null): RunningChartFormState {
-    const assignment = chart?.assignment ? {
+    const assignment: RentalLookupOption | null = chart?.assignment ? {
         id: chart.assignment.id,
-        code: chart.assignment.agreement?.code ?? chart.assignment.agreement?.name,
-        name: chart.assignment.vehicle?.name ?? chart.assignment.vehicle?.code,
+        code: chart.assignment.agreement?.code ?? chart.assignment.agreement?.name ?? `#${chart.assignment.id}`,
+        name: chart.assignment.vehicle?.name ?? chart.assignment.vehicle?.code ?? `Assignment #${chart.assignment.id}`,
+        agreement: chart.assignment.agreement ?? null,
+        vehicle: chart.assignment.vehicle ?? null,
+        ownerAgreement: chart.assignment.owner_agreement ?? null,
+        driver: chart.driver ?? null,
+        selfDrive: chart.driver == null,
     } : null;
     return {
         assignment,
-        operationalDate: chart?.operational_date ?? '',
         startsAt: toLocalDateTime(chart?.starts_at),
         endsAt: toLocalDateTime(chart?.ends_at),
         startOdometer: chart?.start_odometer ?? '',
@@ -161,6 +231,23 @@ function initialState(chart: RentalRunningChart | null): RunningChartFormState {
         odometerVarianceReason: chart?.odometer_variance_reason ?? '',
         remarks: chart?.remarks ?? '',
     };
+}
+
+function distancePreview(start: string, end: string, garage: string): { total: string; commercial: string; error?: string } | null {
+    if (!start.trim() || !end.trim() || !isDecimalString(start) || !isDecimalString(end) || !isDecimalString(garage)) return null;
+    if (compareDecimalStrings(end, start) < 0) {
+        return { total: '—', commercial: '—', error: 'End odometer cannot be lower than start odometer.' };
+    }
+    const total = subtractDecimal(end, start);
+    const garageKm = garage.trim() || '0';
+    if (compareDecimalStrings(garageKm, total) > 0) {
+        return { total, commercial: '—', error: 'Garage KM cannot exceed total KM.' };
+    }
+    return { total, commercial: subtractDecimal(total, garageKm) };
+}
+
+function localDate(value: string): string {
+    return value.slice(0, 10);
 }
 
 function nullable(value: string): string | null {

@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
@@ -8,7 +8,19 @@ import { Select } from '@/shared/components/Select';
 import { Textarea } from '@/shared/components/Textarea';
 import { notifySuccess } from '@/shared/notifications/appToast';
 import {
+    agreementDateBoundary,
+    clampLocalDateTime,
+    earliestLocalDateTime,
+    formatLocalDateTime,
+    latestLocalDateTime,
+    localDateTimeToOffsetIso,
+    nullableLocalDateTimeToOffsetIso,
+    utcDateTimeToLocalInput,
+} from '../rentalDateTime';
+import {
     createRentalAssignment,
+    getRentalAgreement,
+    listRentalAssignmentLookup,
     recordRentalCustody,
     replaceRentalAssignment,
     updateRentalAssignment,
@@ -22,6 +34,7 @@ import type {
     RentalReplacementPayload,
 } from '../vehicleRentalTypes';
 import {
+    rentalAssignmentOption,
     RentalAgreementLookup,
     RentalAssignmentLookup,
     RentalDriverLookup,
@@ -29,16 +42,33 @@ import {
     type RentalLookupOption,
 } from './VehicleRentalLookups';
 
+const SOURCE_LOOKUP_PAGE_SIZE = 100;
+
 interface AssignmentFormState {
     side: RentalAssignmentSide;
     agreement: RentalReference | null;
     vehicle: RentalReference | null;
-    sourceAssignment: RentalReference | null;
+    sourceAssignment: RentalLookupOption | null;
     driver: RentalReference | null;
     startsAt: string;
     endsAt: string;
     handoverOdometer: string;
     selfDrive: boolean;
+}
+
+interface AgreementPeriod {
+    startsOn: string;
+    endsOn: string;
+}
+
+interface AgreementPeriodLookup extends AgreementPeriod {
+    agreementId: number | null;
+}
+
+interface SourceLookupState {
+    vehicleId: number | null;
+    candidates: RentalLookupOption[];
+    error: string;
 }
 
 interface RentalAssignmentDialogProps {
@@ -74,8 +104,78 @@ function RentalAssignmentDialogForm({
     onSaved,
 }: RentalAssignmentDialogProps) {
     const [state, setState] = useState<AssignmentFormState>(() => initialAssignmentState(side, agreement, assignment));
+    const [agreementLookup, setAgreementLookup] = useState<AgreementPeriodLookup>({ agreementId: null, startsOn: '', endsOn: '' });
+    const [sourceLookup, setSourceLookup] = useState<SourceLookupState>({ vehicleId: null, candidates: [], error: '' });
     const [error, setError] = useState<ApiError | null>(null);
     const [submitting, setSubmitting] = useState(false);
+    const agreementId = state.agreement?.id ?? null;
+    const selectedVehicleId = state.side === 'customer_use' ? state.vehicle?.id ?? null : null;
+
+    useEffect(() => {
+        if (!open || agreementId === null) return;
+
+        const controller = new AbortController();
+        const requestedAgreementId = agreementId;
+        void getRentalAgreement(requestedAgreementId, controller.signal)
+            .then((record) => setAgreementLookup({
+                agreementId: requestedAgreementId,
+                startsOn: record.starts_on ?? '',
+                endsOn: record.ends_on ?? '',
+            }))
+            .catch((requestError: unknown) => {
+                if (!controller.signal.aborted) setError(toApiError(requestError));
+            });
+
+        return () => controller.abort();
+    }, [agreementId, open]);
+
+    useEffect(() => {
+        if (!open || selectedVehicleId === null) return;
+
+        const controller = new AbortController();
+        const requestedVehicleId = selectedVehicleId;
+        void listRentalAssignmentLookup('assignment-source', {
+            assignment_side: 'owner_supply',
+            vehicle_id: requestedVehicleId,
+            page: 1,
+            per_page: SOURCE_LOOKUP_PAGE_SIZE,
+        }, controller.signal)
+            .then((result) => setSourceLookup({
+                vehicleId: requestedVehicleId,
+                candidates: result.data.map(rentalAssignmentOption),
+                error: '',
+            }))
+            .catch((requestError: unknown) => {
+                if (controller.signal.aborted) return;
+                setSourceLookup({
+                    vehicleId: requestedVehicleId,
+                    candidates: [],
+                    error: toApiError(requestError).message,
+                });
+            });
+
+        return () => controller.abort();
+    }, [open, selectedVehicleId]);
+
+    const agreementPeriod: AgreementPeriod = agreementLookup.agreementId === agreementId
+        ? { startsOn: agreementLookup.startsOn, endsOn: agreementLookup.endsOn }
+        : { startsOn: '', endsOn: '' };
+    const sourceCandidates = selectedVehicleId !== null && sourceLookup.vehicleId === selectedVehicleId
+        ? sourceLookup.candidates
+        : null;
+    const sourceLoadError = sourceLookup.vehicleId === selectedVehicleId ? sourceLookup.error : '';
+    const eligibleSources = (sourceCandidates ?? [])
+        .filter((candidate) => sourceOverlapsAgreement(candidate, agreementPeriod));
+    const selectedSourceCandidate = state.sourceAssignment
+        ? eligibleSources.find((candidate) => candidate.id === state.sourceAssignment?.id) ?? null
+        : null;
+    const resolvedSourceAssignment = selectedSourceCandidate
+        ?? (eligibleSources.length === 1 ? eligibleSources[0] : null);
+    const bounds = assignmentBounds(agreementPeriod, resolvedSourceAssignment);
+    const fittedDates = fitAssignmentDateTimes(state.startsAt, state.endsAt, bounds);
+    const sourceLoading = state.side === 'customer_use'
+        && selectedVehicleId !== null
+        && sourceCandidates === null;
 
     const setSide = (nextSide: RentalAssignmentSide) => {
         setState((current) => ({
@@ -83,11 +183,14 @@ function RentalAssignmentDialogForm({
             side: nextSide,
             agreement: null,
             sourceAssignment: null,
+            startsAt: '',
+            endsAt: '',
         }));
     };
 
     const submit = async (event: FormEvent) => {
         event.preventDefault();
+        if (sourceLoading) return;
         setSubmitting(true);
         setError(null);
         try {
@@ -95,9 +198,9 @@ function RentalAssignmentDialogForm({
                 agreement_id: state.agreement?.id ?? 0,
                 vehicle_id: state.vehicle?.id ?? 0,
                 side: state.side,
-                starts_at: state.startsAt,
-                ends_at: nullable(state.endsAt),
-                source_assignment_id: state.side === 'customer_use' ? state.sourceAssignment?.id ?? null : null,
+                starts_at: localDateTimeToOffsetIso(fittedDates.startsAt),
+                ends_at: nullableLocalDateTimeToOffsetIso(fittedDates.endsAt),
+                source_assignment_id: state.side === 'customer_use' ? resolvedSourceAssignment?.id ?? null : null,
                 handover_odometer: nullable(state.handoverOdometer),
                 driver_employee_id: state.selfDrive ? null : state.driver?.id ?? null,
                 self_drive: state.selfDrive,
@@ -148,7 +251,13 @@ function RentalAssignmentDialogForm({
                         kind={state.side === 'customer_use' ? 'customer' : 'owner'}
                         required
                         disabled={lockAgreement}
-                        onChange={(value: RentalLookupOption | null) => setState((current) => ({ ...current, agreement: value }))}
+                        onChange={(value: RentalLookupOption | null) => setState((current) => ({
+                            ...current,
+                            agreement: value,
+                            sourceAssignment: null,
+                            startsAt: '',
+                            endsAt: '',
+                        }))}
                         error={fieldError(error, 'agreement_id')}
                     />
                     <RentalVehicleLookup
@@ -165,37 +274,30 @@ function RentalAssignmentDialogForm({
                         label="Starts at"
                         type="datetime-local"
                         required
-                        value={state.startsAt}
+                        min={bounds.minimum || undefined}
+                        max={bounds.maximum || undefined}
+                        value={fittedDates.startsAt}
                         error={fieldError(error, 'starts_at')}
-                        onChange={(event) => setState((current) => ({
-                            ...current,
-                            startsAt: event.target.value,
-                            sourceAssignment: null,
-                        }))}
+                        onChange={(event) => setState((current) => ({ ...current, startsAt: event.target.value }))}
                     />
                     <Input
                         label="Planned end"
                         type="datetime-local"
-                        min={state.startsAt || undefined}
-                        value={state.endsAt}
+                        min={fittedDates.startsAt || bounds.minimum || undefined}
+                        max={bounds.maximum || undefined}
+                        value={fittedDates.endsAt}
                         error={fieldError(error, 'ends_at')}
-                        onChange={(event) => setState((current) => ({
-                            ...current,
-                            endsAt: event.target.value,
-                            sourceAssignment: null,
-                        }))}
+                        onChange={(event) => setState((current) => ({ ...current, endsAt: event.target.value }))}
                     />
                     {state.side === 'customer_use' && (
-                        <RentalAssignmentLookup
-                            label="Owner-supply source assignment"
-                            side="owner_supply"
-                            value={state.sourceAssignment}
-                            vehicleId={state.vehicle?.id ?? null}
-                            startsAt={state.startsAt}
-                            endsAt={state.endsAt}
-                            disabled={!state.vehicle || !state.startsAt}
-                            onChange={(value: RentalLookupOption | null) => setState((current) => ({ ...current, sourceAssignment: value }))}
+                        <OwnerSourceField
+                            candidates={sourceCandidates}
+                            eligibleCandidates={eligibleSources}
+                            value={resolvedSourceAssignment}
+                            loadError={sourceLoadError}
+                            disabled={!state.vehicle}
                             error={fieldError(error, 'source_assignment_id')}
+                            onChange={(value) => setState((current) => ({ ...current, sourceAssignment: value }))}
                         />
                     )}
                     <Input label="Planned handover odometer" type="number" min="0" step="0.000001" value={state.handoverOdometer} error={fieldError(error, 'handover_odometer')} onChange={(event) => setState((current) => ({ ...current, handoverOdometer: event.target.value }))} />
@@ -219,10 +321,81 @@ function RentalAssignmentDialogForm({
                 </div>
                 <div className="flex justify-end gap-2">
                     <Button type="button" variant="secondary" disabled={submitting} onClick={onClose}>Cancel</Button>
-                    <Button type="submit" loading={submitting}>{submitLabel}</Button>
+                    <Button type="submit" loading={submitting} disabled={sourceLoading}>{submitLabel}</Button>
                 </div>
             </form>
         </Modal>
+    );
+}
+
+function OwnerSourceField({
+    candidates,
+    eligibleCandidates,
+    value,
+    loadError,
+    disabled,
+    error,
+    onChange,
+}: {
+    candidates: RentalLookupOption[] | null;
+    eligibleCandidates: RentalLookupOption[];
+    value: RentalLookupOption | null;
+    loadError: string;
+    disabled: boolean;
+    error?: string;
+    onChange: (value: RentalLookupOption | null) => void;
+}) {
+    if (disabled) {
+        return <p className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">Select a vehicle to resolve its vehicle owner agreement.</p>;
+    }
+    if (candidates === null) {
+        return <p className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">Finding the vehicle owner agreement...</p>;
+    }
+    if (loadError) {
+        return <p className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{loadError}</p>;
+    }
+    if (candidates.length === 0) {
+        return (
+            <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                No owner-supplied vehicle source is recorded for this vehicle. Continue without one only when the vehicle is company-owned for the full assignment period.
+            </p>
+        );
+    }
+    if (eligibleCandidates.length === 0) {
+        return (
+            <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">
+                <p className="font-medium">The recorded vehicle owner assignment does not overlap this customer agreement period.</p>
+                {candidates.map((candidate) => (
+                    <p key={candidate.id} className="mt-1">{ownerSourceSummary(candidate)}</p>
+                ))}
+            </div>
+        );
+    }
+    if (eligibleCandidates.length === 1 && value?.id === eligibleCandidates[0].id) {
+        return (
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+                <p className="font-medium">Vehicle owner agreement autoloaded</p>
+                <p className="mt-1">{ownerSourceSummary(eligibleCandidates[0])}</p>
+            </div>
+        );
+    }
+
+    return (
+        <Select
+            label="Vehicle owner agreement"
+            value={value?.id ? String(value.id) : ''}
+            required
+            disabled={disabled}
+            placeholder="Select the vehicle owner agreement"
+            options={eligibleCandidates.map((candidate) => ({
+                value: String(candidate.id),
+                label: ownerSourceSummary(candidate),
+            }))}
+            error={error}
+            onChange={(event) => onChange(
+                eligibleCandidates.find((candidate) => candidate.id === Number(event.target.value)) ?? null,
+            )}
+        />
     );
 }
 
@@ -246,7 +419,7 @@ function RentalCustodyDialogForm({
     onClose,
     onSaved,
 }: RentalCustodyDialogProps) {
-    const [eventAt, setEventAt] = useState(() => eventType === 'handover' ? toLocalDateTime(assignment?.starts_at) : '');
+    const [eventAt, setEventAt] = useState(() => eventType === 'handover' ? utcDateTimeToLocalInput(assignment?.starts_at) : '');
     const [odometer, setOdometer] = useState(() => eventType === 'handover' ? assignment?.handover_odometer ?? '' : assignment?.return_odometer ?? '');
     const [fuelLevel, setFuelLevel] = useState('');
     const [conditionNotes, setConditionNotes] = useState('');
@@ -262,7 +435,7 @@ function RentalCustodyDialogForm({
         try {
             const payload: RentalCustodyPayload = {
                 event_type: eventType,
-                event_at: eventAt,
+                event_at: localDateTimeToOffsetIso(eventAt),
                 odometer,
                 fuel_level: nullable(fuelLevel),
                 condition_notes: nullable(conditionNotes),
@@ -343,7 +516,7 @@ function RentalReplacementDialogForm({
         try {
             const payload: RentalReplacementPayload = {
                 vehicle_id: vehicle?.id ?? 0,
-                effective_at: effectiveAt,
+                effective_at: localDateTimeToOffsetIso(effectiveAt),
                 old_return_odometer: oldReturnOdometer,
                 new_handover_odometer: newHandoverOdometer,
                 source_assignment_id: assignment.side === 'customer_use' ? sourceAssignment?.id ?? null : null,
@@ -396,12 +569,12 @@ function RentalReplacementDialogForm({
                     />
                     {assignment?.side === 'customer_use' && (
                         <RentalAssignmentLookup
-                            label="New owner-supply source"
+                            label="New vehicle owner agreement"
                             side="owner_supply"
                             value={sourceAssignment}
                             vehicleId={vehicle?.id ?? null}
                             startsAt={effectiveAt}
-                            endsAt={assignment.ends_at ?? ''}
+                            endsAt={utcDateTimeToLocalInput(assignment.ends_at)}
                             disabled={!vehicle || !effectiveAt}
                             onChange={setSourceAssignment}
                             error={fieldError(error, 'source_assignment_id')}
@@ -447,12 +620,12 @@ function initialAssignmentState(
             vehicle: assignment.vehicle ?? null,
             sourceAssignment: assignment.source_assignment ? {
                 id: assignment.source_assignment.id,
-                code: assignment.source_assignment.agreement?.code,
-                name: assignment.source_assignment.agreement?.name ?? assignment.source_assignment.agreement?.code,
+                code: assignment.source_assignment.agreement?.code ?? undefined,
+                name: assignment.source_assignment.agreement?.name ?? assignment.source_assignment.agreement?.code ?? `#${assignment.source_assignment.id}`,
             } : null,
             driver: assignment.driver ?? null,
-            startsAt: toLocalDateTime(assignment.starts_at),
-            endsAt: toLocalDateTime(assignment.ends_at),
+            startsAt: utcDateTimeToLocalInput(assignment.starts_at),
+            endsAt: utcDateTimeToLocalInput(assignment.ends_at),
             handoverOdometer: assignment.handover_odometer ?? '',
             selfDrive: assignment.self_drive,
         };
@@ -471,15 +644,51 @@ function initialAssignmentState(
     };
 }
 
+function assignmentBounds(period: AgreementPeriod, source: RentalLookupOption | null): { minimum: string; maximum: string } {
+    return {
+        minimum: latestLocalDateTime(
+            agreementDateBoundary(period.startsOn, 'start'),
+            utcDateTimeToLocalInput(source?.assignmentStartsAt),
+        ),
+        maximum: earliestLocalDateTime(
+            agreementDateBoundary(period.endsOn, 'end'),
+            utcDateTimeToLocalInput(source?.assignmentEndsAt),
+        ),
+    };
+}
+
+function fitAssignmentDateTimes(
+    startsAt: string,
+    endsAt: string,
+    bounds: { minimum: string; maximum: string },
+): { startsAt: string; endsAt: string } {
+    const fittedStart = clampLocalDateTime(startsAt || bounds.minimum, bounds.minimum, bounds.maximum);
+    const endSeed = endsAt || bounds.maximum;
+    const fittedEnd = endSeed
+        ? clampLocalDateTime(endSeed, fittedStart || bounds.minimum, bounds.maximum)
+        : '';
+
+    return { startsAt: fittedStart, endsAt: fittedEnd };
+}
+
+function sourceOverlapsAgreement(source: RentalLookupOption, period: AgreementPeriod): boolean {
+    const sourceStart = utcDateTimeToLocalInput(source.assignmentStartsAt);
+    const sourceEnd = utcDateTimeToLocalInput(source.assignmentEndsAt);
+    const agreementStart = agreementDateBoundary(period.startsOn, 'start');
+    const agreementEnd = agreementDateBoundary(period.endsOn, 'end');
+
+    return (!agreementEnd || !sourceStart || sourceStart <= agreementEnd)
+        && (!sourceEnd || !agreementStart || sourceEnd >= agreementStart);
+}
+
+function ownerSourceSummary(source: RentalLookupOption): string {
+    const owner = source.party?.name || source.party?.code;
+    const agreement = source.agreement?.code || source.code || `#${source.id}`;
+    const period = `${formatLocalDateTime(source.assignmentStartsAt)} → ${formatLocalDateTime(source.assignmentEndsAt)}`;
+    return [owner, agreement, period].filter(Boolean).join(' • ');
+}
+
 function nullable(value: string): string | null {
     const trimmed = value.trim();
     return trimmed === '' ? null : trimmed;
-}
-
-function toLocalDateTime(value?: string | null): string {
-    if (!value) return '';
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return value.slice(0, 16);
-    const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
-    return local.toISOString().slice(0, 16);
 }

@@ -40,16 +40,18 @@ export function RentalSettlementHandoffPage({ side }: RentalSettlementHandoffPag
         (signal) => listRentalCalculations({
             calculation_side: side,
             calculation_status: 'calculated',
+            has_financial_document: true,
+            outstanding_only: true,
             page,
             per_page: PAGE_SIZE,
         }, signal),
         [side, page],
     );
-    const rows = (result.data?.data ?? []).filter((row) => row.financial_document !== null && row.financial_document !== undefined);
+    const rows = result.data?.data ?? [];
     const title = customerSide ? 'Customer receipts' : 'Owner payments';
     const description = customerSide
-        ? 'Receive and allocate customer payments through the shared Payment module without duplicating receipt logic inside Vehicle Rental.'
-        : 'Pay and allocate Owner Payable Vouchers through the shared Payment module without duplicating supplier-payment logic inside Vehicle Rental.';
+        ? 'Receive and allocate outstanding customer invoices through the shared Payment module.'
+        : 'Pay and allocate outstanding Owner Payable Vouchers through the shared Payment module.';
     const actionLabel = customerSide ? 'New customer receipt' : 'New owner payment';
 
     const columns: DataColumn<RentalCalculation>[] = [

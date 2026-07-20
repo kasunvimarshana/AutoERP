@@ -41,6 +41,11 @@ final class RentalRatePolicy
             }
             $codes[$rate->code->value] = true;
 
+            if ($rate->code === RentalRateCode::Other) {
+                throw new InvalidArgumentException(
+                    'Other fixed charges are not supported by automatic rental calculations. Use a governed financial adjustment.',
+                );
+            }
             if ($this->math->isNegative($rate->rate)) {
                 throw new InvalidArgumentException('Rental agreement rates cannot be negative.');
             }

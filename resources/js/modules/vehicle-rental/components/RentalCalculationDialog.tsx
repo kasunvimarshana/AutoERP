@@ -6,7 +6,7 @@ import { Input } from '@/shared/components/Input';
 import { Modal } from '@/shared/components/Modal';
 import { notifySuccess } from '@/shared/notifications/appToast';
 import { createRentalCalculation } from '../vehicleRentalApi';
-import type { RentalCalculation, RentalCalculationSide, RentalReference } from '../vehicleRentalTypes';
+import type { RentalCalculation, RentalCalculationSide } from '../vehicleRentalTypes';
 import { RentalAgreementLookup, type RentalLookupOption } from './VehicleRentalLookups';
 
 interface RentalCalculationDialogProps {
@@ -26,12 +26,17 @@ function RentalCalculationDialogForm({
     onClose,
     onSaved,
 }: RentalCalculationDialogProps) {
-    const [agreement, setAgreement] = useState<RentalReference | null>(null);
+    const [agreement, setAgreement] = useState<RentalLookupOption | null>(null);
+    const [periodMonth, setPeriodMonth] = useState('');
     const [periodStart, setPeriodStart] = useState('');
     const [periodEnd, setPeriodEnd] = useState('');
     const [error, setError] = useState<ApiError | null>(null);
     const [submitting, setSubmitting] = useState(false);
     const customerSide = side === 'customer';
+    const monthly = agreement?.billingBasis === 'monthly';
+    const firstEligibleMonth = firstCompleteMonth(agreement?.startsOn);
+    const lastEligibleMonth = lastCompleteMonth(agreement?.endsOn);
+    const hasEligibleMonth = !firstEligibleMonth || !lastEligibleMonth || firstEligibleMonth <= lastEligibleMonth;
     const title = customerSide ? 'Prepare customer billing period' : side === 'owner' ? 'Prepare owner settlement period' : 'New rental calculation';
     const actionLabel = customerSide ? 'Prepare billing' : side === 'owner' ? 'Prepare settlement' : 'Calculate';
 
@@ -40,9 +45,12 @@ function RentalCalculationDialogForm({
         setSubmitting(true);
         setError(null);
         try {
+            const period = monthly
+                ? completeMonth(periodMonth)
+                : { start: periodStart, end: periodEnd };
             const saved = await createRentalCalculation(agreement?.id ?? 0, {
-                period_start: periodStart,
-                period_end: periodEnd,
+                period_start: period.start,
+                period_end: period.end,
             });
             notifySuccess(customerSide
                 ? 'Customer billing period prepared successfully.'
@@ -58,6 +66,13 @@ function RentalCalculationDialogForm({
         }
     };
 
+    const selectAgreement = (value: RentalLookupOption | null) => {
+        setAgreement(value);
+        setPeriodMonth('');
+        setPeriodStart('');
+        setPeriodEnd('');
+    };
+
     return (
         <Modal open={open} title={title} onClose={onClose} closeDisabled={submitting}>
             <form className="space-y-4" onSubmit={(event) => void submit(event)}>
@@ -70,18 +85,82 @@ function RentalCalculationDialogForm({
                     kind={side === 'customer' ? 'customer' : side === 'owner' ? 'owner' : undefined}
                     purpose="calculation"
                     required
-                    onChange={(value: RentalLookupOption | null) => setAgreement(value)}
+                    onChange={selectAgreement}
                     error={fieldError(error, 'agreement_id')}
                 />
-                <div className="grid gap-4 md:grid-cols-2">
-                    <Input label="Period start" type="date" required value={periodStart} error={fieldError(error, 'period_start')} onChange={(event) => setPeriodStart(event.target.value)} />
-                    <Input label="Period end" type="date" required min={periodStart || undefined} value={periodEnd} error={fieldError(error, 'period_end')} onChange={(event) => setPeriodEnd(event.target.value)} />
-                </div>
+                {monthly ? (
+                    <div className="space-y-2">
+                        <Input
+                            label="Billing month"
+                            type="month"
+                            required
+                            disabled={!hasEligibleMonth}
+                            min={firstEligibleMonth}
+                            max={lastEligibleMonth}
+                            value={periodMonth}
+                            error={fieldError(error, 'period_start') ?? fieldError(error, 'period_end')}
+                            onChange={(event) => setPeriodMonth(event.target.value)}
+                        />
+                        <p className="text-sm text-slate-600">Monthly agreements are prepared for one complete calendar month. Partial-month proration is not configured.</p>
+                        {!hasEligibleMonth && (
+                            <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                                This agreement period does not contain a complete calendar month, so a monthly calculation cannot be prepared.
+                            </p>
+                        )}
+                    </div>
+                ) : (
+                    <div className="grid gap-4 md:grid-cols-2">
+                        <Input
+                            label="Period start"
+                            type="date"
+                            required
+                            min={agreement?.startsOn ?? undefined}
+                            max={agreement?.endsOn ?? undefined}
+                            value={periodStart}
+                            error={fieldError(error, 'period_start')}
+                            onChange={(event) => setPeriodStart(event.target.value)}
+                        />
+                        <Input
+                            label="Period end"
+                            type="date"
+                            required
+                            min={periodStart || agreement?.startsOn || undefined}
+                            max={agreement?.endsOn ?? undefined}
+                            value={periodEnd}
+                            error={fieldError(error, 'period_end')}
+                            onChange={(event) => setPeriodEnd(event.target.value)}
+                        />
+                    </div>
+                )}
                 <div className="flex justify-end gap-2">
                     <Button type="button" variant="secondary" disabled={submitting} onClick={onClose}>Cancel</Button>
-                    <Button type="submit" loading={submitting}>{actionLabel}</Button>
+                    <Button type="submit" loading={submitting} disabled={monthly && !hasEligibleMonth}>{actionLabel}</Button>
                 </div>
             </form>
         </Modal>
     );
+}
+
+function completeMonth(value: string): { start: string; end: string } {
+    const [year, month] = value.split('-').map(Number);
+    if (!year || !month) return { start: '', end: '' };
+    const end = new Date(Date.UTC(year, month, 0)).toISOString().slice(0, 10);
+    return { start: `${value}-01`, end };
+}
+
+function firstCompleteMonth(value?: string | null): string | undefined {
+    if (!value) return undefined;
+    const [year, month, day] = value.split('-').map(Number);
+    if (!year || !month || !day) return value.slice(0, 7);
+    if (day === 1) return value.slice(0, 7);
+    return new Date(Date.UTC(year, month, 1)).toISOString().slice(0, 7);
+}
+
+function lastCompleteMonth(value?: string | null): string | undefined {
+    if (!value) return undefined;
+    const [year, month, day] = value.split('-').map(Number);
+    if (!year || !month || !day) return value.slice(0, 7);
+    const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+    if (day === lastDay) return value.slice(0, 7);
+    return new Date(Date.UTC(year, month - 2, 1)).toISOString().slice(0, 7);
 }

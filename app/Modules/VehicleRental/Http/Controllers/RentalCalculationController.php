@@ -35,6 +35,12 @@ final class RentalCalculationController extends RentalController
         if ($request->filled('calculation_status')) {
             $query->where('status', $request->validated('calculation_status'));
         }
+        if ($request->boolean('has_financial_document') || $request->boolean('outstanding_only')) {
+            $financialDocuments->constrainToActiveFinancialDocuments(
+                $query,
+                $request->boolean('outstanding_only'),
+            );
+        }
         if ($request->filled('date_from')) {
             $query->whereDate('period_end', '>=', $request->validated('date_from'));
         }
