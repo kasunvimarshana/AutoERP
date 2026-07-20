@@ -7,6 +7,7 @@ namespace Tests\Feature\VehicleRental;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Validator;
 use Modules\VehicleRental\Constants\VehicleRentalPermission;
+use Modules\VehicleRental\Http\Requests\DeleteRentalAgreementRequest;
 use Modules\VehicleRental\Http\Requests\ListRentalRequest;
 use Tests\TestCase;
 
@@ -22,6 +23,24 @@ final class RentalCrudInterfaceBoundaryTest extends TestCase
             $permissionMiddleware.':'.VehicleRentalPermission::AGREEMENTS_MANAGE,
             $route->gatherMiddleware(),
         );
+    }
+
+    public function test_draft_agreement_delete_uses_manage_permission_and_optimistic_version(): void
+    {
+        $route = Route::getRoutes()->getByName('api.v1.vehicle-rental.agreements.destroy');
+        self::assertNotNull($route);
+        self::assertContains('DELETE', $route->methods());
+
+        $permissionMiddleware = (string) config('user.tenant.permission_middleware_alias', 'tenant.permission');
+        self::assertContains(
+            $permissionMiddleware.':'.VehicleRentalPermission::AGREEMENTS_MANAGE,
+            $route->gatherMiddleware(),
+        );
+
+        $rules = (new DeleteRentalAgreementRequest())->rules();
+        self::assertFalse(Validator::make(['expected_version' => 1], $rules)->fails());
+        self::assertTrue(Validator::make([], $rules)->fails());
+        self::assertTrue(Validator::make(['expected_version' => 0], $rules)->fails());
     }
 
     public function test_workflow_lookups_use_their_owned_manage_permissions(): void
