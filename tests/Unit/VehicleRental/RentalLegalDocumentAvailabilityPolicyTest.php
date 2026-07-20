@@ -4,19 +4,23 @@ declare(strict_types=1);
 
 namespace Tests\Unit\VehicleRental;
 
-use Modules\Vehicle\Enums\VehicleDocumentType;
-use Modules\VehicleRental\Services\Availability\RentalLegalDocumentAvailabilityBlocker;
+use Modules\VehicleRental\Providers\VehicleRentalServiceProvider;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
 
 final class RentalLegalDocumentAvailabilityPolicyTest extends TestCase
 {
-    public function test_rental_assignment_requires_revenue_license_but_not_insurance(): void
+    public function test_rental_assignment_does_not_register_a_legal_document_availability_blocker(): void
     {
-        $requiredDocumentTypes = (new ReflectionClass(RentalLegalDocumentAvailabilityBlocker::class))
-            ->getConstant('REQUIRED_DOCUMENT_TYPES');
+        $providerFile = (new ReflectionClass(VehicleRentalServiceProvider::class))->getFileName();
+        self::assertIsString($providerFile);
 
-        self::assertSame([VehicleDocumentType::RevenueLicense], $requiredDocumentTypes);
-        self::assertNotContains(VehicleDocumentType::Insurance, $requiredDocumentTypes);
+        $providerSource = file_get_contents($providerFile);
+        self::assertIsString($providerSource);
+        self::assertStringNotContainsString('RentalLegalDocumentAvailabilityBlocker', $providerSource);
+
+        self::assertFileDoesNotExist(
+            dirname($providerFile, 2).'/Services/Availability/RentalLegalDocumentAvailabilityBlocker.php',
+        );
     }
 }
