@@ -68,7 +68,12 @@ final class RentalCrudInterfaceBoundaryTest extends TestCase
         self::assertTrue(Validator::make([], $deleteRules)->fails());
         self::assertTrue(Validator::make(['expected_version' => 0], $deleteRules)->fails());
 
-        $updateRules = (new UpdateRentalAssignmentRequest())->rules();
+        $updateRequest = new UpdateRentalAssignmentRequest();
+        $updateRequest->attributes->set(
+            (string) config('core.current_tenant.id_attribute', 'current_tenant_id'),
+            1,
+        );
+        $updateRules = $updateRequest->rules();
         self::assertArrayHasKey('expected_version', $updateRules);
         self::assertArrayHasKey('agreement_id', $updateRules);
         self::assertArrayHasKey('vehicle_id', $updateRules);
