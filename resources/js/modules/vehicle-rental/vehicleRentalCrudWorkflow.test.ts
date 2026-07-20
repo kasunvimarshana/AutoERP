@@ -33,6 +33,8 @@ import {
     createRentalRunningChart,
     finalizeRentalRunningChart,
     getRentalAgreementFormLookups,
+    listRentalAgreementLookup,
+    listRentalAssignmentLookup,
     recordRentalCustody,
     replaceRentalAssignment,
     reverseRentalRunningChart,
@@ -54,6 +56,18 @@ describe('Vehicle Rental CRUD workflow contracts', () => {
     it('uses the Vehicle Rental-owned agreement form lookup boundary', async () => {
         await getRentalAgreementFormLookups();
         expect(apiClientMocks.get).toHaveBeenCalledWith(`${endpoint}/lookups/agreement-form`, { signal: undefined });
+    });
+
+    it('uses workflow-owned agreement and assignment lookup endpoints', async () => {
+        await listRentalAgreementLookup('assignment', { kind: 'customer' });
+        await listRentalAgreementLookup('calculation', { search: 'VRA' });
+        await listRentalAssignmentLookup('assignment-source', { search: 'CAR' });
+        await listRentalAssignmentLookup('running-chart', { page: 1 });
+
+        expect(apiClientMocks.get).toHaveBeenCalledWith(`${endpoint}/lookups/assignment-agreements`, { params: { kind: 'customer' }, signal: undefined });
+        expect(apiClientMocks.get).toHaveBeenCalledWith(`${endpoint}/lookups/calculation-agreements`, { params: { search: 'VRA' }, signal: undefined });
+        expect(apiClientMocks.get).toHaveBeenCalledWith(`${endpoint}/lookups/assignment-sources`, { params: { search: 'CAR' }, signal: undefined });
+        expect(apiClientMocks.get).toHaveBeenCalledWith(`${endpoint}/lookups/running-chart-assignments`, { params: { page: 1 }, signal: undefined });
     });
 
     it('maps agreement lifecycle actions to their canonical endpoints and optimistic version payloads', async () => {
