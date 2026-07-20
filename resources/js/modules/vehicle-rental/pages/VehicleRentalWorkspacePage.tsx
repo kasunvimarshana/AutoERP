@@ -20,6 +20,7 @@ import { notifySuccess } from '@/shared/notifications/appToast';
 import { RentalReasonDialog } from '../components/RentalActionDialogs';
 import { RentalAgreementDetailDialog } from '../components/RentalAgreementDetailDialog';
 import { RentalAgreementDialog, RentalRateVersionDialog } from '../components/RentalAgreementDialogs';
+import { RentalAssignmentDetailDialog } from '../components/RentalAssignmentDetailDialog';
 import { RentalAssignmentDialog, RentalCustodyDialog, RentalReplacementDialog } from '../components/RentalAssignmentDialogs';
 import { RentalCalculationDialog } from '../components/RentalCalculationDialog';
 import { RentalRunningChartDialog } from '../components/RentalRunningChartDialog';
@@ -29,6 +30,7 @@ import {
     cancelRentalCalculation,
     closeRentalAgreement,
     deleteRentalAgreement,
+    deleteRentalAssignment,
     finalizeRentalRunningChart,
     listRentalAgreements,
     listRentalAssignments,
@@ -251,6 +253,8 @@ function AssignmentsPage() {
     const [status, setStatus] = useState('');
     const [page, setPage] = useState(1);
     const [createOpen, setCreateOpen] = useState(false);
+    const [viewingId, setViewingId] = useState<number | null>(null);
+    const [editing, setEditing] = useState<RentalAssignment | null>(null);
     const [custody, setCustody] = useState<{ assignment: RentalAssignment; eventType: 'handover' | 'return' } | null>(null);
     const [replacement, setReplacement] = useState<RentalAssignment | null>(null);
     const [busyId, setBusyId] = useState<number | null>(null);
@@ -273,6 +277,28 @@ function AssignmentsPage() {
         }
     };
 
+    const remove = async (assignment: RentalAssignment) => {
+        if (!await confirm({
+            title: 'Delete planned vehicle operation?',
+            message: `Delete the unused planned operation for ${relationLabel(assignment.vehicle)}? Use Cancel instead when the planned record must remain in history.`,
+            confirmLabel: 'Delete operation',
+            danger: true,
+        })) return;
+
+        setBusyId(assignment.id);
+        setActionError(null);
+        try {
+            await deleteRentalAssignment(assignment.id, assignment.row_version);
+            if (viewingId === assignment.id) setViewingId(null);
+            notifySuccess('Planned vehicle operation deleted successfully.');
+            result.reload();
+        } catch (error) {
+            setActionError(toApiError(error));
+        } finally {
+            setBusyId(null);
+        }
+    };
+
     const columns: DataColumn<RentalAssignment>[] = [
         { key: 'side', header: 'Side', render: (row) => row.side },
         { key: 'agreement', header: 'Agreement', render: (row) => relationLabel(row.agreement) },
@@ -281,18 +307,21 @@ function AssignmentsPage() {
         { key: 'driver', header: 'Driver', render: (row) => row.self_drive ? 'Self-drive' : relationLabel(row.driver) },
         { key: 'period', header: 'Effective period', render: (row) => `${dateTimeLabel(row.starts_at)} → ${dateTimeLabel(row.ends_at)}` },
         { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.status} /> },
-        ...(canManage ? [{
+        {
             key: 'actions',
             header: 'Actions',
             render: (row: RentalAssignment) => (
                 <div className="flex flex-wrap gap-2">
-                    {row.status === 'planned' && <Button className="min-h-9 px-3 py-1.5" onClick={() => setCustody({ assignment: row, eventType: 'handover' })}>Handover</Button>}
-                    {row.status === 'planned' && <Button variant="danger" className="min-h-9 px-3 py-1.5" loading={busyId === row.id} onClick={() => void cancel(row)}>Cancel</Button>}
-                    {row.status === 'active' && <Button className="min-h-9 px-3 py-1.5" onClick={() => setCustody({ assignment: row, eventType: 'return' })}>Return</Button>}
-                    {row.status === 'active' && <Button variant="secondary" className="min-h-9 px-3 py-1.5" onClick={() => setReplacement(row)}>Replace</Button>}
+                    <Button variant="secondary" className="min-h-9 px-3 py-1.5" onClick={() => setViewingId(row.id)}>View</Button>
+                    {canManage && row.status === 'planned' && <Button variant="secondary" className="min-h-9 px-3 py-1.5" onClick={() => setEditing(row)}>Edit</Button>}
+                    {canManage && row.status === 'planned' && <Button className="min-h-9 px-3 py-1.5" onClick={() => setCustody({ assignment: row, eventType: 'handover' })}>Handover</Button>}
+                    {canManage && row.status === 'planned' && <Button variant="secondary" className="min-h-9 px-3 py-1.5" loading={busyId === row.id} onClick={() => void cancel(row)}>Cancel</Button>}
+                    {canManage && row.status === 'planned' && <Button variant="danger" className="min-h-9 px-3 py-1.5" loading={busyId === row.id} onClick={() => void remove(row)}>Delete</Button>}
+                    {canManage && row.status === 'active' && <Button className="min-h-9 px-3 py-1.5" onClick={() => setCustody({ assignment: row, eventType: 'return' })}>Return</Button>}
+                    {canManage && row.status === 'active' && <Button variant="secondary" className="min-h-9 px-3 py-1.5" onClick={() => setReplacement(row)}>Replace</Button>}
                 </div>
             ),
-        } as DataColumn<RentalAssignment>] : []),
+        },
     ];
 
     return (
@@ -306,7 +335,13 @@ function AssignmentsPage() {
             <ErrorAlert error={actionError ?? result.error} inline />
             {result.loading ? <LoadingState /> : <DataTable rows={result.data?.data ?? []} columns={columns} rowKey={(row) => row.id} />}
             <Pagination meta={result.data?.meta} onPageChange={setPage} />
-            <RentalAssignmentDialog open={createOpen} onClose={() => setCreateOpen(false)} onSaved={() => result.reload()} />
+            <RentalAssignmentDetailDialog assignmentId={viewingId} open={viewingId !== null} onClose={() => setViewingId(null)} />
+            <RentalAssignmentDialog
+                open={createOpen || editing !== null}
+                assignment={editing}
+                onClose={() => { setCreateOpen(false); setEditing(null); }}
+                onSaved={() => result.reload()}
+            />
             <RentalCustodyDialog open={Boolean(custody)} assignment={custody?.assignment ?? null} eventType={custody?.eventType ?? 'handover'} onClose={() => setCustody(null)} onSaved={() => result.reload()} />
             <RentalReplacementDialog open={Boolean(replacement)} assignment={replacement} onClose={() => setReplacement(null)} onSaved={() => result.reload()} />
             {confirmDialog}
