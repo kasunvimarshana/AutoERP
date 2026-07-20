@@ -64,7 +64,7 @@ function RentalAssignmentDialogForm({
             ...current,
             side,
             agreement: null,
-            sourceAssignment: side === 'customer_use' ? current.sourceAssignment : null,
+            sourceAssignment: null,
         }));
     };
 
@@ -118,20 +118,50 @@ function RentalAssignmentDialogForm({
                     <RentalVehicleLookup
                         value={state.vehicle}
                         required
-                        onChange={(value: RentalLookupOption | null) => setState((current) => ({ ...current, vehicle: value }))}
+                        onChange={(value: RentalLookupOption | null) => setState((current) => ({
+                            ...current,
+                            vehicle: value,
+                            sourceAssignment: null,
+                        }))}
                         error={fieldError(error, 'vehicle_id')}
+                    />
+                    <Input
+                        label="Starts at"
+                        type="datetime-local"
+                        required
+                        value={state.startsAt}
+                        error={fieldError(error, 'starts_at')}
+                        onChange={(event) => setState((current) => ({
+                            ...current,
+                            startsAt: event.target.value,
+                            sourceAssignment: null,
+                        }))}
+                    />
+                    <Input
+                        label="Planned end"
+                        type="datetime-local"
+                        min={state.startsAt || undefined}
+                        value={state.endsAt}
+                        error={fieldError(error, 'ends_at')}
+                        onChange={(event) => setState((current) => ({
+                            ...current,
+                            endsAt: event.target.value,
+                            sourceAssignment: null,
+                        }))}
                     />
                     {state.side === 'customer_use' && (
                         <RentalAssignmentLookup
                             label="Owner-supply source assignment"
                             side="owner_supply"
                             value={state.sourceAssignment}
+                            vehicleId={state.vehicle?.id ?? null}
+                            startsAt={state.startsAt}
+                            endsAt={state.endsAt}
+                            disabled={!state.vehicle || !state.startsAt}
                             onChange={(value: RentalLookupOption | null) => setState((current) => ({ ...current, sourceAssignment: value }))}
                             error={fieldError(error, 'source_assignment_id')}
                         />
                     )}
-                    <Input label="Starts at" type="datetime-local" required value={state.startsAt} error={fieldError(error, 'starts_at')} onChange={(event) => setState((current) => ({ ...current, startsAt: event.target.value }))} />
-                    <Input label="Planned end" type="datetime-local" min={state.startsAt || undefined} value={state.endsAt} error={fieldError(error, 'ends_at')} onChange={(event) => setState((current) => ({ ...current, endsAt: event.target.value }))} />
                     <Input label="Planned handover odometer" type="number" min="0" step="0.000001" value={state.handoverOdometer} error={fieldError(error, 'handover_odometer')} onChange={(event) => setState((current) => ({ ...current, handoverOdometer: event.target.value }))} />
                     <div className="space-y-3">
                         <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
@@ -253,7 +283,7 @@ function RentalReplacementDialogForm({
     onSaved,
 }: RentalReplacementDialogProps) {
     const [vehicle, setVehicle] = useState<RentalReference | null>(null);
-    const [sourceAssignment, setSourceAssignment] = useState<RentalReference | null>(() => assignment?.source_assignment ?? null);
+    const [sourceAssignment, setSourceAssignment] = useState<RentalReference | null>(null);
     const [driver, setDriver] = useState<RentalReference | null>(() => assignment?.driver ?? null);
     const [effectiveAt, setEffectiveAt] = useState('');
     const [oldReturnOdometer, setOldReturnOdometer] = useState(() => assignment?.return_odometer ?? '');
@@ -308,11 +338,39 @@ function RentalReplacementDialogForm({
             <form className="space-y-5" onSubmit={(event) => void submit(event)}>
                 <ErrorAlert error={error} inline />
                 <div className="grid gap-4 md:grid-cols-2">
-                    <RentalVehicleLookup value={vehicle} required onChange={setVehicle} error={fieldError(error, 'vehicle_id')} />
+                    <RentalVehicleLookup
+                        value={vehicle}
+                        required
+                        onChange={(value) => {
+                            setVehicle(value);
+                            setSourceAssignment(null);
+                        }}
+                        error={fieldError(error, 'vehicle_id')}
+                    />
+                    <Input
+                        label="Effective at"
+                        type="datetime-local"
+                        required
+                        value={effectiveAt}
+                        error={fieldError(error, 'effective_at')}
+                        onChange={(event) => {
+                            setEffectiveAt(event.target.value);
+                            setSourceAssignment(null);
+                        }}
+                    />
                     {assignment?.side === 'customer_use' && (
-                        <RentalAssignmentLookup label="New owner-supply source" side="owner_supply" value={sourceAssignment} onChange={setSourceAssignment} error={fieldError(error, 'source_assignment_id')} />
+                        <RentalAssignmentLookup
+                            label="New owner-supply source"
+                            side="owner_supply"
+                            value={sourceAssignment}
+                            vehicleId={vehicle?.id ?? null}
+                            startsAt={effectiveAt}
+                            endsAt={assignment.ends_at ?? ''}
+                            disabled={!vehicle || !effectiveAt}
+                            onChange={setSourceAssignment}
+                            error={fieldError(error, 'source_assignment_id')}
+                        />
                     )}
-                    <Input label="Effective at" type="datetime-local" required value={effectiveAt} error={fieldError(error, 'effective_at')} onChange={(event) => setEffectiveAt(event.target.value)} />
                     <Input label="Old vehicle return odometer" type="number" min="0" step="0.000001" required value={oldReturnOdometer} error={fieldError(error, 'old_return_odometer')} onChange={(event) => setOldReturnOdometer(event.target.value)} />
                     <Input label="New vehicle handover odometer" type="number" min="0" step="0.000001" required value={newHandoverOdometer} error={fieldError(error, 'new_handover_odometer')} onChange={(event) => setNewHandoverOdometer(event.target.value)} />
                     <div className="space-y-3">
