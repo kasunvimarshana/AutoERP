@@ -4,12 +4,16 @@ import { tenantWorkspaceNavigationSections } from '@/app/navigation/tenantWorksp
 import { filterNavigation } from '@/app/navigation/navigationUtils';
 import { vehicleRentalPermissions } from './vehicleRentalPermissions';
 
-const expectedLinks = [
+const expectedPrimaryLinks = [
     '/vehicle-rental',
-    '/vehicle-rental/agreements',
-    '/vehicle-rental/assignments',
+    '/vehicle-rental/owner-agreements',
+    '/vehicle-rental/customer-agreements',
     '/vehicle-rental/running-charts',
-    '/vehicle-rental/calculations',
+    '/vehicle-rental/customer-invoices',
+    '/vehicle-rental/owner-settlements',
+    '/vehicle-rental/customer-receipts',
+    '/vehicle-rental/owner-payments',
+    '/vehicle-rental/reports',
 ];
 
 const navigationContext = {
@@ -40,10 +44,10 @@ describe('Vehicle Rental frontend entry', () => {
         if (!module || module.type !== 'module') throw new Error('Vehicle Rental navigation module is missing.');
 
         expect(module.access?.modules).toContain('vehicle-rental');
-        expect(module.children.map((child) => child.to)).toEqual(expectedLinks);
+        expect(module.children.map((child) => child.to)).toEqual(expectedPrimaryLinks);
     });
 
-    it('renders only the Vehicle Rental workspaces authorized for the user role', () => {
+    it('renders only agreement workspaces for an agreement reader', () => {
         expect(rentalModule([])).toBeUndefined();
 
         const module = rentalModule([vehicleRentalPermissions.agreementsView]);
@@ -52,14 +56,37 @@ describe('Vehicle Rental frontend entry', () => {
 
         expect(module.children.map((child) => child.to)).toEqual([
             '/vehicle-rental',
-            '/vehicle-rental/agreements',
+            '/vehicle-rental/owner-agreements',
+            '/vehicle-rental/customer-agreements',
+        ]);
+    });
+
+    it('renders the financial workflow for a calculation reader', () => {
+        const module = rentalModule([vehicleRentalPermissions.calculationsView]);
+        expect(module?.type).toBe('module');
+        if (!module || module.type !== 'module') throw new Error('Authorized Vehicle Rental navigation is missing.');
+
+        expect(module.children.map((child) => child.to)).toEqual([
+            '/vehicle-rental',
+            '/vehicle-rental/customer-invoices',
+            '/vehicle-rental/owner-settlements',
+            '/vehicle-rental/customer-receipts',
+            '/vehicle-rental/owner-payments',
+            '/vehicle-rental/reports',
         ]);
     });
 
     it.each([
+        ['/vehicle-rental/owner-agreements', vehicleRentalPermissions.agreementsView],
+        ['/vehicle-rental/customer-agreements', vehicleRentalPermissions.agreementsView],
         ['/vehicle-rental/agreements', vehicleRentalPermissions.agreementsView],
         ['/vehicle-rental/assignments', vehicleRentalPermissions.assignmentsView],
         ['/vehicle-rental/running-charts', vehicleRentalPermissions.runningChartsView],
+        ['/vehicle-rental/customer-invoices', vehicleRentalPermissions.calculationsView],
+        ['/vehicle-rental/owner-settlements', vehicleRentalPermissions.calculationsView],
+        ['/vehicle-rental/customer-receipts', vehicleRentalPermissions.calculationsView],
+        ['/vehicle-rental/owner-payments', vehicleRentalPermissions.calculationsView],
+        ['/vehicle-rental/reports', vehicleRentalPermissions.calculationsView],
         ['/vehicle-rental/calculations', vehicleRentalPermissions.calculationsView],
     ])('protects %s with the Vehicle Rental module and owned permission', (path, permission) => {
         const entitlement = resolveTenantRouteEntitlement(path);
