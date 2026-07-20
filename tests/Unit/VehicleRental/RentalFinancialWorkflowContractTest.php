@@ -33,25 +33,29 @@ final class RentalFinancialWorkflowContractTest extends TestCase
 
     public function test_rental_reuses_invoice_source_as_the_single_financial_document_relationship(): void
     {
-        $source = file_get_contents(base_path('app/Modules/VehicleRental/Services/RentalFinancialDocumentService.php'));
-        self::assertIsString($source);
-        self::assertStringContainsString('use Modules\\Invoice\\Models\\InvoiceSource;', $source);
-        self::assertStringContainsString('new InvoiceSourceData(', $source);
-        self::assertStringContainsString('new InvoiceSourceLineData(', $source);
-        self::assertStringNotContainsString('vehicle_rental_calculation_invoice', $source);
-        self::assertStringNotContainsString('RentalCalculationInvoice', $source);
+        $service = file_get_contents(base_path('app/Modules/VehicleRental/Services/RentalFinancialDocumentService.php'));
+        $factory = file_get_contents(base_path('app/Modules/VehicleRental/Services/RentalFinancialDocumentDataFactory.php'));
+        self::assertIsString($service);
+        self::assertIsString($factory);
+        self::assertStringContainsString('use Modules\\Invoice\\Models\\InvoiceSource;', $service);
+        self::assertStringContainsString('new InvoiceSourceData(', $factory);
+        self::assertStringContainsString('new InvoiceSourceLineData(', $factory);
+        self::assertStringNotContainsString('vehicle_rental_calculation_invoice', $service.$factory);
+        self::assertStringNotContainsString('RentalCalculationInvoice', $service.$factory);
     }
 
     public function test_rental_financial_creation_delegates_to_tax_invoice_and_finance_owners(): void
     {
-        $source = file_get_contents(base_path('app/Modules/VehicleRental/Services/RentalFinancialDocumentService.php'));
-        self::assertIsString($source);
-        self::assertStringContainsString('TaxCalculationService $taxes', $source);
-        self::assertStringContainsString('InvoiceCreationService $invoices', $source);
-        self::assertStringContainsString('InvoiceStatusService $invoiceStatuses', $source);
-        self::assertStringContainsString('InvoicePostingPlanFactory $postingPlans', $source);
-        self::assertStringContainsString('InvoiceStatus::Approved', $source);
-        self::assertStringContainsString('InvoiceStatus::Posted', $source);
+        $service = file_get_contents(base_path('app/Modules/VehicleRental/Services/RentalFinancialDocumentService.php'));
+        $factory = file_get_contents(base_path('app/Modules/VehicleRental/Services/RentalFinancialDocumentDataFactory.php'));
+        self::assertIsString($service);
+        self::assertIsString($factory);
+        self::assertStringContainsString('TaxCalculationService $taxes', $factory);
+        self::assertStringContainsString('InvoicePostingPlanFactory $postingPlans', $factory);
+        self::assertStringContainsString('InvoiceCreationService $invoices', $service);
+        self::assertStringContainsString('InvoiceStatusService $invoiceStatuses', $service);
+        self::assertStringContainsString('InvoiceStatus::Approved', $service);
+        self::assertStringContainsString('InvoiceStatus::Posted', $service);
     }
 
     public function test_reversed_financial_documents_release_invoice_source_capacity(): void
