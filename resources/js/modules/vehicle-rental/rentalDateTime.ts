@@ -2,6 +2,10 @@ const LOCAL_DATE_TIME_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?$/;
 const EXPLICIT_TIMEZONE_PATTERN = /(?:Z|[+-]\d{2}:\d{2})$/;
 
 export function localDateTimeToOffsetIso(value: string): string {
+    if (typeof value !== 'string') {
+        throw new Error('A valid date and time is required.');
+    }
+
     const input = value.trim();
     if (EXPLICIT_TIMEZONE_PATTERN.test(input)) {
         const explicitDate = new Date(input);
