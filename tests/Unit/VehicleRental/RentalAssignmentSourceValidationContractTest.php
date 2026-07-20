@@ -48,8 +48,8 @@ final class RentalAssignmentSourceValidationContractTest extends TestCase
         self::assertStringContainsString('RentalAssignmentStatus::Planned->value', $source);
         self::assertStringContainsString('RentalAssignmentStatus::Active->value', $source);
         self::assertStringContainsString('$query->where(\'vehicle_id\'', $source);
-        self::assertStringContainsString("$query->where('starts_at', '<=', $startsAt)", $source);
-        self::assertStringContainsString("->orWhere('ends_at', '>=', $endsAt)", $source);
+        self::assertStringContainsString('$query->where(\'starts_at\', \'<=\', $startsAt)', $source);
+        self::assertStringContainsString('->orWhere(\'ends_at\', \'>=\', $endsAt)', $source);
         self::assertStringContainsString('$query->whereNull(\'ends_at\')', $source);
         self::assertStringNotContainsString('whereDate(\'starts_at\'', $source);
         self::assertStringNotContainsString('orWhereDate(\'ends_at\'', $source);
