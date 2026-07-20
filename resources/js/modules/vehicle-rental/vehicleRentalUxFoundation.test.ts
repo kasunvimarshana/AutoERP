@@ -26,9 +26,11 @@ describe('Vehicle Rental UX foundation', () => {
         expect(agreementDialogSource).toContain('currency: current.currency ?? value?.defaultCurrency ?? null');
     });
 
-    it('uses a complete-month selector for monthly calculations', () => {
+    it('uses only complete eligible months for monthly calculations', () => {
         expect(calculationDialogSource).toContain('type="month"');
         expect(calculationDialogSource).toContain('completeMonth(periodMonth)');
+        expect(calculationDialogSource).toContain('firstCompleteMonth(agreement?.startsOn)');
+        expect(calculationDialogSource).toContain('lastCompleteMonth(agreement?.endsOn)');
         expect(calculationDialogSource).toContain('Partial-month proration is not configured');
     });
 
