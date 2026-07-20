@@ -16,8 +16,8 @@ abstract class RentalRunningChartMutationRequest extends TenantScopedRequest
     {
         $rules = [
             'operational_date' => ['required', 'date'],
-            'starts_at' => ['required', 'date'],
-            'ends_at' => ['required', 'date', 'after:starts_at'],
+            'starts_at' => RentalDateTimeRules::required(),
+            'ends_at' => [...RentalDateTimeRules::required(), 'after:starts_at'],
             'start_odometer' => ['required', 'numeric', 'min:0'],
             'end_odometer' => ['required', 'numeric', 'min:0'],
             'garage_km' => ['nullable', 'numeric', 'min:0'],
