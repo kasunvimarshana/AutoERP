@@ -24,7 +24,7 @@ final class RentalAgreementController extends RentalController
     {
         $query = RentalAgreement::query()
             ->forContext($request->tenantId(), $request->organizationUnitId())
-            ->with(['customer', 'supplier', 'currency', 'rateVersions.lines'])
+            ->with(['customer', 'supplier', 'currency', 'taxGroup', 'rateVersions.lines'])
             ->orderByDesc('starts_on')
             ->orderByDesc('id');
         if ($request->filled('kind')) {
