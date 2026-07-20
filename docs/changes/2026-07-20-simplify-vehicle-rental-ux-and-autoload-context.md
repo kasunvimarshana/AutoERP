@@ -35,6 +35,7 @@ The UI should ask for observed business facts and carry forward known agreement,
 - Customer-receipt and owner-payment workspaces now request active outstanding financial documents from the backend before pagination instead of filtering the current page in the browser.
 - Internal concurrency row-version values are no longer shown in agreement and vehicle-operation detail dialogs.
 - Technical assignment labels were replaced with customer-facing vehicle-operation labels.
+- Vehicle owner source autoload and timezone-safe assignment periods are documented in the follow-up 2026-07-21 change record.
 
 ## Ownership and integrity
 
@@ -52,20 +53,18 @@ The following require separate backend-owned work and are intentionally not gues
 - authoritative foreign-exchange-rate resolution for financial documents;
 - owner Non-AC / Front-AC / Dual-AC payable policy confirmed from business evidence;
 - agreement-and-period-aware available-vehicle lookup;
-- unique owner-source automatic selection;
 - calculation preview and report drill-down expansion.
 
 ## Verification
 
-Completed without paid tools or GitHub Actions:
+Completed without paid tools or GitHub Actions before the follow-up timezone/source-resolution commits:
 
 ```bash
-php -l app/Modules/VehicleRental/Http/Requests/ListRentalRequest.php
-php -l app/Modules/VehicleRental/Http/Controllers/RentalCalculationController.php
-php -l app/Modules/VehicleRental/Services/RentalFinancialDocumentService.php
-php -l app/Modules/VehicleRental/Services/Validation/RentalRatePolicy.php
+php artisan test
+npm run typecheck -- --pretty false
+npm run lint
+npm run build
+npm run test
 ```
 
-The changed TSX files were syntax-transpiled with TypeScript `transpileModule` using React JSX and ESNext module settings. Focused regression coverage was added for the rate policy and the Vehicle Rental UX source contracts.
-
-A full dependency-backed Laravel/Vitest/typecheck/lint/build run was not available in the connector-only environment. The draft pull request must remain unmerged until those local project commands pass.
+That baseline passed locally. The follow-up commits must be pulled and the same dependency-backed suite rerun before the draft pull request is merged.
