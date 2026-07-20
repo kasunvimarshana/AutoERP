@@ -13,6 +13,8 @@ use PHPUnit\Framework\TestCase;
 
 final class RentalFinancialWorkflowContractTest extends TestCase
 {
+    private const PROJECT_ROOT = __DIR__.'/../../..';
+
     public function test_rental_invoice_lifecycle_is_active_while_vehicle_finance_remains_retired(): void
     {
         self::assertFalse(InvoiceType::Rental->belongsToRetiredSourceModule());
@@ -33,10 +35,9 @@ final class RentalFinancialWorkflowContractTest extends TestCase
 
     public function test_rental_reuses_invoice_source_as_the_single_financial_document_relationship(): void
     {
-        $service = file_get_contents(base_path('app/Modules/VehicleRental/Services/RentalFinancialDocumentService.php'));
-        $factory = file_get_contents(base_path('app/Modules/VehicleRental/Services/RentalFinancialDocumentDataFactory.php'));
-        self::assertIsString($service);
-        self::assertIsString($factory);
+        $service = $this->source('app/Modules/VehicleRental/Services/RentalFinancialDocumentService.php');
+        $factory = $this->source('app/Modules/VehicleRental/Services/RentalFinancialDocumentDataFactory.php');
+
         self::assertStringContainsString('use Modules\\Invoice\\Models\\InvoiceSource;', $service);
         self::assertStringContainsString('new InvoiceSourceData(', $factory);
         self::assertStringContainsString('new InvoiceSourceLineData(', $factory);
@@ -46,10 +47,9 @@ final class RentalFinancialWorkflowContractTest extends TestCase
 
     public function test_rental_financial_creation_delegates_to_tax_invoice_and_finance_owners(): void
     {
-        $service = file_get_contents(base_path('app/Modules/VehicleRental/Services/RentalFinancialDocumentService.php'));
-        $factory = file_get_contents(base_path('app/Modules/VehicleRental/Services/RentalFinancialDocumentDataFactory.php'));
-        self::assertIsString($service);
-        self::assertIsString($factory);
+        $service = $this->source('app/Modules/VehicleRental/Services/RentalFinancialDocumentService.php');
+        $factory = $this->source('app/Modules/VehicleRental/Services/RentalFinancialDocumentDataFactory.php');
+
         self::assertStringContainsString('TaxCalculationService $taxes', $factory);
         self::assertStringContainsString('InvoicePostingPlanFactory $postingPlans', $factory);
         self::assertStringContainsString('InvoiceCreationService $invoices', $service);
@@ -60,19 +60,26 @@ final class RentalFinancialWorkflowContractTest extends TestCase
 
     public function test_reversed_financial_documents_release_invoice_source_capacity(): void
     {
-        $source = file_get_contents(base_path('app/Modules/Invoice/Services/InvoiceSourceAllocationService.php'));
-        self::assertIsString($source);
+        $source = $this->source('app/Modules/Invoice/Services/InvoiceSourceAllocationService.php');
+
         self::assertStringContainsString('InvoiceStatus::Reversed->value', $source);
     }
 
     public function test_user_workflow_hands_settlement_to_the_payment_owner_module(): void
     {
-        $financialPage = file_get_contents(base_path('resources/js/modules/vehicle-rental/pages/RentalFinancialDocumentsPage.tsx'));
-        $settlementPage = file_get_contents(base_path('resources/js/modules/vehicle-rental/pages/RentalSettlementHandoffPage.tsx'));
-        self::assertIsString($financialPage);
-        self::assertIsString($settlementPage);
+        $financialPage = $this->source('resources/js/modules/vehicle-rental/pages/RentalFinancialDocumentsPage.tsx');
+        $settlementPage = $this->source('resources/js/modules/vehicle-rental/pages/RentalSettlementHandoffPage.tsx');
+
         self::assertStringContainsString('/payments/create?invoice_id=', $financialPage);
         self::assertStringContainsString('/payments/create?invoice_id=', $settlementPage);
         self::assertStringContainsString('Payment module', $settlementPage);
+    }
+
+    private function source(string $relativePath): string
+    {
+        $source = file_get_contents(self::PROJECT_ROOT.'/'.$relativePath);
+        self::assertIsString($source, "Unable to read project source file [{$relativePath}].");
+
+        return $source;
     }
 }
