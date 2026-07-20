@@ -24,6 +24,10 @@ export const listRentalAgreements = (params: ListParams, signal?: AbortSignal) =
     apiClient.get<ApiCollection<RentalAgreement>>(`${endpoint}/agreements`, { params, signal })
         .then((response) => response.data);
 
+export const listRentalAgreementLookup = (purpose: 'assignment' | 'calculation', params: ListParams, signal?: AbortSignal) =>
+    apiClient.get<ApiCollection<RentalAgreement>>(`${endpoint}/lookups/${purpose}-agreements`, { params, signal })
+        .then((response) => response.data);
+
 export const getRentalAgreement = (id: number, signal?: AbortSignal) =>
     apiClient.get<ApiResource<RentalAgreement>>(`${endpoint}/agreements/${id}`, { signal })
         .then((response) => response.data.data);
@@ -51,6 +55,12 @@ export const closeRentalAgreement = (id: number, expectedVersion: number) =>
 export const listRentalAssignments = (params: ListParams, signal?: AbortSignal) =>
     apiClient.get<ApiCollection<RentalAssignment>>(`${endpoint}/assignments`, { params, signal })
         .then((response) => response.data);
+
+export const listRentalAssignmentLookup = (purpose: 'assignment-source' | 'running-chart', params: ListParams, signal?: AbortSignal) => {
+    const path = purpose === 'assignment-source' ? 'assignment-sources' : 'running-chart-assignments';
+    return apiClient.get<ApiCollection<RentalAssignment>>(`${endpoint}/lookups/${path}`, { params, signal })
+        .then((response) => response.data);
+};
 
 export const getRentalAssignment = (id: number, signal?: AbortSignal) =>
     apiClient.get<ApiResource<RentalAssignment>>(`${endpoint}/assignments/${id}`, { signal })
