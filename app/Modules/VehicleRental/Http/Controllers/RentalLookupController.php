@@ -118,14 +118,18 @@ final class RentalLookupController
             $query->where('vehicle_id', (int) $request->validated('vehicle_id'));
         }
         if ($requireCompleteCoverage && $request->filled('date_from')) {
-            $startsOn = CarbonImmutable::parse((string) $request->validated('date_from'))->toDateString();
-            $query->whereDate('starts_at', '<=', $startsOn);
+            $startsAt = CarbonImmutable::parse((string) $request->validated('date_from'))
+                ->seconds(0)
+                ->toDateTimeString();
+            $query->where('starts_at', '<=', $startsAt);
 
             if ($request->filled('date_to')) {
-                $endsOn = CarbonImmutable::parse((string) $request->validated('date_to'))->toDateString();
-                $query->where(function (Builder $scope) use ($endsOn): void {
+                $endsAt = CarbonImmutable::parse((string) $request->validated('date_to'))
+                    ->seconds(0)
+                    ->toDateTimeString();
+                $query->where(function (Builder $scope) use ($endsAt): void {
                     $scope->whereNull('ends_at')
-                        ->orWhereDate('ends_at', '>=', $endsOn);
+                        ->orWhere('ends_at', '>=', $endsAt);
                 });
             } else {
                 $query->whereNull('ends_at');
