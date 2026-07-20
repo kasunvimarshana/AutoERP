@@ -11,6 +11,7 @@ import {
     createRentalAssignment,
     recordRentalCustody,
     replaceRentalAssignment,
+    updateRentalAssignment,
 } from '../vehicleRentalApi';
 import type {
     RentalAssignment,
@@ -42,6 +43,7 @@ interface AssignmentFormState {
 
 interface RentalAssignmentDialogProps {
     open: boolean;
+    assignment?: RentalAssignment | null;
     agreement?: RentalReference | null;
     side?: RentalAssignmentSide;
     lockAgreement?: boolean;
@@ -50,19 +52,28 @@ interface RentalAssignmentDialogProps {
 }
 
 export function RentalAssignmentDialog(props: RentalAssignmentDialogProps) {
-    const identity = `${props.open ? 'open' : 'closed'}:${props.side ?? 'customer_use'}:${props.agreement?.id ?? 'none'}:${props.lockAgreement ? 'locked' : 'editable'}`;
+    const identity = [
+        props.open ? 'open' : 'closed',
+        props.assignment?.id ?? 'new',
+        props.assignment?.row_version ?? 0,
+        props.side ?? 'customer_use',
+        props.agreement?.id ?? 'none',
+        props.lockAgreement ? 'locked' : 'editable',
+    ].join(':');
+
     return <RentalAssignmentDialogForm key={identity} {...props} />;
 }
 
 function RentalAssignmentDialogForm({
     open,
+    assignment = null,
     agreement = null,
     side = 'customer_use',
     lockAgreement = false,
     onClose,
     onSaved,
 }: RentalAssignmentDialogProps) {
-    const [state, setState] = useState<AssignmentFormState>(() => initialAssignmentState(side, agreement));
+    const [state, setState] = useState<AssignmentFormState>(() => initialAssignmentState(side, agreement, assignment));
     const [error, setError] = useState<ApiError | null>(null);
     const [submitting, setSubmitting] = useState(false);
 
@@ -91,8 +102,12 @@ function RentalAssignmentDialogForm({
                 driver_employee_id: state.selfDrive ? null : state.driver?.id ?? null,
                 self_drive: state.selfDrive,
             };
-            const saved = await createRentalAssignment(payload);
-            notifySuccess('Vehicle rental assignment created successfully.');
+            const saved = assignment
+                ? await updateRentalAssignment(assignment.id, payload, assignment.row_version)
+                : await createRentalAssignment(payload);
+            notifySuccess(assignment
+                ? 'Vehicle rental assignment updated successfully.'
+                : 'Vehicle rental assignment created successfully.');
             onSaved(saved);
             onClose();
         } catch (requestError) {
@@ -102,9 +117,16 @@ function RentalAssignmentDialogForm({
         }
     };
 
-    const title = lockAgreement
-        ? `Select vehicle — ${state.agreement?.code ?? state.agreement?.name ?? ''}`
-        : 'New vehicle rental assignment';
+    const title = assignment
+        ? `Edit vehicle operation — ${assignment.agreement?.code ?? assignment.vehicle?.code ?? assignment.id}`
+        : lockAgreement
+            ? `Select vehicle — ${state.agreement?.code ?? state.agreement?.name ?? ''}`
+            : 'New vehicle rental assignment';
+    const submitLabel = assignment
+        ? 'Update assignment'
+        : lockAgreement
+            ? 'Select vehicle'
+            : 'Create assignment';
 
     return (
         <Modal open={open} title={title} onClose={onClose} closeDisabled={submitting}>
@@ -197,7 +219,7 @@ function RentalAssignmentDialogForm({
                 </div>
                 <div className="flex justify-end gap-2">
                     <Button type="button" variant="secondary" disabled={submitting} onClick={onClose}>Cancel</Button>
-                    <Button type="submit" loading={submitting}>{lockAgreement ? 'Select vehicle' : 'Create assignment'}</Button>
+                    <Button type="submit" loading={submitting}>{submitLabel}</Button>
                 </div>
             </form>
         </Modal>
@@ -413,7 +435,29 @@ function RentalReplacementDialogForm({
     );
 }
 
-function initialAssignmentState(side: RentalAssignmentSide, agreement: RentalReference | null): AssignmentFormState {
+function initialAssignmentState(
+    side: RentalAssignmentSide,
+    agreement: RentalReference | null,
+    assignment: RentalAssignment | null,
+): AssignmentFormState {
+    if (assignment) {
+        return {
+            side: assignment.side,
+            agreement: assignment.agreement ?? null,
+            vehicle: assignment.vehicle ?? null,
+            sourceAssignment: assignment.source_assignment ? {
+                id: assignment.source_assignment.id,
+                code: assignment.source_assignment.agreement?.code,
+                name: assignment.source_assignment.agreement?.name ?? assignment.source_assignment.agreement?.code,
+            } : null,
+            driver: assignment.driver ?? null,
+            startsAt: toLocalDateTime(assignment.starts_at),
+            endsAt: toLocalDateTime(assignment.ends_at),
+            handoverOdometer: assignment.handover_odometer ?? '',
+            selfDrive: assignment.self_drive,
+        };
+    }
+
     return {
         side,
         agreement,
