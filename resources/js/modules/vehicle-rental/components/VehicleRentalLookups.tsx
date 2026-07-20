@@ -113,25 +113,41 @@ export function RentalVehicleLookup({
     startsAt?: string;
     endsAt?: string;
 }) {
-    const ownerContextRequested = ownerAgreementId !== null && ownerAgreementId !== undefined;
-    const hasOwnerPeriod = ownerContextRequested && Boolean(startsAt);
+    const ownerAgreement = ownerAgreementId ?? null;
+    const ownerContextRequested = ownerAgreement !== null;
+    const hasOwnerPeriod = ownerAgreement !== null && Boolean(startsAt);
     const lookupContextKey = ownerContextRequested
-        ? `owner:${ownerAgreementId}:${startsAt ?? ''}:${endsAt ?? ''}`
+        ? `owner:${ownerAgreement}:${startsAt ?? ''}:${endsAt ?? ''}`
         : 'all-active-vehicles';
-    const search = useCallback(async (params: LookupLoadParams) => {
-        const result = hasOwnerPeriod
-            ? await listRentalOwnerAgreementVehicles({
-                agreement_id: ownerAgreementId,
+    const search = useCallback(async (params: LookupLoadParams): Promise<LookupResult<RentalLookupOption>> => {
+        if (ownerAgreement !== null) {
+            if (!startsAt) {
+                return {
+                    data: [],
+                    meta: {
+                        current_page: 1,
+                        from: null,
+                        last_page: 1,
+                        path: '',
+                        per_page: params.perPage,
+                        to: null,
+                        total: 0,
+                    },
+                };
+            }
+
+            return mapResult(await listRentalOwnerAgreementVehicles({
+                agreement_id: ownerAgreement,
                 date_from: localDateTimeToOffsetIso(startsAt),
                 date_to: endsAt ? localDateTimeToOffsetIso(endsAt) : undefined,
                 search: params.search || undefined,
                 page: params.page,
                 per_page: params.perPage,
-            }, params.signal)
-            : await searchVehicles(params);
+            }, params.signal), vehicleOption);
+        }
 
-        return mapResult(result, vehicleOption);
-    }, [endsAt, hasOwnerPeriod, ownerAgreementId, startsAt]);
+        return mapResult(await searchVehicles(params), vehicleOption);
+    }, [endsAt, ownerAgreement, startsAt]);
 
     return (
         <ReferenceLookup
