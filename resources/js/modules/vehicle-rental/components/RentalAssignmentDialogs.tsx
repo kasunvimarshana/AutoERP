@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
@@ -40,25 +40,24 @@ interface AssignmentFormState {
     selfDrive: boolean;
 }
 
-export function RentalAssignmentDialog({
-    open,
-    onClose,
-    onSaved,
-}: {
+interface RentalAssignmentDialogProps {
     open: boolean;
     onClose: () => void;
     onSaved: (assignment: RentalAssignment) => void;
-}) {
+}
+
+export function RentalAssignmentDialog(props: RentalAssignmentDialogProps) {
+    return <RentalAssignmentDialogForm key={props.open ? 'open' : 'closed'} {...props} />;
+}
+
+function RentalAssignmentDialogForm({
+    open,
+    onClose,
+    onSaved,
+}: RentalAssignmentDialogProps) {
     const [state, setState] = useState<AssignmentFormState>(() => initialAssignmentState());
     const [error, setError] = useState<ApiError | null>(null);
     const [submitting, setSubmitting] = useState(false);
-
-    useEffect(() => {
-        if (!open) return;
-        setState(initialAssignmentState());
-        setError(null);
-        setSubmitting(false);
-    }, [open]);
 
     const setSide = (side: RentalAssignmentSide) => {
         setState((current) => ({
@@ -161,37 +160,33 @@ export function RentalAssignmentDialog({
     );
 }
 
-export function RentalCustodyDialog({
-    open,
-    assignment,
-    eventType,
-    onClose,
-    onSaved,
-}: {
+interface RentalCustodyDialogProps {
     open: boolean;
     assignment: RentalAssignment | null;
     eventType: 'handover' | 'return';
     onClose: () => void;
     onSaved: (assignment: RentalAssignment) => void;
-}) {
-    const [eventAt, setEventAt] = useState('');
-    const [odometer, setOdometer] = useState('');
+}
+
+export function RentalCustodyDialog(props: RentalCustodyDialogProps) {
+    const identity = `${props.open ? 'open' : 'closed'}:${props.assignment?.id ?? 'none'}:${props.assignment?.row_version ?? 0}:${props.eventType}`;
+    return <RentalCustodyDialogForm key={identity} {...props} />;
+}
+
+function RentalCustodyDialogForm({
+    open,
+    assignment,
+    eventType,
+    onClose,
+    onSaved,
+}: RentalCustodyDialogProps) {
+    const [eventAt, setEventAt] = useState(() => eventType === 'handover' ? toLocalDateTime(assignment?.starts_at) : '');
+    const [odometer, setOdometer] = useState(() => eventType === 'handover' ? assignment?.handover_odometer ?? '' : assignment?.return_odometer ?? '');
     const [fuelLevel, setFuelLevel] = useState('');
     const [conditionNotes, setConditionNotes] = useState('');
     const [damageNotes, setDamageNotes] = useState('');
     const [error, setError] = useState<ApiError | null>(null);
     const [submitting, setSubmitting] = useState(false);
-
-    useEffect(() => {
-        if (!open) return;
-        setEventAt(eventType === 'handover' ? toLocalDateTime(assignment?.starts_at) : '');
-        setOdometer(eventType === 'handover' ? assignment?.handover_odometer ?? '' : assignment?.return_odometer ?? '');
-        setFuelLevel('');
-        setConditionNotes('');
-        setDamageNotes('');
-        setError(null);
-        setSubmitting(false);
-    }, [assignment, eventType, open]);
 
     const submit = async (event: FormEvent) => {
         event.preventDefault();
@@ -239,24 +234,31 @@ export function RentalCustodyDialog({
     );
 }
 
-export function RentalReplacementDialog({
-    open,
-    assignment,
-    onClose,
-    onSaved,
-}: {
+interface RentalReplacementDialogProps {
     open: boolean;
     assignment: RentalAssignment | null;
     onClose: () => void;
     onSaved: (assignment: RentalAssignment) => void;
-}) {
+}
+
+export function RentalReplacementDialog(props: RentalReplacementDialogProps) {
+    const identity = `${props.open ? 'open' : 'closed'}:${props.assignment?.id ?? 'none'}:${props.assignment?.row_version ?? 0}`;
+    return <RentalReplacementDialogForm key={identity} {...props} />;
+}
+
+function RentalReplacementDialogForm({
+    open,
+    assignment,
+    onClose,
+    onSaved,
+}: RentalReplacementDialogProps) {
     const [vehicle, setVehicle] = useState<RentalReference | null>(null);
-    const [sourceAssignment, setSourceAssignment] = useState<RentalReference | null>(null);
-    const [driver, setDriver] = useState<RentalReference | null>(null);
+    const [sourceAssignment, setSourceAssignment] = useState<RentalReference | null>(() => assignment?.source_assignment ?? null);
+    const [driver, setDriver] = useState<RentalReference | null>(() => assignment?.driver ?? null);
     const [effectiveAt, setEffectiveAt] = useState('');
-    const [oldReturnOdometer, setOldReturnOdometer] = useState('');
+    const [oldReturnOdometer, setOldReturnOdometer] = useState(() => assignment?.return_odometer ?? '');
     const [newHandoverOdometer, setNewHandoverOdometer] = useState('');
-    const [selfDrive, setSelfDrive] = useState(false);
+    const [selfDrive, setSelfDrive] = useState(() => assignment?.self_drive ?? false);
     const [reason, setReason] = useState('');
     const [oldFuelLevel, setOldFuelLevel] = useState('');
     const [newFuelLevel, setNewFuelLevel] = useState('');
@@ -266,26 +268,6 @@ export function RentalReplacementDialog({
     const [newDamageNotes, setNewDamageNotes] = useState('');
     const [error, setError] = useState<ApiError | null>(null);
     const [submitting, setSubmitting] = useState(false);
-
-    useEffect(() => {
-        if (!open) return;
-        setVehicle(null);
-        setSourceAssignment(assignment?.source_assignment ?? null);
-        setDriver(assignment?.driver ?? null);
-        setEffectiveAt('');
-        setOldReturnOdometer(assignment?.return_odometer ?? '');
-        setNewHandoverOdometer('');
-        setSelfDrive(assignment?.self_drive ?? false);
-        setReason('');
-        setOldFuelLevel('');
-        setNewFuelLevel('');
-        setOldConditionNotes('');
-        setNewConditionNotes('');
-        setOldDamageNotes('');
-        setNewDamageNotes('');
-        setError(null);
-        setSubmitting(false);
-    }, [assignment, open]);
 
     const submit = async (event: FormEvent) => {
         event.preventDefault();
