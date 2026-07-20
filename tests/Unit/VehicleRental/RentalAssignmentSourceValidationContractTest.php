@@ -30,11 +30,11 @@ final class RentalAssignmentSourceValidationContractTest extends TestCase
 
         self::assertStringContainsString('RentalAssignmentStatus::Planned->value', $source);
         self::assertStringContainsString('RentalAssignmentStatus::Active->value', $source);
-        self::assertStringContainsString("$query->where('vehicle_id'", $source);
-        self::assertStringContainsString("$query->whereDate('starts_at', '<='", $source);
-        self::assertStringContainsString("$scope->whereNull('ends_at')", $source);
-        self::assertStringContainsString("->orWhereDate('ends_at', '>='", $source);
-        self::assertStringContainsString("$query->whereNull('ends_at')", $source);
+        self::assertStringContainsString('$query->where(\'vehicle_id\'', $source);
+        self::assertStringContainsString('$query->whereDate(\'starts_at\', \'<=\'', $source);
+        self::assertStringContainsString('$scope->whereNull(\'ends_at\')', $source);
+        self::assertStringContainsString('->orWhereDate(\'ends_at\', \'>=\'', $source);
+        self::assertStringContainsString('$query->whereNull(\'ends_at\')', $source);
     }
 
     public function test_planning_and_operational_source_eligibility_are_separate(): void
