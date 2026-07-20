@@ -113,6 +113,34 @@ final class RentalAgreementService
         });
     }
 
+    public function deleteDraft(RentalAgreement $agreement, int $expectedVersion): void
+    {
+        DB::transaction(function () use ($agreement, $expectedVersion): void {
+            $organizationUnitId = $agreement->organization_unit_id === null
+                ? null
+                : (int) $agreement->organization_unit_id;
+            $agreement = RentalAgreement::query()
+                ->forContext((int) $agreement->tenant_id, $organizationUnitId)
+                ->whereKey($agreement->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+            $this->assertExpectedVersion($agreement, $expectedVersion);
+            if ($agreement->status !== RentalAgreementStatus::Draft) {
+                throw new InvalidArgumentException('Only draft rental agreements can be deleted. Active and closed agreements must be retained as history.');
+            }
+            if ($agreement->assignments()->lockForUpdate()->exists()
+                || $agreement->calculations()->lockForUpdate()->exists()) {
+                throw new InvalidArgumentException('A rental agreement with operational or financial history cannot be deleted.');
+            }
+
+            $rateVersions = $agreement->rateVersions()->lockForUpdate()->get();
+            foreach ($rateVersions as $rateVersion) {
+                $rateVersion->delete();
+            }
+            $agreement->delete();
+        });
+    }
+
     public function activate(RentalAgreement $agreement, int $expectedVersion, ?int $actorId): RentalAgreement
     {
         return DB::transaction(function () use ($agreement, $expectedVersion, $actorId): RentalAgreement {

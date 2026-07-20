@@ -7,6 +7,8 @@ namespace Modules\VehicleRental\Http\Controllers;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Http\Response;
+use Modules\VehicleRental\Http\Requests\DeleteRentalAgreementRequest;
 use Modules\VehicleRental\Http\Requests\ListRentalRequest;
 use Modules\VehicleRental\Http\Requests\RentalActionRequest;
 use Modules\VehicleRental\Http\Requests\StoreRentalAgreementRequest;
@@ -22,7 +24,7 @@ final class RentalAgreementController extends RentalController
     {
         $query = RentalAgreement::query()
             ->forContext($request->tenantId(), $request->organizationUnitId())
-            ->with(['customer', 'supplier', 'currency', 'rateVersions.lines'])
+            ->with(['customer', 'supplier', 'currency', 'taxGroup', 'rateVersions.lines'])
             ->orderByDesc('starts_on')
             ->orderByDesc('id');
         if ($request->filled('kind')) {
@@ -61,6 +63,19 @@ final class RentalAgreementController extends RentalController
             $request->toData(),
             $request->expectedVersion(),
         ));
+    }
+
+    public function destroy(
+        DeleteRentalAgreementRequest $request,
+        int $agreement,
+        RentalAgreementService $service,
+    ): Response {
+        $service->deleteDraft(
+            $this->agreement($request, $agreement),
+            $request->expectedVersion(),
+        );
+
+        return response()->noContent();
     }
 
     public function storeRateVersion(

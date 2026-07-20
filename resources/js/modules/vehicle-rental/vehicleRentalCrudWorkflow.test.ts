@@ -14,6 +14,7 @@ import {
 } from './components/RentalRateEditor';
 
 const apiClientMocks = vi.hoisted(() => ({
+    delete: vi.fn(),
     get: vi.fn(),
     post: vi.fn(),
     put: vi.fn(),
@@ -31,7 +32,9 @@ import {
     createRentalCalculation,
     createRentalRateVersion,
     createRentalRunningChart,
+    deleteRentalAgreement,
     finalizeRentalRunningChart,
+    getRentalAgreement,
     getRentalAgreementFormLookups,
     listRentalAgreementLookup,
     listRentalAssignmentLookup,
@@ -47,6 +50,7 @@ const endpoint = '/api/v1/vehicle-rental';
 beforeEach(() => {
     vi.clearAllMocks();
     const response = { data: { data: { id: 1 } } };
+    apiClientMocks.delete.mockResolvedValue(response);
     apiClientMocks.get.mockResolvedValue(response);
     apiClientMocks.post.mockResolvedValue(response);
     apiClientMocks.put.mockResolvedValue(response);
@@ -70,18 +74,22 @@ describe('Vehicle Rental CRUD workflow contracts', () => {
         expect(apiClientMocks.get).toHaveBeenCalledWith(`${endpoint}/lookups/running-chart-assignments`, { params: { page: 1 }, signal: undefined });
     });
 
-    it('maps agreement lifecycle actions to their canonical endpoints and optimistic version payloads', async () => {
+    it('maps agreement read and lifecycle actions to canonical endpoints with optimistic versions', async () => {
         const agreement = {} as RentalAgreementPayload;
         const rates = {} as RentalRateVersionPayload;
 
+        await getRentalAgreement(11);
         await createRentalAgreement(agreement);
         await updateRentalAgreement(11, agreement);
+        await deleteRentalAgreement(11, 5);
         await createRentalRateVersion(11, rates);
         await activateRentalAgreement(11, 3);
         await closeRentalAgreement(11, 4);
 
+        expect(apiClientMocks.get).toHaveBeenCalledWith(`${endpoint}/agreements/11`, { signal: undefined });
         expect(apiClientMocks.post).toHaveBeenCalledWith(`${endpoint}/agreements`, agreement);
         expect(apiClientMocks.put).toHaveBeenCalledWith(`${endpoint}/agreements/11`, agreement);
+        expect(apiClientMocks.delete).toHaveBeenCalledWith(`${endpoint}/agreements/11`, { data: { expected_version: 5 } });
         expect(apiClientMocks.post).toHaveBeenCalledWith(`${endpoint}/agreements/11/rate-versions`, rates);
         expect(apiClientMocks.post).toHaveBeenCalledWith(`${endpoint}/agreements/11/activate`, { expected_version: 3 });
         expect(apiClientMocks.post).toHaveBeenCalledWith(`${endpoint}/agreements/11/close`, { expected_version: 4 });

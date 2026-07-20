@@ -43,6 +43,11 @@ export const updateRentalAgreement = (id: number, payload: RentalAgreementPayloa
     apiClient.put<ApiResource<RentalAgreement>>(`${endpoint}/agreements/${id}`, payload)
         .then((response) => response.data.data);
 
+export const deleteRentalAgreement = (id: number, expectedVersion: number) =>
+    apiClient.delete(`${endpoint}/agreements/${id}`, {
+        data: { expected_version: expectedVersion },
+    });
+
 export const createRentalRateVersion = (agreementId: number, payload: RentalRateVersionPayload) =>
     apiClient.post<ApiResource<RentalAgreement>>(`${endpoint}/agreements/${agreementId}/rate-versions`, payload)
         .then((response) => response.data.data);

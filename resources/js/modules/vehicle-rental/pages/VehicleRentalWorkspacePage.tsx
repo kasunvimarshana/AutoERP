@@ -18,6 +18,7 @@ import { useApi } from '@/shared/hooks/useApi';
 import { useDebounce } from '@/shared/hooks/useDebounce';
 import { notifySuccess } from '@/shared/notifications/appToast';
 import { RentalReasonDialog } from '../components/RentalActionDialogs';
+import { RentalAgreementDetailDialog } from '../components/RentalAgreementDetailDialog';
 import { RentalAgreementDialog, RentalRateVersionDialog } from '../components/RentalAgreementDialogs';
 import { RentalAssignmentDialog, RentalCustodyDialog, RentalReplacementDialog } from '../components/RentalAssignmentDialogs';
 import { RentalCalculationDialog } from '../components/RentalCalculationDialog';
@@ -27,6 +28,7 @@ import {
     cancelRentalAssignment,
     cancelRentalCalculation,
     closeRentalAgreement,
+    deleteRentalAgreement,
     finalizeRentalRunningChart,
     listRentalAgreements,
     listRentalAssignments,
@@ -115,13 +117,13 @@ function AgreementsPage({ fixedKind }: { fixedKind?: RentalAgreementKind }) {
     const auth = useAuth();
     const canManage = hasPermission(auth, vehicleRentalPermissions.agreementsManage);
     const canAssign = hasPermission(auth, vehicleRentalPermissions.assignmentsManage);
-    const canAct = canManage || canAssign;
     const { confirm, confirmDialog } = useConfirmDialog();
     const [search, setSearch] = useState('');
     const [kind, setKind] = useState(fixedKind ?? '');
     const [status, setStatus] = useState('');
     const [page, setPage] = useState(1);
     const [formOpen, setFormOpen] = useState(false);
+    const [viewingId, setViewingId] = useState<number | null>(null);
     const [editing, setEditing] = useState<RentalAgreement | null>(null);
     const [rateAgreement, setRateAgreement] = useState<RentalAgreement | null>(null);
     const [assignmentAgreement, setAssignmentAgreement] = useState<RentalAgreement | null>(null);
@@ -145,6 +147,27 @@ function AgreementsPage({ fixedKind }: { fixedKind?: RentalAgreementKind }) {
         if (!await confirm({ title: 'Close rental agreement?', message: `Close ${agreement.agreement_number}? All planned and active assignments must already be closed or cancelled.`, confirmLabel: 'Close agreement' })) return;
         await runAgreementAction(agreement, 'close');
     };
+    const remove = async (agreement: RentalAgreement) => {
+        if (!await confirm({
+            title: 'Delete draft rental agreement?',
+            message: `Delete ${agreement.agreement_number}? This removes only the unused draft and its draft rates. This action cannot be undone.`,
+            confirmLabel: 'Delete agreement',
+            danger: true,
+        })) return;
+
+        setBusyId(agreement.id);
+        setActionError(null);
+        try {
+            await deleteRentalAgreement(agreement.id, agreement.row_version);
+            if (viewingId === agreement.id) setViewingId(null);
+            notifySuccess('Draft rental agreement deleted successfully.');
+            result.reload();
+        } catch (error) {
+            setActionError(toApiError(error));
+        } finally {
+            setBusyId(null);
+        }
+    };
     const runAgreementAction = async (agreement: RentalAgreement, action: 'activate' | 'close') => {
         setBusyId(agreement.id);
         setActionError(null);
@@ -160,7 +183,7 @@ function AgreementsPage({ fixedKind }: { fixedKind?: RentalAgreementKind }) {
         }
     };
 
-    const sideTitle = fixedKind === 'owner' ? 'Owner / supplier agreements' : fixedKind === 'customer' ? 'Customer agreements' : 'Vehicle rental agreements';
+    const sideTitle = fixedKind === 'owner' ? 'Owner agreements' : fixedKind === 'customer' ? 'Customer agreements' : 'Vehicle rental agreements';
     const sideDescription = fixedKind === 'owner'
         ? 'Owner payable terms and the vehicles supplied under each agreement.'
         : fixedKind === 'customer'
@@ -175,19 +198,21 @@ function AgreementsPage({ fixedKind }: { fixedKind?: RentalAgreementKind }) {
         { key: 'period', header: 'Period', render: (row) => periodLabel(row.starts_on, row.ends_on) },
         { key: 'basis', header: 'Basis', render: (row) => row.billing_basis },
         { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.status} /> },
-        ...(canAct ? [{
+        {
             key: 'actions',
             header: 'Actions',
             render: (row: RentalAgreement) => (
                 <div className="flex flex-wrap gap-2">
+                    <Button variant="secondary" className="min-h-9 px-3 py-1.5" onClick={() => setViewingId(row.id)}>View</Button>
                     {canManage && row.status === 'draft' && <Button variant="secondary" className="min-h-9 px-3 py-1.5" onClick={() => { setEditing(row); setFormOpen(true); }}>Edit</Button>}
                     {canManage && row.status === 'draft' && <Button className="min-h-9 px-3 py-1.5" loading={busyId === row.id} onClick={() => void activate(row)}>Activate</Button>}
+                    {canManage && row.status === 'draft' && <Button variant="danger" className="min-h-9 px-3 py-1.5" loading={busyId === row.id} onClick={() => void remove(row)}>Delete</Button>}
                     {canAssign && row.status === 'active' && <Button className="min-h-9 px-3 py-1.5" onClick={() => setAssignmentAgreement(row)}>Select vehicle</Button>}
                     {canManage && row.status === 'active' && <Button variant="secondary" className="min-h-9 px-3 py-1.5" onClick={() => setRateAgreement(row)}>New rates</Button>}
                     {canManage && row.status === 'active' && <Button variant="danger" className="min-h-9 px-3 py-1.5" loading={busyId === row.id} onClick={() => void close(row)}>Close</Button>}
                 </div>
             ),
-        } as DataColumn<RentalAgreement>] : []),
+        },
     ];
 
     return (
@@ -201,6 +226,7 @@ function AgreementsPage({ fixedKind }: { fixedKind?: RentalAgreementKind }) {
             <ErrorAlert error={actionError ?? result.error} inline />
             {result.loading ? <LoadingState /> : <DataTable rows={result.data?.data ?? []} columns={columns} rowKey={(row) => row.id} />}
             <Pagination meta={result.data?.meta} onPageChange={setPage} />
+            <RentalAgreementDetailDialog agreementId={viewingId} open={viewingId !== null} onClose={() => setViewingId(null)} />
             <RentalAgreementDialog open={formOpen} agreement={editing} kind={fixedKind} onClose={() => { setFormOpen(false); setEditing(null); }} onSaved={() => result.reload()} />
             <RentalRateVersionDialog open={Boolean(rateAgreement)} agreement={rateAgreement} onClose={() => setRateAgreement(null)} onSaved={() => result.reload()} />
             <RentalAssignmentDialog
