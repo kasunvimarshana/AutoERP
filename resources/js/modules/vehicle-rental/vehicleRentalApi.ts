@@ -1,5 +1,6 @@
 import { apiClient } from '@/shared/api/apiClient';
 import type { ApiCollection, ApiResource, ListParams } from '@/shared/types/api';
+import { localDateTimeToOffsetIso } from './rentalDateTime';
 import type {
     RentalAgreement,
     RentalAgreementFormLookups,
@@ -110,11 +111,11 @@ export const getRentalRunningChart = (id: number, signal?: AbortSignal) =>
         .then((response) => response.data.data);
 
 export const createRentalRunningChart = (payload: RentalRunningChartPayload) =>
-    apiClient.post<ApiResource<RentalRunningChart>>(`${endpoint}/running-charts`, payload)
+    apiClient.post<ApiResource<RentalRunningChart>>(`${endpoint}/running-charts`, runningChartApiPayload(payload))
         .then((response) => response.data.data);
 
 export const updateRentalRunningChart = (id: number, payload: RentalRunningChartPayload) =>
-    apiClient.put<ApiResource<RentalRunningChart>>(`${endpoint}/running-charts/${id}`, payload)
+    apiClient.put<ApiResource<RentalRunningChart>>(`${endpoint}/running-charts/${id}`, runningChartApiPayload(payload))
         .then((response) => response.data.data);
 
 export const finalizeRentalRunningChart = (id: number, expectedVersion: number) =>
@@ -148,3 +149,11 @@ export const cancelRentalCalculation = (id: number, expectedVersion: number, rea
 export const getRentalReportSummary = (params: Pick<ListParams, 'date_from' | 'date_to'>, signal?: AbortSignal) =>
     apiClient.get<ApiResource<RentalReportSummary>>(`${endpoint}/reports/summary`, { params, signal })
         .then((response) => response.data.data);
+
+function runningChartApiPayload(payload: RentalRunningChartPayload): RentalRunningChartPayload {
+    return {
+        ...payload,
+        starts_at: localDateTimeToOffsetIso(payload.starts_at),
+        ends_at: localDateTimeToOffsetIso(payload.ends_at),
+    };
+}
