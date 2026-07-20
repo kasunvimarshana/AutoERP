@@ -13,6 +13,6 @@ export const vehicleRentalRouteEntitlements: readonly EntitlementRule[] = [
     operational('/vehicle-rental/owner-settlements', ['vehicle-rental'], [vehicleRentalPermissions.calculationsView]),
     operational('/vehicle-rental/customer-receipts', ['vehicle-rental'], [vehicleRentalPermissions.calculationsView]),
     operational('/vehicle-rental/owner-payments', ['vehicle-rental'], [vehicleRentalPermissions.calculationsView]),
-    operational('/vehicle-rental/reports', ['vehicle-rental'], [vehicleRentalPermissions.reportsView]),
+    operational('/vehicle-rental/reports', ['vehicle-rental'], [vehicleRentalPermissions.calculationsView]),
     operational('/vehicle-rental/calculations', ['vehicle-rental'], [vehicleRentalPermissions.calculationsView]),
 ];
