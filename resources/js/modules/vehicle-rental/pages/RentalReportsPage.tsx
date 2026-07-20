@@ -1,4 +1,9 @@
 import { useState, type ReactNode } from 'react';
+import { hasPermission } from '@/modules/auth/accessControl';
+import { useAuth } from '@/modules/auth/AuthProvider';
+import { financePermissions } from '@/modules/finance/financePermissions';
+import { invoicePermissions } from '@/modules/invoice/invoicePermissions';
+import { paymentPermissions } from '@/modules/payment/paymentPermissions';
 import { LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
@@ -10,6 +15,11 @@ import { useApi } from '@/shared/hooks/useApi';
 import { getRentalReportSummary } from '../vehicleRentalApi';
 
 export function RentalReportsPage() {
+    const auth = useAuth();
+    const canViewInvoices = hasPermission(auth, invoicePermissions.view);
+    const canViewPayments = hasPermission(auth, paymentPermissions.view);
+    const canViewLedger = hasPermission(auth, financePermissions.reportsView);
+    const canViewBankReconciliation = hasPermission(auth, financePermissions.bankReconciliationsView);
     const [dateFrom, setDateFrom] = useState('');
     const [dateTo, setDateTo] = useState('');
     const report = useApi(
@@ -76,10 +86,10 @@ export function RentalReportsPage() {
                             Detailed tax, ledger, cheque, and bank results remain in their owning modules and reconcile back to the Rental invoices, payables, receipts, and payments.
                         </p>
                         <div className="mt-4 flex flex-wrap gap-2">
-                            <LinkButton variant="secondary" to="/invoices">Invoice register</LinkButton>
-                            <LinkButton variant="secondary" to="/payments">Payment register</LinkButton>
-                            <LinkButton variant="secondary" to="/finance/ledger">General ledger</LinkButton>
-                            <LinkButton variant="secondary" to="/finance/bank-reconciliations">Bank reconciliation</LinkButton>
+                            {canViewInvoices && <LinkButton variant="secondary" to="/invoices">Invoice register</LinkButton>}
+                            {canViewPayments && <LinkButton variant="secondary" to="/payments">Payment register</LinkButton>}
+                            {canViewLedger && <LinkButton variant="secondary" to="/finance/ledger">General ledger</LinkButton>}
+                            {canViewBankReconciliation && <LinkButton variant="secondary" to="/finance/bank-reconciliations">Bank reconciliation</LinkButton>}
                         </div>
                     </Panel>
                 </div>
