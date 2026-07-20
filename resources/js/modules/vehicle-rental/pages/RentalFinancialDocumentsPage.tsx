@@ -47,7 +47,8 @@ function dateLabel(value?: string | null): string {
 
 export function RentalFinancialDocumentsPage({ side }: RentalFinancialDocumentsPageProps) {
     const auth = useAuth();
-    const canManage = hasPermission(auth, vehicleRentalPermissions.calculationsManage);
+    const canManageCalculations = hasPermission(auth, vehicleRentalPermissions.calculationsManage);
+    const canCreateFinancialDocument = hasPermission(auth, vehicleRentalPermissions.financialDocumentsManage);
     const canViewInvoice = hasPermission(auth, invoicePermissions.view);
     const canCreatePayment = hasPermission(auth, paymentPermissions.create);
     const { confirm, confirmDialog } = useConfirmDialog();
@@ -133,7 +134,7 @@ export function RentalFinancialDocumentsPage({ side }: RentalFinancialDocumentsP
             header: 'Actions',
             render: (row) => (
                 <div className="flex flex-wrap gap-2">
-                    {canManage && row.status === 'calculated' && !row.financial_document && (
+                    {canCreateFinancialDocument && row.status === 'calculated' && !row.financial_document && (
                         <Button className="min-h-9 px-3 py-1.5" loading={busyId === row.id} onClick={() => void createDocument(row)}>
                             Create {documentLabel}
                         </Button>
@@ -148,7 +149,7 @@ export function RentalFinancialDocumentsPage({ side }: RentalFinancialDocumentsP
                             {settlementLabel}
                         </LinkButton>
                     )}
-                    {canManage && row.status === 'calculated' && !row.financial_document && (
+                    {canManageCalculations && row.status === 'calculated' && !row.financial_document && (
                         <Button variant="danger" className="min-h-9 px-3 py-1.5" onClick={() => setCancelling(row)}>Cancel period</Button>
                     )}
                 </div>
@@ -161,7 +162,7 @@ export function RentalFinancialDocumentsPage({ side }: RentalFinancialDocumentsP
             <ContentHeader
                 title={title}
                 description={description}
-                actions={canManage ? <Button onClick={() => setCreateOpen(true)}>{prepareLabel}</Button> : undefined}
+                actions={canManageCalculations ? <Button onClick={() => setCreateOpen(true)}>{prepareLabel}</Button> : undefined}
             />
             <div className="mb-4 max-w-xs">
                 <Select
