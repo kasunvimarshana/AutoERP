@@ -138,12 +138,14 @@ export function RentalAssignmentLookup({
     endsAt?: string;
 }) {
     const lookupPurpose = purpose ?? (side === 'owner_supply' ? 'assignment-source' : 'running-chart');
+    const isAssignmentSource = lookupPurpose === 'assignment-source';
+    const lookupContextKey = isAssignmentSource
+        ? [lookupPurpose, side ?? '', vehicleId ?? '', startsAt ?? '', endsAt ?? ''].join(':')
+        : [lookupPurpose, side ?? ''].join(':');
     const search = useCallback(async (params: LookupLoadParams) => {
-        const isAssignmentSource = lookupPurpose === 'assignment-source';
         const result = await listRentalAssignmentLookup(lookupPurpose, {
             search: params.search || undefined,
             assignment_side: side,
-            assignment_status: 'active',
             vehicle_id: isAssignmentSource ? vehicleId ?? undefined : undefined,
             date_from: isAssignmentSource && startsAt ? startsAt : undefined,
             date_to: isAssignmentSource && endsAt ? endsAt : undefined,
@@ -152,9 +154,9 @@ export function RentalAssignmentLookup({
         }, params.signal);
 
         return mapResult(result, assignmentOption);
-    }, [endsAt, lookupPurpose, side, startsAt, vehicleId]);
+    }, [endsAt, isAssignmentSource, lookupPurpose, side, startsAt, vehicleId]);
 
-    return <ReferenceLookup label={label} value={value} onChange={onChange} search={search} error={error} disabled={disabled} required={required} loadOnOpen />;
+    return <ReferenceLookup key={lookupContextKey} label={label} value={value} onChange={onChange} search={search} error={error} disabled={disabled} required={required} loadOnOpen />;
 }
 
 function ReferenceLookup({
