@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { hasPermission } from '@/modules/auth/accessControl';
 import { useAuth } from '@/modules/auth/AuthProvider';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
-import { Button } from '@/shared/components/Button';
+import { Button, LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { useConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
@@ -133,14 +133,14 @@ export function RentalFinancialDocumentsPage({ side }: RentalFinancialDocumentsP
                         </Button>
                     )}
                     {row.financial_document && (
-                        <Button asChild variant="secondary" className="min-h-9 px-3 py-1.5">
-                            <Link to={`/invoices/${row.financial_document.id}`}>View document</Link>
-                        </Button>
+                        <LinkButton variant="secondary" className="min-h-9 px-3 py-1.5" to={`/invoices/${row.financial_document.id}`}>
+                            View document
+                        </LinkButton>
                     )}
                     {row.financial_document && isPositiveDecimal(row.financial_document.balance_due) && (
-                        <Button asChild className="min-h-9 px-3 py-1.5">
-                            <Link to={`/payments/create?invoice_id=${row.financial_document.id}`}>{settlementLabel}</Link>
-                        </Button>
+                        <LinkButton className="min-h-9 px-3 py-1.5" to={`/payments/create?invoice_id=${row.financial_document.id}`}>
+                            {settlementLabel}
+                        </LinkButton>
                     )}
                     {canManage && row.status === 'calculated' && !row.financial_document && (
                         <Button variant="danger" className="min-h-9 px-3 py-1.5" onClick={() => setCancelling(row)}>Cancel period</Button>
