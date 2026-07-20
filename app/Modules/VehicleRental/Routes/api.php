@@ -86,16 +86,19 @@ Route::prefix('api/v1/vehicle-rental')
             Route::get('calculations', [RentalCalculationController::class, 'index'])->name('calculations.index');
             Route::get('calculations/{calculation}', [RentalCalculationController::class, 'show'])
                 ->whereNumber('calculation')->name('calculations.show');
-            Route::get('reports/summary', [RentalReportController::class, 'summary'])->name('reports.summary');
         });
         Route::middleware($requires(VehicleRentalPermission::CALCULATIONS_MANAGE))->group(function (): void {
             Route::get('lookups/calculation-agreements', [RentalLookupController::class, 'calculationAgreements'])
                 ->name('lookups.calculation-agreements');
             Route::post('agreements/{agreement}/calculations', [RentalCalculationController::class, 'calculate'])
                 ->whereNumber('agreement')->name('agreements.calculations.store');
-            Route::post('calculations/{calculation}/financial-document', [RentalFinancialDocumentController::class, 'store'])
-                ->whereNumber('calculation')->name('calculations.financial-document.store');
             Route::post('calculations/{calculation}/cancel', [RentalCalculationController::class, 'cancel'])
                 ->whereNumber('calculation')->name('calculations.cancel');
         });
+        Route::post('calculations/{calculation}/financial-document', [RentalFinancialDocumentController::class, 'store'])
+            ->middleware($requires(VehicleRentalPermission::FINANCIAL_DOCUMENTS_MANAGE))
+            ->whereNumber('calculation')->name('calculations.financial-document.store');
+        Route::get('reports/summary', [RentalReportController::class, 'summary'])
+            ->middleware($requires(VehicleRentalPermission::REPORTS_VIEW))
+            ->name('reports.summary');
     });
