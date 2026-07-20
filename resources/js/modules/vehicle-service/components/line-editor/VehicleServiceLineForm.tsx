@@ -13,11 +13,20 @@ import {
     type VehicleServiceLineFormValue,
 } from './lineForm';
 
-export function VehicleServiceLineForm({ value, mode, error, saving, onSave, onCancel }: {
+export function VehicleServiceLineForm({
+    value,
+    mode,
+    error,
+    saving,
+    canIssueInventory,
+    onSave,
+    onCancel,
+}: {
     value: VehicleServiceLineFormValue;
     mode: 'create' | 'edit';
     error: ApiError | null;
     saving: boolean;
+    canIssueInventory: boolean;
     onSave: (value: VehicleServiceLineFormValue, issueStock: boolean) => void;
     onCancel: () => void;
 }) {
@@ -27,8 +36,8 @@ export function VehicleServiceLineForm({ value, mode, error, saving, onSave, onC
         next: VehicleServiceLineFormValue[K],
     ) => setDraft((current) => ({ ...current, [key]: next }));
     const preview = calculateLinePreview(draft);
-    const canIssueOnCreate = mode === 'create'
-        && draft.source === 'inventory_item'
+    const showIssueControls = canIssueInventory && mode === 'create' && draft.source === 'inventory_item';
+    const canIssueOnCreate = showIssueControls
         && draft.issueWarehouse !== null
         && draft.issueLocation !== null;
 
@@ -50,7 +59,7 @@ export function VehicleServiceLineForm({ value, mode, error, saving, onSave, onC
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     <LineSourceTypeFields value={draft} error={error} onChange={setDraft} />
-                    {mode === 'create' && draft.source === 'inventory_item' && (
+                    {showIssueControls && (
                         <div className="sm:col-span-2 lg:col-span-3">
                             <VehicleServiceInventoryLocationFields
                                 value={{ warehouse: draft.issueWarehouse, location: draft.issueLocation }}
@@ -81,7 +90,7 @@ export function VehicleServiceLineForm({ value, mode, error, saving, onSave, onC
                 <Button type="submit" loading={saving}>
                     {mode === 'edit' ? 'Save line' : 'Add line'}
                 </Button>
-                {mode === 'create' && draft.source === 'inventory_item' && (
+                {showIssueControls && (
                     <Button
                         type="button"
                         loading={saving}
