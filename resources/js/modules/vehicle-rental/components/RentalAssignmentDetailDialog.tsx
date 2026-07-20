@@ -23,7 +23,9 @@ function dateTimeLabel(value?: string | null): string {
     return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString();
 }
 
-function sideLabel(value: string): string {
+function operationLabel(value: string): string {
+    if (value === 'customer_use') return 'Customer vehicle';
+    if (value === 'owner_supply') return 'Owner-supplied vehicle';
     return value.split('_').map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(' ');
 }
 
@@ -49,7 +51,7 @@ export function RentalAssignmentDetailDialog({
             {assignment && (
                 <div className="space-y-6">
                     <div className="flex items-center justify-between gap-4">
-                        <p className="text-sm text-slate-600">{sideLabel(assignment.side)}</p>
+                        <p className="text-sm text-slate-600">{operationLabel(assignment.side)}</p>
                         <StatusBadge status={assignment.status} />
                     </div>
                     <DetailGrid items={[
@@ -61,10 +63,9 @@ export function RentalAssignmentDetailDialog({
                         { label: 'Planned / actual end', value: dateTimeLabel(assignment.ends_at) },
                         { label: 'Handover odometer', value: assignment.handover_odometer || '—' },
                         { label: 'Return odometer', value: assignment.return_odometer || '—' },
-                        { label: 'Owner-supply source', value: referenceLabel(assignment.source_assignment?.agreement) },
+                        { label: 'Vehicle owner agreement', value: referenceLabel(assignment.source_assignment?.agreement) },
                         { label: 'Replaces vehicle', value: referenceLabel(assignment.replaces_assignment?.vehicle) },
                         { label: 'Replacement reason', value: assignment.replacement_reason || '—' },
-                        { label: 'Version', value: assignment.row_version },
                     ]} />
                     <div>
                         <h3 className="text-sm font-semibold text-slate-900">Custody history</h3>
@@ -85,7 +86,7 @@ export function RentalAssignmentDetailDialog({
                                     <tbody>
                                         {(assignment.custody_events ?? []).map((event) => (
                                             <tr key={event.id} className="border-b border-slate-100 last:border-0">
-                                                <td className="px-3 py-2">{sideLabel(event.event_type)}</td>
+                                                <td className="px-3 py-2">{operationLabel(event.event_type)}</td>
                                                 <td className="px-3 py-2">{dateTimeLabel(event.event_at)}</td>
                                                 <td className="px-3 py-2">{event.odometer}</td>
                                                 <td className="px-3 py-2">{event.fuel_level || '—'}</td>
