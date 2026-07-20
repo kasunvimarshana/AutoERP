@@ -1,14 +1,19 @@
-import { useCallback } from 'react';
+import { useCallback, type ReactNode } from 'react';
 import { searchCustomers } from '@/modules/customer/customerApi';
 import { searchEmployees } from '@/modules/hr/hrApi';
 import { searchSuppliers } from '@/modules/supplier/supplierApi';
 import { searchVehicles } from '@/modules/vehicle/vehicleApi';
+import type { VehicleSummary } from '@/modules/vehicle/vehicleTypes';
 import { searchCurrencies } from '@/shared/api/referenceApi';
 import { GenericLookupSelect } from '@/shared/components/GenericLookupSelect';
 import type { NamedResource } from '@/shared/types/common';
 import type { LookupLoadParams, LookupResult } from '@/shared/types/lookup';
 import { localDateTimeToOffsetIso } from '../rentalDateTime';
-import { listRentalAgreementLookup, listRentalAssignmentLookup } from '../vehicleRentalApi';
+import {
+    listRentalAgreementLookup,
+    listRentalAssignmentLookup,
+    listRentalOwnerAgreementVehicles,
+} from '../vehicleRentalApi';
 import type {
     RentalAgreement,
     RentalAgreementKind,
@@ -94,18 +99,60 @@ export function RentalCurrencyLookup({ value, onChange, error, disabled, require
     return <ReferenceLookup label="Currency" value={value} onChange={onChange} search={search} error={error} disabled={disabled} required={required} loadOnOpen />;
 }
 
-export function RentalVehicleLookup({ value, onChange, error, disabled, required }: LookupProps) {
-    const search = useCallback(async (params: LookupLoadParams) => mapResult(
-        await searchVehicles(params),
-        (item) => ({
-            id: item.id,
-            code: item.vehicle_number,
-            name: item.registration_number || item.vehicle_number,
-            subtitle: [item.make?.name, item.model?.name, item.status].filter(Boolean).join(' • '),
-        }),
-    ), []);
+export function RentalVehicleLookup({
+    value,
+    onChange,
+    ownerAgreementId,
+    startsAt,
+    endsAt,
+    error,
+    disabled,
+    required,
+}: LookupProps & {
+    ownerAgreementId?: number | null;
+    startsAt?: string;
+    endsAt?: string;
+}) {
+    const ownerContextRequested = ownerAgreementId !== null && ownerAgreementId !== undefined;
+    const hasOwnerPeriod = ownerContextRequested && Boolean(startsAt);
+    const lookupContextKey = ownerContextRequested
+        ? `owner:${ownerAgreementId}:${startsAt ?? ''}:${endsAt ?? ''}`
+        : 'all-active-vehicles';
+    const search = useCallback(async (params: LookupLoadParams) => {
+        const result = hasOwnerPeriod
+            ? await listRentalOwnerAgreementVehicles({
+                agreement_id: ownerAgreementId,
+                date_from: localDateTimeToOffsetIso(startsAt),
+                date_to: endsAt ? localDateTimeToOffsetIso(endsAt) : undefined,
+                search: params.search || undefined,
+                page: params.page,
+                per_page: params.perPage,
+            }, params.signal)
+            : await searchVehicles(params);
 
-    return <ReferenceLookup label="Vehicle" value={value} onChange={onChange} search={search} error={error} disabled={disabled} required={required} />;
+        return mapResult(result, vehicleOption);
+    }, [endsAt, hasOwnerPeriod, ownerAgreementId, startsAt]);
+
+    return (
+        <ReferenceLookup
+            key={lookupContextKey}
+            label="Vehicle"
+            value={value}
+            onChange={onChange}
+            search={search}
+            error={error}
+            disabled={disabled || (ownerContextRequested && !hasOwnerPeriod)}
+            required={required}
+            loadOnOpen={hasOwnerPeriod}
+            placeholder={ownerContextRequested ? 'Select a vehicle owned by this supplier' : undefined}
+            renderEmptyState={ownerContextRequested ? () => (
+                <div className="space-y-1 px-3 py-2 text-sm text-amber-800">
+                    <p className="font-medium">No supplier-owned vehicle covers this assignment period.</p>
+                    <p>Add or correct the vehicle under Supplier Vehicles using the same owner and effective dates, then reopen this lookup.</p>
+                </div>
+            ) : undefined}
+        />
+    );
 }
 
 export function RentalDriverLookup({ value, onChange, error, disabled, required }: LookupProps) {
@@ -193,10 +240,14 @@ function ReferenceLookup({
     disabled,
     required,
     loadOnOpen = false,
+    placeholder,
+    renderEmptyState,
 }: LookupProps & {
     label: string;
     search: (params: LookupLoadParams) => Promise<LookupResult<RentalLookupOption>>;
     loadOnOpen?: boolean;
+    placeholder?: string;
+    renderEmptyState?: (state: { searchText: string }) => ReactNode;
 }) {
     return (
         <GenericLookupSelect
@@ -205,7 +256,15 @@ function ReferenceLookup({
             onChange={onChange}
             search={search}
             formatLabel={(item) => [item.code, item.name].filter(Boolean).join(' - ')}
+            renderOption={(item) => (
+                <div>
+                    <p>{[item.code, item.name].filter(Boolean).join(' - ')}</p>
+                    {item.subtitle && <p className="text-xs text-slate-500">{item.subtitle}</p>}
+                </div>
+            )}
+            renderEmptyState={renderEmptyState}
             error={error}
+            placeholder={placeholder}
             disabled={disabled}
             required={required}
             loadOnOpen={loadOnOpen}
@@ -225,6 +284,20 @@ function agreementOption(agreement: RentalAgreement): RentalLookupOption {
         startsOn: agreement.starts_on,
         endsOn: agreement.ends_on,
         defaultCurrency: agreement.currency ?? null,
+    };
+}
+
+function vehicleOption(item: VehicleSummary): RentalLookupOption {
+    return {
+        id: item.id,
+        code: item.vehicle_number,
+        name: item.registration_number || item.vehicle_number,
+        subtitle: [
+            item.make?.name,
+            item.model?.name,
+            item.status,
+            `${item.odometer_reading} ${item.odometer_unit ?? 'km'}`,
+        ].filter(Boolean).join(' • '),
     };
 }
 
