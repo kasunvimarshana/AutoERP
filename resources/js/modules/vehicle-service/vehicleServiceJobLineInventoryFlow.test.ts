@@ -23,11 +23,13 @@ describe('Vehicle Service job-line inventory flow', () => {
         expect(payload).not.toHaveProperty('warehouse_location_id');
     });
 
-    it('offers add-and-issue only for newly created inventory lines', () => {
-        expect(lineFormSource).toContain("mode === 'create' && draft.source === 'inventory_item'");
+    it('offers add-and-issue only for permitted newly created inventory lines', () => {
+        expect(lineFormSource).toContain("canIssueInventory && mode === 'create' && draft.source === 'inventory_item'");
         expect(lineFormSource).toContain('Add & issue stock');
         expect(lineFormSource).toContain('draft.issueWarehouse !== null');
         expect(lineFormSource).toContain('draft.issueLocation !== null');
+        expect(lineEditorSource).toContain('vehicleServicePermissions.inventoryView');
+        expect(lineEditorSource).toContain('vehicleServicePermissions.inventoryIssue');
     });
 
     it('uses the existing Inventory issue API after line creation and preserves pending recovery on failure', () => {
@@ -40,12 +42,12 @@ describe('Vehicle Service job-line inventory flow', () => {
 
     it('keeps stock issue recovery available for combo child inventory lines', () => {
         expect(lineEditorSource).toContain('onEdit={row.isComboChild ? undefined');
-        expect(lineEditorSource).toContain('onIssue={canIssueLine(row.line)');
+        expect(lineEditorSource).toContain('canIssueInventory && canIssueLine(row.line)');
         expect(lineEditorSource).toContain("line.inventory_movement_id == null ? 'Pending issue' : 'Issued'");
     });
 
     it('removes only the Inventory tab while keeping Inventory APIs owned by their existing module', () => {
-        expect(detailPageSource).not.toContain("VehicleServiceInventoryIssueTab");
+        expect(detailPageSource).not.toContain('VehicleServiceInventoryIssueTab');
         expect(detailPageSource).not.toContain("{ id: 'inventory', label: 'Inventory' }");
         expect(detailPageSource).not.toContain("tabs.openedTabs.has('inventory')");
         expect(lineEditorSource).toContain('issueVehicleServiceInventory');
