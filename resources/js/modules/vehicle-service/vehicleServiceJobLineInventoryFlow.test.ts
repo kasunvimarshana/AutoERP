@@ -15,7 +15,7 @@ describe('Vehicle Service job-line inventory flow', () => {
         form.issueWarehouse = { id: 4, code: 'MAIN', name: 'Main warehouse' };
         form.issueLocation = { id: 9, code: 'RECEIVING', name: 'Receiving' };
 
-        const payload = lineFormToPayload(form) as Record<string, unknown>;
+        const payload = lineFormToPayload(form);
 
         expect(payload).not.toHaveProperty('issueWarehouse');
         expect(payload).not.toHaveProperty('issueLocation');
