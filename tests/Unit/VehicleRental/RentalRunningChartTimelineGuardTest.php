@@ -67,6 +67,37 @@ final class RentalRunningChartTimelineGuardTest extends TestCase
         (new RentalRunningChartTimelineGuard(new DecimalMath()))->startsAt($data);
     }
 
+    public function test_offset_start_keeps_entered_operational_date_and_normalizes_to_utc(): void
+    {
+        $data = $this->data('1000', '1010', '0');
+        $data = new RentalRunningChartData(
+            tenantId: $data->tenantId,
+            organizationUnitId: $data->organizationUnitId,
+            assignmentId: $data->assignmentId,
+            operationalDate: '2026-07-01',
+            startsAt: '2026-07-01T00:30:00+05:30',
+            endsAt: '2026-07-01T01:30:00+05:30',
+            startOdometer: $data->startOdometer,
+            endOdometer: $data->endOdometer,
+            garageKm: $data->garageKm,
+            normalOvertimeHours: $data->normalOvertimeHours,
+            doubleOvertimeHours: $data->doubleOvertimeHours,
+            tripleOvertimeHours: $data->tripleOvertimeHours,
+            nightOutCount: $data->nightOutCount,
+            acMode: null,
+            tripOrigin: null,
+            tripDestination: null,
+            purpose: null,
+            odometerVarianceReason: null,
+            remarks: null,
+            actorId: null,
+        );
+
+        $startsAt = (new RentalRunningChartTimelineGuard(new DecimalMath()))->startsAt($data);
+
+        self::assertSame('UTC', $startsAt->getTimezone()->getName());
+        self::assertSame('2026-06-30 19:00:00', $startsAt->toDateTimeString());
+    }
 
     public function test_self_drive_assignment_rejects_driver_time_facts(): void
     {
