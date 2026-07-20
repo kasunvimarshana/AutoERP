@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\VehicleRental\Http\Controllers;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -55,7 +56,7 @@ final class RentalLookupController
         ListRentalRequest $request,
         RentalAssignmentService $service,
     ): AnonymousResourceCollection {
-        return $this->assignments($request, $service, RentalAssignmentSide::OwnerSupply);
+        return $this->assignments($request, $service, RentalAssignmentSide::OwnerSupply, true);
     }
 
     public function runningChartAssignments(
@@ -92,6 +93,7 @@ final class RentalLookupController
         ListRentalRequest $request,
         RentalAssignmentService $service,
         RentalAssignmentSide $side,
+        bool $requireCompleteCoverage = false,
     ): AnonymousResourceCollection {
         $query = RentalAssignment::query()
             ->forContext($request->tenantId(), $request->organizationUnitId())
@@ -99,6 +101,23 @@ final class RentalLookupController
             ->where('side', $side->value)
             ->with($service->relations())
             ->orderByDesc('starts_at');
+        if ($request->filled('vehicle_id')) {
+            $query->where('vehicle_id', (int) $request->validated('vehicle_id'));
+        }
+        if ($requireCompleteCoverage && $request->filled('date_from')) {
+            $startsAt = CarbonImmutable::parse((string) $request->validated('date_from'))->seconds(0);
+            $query->where('starts_at', '<=', $startsAt->toDateTimeString());
+
+            if ($request->filled('date_to')) {
+                $endsAt = CarbonImmutable::parse((string) $request->validated('date_to'))->seconds(0);
+                $query->where(function (Builder $scope) use ($endsAt): void {
+                    $scope->whereNull('ends_at')
+                        ->orWhere('ends_at', '>=', $endsAt->toDateTimeString());
+                });
+            } else {
+                $query->whereNull('ends_at');
+            }
+        }
         if ($request->filled('search')) {
             $search = trim((string) $request->validated('search'));
             $query->where(function (Builder $scope) use ($search): void {
