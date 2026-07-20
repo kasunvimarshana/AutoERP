@@ -86,6 +86,7 @@ Route::prefix('api/v1/vehicle-rental')
             Route::get('calculations', [RentalCalculationController::class, 'index'])->name('calculations.index');
             Route::get('calculations/{calculation}', [RentalCalculationController::class, 'show'])
                 ->whereNumber('calculation')->name('calculations.show');
+            Route::get('reports/summary', [RentalReportController::class, 'summary'])->name('reports.summary');
         });
         Route::middleware($requires(VehicleRentalPermission::CALCULATIONS_MANAGE))->group(function (): void {
             Route::get('lookups/calculation-agreements', [RentalLookupController::class, 'calculationAgreements'])
@@ -98,7 +99,4 @@ Route::prefix('api/v1/vehicle-rental')
         Route::post('calculations/{calculation}/financial-document', [RentalFinancialDocumentController::class, 'store'])
             ->middleware($requires(VehicleRentalPermission::FINANCIAL_DOCUMENTS_MANAGE))
             ->whereNumber('calculation')->name('calculations.financial-document.store');
-        Route::get('reports/summary', [RentalReportController::class, 'summary'])
-            ->middleware($requires(VehicleRentalPermission::REPORTS_VIEW))
-            ->name('reports.summary');
     });
