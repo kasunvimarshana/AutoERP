@@ -34,6 +34,9 @@ function RentalCalculationDialogForm({
     const [submitting, setSubmitting] = useState(false);
     const customerSide = side === 'customer';
     const monthly = agreement?.billingBasis === 'monthly';
+    const firstEligibleMonth = firstCompleteMonth(agreement?.startsOn);
+    const lastEligibleMonth = lastCompleteMonth(agreement?.endsOn);
+    const hasEligibleMonth = !firstEligibleMonth || !lastEligibleMonth || firstEligibleMonth <= lastEligibleMonth;
     const title = customerSide ? 'Prepare customer billing period' : side === 'owner' ? 'Prepare owner settlement period' : 'New rental calculation';
     const actionLabel = customerSide ? 'Prepare billing' : side === 'owner' ? 'Prepare settlement' : 'Calculate';
 
@@ -91,13 +94,19 @@ function RentalCalculationDialogForm({
                             label="Billing month"
                             type="month"
                             required
-                            min={monthValue(agreement?.startsOn)}
-                            max={monthValue(agreement?.endsOn)}
+                            disabled={!hasEligibleMonth}
+                            min={firstEligibleMonth}
+                            max={lastEligibleMonth}
                             value={periodMonth}
                             error={fieldError(error, 'period_start') ?? fieldError(error, 'period_end')}
                             onChange={(event) => setPeriodMonth(event.target.value)}
                         />
                         <p className="text-sm text-slate-600">Monthly agreements are prepared for one complete calendar month. Partial-month proration is not configured.</p>
+                        {!hasEligibleMonth && (
+                            <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                                This agreement period does not contain a complete calendar month, so a monthly calculation cannot be prepared.
+                            </p>
+                        )}
                     </div>
                 ) : (
                     <div className="grid gap-4 md:grid-cols-2">
@@ -125,7 +134,7 @@ function RentalCalculationDialogForm({
                 )}
                 <div className="flex justify-end gap-2">
                     <Button type="button" variant="secondary" disabled={submitting} onClick={onClose}>Cancel</Button>
-                    <Button type="submit" loading={submitting}>{actionLabel}</Button>
+                    <Button type="submit" loading={submitting} disabled={monthly && !hasEligibleMonth}>{actionLabel}</Button>
                 </div>
             </form>
         </Modal>
@@ -139,6 +148,19 @@ function completeMonth(value: string): { start: string; end: string } {
     return { start: `${value}-01`, end };
 }
 
-function monthValue(value?: string | null): string | undefined {
-    return value ? value.slice(0, 7) : undefined;
+function firstCompleteMonth(value?: string | null): string | undefined {
+    if (!value) return undefined;
+    const [year, month, day] = value.split('-').map(Number);
+    if (!year || !month || !day) return value.slice(0, 7);
+    if (day === 1) return value.slice(0, 7);
+    return new Date(Date.UTC(year, month, 1)).toISOString().slice(0, 7);
+}
+
+function lastCompleteMonth(value?: string | null): string | undefined {
+    if (!value) return undefined;
+    const [year, month, day] = value.split('-').map(Number);
+    if (!year || !month || !day) return value.slice(0, 7);
+    const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+    if (day === lastDay) return value.slice(0, 7);
+    return new Date(Date.UTC(year, month - 2, 1)).toISOString().slice(0, 7);
 }
