@@ -91,8 +91,7 @@ final class InvoiceSourceAllocationService
         CreateInvoiceData $data,
         InvoiceSourceLineData $sourceLine,
         bool $lockRows,
-    ): string
-    {
+    ): string {
         $rows = InvoiceSourceLine::query()
             ->where('tenant_id', $data->tenantId)
             ->when(
@@ -107,6 +106,7 @@ final class InvoiceSourceAllocationService
             ->whereHas('invoice', fn ($query) => $query->whereNotIn('status', [
                 InvoiceStatus::Cancelled->value,
                 InvoiceStatus::Void->value,
+                InvoiceStatus::Reversed->value,
             ]))
             ->when($lockRows, fn ($query) => $query->lockForUpdate())
             ->get(['invoiced_quantity']);

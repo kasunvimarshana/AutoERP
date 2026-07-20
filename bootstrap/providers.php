@@ -25,6 +25,7 @@ use Modules\Tenant\Providers\TenantServiceProvider;
 use Modules\UOM\Providers\UomServiceProvider;
 use Modules\User\Providers\UserServiceProvider;
 use Modules\Vehicle\Providers\VehicleServiceProvider;
+use Modules\VehicleRental\Providers\VehicleRentalServiceProvider;
 use Modules\VehicleService\Providers\VehicleServiceServiceProvider;
 use Modules\Voucher\Providers\VoucherServiceProvider;
 use Modules\Warehouse\Providers\WarehouseServiceProvider;
@@ -55,6 +56,7 @@ return [
     CustomerServiceProvider::class,
     VehicleServiceProvider::class,
     VehicleServiceServiceProvider::class,
+    VehicleRentalServiceProvider::class,
     UomServiceProvider::class,
     AuditServiceProvider::class,
     WarehouseServiceProvider::class,
