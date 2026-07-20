@@ -12,11 +12,15 @@ use Modules\VehicleRental\Http\Requests\ListRentalRequest;
 use Modules\VehicleRental\Http\Resources\RentalCalculationResource;
 use Modules\VehicleRental\Models\RentalCalculation;
 use Modules\VehicleRental\Services\RentalCalculationService;
+use Modules\VehicleRental\Services\RentalFinancialDocumentService;
 
 final class RentalCalculationController extends RentalController
 {
-    public function index(ListRentalRequest $request, RentalCalculationService $service): AnonymousResourceCollection
-    {
+    public function index(
+        ListRentalRequest $request,
+        RentalCalculationService $service,
+        RentalFinancialDocumentService $financialDocuments,
+    ): AnonymousResourceCollection {
         $query = RentalCalculation::query()
             ->forContext($request->tenantId(), $request->organizationUnitId())
             ->with($service->relations())
@@ -38,12 +42,22 @@ final class RentalCalculationController extends RentalController
             $query->whereDate('period_start', '<=', $request->validated('date_to'));
         }
 
-        return RentalCalculationResource::collection($query->paginate($request->perPage()));
+        $paginator = $query->paginate($request->perPage());
+        $financialDocuments->attachFinancialDocuments($paginator->getCollection());
+
+        return RentalCalculationResource::collection($paginator);
     }
 
-    public function show(ListRentalRequest $request, int $calculation, RentalCalculationService $service): RentalCalculationResource
-    {
-        return new RentalCalculationResource($this->calculation($request, $calculation)->load($service->relations()));
+    public function show(
+        ListRentalRequest $request,
+        int $calculation,
+        RentalCalculationService $service,
+        RentalFinancialDocumentService $financialDocuments,
+    ): RentalCalculationResource {
+        $record = $this->calculation($request, $calculation)->load($service->relations());
+        $financialDocuments->attachFinancialDocuments(collect([$record]));
+
+        return new RentalCalculationResource($record);
     }
 
     public function calculate(
