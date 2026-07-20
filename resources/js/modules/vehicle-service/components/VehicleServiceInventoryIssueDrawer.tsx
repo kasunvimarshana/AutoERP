@@ -67,13 +67,15 @@ function VehicleServiceInventoryIssueDrawerForm({
         }, signal),
         [jobId, warehouse?.id, location?.id],
         open,
-        false,
     );
     const eligibleLine = line
         ? (eligibility.data ?? []).find((candidate) => candidate.id === line.id) ?? null
         : null;
     const exactLocationSelected = warehouse !== null && location !== null;
-    const canIssue = exactLocationSelected && eligibleLine?.issue_eligible !== false && eligibleLine !== null;
+    const canIssue = !eligibility.loading
+        && exactLocationSelected
+        && eligibleLine?.issue_eligible !== false
+        && eligibleLine !== null;
 
     const submit = async (event: FormEvent) => {
         event.preventDefault();
