@@ -71,38 +71,40 @@ export function VehicleServiceInventoryLocationFields({
     );
 
     return (
-        <>
+        <div className="space-y-3">
             <ErrorAlert error={defaultsError} inline />
-            <GenericLookupSelect
-                label="Issue warehouse"
-                value={value.warehouse}
-                onChange={(warehouse) => {
-                    warehouseTouched.current = true;
-                    locationTouched.current = false;
-                    setDefaultsError(null);
-                    onChange({ warehouse, location: null });
-                }}
-                search={searchWarehouses}
-                formatLabel={(warehouse) => `${warehouse.code ?? ''} ${warehouse.name}`.trim()}
-                disabled={disabled}
-                loadOnOpen
-                minSearchLength={0}
-            />
-            <GenericLookupSelect
-                label="Issue location"
-                value={value.location}
-                onChange={(location) => {
-                    locationTouched.current = true;
-                    setDefaultsError(null);
-                    onChange({ ...value, location });
-                }}
-                search={searchLocations}
-                formatLabel={(location) => `${location.code ?? ''} ${location.name}`.trim()}
-                placeholder={value.warehouse ? 'Select warehouse location' : 'Select a warehouse first'}
-                disabled={disabled || !value.warehouse}
-                loadOnOpen={Boolean(value.warehouse)}
-                minSearchLength={0}
-            />
-        </>
+            <div className="grid gap-4 sm:grid-cols-2">
+                <GenericLookupSelect
+                    label="Issue warehouse"
+                    value={value.warehouse}
+                    onChange={(warehouse) => {
+                        warehouseTouched.current = true;
+                        locationTouched.current = false;
+                        setDefaultsError(null);
+                        onChange({ warehouse, location: null });
+                    }}
+                    search={searchWarehouses}
+                    formatLabel={(warehouse) => `${warehouse.code ?? ''} ${warehouse.name}`.trim()}
+                    disabled={disabled}
+                    loadOnOpen
+                    minSearchLength={0}
+                />
+                <GenericLookupSelect
+                    label="Issue location"
+                    value={value.location}
+                    onChange={(location) => {
+                        locationTouched.current = true;
+                        setDefaultsError(null);
+                        onChange({ ...value, location });
+                    }}
+                    search={searchLocations}
+                    formatLabel={(location) => `${location.code ?? ''} ${location.name}`.trim()}
+                    placeholder={value.warehouse ? 'Select warehouse location' : 'Select a warehouse first'}
+                    disabled={disabled || !value.warehouse}
+                    loadOnOpen={Boolean(value.warehouse)}
+                    minSearchLength={0}
+                />
+            </div>
+        </div>
     );
 }
