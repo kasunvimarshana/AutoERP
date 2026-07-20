@@ -26,9 +26,10 @@ The Job Lines UI orchestrates the existing Inventory issue API. It does not calc
 - Added a Stock column with `Pending issue` and `Issued` states.
 - Reused the existing exact warehouse-location readiness check before posting.
 - Removed the Vehicle Service Inventory tab and its replaced frontend component.
-- Preserved inventory-only storekeeper access: users with Vehicle Service inventory permissions but without Job Line view permission see pending stock requirements inside the Job Lines tab without pricing or line-edit actions.
-- Kept line creation/edit/removal under Job Line permissions and stock status/issue actions under their existing Inventory permissions.
-- Kept all inventory endpoints, movement services, warehouse/location validation, and movement history unchanged.
+- Kept all inventory endpoints, movement services, permissions, warehouse/location validation, and movement history unchanged.
+- Kept Job Line create/edit/remove under `vehicle_service.lines.manage`.
+- Kept stock visibility and issue actions under the existing Inventory permissions.
+- Preserved inventory-only storekeeper access by showing only pending stock requirements in Job Lines without pricing or line-edit actions.
 
 ## Version and failure behavior
 
@@ -44,6 +45,16 @@ Create job line at version N
 If the second command fails, the first command is retained as a visible pending line and the job remains at version `N + 1`. This is the smallest safe change because it preserves recovery without introducing a cross-module transaction or compensating deletion.
 
 ## Verification
+
+Completed on the feature branch:
+
+- targeted inventory-flow tests: 6 passed;
+- existing Vehicle Service job-detail tests: 4 passed;
+- full frontend test suite: 76 files / 298 tests passed;
+- ESLint passed;
+- production Vite build passed.
+
+A test-only TypeScript assertion reported `TS2352` during the first typecheck run. The unnecessary `VehicleServiceLinePayload` to `Record<string, unknown>` assertion was removed at the source. Re-run the typecheck after pulling the latest branch commit.
 
 ```bash
 npx vitest run resources/js/modules/vehicle-service/vehicleServiceJobLineInventoryFlow.test.ts
@@ -73,9 +84,7 @@ Combo/package
 → verify inventory child has Issue stock recovery
 
 Inventory-only role
-→ open Job Lines
-→ verify only pending stock requirements and Issue stock actions are visible
-→ verify prices and line edit/remove actions remain hidden
+→ verify pending stock requirements are visible without pricing/edit controls
 ```
 
 No schema, backend Inventory rule, permission, invoice, payment, or accounting change is included.
