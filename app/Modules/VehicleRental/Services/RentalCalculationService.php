@@ -37,6 +37,7 @@ final class RentalCalculationService
     public function __construct(
         private readonly RentalCalculationEngine $engine,
         private readonly RentalNumberService $numbers,
+        private readonly RentalFinancialDocumentService $financialDocuments,
     ) {}
 
     public function calculate(RentalAgreement $agreement, RentalCalculationPeriodData $data): RentalCalculation
@@ -140,6 +141,7 @@ final class RentalCalculationService
             if (mb_strlen(trim($reason)) < 5) {
                 throw new InvalidArgumentException('Rental calculation cancellation reason must contain at least 5 characters.');
             }
+            $this->financialDocuments->assertNoActiveFinancialDocument($calculation);
 
             $sources = $calculation->sources()
                 ->where('active_marker', true)
