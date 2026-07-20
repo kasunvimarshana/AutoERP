@@ -6,6 +6,8 @@ use Illuminate\Support\Facades\Route;
 use Modules\VehicleRental\Constants\VehicleRentalPermission;
 use Modules\VehicleRental\Http\Controllers\RentalAgreementController;
 use Modules\VehicleRental\Http\Controllers\RentalAssignmentController;
+use Modules\VehicleRental\Http\Controllers\RentalCalculationController;
+use Modules\VehicleRental\Http\Controllers\RentalRunningChartController;
 
 $middleware = [
     'api',
@@ -52,5 +54,32 @@ Route::prefix('api/v1/vehicle-rental')
                 ->whereNumber('assignment')->name('assignments.custody');
             Route::post('assignments/{assignment}/cancel', [RentalAssignmentController::class, 'cancel'])
                 ->whereNumber('assignment')->name('assignments.cancel');
+        });
+
+        Route::middleware($requires(VehicleRentalPermission::RUNNING_CHARTS_VIEW))->group(function (): void {
+            Route::get('running-charts', [RentalRunningChartController::class, 'index'])->name('running-charts.index');
+            Route::get('running-charts/{runningChart}', [RentalRunningChartController::class, 'show'])
+                ->whereNumber('runningChart')->name('running-charts.show');
+        });
+        Route::middleware($requires(VehicleRentalPermission::RUNNING_CHARTS_MANAGE))->group(function (): void {
+            Route::post('running-charts', [RentalRunningChartController::class, 'store'])->name('running-charts.store');
+            Route::put('running-charts/{runningChart}', [RentalRunningChartController::class, 'update'])
+                ->whereNumber('runningChart')->name('running-charts.update');
+            Route::post('running-charts/{runningChart}/finalize', [RentalRunningChartController::class, 'finalize'])
+                ->whereNumber('runningChart')->name('running-charts.finalize');
+            Route::post('running-charts/{runningChart}/reverse', [RentalRunningChartController::class, 'reverse'])
+                ->whereNumber('runningChart')->name('running-charts.reverse');
+        });
+
+        Route::middleware($requires(VehicleRentalPermission::CALCULATIONS_VIEW))->group(function (): void {
+            Route::get('calculations', [RentalCalculationController::class, 'index'])->name('calculations.index');
+            Route::get('calculations/{calculation}', [RentalCalculationController::class, 'show'])
+                ->whereNumber('calculation')->name('calculations.show');
+        });
+        Route::middleware($requires(VehicleRentalPermission::CALCULATIONS_MANAGE))->group(function (): void {
+            Route::post('agreements/{agreement}/calculations', [RentalCalculationController::class, 'calculate'])
+                ->whereNumber('agreement')->name('agreements.calculations.store');
+            Route::post('calculations/{calculation}/cancel', [RentalCalculationController::class, 'cancel'])
+                ->whereNumber('calculation')->name('calculations.cancel');
         });
     });

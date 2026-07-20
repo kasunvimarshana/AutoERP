@@ -18,6 +18,7 @@ use Modules\VehicleRental\Models\RentalAssignment;
 use Modules\VehicleRental\Models\RentalCustodyEvent;
 use Modules\VehicleRental\Services\Validation\RentalAssignmentSourceGuard;
 use Modules\VehicleRental\Services\Validation\RentalAssignmentTimelineGuard;
+use Modules\VehicleRental\Services\Validation\RentalRunningChartTimelineGuard;
 
 final class RentalCustodyService
 {
@@ -25,6 +26,7 @@ final class RentalCustodyService
         private readonly DecimalMath $math,
         private readonly RentalAssignmentTimelineGuard $timeline,
         private readonly RentalAssignmentSourceGuard $sources,
+        private readonly RentalRunningChartTimelineGuard $runningCharts,
     ) {}
 
     public function record(
@@ -33,7 +35,12 @@ final class RentalCustodyService
         int $expectedVersion,
     ): RentalAssignment {
         return DB::transaction(function () use ($assignment, $data, $expectedVersion): RentalAssignment {
-            $assignment = RentalAssignment::query()->lockForUpdate()->findOrFail($assignment->getKey());
+            $tenantId = (int) $assignment->tenant_id;
+            $organizationUnitId = $assignment->organization_unit_id === null ? null : (int) $assignment->organization_unit_id;
+            $assignment = RentalAssignment::query()
+                ->forContext($tenantId, $organizationUnitId)
+                ->lockForUpdate()
+                ->findOrFail($assignment->getKey());
             $this->timeline->assertExpectedVersion($assignment, $expectedVersion);
             $this->assertTransition($assignment, $data);
             $eventAt = $this->timeline->dateTime($data->eventAt);
@@ -41,9 +48,12 @@ final class RentalCustodyService
             if ($data->eventType === RentalCustodyEventType::Handover) {
                 $this->revalidateForHandover($assignment, $eventAt);
             }
-            if ($data->eventType === RentalCustodyEventType::Return
-                && $assignment->side === RentalAssignmentSide::OwnerSupply) {
-                $this->sources->assertNoActiveDependents($assignment);
+            if ($data->eventType === RentalCustodyEventType::Return) {
+                $this->runningCharts->assertNoChartsAfterClosure($assignment, $eventAt);
+                $this->runningCharts->assertClosureOdometer($assignment, $eventAt, $data->odometer);
+                if ($assignment->side === RentalAssignmentSide::OwnerSupply) {
+                    $this->sources->assertNoActiveDependents($assignment);
+                }
             }
 
             $this->appendEvent(
