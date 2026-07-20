@@ -10,10 +10,12 @@ import { useApi } from '@/shared/hooks/useApi';
 import {
     createVehicleServiceLine,
     deleteVehicleServiceLine,
+    issueVehicleServiceInventory,
     listVehicleServiceLines,
     updateVehicleServiceLine,
 } from '../vehicleServiceApi';
 import type { VehicleServiceJobLine } from '../vehicleServiceTypes';
+import { VehicleServiceInventoryIssueDrawer } from './VehicleServiceInventoryIssueDrawer';
 import {
     emptyLineForm,
     formatLineItem,
@@ -49,6 +51,7 @@ export default function VehicleServiceLineEditor({
     const result = useApi((signal) => listVehicleServiceLines(jobId, signal), [jobId], true, false);
     const [dialog, setDialog] = useState<LineDialog | null>(null);
     const [removeTarget, setRemoveTarget] = useState<VehicleServiceJobLine | null>(null);
+    const [issueTarget, setIssueTarget] = useState<VehicleServiceJobLine | null>(null);
     const [saving, setSaving] = useState(false);
     const [removing, setRemoving] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
@@ -61,7 +64,7 @@ export default function VehicleServiceLineEditor({
         return () => window.clearTimeout(timeout);
     }, [toast]);
 
-    const saveLine = async (value: VehicleServiceLineFormValue) => {
+    const saveLine = async (value: VehicleServiceLineFormValue, issueStock: boolean) => {
         if (!dialog || saving) return;
         setSaving(true);
         setError(null);
@@ -76,9 +79,38 @@ export default function VehicleServiceLineEditor({
             } else {
                 const saved = await createVehicleServiceLine(jobId, payload);
                 const nextLines = appendLine(result.data ?? [], saved);
-                result.setData(nextLines);
-                setToast('Job line added.');
-                onChanged(nextLines, expectedVersion + 1);
+                const lineVersion = expectedVersion + 1;
+
+                if (issueStock && value.issueWarehouse && value.issueLocation) {
+                    try {
+                        const movements = await issueVehicleServiceInventory(jobId, {
+                            expected_version: lineVersion,
+                            warehouse_id: value.issueWarehouse.id,
+                            warehouse_location_id: value.issueLocation.id,
+                            line_ids: [saved.id],
+                        });
+                        const movement = movements.find((candidate) => candidate.source_line_id === saved.id);
+                        const issuedLine = {
+                            ...saved,
+                            inventory_movement_id: movement?.id ?? saved.inventory_movement_id ?? null,
+                            issue_eligible: false,
+                            inventory_warning: null,
+                        };
+                        const issuedLines = replaceLine(nextLines, issuedLine);
+                        result.setData(issuedLines);
+                        setToast('Job line added and stock issued.');
+                        onChanged(issuedLines, lineVersion + 1);
+                    } catch (requestError) {
+                        result.setData(nextLines);
+                        setToast('Job line added. Stock issue is still pending.');
+                        setError(toApiError(requestError));
+                        onChanged(nextLines, lineVersion);
+                    }
+                } else {
+                    result.setData(nextLines);
+                    setToast('Job line added.');
+                    onChanged(nextLines, lineVersion);
+                }
             }
             setDialog(null);
         } catch (requestError) {
@@ -106,6 +138,20 @@ export default function VehicleServiceLineEditor({
         }
     };
 
+    const handleStockIssued = async (nextVersion: number) => {
+        const currentLines = result.data ?? [];
+        onChanged(currentLines, nextVersion);
+        setToast('Stock issued successfully.');
+        setError(null);
+        try {
+            const freshLines = await listVehicleServiceLines(jobId);
+            result.setData(freshLines);
+            onChanged(freshLines, nextVersion);
+        } catch (requestError) {
+            setError(toApiError(requestError));
+        }
+    };
+
     return (
         <div className="space-y-5">
             <ErrorAlert error={error ?? result.error} />
@@ -122,11 +168,16 @@ export default function VehicleServiceLineEditor({
                     setDialog({ mode: 'edit', lineId: line.id, value: lineToForm(line) });
                 }}
                 onRemove={setRemoveTarget}
+                onIssue={(line) => {
+                    setError(null);
+                    setIssueTarget(line);
+                }}
             />
             <FormDrawer
                 open={Boolean(dialog)}
                 title={dialog?.mode === 'edit' ? 'Edit line' : 'Add line'}
                 onClose={() => !saving && setDialog(null)}
+                closeDisabled={saving}
             >
                 {dialog && (
                     <VehicleServiceLineForm
@@ -136,10 +187,18 @@ export default function VehicleServiceLineEditor({
                         error={error}
                         saving={saving}
                         onCancel={() => setDialog(null)}
-                        onSave={(value) => void saveLine(value)}
+                        onSave={(value, issueStock) => void saveLine(value, issueStock)}
                     />
                 )}
             </FormDrawer>
+            <VehicleServiceInventoryIssueDrawer
+                open={Boolean(issueTarget)}
+                jobId={jobId}
+                line={issueTarget}
+                expectedVersion={expectedVersion}
+                onClose={() => setIssueTarget(null)}
+                onIssued={(nextVersion) => void handleStockIssued(nextVersion)}
+            />
             <ConfirmDialog
                 open={Boolean(removeTarget)}
                 title="Remove line"
@@ -169,26 +228,32 @@ function removeLineFromList(lines: VehicleServiceJobLine[], lineId: number): Veh
         .map((line, index) => ({ ...line, line_number: index + 1 }));
 }
 
-function VehicleServiceLineTable({ lines, loading, onAdd, onEdit, onRemove }: {
+function VehicleServiceLineTable({ lines, loading, onAdd, onEdit, onRemove, onIssue }: {
     lines: VehicleServiceJobLine[];
     loading: boolean;
     onAdd: () => void;
     onEdit: (line: VehicleServiceJobLine) => void;
     onRemove: (line: VehicleServiceJobLine) => void;
+    onIssue: (line: VehicleServiceJobLine) => void;
 }) {
     const rows = buildVehicleServiceLineDisplayRows(lines);
     const columns: DataColumn<VehicleServiceLineDisplayRow>[] = [
         { key: 'item', header: 'Item', render: renderLineItemCell },
         { key: 'quantity', header: 'Qty', render: (row) => renderLineMetric(row, row.line.quantity), className: 'tabular-nums' },
         { key: 'uom', header: 'UOM', render: (row) => renderLineMetric(row, row.line.uom?.code ?? '-') },
+        { key: 'stock', header: 'Stock', render: (row) => renderStockState(row.line) },
         { key: 'price', header: 'Unit price', render: renderLineUnitPrice, className: 'tabular-nums' },
         { key: 'total', header: 'Total', render: renderLineTotal, className: 'tabular-nums font-semibold' },
         {
             key: 'actions',
             header: 'Actions',
             className: 'text-right',
-            render: (row) => row.isComboChild ? null : (
-                <LineActions onEdit={() => onEdit(row.line)} onRemove={() => onRemove(row.line)} />
+            render: (row) => (
+                <LineActions
+                    onEdit={row.isComboChild ? undefined : () => onEdit(row.line)}
+                    onRemove={row.isComboChild ? undefined : () => onRemove(row.line)}
+                    onIssue={canIssueLine(row.line) ? () => onIssue(row.line) : undefined}
+                />
             ),
         },
     ];
@@ -208,10 +273,11 @@ function VehicleServiceLineTable({ lines, loading, onAdd, onEdit, onRemove }: {
                         emptyMessage="No lines added yet. Click Add line to start."
                         mobileSummary={(row) => renderMobileSummary(row)}
                         mobileDetails={(row) => <LineMobileDetails row={row} />}
-                        mobileActions={(row) => row.isComboChild ? null : (
+                        mobileActions={(row) => (
                             <LineActions
-                                onEdit={() => onEdit(row.line)}
-                                onRemove={() => onRemove(row.line)}
+                                onEdit={row.isComboChild ? undefined : () => onEdit(row.line)}
+                                onRemove={row.isComboChild ? undefined : () => onRemove(row.line)}
+                                onIssue={canIssueLine(row.line) ? () => onIssue(row.line) : undefined}
                             />
                         )}
                         rowClassName={lineRowClassName}
@@ -221,36 +287,57 @@ function VehicleServiceLineTable({ lines, loading, onAdd, onEdit, onRemove }: {
     );
 }
 
-function LineActions({ onEdit, onRemove }: { onEdit: () => void; onRemove: () => void }) {
+function LineActions({ onEdit, onRemove, onIssue }: {
+    onEdit?: () => void;
+    onRemove?: () => void;
+    onIssue?: () => void;
+}) {
+    if (!onEdit && !onRemove && !onIssue) return null;
+
     return (
         <div className="flex justify-end gap-2">
-            <button
-                type="button"
-                className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-sky-700 transition hover:border-sky-200 hover:bg-sky-50"
-                onClick={onEdit}
-                aria-label="Edit line"
-                title="Edit line"
-            >
-                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.9" className="h-5 w-5" aria-hidden="true">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.75v2.5h2.5L14.5 8l-2.5-2.5-8.25 8.25Z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" d="m10.75 4.75 2.5 2.5" />
-                </svg>
-            </button>
-            <button
-                type="button"
-                className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-rose-600 transition hover:border-rose-200 hover:bg-rose-50"
-                onClick={onRemove}
-                aria-label="Remove line"
-                title="Remove line"
-            >
-                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.9" className="h-5 w-5" aria-hidden="true">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M5.75 7.25h8.5" />
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M8 7.25V5.75a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1.5" />
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M7 7.25v6a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-6" />
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.75 9.25v3" />
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 9.25v3" />
-                </svg>
-            </button>
+            {onIssue && (
+                <button
+                    type="button"
+                    className="inline-flex h-10 items-center justify-center rounded-xl border border-emerald-200 px-3 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-50"
+                    onClick={onIssue}
+                    aria-label="Issue stock"
+                    title="Issue stock"
+                >
+                    Issue stock
+                </button>
+            )}
+            {onEdit && (
+                <button
+                    type="button"
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-sky-700 transition hover:border-sky-200 hover:bg-sky-50"
+                    onClick={onEdit}
+                    aria-label="Edit line"
+                    title="Edit line"
+                >
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.9" className="h-5 w-5" aria-hidden="true">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.75v2.5h2.5L14.5 8l-2.5-2.5-8.25 8.25Z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="m10.75 4.75 2.5 2.5" />
+                    </svg>
+                </button>
+            )}
+            {onRemove && (
+                <button
+                    type="button"
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-rose-600 transition hover:border-rose-200 hover:bg-rose-50"
+                    onClick={onRemove}
+                    aria-label="Remove line"
+                    title="Remove line"
+                >
+                    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.9" className="h-5 w-5" aria-hidden="true">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5.75 7.25h8.5" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M8 7.25V5.75a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1.5" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M7 7.25v6a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-6" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M8.75 9.25v3" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 9.25v3" />
+                    </svg>
+                </button>
+            )}
         </div>
     );
 }
@@ -261,8 +348,9 @@ function LineMobileDetails({ row }: { row: VehicleServiceLineDisplayRow }) {
         <div className={`grid grid-cols-2 gap-2 ${row.isComboChild ? CHILD_LINE_INDENT_CLASS : ''}`}>
             <SummaryValue label="Qty" value={line.quantity} />
             <SummaryValue label="UOM" value={line.uom?.code ?? '-'} />
+            <SummaryValue label="Stock" value={stockStateLabel(line)} />
             <SummaryValue label="Price" value={row.isComboChild && !line.is_billable ? 'Included in pack' : line.unit_price} />
-            <SummaryValue label="Total" value={row.isComboChild && !line.is_billable ? line.line_total : line.line_total} />
+            <SummaryValue label="Total" value={line.line_total} />
         </div>
     );
 }
@@ -401,4 +489,27 @@ function lineRowClassName(row: VehicleServiceLineDisplayRow): string | undefined
     if (row.isComboParent) return 'bg-sky-50/60';
     if (row.isComboChild) return 'bg-slate-50/70';
     return undefined;
+}
+
+function canIssueLine(line: VehicleServiceJobLine): boolean {
+    return line.is_inventory_tracked
+        && !line.is_customer_supplied
+        && line.inventory_movement_id == null
+        && line.status !== 'cancelled';
+}
+
+function stockStateLabel(line: VehicleServiceJobLine): string {
+    if (!line.is_inventory_tracked || line.is_customer_supplied) return '-';
+    return line.inventory_movement_id == null ? 'Pending issue' : 'Issued';
+}
+
+function renderStockState(line: VehicleServiceJobLine) {
+    const label = stockStateLabel(line);
+    if (label === '-') return <span className="text-slate-400">-</span>;
+
+    return (
+        <span className={`rounded-full px-2 py-1 text-xs font-semibold ${label === 'Issued' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-800'}`}>
+            {label}
+        </span>
+    );
 }
