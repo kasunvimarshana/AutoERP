@@ -49,6 +49,16 @@ function relationLabel(value?: RentalReference | null): string {
     return value?.name || value?.code || '—';
 }
 
+function agreementReference(agreement: RentalAgreement): RentalReference {
+    const party = agreement.customer ?? agreement.supplier;
+
+    return {
+        id: agreement.id,
+        code: agreement.agreement_number,
+        name: party?.name || party?.code || agreement.agreement_number,
+    };
+}
+
 function dateLabel(value?: string | null): string {
     if (!value) return '—';
     const parsed = new Date(value);
@@ -68,8 +78,8 @@ function periodLabel(start?: string | null, end?: string | null): string {
 function OverviewPage() {
     const auth = useAuth();
     const workspaces = [
-        { label: 'Agreements', description: 'Customer and owner agreements, draft editing, activation, closure, and effective rate versions.', to: '/vehicle-rental/agreements', permission: vehicleRentalPermissions.agreementsView },
-        { label: 'Vehicle assignments', description: 'Create assignments and record handover, return, replacement, or cancellation.', to: '/vehicle-rental/assignments', permission: vehicleRentalPermissions.assignmentsView },
+        { label: 'Agreements', description: 'Customer and owner agreements, vehicle selection, draft editing, activation, closure, and effective rate versions.', to: '/vehicle-rental/agreements', permission: vehicleRentalPermissions.agreementsView },
+        { label: 'Vehicle assignments', description: 'Review assignments and record handover, return, replacement, or cancellation.', to: '/vehicle-rental/assignments', permission: vehicleRentalPermissions.assignmentsView },
         { label: 'Running charts', description: 'Create and edit daily drafts, then finalize or reverse physical usage evidence.', to: '/vehicle-rental/running-charts', permission: vehicleRentalPermissions.runningChartsView },
         { label: 'Calculations', description: 'Create immutable customer and owner snapshots and cancel them to release their sources.', to: '/vehicle-rental/calculations', permission: vehicleRentalPermissions.calculationsView },
     ].filter((workspace) => hasPermission(auth, workspace.permission));
@@ -93,6 +103,8 @@ function OverviewPage() {
 function AgreementsPage() {
     const auth = useAuth();
     const canManage = hasPermission(auth, vehicleRentalPermissions.agreementsManage);
+    const canAssign = hasPermission(auth, vehicleRentalPermissions.assignmentsManage);
+    const canAct = canManage || canAssign;
     const { confirm, confirmDialog } = useConfirmDialog();
     const [search, setSearch] = useState('');
     const [kind, setKind] = useState('');
@@ -101,6 +113,7 @@ function AgreementsPage() {
     const [formOpen, setFormOpen] = useState(false);
     const [editing, setEditing] = useState<RentalAgreement | null>(null);
     const [rateAgreement, setRateAgreement] = useState<RentalAgreement | null>(null);
+    const [assignmentAgreement, setAssignmentAgreement] = useState<RentalAgreement | null>(null);
     const [busyId, setBusyId] = useState<number | null>(null);
     const [actionError, setActionError] = useState<ApiError | null>(null);
     const debouncedSearch = useDebounce(search);
@@ -136,15 +149,16 @@ function AgreementsPage() {
         { key: 'period', header: 'Period', render: (row) => periodLabel(row.starts_on, row.ends_on) },
         { key: 'basis', header: 'Basis', render: (row) => row.billing_basis },
         { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.status} /> },
-        ...(canManage ? [{
+        ...(canAct ? [{
             key: 'actions',
             header: 'Actions',
             render: (row: RentalAgreement) => (
                 <div className="flex flex-wrap gap-2">
-                    {row.status === 'draft' && <Button variant="secondary" className="min-h-9 px-3 py-1.5" onClick={() => { setEditing(row); setFormOpen(true); }}>Edit</Button>}
-                    {row.status === 'draft' && <Button className="min-h-9 px-3 py-1.5" loading={busyId === row.id} onClick={() => void activate(row)}>Activate</Button>}
-                    {row.status === 'active' && <Button variant="secondary" className="min-h-9 px-3 py-1.5" onClick={() => setRateAgreement(row)}>New rates</Button>}
-                    {row.status === 'active' && <Button variant="danger" className="min-h-9 px-3 py-1.5" loading={busyId === row.id} onClick={() => void close(row)}>Close</Button>}
+                    {canManage && row.status === 'draft' && <Button variant="secondary" className="min-h-9 px-3 py-1.5" onClick={() => { setEditing(row); setFormOpen(true); }}>Edit</Button>}
+                    {canManage && row.status === 'draft' && <Button className="min-h-9 px-3 py-1.5" loading={busyId === row.id} onClick={() => void activate(row)}>Activate</Button>}
+                    {canAssign && row.status === 'active' && <Button className="min-h-9 px-3 py-1.5" onClick={() => setAssignmentAgreement(row)}>Select vehicle</Button>}
+                    {canManage && row.status === 'active' && <Button variant="secondary" className="min-h-9 px-3 py-1.5" onClick={() => setRateAgreement(row)}>New rates</Button>}
+                    {canManage && row.status === 'active' && <Button variant="danger" className="min-h-9 px-3 py-1.5" loading={busyId === row.id} onClick={() => void close(row)}>Close</Button>}
                 </div>
             ),
         } as DataColumn<RentalAgreement>] : []),
@@ -163,6 +177,14 @@ function AgreementsPage() {
             <Pagination meta={result.data?.meta} onPageChange={setPage} />
             <RentalAgreementDialog open={formOpen} agreement={editing} onClose={() => { setFormOpen(false); setEditing(null); }} onSaved={() => result.reload()} />
             <RentalRateVersionDialog open={Boolean(rateAgreement)} agreement={rateAgreement} onClose={() => setRateAgreement(null)} onSaved={() => result.reload()} />
+            <RentalAssignmentDialog
+                open={Boolean(assignmentAgreement)}
+                agreement={assignmentAgreement ? agreementReference(assignmentAgreement) : null}
+                side={assignmentAgreement?.kind === 'owner' ? 'owner_supply' : 'customer_use'}
+                lockAgreement
+                onClose={() => setAssignmentAgreement(null)}
+                onSaved={() => setAssignmentAgreement(null)}
+            />
             {confirmDialog}
         </>
     );
