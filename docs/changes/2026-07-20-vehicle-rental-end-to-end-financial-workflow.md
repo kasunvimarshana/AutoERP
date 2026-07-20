@@ -79,7 +79,8 @@ Posted Customer Invoices and Owner Payable Vouchers are immutable. Correction fo
 ## Permissions
 
 - Rental calculation viewing also protects derived Rental reports.
-- Rental calculation management protects billing-period preparation, owner-settlement preparation, financial-document creation, and calculation cancellation.
+- Rental calculation management protects billing-period preparation, owner-settlement preparation, and calculation cancellation.
+- `vehicle_rental.financial_documents.manage` separately protects Customer Invoice and Owner Payable Voucher creation/posting.
 - Invoice and Payment links are shown only when the user has the corresponding owner-module permission.
 
 ## Verification commands
