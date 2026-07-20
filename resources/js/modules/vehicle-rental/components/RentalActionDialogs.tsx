@@ -1,20 +1,11 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Modal } from '@/shared/components/Modal';
 import { Textarea } from '@/shared/components/Textarea';
 
-export function RentalReasonDialog({
-    open,
-    title,
-    message,
-    confirmLabel,
-    danger = true,
-    minLength = 5,
-    onClose,
-    onConfirm,
-}: {
+interface RentalReasonDialogProps {
     open: boolean;
     title: string;
     message: string;
@@ -23,17 +14,26 @@ export function RentalReasonDialog({
     minLength?: number;
     onClose: () => void;
     onConfirm: (reason: string) => Promise<void>;
-}) {
+}
+
+export function RentalReasonDialog(props: RentalReasonDialogProps) {
+    const identity = `${props.open ? 'open' : 'closed'}:${props.title}:${props.confirmLabel}`;
+    return <RentalReasonDialogForm key={identity} {...props} />;
+}
+
+function RentalReasonDialogForm({
+    open,
+    title,
+    message,
+    confirmLabel,
+    danger = true,
+    minLength = 5,
+    onClose,
+    onConfirm,
+}: RentalReasonDialogProps) {
     const [reason, setReason] = useState('');
     const [error, setError] = useState<ApiError | null>(null);
     const [submitting, setSubmitting] = useState(false);
-
-    useEffect(() => {
-        if (!open) return;
-        setReason('');
-        setError(null);
-        setSubmitting(false);
-    }, [open]);
 
     const submit = async (event: FormEvent) => {
         event.preventDefault();
