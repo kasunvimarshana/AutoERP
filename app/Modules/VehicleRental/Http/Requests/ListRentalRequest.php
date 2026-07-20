@@ -9,6 +9,7 @@ use Modules\Core\Http\Requests\TenantScopedRequest;
 use Modules\VehicleRental\Enums\RentalAgreementKind;
 use Modules\VehicleRental\Enums\RentalAgreementStatus;
 use Modules\VehicleRental\Enums\RentalAssignmentSide;
+use Modules\VehicleRental\Enums\RentalAssignmentStatus;
 use Modules\VehicleRental\Enums\RentalCalculationSide;
 use Modules\VehicleRental\Enums\RentalCalculationStatus;
 use Modules\VehicleRental\Enums\RentalRunningChartStatus;
@@ -22,6 +23,7 @@ final class ListRentalRequest extends TenantScopedRequest
             'kind' => ['nullable', Rule::enum(RentalAgreementKind::class)],
             'agreement_status' => ['nullable', Rule::enum(RentalAgreementStatus::class)],
             'assignment_side' => ['nullable', Rule::enum(RentalAssignmentSide::class)],
+            'assignment_status' => ['nullable', Rule::enum(RentalAssignmentStatus::class)],
             'running_chart_status' => ['nullable', Rule::enum(RentalRunningChartStatus::class)],
             'calculation_side' => ['nullable', Rule::enum(RentalCalculationSide::class)],
             'calculation_status' => ['nullable', Rule::enum(RentalCalculationStatus::class)],
