@@ -61,6 +61,21 @@ final class RentalAssignmentSourceValidationContractTest extends TestCase
         self::assertStringNotContainsString('orWhereDate(\'ends_at\'', $source);
     }
 
+    public function test_owner_vehicle_lookup_matches_the_agreement_supplier_and_complete_ownership_period(): void
+    {
+        $source = $this->source(RentalLookupController::class);
+
+        self::assertStringContainsString('function ownerAgreementVehicles', $source);
+        self::assertStringContainsString('RentalAgreementKind::Owner', $source);
+        self::assertStringContainsString("->whereHas('ownerships'", $source);
+        self::assertStringContainsString('VehicleOwnerType::Supplier->value', $source);
+        self::assertStringContainsString("->where('owner_id', $supplierId)", $source);
+        self::assertStringContainsString("->where('started_at', '<=', $startsAt)", $source);
+        self::assertStringContainsString("->orWhere('ended_at', '>=', $endsAt)", $source);
+        self::assertStringNotContainsString('VehicleOwnership::create', $source);
+        self::assertStringNotContainsString('VehicleOwnership::query()->create', $source);
+    }
+
     public function test_planning_and_operational_source_eligibility_share_one_exact_period_boundary(): void
     {
         $guard = $this->source(RentalAssignmentSourceGuard::class);
