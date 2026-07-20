@@ -14,7 +14,8 @@ The frontend-entry batch intentionally stopped at read visibility. Mutation inte
 - Added a Vehicle Rental-owned agreement-form lookup endpoint. Active tax-group visibility and agreement validation now share one query source of truth.
 - Added agreement activation, closure, and effective successor-rate actions with optimistic row-version protection.
 - Added assignment creation, handover, return, replacement, and planned-assignment cancellation.
-- Added scalable agreement and assignment lookup support; assignment list filtering now owns search and status filters in the Vehicle Rental backend.
+- Added workflow-owned agreement and assignment lookup endpoints guarded by the relevant Vehicle Rental manage permission, avoiding hidden dependencies on unrelated Vehicle Rental view permissions.
+- Added scalable assignment list filtering with owned search and status filters in the Vehicle Rental backend.
 - Added running-chart draft creation/editing, finalization, and reversal with the complete operational evidence fields.
 - Added customer/owner calculation creation and cancellation. Calculation records remain immutable; cancellation releases only that side's source locks.
 - Added permission-aware management controls. Tenant-plan enablement still controls module availability, while `vehicle_rental.*.manage` permissions control mutations.
