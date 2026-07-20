@@ -5,21 +5,21 @@ declare(strict_types=1);
 namespace Modules\VehicleRental\Services\Validation;
 
 use Carbon\CarbonImmutable;
-use Illuminate\Database\Eloquent\Builder;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Customer\Models\Customer;
 use Modules\ReferenceData\Models\CurrencyModel;
 use Modules\Supplier\Models\Supplier;
-use Modules\Tax\Models\TaxGroup;
 use Modules\VehicleRental\DTOs\RentalAgreementData;
 use Modules\VehicleRental\Enums\RentalAgreementKind;
+use Modules\VehicleRental\Services\Lookups\RentalAgreementReferenceQuery;
 
 final class RentalAgreementValidator
 {
     public function __construct(
         private readonly DecimalMath $math,
         private readonly RentalRatePolicy $rates,
+        private readonly RentalAgreementReferenceQuery $references,
     ) {}
 
     public function validateData(RentalAgreementData $data): void
@@ -87,24 +87,10 @@ final class RentalAgreementValidator
             ->firstOrFail();
 
         if ($taxGroupId !== null) {
-            $this->activeTaxGroupQuery($tenantId, $organizationUnitId)
+            $this->references
+                ->activeTaxGroups($tenantId, $organizationUnitId)
                 ->lockForUpdate()
                 ->findOrFail($taxGroupId);
         }
-    }
-
-    private function activeTaxGroupQuery(int $tenantId, ?int $organizationUnitId): Builder
-    {
-        return TaxGroup::query()
-            ->where('tenant_id', $tenantId)
-            ->where('active', true)
-            ->when(
-                $organizationUnitId === null,
-                fn (Builder $query): Builder => $query->whereNull('organization_unit_id'),
-                fn (Builder $query): Builder => $query->where(function (Builder $scope) use ($organizationUnitId): void {
-                    $scope->whereNull('organization_unit_id')
-                        ->orWhere('organization_unit_id', $organizationUnitId);
-                }),
-            );
     }
 }
