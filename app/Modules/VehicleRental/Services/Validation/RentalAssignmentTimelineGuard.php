@@ -144,6 +144,9 @@ final class RentalAssignmentTimelineGuard
         if ($ignoreAssignmentId !== null) {
             $query->whereKeyNot($ignoreAssignmentId);
         }
+        if ($data->side === RentalAssignmentSide::CustomerUse && $data->sourceAssignmentId !== null) {
+            $query->whereKeyNot($data->sourceAssignmentId);
+        }
         if ($query->exists()) {
             throw new InvalidArgumentException('The selected driver already has an overlapping rental assignment.');
         }
