@@ -7,7 +7,7 @@ import { searchCurrencies } from '@/shared/api/referenceApi';
 import { GenericLookupSelect } from '@/shared/components/GenericLookupSelect';
 import type { NamedResource } from '@/shared/types/common';
 import type { LookupLoadParams, LookupResult } from '@/shared/types/lookup';
-import { listRentalAgreements, listRentalAssignments } from '../vehicleRentalApi';
+import { listRentalAgreementLookup, listRentalAssignmentLookup } from '../vehicleRentalApi';
 import type {
     RentalAgreement,
     RentalAgreementKind,
@@ -96,12 +96,13 @@ export function RentalAgreementLookup({
     value,
     onChange,
     kind,
+    purpose,
     error,
     disabled,
     required,
-}: LookupProps & { kind?: RentalAgreementKind }) {
+}: LookupProps & { kind?: RentalAgreementKind; purpose: 'assignment' | 'calculation' }) {
     const search = useCallback(async (params: LookupLoadParams) => {
-        const result = await listRentalAgreements({
+        const result = await listRentalAgreementLookup(purpose, {
             search: params.search || undefined,
             kind,
             agreement_status: 'active',
@@ -110,7 +111,7 @@ export function RentalAgreementLookup({
         }, params.signal);
 
         return mapResult(result, agreementOption);
-    }, [kind]);
+    }, [kind, purpose]);
 
     return <ReferenceLookup label={kind === 'owner' ? 'Owner agreement' : kind === 'customer' ? 'Customer agreement' : 'Agreement'} value={value} onChange={onChange} search={search} error={error} disabled={disabled} required={required} loadOnOpen />;
 }
@@ -119,13 +120,14 @@ export function RentalAssignmentLookup({
     value,
     onChange,
     side,
+    purpose,
     error,
     disabled,
     required,
     label = 'Assignment',
-}: LookupProps & { side?: RentalAssignmentSide; label?: string }) {
+}: LookupProps & { side?: RentalAssignmentSide; label?: string; purpose: 'assignment-source' | 'running-chart' }) {
     const search = useCallback(async (params: LookupLoadParams) => {
-        const result = await listRentalAssignments({
+        const result = await listRentalAssignmentLookup(purpose, {
             search: params.search || undefined,
             assignment_side: side,
             assignment_status: 'active',
@@ -134,7 +136,7 @@ export function RentalAssignmentLookup({
         }, params.signal);
 
         return mapResult(result, assignmentOption);
-    }, [side]);
+    }, [purpose, side]);
 
     return <ReferenceLookup label={label} value={value} onChange={onChange} search={search} error={error} disabled={disabled} required={required} loadOnOpen />;
 }
