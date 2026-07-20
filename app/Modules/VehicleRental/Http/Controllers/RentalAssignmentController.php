@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\VehicleRental\Http\Controllers;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Modules\VehicleRental\Http\Requests\ListRentalRequest;
@@ -33,6 +34,19 @@ final class RentalAssignmentController extends RentalController
         }
         if ($request->filled('assignment_side')) {
             $query->where('side', $request->validated('assignment_side'));
+        }
+        if ($request->filled('assignment_status')) {
+            $query->where('status', $request->validated('assignment_status'));
+        }
+        if ($request->filled('search')) {
+            $search = trim((string) $request->validated('search'));
+            $query->where(function (Builder $scope) use ($search): void {
+                $scope->whereHas('agreement', fn (Builder $agreement): Builder => $agreement
+                    ->where('agreement_number', 'like', "%{$search}%"))
+                    ->orWhereHas('vehicle', fn (Builder $vehicle): Builder => $vehicle
+                        ->where('vehicle_number', 'like', "%{$search}%")
+                        ->orWhere('registration_number', 'like', "%{$search}%"));
+            });
         }
 
         return RentalAssignmentResource::collection($query->paginate($request->perPage()));

@@ -7,6 +7,7 @@ use Modules\VehicleRental\Constants\VehicleRentalPermission;
 use Modules\VehicleRental\Http\Controllers\RentalAgreementController;
 use Modules\VehicleRental\Http\Controllers\RentalAssignmentController;
 use Modules\VehicleRental\Http\Controllers\RentalCalculationController;
+use Modules\VehicleRental\Http\Controllers\RentalLookupController;
 use Modules\VehicleRental\Http\Controllers\RentalRunningChartController;
 
 $middleware = [
@@ -30,6 +31,8 @@ Route::prefix('api/v1/vehicle-rental')
                 ->whereNumber('agreement')->name('agreements.show');
         });
         Route::middleware($requires(VehicleRentalPermission::AGREEMENTS_MANAGE))->group(function (): void {
+            Route::get('lookups/agreement-form', [RentalLookupController::class, 'agreementForm'])
+                ->name('lookups.agreement-form');
             Route::post('agreements', [RentalAgreementController::class, 'store'])->name('agreements.store');
             Route::put('agreements/{agreement}', [RentalAgreementController::class, 'update'])
                 ->whereNumber('agreement')->name('agreements.update');
@@ -47,6 +50,10 @@ Route::prefix('api/v1/vehicle-rental')
                 ->whereNumber('assignment')->name('assignments.show');
         });
         Route::middleware($requires(VehicleRentalPermission::ASSIGNMENTS_MANAGE))->group(function (): void {
+            Route::get('lookups/assignment-agreements', [RentalLookupController::class, 'assignmentAgreements'])
+                ->name('lookups.assignment-agreements');
+            Route::get('lookups/assignment-sources', [RentalLookupController::class, 'assignmentSources'])
+                ->name('lookups.assignment-sources');
             Route::post('assignments', [RentalAssignmentController::class, 'store'])->name('assignments.store');
             Route::post('assignments/{assignment}/replace', [RentalAssignmentController::class, 'replace'])
                 ->whereNumber('assignment')->name('assignments.replace');
@@ -62,6 +69,8 @@ Route::prefix('api/v1/vehicle-rental')
                 ->whereNumber('runningChart')->name('running-charts.show');
         });
         Route::middleware($requires(VehicleRentalPermission::RUNNING_CHARTS_MANAGE))->group(function (): void {
+            Route::get('lookups/running-chart-assignments', [RentalLookupController::class, 'runningChartAssignments'])
+                ->name('lookups.running-chart-assignments');
             Route::post('running-charts', [RentalRunningChartController::class, 'store'])->name('running-charts.store');
             Route::put('running-charts/{runningChart}', [RentalRunningChartController::class, 'update'])
                 ->whereNumber('runningChart')->name('running-charts.update');
@@ -77,6 +86,8 @@ Route::prefix('api/v1/vehicle-rental')
                 ->whereNumber('calculation')->name('calculations.show');
         });
         Route::middleware($requires(VehicleRentalPermission::CALCULATIONS_MANAGE))->group(function (): void {
+            Route::get('lookups/calculation-agreements', [RentalLookupController::class, 'calculationAgreements'])
+                ->name('lookups.calculation-agreements');
             Route::post('agreements/{agreement}/calculations', [RentalCalculationController::class, 'calculate'])
                 ->whereNumber('agreement')->name('agreements.calculations.store');
             Route::post('calculations/{calculation}/cancel', [RentalCalculationController::class, 'cancel'])
