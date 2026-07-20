@@ -15,13 +15,19 @@ use ReflectionClass;
 
 final class RentalAssignmentSourceValidationContractTest extends TestCase
 {
-    public function test_linked_owner_supply_driver_is_not_treated_as_a_separate_booking(): void
+    public function test_linked_owner_supply_and_customer_use_share_driver_without_becoming_separate_bookings(): void
     {
         $source = $this->source(RentalAssignmentTimelineGuard::class);
 
         self::assertStringContainsString('RentalAssignmentSide::CustomerUse', $source);
         self::assertStringContainsString('$data->sourceAssignmentId !== null', $source);
         self::assertStringContainsString('$query->whereKeyNot($data->sourceAssignmentId)', $source);
+        self::assertStringContainsString('RentalAssignmentSide::OwnerSupply', $source);
+        self::assertStringContainsString('$ignoreAssignmentId !== null', $source);
+        self::assertStringContainsString('$scope->where(\'side\', \'!=\', RentalAssignmentSide::CustomerUse->value)', $source);
+        self::assertStringContainsString('->orWhereNull(\'source_assignment_id\')', $source);
+        self::assertStringContainsString('->orWhere(\'source_assignment_id\', \'!=\', $ignoreAssignmentId)', $source);
+        self::assertStringContainsString('The selected driver already has an overlapping rental assignment.', $source);
     }
 
     public function test_owner_supply_lookup_uses_planning_statuses_and_calendar_date_coverage(): void
