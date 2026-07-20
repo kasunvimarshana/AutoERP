@@ -8,12 +8,26 @@ const expectedPrimaryLinks = [
     '/vehicle-rental',
     '/vehicle-rental/owner-agreements',
     '/vehicle-rental/customer-agreements',
+    '/vehicle-rental/assignments',
     '/vehicle-rental/running-charts',
     '/vehicle-rental/customer-invoices',
     '/vehicle-rental/owner-settlements',
     '/vehicle-rental/customer-receipts',
     '/vehicle-rental/owner-payments',
     '/vehicle-rental/reports',
+];
+
+const expectedPrimaryLabels = [
+    'Overview',
+    'Owner Agreements',
+    'Customer Agreements',
+    'Vehicle Operations',
+    'Daily Running Charts',
+    'Customer Invoices',
+    'Owner Payable Vouchers',
+    'Customer Receipts',
+    'Owner Payments',
+    'Reports',
 ];
 
 const navigationContext = {
@@ -45,6 +59,7 @@ describe('Vehicle Rental frontend entry', () => {
 
         expect(module.access?.modules).toContain('vehicle-rental');
         expect(module.children.map((child) => child.to)).toEqual(expectedPrimaryLinks);
+        expect(module.children.map((child) => child.label)).toEqual(expectedPrimaryLabels);
     });
 
     it('renders only agreement workspaces for an agreement reader', () => {
@@ -61,6 +76,21 @@ describe('Vehicle Rental frontend entry', () => {
         ]);
     });
 
+    it('renders Vehicle Operations for an assignment reader', () => {
+        const module = rentalModule([vehicleRentalPermissions.assignmentsView]);
+        expect(module?.type).toBe('module');
+        if (!module || module.type !== 'module') throw new Error('Authorized Vehicle Rental navigation is missing.');
+
+        expect(module.children.map((child) => child.to)).toEqual([
+            '/vehicle-rental',
+            '/vehicle-rental/assignments',
+        ]);
+        expect(module.children.map((child) => child.label)).toEqual([
+            'Overview',
+            'Vehicle Operations',
+        ]);
+    });
+
     it('renders the financial workflow for a calculation reader', () => {
         const module = rentalModule([vehicleRentalPermissions.calculationsView]);
         expect(module?.type).toBe('module');
@@ -73,6 +103,14 @@ describe('Vehicle Rental frontend entry', () => {
             '/vehicle-rental/customer-receipts',
             '/vehicle-rental/owner-payments',
             '/vehicle-rental/reports',
+        ]);
+        expect(module.children.map((child) => child.label)).toEqual([
+            'Overview',
+            'Customer Invoices',
+            'Owner Payable Vouchers',
+            'Customer Receipts',
+            'Owner Payments',
+            'Reports',
         ]);
     });
 

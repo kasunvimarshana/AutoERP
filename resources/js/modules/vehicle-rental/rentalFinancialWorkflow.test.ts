@@ -15,23 +15,32 @@ const reportsSource = source('resources/js/modules/vehicle-rental/pages/RentalRe
 const apiSource = source('resources/js/modules/vehicle-rental/vehicleRentalApi.ts');
 
 const primaryWorkflowLabels = [
-    'Owner / Supplier Agreements',
+    'Owner Agreements',
     'Customer Agreements',
+    'Vehicle Operations',
     'Daily Running Charts',
     'Customer Invoices',
-    'Owner Settlements',
+    'Owner Payable Vouchers',
     'Customer Receipts',
     'Owner Payments',
     'Reports',
 ];
 
+const retiredNavigationLabels = [
+    'Owner / Supplier Agreements',
+    'Owner Settlements',
+    'Vehicle Assignments',
+    'Calculations',
+];
+
 describe('Vehicle Rental end-to-end financial workflow', () => {
     it('keeps the primary navigation aligned to the simple business workflow', () => {
         for (const label of primaryWorkflowLabels) {
-            expect(navigationSource).toContain(label);
+            expect(navigationSource).toContain(`'${label}'`);
         }
-        expect(navigationSource).not.toContain("label: 'Vehicle Assignments'");
-        expect(navigationSource).not.toContain("label: 'Calculations'");
+        for (const label of retiredNavigationLabels) {
+            expect(navigationSource).not.toContain(`label: '${label}'`);
+        }
     });
 
     it('keeps vehicle selection contextual to the active agreement', () => {

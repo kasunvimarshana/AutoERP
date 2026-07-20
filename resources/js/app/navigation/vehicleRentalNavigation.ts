@@ -14,6 +14,7 @@ const VEHICLE_RENTAL_ROUTES = {
     overview: VEHICLE_RENTAL_BASE_PATH,
     ownerAgreements: `${VEHICLE_RENTAL_BASE_PATH}/owner-agreements`,
     customerAgreements: `${VEHICLE_RENTAL_BASE_PATH}/customer-agreements`,
+    vehicleOperations: `${VEHICLE_RENTAL_BASE_PATH}/assignments`,
     runningCharts: `${VEHICLE_RENTAL_BASE_PATH}/running-charts`,
     customerInvoices: `${VEHICLE_RENTAL_BASE_PATH}/customer-invoices`,
     ownerSettlements: `${VEHICLE_RENTAL_BASE_PATH}/owner-settlements`,
@@ -23,7 +24,6 @@ const VEHICLE_RENTAL_ROUTES = {
 } as const;
 const VEHICLE_RENTAL_INTERNAL_ROUTES = [
     `${VEHICLE_RENTAL_BASE_PATH}/agreements`,
-    `${VEHICLE_RENTAL_BASE_PATH}/assignments`,
     `${VEHICLE_RENTAL_BASE_PATH}/calculations`,
 ] as const;
 const VEHICLE_RENTAL_OVERVIEW_EXCLUSIONS = [
@@ -74,7 +74,7 @@ export const vehicleRentalNavigationItem = {
         },
         workspaceLink(
             'vehicle-rental-owner-agreements',
-            'Owner / Supplier Agreements',
+            'Owner Agreements',
             VEHICLE_RENTAL_ROUTES.ownerAgreements,
             [vehicleRentalPermissions.agreementsView],
         ),
@@ -83,6 +83,12 @@ export const vehicleRentalNavigationItem = {
             'Customer Agreements',
             VEHICLE_RENTAL_ROUTES.customerAgreements,
             [vehicleRentalPermissions.agreementsView],
+        ),
+        workspaceLink(
+            'vehicle-rental-vehicle-operations',
+            'Vehicle Operations',
+            VEHICLE_RENTAL_ROUTES.vehicleOperations,
+            [vehicleRentalPermissions.assignmentsView],
         ),
         workspaceLink(
             'vehicle-rental-running-charts',
@@ -98,7 +104,7 @@ export const vehicleRentalNavigationItem = {
         ),
         workspaceLink(
             'vehicle-rental-owner-settlements',
-            'Owner Settlements',
+            'Owner Payable Vouchers',
             VEHICLE_RENTAL_ROUTES.ownerSettlements,
             [vehicleRentalPermissions.calculationsView],
         ),
