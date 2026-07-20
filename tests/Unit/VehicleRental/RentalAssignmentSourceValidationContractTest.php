@@ -69,9 +69,9 @@ final class RentalAssignmentSourceValidationContractTest extends TestCase
         self::assertStringContainsString('RentalAgreementKind::Owner', $source);
         self::assertStringContainsString("->whereHas('ownerships'", $source);
         self::assertStringContainsString('VehicleOwnerType::Supplier->value', $source);
-        self::assertStringContainsString("->where('owner_id', $supplierId)", $source);
-        self::assertStringContainsString("->where('started_at', '<=', $startsAt)", $source);
-        self::assertStringContainsString("->orWhere('ended_at', '>=', $endsAt)", $source);
+        self::assertStringContainsString('->where(\'owner_id\', $supplierId)', $source);
+        self::assertStringContainsString('->where(\'started_at\', \'<=\', $startsAt)', $source);
+        self::assertStringContainsString('->orWhere(\'ended_at\', \'>=\', $endsAt)', $source);
         self::assertStringNotContainsString('VehicleOwnership::create', $source);
         self::assertStringNotContainsString('VehicleOwnership::query()->create', $source);
     }
