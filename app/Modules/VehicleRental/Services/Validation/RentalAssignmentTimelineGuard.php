@@ -29,7 +29,7 @@ final class RentalAssignmentTimelineGuard
 
     public function dateTime(string $value): CarbonImmutable
     {
-        return CarbonImmutable::parse($value)->seconds(0);
+        return CarbonImmutable::parse($value)->utc()->seconds(0);
     }
 
     public function assertExpectedVersion(RentalAssignment $assignment, int $expectedVersion): void
