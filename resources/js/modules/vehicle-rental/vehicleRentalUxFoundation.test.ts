@@ -15,7 +15,7 @@ const vehicleRentalApiSource = source('resources/js/modules/vehicle-rental/vehic
 const settlementPageSource = source('resources/js/modules/vehicle-rental/pages/RentalSettlementHandoffPage.tsx');
 const calculationControllerSource = source('app/Modules/VehicleRental/Http/Controllers/RentalCalculationController.php');
 
-describe('Vehicle Rental UX foundation', () => {
+ describe('Vehicle Rental UX foundation', () => {
     it('does not offer unsupported fixed Other rates for new agreements', () => {
         expect(rateEditorSource).toContain('const EDITABLE_RATE_CODES');
         expect(rateEditorSource).not.toContain("{ value: 'other', label: 'Other fixed charge' }");
@@ -44,6 +44,15 @@ describe('Vehicle Rental UX foundation', () => {
         expect(assignmentDialogSource).toContain('fitAssignmentDateTimes(state.startsAt, state.endsAt, bounds)');
         expect(assignmentDialogSource).toContain('assignmentBounds');
         expect(assignmentDialogSource).not.toContain('label="Owner-supply source assignment"');
+    });
+
+    it('shows only vehicles owned by the owner-agreement supplier for the complete period', () => {
+        expect(vehicleRentalApiSource).toContain('listRentalOwnerAgreementVehicles');
+        expect(lookupsSource).toContain('listRentalOwnerAgreementVehicles({');
+        expect(lookupsSource).toContain('agreement_id: ownerAgreement');
+        expect(lookupsSource).toContain('No supplier-owned vehicle covers this assignment period.');
+        expect(assignmentDialogSource).toContain('ownerAgreementId={ownerVehicleContext ? agreementId : null}');
+        expect(assignmentDialogSource).toContain("vehicle: current.side === 'owner_supply' ? null : current.vehicle");
     });
 
     it('uses explicit-offset timestamps for source lookup and rental mutations', () => {
