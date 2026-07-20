@@ -147,6 +147,13 @@ final class RentalAssignmentTimelineGuard
         if ($data->side === RentalAssignmentSide::CustomerUse && $data->sourceAssignmentId !== null) {
             $query->whereKeyNot($data->sourceAssignmentId);
         }
+        if ($data->side === RentalAssignmentSide::OwnerSupply && $ignoreAssignmentId !== null) {
+            $query->where(function (Builder $scope) use ($ignoreAssignmentId): void {
+                $scope->where('side', '!=', RentalAssignmentSide::CustomerUse->value)
+                    ->orWhereNull('source_assignment_id')
+                    ->orWhere('source_assignment_id', '!=', $ignoreAssignmentId);
+            });
+        }
         if ($query->exists()) {
             throw new InvalidArgumentException('The selected driver already has an overlapping rental assignment.');
         }
