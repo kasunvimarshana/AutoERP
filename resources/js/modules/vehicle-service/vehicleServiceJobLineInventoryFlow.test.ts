@@ -36,14 +36,23 @@ describe('Vehicle Service job-line inventory flow', () => {
         expect(lineEditorSource).toContain('const lineVersion = expectedVersion + 1');
         expect(lineEditorSource).toContain('expected_version: lineVersion');
         expect(lineEditorSource).toContain('line_ids: [saved.id]');
+        expect(lineEditorSource).toContain("status: 'issued'");
         expect(lineEditorSource).toContain('Job line added. Stock issue is still pending.');
         expect(lineEditorSource).toContain('onChanged(nextLines, lineVersion)');
     });
 
     it('keeps stock issue recovery available for combo child inventory lines', () => {
-        expect(lineEditorSource).toContain('onEdit={row.isComboChild ? undefined');
+        expect(lineEditorSource).toContain('canManageLines && !row.isComboChild');
         expect(lineEditorSource).toContain('canIssueInventory && canIssueLine(row.line)');
         expect(lineEditorSource).toContain("line.inventory_movement_id == null ? 'Pending issue' : 'Issued'");
+    });
+
+    it('preserves inventory-only storekeeper access inside Job Lines', () => {
+        expect(lineEditorSource).toContain('!canViewLines && canViewInventory');
+        expect(lineEditorSource).toContain('listInventoryIssueLines(jobId, {}, signal)');
+        expect(lineEditorSource).toContain('Showing inventory lines that are still pending stock issue.');
+        expect(lineEditorSource).toContain('onVersionChanged(nextVersion)');
+        expect(detailPageSource).toContain('onVersionChanged={updateJobVersion}');
     });
 
     it('removes only the Inventory tab while keeping Inventory APIs owned by their existing module', () => {
@@ -51,6 +60,7 @@ describe('Vehicle Service job-line inventory flow', () => {
         expect(detailPageSource).not.toContain("{ id: 'inventory', label: 'Inventory' }");
         expect(detailPageSource).not.toContain("tabs.openedTabs.has('inventory')");
         expect(lineEditorSource).toContain('issueVehicleServiceInventory');
+        expect(lineEditorSource).toContain('listInventoryIssueLines');
         expect(lineEditorSource).toContain('listVehicleServiceLines');
     });
 });
