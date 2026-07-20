@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useEffectEvent, useRef, useState } from 'react';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { searchWarehouseLocations, searchWarehouses } from '@/shared/api/referenceApi';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
@@ -23,46 +23,40 @@ export function VehicleServiceInventoryLocationFields({
     const [defaultsError, setDefaultsError] = useState<ApiError | null>(null);
     const warehouseTouched = useRef(false);
     const locationTouched = useRef(false);
-    const valueRef = useRef(value);
-    const onChangeRef = useRef(onChange);
-    valueRef.current = value;
-    onChangeRef.current = onChange;
+    const notifyChange = useEffectEvent(onChange);
 
     useEffect(() => {
-        if (disabled || warehouseTouched.current || valueRef.current.warehouse !== null) return;
+        if (disabled || warehouseTouched.current || value.warehouse !== null) return;
 
         const controller = new AbortController();
         void getDefaultWarehouse(controller.signal)
             .then((warehouse) => {
                 if (controller.signal.aborted || warehouseTouched.current || warehouse === null) return;
-                onChangeRef.current({ warehouse, location: null });
+                notifyChange({ warehouse, location: null });
             })
             .catch((requestError: unknown) => {
                 if (!controller.signal.aborted) setDefaultsError(toApiError(requestError));
             });
 
         return () => controller.abort();
-    }, [disabled]);
+    }, [disabled, value.warehouse]);
 
     useEffect(() => {
-        const warehouseId = value.warehouse?.id;
-        if (disabled || !warehouseId || value.location !== null || locationTouched.current) return;
+        const warehouse = value.warehouse;
+        if (disabled || !warehouse || value.location !== null || locationTouched.current) return;
 
         const controller = new AbortController();
-        void getDefaultWarehouseLocation(warehouseId, controller.signal)
+        void getDefaultWarehouseLocation(warehouse.id, controller.signal)
             .then((location) => {
                 if (controller.signal.aborted || locationTouched.current || location === null) return;
-                const current = valueRef.current;
-                if (current.warehouse?.id === warehouseId && current.location === null) {
-                    onChangeRef.current({ ...current, location });
-                }
+                notifyChange({ warehouse, location });
             })
             .catch((requestError: unknown) => {
                 if (!controller.signal.aborted) setDefaultsError(toApiError(requestError));
             });
 
         return () => controller.abort();
-    }, [disabled, value.location, value.warehouse?.id]);
+    }, [disabled, value.location, value.warehouse]);
 
     const searchLocations = useCallback(
         (params: Parameters<typeof searchWarehouseLocations>[0]) =>
