@@ -40,8 +40,12 @@ final class RentalReportService
             ->where('active_marker', true);
         $this->applyCalculationPeriod($calculationQuery, $dateFrom, $dateTo);
         $calculations = $calculationQuery->get();
-        $customerCalculations = $calculations->where('side', RentalCalculationSide::Customer);
-        $ownerCalculations = $calculations->where('side', RentalCalculationSide::Owner);
+        $customerCalculations = $calculations->filter(
+            static fn (RentalCalculation $calculation): bool => $calculation->side === RentalCalculationSide::Customer,
+        );
+        $ownerCalculations = $calculations->filter(
+            static fn (RentalCalculation $calculation): bool => $calculation->side === RentalCalculationSide::Owner,
+        );
         $customerDocuments = $this->financialTotals($tenantId, $organizationUnitId, $customerCalculations);
         $ownerDocuments = $this->financialTotals($tenantId, $organizationUnitId, $ownerCalculations);
         $customerSubtotal = $this->sumCalculationSubtotal($customerCalculations);
