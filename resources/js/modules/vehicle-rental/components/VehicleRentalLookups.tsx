@@ -7,6 +7,7 @@ import { searchCurrencies } from '@/shared/api/referenceApi';
 import { GenericLookupSelect } from '@/shared/components/GenericLookupSelect';
 import type { NamedResource } from '@/shared/types/common';
 import type { LookupLoadParams, LookupResult } from '@/shared/types/lookup';
+import { localDateTimeToOffsetIso } from '../rentalDateTime';
 import { listRentalAgreementLookup, listRentalAssignmentLookup } from '../vehicleRentalApi';
 import type {
     RentalAgreement,
@@ -31,6 +32,7 @@ export interface RentalLookupOption extends NamedResource {
     vehicle?: RentalReference | null;
     agreement?: RentalReference | null;
     ownerAgreement?: RentalReference | null;
+    party?: RentalReference | null;
 }
 
 interface LookupProps {
@@ -170,13 +172,13 @@ export function RentalAssignmentLookup({
             search: params.search || undefined,
             assignment_side: side,
             vehicle_id: isAssignmentSource ? vehicleId ?? undefined : undefined,
-            date_from: isAssignmentSource && startsAt ? startsAt : undefined,
-            date_to: isAssignmentSource && endsAt ? endsAt : undefined,
+            date_from: isAssignmentSource && startsAt ? localDateTimeToOffsetIso(startsAt) : undefined,
+            date_to: isAssignmentSource && endsAt ? localDateTimeToOffsetIso(endsAt) : undefined,
             page: params.page,
             per_page: params.perPage,
         }, params.signal);
 
-        return mapResult(result, assignmentOption);
+        return mapResult(result, rentalAssignmentOption);
     }, [endsAt, isAssignmentSource, lookupPurpose, side, startsAt, vehicleId]);
 
     return <ReferenceLookup key={lookupContextKey} label={label} value={value} onChange={onChange} search={search} error={error} disabled={disabled} required={required} loadOnOpen />;
@@ -226,7 +228,7 @@ function agreementOption(agreement: RentalAgreement): RentalLookupOption {
     };
 }
 
-function assignmentOption(assignment: RentalAssignment): RentalLookupOption {
+export function rentalAssignmentOption(assignment: RentalAssignment): RentalLookupOption {
     const agreement = assignment.agreement?.code || assignment.agreement?.name || `Agreement #${assignment.agreement?.id ?? ''}`;
     const vehicle = assignment.vehicle?.name || assignment.vehicle?.code || `Vehicle #${assignment.vehicle?.id ?? ''}`;
     return {
@@ -241,6 +243,7 @@ function assignmentOption(assignment: RentalAssignment): RentalLookupOption {
         driver: assignment.driver ?? null,
         vehicle: assignment.vehicle ?? null,
         agreement: assignment.agreement ?? null,
+        party: assignment.agreement?.party ?? null,
         ownerAgreement: assignment.source_assignment?.agreement ?? null,
     };
 }
