@@ -1,13 +1,14 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { cwd } from 'node:process';
 import { describe, expect, it } from 'vitest';
 
 const lookupsSource = readFileSync(
-    resolve(process.cwd(), 'resources/js/modules/vehicle-rental/components/VehicleRentalLookups.tsx'),
+    resolve(cwd(), 'resources/js/modules/vehicle-rental/components/VehicleRentalLookups.tsx'),
     'utf8',
 );
 const dialogsSource = readFileSync(
-    resolve(process.cwd(), 'resources/js/modules/vehicle-rental/components/RentalAssignmentDialogs.tsx'),
+    resolve(cwd(), 'resources/js/modules/vehicle-rental/components/RentalAssignmentDialogs.tsx'),
     'utf8',
 );
 
