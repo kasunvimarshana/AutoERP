@@ -12,7 +12,7 @@ const runningChartDialogSource = source('resources/js/modules/vehicle-rental/com
 const settlementPageSource = source('resources/js/modules/vehicle-rental/pages/RentalSettlementHandoffPage.tsx');
 const calculationControllerSource = source('app/Modules/VehicleRental/Http/Controllers/RentalCalculationController.php');
 
- describe('Vehicle Rental UX foundation', () => {
+describe('Vehicle Rental UX foundation', () => {
     it('does not offer unsupported fixed Other rates for new agreements', () => {
         expect(rateEditorSource).toContain('const EDITABLE_RATE_CODES');
         expect(rateEditorSource).not.toContain("{ value: 'other', label: 'Other fixed charge' }");
