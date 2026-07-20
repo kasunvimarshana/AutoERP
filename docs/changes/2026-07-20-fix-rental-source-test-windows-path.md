@@ -6,7 +6,7 @@ The Vehicle Rental source-selection Vitest suite read sibling source files throu
 
 ## Change
 
-The test now resolves both repository files from `process.cwd()` with Node's cross-platform `path.resolve()` API and passes normal filesystem paths to `readFileSync()`.
+The test now resolves both repository files from the current working directory through Node's cross-platform `cwd()` and `path.resolve()` APIs, then passes normal filesystem paths to `readFileSync()`.
 
 ## Scope
 
