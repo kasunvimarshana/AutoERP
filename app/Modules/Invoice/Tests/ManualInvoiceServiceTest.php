@@ -91,49 +91,43 @@ final class ManualInvoiceServiceTest extends TestCase
         $this->withTenantExecutionContext($tenantId, fn () => $invoice->delete());
     }
 
-    public function test_retired_source_invoices_reject_non_settlement_lifecycle_changes(): void
-    {
-        $tenantId = $this->createTenant();
-        $organizationUnitId = $this->createOrganizationUnit($tenantId);
-        $customerId = $this->createCustomer($tenantId, $organizationUnitId);
-
-        foreach ([InvoiceType::Rental, InvoiceType::VehicleFinance] as $type) {
-            $invoice = $this->withTenantExecutionContext($tenantId, fn () => app(ManualInvoiceService::class)->create(
-                $this->invoiceData($tenantId, $organizationUnitId, $customerId, '100.000000'),
-                'retired-invoice-lifecycle-'.$type->value,
-            ));
-            DB::table('invoices')->where('id', $invoice->getKey())->update([
-                'invoice_type' => $type->value,
-            ]);
-            $invoice = $this->withTenantExecutionContext($tenantId, fn () => $invoice->refresh());
-
-            try {
-                $this->withTenantExecutionContext($tenantId, fn () => app(InvoiceStatusService::class)->transitionIfVersion(
-                    $invoice,
-                    InvoiceStatus::Cancelled,
-                    (int) $invoice->row_version,
-                ));
-                self::fail("Expected the retired [{$type->value}] invoice to reject cancellation.");
-            } catch (InvalidArgumentException $exception) {
-                self::assertSame(
-                    'Historical rental and vehicle finance invoices are read-only except for settlement updates.',
-                    $exception->getMessage(),
-                );
-            }
-        }
-    }
-
-    public function test_retired_source_invoice_rejects_reversal_before_financial_mutation(): void
+    public function test_retired_vehicle_finance_invoice_rejects_non_settlement_lifecycle_changes(): void
     {
         $tenantId = $this->createTenant();
         $organizationUnitId = $this->createOrganizationUnit($tenantId);
         $customerId = $this->createCustomer($tenantId, $organizationUnitId);
         $invoice = $this->withTenantExecutionContext($tenantId, fn () => app(ManualInvoiceService::class)->create(
             $this->invoiceData($tenantId, $organizationUnitId, $customerId, '100.000000'),
-            'retired-invoice-reversal',
+            'retired-vehicle-finance-lifecycle',
         ));
         DB::table('invoices')->where('id', $invoice->getKey())->update([
-            'invoice_type' => InvoiceType::Rental->value,
+            'invoice_type' => InvoiceType::VehicleFinance->value,
+        ]);
+        $invoice = $this->withTenantExecutionContext($tenantId, fn () => $invoice->refresh());
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage(
+            'Historical Vehicle Finance invoices are read-only except for settlement updates.',
+        );
+
+        $this->withTenantExecutionContext($tenantId, fn () => app(InvoiceStatusService::class)->transitionIfVersion(
+            $invoice,
+            InvoiceStatus::Cancelled,
+            (int) $invoice->row_version,
+        ));
+    }
+
+    public function test_retired_vehicle_finance_invoice_rejects_reversal_before_financial_mutation(): void
+    {
+        $tenantId = $this->createTenant();
+        $organizationUnitId = $this->createOrganizationUnit($tenantId);
+        $customerId = $this->createCustomer($tenantId, $organizationUnitId);
+        $invoice = $this->withTenantExecutionContext($tenantId, fn () => app(ManualInvoiceService::class)->create(
+            $this->invoiceData($tenantId, $organizationUnitId, $customerId, '100.000000'),
+            'retired-vehicle-finance-reversal',
+        ));
+        DB::table('invoices')->where('id', $invoice->getKey())->update([
+            'invoice_type' => InvoiceType::VehicleFinance->value,
             'status' => InvoiceStatus::Posted->value,
             'posted_at' => now(),
         ]);
@@ -141,7 +135,7 @@ final class ManualInvoiceServiceTest extends TestCase
 
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage(
-            'Historical rental and vehicle finance invoices cannot be reversed after their source module was retired.',
+            'Historical Vehicle Finance invoices cannot be reversed after their source module was retired.',
         );
 
         $this->withTenantExecutionContext($tenantId, fn () => app(InvoiceReversalService::class)->reverse(
