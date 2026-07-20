@@ -1,26 +1,124 @@
-import type { AppNavigationItem } from './types';
 import {
     vehicleRentalPermissions,
     vehicleRentalViewPermissions,
 } from '@/modules/vehicle-rental/vehicleRentalPermissions';
+import type {
+    NavigationAccessRule,
+    NavigationLinkItem,
+    NavigationModuleItem,
+} from './navigationTypes';
 
-export const vehicleRentalNavigation: AppNavigationItem[] = [
-    {
-        label: 'Vehicle Rental',
-        icon: 'truck',
-        to: '/vehicle-rental',
-        module: 'vehicle-rental',
-        anyPermissions: [...vehicleRentalViewPermissions],
-        children: [
-            { label: 'Overview', to: '/vehicle-rental', permissions: [...vehicleRentalViewPermissions] },
-            { label: 'Owner / Supplier Agreements', to: '/vehicle-rental/owner-agreements', permissions: [vehicleRentalPermissions.agreementsView] },
-            { label: 'Customer Agreements', to: '/vehicle-rental/customer-agreements', permissions: [vehicleRentalPermissions.agreementsView] },
-            { label: 'Daily Running Charts', to: '/vehicle-rental/running-charts', permissions: [vehicleRentalPermissions.runningChartsView] },
-            { label: 'Customer Invoices', to: '/vehicle-rental/customer-invoices', permissions: [vehicleRentalPermissions.calculationsView] },
-            { label: 'Owner Settlements', to: '/vehicle-rental/owner-settlements', permissions: [vehicleRentalPermissions.calculationsView] },
-            { label: 'Customer Receipts', to: '/vehicle-rental/customer-receipts', permissions: [vehicleRentalPermissions.calculationsView] },
-            { label: 'Owner Payments', to: '/vehicle-rental/owner-payments', permissions: [vehicleRentalPermissions.calculationsView] },
-            { label: 'Reports', to: '/vehicle-rental/reports', permissions: [vehicleRentalPermissions.calculationsView] },
-        ],
-    },
+const VEHICLE_RENTAL_MODULE = 'vehicle-rental' as const;
+const VEHICLE_RENTAL_BASE_PATH = '/vehicle-rental';
+const VEHICLE_RENTAL_ROUTES = {
+    overview: VEHICLE_RENTAL_BASE_PATH,
+    ownerAgreements: `${VEHICLE_RENTAL_BASE_PATH}/owner-agreements`,
+    customerAgreements: `${VEHICLE_RENTAL_BASE_PATH}/customer-agreements`,
+    runningCharts: `${VEHICLE_RENTAL_BASE_PATH}/running-charts`,
+    customerInvoices: `${VEHICLE_RENTAL_BASE_PATH}/customer-invoices`,
+    ownerSettlements: `${VEHICLE_RENTAL_BASE_PATH}/owner-settlements`,
+    customerReceipts: `${VEHICLE_RENTAL_BASE_PATH}/customer-receipts`,
+    ownerPayments: `${VEHICLE_RENTAL_BASE_PATH}/owner-payments`,
+    reports: `${VEHICLE_RENTAL_BASE_PATH}/reports`,
+} as const;
+const VEHICLE_RENTAL_INTERNAL_ROUTES = [
+    `${VEHICLE_RENTAL_BASE_PATH}/agreements`,
+    `${VEHICLE_RENTAL_BASE_PATH}/assignments`,
+    `${VEHICLE_RENTAL_BASE_PATH}/calculations`,
+] as const;
+const VEHICLE_RENTAL_OVERVIEW_EXCLUSIONS = [
+    ...Object.values(VEHICLE_RENTAL_ROUTES).filter((path) => path !== VEHICLE_RENTAL_ROUTES.overview),
+    ...VEHICLE_RENTAL_INTERNAL_ROUTES,
 ];
+
+function operationalAccess(permissions: readonly string[]): NavigationAccessRule {
+    return {
+        requiresTenant: true,
+        requiresOrganizationUnit: true,
+        modules: [VEHICLE_RENTAL_MODULE],
+        permissions,
+    };
+}
+
+function workspaceLink(
+    id: string,
+    label: string,
+    to: string,
+    permissions: readonly string[],
+): NavigationLinkItem {
+    return {
+        id,
+        type: 'link',
+        label,
+        to,
+        match: [to],
+        access: operationalAccess(permissions),
+    };
+}
+
+export const vehicleRentalNavigationItem = {
+    id: VEHICLE_RENTAL_MODULE,
+    type: 'module',
+    label: 'Vehicle Rental',
+    icon: 'vehicle',
+    access: operationalAccess(vehicleRentalViewPermissions),
+    children: [
+        {
+            ...workspaceLink(
+                'vehicle-rental-overview',
+                'Overview',
+                VEHICLE_RENTAL_ROUTES.overview,
+                vehicleRentalViewPermissions,
+            ),
+            exclude: VEHICLE_RENTAL_OVERVIEW_EXCLUSIONS,
+        },
+        workspaceLink(
+            'vehicle-rental-owner-agreements',
+            'Owner / Supplier Agreements',
+            VEHICLE_RENTAL_ROUTES.ownerAgreements,
+            [vehicleRentalPermissions.agreementsView],
+        ),
+        workspaceLink(
+            'vehicle-rental-customer-agreements',
+            'Customer Agreements',
+            VEHICLE_RENTAL_ROUTES.customerAgreements,
+            [vehicleRentalPermissions.agreementsView],
+        ),
+        workspaceLink(
+            'vehicle-rental-running-charts',
+            'Daily Running Charts',
+            VEHICLE_RENTAL_ROUTES.runningCharts,
+            [vehicleRentalPermissions.runningChartsView],
+        ),
+        workspaceLink(
+            'vehicle-rental-customer-invoices',
+            'Customer Invoices',
+            VEHICLE_RENTAL_ROUTES.customerInvoices,
+            [vehicleRentalPermissions.calculationsView],
+        ),
+        workspaceLink(
+            'vehicle-rental-owner-settlements',
+            'Owner Settlements',
+            VEHICLE_RENTAL_ROUTES.ownerSettlements,
+            [vehicleRentalPermissions.calculationsView],
+        ),
+        workspaceLink(
+            'vehicle-rental-customer-receipts',
+            'Customer Receipts',
+            VEHICLE_RENTAL_ROUTES.customerReceipts,
+            [vehicleRentalPermissions.calculationsView],
+        ),
+        workspaceLink(
+            'vehicle-rental-owner-payments',
+            'Owner Payments',
+            VEHICLE_RENTAL_ROUTES.ownerPayments,
+            [vehicleRentalPermissions.calculationsView],
+        ),
+        workspaceLink(
+            'vehicle-rental-reports',
+            'Reports',
+            VEHICLE_RENTAL_ROUTES.reports,
+            [vehicleRentalPermissions.calculationsView],
+        ),
+    ],
+} satisfies NavigationModuleItem;
