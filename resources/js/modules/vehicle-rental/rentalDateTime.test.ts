@@ -20,6 +20,11 @@ describe('Vehicle Rental datetime contract', () => {
             .toBe('2026-07-21T10:55:00+05:30');
     });
 
+    it('rejects malformed runtime values with a domain-readable error', () => {
+        expect(() => localDateTimeToOffsetIso(undefined as unknown as string))
+            .toThrow('A valid date and time is required.');
+    });
+
     it('intersects agreement and owner-source date boundaries without magic defaults', () => {
         const agreementStart = agreementDateBoundary('2026-07-20', 'start');
         const agreementEnd = agreementDateBoundary('2026-07-30', 'end');
