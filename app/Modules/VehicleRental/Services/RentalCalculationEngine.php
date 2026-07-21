@@ -72,8 +72,11 @@ final class RentalCalculationEngine
         if ($agreement->billing_basis === RentalBillingBasis::Daily) {
             $lines = [...$lines, ...$this->dailyBaseLines($rates, $charts)];
         } else {
-            $this->assertCompleteCalendarMonth($periodStart, $periodEnd);
-            $lines[] = $this->line($this->requiredRate($rates, RentalRateCode::BaseRental, RentalRateUnit::Month), '1');
+            $lines[] = $this->proratedMonthlyLine(
+                $this->requiredRate($rates, RentalRateCode::BaseRental, RentalRateUnit::Month),
+                $periodStart,
+                $periodEnd,
+            );
         }
 
         if ($rates->has(RentalRateCode::ExcessKm->value) && ! $this->math->isZero($excessKm)) {
@@ -88,15 +91,23 @@ final class RentalCalculationEngine
                 fn (RentalRunningChart $chart): bool => $chart->driver_employee_id !== null,
             );
             if ($driverCharts->isNotEmpty()) {
-                $quantity = match ($driverRate->unit) {
-                    RentalRateUnit::Day => (string) $driverCharts->pluck('operational_date')
-                        ->map(fn ($date): string => CarbonImmutable::parse($date)->toDateString())
-                        ->unique()
-                        ->count(),
-                    RentalRateUnit::Month => $this->monthlyDriverQuantity($periodStart, $periodEnd, $charts, $driverCharts),
+                $lines[] = match ($driverRate->unit) {
+                    RentalRateUnit::Day => $this->line(
+                        $driverRate,
+                        (string) $driverCharts->pluck('operational_date')
+                            ->map(fn ($date): string => CarbonImmutable::parse($date)->toDateString())
+                            ->unique()
+                            ->count(),
+                    ),
+                    RentalRateUnit::Month => $this->monthlyDriverLine(
+                        $driverRate,
+                        $periodStart,
+                        $periodEnd,
+                        $charts,
+                        $driverCharts,
+                    ),
                     default => throw new InvalidArgumentException('Driver salary must use a day or month unit.'),
                 };
-                $lines[] = $this->line($driverRate, $quantity);
             }
         }
 
@@ -187,26 +198,72 @@ final class RentalCalculationEngine
         );
     }
 
-    private function monthlyIncludedKm(RentalAgreement $agreement, CarbonImmutable $periodStart, CarbonImmutable $periodEnd): string
-    {
-        $this->assertCompleteCalendarMonth($periodStart, $periodEnd);
+    private function proratedMonthlyLine(
+        RentalRateLine $rate,
+        CarbonImmutable $periodStart,
+        CarbonImmutable $periodEnd,
+    ): RentalCalculationLineResult {
+        $proratedAmount = $this->proratedMonthlyValue((string) $rate->rate, $periodStart, $periodEnd);
 
-        return $this->math->normalize((string) $agreement->included_km);
+        return new RentalCalculationLineResult(
+            rateLineId: (int) $rate->getKey(),
+            rateCode: $rate->rate_code,
+            unit: $rate->unit,
+            quantity: $this->math->normalize('1'),
+            unitRate: $proratedAmount,
+            lineTotal: $proratedAmount,
+            isTaxable: (bool) $rate->is_taxable,
+            description: $rate->description,
+        );
+    }
+
+    private function monthlyIncludedKm(
+        RentalAgreement $agreement,
+        CarbonImmutable $periodStart,
+        CarbonImmutable $periodEnd,
+    ): string {
+        return $this->proratedMonthlyValue((string) $agreement->included_km, $periodStart, $periodEnd);
     }
 
     /** @param Collection<int, RentalRunningChart> $charts @param Collection<int, RentalRunningChart> $driverCharts */
-    private function monthlyDriverQuantity(
+    private function monthlyDriverLine(
+        RentalRateLine $driverRate,
         CarbonImmutable $periodStart,
         CarbonImmutable $periodEnd,
         Collection $charts,
         Collection $driverCharts,
-    ): string {
-        $this->assertCompleteCalendarMonth($periodStart, $periodEnd);
+    ): RentalCalculationLineResult {
         if ($driverCharts->count() !== $charts->count()) {
             throw new InvalidArgumentException('Monthly driver salary cannot be calculated from mixed driver and self-drive running charts. Split the calculation period.');
         }
 
-        return '1';
+        return $this->proratedMonthlyLine($driverRate, $periodStart, $periodEnd);
+    }
+
+    private function proratedMonthlyValue(
+        string $monthlyValue,
+        CarbonImmutable $periodStart,
+        CarbonImmutable $periodEnd,
+    ): string {
+        $this->assertSingleCalendarMonth($periodStart, $periodEnd);
+        $billedDays = $periodStart->diffInDays($periodEnd) + 1;
+        $unrounded = $this->math->div(
+            $this->math->mul($monthlyValue, (string) $billedDays, DecimalMath::MAX_SCALE),
+            (string) $periodStart->daysInMonth,
+            DecimalMath::SCALE + 1,
+        );
+
+        return $this->roundHalfUp($unrounded);
+    }
+
+    private function roundHalfUp(string $value): string
+    {
+        $roundingIncrement = '0.'.str_repeat('0', DecimalMath::SCALE).'5';
+        $adjusted = $this->math->compare($value, '0', DecimalMath::SCALE + 1) < 0
+            ? $this->math->sub($value, $roundingIncrement, DecimalMath::SCALE + 1)
+            : $this->math->add($value, $roundingIncrement, DecimalMath::SCALE + 1);
+
+        return $this->math->add($adjusted, '0', DecimalMath::SCALE);
     }
 
     /** @param Collection<int, RentalRunningChart> $charts */
@@ -226,12 +283,10 @@ final class RentalCalculationEngine
         }
     }
 
-    private function assertCompleteCalendarMonth(CarbonImmutable $periodStart, CarbonImmutable $periodEnd): void
+    private function assertSingleCalendarMonth(CarbonImmutable $periodStart, CarbonImmutable $periodEnd): void
     {
-        if ($periodStart->day !== 1
-            || ! $periodStart->isSameMonth($periodEnd)
-            || $periodEnd->toDateString() !== $periodEnd->endOfMonth()->toDateString()) {
-            throw new InvalidArgumentException('Monthly rental calculations require one complete calendar month. Partial-month proration is not configured.');
+        if (! $periodStart->isSameMonth($periodEnd)) {
+            throw new InvalidArgumentException('Monthly rental calculations must stay within one calendar month. Split the agreement range into monthly billing periods.');
         }
     }
 }
