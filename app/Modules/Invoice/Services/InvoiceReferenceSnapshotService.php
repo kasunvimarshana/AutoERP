@@ -1,10 +1,10 @@
 <?php
 
 declare(strict_types=1);
-
 namespace Modules\Invoice\Services;
 
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use InvalidArgumentException;
 use Modules\Customer\Models\Customer;
 use Modules\Invoice\Constants\InvoiceTaxMetadata;
@@ -156,7 +156,7 @@ final class InvoiceReferenceSnapshotService
         };
         $organizationUnitId = $data->organizationUnitId;
         $party = $query
-            ->with(['addresses' => static function (Builder $addresses) use ($organizationUnitId): void {
+            ->with(['addresses' => static function (HasMany $addresses) use ($organizationUnitId): void {
                 $addresses->where('is_active', true)->whereNull('deleted_at');
                 $organizationUnitId === null
                     ? $addresses->whereNull('organization_unit_id')
