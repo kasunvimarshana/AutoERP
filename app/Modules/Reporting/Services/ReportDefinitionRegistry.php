@@ -13,7 +13,7 @@ final class ReportDefinitionRegistry
         private readonly ReportCatalog $catalog,
         private readonly DetailedPurchaseReportService $detailedPurchase,
         private readonly DetailedVehicleServiceReportService $detailedVehicleService,
-        private readonly VehicleRentalReportService $vehicleRental,
+        private readonly VehicleRentalReportDefinitions $vehicleRental,
     ) {}
 
     /** @return array<string, ReportDefinition> */
@@ -48,7 +48,7 @@ final class ReportDefinitionRegistry
         return [
             $this->detailedPurchase->definition(),
             $this->detailedVehicleService->definition(),
-            ...$this->vehicleRental->definitions(),
+            ...$this->vehicleRental->all(),
         ];
     }
 }
