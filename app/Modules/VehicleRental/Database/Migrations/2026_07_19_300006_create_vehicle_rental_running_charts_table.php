@@ -24,11 +24,11 @@ return new class extends Migration
             $table->dateTime('ends_at');
             $table->foreignId('driver_employee_id')->nullable();
             $table->string('ac_mode', 20)->nullable();
-            $table->decimal('start_odometer', 20, 6);
-            $table->decimal('end_odometer', 20, 6);
-            $table->decimal('total_km', 20, 6);
-            $table->decimal('garage_km', 20, 6)->default('0.000000');
-            $table->decimal('commercial_km', 20, 6);
+            $table->decimal('start_odometer', 20, 6)->nullable();
+            $table->decimal('end_odometer', 20, 6)->nullable();
+            $table->decimal('total_km', 20, 6)->nullable();
+            $table->decimal('garage_km', 20, 6)->nullable();
+            $table->decimal('commercial_km', 20, 6)->nullable();
             $table->decimal('normal_overtime_hours', 20, 6)->default('0.000000');
             $table->decimal('double_overtime_hours', 20, 6)->default('0.000000');
             $table->decimal('triple_overtime_hours', 20, 6)->default('0.000000');
