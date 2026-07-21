@@ -30,6 +30,8 @@ final class RentalAssignmentResource extends JsonResource
                 'code' => $this->vehicle->vehicle_number,
                 'name' => trim(($this->vehicle->registration_number ?? $this->vehicle->vehicle_number).' '.($this->vehicle->model?->name ?? '')),
                 'registration_number' => $this->vehicle->registration_number,
+                'odometer_reading' => $this->vehicle->odometer_reading === null ? null : (string) $this->vehicle->odometer_reading,
+                'odometer_unit' => $this->vehicle->odometer_unit,
             ]),
             'driver' => $this->whenLoaded('driver', fn () => $this->driver === null ? null : [
                 'id' => (int) $this->driver->getKey(),
