@@ -89,25 +89,33 @@ final class InvoiceDocumentSnapshotService
             return InvoiceDocumentKind::PurchaseInvoice;
         }
 
-        return $this->nullableString($sellerVatRegistrationNumber) !== null && $this->hasOutputTax($invoice)
+        return $this->nullableString($sellerVatRegistrationNumber) !== null && $this->hasVatOutputTax($invoice)
             ? InvoiceDocumentKind::TaxInvoice
             : InvoiceDocumentKind::Invoice;
     }
 
-    private function hasOutputTax(Invoice $invoice): bool
+    private function hasVatOutputTax(Invoice $invoice): bool
     {
-        return $invoice->lines->contains(static function (InvoiceLine $line): bool {
-            if (! is_array($line->tax_snapshot)) {
-                return false;
+        foreach ($invoice->lines as $line) {
+            if (! $line instanceof InvoiceLine || ! is_array($line->tax_snapshot)) {
+                continue;
             }
+
             foreach ($line->tax_snapshot as $tax) {
-                if (is_array($tax) && ! (bool) ($tax['is_withholding'] ?? false)) {
+                if (! is_array($tax) || (bool) ($tax['is_withholding'] ?? false)) {
+                    continue;
+                }
+
+                $identifier = $this->nullableString($tax['tax_code'] ?? null)
+                    ?? $this->nullableString($tax['tax_name'] ?? null)
+                    ?? $this->nullableString($tax['tax_type'] ?? null);
+                if ($identifier !== null && str_contains(mb_strtolower($identifier), 'vat')) {
                     return true;
                 }
             }
+        }
 
-            return false;
-        });
+        return false;
     }
 
     /** @return array{name:string,tin:null,vat_registration_number:null,svat_registration_number:null,address:null,phone:null,email:null} */
