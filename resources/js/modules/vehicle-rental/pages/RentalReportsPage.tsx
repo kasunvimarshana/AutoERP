@@ -5,6 +5,7 @@ import { useAuth } from '@/modules/auth/AuthProvider';
 import { financePermissions } from '@/modules/finance/financePermissions';
 import { invoicePermissions } from '@/modules/invoice/invoicePermissions';
 import { paymentPermissions } from '@/modules/payment/paymentPermissions';
+import { reportingPermissions } from '@/modules/reporting/reportingPermissions';
 import { LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
@@ -30,16 +31,29 @@ const REPORT_ROUTES: Record<string, ReportRoute> = {
 };
 
 export function RentalReportsPage() {
+    const auth = useAuth();
     const { pathname } = useLocation();
     const reportSlug = pathname.split('/').filter(Boolean)[2] ?? '';
     const report = REPORT_ROUTES[reportSlug];
+    const canViewDetailedReports = hasPermission(auth, reportingPermissions.view);
+
+    if (report && !canViewDetailedReports) {
+        return (
+            <>
+                <ContentHeader title="Vehicle rental report" description="Detailed reports require the Reporting view permission." />
+                <Panel title="Access required">
+                    <p className="text-sm text-slate-700">Your role does not include permission to view detailed reports.</p>
+                </Panel>
+            </>
+        );
+    }
 
     return report
         ? <VehicleRentalReportPage reportKey={report.reportKey} kind={report.kind} />
-        : <RentalReportsOverview />;
+        : <RentalReportsOverview canViewDetailedReports={canViewDetailedReports} />;
 }
 
-function RentalReportsOverview() {
+function RentalReportsOverview({ canViewDetailedReports }: { canViewDetailedReports: boolean }) {
     const auth = useAuth();
     const canViewInvoices = hasPermission(auth, invoicePermissions.view);
     const canViewPayments = hasPermission(auth, paymentPermissions.view);
@@ -63,33 +77,37 @@ function RentalReportsOverview() {
                 description="Operational evidence, customer revenue, owner cost and financial documents derived from authoritative Vehicle Rental transactions."
             />
             <Panel title="Phase 1 operational and billing reports">
-                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                    <ReportLink
-                        to="/vehicle-rental/reports/running-chart"
-                        title="Daily Running Chart Report"
-                        description="Physical usage, customer and owner context, kilometres, driver overtime and night-outs."
-                    />
-                    <ReportLink
-                        to="/vehicle-rental/reports/chart-exceptions"
-                        title="Missing / Duplicate Running Charts"
-                        description="Assignment dates without current charts and duplicate assignment or vehicle evidence."
-                    />
-                    <ReportLink
-                        to="/vehicle-rental/reports/customer-invoices"
-                        title="Customer Invoice Register"
-                        description="Posted customer invoices traced to rental calculations and Running Charts."
-                    />
-                    <ReportLink
-                        to="/vehicle-rental/reports/owner-vouchers"
-                        title="Owner Payable Voucher Register"
-                        description="Posted self-billed owner settlements traced to calculations and Running Charts."
-                    />
-                    <ReportLink
-                        to="/vehicle-rental/reports/rental-history"
-                        title="Vehicle Rental History"
-                        description="Assignments, owner source, driver mode, replacement lineage and finalized usage totals."
-                    />
-                </div>
+                {canViewDetailedReports ? (
+                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                        <ReportLink
+                            to="/vehicle-rental/reports/running-chart"
+                            title="Daily Running Chart Report"
+                            description="Physical usage, customer and owner context, kilometres, driver overtime and night-outs."
+                        />
+                        <ReportLink
+                            to="/vehicle-rental/reports/chart-exceptions"
+                            title="Missing / Duplicate Running Charts"
+                            description="Assignment dates without current charts and duplicate assignment or vehicle evidence."
+                        />
+                        <ReportLink
+                            to="/vehicle-rental/reports/customer-invoices"
+                            title="Customer Invoice Register"
+                            description="Posted customer invoices traced to rental calculations and Running Charts."
+                        />
+                        <ReportLink
+                            to="/vehicle-rental/reports/owner-vouchers"
+                            title="Owner Payable Voucher Register"
+                            description="Posted self-billed owner settlements traced to calculations and Running Charts."
+                        />
+                        <ReportLink
+                            to="/vehicle-rental/reports/rental-history"
+                            title="Vehicle Rental History"
+                            description="Assignments, owner source, driver mode, replacement lineage and finalized usage totals."
+                        />
+                    </div>
+                ) : (
+                    <p className="text-sm text-slate-700">Your role can view the Vehicle Rental summary but does not include the Reporting view permission required for detailed reports.</p>
+                )}
             </Panel>
 
             <div className="my-5 grid gap-4 md:grid-cols-2">
@@ -174,12 +192,7 @@ function Metric({ title, value, money }: { title: string; value?: string; money?
     );
 }
 
-function ReportRows({
-    calculations,
-    documents,
-    documentTotal,
-    outstanding,
-}: {
+function ReportRows({ calculations, documents, documentTotal, outstanding }: {
     calculations: number;
     documents: number;
     documentTotal: string;
