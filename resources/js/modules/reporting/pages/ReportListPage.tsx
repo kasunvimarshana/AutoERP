@@ -23,7 +23,7 @@ export default function ReportListPage() {
                                 {rows.map((report) => (
                                     <Link key={report.key} to={reportPath(report.key)} className="block px-1 py-3 hover:bg-slate-50">
                                         <div className="font-semibold text-slate-900">{report.title}</div>
-                                        <div className="text-sm text-slate-500">{report.description || report.key}</div>
+                                        <div className="text-sm text-slate-500">{report.key}</div>
                                     </Link>
                                 ))}
                             </div>
