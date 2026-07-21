@@ -29,7 +29,7 @@ final class InvoiceDocumentSnapshotService
             ? null
             : $this->organizationProfiles->find($data->tenantId, $data->organizationUnitId);
         $counterpartyPresent = $data->partyId !== null && $data->partyType !== null;
-        if ($counterpartyPresent && $organizationProfile === null) {
+        if ($counterpartyPresent && $data->organizationUnitId !== null && $organizationProfile === null) {
             throw new InvalidArgumentException(
                 'Configure the organization unit legal and tax profile before creating a business invoice.',
             );
