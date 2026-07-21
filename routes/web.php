@@ -22,11 +22,11 @@ Route::middleware($__printMiddleware)->group(function () {
     Route::get('/invoices/{invoice}/pdf', [InvoiceController::class, 'pdf'])->name('invoices.pdf');
 });
 
-Route::get('/public/invoices/{invoice}/print/{tenant}', [InvoiceController::class, 'publicPrint'])
+Route::get('/signed/invoices/{invoice}/print/{tenant}', [InvoiceController::class, 'publicPrint'])
     ->name('invoices.public.print')
     ->middleware('signed');
 
-Route::get('/public/invoices/{invoice}/pdf/{tenant}', [InvoiceController::class, 'publicPdf'])
+Route::get('/signed/invoices/{invoice}/pdf/{tenant}', [InvoiceController::class, 'publicPdf'])
     ->name('invoices.public.pdf')
     ->middleware('signed');
 
