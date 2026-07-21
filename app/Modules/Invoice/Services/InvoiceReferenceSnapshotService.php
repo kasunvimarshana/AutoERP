@@ -77,7 +77,7 @@ final class InvoiceReferenceSnapshotService
             'tin' => $this->nullableString($party->tax_registration_number),
             'vat_registration_number' => $this->nullableString($party->vat_number),
             'svat_registration_number' => $this->nullableString($party->svat_number),
-            'address' => $this->partyAddress($party),
+            'address' => $this->partyAddress($party, $data->organizationUnitId),
             'phone' => $this->nullableString($party->phone) ?? $this->nullableString($party->mobile),
             'email' => $this->nullableString($party->email),
         ];
@@ -176,15 +176,21 @@ final class InvoiceReferenceSnapshotService
         return $party;
     }
 
-    private function partyAddress(Customer|Supplier $party): ?string
+    private function partyAddress(Customer|Supplier $party, ?int $organizationUnitId): ?string
     {
         $address = $party->addresses
-            ->sortBy(function ($address): string {
+            ->sortBy(function ($address) use ($organizationUnitId): string {
+                $addressOrganizationUnitId = is_numeric($address->organization_unit_id)
+                    ? (int) $address->organization_unit_id
+                    : null;
+                $scopeRank = $organizationUnitId === null || $addressOrganizationUnitId === $organizationUnitId
+                    ? 0
+                    : 1;
                 $type = $address->address_type instanceof \BackedEnum
                     ? (string) $address->address_type->value
                     : (string) $address->address_type;
                 $primary = (bool) $address->is_primary;
-                $rank = match (true) {
+                $typeRank = match (true) {
                     $primary && $type === 'registered' => 0,
                     $primary && $type === 'billing' => 1,
                     $primary => 2,
@@ -193,7 +199,7 @@ final class InvoiceReferenceSnapshotService
                     default => 5,
                 };
 
-                return sprintf('%02d-%020d', $rank, (int) $address->getKey());
+                return sprintf('%02d-%02d-%020d', $scopeRank, $typeRank, (int) $address->getKey());
             })
             ->first();
 
