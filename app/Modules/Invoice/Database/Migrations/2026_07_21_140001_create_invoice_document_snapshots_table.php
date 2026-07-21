@@ -17,6 +17,7 @@ return new class extends Migration
             $table->foreignId('invoice_id');
             $table->string('document_kind', 50);
             $table->boolean('organization_profile_present')->default(false);
+            $table->boolean('counterparty_present')->default(false);
 
             foreach (['seller', 'buyer'] as $role) {
                 $table->string($role.'_legal_name');
