@@ -64,11 +64,13 @@ final class VehicleRentalFinancialReportService
             VehicleRentalReportService::OWNER_VOUCHERS => RentalCalculationSide::Owner,
             default => throw new InvalidArgumentException("Financial Vehicle Rental report [{$key}] is not defined."),
         };
+        $tenantId = (int) $params['tenant_id'];
         $customerSide = $side === RentalCalculationSide::Customer;
         $vehicleTotals = DB::table('vehicle_rental_calculation_sources as calculation_sources')
             ->join('vehicle_rental_running_charts as source_charts', 'source_charts.id', '=', 'calculation_sources.running_chart_id')
             ->join('vehicle_rental_assignments as source_assignments', 'source_assignments.id', '=', 'source_charts.assignment_id')
             ->join('vehicles as source_vehicles', 'source_vehicles.id', '=', 'source_assignments.vehicle_id')
+            ->where('calculation_sources.tenant_id', $tenantId)
             ->where('calculation_sources.active_marker', true)
             ->selectRaw(
                 'calculation_sources.calculation_id, COUNT(DISTINCT source_vehicles.id) as vehicle_count, '
@@ -77,6 +79,7 @@ final class VehicleRentalFinancialReportService
             ->groupBy('calculation_sources.calculation_id');
 
         $query = DB::table('invoices')
+            ->where('invoices.tenant_id', $tenantId)
             ->join('invoice_sources', function ($join): void {
                 $join->on('invoice_sources.invoice_id', '=', 'invoices.id')
                     ->where('invoice_sources.source_type', VehicleRentalSource::CALCULATION_DOCUMENT);
@@ -104,7 +107,7 @@ final class VehicleRentalFinancialReportService
                 'currencies.code as currency_code', 'vehicle_totals.vehicle_count', 'vehicle_totals.first_vehicle',
             ]);
 
-        $this->contextScope($query, $params);
+        $this->organizationScope($query, $params);
         $this->dateRange($query, $params);
         if (! empty($params['invoice_status'])) {
             $query->where('invoices.status', (string) $params['invoice_status']);
@@ -116,12 +119,13 @@ final class VehicleRentalFinancialReportService
         if (! empty($params['supplier_id'])) $query->where('agreements.supplier_id', (int) $params['supplier_id']);
         if (! empty($params['vehicle_id'])) {
             $vehicleId = (int) $params['vehicle_id'];
-            $query->whereExists(function (Builder $vehicleQuery) use ($vehicleId): void {
+            $query->whereExists(function (Builder $vehicleQuery) use ($tenantId, $vehicleId): void {
                 $vehicleQuery->selectRaw('1')
                     ->from('vehicle_rental_calculation_sources as filtered_sources')
                     ->join('vehicle_rental_running_charts as filtered_charts', 'filtered_charts.id', '=', 'filtered_sources.running_chart_id')
                     ->join('vehicle_rental_assignments as filtered_assignments', 'filtered_assignments.id', '=', 'filtered_charts.assignment_id')
                     ->whereColumn('filtered_sources.calculation_id', 'calculations.id')
+                    ->where('filtered_sources.tenant_id', $tenantId)
                     ->where('filtered_sources.active_marker', true)
                     ->where('filtered_assignments.vehicle_id', $vehicleId);
             });
@@ -203,9 +207,8 @@ final class VehicleRentalFinancialReportService
     }
 
     /** @param array<string, mixed> $params */
-    private function contextScope(Builder $query, array $params): void
+    private function organizationScope(Builder $query, array $params): void
     {
-        $query->where('invoices.tenant_id', (int) $params['tenant_id']);
         ($params['organization_unit_id'] ?? null) === null
             ? $query->whereNull('invoices.organization_unit_id')
             : $query->where('invoices.organization_unit_id', (int) $params['organization_unit_id']);
