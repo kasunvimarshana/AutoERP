@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import {
     approvePayment,
@@ -64,12 +64,6 @@ export default function PaymentDetailPage() {
     const [reversalDate, setReversalDate] = useState(today());
     const [reversalReason, setReversalReason] = useState('');
     const [voidReason, setVoidReason] = useState('');
-
-    useEffect(() => {
-        if (payment.data !== null) {
-            paymentState.setData(payment.data);
-        }
-    }, [payment.data, paymentState]);
 
     if (payment.loading && paymentState.data === null) return <LoadingState />;
     if (!paymentState.data) return <ErrorAlert error={payment.error} />;
