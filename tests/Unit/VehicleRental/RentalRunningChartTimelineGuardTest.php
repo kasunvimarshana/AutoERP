@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Unit\VehicleRental;
 
+use Carbon\CarbonImmutable;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
+use Modules\Vehicle\Models\Vehicle;
 use Modules\VehicleRental\DTOs\RentalRunningChartData;
 use Modules\VehicleRental\Enums\RentalAssignmentSide;
 use Modules\VehicleRental\Enums\RentalAssignmentStatus;
@@ -35,6 +37,50 @@ final class RentalRunningChartTimelineGuardTest extends TestCase
             'garage_km' => null,
             'commercial_km' => null,
         ], $guard->distances($this->data(null, null, null)));
+    }
+
+    public function test_vehicle_without_an_odometer_creates_an_unmeasured_snapshot(): void
+    {
+        $assignment = new RentalAssignment();
+        $vehicle = new Vehicle();
+        $vehicle->forceFill(['odometer_reading' => null]);
+        $assignment->setRelation('vehicle', $vehicle);
+
+        $measurements = (new RentalRunningChartTimelineGuard(new DecimalMath()))->measurements(
+            $assignment,
+            $this->data(null, null, null),
+            CarbonImmutable::parse('2026-07-01 08:00:00'),
+        );
+
+        self::assertSame([
+            'start_odometer' => null,
+            'end_odometer' => null,
+            'total_km' => null,
+            'garage_km' => null,
+            'commercial_km' => null,
+        ], $measurements);
+    }
+
+    public function test_working_vehicle_keeps_exact_measured_snapshot(): void
+    {
+        $assignment = new RentalAssignment();
+        $vehicle = new Vehicle();
+        $vehicle->forceFill(['odometer_reading' => '900.000000']);
+        $assignment->setRelation('vehicle', $vehicle);
+
+        $measurements = (new RentalRunningChartTimelineGuard(new DecimalMath()))->measurements(
+            $assignment,
+            $this->data('1000', '1150', '20'),
+            CarbonImmutable::parse('2026-07-01 08:00:00'),
+        );
+
+        self::assertSame([
+            'start_odometer' => '1000.000000',
+            'end_odometer' => '1150.000000',
+            'total_km' => '150.000000',
+            'garage_km' => '20.000000',
+            'commercial_km' => '130.000000',
+        ], $measurements);
     }
 
     public function test_garage_kilometres_cannot_exceed_total_distance(): void
