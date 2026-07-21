@@ -51,13 +51,16 @@ final class RentalRunningChartTimelineGuard
         RentalAssignment $assignment,
         RentalRunningChartData $data,
         CarbonImmutable $startsAt,
-        ?int $exceptChartId = null,
+        ?RentalRunningChart $existingChart = null,
     ): array {
         $assignment->loadMissing('vehicle');
-        $vehicleReading = $assignment->vehicle?->odometer_reading;
-        if ($vehicleReading === null) {
+        $odometerAvailable = $existingChart instanceof RentalRunningChart
+            ? $existingChart->start_odometer !== null
+            : $assignment->vehicle?->odometer_reading !== null;
+
+        if (! $odometerAvailable) {
             if ($data->startOdometer !== null || $data->endOdometer !== null || $data->garageKm !== null) {
-                throw new InvalidArgumentException('This vehicle has no available odometer. Leave the kilometre fields blank.');
+                throw new InvalidArgumentException('This running chart has no available odometer. Leave the kilometre fields blank.');
             }
 
             return [
@@ -70,13 +73,14 @@ final class RentalRunningChartTimelineGuard
         }
 
         if ($data->endOdometer === null) {
-            throw new InvalidArgumentException('End odometer is required while this vehicle odometer is available.');
+            throw new InvalidArgumentException('End odometer is required while this running chart uses odometer readings.');
         }
 
+        $exceptChartId = $existingChart?->getKey();
         $start = $data->startOdometer ?? $this->suggestedStartOdometer(
             $assignment,
             $startsAt,
-            $exceptChartId,
+            $exceptChartId === null ? null : (int) $exceptChartId,
         );
         if ($start === null) {
             throw new InvalidArgumentException('Start odometer could not be resolved for this vehicle.');
@@ -103,6 +107,7 @@ final class RentalRunningChartTimelineGuard
             ->where('ends_at', '<=', $startsAt->toDateTimeString())
             ->orderByDesc('ends_at')
             ->orderByDesc('id')
+            ->lockForUpdate()
             ->first();
 
         if ($previous instanceof RentalRunningChart) {
