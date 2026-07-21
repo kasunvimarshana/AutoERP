@@ -4,6 +4,12 @@ export interface RentalReference {
     name?: string | null;
 }
 
+export interface RentalVehicleReference extends RentalReference {
+    registration_number?: string | null;
+    odometer_reading?: string | null;
+    odometer_unit?: string | null;
+}
+
 export interface RentalAgreementFormLookups {
     tax_groups: RentalReference[];
 }
@@ -75,7 +81,7 @@ export interface RentalCustodyEvent {
     id: number;
     event_type: 'handover' | 'return' | string;
     event_at?: string | null;
-    odometer: string;
+    odometer: string | null;
     fuel_level?: string | null;
     condition_notes?: string | null;
     damage_notes?: string | null;
@@ -90,7 +96,7 @@ export interface RentalAssignment {
         kind?: RentalAgreementKind | null;
         party?: RentalReference | null;
     }) | null;
-    vehicle?: (RentalReference & { registration_number?: string | null }) | null;
+    vehicle?: RentalVehicleReference | null;
     driver?: RentalReference | null;
     source_assignment?: (RentalReference & { agreement?: RentalReference | null }) | null;
     replaces_assignment?: (RentalReference & { vehicle?: RentalReference | null }) | null;
@@ -114,16 +120,16 @@ export interface RentalRunningChart {
     assignment?: {
         id: number;
         agreement?: RentalReference | null;
-        vehicle?: RentalReference | null;
+        vehicle?: RentalVehicleReference | null;
         owner_agreement?: RentalReference | null;
     } | null;
     driver?: RentalReference | null;
     ac_mode?: RentalAcMode | null;
-    start_odometer: string;
-    end_odometer: string;
-    total_km: string;
-    garage_km: string;
-    commercial_km: string;
+    start_odometer: string | null;
+    end_odometer: string | null;
+    total_km: string | null;
+    garage_km: string | null;
+    commercial_km: string | null;
     normal_overtime_hours: string;
     double_overtime_hours: string;
     triple_overtime_hours: string;
@@ -197,9 +203,9 @@ export interface RentalCalculation {
     period_end?: string | null;
     chart_count: number;
     operating_days: number;
-    commercial_km: string;
+    commercial_km: string | null;
     included_km: string;
-    excess_km: string;
+    excess_km: string | null;
     subtotal_amount: string;
     lines?: RentalCalculationLine[];
     sources?: RentalCalculationSource[];
@@ -276,7 +282,7 @@ export interface RentalAssignmentPayload {
 export interface RentalCustodyPayload {
     event_type: 'handover' | 'return';
     event_at: string;
-    odometer: string;
+    odometer?: string | null;
     fuel_level?: string | null;
     condition_notes?: string | null;
     damage_notes?: string | null;
@@ -286,8 +292,8 @@ export interface RentalCustodyPayload {
 export interface RentalReplacementPayload {
     vehicle_id: number;
     effective_at: string;
-    old_return_odometer: string;
-    new_handover_odometer: string;
+    old_return_odometer?: string | null;
+    new_handover_odometer?: string | null;
     source_assignment_id?: number | null;
     driver_employee_id?: number | null;
     self_drive: boolean;
@@ -306,9 +312,9 @@ export interface RentalRunningChartPayload {
     operational_date: string;
     starts_at: string;
     ends_at: string;
-    start_odometer: string;
-    end_odometer: string;
-    garage_km: string;
+    start_odometer?: string | null;
+    end_odometer?: string | null;
+    garage_km?: string | null;
     normal_overtime_hours: string;
     double_overtime_hours: string;
     triple_overtime_hours: string;
