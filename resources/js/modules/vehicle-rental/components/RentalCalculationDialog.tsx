@@ -34,9 +34,11 @@ function RentalCalculationDialogForm({
     const [submitting, setSubmitting] = useState(false);
     const customerSide = side === 'customer';
     const monthly = agreement?.billingBasis === 'monthly';
-    const firstEligibleMonth = firstCompleteMonth(agreement?.startsOn);
-    const lastEligibleMonth = lastCompleteMonth(agreement?.endsOn);
-    const hasEligibleMonth = !firstEligibleMonth || !lastEligibleMonth || firstEligibleMonth <= lastEligibleMonth;
+    const firstEligibleMonth = agreementMonth(agreement?.startsOn);
+    const lastEligibleMonth = agreementMonth(agreement?.endsOn);
+    const selectedMonthlyPeriod = monthly
+        ? billingPeriodForMonth(periodMonth, agreement?.startsOn, agreement?.endsOn)
+        : null;
     const title = customerSide ? 'Prepare customer billing period' : side === 'owner' ? 'Prepare owner settlement period' : 'New rental calculation';
     const actionLabel = customerSide ? 'Prepare billing' : side === 'owner' ? 'Prepare settlement' : 'Calculate';
 
@@ -46,7 +48,7 @@ function RentalCalculationDialogForm({
         setError(null);
         try {
             const period = monthly
-                ? completeMonth(periodMonth)
+                ? billingPeriodForMonth(periodMonth, agreement?.startsOn, agreement?.endsOn)
                 : { start: periodStart, end: periodEnd };
             const saved = await createRentalCalculation(agreement?.id ?? 0, {
                 period_start: period.start,
@@ -94,17 +96,18 @@ function RentalCalculationDialogForm({
                             label="Billing month"
                             type="month"
                             required
-                            disabled={!hasEligibleMonth}
                             min={firstEligibleMonth}
                             max={lastEligibleMonth}
                             value={periodMonth}
                             error={fieldError(error, 'period_start') ?? fieldError(error, 'period_end')}
                             onChange={(event) => setPeriodMonth(event.target.value)}
                         />
-                        <p className="text-sm text-slate-600">Monthly agreements are prepared for one complete calendar month. Partial-month proration is not configured.</p>
-                        {!hasEligibleMonth && (
-                            <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-                                This agreement period does not contain a complete calendar month, so a monthly calculation cannot be prepared.
+                        <p className="text-sm text-slate-600">
+                            Billing is limited to this agreement's date range. Partial months use actual calendar-day proration.
+                        </p>
+                        {selectedMonthlyPeriod?.start && selectedMonthlyPeriod.end && (
+                            <p className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+                                Billing period: {selectedMonthlyPeriod.start} to {selectedMonthlyPeriod.end}
                             </p>
                         )}
                     </div>
@@ -134,11 +137,25 @@ function RentalCalculationDialogForm({
                 )}
                 <div className="flex justify-end gap-2">
                     <Button type="button" variant="secondary" disabled={submitting} onClick={onClose}>Cancel</Button>
-                    <Button type="submit" loading={submitting} disabled={monthly && !hasEligibleMonth}>{actionLabel}</Button>
+                    <Button type="submit" loading={submitting} disabled={monthly && periodMonth === ''}>{actionLabel}</Button>
                 </div>
             </form>
         </Modal>
     );
+}
+
+function billingPeriodForMonth(
+    value: string,
+    agreementStart?: string | null,
+    agreementEnd?: string | null,
+): { start: string; end: string } {
+    const month = completeMonth(value);
+    if (!month.start || !month.end) return month;
+
+    return {
+        start: agreementStart && agreementStart > month.start ? agreementStart : month.start,
+        end: agreementEnd && agreementEnd < month.end ? agreementEnd : month.end,
+    };
 }
 
 function completeMonth(value: string): { start: string; end: string } {
@@ -148,19 +165,6 @@ function completeMonth(value: string): { start: string; end: string } {
     return { start: `${value}-01`, end };
 }
 
-function firstCompleteMonth(value?: string | null): string | undefined {
-    if (!value) return undefined;
-    const [year, month, day] = value.split('-').map(Number);
-    if (!year || !month || !day) return value.slice(0, 7);
-    if (day === 1) return value.slice(0, 7);
-    return new Date(Date.UTC(year, month, 1)).toISOString().slice(0, 7);
-}
-
-function lastCompleteMonth(value?: string | null): string | undefined {
-    if (!value) return undefined;
-    const [year, month, day] = value.split('-').map(Number);
-    if (!year || !month || !day) return value.slice(0, 7);
-    const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
-    if (day === lastDay) return value.slice(0, 7);
-    return new Date(Date.UTC(year, month - 2, 1)).toISOString().slice(0, 7);
+function agreementMonth(value?: string | null): string | undefined {
+    return value?.slice(0, 7) || undefined;
 }
