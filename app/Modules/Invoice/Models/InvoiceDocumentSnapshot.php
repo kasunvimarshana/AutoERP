@@ -33,6 +33,7 @@ final class InvoiceDocumentSnapshot extends TenantOwnedModel
             'invoice_id' => 'integer',
             'document_kind' => InvoiceDocumentKind::class,
             'organization_profile_present' => 'boolean',
+            'counterparty_present' => 'boolean',
             'supply_date' => 'date',
             'supply_period_start' => 'date',
             'supply_period_end' => 'date',
