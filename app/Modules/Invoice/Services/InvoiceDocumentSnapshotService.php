@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Modules\Invoice\Services;
 
 use BackedEnum;
-use InvalidArgumentException;
 use Modules\Invoice\DTOs\CreateInvoiceData;
 use Modules\Invoice\Enums\InvoiceDirection;
 use Modules\Invoice\Enums\InvoiceDocumentKind;
@@ -29,11 +28,6 @@ final class InvoiceDocumentSnapshotService
             ? null
             : $this->organizationProfiles->find($data->tenantId, $data->organizationUnitId);
         $counterpartyPresent = $data->partyId !== null && $data->partyType !== null;
-        if ($counterpartyPresent && $data->organizationUnitId !== null && $organizationProfile === null) {
-            throw new InvalidArgumentException(
-                'Configure the organization unit legal and tax profile before creating a business invoice.',
-            );
-        }
 
         $organization = [
             'name' => $organizationProfile?->legalName
@@ -59,7 +53,7 @@ final class InvoiceDocumentSnapshotService
             'tenant_id' => $data->tenantId,
             'organization_unit_id' => $data->organizationUnitId,
             'invoice_id' => (int) $invoice->getKey(),
-            'document_kind' => $this->documentKind($invoice)->value,
+            'document_kind' => $this->documentKind($invoice, $seller['vat_registration_number'])->value,
             'organization_profile_present' => $organizationProfile !== null,
             'counterparty_present' => $counterpartyPresent,
             ...$this->partyColumns('seller', $seller),
@@ -77,7 +71,7 @@ final class InvoiceDocumentSnapshotService
         return $snapshot;
     }
 
-    private function documentKind(Invoice $invoice): InvoiceDocumentKind
+    private function documentKind(Invoice $invoice, ?string $sellerVatRegistrationNumber): InvoiceDocumentKind
     {
         $type = $this->enumValue($invoice->invoice_type);
         $direction = $this->enumValue($invoice->direction);
@@ -95,7 +89,7 @@ final class InvoiceDocumentSnapshotService
             return InvoiceDocumentKind::PurchaseInvoice;
         }
 
-        return $this->hasOutputTax($invoice)
+        return $this->nullableString($sellerVatRegistrationNumber) !== null && $this->hasOutputTax($invoice)
             ? InvoiceDocumentKind::TaxInvoice
             : InvoiceDocumentKind::Invoice;
     }
