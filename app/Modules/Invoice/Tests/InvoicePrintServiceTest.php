@@ -58,12 +58,12 @@ final class InvoicePrintServiceTest extends TestCase
         $this->assertStringContainsString('Tax Invoice', $html);
         $this->assertStringContainsString('Tax Invoice No.', $html);
         $this->assertStringContainsString('Total Value of Supply', $html);
-        $this->assertStringContainsString('Total Amount including Tax', $html);
+        $this->assertStringContainsString('Total Amount including VAT', $html);
         $this->assertStringContainsString($originalName, $html);
         $this->assertStringContainsString('95.00', $html);
         $this->assertStringNotContainsString('118.00', $html);
         $this->assertStringNotContainsString('Changed Print Customer', $html);
-        $this->assertStringNotContainsString('VAT Amount', $html);
+        $this->assertStringContainsString('VAT Amount', $html);
         $this->assertStringNotContainsString('Total Value of Supply @ 18%', $html);
         $this->assertStringNotContainsString('SAMPLE', $html);
         $this->assertStringNotContainsString('EOG', $html);
@@ -157,6 +157,7 @@ final class InvoicePrintServiceTest extends TestCase
                                 InvoiceTaxMetadata::CALCULATION_METHOD => InvoiceTaxMetadata::CALCULATION_METHOD_INCLUSIVE,
                                 InvoiceTaxMetadata::TAX_AMOUNT => '15.000000',
                                 InvoiceTaxMetadata::IS_WITHHOLDING => false,
+                                'tax_code' => 'VAT-INCLUSIVE',
                             ]],
                         ],
                     ),
@@ -210,6 +211,7 @@ final class InvoicePrintServiceTest extends TestCase
             'tenant_id' => $tenantId,
             'name' => $name,
             'code' => $code,
+            'vat_registration_number' => 'VAT-'.$code,
             'is_active' => true,
             'created_at' => now(),
             'updated_at' => now(),
