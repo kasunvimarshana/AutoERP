@@ -6,7 +6,6 @@ namespace Modules\Invoice\Services;
 
 use Illuminate\Database\Eloquent\Builder;
 use InvalidArgumentException;
-use Modules\Customer\Enums\CustomerAddressType;
 use Modules\Customer\Models\Customer;
 use Modules\Invoice\Constants\InvoiceTaxMetadata;
 use Modules\Invoice\DTOs\CreateInvoiceData;
@@ -14,7 +13,6 @@ use Modules\Invoice\DTOs\InvoiceLineData;
 use Modules\Invoice\Enums\InvoicePartyType;
 use Modules\Item\Models\Item;
 use Modules\ReferenceData\Models\CurrencyModel;
-use Modules\Supplier\Enums\SupplierAddressType;
 use Modules\Supplier\Models\Supplier;
 use Modules\UOM\Models\UnitOfMeasureModel;
 
@@ -185,17 +183,17 @@ final class InvoiceReferenceSnapshotService
                 $type = $address->address_type instanceof \BackedEnum
                     ? (string) $address->address_type->value
                     : (string) $address->address_type;
-                $rank = match ($type) {
-                    CustomerAddressType::Registered->value, SupplierAddressType::Registered->value => 0,
-                    CustomerAddressType::Billing->value, SupplierAddressType::Billing->value => 1,
-                    CustomerAddressType::Service->value,
-                    CustomerAddressType::Shipping->value,
-                    SupplierAddressType::Shipping->value,
-                    SupplierAddressType::Warehouse->value => 2,
-                    default => 3,
+                $primary = (bool) $address->is_primary;
+                $rank = match (true) {
+                    $primary && $type === 'registered' => 0,
+                    $primary && $type === 'billing' => 1,
+                    $primary => 2,
+                    $type === 'registered' => 3,
+                    $type === 'billing' => 4,
+                    default => 5,
                 };
 
-                return sprintf('%02d-%d-%020d', $rank, $address->is_primary ? 0 : 1, (int) $address->getKey());
+                return sprintf('%02d-%020d', $rank, (int) $address->getKey());
             })
             ->first();
 
