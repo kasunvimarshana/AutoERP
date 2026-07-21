@@ -8,6 +8,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
+use Modules\Vehicle\Models\Vehicle;
 use Modules\VehicleRental\DTOs\RentalAssignmentData;
 use Modules\VehicleRental\DTOs\RentalReplacementData;
 use Modules\VehicleRental\Enums\RentalAssignmentSide;
@@ -52,15 +53,27 @@ final class RentalReplacementService
                 ->lockForUpdate()
                 ->get();
 
-            $this->timeline->lockVehicles(
-                $data->tenantId,
-                $data->organizationUnitId,
-                [(int) $original->vehicle_id, $data->vehicleId],
-            );
+            $vehicleIds = [(int) $original->vehicle_id, $data->vehicleId];
+            $this->timeline->lockVehicles($data->tenantId, $data->organizationUnitId, $vehicleIds);
+            $vehicles = Vehicle::query()
+                ->forTenant($data->tenantId, $data->organizationUnitId)
+                ->whereIn('id', $vehicleIds)
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get()
+                ->keyBy(fn (Vehicle $vehicle): int => (int) $vehicle->getKey());
+            $oldVehicle = $vehicles->get((int) $original->vehicle_id);
+            $newVehicle = $vehicles->get($data->vehicleId);
+            if (! $oldVehicle instanceof Vehicle || ! $newVehicle instanceof Vehicle) {
+                throw new InvalidArgumentException('Both replacement vehicles must be available in the current organization.');
+            }
+            $oldReturnOdometer = $this->resolveOdometer($oldVehicle, $data->oldReturnOdometer, 'Old vehicle');
+            $newHandoverOdometer = $this->resolveOdometer($newVehicle, $data->newHandoverOdometer, 'Replacement vehicle');
+
             $this->timeline->lockVehicleTimeline(
                 $data->tenantId,
                 $data->organizationUnitId,
-                [(int) $original->vehicle_id, $data->vehicleId],
+                $vehicleIds,
                 $original->side,
             );
             $original = RentalAssignment::query()
@@ -91,11 +104,14 @@ final class RentalReplacementService
                 throw new InvalidArgumentException('A replacement must occur within the original assignment period.');
             }
             if ($original->handover_odometer !== null
-                && $this->math->compare($data->oldReturnOdometer, (string) $original->handover_odometer) < 0) {
+                && $oldReturnOdometer !== null
+                && $this->math->compare($oldReturnOdometer, (string) $original->handover_odometer) < 0) {
                 throw new InvalidArgumentException('Replacement return odometer cannot be lower than the original handover odometer.');
             }
             $this->runningCharts->assertNoChartsAfterClosure($original, $effectiveAt);
-            $this->runningCharts->assertClosureOdometer($original, $effectiveAt, $data->oldReturnOdometer);
+            if ($oldReturnOdometer !== null) {
+                $this->runningCharts->assertClosureOdometer($original, $effectiveAt, $oldReturnOdometer);
+            }
 
             $agreement = RentalAgreement::query()
                 ->forContext($data->tenantId, $data->organizationUnitId)
@@ -110,7 +126,7 @@ final class RentalReplacementService
                 startsAt: $enteredEffectiveAt->toIso8601String(),
                 endsAt: $enteredEndsAt,
                 sourceAssignmentId: $data->sourceAssignmentId,
-                handoverOdometer: $data->newHandoverOdometer,
+                handoverOdometer: $newHandoverOdometer,
                 driverEmployeeId: $data->driverEmployeeId,
                 selfDrive: $data->selfDrive,
                 actorId: $data->actorId,
@@ -146,7 +162,7 @@ final class RentalReplacementService
                 'status' => RentalAssignmentStatus::Active->value,
                 'starts_at' => $effectiveAt->toDateTimeString(),
                 'ends_at' => $endsAt?->toDateTimeString(),
-                'handover_odometer' => $this->math->normalize($data->newHandoverOdometer),
+                'handover_odometer' => $newHandoverOdometer,
                 'driver_employee_id' => $data->driverEmployeeId,
                 'self_drive' => $data->selfDrive,
                 'replacement_reason' => $data->reason,
@@ -157,7 +173,7 @@ final class RentalReplacementService
                 $original,
                 RentalCustodyEventType::ReplacementOut,
                 $effectiveAt,
-                $data->oldReturnOdometer,
+                $oldReturnOdometer,
                 $data->oldFuelLevel,
                 $data->oldConditionNotes,
                 $data->oldDamageNotes,
@@ -167,7 +183,7 @@ final class RentalReplacementService
                 $replacement,
                 RentalCustodyEventType::ReplacementIn,
                 $effectiveAt,
-                $data->newHandoverOdometer,
+                $newHandoverOdometer,
                 $data->newFuelLevel,
                 $data->newConditionNotes,
                 $data->newDamageNotes,
@@ -176,7 +192,7 @@ final class RentalReplacementService
 
             $original->forceFill([
                 'status' => RentalAssignmentStatus::Replaced->value,
-                'return_odometer' => $this->math->normalize($data->oldReturnOdometer),
+                'return_odometer' => $oldReturnOdometer,
                 'ends_at' => $effectiveAt->toDateTimeString(),
                 'replacement_reason' => $data->reason,
                 'closed_by' => $data->actorId,
@@ -186,5 +202,22 @@ final class RentalReplacementService
 
             return $replacement->refresh()->load(RentalAssignmentService::RELATIONS);
         });
+    }
+
+    private function resolveOdometer(Vehicle $vehicle, ?string $value, string $label): ?string
+    {
+        if ($vehicle->odometer_reading === null) {
+            if ($value !== null) {
+                throw new InvalidArgumentException($label.' has no available odometer. Leave its odometer field blank.');
+            }
+
+            return null;
+        }
+
+        if ($value === null) {
+            throw new InvalidArgumentException($label.' odometer reading is required while its odometer is available.');
+        }
+
+        return $this->math->normalize($value);
     }
 }
