@@ -98,7 +98,15 @@ final class RentalRunningChartService
             );
             $this->timeline->assertNoOperationalOverlap($assignment, $startsAt, $endsAt, (int) $chart->getKey());
 
-            $attributes = $this->attributes($data, $assignment, $startsAt, $endsAt, (string) $chart->chart_number, $chart->replaces_running_chart_id);
+            $attributes = $this->attributes(
+                $data,
+                $assignment,
+                $startsAt,
+                $endsAt,
+                (string) $chart->chart_number,
+                $chart->replaces_running_chart_id,
+                (int) $chart->getKey(),
+            );
             unset($attributes['tenant_id'], $attributes['organization_unit_id'], $attributes['assignment_id'], $attributes['chart_number'], $attributes['replaces_running_chart_id'], $attributes['created_by'], $attributes['status'], $attributes['active_marker']);
             $chart->forceFill([...$attributes, 'row_version' => $expectedVersion + 1])->save();
 
@@ -185,8 +193,9 @@ final class RentalRunningChartService
         CarbonImmutable $endsAt,
         string $number,
         ?int $replacesChartId,
+        ?int $exceptChartId = null,
     ): array {
-        $distances = $this->timeline->distances($data);
+        $measurements = $this->timeline->measurements($assignment, $data, $startsAt, $exceptChartId);
 
         return [
             'tenant_id' => $data->tenantId,
@@ -199,9 +208,7 @@ final class RentalRunningChartService
             'ends_at' => $endsAt->toDateTimeString(),
             'driver_employee_id' => $assignment->driver_employee_id,
             'ac_mode' => $data->acMode?->value,
-            'start_odometer' => $this->math->normalize($data->startOdometer),
-            'end_odometer' => $this->math->normalize($data->endOdometer),
-            ...$distances,
+            ...$measurements,
             'normal_overtime_hours' => $this->nonNegative($data->normalOvertimeHours, 'Normal overtime'),
             'double_overtime_hours' => $this->nonNegative($data->doubleOvertimeHours, 'Double overtime'),
             'triple_overtime_hours' => $this->nonNegative($data->tripleOvertimeHours, 'Triple overtime'),
