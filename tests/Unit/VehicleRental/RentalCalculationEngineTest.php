@@ -60,6 +60,39 @@ final class RentalCalculationEngineTest extends TestCase
         );
     }
 
+    public function test_fixed_daily_billing_continues_without_an_odometer(): void
+    {
+        $result = $this->engine->calculate(
+            $this->agreement(RentalAgreementKind::Customer, RentalBillingBasis::Daily, '100'),
+            $this->version([$this->rate(1, RentalRateCode::BaseRental, RentalRateUnit::Day, '100')]),
+            CarbonImmutable::parse('2026-07-01'),
+            CarbonImmutable::parse('2026-07-01'),
+            collect([$this->chart('2026-07-01', null, '0', '0', '0', 0)]),
+        );
+
+        self::assertNull($result->commercialKm);
+        self::assertNull($result->excessKm);
+        self::assertSame('100.000000', $result->subtotalAmount);
+        self::assertSame(['base_rental'], array_map(static fn ($line): string => $line->rateCode->value, $result->lines));
+    }
+
+    public function test_kilometre_charges_require_verified_distance(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Verified distance is required');
+
+        $this->engine->calculate(
+            $this->agreement(RentalAgreementKind::Customer, RentalBillingBasis::Daily, '100'),
+            $this->version([
+                $this->rate(1, RentalRateCode::BaseRental, RentalRateUnit::Day, '100'),
+                $this->rate(2, RentalRateCode::ExcessKm, RentalRateUnit::Kilometre, '2'),
+            ]),
+            CarbonImmutable::parse('2026-07-01'),
+            CarbonImmutable::parse('2026-07-01'),
+            collect([$this->chart('2026-07-01', null, '0', '0', '0', 0)]),
+        );
+    }
+
     public function test_daily_ac_mode_calculation_uses_each_explicit_mode_rate(): void
     {
         $first = $this->chart('2026-07-01', '10', '0', '0', '0', 0);
@@ -247,7 +280,7 @@ final class RentalCalculationEngineTest extends TestCase
 
     private function chart(
         string $date,
-        string $commercialKm,
+        ?string $commercialKm,
         string $normalOvertime,
         string $doubleOvertime,
         string $tripleOvertime,
