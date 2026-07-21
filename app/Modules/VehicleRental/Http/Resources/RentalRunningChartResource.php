@@ -33,13 +33,16 @@ final class RentalRunningChartResource extends JsonResource
                         ($this->assignment->vehicle->registration_number ?? $this->assignment->vehicle->vehicle_number)
                         .' '.($this->assignment->vehicle->model?->name ?? ''),
                     ),
+                    'odometer_reading' => $this->assignment->vehicle->odometer_reading === null
+                        ? null
+                        : (string) $this->assignment->vehicle->odometer_reading,
                 ] : null,
                 'owner_agreement' => $this->assignment->relationLoaded('sourceAssignment')
                     && $this->assignment->sourceAssignment?->relationLoaded('agreement') ? [
-                        'id' => (int) $this->assignment->sourceAssignment->agreement->getKey(),
-                        'code' => $this->assignment->sourceAssignment->agreement->agreement_number,
-                        'name' => $this->assignment->sourceAssignment->agreement->agreement_number,
-                    ] : null,
+                    'id' => (int) $this->assignment->sourceAssignment->agreement->getKey(),
+                    'code' => $this->assignment->sourceAssignment->agreement->agreement_number,
+                    'name' => $this->assignment->sourceAssignment->agreement->agreement_number,
+                ] : null,
             ]),
             'driver' => $this->whenLoaded('driver', fn () => $this->driver === null ? null : [
                 'id' => (int) $this->driver->getKey(),
@@ -47,11 +50,11 @@ final class RentalRunningChartResource extends JsonResource
                 'name' => $this->driver->display_name,
             ]),
             'ac_mode' => $this->enum($this->ac_mode),
-            'start_odometer' => (string) $this->start_odometer,
-            'end_odometer' => (string) $this->end_odometer,
-            'total_km' => (string) $this->total_km,
-            'garage_km' => (string) $this->garage_km,
-            'commercial_km' => (string) $this->commercial_km,
+            'start_odometer' => $this->decimalOrNull($this->start_odometer),
+            'end_odometer' => $this->decimalOrNull($this->end_odometer),
+            'total_km' => $this->decimalOrNull($this->total_km),
+            'garage_km' => $this->decimalOrNull($this->garage_km),
+            'commercial_km' => $this->decimalOrNull($this->commercial_km),
             'normal_overtime_hours' => (string) $this->normal_overtime_hours,
             'double_overtime_hours' => (string) $this->double_overtime_hours,
             'triple_overtime_hours' => (string) $this->triple_overtime_hours,
@@ -69,6 +72,11 @@ final class RentalRunningChartResource extends JsonResource
             'reversed_at' => $this->reversed_at?->toISOString(),
             'reversal_reason' => $this->reversal_reason,
         ];
+    }
+
+    private function decimalOrNull(mixed $value): ?string
+    {
+        return $value === null ? null : (string) $value;
     }
 
     private function enum(mixed $value): mixed
