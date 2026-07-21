@@ -25,9 +25,9 @@ return new class extends Migration
             $table->date('period_end');
             $table->unsignedInteger('chart_count');
             $table->unsignedInteger('operating_days');
-            $table->decimal('commercial_km', 20, 6);
+            $table->decimal('commercial_km', 20, 6)->nullable();
             $table->decimal('included_km', 20, 6);
-            $table->decimal('excess_km', 20, 6);
+            $table->decimal('excess_km', 20, 6)->nullable();
             $table->decimal('subtotal_amount', 20, 6);
             $table->string('status', 20)->default(RentalCalculationStatus::Calculated->value);
             $table->boolean('active_marker')->nullable()->default(true);
