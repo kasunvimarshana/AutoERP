@@ -7,14 +7,13 @@ const source = (path: string) => readFileSync(resolve(cwd(), path), 'utf8');
 
 const reportPageSource = source('resources/js/modules/vehicle-rental/pages/VehicleRentalReportPage.tsx');
 const rentalReportsSource = source('resources/js/modules/vehicle-rental/pages/RentalReportsPage.tsx');
-const reportListSource = source('resources/js/modules/reporting/pages/ReportListPage.tsx');
 const reportingRoutesSource = source('app/Modules/Reporting/Routes/api.php');
 const exceptionServiceSource = source('app/Modules/Reporting/Services/VehicleRentalChartExceptionReportService.php');
 const financialServiceSource = source('app/Modules/Reporting/Services/VehicleRentalFinancialReportService.php');
 const definitionSource = source('app/Modules/Reporting/Services/VehicleRentalReportDefinitions.php');
 
 describe('Vehicle Rental Phase 1 reporting', () => {
-    it('exposes all five business reports from the Vehicle Rental workspace and global catalog', () => {
+    it('exposes all five business reports from the Vehicle Rental workspace', () => {
         for (const slug of [
             'running-chart',
             'chart-exceptions',
@@ -23,8 +22,8 @@ describe('Vehicle Rental Phase 1 reporting', () => {
             'rental-history',
         ]) {
             expect(rentalReportsSource).toContain(`'/vehicle-rental/reports/${slug}'`);
-            expect(reportListSource).toContain(`'/vehicle-rental/reports/${slug}'`);
         }
+        expect(rentalReportsSource).toContain('reportingPermissions.view');
     });
 
     it('uses the existing report filter, summary, pagination and export infrastructure', () => {
@@ -50,12 +49,13 @@ describe('Vehicle Rental Phase 1 reporting', () => {
         expect(definitionSource).toContain('Owner Payable Voucher Register');
     });
 
-    it('registers explicit report and export routes before the generic catch-all', () => {
+    it('registers feature-gated report and export routes before the generic catch-all', () => {
         const vehicleRentalRoute = reportingRoutesSource.indexOf("Route::get('vehicle-rental/running-chart'");
         const genericRoute = reportingRoutesSource.indexOf("Route::get('{report}'");
         const vehicleRentalExport = reportingRoutesSource.indexOf("Route::get('vehicle-rental/running-chart/export/{format}'");
         const genericExport = reportingRoutesSource.indexOf("Route::get('{report}/export/{format}'");
 
+        expect(reportingRoutesSource).toContain("Route::middleware('tenant.feature:vehicle-rental')");
         expect(vehicleRentalRoute).toBeGreaterThan(-1);
         expect(vehicleRentalRoute).toBeLessThan(genericRoute);
         expect(vehicleRentalExport).toBeGreaterThan(-1);
