@@ -60,13 +60,25 @@ final class RentalCalculationEngine
         if ($charts->count() !== $operatingDays) {
             throw new InvalidArgumentException('Calculations cannot contain multiple running charts for the same operational date. Replacement-day and concurrent-vehicle charging require an explicit business rule.');
         }
-        $commercialKm = $this->math->sum($charts->map(fn (RentalRunningChart $chart): string => (string) $chart->commercial_km));
+
+        $hasVerifiedDistance = $charts->every(
+            fn (RentalRunningChart $chart): bool => $chart->commercial_km !== null,
+        );
+        if (! $hasVerifiedDistance && $rates->has(RentalRateCode::ExcessKm->value)) {
+            throw new InvalidArgumentException('Verified distance is required because this agreement includes kilometre-based charges.');
+        }
+
+        $commercialKm = $hasVerifiedDistance
+            ? $this->math->sum($charts->map(fn (RentalRunningChart $chart): string => (string) $chart->commercial_km))
+            : null;
         $includedKm = $agreement->billing_basis === RentalBillingBasis::Daily
             ? $this->math->mul((string) $agreement->included_km, (string) $operatingDays)
             : $this->monthlyIncludedKm($agreement, $periodStart, $periodEnd);
-        $excessKm = $this->math->compare($commercialKm, $includedKm) > 0
-            ? $this->math->sub($commercialKm, $includedKm)
-            : $this->math->normalize('0');
+        $excessKm = $commercialKm === null
+            ? null
+            : ($this->math->compare($commercialKm, $includedKm) > 0
+                ? $this->math->sub($commercialKm, $includedKm)
+                : $this->math->normalize('0'));
 
         $lines = [];
         if ($agreement->billing_basis === RentalBillingBasis::Daily) {
@@ -79,7 +91,9 @@ final class RentalCalculationEngine
             );
         }
 
-        if ($rates->has(RentalRateCode::ExcessKm->value) && ! $this->math->isZero($excessKm)) {
+        if ($rates->has(RentalRateCode::ExcessKm->value)
+            && $excessKm !== null
+            && ! $this->math->isZero($excessKm)) {
             $lines[] = $this->line($this->requiredRate($rates, RentalRateCode::ExcessKm, RentalRateUnit::Kilometre), $excessKm);
         }
         if ($rates->has(RentalRateCode::DriverSalary->value)) {
