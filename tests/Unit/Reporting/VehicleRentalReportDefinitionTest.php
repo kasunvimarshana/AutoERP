@@ -6,7 +6,7 @@ namespace Tests\Unit\Reporting;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Route;
-use Modules\Reporting\Services\ReportDefinitionRegistry;
+use Modules\Reporting\Services\VehicleRentalReportDefinitions;
 use Modules\Reporting\Services\VehicleRentalReportService;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
@@ -28,9 +28,9 @@ final class VehicleRentalReportDefinitionTest extends TestCase
     }
 
     #[DataProvider('reportDefinitions')]
-    public function test_phase_one_vehicle_rental_report_is_registered(string $key, string $title): void
+    public function test_phase_one_vehicle_rental_report_is_defined(string $key, string $title): void
     {
-        $definition = $this->app->make(ReportDefinitionRegistry::class)->get($key);
+        $definition = $this->app->make(VehicleRentalReportDefinitions::class)->get($key);
 
         self::assertSame($key, $definition->key);
         self::assertSame($title, $definition->title);
@@ -41,10 +41,10 @@ final class VehicleRentalReportDefinitionTest extends TestCase
 
     public function test_financial_registers_expose_traceability_and_balance_columns(): void
     {
-        $registry = $this->app->make(ReportDefinitionRegistry::class);
+        $definitions = $this->app->make(VehicleRentalReportDefinitions::class);
 
         foreach ([VehicleRentalReportService::CUSTOMER_INVOICES, VehicleRentalReportService::OWNER_VOUCHERS] as $key) {
-            $columns = collect($registry->get($key)->columns)->pluck('key')->all();
+            $columns = collect($definitions->get($key)->columns)->pluck('key')->all();
 
             self::assertContains('agreement', $columns);
             self::assertContains('calculation_number', $columns);
@@ -60,7 +60,7 @@ final class VehicleRentalReportDefinitionTest extends TestCase
         $service = $this->app->make(VehicleRentalReportService::class);
         $params = [
             'tenant_id' => 999999,
-            'organization_unit_id' => null,
+            'organization_unit_id' => 999999,
             'page' => 1,
             'per_page' => 25,
         ];
