@@ -50,9 +50,11 @@ final class OrganizationUnitLegalProfileService
                 $profile = new OrganizationUnitLegalProfileModel();
                 $profile->tenant_id = $tenantId;
                 $profile->organization_unit_id = $organizationUnitId;
+                $profile->row_version = 1;
             }
 
             $before = $profile->exists ? $profile->attributesToArray() : null;
+            $created = ! $profile->exists;
             $profile->forceFill([
                 'legal_name' => $this->requiredString($payload['legal_name'] ?? null),
                 'tin' => $this->nullableString($payload['tin'] ?? null),
@@ -68,9 +70,15 @@ final class OrganizationUnitLegalProfileService
                 'email' => $this->nullableString($payload['email'] ?? null),
             ]);
             $profile->save();
-            $this->audit->legalProfile($profile->wasRecentlyCreated ? 'created' : 'updated', $profile, $before, $profile->attributesToArray());
+            $profile->refresh();
+            $this->audit->legalProfile(
+                $created ? 'created' : 'updated',
+                $profile,
+                $before,
+                $profile->attributesToArray(),
+            );
 
-            return $profile->refresh();
+            return $profile;
         }, 3);
     }
 
