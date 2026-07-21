@@ -72,8 +72,7 @@ export function OrganizationUnitLegalProfilePanel({
                 email: nullable(form.email),
             };
             const saved = await organizationUnitApi.saveLegalProfile(unit.id, payload);
-            setForm(profileForm(saved));
-            profile.reload();
+            profile.setData(saved);
         } catch (caught: unknown) {
             setActionError(toApiError(caught));
         } finally {
