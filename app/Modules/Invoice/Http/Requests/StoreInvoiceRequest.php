@@ -65,6 +65,12 @@ final class StoreInvoiceRequest extends TenantScopedRequest
                 $this->activeScopedExists('tax_groups', 'active', softDeletes: false),
             ],
             'notes' => ['nullable', 'string'],
+            'supply_date' => ['nullable', 'date'],
+            'supply_period_start' => ['nullable', 'date', 'required_with:supply_period_end'],
+            'supply_period_end' => ['nullable', 'date', 'required_with:supply_period_start', 'after_or_equal:supply_period_start'],
+            'place_of_supply' => ['nullable', 'string', 'max:1000'],
+            'payment_mode' => ['nullable', 'string', 'max:100'],
+            'payment_terms' => ['nullable', 'string', 'max:255'],
             'idempotency_key' => $this->routeIs('api.v1.invoices.store')
                 ? ['required', 'string', 'max:'.self::IDEMPOTENCY_KEY_MAX_LENGTH]
                 : ['prohibited'],
@@ -96,7 +102,6 @@ final class StoreInvoiceRequest extends TenantScopedRequest
             'lines.*.discount_amount' => ['nullable', 'decimal:0,6', 'min:0'],
             'lines.*.charge_amount' => ['nullable', 'decimal:0,6', 'min:0'],
 
-            // The public manual-invoice boundary never accepts server-owned facts.
             'invoice_type' => ['prohibited'],
             'invoice_number' => ['prohibited'],
             'status' => ['prohibited'],
@@ -141,6 +146,12 @@ final class StoreInvoiceRequest extends TenantScopedRequest
             notes: $this->stringOrNull('notes'),
             createdBy: $this->currentUserId(),
             lines: array_map($this->mapLine(...), $this->input('lines')),
+            supplyDate: $this->stringOrNull('supply_date'),
+            supplyPeriodStart: $this->stringOrNull('supply_period_start'),
+            supplyPeriodEnd: $this->stringOrNull('supply_period_end'),
+            placeOfSupply: $this->stringOrNull('place_of_supply'),
+            paymentMode: $this->stringOrNull('payment_mode'),
+            paymentTerms: $this->stringOrNull('payment_terms'),
         );
     }
 
@@ -199,6 +210,6 @@ final class StoreInvoiceRequest extends TenantScopedRequest
 
     private function stringOrNull(string $key): ?string
     {
-        return $this->filled($key) ? (string) $this->input($key) : null;
+        return $this->filled($key) ? trim((string) $this->input($key)) : null;
     }
 }

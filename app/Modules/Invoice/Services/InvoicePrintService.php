@@ -4,38 +4,36 @@ declare(strict_types=1);
 
 namespace Modules\Invoice\Services;
 
+use BackedEnum;
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Modules\Invoice\Enums\InvoiceDirection;
+use Modules\Invoice\Enums\InvoiceDocumentKind;
+use Modules\Invoice\Enums\InvoiceType;
 use Modules\Invoice\Models\Invoice;
+use Modules\Invoice\Models\InvoiceDocumentSnapshot;
 use Modules\Invoice\Models\InvoiceLine;
 
 final class InvoicePrintService
 {
-    private const DOCUMENT_TITLE = 'Tax Invoice';
-
     private const DEFAULT_TAX_LABEL = 'Tax';
-
     public const SIGNED_URL_TTL_MINUTES = 15;
-
     public const PDF_PAPER_SIZE = 'A4';
-
     public const PDF_ORIENTATION = 'portrait';
-
     private const MONEY_SCALE = 2;
-
     private const QUANTITY_SCALE = 3;
 
-    /**
-     * @return Builder<Invoice>
-     */
+    public function __construct(private readonly InvoiceAmountInWordsFormatter $amountInWords) {}
+
+    /** @return Builder<Invoice> */
     public function scopedQuery(int $tenantId, ?int $organizationUnitId): Builder
     {
         $query = Invoice::query()
             ->with([
                 'tenant',
                 'organizationUnit',
+                'documentSnapshot',
                 'lines' => static fn ($query) => $query->orderBy('line_number'),
             ])
             ->where('tenant_id', $tenantId);
@@ -50,28 +48,41 @@ final class InvoicePrintService
         return $this->scopedQuery($tenantId, $organizationUnitId)->find($invoiceId);
     }
 
-    /**
-     * @return array<string, mixed>
-     */
+    /** @return array<string, mixed> */
     public function viewData(Invoice $invoice, ?string $pdfUrl = null, string $mode = 'print'): array
     {
         $invoice->loadMissing([
             'tenant',
             'organizationUnit',
+            'documentSnapshot',
             'lines' => static fn ($query) => $query->orderBy('line_number'),
         ]);
 
         $currency = $this->currency($invoice);
-        $supplier = $this->supplier($invoice);
-        $purchaser = $this->purchaser($invoice);
-
+        $snapshot = $invoice->documentSnapshot;
+        $kind = $snapshot instanceof InvoiceDocumentSnapshot
+            ? $this->documentKind($snapshot->document_kind)
+            : $this->legacyDocumentKind($invoice);
+        $supplier = $snapshot instanceof InvoiceDocumentSnapshot
+            ? $this->snapshotParty($snapshot, 'seller')
+            : $this->supplier($invoice);
+        $purchaser = $snapshot instanceof InvoiceDocumentSnapshot
+            ? $this->snapshotParty($snapshot, 'buyer')
+            : $this->purchaser($invoice);
         $taxLabel = $this->taxLabel($invoice->lines);
+        $warnings = [];
+        if (! $snapshot instanceof InvoiceDocumentSnapshot) {
+            $warnings[] = 'This historical invoice predates immutable legal-document snapshots. Missing legal fields were not reconstructed from current master data.';
+        } elseif (! (bool) $snapshot->organization_profile_present) {
+            $warnings[] = 'The organization legal profile was not configured when this invoice was created.';
+        }
 
         return [
             'mode' => $mode,
             'pdf_url' => $pdfUrl,
             'document' => [
-                'title' => self::DOCUMENT_TITLE,
+                'title' => $kind->title(),
+                'number_label' => $kind->numberLabel(),
                 'invoice_number' => $this->nullableString($invoice->invoice_number) ?? 'Unnumbered invoice',
                 'invoice_date' => $this->dateString($invoice->invoice_date),
                 'due_date' => $this->dateString($invoice->due_date),
@@ -82,7 +93,15 @@ final class InvoicePrintService
                 'currency' => $currency,
                 'supplier' => $supplier,
                 'purchaser' => $purchaser,
+                'supply_date' => $snapshot instanceof InvoiceDocumentSnapshot ? $this->dateString($snapshot->supply_date) : null,
+                'supply_period_start' => $snapshot instanceof InvoiceDocumentSnapshot ? $this->dateString($snapshot->supply_period_start) : null,
+                'supply_period_end' => $snapshot instanceof InvoiceDocumentSnapshot ? $this->dateString($snapshot->supply_period_end) : null,
+                'place_of_supply' => $snapshot instanceof InvoiceDocumentSnapshot ? $this->nullableString($snapshot->place_of_supply) : null,
+                'payment_mode' => $snapshot instanceof InvoiceDocumentSnapshot ? $this->nullableString($snapshot->payment_mode) : null,
+                'payment_terms' => $snapshot instanceof InvoiceDocumentSnapshot ? $this->nullableString($snapshot->payment_terms) : null,
+                'amount_in_words' => $this->amountInWords->format($invoice->grand_total, $currency['code']),
                 'notes' => $this->nullableString($invoice->notes),
+                'warnings' => $warnings,
                 'lines' => $this->lines($invoice->lines, $currency),
                 'amounts' => $this->amounts($invoice, $currency, $taxLabel),
             ],
@@ -98,10 +117,7 @@ final class InvoicePrintService
         return 'invoice-'.($safeNumber === '' ? (string) $invoice->getKey() : $safeNumber).'.pdf';
     }
 
-    /**
-     * @param  Collection<int, InvoiceLine>  $lines
-     * @return list<array<string, mixed>>
-     */
+    /** @param Collection<int, InvoiceLine> $lines @return list<array<string, mixed>> */
     private function lines(Collection $lines, array $currency): array
     {
         return $lines
@@ -127,9 +143,7 @@ final class InvoicePrintService
             ->all();
     }
 
-    /**
-     * @return array<string, array{label:string, raw:string, display:string}>
-     */
+    /** @return array<string, array{label:string, raw:string, display:string}> */
     private function amounts(Invoice $invoice, array $currency, string $taxLabel): array
     {
         return [
@@ -145,9 +159,7 @@ final class InvoicePrintService
         ];
     }
 
-    /**
-     * @param  Collection<int, InvoiceLine>  $lines
-     */
+    /** @param Collection<int, InvoiceLine> $lines */
     private function taxLabel(Collection $lines): string
     {
         $taxNames = [];
@@ -177,9 +189,7 @@ final class InvoicePrintService
         return self::DEFAULT_TAX_LABEL;
     }
 
-    /**
-     * @return array{label:string, raw:string, display:string}
-     */
+    /** @return array{label:string, raw:string, display:string} */
     private function labeledMoney(string $label, mixed $value, array $currency): array
     {
         return [
@@ -188,9 +198,7 @@ final class InvoicePrintService
         ];
     }
 
-    /**
-     * @return array{raw:string, display:string}
-     */
+    /** @return array{raw:string, display:string} */
     private function money(mixed $value, array $currency): array
     {
         $raw = $this->decimalString($value);
@@ -201,9 +209,7 @@ final class InvoicePrintService
         ];
     }
 
-    /**
-     * @return array{code:?string, symbol:?string, prefix:string}
-     */
+    /** @return array{code:?string, symbol:?string, prefix:string} */
     private function currency(Invoice $invoice): array
     {
         $symbol = $this->nullableString($invoice->currency_symbol_snapshot);
@@ -216,9 +222,20 @@ final class InvoicePrintService
         ];
     }
 
-    /**
-     * @return array{name:string, number:?string, code:?string, tax_registration_number:?string, phone:?string, email:?string}
-     */
+    /** @return array{name:string,tin:?string,vat_registration_number:?string,svat_registration_number:?string,address:?string,phone:?string,email:?string} */
+    private function snapshotParty(InvoiceDocumentSnapshot $snapshot, string $prefix): array
+    {
+        return [
+            'name' => (string) $snapshot->getAttribute($prefix.'_legal_name'),
+            'tin' => $this->nullableString($snapshot->getAttribute($prefix.'_tin')),
+            'vat_registration_number' => $this->nullableString($snapshot->getAttribute($prefix.'_vat_registration_number')),
+            'svat_registration_number' => $this->nullableString($snapshot->getAttribute($prefix.'_svat_registration_number')),
+            'address' => $this->nullableString($snapshot->getAttribute($prefix.'_address')),
+            'phone' => $this->nullableString($snapshot->getAttribute($prefix.'_phone')),
+            'email' => $this->nullableString($snapshot->getAttribute($prefix.'_email')),
+        ];
+    }
+
     private function supplier(Invoice $invoice): array
     {
         return $this->isOutbound($invoice)
@@ -226,9 +243,6 @@ final class InvoicePrintService
             : $this->counterparty($invoice, 'Supplier');
     }
 
-    /**
-     * @return array{name:string, number:?string, code:?string, tax_registration_number:?string, phone:?string, email:?string}
-     */
     private function purchaser(Invoice $invoice): array
     {
         return $this->isOutbound($invoice)
@@ -236,48 +250,79 @@ final class InvoicePrintService
             : $this->organizationParty($invoice);
     }
 
-    /**
-     * @return array{name:string, number:?string, code:?string, tax_registration_number:?string, phone:?string, email:?string}
-     */
     private function organizationParty(Invoice $invoice): array
     {
         $organization = $invoice->organizationUnit;
         $tenant = $invoice->tenant;
-
         $name = $this->nullableString($organization?->name)
             ?? $this->nullableString($tenant?->name)
             ?? 'Organization';
-        $code = $this->nullableString($organization?->code)
-            ?? $this->nullableString($tenant?->code);
 
         return [
             'name' => $name,
-            'number' => $code,
-            'code' => $code,
-            'tax_registration_number' => null,
+            'tin' => null,
+            'vat_registration_number' => null,
+            'svat_registration_number' => null,
+            'address' => null,
             'phone' => null,
             'email' => null,
         ];
     }
 
-    /**
-     * @return array{name:string, number:?string, code:?string, tax_registration_number:?string, phone:?string, email:?string}
-     */
     private function counterparty(Invoice $invoice, string $fallbackName): array
     {
-        $name = $this->nullableString($invoice->party_name_snapshot)
-            ?? $this->nullableString($invoice->party_legal_name_snapshot)
+        $name = $this->nullableString($invoice->party_legal_name_snapshot)
+            ?? $this->nullableString($invoice->party_name_snapshot)
             ?? $this->nullableString($invoice->party_code_snapshot)
             ?? $fallbackName;
 
         return [
             'name' => $name,
-            'number' => $this->nullableString($invoice->party_number_snapshot),
-            'code' => $this->nullableString($invoice->party_code_snapshot),
-            'tax_registration_number' => $this->nullableString($invoice->party_tax_registration_snapshot),
+            'tin' => $this->nullableString($invoice->party_tax_registration_snapshot),
+            'vat_registration_number' => null,
+            'svat_registration_number' => null,
+            'address' => null,
             'phone' => $this->nullableString($invoice->party_phone_snapshot),
             'email' => $this->nullableString($invoice->party_email_snapshot),
         ];
+    }
+
+    private function documentKind(mixed $value): InvoiceDocumentKind
+    {
+        return $value instanceof InvoiceDocumentKind
+            ? $value
+            : InvoiceDocumentKind::from((string) $value);
+    }
+
+    private function legacyDocumentKind(Invoice $invoice): InvoiceDocumentKind
+    {
+        $type = $this->enumValue($invoice->invoice_type);
+        $direction = $this->enumValue($invoice->direction);
+        if ($type === InvoiceType::Credit->value) {
+            return InvoiceDocumentKind::CreditNote;
+        }
+        if ($type === InvoiceType::Debit->value) {
+            return InvoiceDocumentKind::DebitNote;
+        }
+        if ($type === InvoiceType::Rental->value && $direction === InvoiceDirection::Inbound->value) {
+            return InvoiceDocumentKind::OwnerPayableVoucher;
+        }
+        if ($direction === InvoiceDirection::Inbound->value) {
+            return InvoiceDocumentKind::PurchaseInvoice;
+        }
+
+        return $invoice->lines->contains(static function (InvoiceLine $line): bool {
+            if (! is_array($line->tax_snapshot)) {
+                return false;
+            }
+            foreach ($line->tax_snapshot as $tax) {
+                if (is_array($tax) && ! (bool) ($tax['is_withholding'] ?? false)) {
+                    return true;
+                }
+            }
+
+            return false;
+        }) ? InvoiceDocumentKind::TaxInvoice : InvoiceDocumentKind::Invoice;
     }
 
     private function lineItemLabel(InvoiceLine $line): ?string
@@ -285,11 +330,7 @@ final class InvoicePrintService
         $name = $this->nullableString($line->item_name_snapshot);
         $code = $this->nullableString($line->item_code_snapshot);
 
-        if ($name !== null && $code !== null) {
-            return $code.' - '.$name;
-        }
-
-        return $name ?? $code;
+        return $name !== null && $code !== null ? $code.' - '.$name : $name ?? $code;
     }
 
     private function lineReference(InvoiceLine $line): string
@@ -306,30 +347,19 @@ final class InvoicePrintService
 
     private function enumValue(mixed $value): ?string
     {
-        if ($value instanceof \BackedEnum) {
-            return (string) $value->value;
-        }
-
-        return $this->nullableString($value);
+        return $value instanceof BackedEnum ? (string) $value->value : $this->nullableString($value);
     }
 
     private function label(?string $value): string
     {
         $value = $this->nullableString($value);
-        if ($value === null) {
-            return 'Not set';
-        }
 
-        return ucwords(str_replace('_', ' ', $value));
+        return $value === null ? 'Not set' : ucwords(str_replace('_', ' ', $value));
     }
 
     private function dateString(mixed $value): ?string
     {
-        if ($value instanceof DateTimeInterface) {
-            return $value->format('Y-m-d');
-        }
-
-        return $this->nullableString($value);
+        return $value instanceof DateTimeInterface ? $value->format('Y-m-d') : $this->nullableString($value);
     }
 
     private function decimalString(mixed $value): string
@@ -347,11 +377,7 @@ final class InvoicePrintService
         }
 
         $increment = '0.'.str_repeat('0', $scale).'5';
-        $rounded = bcadd(
-            $decimal,
-            str_starts_with($decimal, '-') ? '-'.$increment : $increment,
-            $scale,
-        );
+        $rounded = bcadd($decimal, str_starts_with($decimal, '-') ? '-'.$increment : $increment, $scale);
         if (bccomp($rounded, '0', $scale) === 0) {
             $rounded = '0'.($scale > 0 ? '.'.str_repeat('0', $scale) : '');
         }

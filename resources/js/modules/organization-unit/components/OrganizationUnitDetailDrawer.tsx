@@ -18,6 +18,7 @@ import {
     type OrganizationUnitSummary,
 } from '../organizationUnitApi';
 import { organizationUnitPermissions } from '../organizationUnitPermissions';
+import { OrganizationUnitLegalProfilePanel } from './OrganizationUnitLegalProfilePanel';
 
 export function OrganizationUnitDetailDrawer({
     unit,
@@ -91,6 +92,11 @@ export function OrganizationUnitDetailDrawer({
                     </dl>
                     {unit.description && <p className="mt-5 border-t border-slate-100 pt-4 text-sm text-slate-700">{unit.description}</p>}
                 </Panel>
+
+                <OrganizationUnitLegalProfilePanel
+                    unit={unit}
+                    canManage={canUpdate && unit.lifecycle_status !== 'retired'}
+                />
 
                 {canUpdate && unit.lifecycle_status !== 'retired' && (
                     <Panel>

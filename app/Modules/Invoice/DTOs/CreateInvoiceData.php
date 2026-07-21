@@ -38,5 +38,11 @@ final readonly class CreateInvoiceData
         public array $adjustments = [],
         public ?TaxCalculationResult $taxCalculation = null,
         public ?InvoicePostingPlanData $postingPlan = null,
+        public ?string $supplyDate = null,
+        public ?string $supplyPeriodStart = null,
+        public ?string $supplyPeriodEnd = null,
+        public ?string $placeOfSupply = null,
+        public ?string $paymentMode = null,
+        public ?string $paymentTerms = null,
     ) {}
 }
