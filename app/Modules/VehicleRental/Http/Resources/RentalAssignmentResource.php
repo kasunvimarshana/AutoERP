@@ -67,7 +67,7 @@ final class RentalAssignmentResource extends JsonResource
                 'id' => (int) $event->getKey(),
                 'event_type' => $this->enum($event->event_type),
                 'event_at' => $event->event_at?->toISOString(),
-                'odometer' => (string) $event->odometer,
+                'odometer' => $event->odometer === null ? null : (string) $event->odometer,
                 'fuel_level' => $event->fuel_level,
                 'condition_notes' => $event->condition_notes,
                 'damage_notes' => $event->damage_notes,
