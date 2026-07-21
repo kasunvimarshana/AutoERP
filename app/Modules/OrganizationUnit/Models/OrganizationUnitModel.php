@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace Modules\OrganizationUnit\Models;
 
-use Modules\Core\Exceptions\DomainException;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use Modules\Core\Exceptions\DomainException;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\OrganizationUnit\Constants\OrganizationUnitHierarchy;
 use Modules\Tenant\Models\TenantModel;
@@ -102,5 +103,10 @@ final class OrganizationUnitModel extends TenantOwnedModel
     public function documents(): HasMany
     {
         return $this->hasMany(OrganizationUnitDocumentModel::class, 'organization_unit_id');
+    }
+
+    public function legalProfile(): HasOne
+    {
+        return $this->hasOne(OrganizationUnitLegalProfileModel::class, 'organization_unit_id');
     }
 }
