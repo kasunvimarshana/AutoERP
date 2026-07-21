@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Reporting;
 
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Route;
 use Modules\Reporting\Services\ReportDefinitionRegistry;
 use Modules\Reporting\Services\VehicleRentalReportService;
@@ -12,6 +13,8 @@ use Tests\TestCase;
 
 final class VehicleRentalReportDefinitionTest extends TestCase
 {
+    use RefreshDatabase;
+
     /** @return array<string, array{string, string}> */
     public static function reportDefinitions(): array
     {
@@ -50,6 +53,36 @@ final class VehicleRentalReportDefinitionTest extends TestCase
             self::assertContains('paid', $columns);
             self::assertContains('balance_due', $columns);
         }
+    }
+
+    public function test_empty_database_queries_execute_for_all_phase_one_reports(): void
+    {
+        $service = $this->app->make(VehicleRentalReportService::class);
+        $params = [
+            'tenant_id' => 999999,
+            'organization_unit_id' => null,
+            'page' => 1,
+            'per_page' => 25,
+        ];
+
+        foreach ([
+            VehicleRentalReportService::RUNNING_CHART,
+            VehicleRentalReportService::CUSTOMER_INVOICES,
+            VehicleRentalReportService::OWNER_VOUCHERS,
+            VehicleRentalReportService::RENTAL_HISTORY,
+        ] as $key) {
+            $result = $service->run($key, $params);
+            self::assertSame([], $result['data']->all());
+            self::assertSame(0, $result['meta']['total']);
+        }
+
+        $exceptions = $service->run(VehicleRentalReportService::CHART_EXCEPTIONS, [
+            ...$params,
+            'date_from' => '2026-07-01',
+            'date_to' => '2026-07-31',
+        ]);
+        self::assertSame([], $exceptions['data']->all());
+        self::assertSame(0, $exceptions['meta']['total']);
     }
 
     public function test_specialized_vehicle_rental_routes_are_registered_before_generic_reports(): void
