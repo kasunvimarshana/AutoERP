@@ -40,29 +40,82 @@ final class RentalRunningChartTimelineGuard
         return $endsAt;
     }
 
-    /** @return array{total_km:string,garage_km:string,commercial_km:string} */
+    /** @return array{total_km:?string,garage_km:?string,commercial_km:?string} */
     public function distances(RentalRunningChartData $data): array
     {
-        $start = $this->math->normalize($data->startOdometer);
-        $end = $this->math->normalize($data->endOdometer);
-        $garage = $this->math->normalize($data->garageKm);
-        if ($this->math->compare($end, $start) < 0) {
-            throw new InvalidArgumentException('End odometer cannot be lower than start odometer.');
-        }
-        if ($this->math->isNegative($garage)) {
-            throw new InvalidArgumentException('Garage kilometres cannot be negative.');
+        return $this->distanceValues($data->startOdometer, $data->endOdometer, $data->garageKm);
+    }
+
+    /** @return array{start_odometer:?string,end_odometer:?string,total_km:?string,garage_km:?string,commercial_km:?string} */
+    public function measurements(
+        RentalAssignment $assignment,
+        RentalRunningChartData $data,
+        CarbonImmutable $startsAt,
+        ?int $exceptChartId = null,
+    ): array {
+        $assignment->loadMissing('vehicle');
+        $vehicleReading = $assignment->vehicle?->odometer_reading;
+        if ($vehicleReading === null) {
+            if ($data->startOdometer !== null || $data->endOdometer !== null || $data->garageKm !== null) {
+                throw new InvalidArgumentException('This vehicle has no available odometer. Leave the kilometre fields blank.');
+            }
+
+            return [
+                'start_odometer' => null,
+                'end_odometer' => null,
+                'total_km' => null,
+                'garage_km' => null,
+                'commercial_km' => null,
+            ];
         }
 
-        $total = $this->math->sub($end, $start);
-        if ($this->math->compare($garage, $total) > 0) {
-            throw new InvalidArgumentException('Garage kilometres cannot exceed total kilometres.');
+        if ($data->endOdometer === null) {
+            throw new InvalidArgumentException('End odometer is required while this vehicle odometer is available.');
+        }
+
+        $start = $data->startOdometer ?? $this->suggestedStartOdometer(
+            $assignment,
+            $startsAt,
+            $exceptChartId,
+        );
+        if ($start === null) {
+            throw new InvalidArgumentException('Start odometer could not be resolved for this vehicle.');
         }
 
         return [
-            'total_km' => $total,
-            'garage_km' => $garage,
-            'commercial_km' => $this->math->sub($total, $garage),
+            'start_odometer' => $this->math->normalize($start),
+            'end_odometer' => $this->math->normalize($data->endOdometer),
+            ...$this->distanceValues($start, $data->endOdometer, $data->garageKm ?? '0'),
         ];
+    }
+
+    public function suggestedStartOdometer(
+        RentalAssignment $assignment,
+        CarbonImmutable $startsAt,
+        ?int $exceptChartId = null,
+    ): ?string {
+        $assignment->loadMissing('vehicle');
+        if ($assignment->vehicle?->odometer_reading === null) {
+            return null;
+        }
+
+        $previous = $this->vehicleChartScope($assignment, $exceptChartId)
+            ->where('ends_at', '<=', $startsAt->toDateTimeString())
+            ->orderByDesc('ends_at')
+            ->orderByDesc('id')
+            ->first();
+
+        if ($previous instanceof RentalRunningChart) {
+            return $previous->end_odometer === null
+                ? (string) $assignment->vehicle->odometer_reading
+                : (string) $previous->end_odometer;
+        }
+
+        if ($assignment->handover_odometer !== null) {
+            return (string) $assignment->handover_odometer;
+        }
+
+        return (string) $assignment->vehicle->odometer_reading;
     }
 
     public function assertDriverFacts(RentalAssignment $assignment, RentalRunningChartData $data): void
@@ -158,34 +211,33 @@ final class RentalRunningChartTimelineGuard
 
     public function assertOdometerContinuity(RentalRunningChart $chart): void
     {
-        $chart->loadMissing('assignment');
-        $vehicleId = (int) $chart->assignment->vehicle_id;
-        $scope = RentalRunningChart::query()
-            ->forContext((int) $chart->tenant_id, $chart->organization_unit_id === null ? null : (int) $chart->organization_unit_id)
-            ->where('status', RentalRunningChartStatus::Finalized->value)
-            ->where('active_marker', true)
-            ->where('id', '!=', $chart->getKey())
-            ->whereHas('assignment', fn (Builder $query): Builder => $query->where('vehicle_id', $vehicleId));
+        if ($chart->start_odometer === null || $chart->end_odometer === null) {
+            return;
+        }
 
+        $chart->loadMissing('assignment');
+        $scope = $this->vehicleChartScope($chart->assignment, (int) $chart->getKey());
         $previous = (clone $scope)
             ->where('ends_at', '<=', $chart->starts_at)
             ->orderByDesc('ends_at')
+            ->orderByDesc('id')
             ->lockForUpdate()
             ->first();
         $next = (clone $scope)
             ->where('starts_at', '>=', $chart->ends_at)
             ->orderBy('starts_at')
+            ->orderBy('id')
             ->lockForUpdate()
             ->first();
 
         $hasGap = false;
-        if ($previous instanceof RentalRunningChart) {
+        if ($previous instanceof RentalRunningChart && $previous->end_odometer !== null) {
             if ($this->math->compare((string) $chart->start_odometer, (string) $previous->end_odometer) < 0) {
                 throw new InvalidArgumentException('Start odometer is lower than the previous finalized running chart.');
             }
             $hasGap = $this->math->compare((string) $chart->start_odometer, (string) $previous->end_odometer) !== 0;
         }
-        if ($next instanceof RentalRunningChart) {
+        if ($next instanceof RentalRunningChart && $next->start_odometer !== null) {
             if ($this->math->compare((string) $chart->end_odometer, (string) $next->start_odometer) > 0) {
                 throw new InvalidArgumentException('End odometer exceeds the next finalized running chart start odometer.');
             }
@@ -206,6 +258,7 @@ final class RentalRunningChartTimelineGuard
             ->lockForUpdate()
             ->first();
         if ($latest instanceof RentalRunningChart
+            && $latest->end_odometer !== null
             && $this->math->compare($odometer, (string) $latest->end_odometer) < 0) {
             throw new InvalidArgumentException('Assignment closure odometer cannot be lower than the latest finalized running chart.');
         }
@@ -223,5 +276,56 @@ final class RentalRunningChartTimelineGuard
             ->exists()) {
             throw new InvalidArgumentException('Reverse or move running charts at or after the assignment closure time first.');
         }
+    }
+
+    /** @return array{total_km:?string,garage_km:?string,commercial_km:?string} */
+    private function distanceValues(?string $startValue, ?string $endValue, ?string $garageValue): array
+    {
+        if ($startValue === null && $endValue === null) {
+            if ($garageValue !== null) {
+                throw new InvalidArgumentException('Garage kilometres require odometer readings.');
+            }
+
+            return ['total_km' => null, 'garage_km' => null, 'commercial_km' => null];
+        }
+        if ($startValue === null || $endValue === null) {
+            throw new InvalidArgumentException('Start and end odometer readings must be supplied together.');
+        }
+
+        $start = $this->math->normalize($startValue);
+        $end = $this->math->normalize($endValue);
+        $garage = $this->math->normalize($garageValue ?? '0');
+        if ($this->math->compare($end, $start) < 0) {
+            throw new InvalidArgumentException('End odometer cannot be lower than start odometer.');
+        }
+        if ($this->math->isNegative($garage)) {
+            throw new InvalidArgumentException('Garage kilometres cannot be negative.');
+        }
+
+        $total = $this->math->sub($end, $start);
+        if ($this->math->compare($garage, $total) > 0) {
+            throw new InvalidArgumentException('Garage kilometres cannot exceed total kilometres.');
+        }
+
+        return [
+            'total_km' => $total,
+            'garage_km' => $garage,
+            'commercial_km' => $this->math->sub($total, $garage),
+        ];
+    }
+
+    private function vehicleChartScope(RentalAssignment $assignment, ?int $exceptChartId = null): Builder
+    {
+        $query = RentalRunningChart::query()
+            ->forContext((int) $assignment->tenant_id, $assignment->organization_unit_id === null ? null : (int) $assignment->organization_unit_id)
+            ->where('status', RentalRunningChartStatus::Finalized->value)
+            ->where('active_marker', true)
+            ->whereHas('assignment', fn (Builder $scope): Builder => $scope->where('vehicle_id', $assignment->vehicle_id));
+
+        if ($exceptChartId !== null) {
+            $query->where('id', '!=', $exceptChartId);
+        }
+
+        return $query;
     }
 }
