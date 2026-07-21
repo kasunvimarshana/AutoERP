@@ -6,6 +6,7 @@ namespace Modules\Invoice\Services;
 
 use Illuminate\Database\Eloquent\Builder;
 use InvalidArgumentException;
+use Modules\Customer\Enums\CustomerAddressType;
 use Modules\Customer\Models\Customer;
 use Modules\Invoice\Constants\InvoiceTaxMetadata;
 use Modules\Invoice\DTOs\CreateInvoiceData;
@@ -13,25 +14,13 @@ use Modules\Invoice\DTOs\InvoiceLineData;
 use Modules\Invoice\Enums\InvoicePartyType;
 use Modules\Item\Models\Item;
 use Modules\ReferenceData\Models\CurrencyModel;
+use Modules\Supplier\Enums\SupplierAddressType;
 use Modules\Supplier\Models\Supplier;
 use Modules\UOM\Models\UnitOfMeasureModel;
 
 final class InvoiceReferenceSnapshotService
 {
-    /**
-     * @return array{
-     *   party_number_snapshot:?string,
-     *   party_code_snapshot:?string,
-     *   party_name_snapshot:?string,
-     *   party_legal_name_snapshot:?string,
-     *   party_email_snapshot:?string,
-     *   party_phone_snapshot:?string,
-     *   party_tax_registration_snapshot:?string,
-     *   currency_code_snapshot:?string,
-     *   currency_name_snapshot:?string,
-     *   currency_symbol_snapshot:?string
-     * }
-     */
+    /** @return array<string, ?string> */
     public function header(CreateInvoiceData $data): array
     {
         $party = $this->party($data);
@@ -74,14 +63,30 @@ final class InvoiceReferenceSnapshotService
         ];
     }
 
+    /** @return array{name:string,tin:?string,vat_registration_number:?string,svat_registration_number:?string,address:?string,phone:?string,email:?string} */
+    public function documentParty(CreateInvoiceData $data): array
+    {
+        $party = $this->party($data);
+        if (! $party instanceof Customer && ! $party instanceof Supplier) {
+            throw new InvalidArgumentException('Invoice document party does not exist.');
+        }
+
+        return [
+            'name' => $this->nullableString($party->legal_name)
+                ?? $this->nullableString($party->display_name)
+                ?? $this->nullableString($party->name)
+                ?? 'Counterparty',
+            'tin' => $this->nullableString($party->tax_registration_number),
+            'vat_registration_number' => $this->nullableString($party->vat_number),
+            'svat_registration_number' => $this->nullableString($party->svat_number),
+            'address' => $this->partyAddress($party),
+            'phone' => $this->nullableString($party->phone) ?? $this->nullableString($party->mobile),
+            'email' => $this->nullableString($party->email),
+        ];
+    }
+
     /**
-     * @return array<int, array{
-     *   item_code_snapshot:?string,
-     *   item_name_snapshot:?string,
-     *   uom_code_snapshot:?string,
-     *   uom_name_snapshot:?string,
-     *   tax_snapshot:?array
-     * }>
+     * @return array<int, array{item_code_snapshot:?string,item_name_snapshot:?string,uom_code_snapshot:?string,uom_name_snapshot:?string,tax_snapshot:?array}>
      */
     public function lines(CreateInvoiceData $data): array
     {
@@ -151,7 +156,16 @@ final class InvoiceReferenceSnapshotService
             InvoicePartyType::Supplier->value => Supplier::withTrashed(),
             default => throw new InvalidArgumentException('Invoice party type is not supported.'),
         };
+        $organizationUnitId = $data->organizationUnitId;
         $party = $query
+            ->with(['addresses' => static function (Builder $addresses) use ($organizationUnitId): void {
+                $addresses->where('is_active', true)->whereNull('deleted_at');
+                $organizationUnitId === null
+                    ? $addresses->whereNull('organization_unit_id')
+                    : $addresses->where(static fn (Builder $scope): Builder => $scope
+                        ->whereNull('organization_unit_id')
+                        ->orWhere('organization_unit_id', $organizationUnitId));
+            }])
             ->where('tenant_id', $data->tenantId)
             ->whereKey($data->partyId)
             ->where($this->scopeConstraint($data))
@@ -162,6 +176,43 @@ final class InvoiceReferenceSnapshotService
         }
 
         return $party;
+    }
+
+    private function partyAddress(Customer|Supplier $party): ?string
+    {
+        $address = $party->addresses
+            ->sortBy(function ($address): string {
+                $type = $address->address_type instanceof \BackedEnum
+                    ? (string) $address->address_type->value
+                    : (string) $address->address_type;
+                $rank = match ($type) {
+                    CustomerAddressType::Registered->value, SupplierAddressType::Registered->value => 0,
+                    CustomerAddressType::Billing->value, SupplierAddressType::Billing->value => 1,
+                    CustomerAddressType::Service->value,
+                    CustomerAddressType::Shipping->value,
+                    SupplierAddressType::Shipping->value,
+                    SupplierAddressType::Warehouse->value => 2,
+                    default => 3,
+                };
+
+                return sprintf('%02d-%d-%020d', $rank, $address->is_primary ? 0 : 1, (int) $address->getKey());
+            })
+            ->first();
+
+        if ($address === null) {
+            return null;
+        }
+
+        $parts = array_filter([
+            $this->nullableString($address->address_line_1),
+            $this->nullableString($address->address_line_2),
+            $this->nullableString($address->city),
+            $this->nullableString($address->state),
+            $this->nullableString($address->postal_code),
+            $this->nullableString($address->country),
+        ]);
+
+        return $parts === [] ? null : implode(', ', $parts);
     }
 
     private function partyNumberColumn(?string $partyType): string
