@@ -9,7 +9,9 @@ const reportPageSource = source('resources/js/modules/vehicle-rental/pages/Vehic
 const rentalReportsSource = source('resources/js/modules/vehicle-rental/pages/RentalReportsPage.tsx');
 const reportListSource = source('resources/js/modules/reporting/pages/ReportListPage.tsx');
 const reportingRoutesSource = source('app/Modules/Reporting/Routes/api.php');
-const reportServiceSource = source('app/Modules/Reporting/Services/VehicleRentalReportService.php');
+const exceptionServiceSource = source('app/Modules/Reporting/Services/VehicleRentalChartExceptionReportService.php');
+const financialServiceSource = source('app/Modules/Reporting/Services/VehicleRentalFinancialReportService.php');
+const definitionSource = source('app/Modules/Reporting/Services/VehicleRentalReportDefinitions.php');
 
 describe('Vehicle Rental Phase 1 reporting', () => {
     it('exposes all five business reports from the Vehicle Rental workspace and global catalog', () => {
@@ -36,16 +38,16 @@ describe('Vehicle Rental Phase 1 reporting', () => {
     it('requires a bounded date range for missing and duplicate chart detection', () => {
         expect(reportPageSource).toContain("kind === 'chart-exceptions'");
         expect(reportPageSource).toContain('maximum period of 366 calendar days');
-        expect(reportServiceSource).toContain('private const MAX_EXCEPTION_REPORT_DAYS = 366;');
-        expect(reportServiceSource).toContain('The missing and duplicate Running Chart report requires a start and end date.');
+        expect(exceptionServiceSource).toContain('private const MAX_REPORT_DAYS = 366;');
+        expect(exceptionServiceSource).toContain('The missing and duplicate Running Chart report requires a start and end date.');
     });
 
     it('keeps customer invoices and owner vouchers on independent financial sides', () => {
-        expect(reportServiceSource).toContain('RentalCalculationSide::Customer');
-        expect(reportServiceSource).toContain('RentalCalculationSide::Owner');
-        expect(reportServiceSource).toContain('InvoiceDirection::Outbound');
-        expect(reportServiceSource).toContain('InvoiceDirection::Inbound');
-        expect(reportServiceSource).toContain('Owner Payable Voucher Register');
+        expect(financialServiceSource).toContain('RentalCalculationSide::Customer');
+        expect(financialServiceSource).toContain('RentalCalculationSide::Owner');
+        expect(financialServiceSource).toContain('InvoiceDirection::Outbound');
+        expect(financialServiceSource).toContain('InvoiceDirection::Inbound');
+        expect(definitionSource).toContain('Owner Payable Voucher Register');
     });
 
     it('registers explicit report and export routes before the generic catch-all', () => {
