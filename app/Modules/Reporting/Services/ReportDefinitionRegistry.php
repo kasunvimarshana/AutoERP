@@ -13,10 +13,11 @@ final class ReportDefinitionRegistry
         private readonly ReportCatalog $catalog,
         private readonly DetailedPurchaseReportService $detailedPurchase,
         private readonly DetailedVehicleServiceReportService $detailedVehicleService,
-        private readonly VehicleRentalReportDefinitions $vehicleRental,
     ) {}
 
-    /** @return array<string, ReportDefinition> */
+    /**
+     * @return array<string, ReportDefinition>
+     */
     public function all(): array
     {
         $reports = $this->catalog->all();
@@ -33,7 +34,9 @@ final class ReportDefinitionRegistry
         return $this->all()[$key] ?? throw new InvalidArgumentException("Report [{$key}] is not defined.");
     }
 
-    /** @return array<int, array<string, mixed>> */
+    /**
+     * @return array<int, array<string, mixed>>
+     */
     public function index(): array
     {
         return array_values(array_map(
@@ -42,13 +45,14 @@ final class ReportDefinitionRegistry
         ));
     }
 
-    /** @return array<int, ReportDefinition> */
+    /**
+     * @return array<int, ReportDefinition>
+     */
     private function specializedDefinitions(): array
     {
         return [
             $this->detailedPurchase->definition(),
             $this->detailedVehicleService->definition(),
-            ...$this->vehicleRental->all(),
         ];
     }
 }
