@@ -29,12 +29,13 @@ const calculationControllerSource = source('app/Modules/VehicleRental/Http/Contr
         expect(agreementDialogSource).toContain('currency: current.currency ?? value?.defaultCurrency ?? null');
     });
 
-    it('uses only complete eligible months for monthly calculations', () => {
+    it('fits monthly calculations to the selected month inside the agreement date range', () => {
         expect(calculationDialogSource).toContain('type="month"');
-        expect(calculationDialogSource).toContain('completeMonth(periodMonth)');
-        expect(calculationDialogSource).toContain('firstCompleteMonth(agreement?.startsOn)');
-        expect(calculationDialogSource).toContain('lastCompleteMonth(agreement?.endsOn)');
-        expect(calculationDialogSource).toContain('Partial-month proration is not configured');
+        expect(calculationDialogSource).toContain('billingPeriodForMonth(periodMonth, agreement?.startsOn, agreement?.endsOn)');
+        expect(calculationDialogSource).toContain('agreementMonth(agreement?.startsOn)');
+        expect(calculationDialogSource).toContain('agreementMonth(agreement?.endsOn)');
+        expect(calculationDialogSource).toContain('Partial months use actual calendar-day proration.');
+        expect(calculationDialogSource).not.toContain('does not contain a complete calendar month');
     });
 
     it('autoloads the unique vehicle owner agreement and fits the customer period to it', () => {
