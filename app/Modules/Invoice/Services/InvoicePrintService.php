@@ -70,12 +70,6 @@ final class InvoicePrintService
             ? $this->snapshotParty($snapshot, 'buyer')
             : $this->purchaser($invoice);
         $taxLabel = $this->taxLabel($invoice->lines);
-        $warnings = [];
-        if (! $snapshot instanceof InvoiceDocumentSnapshot) {
-            $warnings[] = 'This historical invoice predates immutable legal-document snapshots. Missing legal fields were not reconstructed from current master data.';
-        } elseif (! (bool) $snapshot->organization_profile_present) {
-            $warnings[] = 'The organization legal profile was not configured when this invoice was created.';
-        }
 
         return [
             'mode' => $mode,
@@ -101,7 +95,7 @@ final class InvoicePrintService
                 'payment_terms' => $snapshot instanceof InvoiceDocumentSnapshot ? $this->nullableString($snapshot->payment_terms) : null,
                 'amount_in_words' => $this->amountInWords->format($invoice->grand_total, $currency['code']),
                 'notes' => $this->nullableString($invoice->notes),
-                'warnings' => $warnings,
+                'warnings' => [],
                 'lines' => $this->lines($invoice->lines, $currency),
                 'amounts' => $this->amounts($invoice, $currency, $taxLabel),
             ],
