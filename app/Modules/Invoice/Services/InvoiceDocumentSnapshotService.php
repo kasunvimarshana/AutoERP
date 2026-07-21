@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Invoice\Services;
 
 use BackedEnum;
+use InvalidArgumentException;
 use Modules\Invoice\DTOs\CreateInvoiceData;
 use Modules\Invoice\Enums\InvoiceDirection;
 use Modules\Invoice\Enums\InvoiceDocumentKind;
@@ -27,6 +28,13 @@ final class InvoiceDocumentSnapshotService
         $organizationProfile = $data->organizationUnitId === null
             ? null
             : $this->organizationProfiles->find($data->tenantId, $data->organizationUnitId);
+        $counterpartyPresent = $data->partyId !== null && $data->partyType !== null;
+        if ($counterpartyPresent && $organizationProfile === null) {
+            throw new InvalidArgumentException(
+                'Configure the organization unit legal and tax profile before creating a business invoice.',
+            );
+        }
+
         $organization = [
             'name' => $organizationProfile?->legalName
                 ?? $this->nullableString($invoice->organizationUnit?->name)
@@ -40,7 +48,6 @@ final class InvoiceDocumentSnapshotService
             'email' => $organizationProfile?->email,
         ];
         $outbound = $this->enumValue($invoice->direction) === InvoiceDirection::Outbound->value;
-        $counterpartyPresent = $data->partyId !== null && $data->partyType !== null;
         $counterparty = $counterpartyPresent
             ? $this->references->documentParty($data)
             : $this->emptyParty($outbound ? 'Purchaser' : 'Supplier');
