@@ -14,8 +14,8 @@ final class ReplaceRentalAssignmentRequest extends TenantScopedRequest
         return [
             'vehicle_id' => ['required', 'integer', $this->tenantExists('vehicles')],
             'effective_at' => RentalDateTimeRules::required(),
-            'old_return_odometer' => ['required', 'numeric', 'min:0'],
-            'new_handover_odometer' => ['required', 'numeric', 'min:0'],
+            'old_return_odometer' => ['nullable', 'numeric', 'min:0'],
+            'new_handover_odometer' => ['nullable', 'numeric', 'min:0'],
             'source_assignment_id' => ['nullable', 'integer', $this->tenantExists('vehicle_rental_assignments')],
             'driver_employee_id' => ['nullable', 'integer', $this->tenantExists('hr_employees')],
             'self_drive' => ['nullable', 'boolean'],
@@ -37,8 +37,8 @@ final class ReplaceRentalAssignmentRequest extends TenantScopedRequest
             organizationUnitId: $this->organizationUnitId(),
             vehicleId: (int) $this->validated('vehicle_id'),
             effectiveAt: (string) $this->validated('effective_at'),
-            oldReturnOdometer: (string) $this->validated('old_return_odometer'),
-            newHandoverOdometer: (string) $this->validated('new_handover_odometer'),
+            oldReturnOdometer: $this->nullableDecimal('old_return_odometer'),
+            newHandoverOdometer: $this->nullableDecimal('new_handover_odometer'),
             sourceAssignmentId: $this->integerOrNull('source_assignment_id'),
             driverEmployeeId: $this->integerOrNull('driver_employee_id'),
             selfDrive: (bool) ($this->validated('self_drive') ?? false),
@@ -63,6 +63,13 @@ final class ReplaceRentalAssignmentRequest extends TenantScopedRequest
         $value = $this->validated($key);
 
         return is_numeric($value) && (int) $value > 0 ? (int) $value : null;
+    }
+
+    private function nullableDecimal(string $key): ?string
+    {
+        $value = $this->validated($key);
+
+        return is_scalar($value) && trim((string) $value) !== '' ? (string) $value : null;
     }
 
     private function nullableString(string $key): ?string
