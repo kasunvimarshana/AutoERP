@@ -104,17 +104,39 @@ final class RentalCalculationEngineTest extends TestCase
         self::assertSame('1300.000000', $result->subtotalAmount);
     }
 
-    public function test_monthly_calculation_requires_a_complete_calendar_month(): void
+    public function test_monthly_calculation_prorates_agreement_values_by_actual_calendar_days(): void
+    {
+        $result = $this->engine->calculate(
+            $this->agreement(RentalAgreementKind::Owner, RentalBillingBasis::Monthly, '3100'),
+            $this->version([
+                $this->rate(1, RentalRateCode::BaseRental, RentalRateUnit::Month, '31000'),
+                $this->rate(2, RentalRateCode::ExcessKm, RentalRateUnit::Kilometre, '1.5'),
+                $this->rate(3, RentalRateCode::DriverSalary, RentalRateUnit::Month, '3100'),
+            ]),
+            CarbonImmutable::parse('2026-07-20'),
+            CarbonImmutable::parse('2026-07-31'),
+            collect([$this->chart('2026-07-20', '2000', '0', '0', '0', 0)]),
+        );
+
+        self::assertSame('1200.000000', $result->includedKm);
+        self::assertSame('800.000000', $result->excessKm);
+        self::assertSame('14400.000000', $result->subtotalAmount);
+        self::assertSame('12000.000000', $result->lines[0]->unitRate);
+        self::assertSame('1.000000', $result->lines[0]->quantity);
+        self::assertSame('1200.000000', $result->lines[2]->unitRate);
+    }
+
+    public function test_monthly_calculation_must_stay_within_one_calendar_month(): void
     {
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('complete calendar month');
+        $this->expectExceptionMessage('one calendar month');
 
         $this->engine->calculate(
             $this->agreement(RentalAgreementKind::Owner, RentalBillingBasis::Monthly, '1000'),
             $this->version([$this->rate(1, RentalRateCode::BaseRental, RentalRateUnit::Month, '1000')]),
-            CarbonImmutable::parse('2026-07-05'),
-            CarbonImmutable::parse('2026-07-31'),
-            collect([$this->chart('2026-07-05', '10', '0', '0', '0', 0)]),
+            CarbonImmutable::parse('2026-07-20'),
+            CarbonImmutable::parse('2026-08-19'),
+            collect([$this->chart('2026-07-20', '10', '0', '0', '0', 0)]),
         );
     }
 
@@ -134,7 +156,6 @@ final class RentalCalculationEngineTest extends TestCase
             ]),
         );
     }
-
 
     public function test_self_drive_charts_do_not_generate_driver_salary(): void
     {
