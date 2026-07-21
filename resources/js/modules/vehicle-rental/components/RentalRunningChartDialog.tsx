@@ -63,8 +63,10 @@ function RentalRunningChartDialogForm({
     const distance = odometerAvailable
         ? distancePreview(state.startOdometer, state.endOdometer, state.garageKm)
         : null;
+    const startOdometerOverridden = state.startOdometer.trim() !== ''
+        && (chart === null || state.startOdometer !== (chart.start_odometer ?? ''));
     const showVarianceReason = odometerAvailable
-        && (state.startOdometer.trim() !== '' || state.odometerVarianceReason.trim() !== '');
+        && (startOdometerOverridden || state.odometerVarianceReason.trim() !== '');
 
     const submit = async (event: FormEvent) => {
         event.preventDefault();
