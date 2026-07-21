@@ -39,6 +39,10 @@ use Modules\VehicleRental\Models\RentalCalculationLine;
 
 final class RentalFinancialDocumentDataFactory
 {
+    private const IMMEDIATE_PAYMENT_TERMS_DAYS = 0;
+    private const CREDIT_PAYMENT_MODE = 'Credit';
+    private const IMMEDIATE_PAYMENT_MODE = 'Due on receipt';
+
     public function __construct(
         private readonly DecimalMath $math,
         private readonly TaxCalculationService $taxes,
@@ -171,8 +175,9 @@ final class RentalFinancialDocumentDataFactory
             $this->math->add((string) $calculation->subtotal_amount, $taxCalculation->taxAmount),
             $taxCalculation->withholdingAmount,
         );
+        $paymentTermsDays = (int) $agreement->payment_terms_days;
         $dueDate = CarbonImmutable::parse($data->invoiceDate)
-            ->addDays((int) $agreement->payment_terms_days)
+            ->addDays($paymentTermsDays)
             ->toDateString();
 
         return new CreateInvoiceData(
@@ -204,6 +209,11 @@ final class RentalFinancialDocumentDataFactory
             adjustments: $adjustments,
             taxCalculation: $taxCalculation,
             postingPlan: $postingPlan,
+            supplyDate: $calculation->period_end?->toDateString(),
+            supplyPeriodStart: $calculation->period_start?->toDateString(),
+            supplyPeriodEnd: $calculation->period_end?->toDateString(),
+            paymentMode: $this->paymentMode($paymentTermsDays),
+            paymentTerms: $this->paymentTerms($paymentTermsDays),
         );
     }
 
@@ -289,5 +299,19 @@ final class RentalFinancialDocumentDataFactory
         }
 
         return implode(' ', $parts);
+    }
+
+    private function paymentMode(int $paymentTermsDays): string
+    {
+        return $paymentTermsDays > self::IMMEDIATE_PAYMENT_TERMS_DAYS
+            ? self::CREDIT_PAYMENT_MODE
+            : self::IMMEDIATE_PAYMENT_MODE;
+    }
+
+    private function paymentTerms(int $paymentTermsDays): string
+    {
+        return $paymentTermsDays > self::IMMEDIATE_PAYMENT_TERMS_DAYS
+            ? 'Credit - '.$paymentTermsDays.' calendar days'
+            : self::IMMEDIATE_PAYMENT_MODE;
     }
 }
