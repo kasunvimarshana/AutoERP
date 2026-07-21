@@ -322,7 +322,7 @@ export function rentalAssignmentOption(assignment: RentalAssignment): RentalLook
         assignmentStartsAt: assignment.starts_at,
         assignmentEndsAt: assignment.ends_at,
         handoverOdometer: assignment.handover_odometer,
-        odometerAvailable: assignment.vehicle?.odometer_reading !== null,
+        odometerAvailable: assignment.vehicle?.odometer_reading != null,
         vehicleOdometerReading: assignment.vehicle?.odometer_reading ?? null,
         driver: assignment.driver ?? null,
         vehicle: assignment.vehicle ?? null,
