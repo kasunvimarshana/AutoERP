@@ -34,13 +34,10 @@ final class InvoiceAmountInWordsFormatter
             throw new InvalidArgumentException('Invoice total must be a plain decimal value.');
         }
 
-        $rounded = bcadd(
-            $decimal,
-            str_starts_with($decimal, '-') ? '-0.005' : '0.005',
-            self::SCALE,
-        );
-        $negative = str_starts_with($rounded, '-');
-        $absolute = ltrim($rounded, '-');
+        $negativeInput = str_starts_with($decimal, '-');
+        $absoluteInput = ltrim($decimal, '-');
+        $absolute = bcadd($absoluteInput, '0.005', self::SCALE);
+        $negative = $negativeInput && bccomp($absolute, '0', self::SCALE) !== 0;
         [$whole, $fraction] = array_pad(explode('.', $absolute, 2), 2, '');
         $whole = ltrim($whole, '0');
         $whole = $whole === '' ? '0' : $whole;
