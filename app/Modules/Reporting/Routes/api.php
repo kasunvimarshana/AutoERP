@@ -32,11 +32,13 @@ Route::prefix('api/v1/reports')->middleware($middleware)->name('api.v1.reports.'
         Route::get('vehicle-service/employee-commissions', [EmployeeCommissionReportController::class, 'index'])
             ->name('vehicle-service.employee-commissions');
 
-        Route::get('vehicle-rental/running-chart', [VehicleRentalReportController::class, 'runningChart'])->name('vehicle-rental.running-chart');
-        Route::get('vehicle-rental/chart-exceptions', [VehicleRentalReportController::class, 'chartExceptions'])->name('vehicle-rental.chart-exceptions');
-        Route::get('vehicle-rental/customer-invoices', [VehicleRentalReportController::class, 'customerInvoices'])->name('vehicle-rental.customer-invoices');
-        Route::get('vehicle-rental/owner-vouchers', [VehicleRentalReportController::class, 'ownerVouchers'])->name('vehicle-rental.owner-vouchers');
-        Route::get('vehicle-rental/rental-history', [VehicleRentalReportController::class, 'rentalHistory'])->name('vehicle-rental.rental-history');
+        Route::middleware('tenant.feature:vehicle-rental')->group(function (): void {
+            Route::get('vehicle-rental/running-chart', [VehicleRentalReportController::class, 'runningChart'])->name('vehicle-rental.running-chart');
+            Route::get('vehicle-rental/chart-exceptions', [VehicleRentalReportController::class, 'chartExceptions'])->name('vehicle-rental.chart-exceptions');
+            Route::get('vehicle-rental/customer-invoices', [VehicleRentalReportController::class, 'customerInvoices'])->name('vehicle-rental.customer-invoices');
+            Route::get('vehicle-rental/owner-vouchers', [VehicleRentalReportController::class, 'ownerVouchers'])->name('vehicle-rental.owner-vouchers');
+            Route::get('vehicle-rental/rental-history', [VehicleRentalReportController::class, 'rentalHistory'])->name('vehicle-rental.rental-history');
+        });
 
         Route::get('{report}', [ReportController::class, 'show'])->where('report', '[A-Za-z0-9._-]+')->name('show');
         Route::get('{report}/run', [ReportController::class, 'run'])->where('report', '[A-Za-z0-9._-]+')->name('run');
@@ -59,21 +61,23 @@ Route::prefix('api/v1/reports')->middleware($middleware)->name('api.v1.reports.'
             ->whereIn('format', $exportFormats)
             ->name('vehicle-service.employee-commissions.export');
 
-        Route::get('vehicle-rental/running-chart/export/{format}', [VehicleRentalReportController::class, 'exportRunningChart'])
-            ->whereIn('format', $exportFormats)
-            ->name('vehicle-rental.running-chart.export');
-        Route::get('vehicle-rental/chart-exceptions/export/{format}', [VehicleRentalReportController::class, 'exportChartExceptions'])
-            ->whereIn('format', $exportFormats)
-            ->name('vehicle-rental.chart-exceptions.export');
-        Route::get('vehicle-rental/customer-invoices/export/{format}', [VehicleRentalReportController::class, 'exportCustomerInvoices'])
-            ->whereIn('format', $exportFormats)
-            ->name('vehicle-rental.customer-invoices.export');
-        Route::get('vehicle-rental/owner-vouchers/export/{format}', [VehicleRentalReportController::class, 'exportOwnerVouchers'])
-            ->whereIn('format', $exportFormats)
-            ->name('vehicle-rental.owner-vouchers.export');
-        Route::get('vehicle-rental/rental-history/export/{format}', [VehicleRentalReportController::class, 'exportRentalHistory'])
-            ->whereIn('format', $exportFormats)
-            ->name('vehicle-rental.rental-history.export');
+        Route::middleware('tenant.feature:vehicle-rental')->group(function () use ($exportFormats): void {
+            Route::get('vehicle-rental/running-chart/export/{format}', [VehicleRentalReportController::class, 'exportRunningChart'])
+                ->whereIn('format', $exportFormats)
+                ->name('vehicle-rental.running-chart.export');
+            Route::get('vehicle-rental/chart-exceptions/export/{format}', [VehicleRentalReportController::class, 'exportChartExceptions'])
+                ->whereIn('format', $exportFormats)
+                ->name('vehicle-rental.chart-exceptions.export');
+            Route::get('vehicle-rental/customer-invoices/export/{format}', [VehicleRentalReportController::class, 'exportCustomerInvoices'])
+                ->whereIn('format', $exportFormats)
+                ->name('vehicle-rental.customer-invoices.export');
+            Route::get('vehicle-rental/owner-vouchers/export/{format}', [VehicleRentalReportController::class, 'exportOwnerVouchers'])
+                ->whereIn('format', $exportFormats)
+                ->name('vehicle-rental.owner-vouchers.export');
+            Route::get('vehicle-rental/rental-history/export/{format}', [VehicleRentalReportController::class, 'exportRentalHistory'])
+                ->whereIn('format', $exportFormats)
+                ->name('vehicle-rental.rental-history.export');
+        });
 
         Route::get('{report}/export/{format}', [ReportController::class, 'export'])
             ->where('report', '[A-Za-z0-9._-]+')
