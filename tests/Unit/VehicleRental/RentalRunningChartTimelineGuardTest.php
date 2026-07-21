@@ -26,6 +26,17 @@ final class RentalRunningChartTimelineGuardTest extends TestCase
         ], $guard->distances($this->data('1000', '1150', '20')));
     }
 
+    public function test_unavailable_odometer_has_no_distance_values(): void
+    {
+        $guard = new RentalRunningChartTimelineGuard(new DecimalMath());
+
+        self::assertSame([
+            'total_km' => null,
+            'garage_km' => null,
+            'commercial_km' => null,
+        ], $guard->distances($this->data(null, null, null)));
+    }
+
     public function test_garage_kilometres_cannot_exceed_total_distance(): void
     {
         $this->expectException(InvalidArgumentException::class);
@@ -138,7 +149,7 @@ final class RentalRunningChartTimelineGuardTest extends TestCase
         (new RentalRunningChartTimelineGuard(new DecimalMath()))->assertDriverFacts($assignment, $data);
     }
 
-    private function data(string $start, string $end, string $garage): RentalRunningChartData
+    private function data(?string $start, ?string $end, ?string $garage): RentalRunningChartData
     {
         return new RentalRunningChartData(
             tenantId: 1,
