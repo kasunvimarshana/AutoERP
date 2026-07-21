@@ -49,8 +49,10 @@ describe('invoice legal print foundation', () => {
         expect(rentalFactory).toContain('paymentTerms: $this->paymentTerms($paymentTermsDays)');
     });
 
-    it('fails closed rather than freezing an incomplete organization identity', () => {
-        expect(snapshotService).toContain('Configure the organization unit legal and tax profile');
+    it('keeps organization legal registration details optional', () => {
+        expect(snapshotService).not.toContain('Configure the organization unit legal and tax profile');
+        expect(snapshotService).toContain("'organization_profile_present' => $organizationProfile !== null");
+        expect(snapshotService).toContain("$this->documentKind($invoice, $seller['vat_registration_number'])");
         expect(snapshotService).toContain('InvoiceDocumentKind::OwnerPayableVoucher');
         expect(snapshotService).toContain("'place_of_supply' => $this->nullableString($data->placeOfSupply)");
     });
