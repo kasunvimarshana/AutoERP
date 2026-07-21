@@ -24,8 +24,6 @@ describe('invoice legal print foundation', () => {
     it('prints every required legal field from prepared document data', () => {
         for (const label of [
             'Date of Invoice:',
-            "Supplier's TIN:",
-            "Purchaser's TIN:",
             'Address:',
             'Telephone No:',
             'Date of Delivery / Supply:',
@@ -35,6 +33,10 @@ describe('invoice legal print foundation', () => {
         ]) {
             expect(invoicePrint).toContain(label);
         }
+        expect(invoicePrint).toContain("['supplier' => 'Supplier', 'purchaser' => 'Purchaser']");
+        expect(invoicePrint).toContain("{{ $label }}'s TIN:");
+        expect(invoicePrint).toContain("{{ $label }}'s Name:");
+        expect(invoicePrint).toContain('@php($party = $document[$key])');
         expect(invoicePrint).toContain("$document['number_label']");
         expect(invoicePrint).toContain("$document['amount_in_words']");
         expect(invoicePrint).toContain("$document['place_of_supply']");
