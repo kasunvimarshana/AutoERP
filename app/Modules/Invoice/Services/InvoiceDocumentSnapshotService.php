@@ -39,8 +39,11 @@ final class InvoiceDocumentSnapshotService
             'phone' => $organizationProfile?->phone,
             'email' => $organizationProfile?->email,
         ];
-        $counterparty = $this->references->documentParty($data);
         $outbound = $this->enumValue($invoice->direction) === InvoiceDirection::Outbound->value;
+        $counterpartyPresent = $data->partyId !== null && $data->partyType !== null;
+        $counterparty = $counterpartyPresent
+            ? $this->references->documentParty($data)
+            : $this->emptyParty($outbound ? 'Purchaser' : 'Supplier');
         $seller = $outbound ? $organization : $counterparty;
         $buyer = $outbound ? $counterparty : $organization;
 
@@ -51,6 +54,7 @@ final class InvoiceDocumentSnapshotService
             'invoice_id' => (int) $invoice->getKey(),
             'document_kind' => $this->documentKind($invoice)->value,
             'organization_profile_present' => $organizationProfile !== null,
+            'counterparty_present' => $counterpartyPresent,
             ...$this->partyColumns('seller', $seller),
             ...$this->partyColumns('buyer', $buyer),
             'supply_date' => $this->nullableString($data->supplyDate),
@@ -103,6 +107,20 @@ final class InvoiceDocumentSnapshotService
 
             return false;
         });
+    }
+
+    /** @return array{name:string,tin:null,vat_registration_number:null,svat_registration_number:null,address:null,phone:null,email:null} */
+    private function emptyParty(string $name): array
+    {
+        return [
+            'name' => $name,
+            'tin' => null,
+            'vat_registration_number' => null,
+            'svat_registration_number' => null,
+            'address' => null,
+            'phone' => null,
+            'email' => null,
+        ];
     }
 
     /** @param array{name:string,tin:?string,vat_registration_number:?string,svat_registration_number:?string,address:?string,phone:?string,email:?string} $party */
