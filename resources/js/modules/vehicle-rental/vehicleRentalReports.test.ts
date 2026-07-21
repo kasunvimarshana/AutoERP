@@ -21,7 +21,7 @@ describe('Vehicle Rental Phase 1 reporting', () => {
             'owner-vouchers',
             'rental-history',
         ]) {
-            expect(rentalReportsSource).toContain(`'/vehicle-rental/reports/${slug}'`);
+            expect(rentalReportsSource).toContain(`/vehicle-rental/reports/${slug}`);
         }
         expect(rentalReportsSource).toContain('reportingPermissions.view');
     });
