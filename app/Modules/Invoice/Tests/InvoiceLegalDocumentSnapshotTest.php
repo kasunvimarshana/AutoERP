@@ -7,7 +7,6 @@ namespace Modules\Invoice\Tests;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use InvalidArgumentException;
 use Modules\Invoice\Constants\InvoiceTaxMetadata;
 use Modules\Invoice\DTOs\CreateInvoiceData;
 use Modules\Invoice\DTOs\InvoiceLineData;
@@ -155,15 +154,12 @@ final class InvoiceLegalDocumentSnapshotTest extends TestCase
         self::assertSame('Invoice Test Unit Legal', $document['purchaser']['name']);
     }
 
-    public function test_business_invoice_fails_when_organization_legal_profile_is_missing(): void
+    public function test_business_invoice_uses_available_identity_when_legal_profile_is_missing(): void
     {
         [$tenantId, $organizationUnitId] = $this->scope(['create_legal_profile' => false]);
         $customerId = $this->customer($tenantId, $organizationUnitId, 'Missing Profile Customer');
 
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Configure the organization unit legal and tax profile');
-
-        $this->createInvoice(new CreateInvoiceData(
+        $invoice = $this->createInvoice(new CreateInvoiceData(
             tenantId: $tenantId,
             invoiceType: InvoiceType::Manual,
             direction: InvoiceDirection::Outbound,
@@ -177,9 +173,40 @@ final class InvoiceLegalDocumentSnapshotTest extends TestCase
                 description: 'Service',
                 quantity: '1.000000',
                 unitPrice: '10.000000',
+                taxAmount: '0.000000',
                 lineTotal: '10.000000',
+                metadata: [
+                    InvoiceTaxMetadata::TAXES => [[
+                        InvoiceTaxMetadata::CALCULATION_METHOD => InvoiceTaxMetadata::CALCULATION_METHOD_EXCLUSIVE,
+                        InvoiceTaxMetadata::TAX_AMOUNT => '0.000000',
+                        InvoiceTaxMetadata::IS_WITHHOLDING => false,
+                        'tax_code' => 'VAT-ZERO',
+                    ]],
+                ],
             )],
         ));
+
+        $snapshot = $invoice->documentSnapshot;
+        self::assertNotNull($snapshot);
+        self::assertFalse((bool) $snapshot->organization_profile_present);
+        self::assertSame(InvoiceDocumentKind::Invoice, $snapshot->document_kind);
+        self::assertSame('Invoice Test Unit', $snapshot->seller_legal_name);
+        self::assertNull($snapshot->seller_tin);
+        self::assertNull($snapshot->seller_vat_registration_number);
+        self::assertNull($snapshot->seller_svat_registration_number);
+        self::assertNull($snapshot->seller_address);
+        self::assertNull($snapshot->seller_phone);
+        self::assertNull($snapshot->seller_email);
+        self::assertNull($snapshot->place_of_supply);
+
+        $document = app(InvoicePrintService::class)->viewData($invoice)['document'];
+        self::assertSame('Invoice', $document['title']);
+        self::assertSame('Invoice No.', $document['number_label']);
+        self::assertSame('Invoice Test Unit', $document['supplier']['name']);
+        self::assertNull($document['supplier']['tin']);
+        self::assertNull($document['supplier']['vat_registration_number']);
+        self::assertNull($document['supplier']['address']);
+        self::assertSame([], $document['warnings']);
     }
 
     private function createInvoice(CreateInvoiceData $data): Invoice
