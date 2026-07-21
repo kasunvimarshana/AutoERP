@@ -105,7 +105,7 @@ final class RentalRunningChartService
                 $endsAt,
                 (string) $chart->chart_number,
                 $chart->replaces_running_chart_id,
-                (int) $chart->getKey(),
+                $chart,
             );
             unset($attributes['tenant_id'], $attributes['organization_unit_id'], $attributes['assignment_id'], $attributes['chart_number'], $attributes['replaces_running_chart_id'], $attributes['created_by'], $attributes['status'], $attributes['active_marker']);
             $chart->forceFill([...$attributes, 'row_version' => $expectedVersion + 1])->save();
@@ -193,9 +193,9 @@ final class RentalRunningChartService
         CarbonImmutable $endsAt,
         string $number,
         ?int $replacesChartId,
-        ?int $exceptChartId = null,
+        ?RentalRunningChart $existingChart = null,
     ): array {
-        $measurements = $this->timeline->measurements($assignment, $data, $startsAt, $exceptChartId);
+        $measurements = $this->timeline->measurements($assignment, $data, $startsAt, $existingChart);
 
         return [
             'tenant_id' => $data->tenantId,
