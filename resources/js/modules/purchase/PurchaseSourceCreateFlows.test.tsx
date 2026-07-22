@@ -151,6 +151,9 @@ describe('Purchase source create flows', () => {
         expect(screen.getByTestId('po-eligibility')).toHaveTextContent('receivable');
         expect(await screen.findByText('PO-31 - Supplier A')).toBeInTheDocument();
         await waitFor(() => expect(screen.getAllByText('Widget')).toHaveLength(2));
+        expect(screen.getByText('Accepted amount')).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Receive All Remaining' }));
+        expect(await screen.findByText('$50.00')).toBeInTheDocument();
         expect(screen.getByTestId('location-search')).toHaveTextContent('tab=source');
         expect(screen.getByTestId('location-search')).not.toHaveTextContent('purchase_order_id');
         fireEvent.click(screen.getByRole('button', { name: 'Clear PO' }));
