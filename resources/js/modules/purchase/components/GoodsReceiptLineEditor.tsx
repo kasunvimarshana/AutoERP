@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Button } from '@/shared/components/Button';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
 import { DecimalInput } from '@/shared/components/DecimalInput';
 import { FormDrawer } from '@/shared/components/Drawer';
+import { MoneyDisplay } from '@/shared/components/MoneyDisplay';
+import { multiplyDecimal } from '@/shared/utils/decimal';
 import type { PurchaseOrderLine } from '../purchaseApi';
 
 export interface EditableGoodsReceiptLine {
@@ -15,8 +17,9 @@ export interface EditableGoodsReceiptLine {
 
 type GoodsReceiptDialog = { index: number; line: EditableGoodsReceiptLine };
 
-export function GoodsReceiptLineEditor({ lines, onChange, errorFor }: {
+export function GoodsReceiptLineEditor({ lines, currencyCode, onChange, errorFor }: {
     lines: EditableGoodsReceiptLine[];
+    currencyCode?: string;
     onChange: (lines: EditableGoodsReceiptLine[]) => void;
     errorFor: (field: string) => string | undefined;
 }) {
@@ -43,6 +46,7 @@ export function GoodsReceiptLineEditor({ lines, onChange, errorFor }: {
         { key: 'accepted', header: 'Accepted', render: (line) => line.accepted_quantity, className: 'tabular-nums' },
         { key: 'rejected', header: 'Rejected', render: (line) => line.rejected_quantity, className: 'tabular-nums' },
         { key: 'remaining', header: 'Remaining quantity', render: remainingQuantity, className: 'tabular-nums' },
+        { key: 'accepted_amount', header: 'Accepted amount', render: (line) => <strong className="tabular-nums font-semibold text-slate-900"><MoneyDisplay value={acceptedAmount(line)} currency={currencyCode} /></strong>, className: 'tabular-nums' },
         { key: 'actions', header: 'Actions', className: 'text-right', render: (line) => <button type="button" className="font-semibold text-sky-700" onClick={() => setDialog({ index: line.rowIndex, line })}>Edit line</button> },
     ];
     const rows = lines.map((line, index) => ({ ...line, rowIndex: index }));
@@ -54,7 +58,7 @@ export function GoodsReceiptLineEditor({ lines, onChange, errorFor }: {
                 <Button type="button" variant="ghost" onClick={clearQuantities}>Clear</Button>
                 <Button type="button" variant="secondary" onClick={receiveAll}>Receive All Remaining</Button>
             </div>
-            <DataTable rows={rows} columns={columns} rowKey={(line) => line.source.id ?? line.rowIndex} emptyMessage="Select a purchase order with receivable lines." mobileSummary={formatGoodsReceiptItem} mobileDetails={(line) => <GoodsReceiptMobileDetails line={line} />} mobileActions={(line) => <button type="button" className="font-semibold text-sky-700" onClick={() => setDialog({ index: line.rowIndex, line })}>Edit line</button>} />
+            <DataTable rows={rows} columns={columns} rowKey={(line) => line.source.id ?? line.rowIndex} emptyMessage="Select a purchase order with receivable lines." mobileSummary={formatGoodsReceiptItem} mobileDetails={(line) => <GoodsReceiptMobileDetails line={line} currencyCode={currencyCode} />} mobileActions={(line) => <button type="button" className="font-semibold text-sky-700" onClick={() => setDialog({ index: line.rowIndex, line })}>Edit line</button>} />
             <FormDrawer open={Boolean(dialog)} title="Edit receipt line" onClose={() => setDialog(null)}>
                 {dialog && (
                     <GoodsReceiptLineForm
@@ -128,10 +132,14 @@ function remainingQuantity(line: EditableGoodsReceiptLine): string {
     return line.source.remaining_receivable_quantity ?? line.source.remaining_quantity ?? '0.000000';
 }
 
-function Summary({ label, value }: { label: string; value: string }) {
+function acceptedAmount(line: EditableGoodsReceiptLine): string {
+    return multiplyDecimal(line.accepted_quantity, line.source.unit_price);
+}
+
+function Summary({ label, value }: { label: string; value: ReactNode }) {
     return <div><span className="text-xs uppercase text-slate-500">{label}</span><strong className="block tabular-nums text-slate-900">{value}</strong></div>;
 }
 
-function GoodsReceiptMobileDetails({ line }: { line: EditableGoodsReceiptLine }) {
-    return <div className="grid grid-cols-2 gap-2"><Summary label="Include" value={line.include ? 'Yes' : 'No'} /><Summary label="Quantity now" value={line.received_quantity} /><Summary label="Accepted" value={line.accepted_quantity} /><Summary label="Rejected" value={line.rejected_quantity} /><Summary label="Remaining quantity" value={remainingQuantity(line)} /></div>;
+function GoodsReceiptMobileDetails({ line, currencyCode }: { line: EditableGoodsReceiptLine; currencyCode?: string }) {
+    return <div className="grid grid-cols-2 gap-2"><Summary label="Include" value={line.include ? 'Yes' : 'No'} /><Summary label="Quantity now" value={line.received_quantity} /><Summary label="Accepted" value={line.accepted_quantity} /><Summary label="Accepted amount" value={<MoneyDisplay value={acceptedAmount(line)} currency={currencyCode} />} /><Summary label="Rejected" value={line.rejected_quantity} /><Summary label="Remaining quantity" value={remainingQuantity(line)} /></div>;
 }
