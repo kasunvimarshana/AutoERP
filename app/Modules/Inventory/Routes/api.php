@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Route;
 use Modules\Inventory\Constants\InventoryPermission;
 use Modules\Inventory\Http\Controllers\AdjustmentController;
 use Modules\Inventory\Http\Controllers\AllocationController;
+use Modules\Inventory\Http\Controllers\OpeningStockImportController;
 use Modules\Inventory\Http\Controllers\ReservationController;
 use Modules\Inventory\Http\Controllers\StockController;
 use Modules\Inventory\Http\Controllers\StockCountController;
@@ -66,6 +67,15 @@ Route::prefix('api/v1/inventory')->middleware($middleware)->name('api.v1.invento
     Route::post('adjustments', [AdjustmentController::class, 'store'])
         ->middleware($requires(InventoryPermission::ADJUSTMENTS_MANAGE))
         ->name('adjustments.store');
+    Route::get('opening-stock-import/template', [OpeningStockImportController::class, 'template'])
+        ->middleware($requires(InventoryPermission::ADJUSTMENTS_MANAGE))
+        ->name('opening-stock-import.template');
+    Route::post('opening-stock-import/preview', [OpeningStockImportController::class, 'preview'])
+        ->middleware($requires(InventoryPermission::ADJUSTMENTS_MANAGE))
+        ->name('opening-stock-import.preview');
+    Route::post('opening-stock-import', [OpeningStockImportController::class, 'store'])
+        ->middleware($requires(InventoryPermission::ADJUSTMENTS_MANAGE))
+        ->name('opening-stock-import.store');
     Route::post('adjustments/{adjustment}/post', [AdjustmentController::class, 'post'])
         ->whereNumber('adjustment')
         ->middleware($requires(InventoryPermission::ADJUSTMENTS_POST))

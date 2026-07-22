@@ -10,6 +10,7 @@ import type {
     CostAdjustmentPayload,
     InventoryAvailability,
     InventoryRecord,
+    OpeningStockImportPreview,
     ReservationPayload,
     StockBalance,
     StockCountPayload,
@@ -22,6 +23,7 @@ export type {
     CostAdjustmentPayload,
     InventoryAvailability,
     InventoryRecord,
+    OpeningStockImportPreview,
     ReservationPayload,
     StockBalance,
     StockCountPayload,
@@ -63,6 +65,18 @@ export const createAdjustment = (payload: AdjustmentPayload) =>
 
 export const postAdjustment = (id: number) =>
     apiClient.post<ApiResource<InventoryRecord>>(`${endpoints.inventory}/adjustments/${id}/post`, {}).then((response) => response.data.data);
+
+export const downloadOpeningStockTemplate = () =>
+    apiClient.get<Blob>(`${endpoints.inventory}/opening-stock-import/template`, { responseType: 'blob' })
+        .then((response) => response.data);
+
+export const previewOpeningStockImport = (payload: FormData) =>
+    apiClient.post<ApiResource<OpeningStockImportPreview>>(`${endpoints.inventory}/opening-stock-import/preview`, payload)
+        .then((response) => response.data.data);
+
+export const createOpeningStockImport = (payload: FormData) =>
+    apiClient.post<ApiResource<InventoryRecord>>(`${endpoints.inventory}/opening-stock-import`, payload)
+        .then((response) => response.data.data);
 
 export const listTransfers = (params: ListParams, signal?: AbortSignal) =>
     apiClient.get<ApiCollection<InventoryRecord>>(`${endpoints.inventory}/transfers`, { params, signal }).then((response) => response.data);
