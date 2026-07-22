@@ -82,6 +82,8 @@ final class InvoicePrintServiceTest extends TestCase
         );
         $payload = $response->getData(true);
 
+        $this->assertStringContainsString('/signed/invoices/', $payload['data']['print_url']);
+        $this->assertStringContainsString('/signed/invoices/', $payload['data']['pdf_url']);
         $this->assertStringContainsString('organization_unit='.$organizationUnitId, $payload['data']['print_url']);
         $this->assertStringContainsString('organization_unit='.$organizationUnitId, $payload['data']['pdf_url']);
 
