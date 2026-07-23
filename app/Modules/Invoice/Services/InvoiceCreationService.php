@@ -33,6 +33,7 @@ final class InvoiceCreationService
         private readonly InvoiceTaxDocumentMapper $taxDocumentMapper,
         private readonly InvoiceIssuanceService $issuance,
         private readonly InvoiceReferenceSnapshotService $snapshots,
+        private readonly InvoiceDocumentSnapshotService $documentSnapshots,
         private readonly TaxSnapshotService $taxSnapshots,
         private readonly InvoicePostingPlanService $postingPlans,
     ) {}
@@ -83,6 +84,8 @@ final class InvoiceCreationService
             $invoice->save();
 
             $this->lines->create($invoice, $data, $calculation, $sourceLineRows);
+            $invoice->load('lines');
+            $this->documentSnapshots->create($invoice, $data);
             $this->sources->createSources(
                 $invoice,
                 $data,
@@ -123,6 +126,7 @@ final class InvoiceCreationService
                 'adjustmentAllocations',
                 'balance',
                 'postingPlan',
+                'documentSnapshot',
             ]);
         });
     }

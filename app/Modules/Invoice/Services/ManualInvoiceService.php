@@ -37,17 +37,11 @@ use Modules\Tax\Services\TaxCalculationService;
 final class ManualInvoiceService
 {
     private const IDEMPOTENCY_OPERATION = 'invoice.manual.create';
-
     private const TAX_DOCUMENT_OUTBOUND = 'invoice_outbound_manual';
-
     private const TAX_DOCUMENT_INBOUND = 'invoice_inbound_manual';
-
     private const CALCULATION_TYPE_FIXED = 'fixed';
-
     private const WITHHOLDING_ADJUSTMENT_NAME = 'Tax withholding';
-
     private const WITHHOLDING_ADJUSTMENT_DESCRIPTION = 'Withholding calculated by the Tax module.';
-
     private const ZERO = '0.000000';
 
     public function __construct(
@@ -221,6 +215,12 @@ final class ManualInvoiceService
             adjustments: $adjustments,
             taxCalculation: $taxCalculation,
             postingPlan: $postingPlan,
+            supplyDate: $this->nullableTrimmed($data->supplyDate),
+            supplyPeriodStart: $this->nullableTrimmed($data->supplyPeriodStart),
+            supplyPeriodEnd: $this->nullableTrimmed($data->supplyPeriodEnd),
+            placeOfSupply: $this->nullableTrimmed($data->placeOfSupply),
+            paymentMode: $this->nullableTrimmed($data->paymentMode),
+            paymentTerms: $this->nullableTrimmed($data->paymentTerms),
         );
     }
 
@@ -303,7 +303,7 @@ final class ManualInvoiceService
         return Invoice::query()
             ->where('tenant_id', $data->tenantId)
             ->where('organization_unit_id', $data->organizationUnitId)
-            ->with(['lines', 'adjustments', 'balance', 'postingPlan'])
+            ->with(['lines', 'adjustments', 'balance', 'postingPlan', 'documentSnapshot'])
             ->findOrFail($invoiceId);
     }
 
@@ -333,6 +333,12 @@ final class ManualInvoiceService
                 'exchange_rate' => $this->math->normalize($data->exchangeRate),
                 'document_tax_group_id' => $data->documentTaxGroupId,
                 'notes' => $this->nullableTrimmed($data->notes),
+                'supply_date' => $this->nullableTrimmed($data->supplyDate),
+                'supply_period_start' => $this->nullableTrimmed($data->supplyPeriodStart),
+                'supply_period_end' => $this->nullableTrimmed($data->supplyPeriodEnd),
+                'place_of_supply' => $this->nullableTrimmed($data->placeOfSupply),
+                'payment_mode' => $this->nullableTrimmed($data->paymentMode),
+                'payment_terms' => $this->nullableTrimmed($data->paymentTerms),
                 'created_by' => $data->createdBy,
                 'lines' => array_map(fn (ManualInvoiceLineData $line): array => [
                     'description' => trim($line->description),

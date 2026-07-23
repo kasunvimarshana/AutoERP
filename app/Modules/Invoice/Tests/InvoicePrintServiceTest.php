@@ -35,11 +35,12 @@ final class InvoicePrintServiceTest extends TestCase
         [$tenantId, $organizationUnitId] = $this->scope();
         $customerId = $this->customer($tenantId, $organizationUnitId, 'Original Print Customer');
         $invoice = $this->printedInvoice($tenantId, $organizationUnitId, $customerId);
-        $originalName = (string) $invoice->party_name_snapshot;
+        $originalName = (string) $invoice->documentSnapshot?->buyer_legal_name;
 
         DB::table('customers')->where('id', $customerId)->update([
             'display_name' => 'Changed Print Customer',
             'name' => 'Changed Print Customer',
+            'legal_name' => 'Changed Print Customer Legal',
             'tax_registration_number' => 'CHANGED-TAX',
             'phone' => '0000000000',
             'updated_at' => now(),
@@ -57,12 +58,12 @@ final class InvoicePrintServiceTest extends TestCase
         $this->assertStringContainsString('Tax Invoice', $html);
         $this->assertStringContainsString('Tax Invoice No.', $html);
         $this->assertStringContainsString('Total Value of Supply', $html);
-        $this->assertStringContainsString('Total Amount including Tax', $html);
+        $this->assertStringContainsString('Total Amount including VAT', $html);
         $this->assertStringContainsString($originalName, $html);
         $this->assertStringContainsString('95.00', $html);
         $this->assertStringNotContainsString('118.00', $html);
         $this->assertStringNotContainsString('Changed Print Customer', $html);
-        $this->assertStringNotContainsString('VAT Amount', $html);
+        $this->assertStringContainsString('VAT Amount', $html);
         $this->assertStringNotContainsString('Total Value of Supply @ 18%', $html);
         $this->assertStringNotContainsString('SAMPLE', $html);
         $this->assertStringNotContainsString('EOG', $html);
@@ -112,7 +113,7 @@ final class InvoicePrintServiceTest extends TestCase
         ]);
         $this->get($validUrl)
             ->assertOk()
-            ->assertSee('Public Print Customer')
+            ->assertSee('Public Print Customer Legal')
             ->assertDontSee('118.00');
 
         $validPdfUrl = URL::temporarySignedRoute('invoices.public.pdf', now()->addMinutes(5), [
@@ -158,6 +159,7 @@ final class InvoicePrintServiceTest extends TestCase
                                 InvoiceTaxMetadata::CALCULATION_METHOD => InvoiceTaxMetadata::CALCULATION_METHOD_INCLUSIVE,
                                 InvoiceTaxMetadata::TAX_AMOUNT => '15.000000',
                                 InvoiceTaxMetadata::IS_WITHHOLDING => false,
+                                'tax_code' => 'VAT-INCLUSIVE',
                             ]],
                         ],
                     ),
@@ -179,14 +181,12 @@ final class InvoicePrintServiceTest extends TestCase
         return $this->withTenantExecutionContext(
             $tenantId,
             fn (): Invoice => Invoice::query()
-                ->with(['tenant', 'organizationUnit', 'lines'])
+                ->with(['tenant', 'organizationUnit', 'lines', 'documentSnapshot'])
                 ->findOrFail($invoiceId),
         );
     }
 
-    /**
-     * @return array{int, int}
-     */
+    /** @return array{int, int} */
     private function scope(): array
     {
         $suffix = Str::upper(Str::random(6));
@@ -213,6 +213,7 @@ final class InvoicePrintServiceTest extends TestCase
             'tenant_id' => $tenantId,
             'name' => $name,
             'code' => $code,
+            'vat_registration_number' => 'VAT-'.$code,
             'is_active' => true,
             'created_at' => now(),
             'updated_at' => now(),

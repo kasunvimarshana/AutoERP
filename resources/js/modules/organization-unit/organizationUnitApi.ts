@@ -32,6 +32,40 @@ export interface OrganizationUnitSummary {
     parent?: { id: number; name: string; code: string; path: string; depth: number; is_active: boolean; retired_at?: string | null } | null;
 }
 
+export interface OrganizationUnitLegalProfile {
+    id: number;
+    organization_unit_id: number;
+    legal_name: string;
+    tin: string | null;
+    vat_registration_number: string | null;
+    svat_registration_number: string | null;
+    address_line_1: string;
+    address_line_2: string | null;
+    city: string | null;
+    state: string | null;
+    postal_code: string | null;
+    country: string | null;
+    phone: string | null;
+    email: string | null;
+    row_version: number;
+}
+
+export interface OrganizationUnitLegalProfilePayload {
+    expected_version?: number;
+    legal_name: string;
+    tin?: string | null;
+    vat_registration_number?: string | null;
+    svat_registration_number?: string | null;
+    address_line_1: string;
+    address_line_2?: string | null;
+    city?: string | null;
+    state?: string | null;
+    postal_code?: string | null;
+    country?: string | null;
+    phone?: string | null;
+    email?: string | null;
+}
+
 export interface OrganizationUnitDocument {
     id: number;
     name: string;
@@ -121,6 +155,22 @@ export const organizationUnitApi = {
         const response = await apiClient.patch<ApiResource<OrganizationUnitSummary>>(`${organizationUnitsEndpoint}/${unit.id}/retire`, {
             expected_version: unit.row_version,
         });
+        return response.data.data;
+    },
+
+    async getLegalProfile(unitId: number, signal?: AbortSignal): Promise<OrganizationUnitLegalProfile | null> {
+        const response = await apiClient.get<ApiResource<OrganizationUnitLegalProfile | null>>(
+            `${organizationUnitsEndpoint}/${unitId}/legal-profile`,
+            { signal },
+        );
+        return response.data.data;
+    },
+
+    async saveLegalProfile(unitId: number, payload: OrganizationUnitLegalProfilePayload): Promise<OrganizationUnitLegalProfile> {
+        const response = await apiClient.put<ApiResource<OrganizationUnitLegalProfile>>(
+            `${organizationUnitsEndpoint}/${unitId}/legal-profile`,
+            payload,
+        );
         return response.data.data;
     },
 

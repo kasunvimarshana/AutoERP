@@ -19,4 +19,6 @@ final class InvoiceTaxMetadata
     public const IS_WITHHOLDING = 'is_withholding';
 
     public const CALCULATION_METHOD_INCLUSIVE = 'inclusive';
+
+    public const CALCULATION_METHOD_EXCLUSIVE = 'exclusive';
 }
