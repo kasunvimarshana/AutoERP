@@ -19,6 +19,11 @@ final class OrganizationUnitFixture
      * an explicit parent are created below that root so tests cannot manufacture
      * invalid parallel roots.
      *
+     * A deterministic legal profile is created by default because printable
+     * business documents fail closed when the organization identity is absent.
+     * Tests that explicitly exercise a missing profile may pass
+     * `create_legal_profile => false`.
+     *
      * @param array<string, mixed> $attributes
      */
     public static function create(array $attributes): int
@@ -58,7 +63,7 @@ final class OrganizationUnitFixture
         $retiredAt = $isRoot ? null : ($attributes['retired_at'] ?? null);
         $now = now();
 
-        return (int) DB::table('organization_units')->insertGetId([
+        $organizationUnitId = (int) DB::table('organization_units')->insertGetId([
             'tenant_id' => $tenantId,
             'type_id' => $typeId,
             'parent_id' => $isRoot ? null : (int) $parent->id,
@@ -78,6 +83,30 @@ final class OrganizationUnitFixture
             'created_at' => $attributes['created_at'] ?? $now,
             'updated_at' => $attributes['updated_at'] ?? $now,
         ]);
+
+        if (($attributes['create_legal_profile'] ?? true) === true) {
+            DB::table('organization_unit_legal_profiles')->insert([
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $organizationUnitId,
+                'legal_name' => $attributes['legal_name'] ?? $name.' Legal',
+                'tin' => $attributes['tin'] ?? 'TIN-'.$code,
+                'vat_registration_number' => $attributes['vat_registration_number'] ?? null,
+                'svat_registration_number' => $attributes['svat_registration_number'] ?? null,
+                'address_line_1' => $attributes['address_line_1'] ?? '1 Test Registered Address',
+                'address_line_2' => $attributes['address_line_2'] ?? null,
+                'city' => $attributes['city'] ?? 'Test City',
+                'state' => $attributes['state'] ?? null,
+                'postal_code' => $attributes['postal_code'] ?? null,
+                'country' => $attributes['country'] ?? 'Test Country',
+                'phone' => $attributes['legal_phone'] ?? '0110000000',
+                'email' => $attributes['legal_email'] ?? null,
+                'row_version' => 1,
+                'created_at' => $attributes['created_at'] ?? $now,
+                'updated_at' => $attributes['updated_at'] ?? $now,
+            ]);
+        }
+
+        return $organizationUnitId;
     }
 
     private static function typeId(int $tenantId, int $depth): int

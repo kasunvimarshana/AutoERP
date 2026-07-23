@@ -3,12 +3,13 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
+use Modules\Core\Authorization\PlatformPermission;
 use Modules\OrganizationUnit\Http\Controllers\OrganizationUnitContextController;
 use Modules\OrganizationUnit\Http\Controllers\OrganizationUnitController;
 use Modules\OrganizationUnit\Http\Controllers\OrganizationUnitDocumentController;
+use Modules\OrganizationUnit\Http\Controllers\OrganizationUnitLegalProfileController;
 use Modules\OrganizationUnit\Http\Controllers\OrganizationUnitTypeController;
 use Modules\OrganizationUnit\Http\Controllers\Platform\PlatformConfigurationOrganizationTargetController;
-use Modules\Core\Authorization\PlatformPermission;
 
 $protectedGuard = (string) config('module-auth.protected_route_guard', 'auth-api');
 $currentUser = (string) config('core.current_user.middleware_alias', 'current.user');
@@ -31,6 +32,10 @@ Route::prefix('api/v1')
         Route::get('organization-units/context/options', [OrganizationUnitContextController::class, 'options']);
         Route::apiResource('organization-unit-types', OrganizationUnitTypeController::class);
         Route::apiResource('organization-units', OrganizationUnitController::class)->except('destroy');
+        Route::get('organization-units/{organizationUnit}/legal-profile', [OrganizationUnitLegalProfileController::class, 'show'])
+            ->whereNumber('organizationUnit');
+        Route::put('organization-units/{organizationUnit}/legal-profile', [OrganizationUnitLegalProfileController::class, 'update'])
+            ->whereNumber('organizationUnit');
         Route::patch('organization-units/{organizationUnit}/activate', [OrganizationUnitController::class, 'activate']);
         Route::patch('organization-units/{organizationUnit}/deactivate', [OrganizationUnitController::class, 'deactivate']);
         Route::patch('organization-units/{organizationUnit}/retire', [OrganizationUnitController::class, 'retire']);

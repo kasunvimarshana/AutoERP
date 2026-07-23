@@ -6,6 +6,7 @@ namespace Tests\Feature\VehicleRental;
 
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rules\Exists;
 use Modules\VehicleRental\Constants\VehicleRentalPermission;
 use Modules\VehicleRental\Http\Requests\DeleteRentalAgreementRequest;
 use Modules\VehicleRental\Http\Requests\DeleteRentalAssignmentRequest;
@@ -118,19 +119,25 @@ final class RentalCrudInterfaceBoundaryTest extends TestCase
             1,
         );
         $rules = $request->rules();
+        $periodRules = [
+            'date_from' => $rules['date_from'],
+            'date_to' => $rules['date_to'],
+        ];
 
+        self::assertContains('required', $rules['agreement_id']);
+        self::assertTrue(collect($rules['agreement_id'])->contains(
+            static fn (mixed $rule): bool => $rule instanceof Exists,
+        ));
         self::assertFalse(Validator::make([
-            'agreement_id' => 1,
             'date_from' => '2026-07-21T10:55:00+05:30',
             'date_to' => '2026-07-30T18:00:00+05:30',
-        ], $rules)->fails());
+        ], $periodRules)->fails());
         self::assertTrue(Validator::make([
-            'agreement_id' => 1,
             'date_from' => '2026-07-21T10:55:00',
-        ], $rules)->fails());
-        self::assertTrue(Validator::make([
-            'date_from' => '2026-07-21T10:55:00+05:30',
-        ], $rules)->fails());
+        ], $periodRules)->fails());
+        self::assertTrue(Validator::make([], [
+            'agreement_id' => $rules['agreement_id'],
+        ])->fails());
     }
 
     public function test_workflow_lookups_use_their_owned_manage_permissions(): void

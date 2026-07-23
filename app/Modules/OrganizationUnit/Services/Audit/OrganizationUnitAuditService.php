@@ -9,6 +9,7 @@ use Modules\Audit\Constants\AuditEventCategory;
 use Modules\Audit\Contracts\AuditRecorderInterface;
 use Modules\Audit\Data\AuditEventData;
 use Modules\OrganizationUnit\Models\OrganizationUnitDocumentModel;
+use Modules\OrganizationUnit\Models\OrganizationUnitLegalProfileModel;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\OrganizationUnit\Models\OrganizationUnitTypeModel;
 
@@ -27,6 +28,24 @@ final class OrganizationUnitAuditService
             before: $this->publicUnitSnapshot($before),
             after: $this->publicUnitSnapshot($after),
             tags: ['organization-unit', 'hierarchy'],
+        );
+    }
+
+    /** @param array<string, mixed>|null $before @param array<string, mixed>|null $after */
+    public function legalProfile(
+        string $action,
+        OrganizationUnitLegalProfileModel $profile,
+        ?array $before,
+        ?array $after,
+    ): void {
+        $this->record(
+            action: 'legal_profile.'.$action,
+            subjectType: 'organization_unit_legal_profile',
+            subject: $profile,
+            subjectReference: (string) $profile->getAttribute('legal_name'),
+            before: $this->withoutInternalFields($before, []),
+            after: $this->withoutInternalFields($after, []),
+            tags: ['organization-unit', 'legal-profile'],
         );
     }
 
@@ -72,6 +91,9 @@ final class OrganizationUnitAuditService
         ?array $after,
         array $tags,
     ): void {
+        $organizationUnitId = $subject instanceof OrganizationUnitModel
+            ? (int) $subject->getKey()
+            : $this->positiveInt($subject->getAttribute('organization_unit_id'));
         $this->audit->record(new AuditEventData(
             eventName: 'organization_unit.'.$action,
             eventCategory: AuditEventCategory::ADMINISTRATION,
@@ -82,9 +104,7 @@ final class OrganizationUnitAuditService
             changes: ['before' => $before, 'after' => $after],
             metadata: [
                 'tenant_id' => (int) $subject->getAttribute('tenant_id'),
-                'organization_unit_id' => $subject instanceof OrganizationUnitModel
-                    ? (int) $subject->getKey()
-                    : $this->positiveInt($subject->getAttribute('organization_unit_id')),
+                'organization_unit_id' => $organizationUnitId,
                 'row_version' => $this->positiveInt($subject->getAttribute('row_version')),
             ],
             tags: $tags,

@@ -21,6 +21,12 @@ export interface OperationalReportParams {
     vehicle_id?: number | null;
     employee_id?: number | null;
     department_id?: number | null;
+    agreement_id?: number | null;
+    driver_employee_id?: number | null;
+    chart_status?: string;
+    assignment_status?: string;
+    invoice_status?: string;
+    exception_type?: string;
 }
 
 export type OperationalReportSummary = Record<string, string | number>;

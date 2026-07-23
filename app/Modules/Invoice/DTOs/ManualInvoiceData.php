@@ -8,9 +8,7 @@ use Modules\Invoice\Enums\InvoiceDirection;
 
 final readonly class ManualInvoiceData
 {
-    /**
-     * @param  list<ManualInvoiceLineData>  $lines
-     */
+    /** @param list<ManualInvoiceLineData> $lines */
     public function __construct(
         public int $tenantId,
         public InvoiceDirection $direction,
@@ -25,5 +23,11 @@ final readonly class ManualInvoiceData
         public ?string $notes = null,
         public ?int $createdBy = null,
         public array $lines = [],
+        public ?string $supplyDate = null,
+        public ?string $supplyPeriodStart = null,
+        public ?string $supplyPeriodEnd = null,
+        public ?string $placeOfSupply = null,
+        public ?string $paymentMode = null,
+        public ?string $paymentTerms = null,
     ) {}
 }
