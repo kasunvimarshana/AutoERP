@@ -142,3 +142,30 @@ export interface AdjustmentPayload {
         reason?: string;
     }>;
 }
+
+export interface OpeningStockImportPreviewRow {
+    row_number: number;
+    item_code: string;
+    item_name: string | null;
+    variant_code: string;
+    variant_name: string | null;
+    uom_code: string | null;
+    uom_name: string | null;
+    opening_quantity: string;
+    unit_cost: string;
+    base_quantity: string | null;
+    base_unit_cost: string | null;
+    batch_number: string;
+    serial_number: string;
+    reason: string;
+    errors: string[];
+}
+
+export interface OpeningStockImportPreview {
+    file_name: string;
+    total_rows: number;
+    valid_rows: number;
+    invalid_rows: number;
+    can_create: boolean;
+    rows: OpeningStockImportPreviewRow[];
+}
