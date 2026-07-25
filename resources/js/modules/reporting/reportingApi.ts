@@ -12,6 +12,7 @@ import type {
     ReportResult,
     TechnicianWorkReportParams,
     TechnicianWorkReportResult,
+    SummaryReportResult,
 } from './reportingTypes';
 
 export async function listReports(signal?: AbortSignal): Promise<ReportDefinition[]> {
@@ -102,4 +103,16 @@ export async function runEmployeeCommissionReport(params: EmployeeCommissionRepo
 export async function runOperationalReport(key: string, params: OperationalReportParams, signal?: AbortSignal): Promise<OperationalReportResult> {
     const response = await apiClient.get<OperationalReportResult>(`${endpoints.reports}/${key}`, { params, signal });
     return response.data;
+}
+
+export async function runSummaryReport(
+    params: { date_from: string; date_to: string },
+    signal?: AbortSignal,
+): Promise<SummaryReportResult> {
+    const response = await apiClient.get<ApiResource<SummaryReportResult>>(`${endpoints.reports}/summary`, {
+        params,
+        signal,
+    });
+
+    return response.data.data;
 }

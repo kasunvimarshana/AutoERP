@@ -25,6 +25,7 @@ $exportFormats = ['html', 'csv', 'xlsx', 'pdf', 'print'];
 Route::prefix('api/v1/reports')->middleware($middleware)->name('api.v1.reports.')->group(function () use ($requires, $exportFormats): void {
     Route::middleware($requires(ReportingAuthorizationService::REPORTS_VIEW))->group(function (): void {
         Route::get('/', [ReportController::class, 'index'])->name('index');
+        Route::get('summary', [OperationalReportController::class, 'summary'])->name('summary');
         Route::get('purchase/detailed', [OperationalReportController::class, 'detailedPurchase'])->name('purchase.detailed');
         Route::get('vehicle-service/detailed', [OperationalReportController::class, 'detailedVehicleService'])->name('vehicle-service.detailed');
         Route::get('vehicle-service/employee-incentives', [OperationalReportController::class, 'employeeIncentives'])->name('vehicle-service.employee-incentives');

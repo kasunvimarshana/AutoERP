@@ -26,6 +26,7 @@ final class ReportingPermissionBoundaryTest extends TestCase
     {
         $expected = [
             'api.v1.reports.index' => ReportingAuthorizationService::REPORTS_VIEW,
+            'api.v1.reports.summary' => ReportingAuthorizationService::REPORTS_VIEW,
             'api.v1.reports.purchase.detailed' => ReportingAuthorizationService::REPORTS_VIEW,
             'api.v1.reports.vehicle-service.detailed' => ReportingAuthorizationService::REPORTS_VIEW,
             'api.v1.reports.vehicle-service.employee-incentives' => ReportingAuthorizationService::REPORTS_VIEW,
