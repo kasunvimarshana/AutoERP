@@ -311,6 +311,9 @@ const ReportListPage = lazy(
     () => import("@/modules/reporting/pages/ReportListPage"),
 );
 const ReportPage = lazy(() => import("@/modules/reporting/pages/ReportPage"));
+const SummaryReportPage = lazy(
+    () => import("@/modules/reporting/pages/SummaryReportPage"),
+);
 const TechnicianWorkReportPage = lazy(
     () => import("@/modules/reporting/pages/TechnicianWorkReportPage"),
 );
@@ -843,6 +846,10 @@ const appRouter = createBrowserRouter(
                         <Route
                             path="/reports"
                             element={<ReportListPage />}
+                        />
+                        <Route
+                            path="/reports/summary"
+                            element={<SummaryReportPage />}
                         />
                         <Route
                             path="/reports/purchase/detailed"
