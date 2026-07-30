@@ -15,13 +15,16 @@ final class VehicleOptionalOdometerContractTest extends TestCase
 
         $requestMapper = file_get_contents(base_path('app/Modules/Vehicle/Http/Requests/Concerns/MapsVehicleData.php'));
         $creationService = file_get_contents(base_path('app/Modules/Vehicle/Services/VehicleCreationService.php'));
+        $validationService = file_get_contents(base_path('app/Modules/Vehicle/Validators/VehicleValidationService.php'));
         $summaryResource = file_get_contents(base_path('app/Modules/Vehicle/Http/Resources/VehicleSummaryResource.php'));
 
         self::assertIsString($requestMapper);
         self::assertIsString($creationService);
+        self::assertIsString($validationService);
         self::assertIsString($summaryResource);
         self::assertStringContainsString("odometerReading: \$this->nullableString(\$vehicle, 'odometer_reading')", $requestMapper);
         self::assertStringContainsString("'odometer_reading' => \$data->odometerReading === null", $creationService);
+        self::assertStringContainsString('if ($data->odometerReading !== null)', $validationService);
         self::assertStringContainsString("'odometer_reading' => \$this->odometer_reading === null ? null", $summaryResource);
         self::assertStringNotContainsString("odometer_reading'] ?? '0.000000'", $requestMapper);
     }
