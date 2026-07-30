@@ -43,11 +43,12 @@ An unmeasured finalized chart breaks the old continuity chain. When a usable or 
 
 The deployment migrations make these existing columns nullable:
 
+- `vehicles.odometer_reading`
 - `vehicle_rental_custody_events.odometer`
 - Running Chart start, end, total, garage and commercial kilometres
 - Calculation commercial and excess kilometres
 
-No existing value is rewritten. Existing zero readings remain zero. Rollback fails explicitly when nullable operational facts already exist rather than fabricating values.
+The Vehicle module baseline also creates `vehicles.odometer_reading` as nullable for fresh installations. No existing value is rewritten. Existing zero readings remain zero. Rollback fails explicitly when nullable operational facts already exist rather than fabricating values.
 
 ## UAT checklist
 
