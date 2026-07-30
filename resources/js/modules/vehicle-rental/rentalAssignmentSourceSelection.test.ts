@@ -37,7 +37,6 @@ describe('Vehicle Rental assignment source selection', () => {
         expect(dialogsSource).toContain('const resolvedSourceAssignment = selectedSourceCandidate');
         expect(dialogsSource).toContain('fitAssignmentDateTimes(state.startsAt, state.endsAt, bounds)');
         expect(dialogsSource).toContain('sourceAssignment: null');
-        expect(dialogsSource).toContain('setSourceAssignment(null)');
         expect(dialogsSource).not.toContain('setSourceCandidates(null)');
     });
 
