@@ -8,7 +8,7 @@ function source(path: string): string {
 }
 
 const workspaceSource = source('resources/js/modules/vehicle-rental/pages/VehicleRentalWorkspacePage.tsx');
-const dialogSource = source('resources/js/modules/vehicle-rental/components/RentalAssignmentDialogs.tsx');
+const dialogSource = source('resources/js/modules/vehicle-rental/components/RentalAssignmentDialog.tsx');
 const detailSource = source('resources/js/modules/vehicle-rental/components/RentalAssignmentDetailDialog.tsx');
 const serviceSource = source('app/Modules/VehicleRental/Services/RentalAssignmentService.php');
 
@@ -29,11 +29,11 @@ describe('Vehicle Operations CRUD actions', () => {
 
     it('preloads the complete planned operation into the edit form', () => {
         expect(dialogSource).toContain('agreement: assignment.agreement ?? null');
-        expect(dialogSource).toContain('vehicle: assignment.vehicle ?? null');
+        expect(dialogSource).toContain('vehicle: assignment.vehicle ? {');
         expect(dialogSource).toContain('driver: assignment.driver ?? null');
         expect(dialogSource).toContain('startsAt: utcDateTimeToLocalInput(assignment.starts_at)');
         expect(dialogSource).toContain('endsAt: utcDateTimeToLocalInput(assignment.ends_at)');
-        expect(dialogSource).toContain('handoverOdometer: assignment.handover_odometer ??');
+        expect(dialogSource).toContain("handoverOdometer: assignment.handover_odometer ?? ''");
     });
 
     it('retains operational and dependent history', () => {
