@@ -7,7 +7,9 @@ const source = (path: string) => readFileSync(resolve(cwd(), path), 'utf8');
 
 const rateEditorSource = source('resources/js/modules/vehicle-rental/components/RentalRateEditor.tsx');
 const agreementDialogSource = source('resources/js/modules/vehicle-rental/components/RentalAgreementDialogs.tsx');
-const assignmentDialogSource = source('resources/js/modules/vehicle-rental/components/RentalAssignmentDialogs.tsx');
+const assignmentDialogSource = source('resources/js/modules/vehicle-rental/components/RentalAssignmentDialog.tsx');
+const custodyDialogSource = source('resources/js/modules/vehicle-rental/components/RentalCustodyDialog.tsx');
+const replacementDialogSource = source('resources/js/modules/vehicle-rental/components/RentalReplacementDialog.tsx');
 const lookupsSource = source('resources/js/modules/vehicle-rental/components/VehicleRentalLookups.tsx');
 const calculationDialogSource = source('resources/js/modules/vehicle-rental/components/RentalCalculationDialog.tsx');
 const runningChartDialogSource = source('resources/js/modules/vehicle-rental/components/RentalRunningChartDialog.tsx');
@@ -15,7 +17,7 @@ const vehicleRentalApiSource = source('resources/js/modules/vehicle-rental/vehic
 const settlementPageSource = source('resources/js/modules/vehicle-rental/pages/RentalSettlementHandoffPage.tsx');
 const calculationControllerSource = source('app/Modules/VehicleRental/Http/Controllers/RentalCalculationController.php');
 
- describe('Vehicle Rental UX foundation', () => {
+describe('Vehicle Rental UX foundation', () => {
     it('does not offer unsupported fixed Other rates for new agreements', () => {
         expect(rateEditorSource).toContain('const EDITABLE_RATE_CODES');
         expect(rateEditorSource).not.toContain("{ value: 'other', label: 'Other fixed charge' }");
@@ -61,8 +63,8 @@ const calculationControllerSource = source('app/Modules/VehicleRental/Http/Contr
         expect(lookupsSource).toContain('localDateTimeToOffsetIso(endsAt)');
         expect(assignmentDialogSource).toContain('starts_at: localDateTimeToOffsetIso(fittedDates.startsAt)');
         expect(assignmentDialogSource).toContain('ends_at: nullableLocalDateTimeToOffsetIso(fittedDates.endsAt)');
-        expect(assignmentDialogSource).toContain('event_at: localDateTimeToOffsetIso(eventAt)');
-        expect(assignmentDialogSource).toContain('effective_at: localDateTimeToOffsetIso(effectiveAt)');
+        expect(custodyDialogSource).toContain('event_at: localDateTimeToOffsetIso(eventAt)');
+        expect(replacementDialogSource).toContain('effective_at: localDateTimeToOffsetIso(effectiveAt)');
         expect(vehicleRentalApiSource).toContain('runningChartApiPayload(payload)');
     });
 
