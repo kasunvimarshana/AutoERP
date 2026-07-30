@@ -6,7 +6,6 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use RuntimeException;
 
 return new class extends Migration
 {
@@ -30,7 +29,7 @@ return new class extends Migration
             ->orWhereNull('garage_km')
             ->orWhereNull('commercial_km')
             ->exists()) {
-            throw new RuntimeException('Cannot restore mandatory rental odometers while charts without readings exist.');
+            throw new \RuntimeException('Cannot restore mandatory rental odometers while charts without readings exist.');
         }
 
         Schema::table('vehicle_rental_running_charts', function (Blueprint $table): void {
