@@ -42,6 +42,7 @@ const existingJob: VehicleServiceJob = {
     row_version: 3,
     job_number: 'VSJ-92',
     job_date: '2026-07-15',
+    manual_job_card_number: 'PAPER-92',
     type: 'body_wash',
     customer_id: 5,
     customer: { id: 5, code: 'CUS-5', name: 'Vehicle Owner' },
@@ -60,6 +61,7 @@ const existingJob: VehicleServiceJob = {
     tax_total: '0.000000',
     charge_total: '0.000000',
     grand_total: '0.000000',
+    next_service_mileage: '18000.000000',
 };
 
 const organizationDefault = {
@@ -92,23 +94,70 @@ describe('VehicleServiceJobForm', () => {
         expect(screen.getByLabelText('Commission value')).toHaveValue('7.500000');
         expect(screen.getByLabelText('Commission value')).toBeEnabled();
         expect(screen.getByText('Loaded from organization default.')).toBeInTheDocument();
+        expect(screen.queryByLabelText('Bill-to customer')).not.toBeInTheDocument();
+        expect(screen.queryByLabelText('Job date')).not.toBeInTheDocument();
+        expect(screen.queryByLabelText('Expected delivery')).not.toBeInTheDocument();
+        expect(screen.queryByLabelText('Fuel level')).not.toBeInTheDocument();
+        expect(screen.queryByLabelText('Priority')).not.toBeInTheDocument();
+        expect(screen.getByLabelText('Manual job card')).toBeInTheDocument();
+        expect(screen.getByLabelText('Next service mileage')).toBeInTheDocument();
 
         await user.click(screen.getByRole('button', { name: 'Choose Vehicle' }));
-        await user.click(screen.getByRole('button', { name: 'Choose Bill-to customer' }));
         await user.click(screen.getByRole('button', { name: 'Choose Supervisor' }));
         await user.click(screen.getByRole('button', { name: 'Save draft' }));
 
         await waitFor(() => expect(apiMocks.createVehicleServiceJob).toHaveBeenCalledWith(
             expect.objectContaining({
                 customer_id: 5,
-                bill_to_customer_id: 8,
+                bill_to_customer_id: 5,
                 vehicle_id: 14,
                 type: 'full_service',
                 supervisor_employee_id: 21,
                 supervisor_commission_type: 'percentage',
                 supervisor_commission_value: '7.500000',
+                job_date: '2026-07-30',
+                priority: 'normal',
+                next_service_mileage: '6200.000000',
             }),
         ));
+    });
+
+    it('autofills next service mileage from odometer and allows manual override', async () => {
+        const user = userEvent.setup();
+        render(
+            <TestRouter initialEntries={['/vehicle-service/jobs/create']}>
+                <VehicleServiceJobForm />
+            </TestRouter>,
+        );
+
+        await user.click(screen.getByRole('button', { name: 'Choose Vehicle' }));
+        expect(await screen.findByLabelText('Next service mileage')).toHaveValue('6200.000000');
+
+        await user.clear(screen.getByLabelText('Odometer'));
+        await user.type(screen.getByLabelText('Odometer'), '15000');
+        expect(screen.getByLabelText('Next service mileage')).toHaveValue('20000.000000');
+
+        await user.clear(screen.getByLabelText('Next service mileage'));
+        await user.type(screen.getByLabelText('Next service mileage'), '21000');
+        await user.clear(screen.getByLabelText('Odometer'));
+        await user.type(screen.getByLabelText('Odometer'), '16000');
+        expect(screen.getByLabelText('Next service mileage')).toHaveValue('21000');
+    });
+
+    it('recomputes next service mileage when switching back to full service', async () => {
+        const user = userEvent.setup();
+        render(
+            <TestRouter initialEntries={['/vehicle-service/jobs/create']}>
+                <VehicleServiceJobForm />
+            </TestRouter>,
+        );
+
+        await user.click(screen.getByRole('button', { name: 'Choose Vehicle' }));
+        await user.selectOptions(screen.getByLabelText('Type'), 'body_wash');
+        expect(screen.queryByLabelText('Next service mileage')).not.toBeInTheDocument();
+
+        await user.selectOptions(screen.getByLabelText('Type'), 'full_service');
+        expect(await screen.findByLabelText('Next service mileage')).toHaveValue('6200.000000');
     });
 
     it('allows an explicit supervisor commission override while creating a job', async () => {
@@ -193,6 +242,8 @@ describe('VehicleServiceJobForm', () => {
 
         expect(screen.getByLabelText('Supervisor commission')).toHaveValue('percentage');
         expect(screen.getByLabelText('Type')).toHaveValue('body_wash');
+        expect(screen.queryByLabelText('Manual job card')).not.toBeInTheDocument();
+        expect(screen.queryByLabelText('Next service mileage')).not.toBeInTheDocument();
         expect(screen.getByLabelText('Commission value')).toHaveValue('5.000000');
         expect(screen.getByText('Stored job commission snapshot.')).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Save job' })).toBeInTheDocument();
@@ -215,15 +266,6 @@ function lookupChoice(label: string): NamedResource | null {
             odometer_unit: 'km',
         } as NamedResource;
     }
-
-    if (label === 'Bill-to customer') {
-        return {
-            id: 8,
-            code: 'CUS-8',
-            name: 'Billing Customer',
-        };
-    }
-
     if (label === 'Supervisor') {
         return {
             id: 21,

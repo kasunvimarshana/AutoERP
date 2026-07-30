@@ -15,6 +15,27 @@ final class StoreVehicleServiceJobRequest extends TenantScopedRequest
 {
     use HasExpectedVehicleServiceJobVersion;
 
+    protected function prepareForValidation(): void
+    {
+        if (! $this->isMethod('post')) {
+            return;
+        }
+
+        $updates = [];
+
+        if (! $this->filled('job_date')) {
+            $updates['job_date'] = now()->toDateString();
+        }
+
+        if (! $this->filled('priority')) {
+            $updates['priority'] = 'normal';
+        }
+
+        if ($updates !== []) {
+            $this->merge($updates);
+        }
+    }
+
     public function rules(): array
     {
         return [
@@ -22,6 +43,7 @@ final class StoreVehicleServiceJobRequest extends TenantScopedRequest
             'organization_unit_id' => ['nullable', 'integer', 'min:1'],
             'expected_version' => $this->expectedVersionRules(! $this->isMethod('post')),
             'job_number' => ['nullable', 'string', 'max:100'],
+            'manual_job_card_number' => ['nullable', 'string', 'max:100'],
             'job_date' => ['required', 'date'],
             'expected_delivery_date' => ['nullable', 'date', 'after_or_equal:job_date'],
             'type' => ['required', Rule::enum(VehicleServiceJobType::class)],
@@ -41,6 +63,7 @@ final class StoreVehicleServiceJobRequest extends TenantScopedRequest
                 'min:0',
             ],
             'odometer_reading' => ['nullable', 'decimal:0,6', 'min:0'],
+            'next_service_mileage' => ['nullable', 'decimal:0,6', 'min:0'],
             'fuel_level' => ['nullable', 'string', 'max:100'],
             'priority' => ['nullable', 'string', 'max:30'],
             'notes' => ['nullable', 'string'],
@@ -52,13 +75,14 @@ final class StoreVehicleServiceJobRequest extends TenantScopedRequest
     {
         return new VehicleServiceJobData(
             tenantId: $this->tenantId(),
-            jobDate: (string) $this->input('job_date'),
+            jobDate: $this->stringOrNull('job_date'),
             customerId: (int) $this->input('customer_id'),
             vehicleId: (int) $this->input('vehicle_id'),
             type: VehicleServiceJobType::from((string) $this->input('type')),
             billToCustomerId: $this->intOrNull('bill_to_customer_id'),
             organizationUnitId: $this->organizationUnitId(),
             jobNumber: $this->stringOrNull('job_number'),
+            manualJobCardNumber: $this->stringOrNull('manual_job_card_number'),
             expectedDeliveryDate: $this->stringOrNull('expected_delivery_date'),
             supervisorEmployeeId: $this->intOrNull('supervisor_employee_id'),
             supervisorCommissionType: $this->filled('supervisor_commission_type')
@@ -68,6 +92,7 @@ final class StoreVehicleServiceJobRequest extends TenantScopedRequest
                 ? (string) $this->input('supervisor_commission_value')
                 : null,
             odometerReading: $this->stringOrNull('odometer_reading'),
+            nextServiceMileage: $this->stringOrNull('next_service_mileage'),
             fuelLevel: $this->stringOrNull('fuel_level'),
             priority: $this->stringOrNull('priority'),
             notes: $this->stringOrNull('notes'),

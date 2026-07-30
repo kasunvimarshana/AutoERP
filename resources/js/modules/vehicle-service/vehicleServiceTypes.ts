@@ -165,6 +165,7 @@ export interface VehicleServiceJob {
     row_version?: number;
     job_number: string;
     job_date: string;
+    manual_job_card_number?: string | null;
     expected_delivery_date?: string | null;
     type: VehicleServiceJobType;
     type_label?: string;
@@ -182,6 +183,7 @@ export interface VehicleServiceJob {
     status: VehicleServiceJobStatus;
     status_label?: string;
     odometer_reading?: string | null;
+    next_service_mileage?: string | null;
     fuel_level?: string | null;
     priority?: string | null;
     subtotal: string;
@@ -199,7 +201,8 @@ export interface VehicleServiceJob {
 
 export interface VehicleServiceJobPayload {
     expected_version?: number;
-    job_date: string;
+    job_date?: string;
+    manual_job_card_number?: string;
     expected_delivery_date?: string;
     type: VehicleServiceJobType;
     customer_id: number;
@@ -209,6 +212,7 @@ export interface VehicleServiceJobPayload {
     supervisor_commission_type?: CommissionType;
     supervisor_commission_value?: string;
     odometer_reading?: string;
+    next_service_mileage?: string;
     fuel_level?: string;
     priority?: string;
     notes?: string;

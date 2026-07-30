@@ -20,6 +20,7 @@ final class VehicleServiceJobService
     use AssertsVehicleServiceExpectedVersion;
 
     private const ZERO_AMOUNT = '0.000000';
+    private const DEFAULT_PRIORITY = 'normal';
 
     public function __construct(
         private readonly DecimalMath $math,
@@ -117,7 +118,8 @@ final class VehicleServiceJobService
         $attributes = [
             'tenant_id' => $data->tenantId,
             'organization_unit_id' => $data->organizationUnitId,
-            'job_date' => $data->jobDate,
+            'job_date' => $data->jobDate ?? now()->toDateString(),
+            'manual_job_card_number' => $data->manualJobCardNumber,
             'expected_delivery_date' => $data->expectedDeliveryDate,
             'type' => $data->type->value,
             'customer_id' => $data->customerId,
@@ -132,8 +134,9 @@ final class VehicleServiceJobService
                 $commissionBase,
             ),
             'odometer_reading' => $data->odometerReading === null ? null : $this->math->normalize($data->odometerReading),
+            'next_service_mileage' => $data->nextServiceMileage === null ? null : $this->math->normalize($data->nextServiceMileage),
             'fuel_level' => $data->fuelLevel,
-            'priority' => $data->priority,
+            'priority' => $data->priority ?? self::DEFAULT_PRIORITY,
             'notes' => $data->notes,
         ];
 

@@ -513,6 +513,8 @@ final class VehicleServiceEngineTest extends TestCase
         $this->assertSame($context['customer_id'], $resource['customer']['id']);
         $this->assertSame($context['customer_id'], $resource['bill_to_customer']['id']);
         $this->assertSame($context['vehicle_id'], $resource['vehicle']['id']);
+        $this->assertSame('PAPER-'.$context['tenant_id'], $resource['manual_job_card_number']);
+        $this->assertSame('17000.000000', $resource['next_service_mileage']);
         $this->assertSame('125.500000', $resource['lines'][0]['line_total']);
         $this->assertSame($this->currentJobVersion($job), $resource['row_version']);
     }
@@ -585,6 +587,37 @@ final class VehicleServiceEngineTest extends TestCase
         ])->assertCreated()
             ->assertJsonPath('data.commission_type', VehicleServiceCommissionType::None->value)
             ->assertJsonPath('data.commission_value', '0.000000');
+    }
+
+    public function test_job_create_request_defaults_job_date_and_priority_and_persists_new_optional_fields(): void
+    {
+        $this->withoutMiddleware();
+        $context = $this->context();
+        $this->actingAsTenantUser($context['tenant_id']);
+
+        $createdJobId = (int) $this->tenantPostJson($context['tenant_id'], '/api/v1/vehicle-service/jobs', [
+            'tenant_id' => $context['tenant_id'],
+            'type' => 'full_service',
+            'customer_id' => $context['customer_id'],
+            'vehicle_id' => $context['vehicle_id'],
+            'manual_job_card_number' => 'MANUAL-001',
+            'odometer_reading' => '15000.000000',
+            'next_service_mileage' => '20000.000000',
+        ])->assertCreated()
+            ->assertJsonPath('data.manual_job_card_number', 'MANUAL-001')
+            ->assertJsonPath('data.next_service_mileage', '20000.000000')
+            ->assertJsonPath('data.priority', 'normal')
+            ->json('data.id');
+
+        $job = $this->withTenantExecutionContext(
+            (int) $context['tenant_id'],
+            fn (): VehicleServiceJob => VehicleServiceJob::query()->findOrFail($createdJobId),
+        );
+
+        $this->assertSame('2026-07-30', $job->job_date?->toDateString());
+        $this->assertSame('MANUAL-001', $job->manual_job_card_number);
+        $this->assertSame('20000.000000', (string) $job->next_service_mileage);
+        $this->assertSame('normal', $job->priority);
     }
 
     public function test_line_sources_enforce_inventory_and_customer_supplied_rules(): void
@@ -932,10 +965,12 @@ final class VehicleServiceEngineTest extends TestCase
                 jobDate: '2026-06-07',
                 customerId: $context['customer_id'],
                 vehicleId: $context['vehicle_id'],
+                manualJobCardNumber: 'PAPER-'.$context['tenant_id'],
                 supervisorEmployeeId: $context['employee_id'],
                 supervisorCommissionType: $commissionType,
                 supervisorCommissionValue: $commissionValue,
                 odometerReading: '12000.000000',
+                nextServiceMileage: '17000.000000',
                 fuelLevel: 'half',
             )),
         );
