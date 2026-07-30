@@ -8,7 +8,7 @@ const lookupsSource = readFileSync(
     'utf8',
 );
 const dialogsSource = readFileSync(
-    resolve(cwd(), 'resources/js/modules/vehicle-rental/components/RentalAssignmentDialogs.tsx'),
+    resolve(cwd(), 'resources/js/modules/vehicle-rental/components/RentalAssignmentDialog.tsx'),
     'utf8',
 );
 const workspaceSource = readFileSync(
