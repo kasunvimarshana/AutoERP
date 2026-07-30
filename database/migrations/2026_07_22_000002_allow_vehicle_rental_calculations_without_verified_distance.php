@@ -6,7 +6,6 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use RuntimeException;
 
 return new class extends Migration
 {
@@ -24,7 +23,7 @@ return new class extends Migration
             ->whereNull('commercial_km')
             ->orWhereNull('excess_km')
             ->exists()) {
-            throw new RuntimeException('Cannot restore mandatory rental distance totals while unmeasured calculations exist.');
+            throw new \RuntimeException('Cannot restore mandatory rental distance totals while unmeasured calculations exist.');
         }
 
         Schema::table('vehicle_rental_calculations', function (Blueprint $table): void {
