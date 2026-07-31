@@ -11,6 +11,7 @@ use Modules\VehicleService\DTOs\VehicleServiceInspectionData;
 use Modules\VehicleService\DTOs\VehicleServiceJobData;
 use Modules\VehicleService\Enums\VehicleServiceCommissionType;
 use Modules\VehicleService\Enums\VehicleServiceJobStatus;
+use Modules\VehicleService\Enums\VehicleServiceJobType;
 use Modules\VehicleService\Models\VehicleServiceInspection;
 use Modules\VehicleService\Models\VehicleServiceJob;
 use Modules\VehicleService\Services\Concerns\AssertsVehicleServiceExpectedVersion;
@@ -40,9 +41,7 @@ final class VehicleServiceJobService
             if ($data->supervisorEmployeeId !== null) {
                 $this->validator->employee($data->tenantId, $data->organizationUnitId, $data->supervisorEmployeeId);
             }
-            if ($data->odometerReading !== null) {
-                $this->validator->nonNegative($data->odometerReading, 'Odometer reading cannot be negative.');
-            }
+            $this->validateMileageFields($data);
 
             $job = new VehicleServiceJob();
             $job->forceFill($this->attributes($data, true, self::ZERO_AMOUNT))->save();
@@ -75,9 +74,7 @@ final class VehicleServiceJobService
             if ($data->supervisorEmployeeId !== null) {
                 $this->validator->employee($data->tenantId, $data->organizationUnitId, $data->supervisorEmployeeId);
             }
-            if ($data->odometerReading !== null) {
-                $this->validator->nonNegative($data->odometerReading, 'Odometer reading cannot be negative.');
-            }
+            $this->validateMileageFields($data);
 
             $versionBefore = (int) $job->row_version;
             $job->forceFill($this->attributes($data, false, (string) $job->grand_total, $job))->save();
@@ -132,6 +129,8 @@ final class VehicleServiceJobService
                 $commissionBase,
             ),
             'odometer_reading' => $data->odometerReading === null ? null : $this->math->normalize($data->odometerReading),
+            'next_service_mileage' => $data->nextServiceMileage === null ? null : $this->math->normalize($data->nextServiceMileage),
+            'manual_job_card' => $data->manualJobCard,
             'fuel_level' => $data->fuelLevel,
             'priority' => $data->priority,
             'notes' => $data->notes,
@@ -197,6 +196,26 @@ final class VehicleServiceJobService
     private function billToCustomerId(VehicleServiceJobData $data): int
     {
         return $data->billToCustomerId ?? $data->customerId;
+    }
+
+    private function validateMileageFields(VehicleServiceJobData $data): void
+    {
+        if ($data->type === VehicleServiceJobType::BodyWash) {
+            if ($data->odometerReading !== null || $data->nextServiceMileage !== null) {
+                throw new InvalidArgumentException('Mileage fields are not applicable to body wash jobs.');
+            }
+
+            return;
+        }
+
+        if ($data->odometerReading === null) {
+            throw new InvalidArgumentException('Odometer reading is required for full service jobs.');
+        }
+
+        $this->validator->nonNegative($data->odometerReading, 'Odometer reading cannot be negative.');
+        if ($data->nextServiceMileage !== null) {
+            $this->validator->nonNegative($data->nextServiceMileage, 'Next service mileage cannot be negative.');
+        }
     }
 
     private function syncCustomerComplaint(VehicleServiceJob $job, VehicleServiceJobData $data): bool

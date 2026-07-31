@@ -14,7 +14,6 @@ import { TabPanel, Tabs } from '@/shared/components/Tabs';
 import { WorkflowHeader } from '@/shared/components/WorkflowHeader';
 import { useApi } from '@/shared/hooks/useApi';
 import { useOnDemandTab } from '@/shared/hooks/useOnDemandTab';
-import { formatDate } from '@/shared/utils/formatDate';
 import { readableRelation } from '@/shared/utils/object';
 import { compareDecimalStrings, multiplyDecimal, sumDecimals } from '@/shared/utils/decimal';
 import { VehicleServiceSummaryPanel } from '../components/VehicleServiceSummaryPanel';
@@ -145,9 +144,11 @@ export default function VehicleServiceJobDetailPage() {
                     { label: 'Registration', value: job.vehicle?.registration_number ?? readableRelation(job.vehicle) },
                     { label: 'Make / model', value: `${job.vehicle?.make?.name ?? '-'} / ${job.vehicle?.model?.name ?? '-'}` },
                     { label: 'Vehicle owner', value: readableRelation(currentCustomerOwner) },
-                    { label: 'Odometer', value: `${job.odometer_reading ?? job.vehicle?.odometer_reading ?? '-'} ${job.vehicle?.odometer_unit ?? ''}`.trim() },
+                    ...(job.type === 'full_service' ? [{
+                        label: 'Odometer',
+                        value: `${job.odometer_reading ?? job.vehicle?.odometer_reading ?? '-'} ${job.vehicle?.odometer_unit ?? ''}`.trim(),
+                    }] : []),
                     { label: 'Supervisor', value: readableRelation(job.supervisor) },
-                    { label: 'Expected delivery', value: formatDate(job.expected_delivery_date) },
                     { label: 'Grand total', value: <MoneyDisplay value={job.grand_total} /> },
                 ]} />
             </div>

@@ -15,25 +15,16 @@ import { useMutationFormGuard } from '@/shared/hooks/useMutationFormGuard';
 import type { NamedResource } from '@/shared/types/common';
 import type { LookupLoadParams } from '@/shared/types/lookup';
 import { businessDateInputValue } from '@/shared/utils/businessDate';
+import { addDecimal, isDecimalString } from '@/shared/utils/decimal';
 import {
     createVehicleServiceJob,
-    getVehicleServiceJobCreateDefaults,
     updateVehicleServiceJob,
 } from '../vehicleServiceApi';
 import type { CommissionType, VehicleServiceJob, VehicleServiceJobPayload, VehicleServiceJobType } from '../vehicleServiceTypes';
 import { VehicleServiceQuickVehicleModal } from './VehicleServiceQuickVehicleModal';
 
 const ZERO_AMOUNT = '0.000000';
-const COMMISSION_TYPE = {
-    NONE: 'none',
-    FIXED: 'fixed',
-    PERCENTAGE: 'percentage',
-} as const satisfies Record<string, CommissionType>;
-const SUPERVISOR_COMMISSION_OPTIONS = [
-    { value: COMMISSION_TYPE.NONE, label: 'None' },
-    { value: COMMISSION_TYPE.FIXED, label: 'Fixed' },
-    { value: COMMISSION_TYPE.PERCENTAGE, label: 'Percentage of whole job' },
-];
+const NO_COMMISSION_TYPE: CommissionType = 'none';
 const JOB_TYPE = {
     FULL_SERVICE: 'full_service',
     BODY_WASH: 'body_wash',
@@ -42,10 +33,17 @@ const JOB_TYPE_OPTIONS = [
     { value: JOB_TYPE.FULL_SERVICE, label: 'Full Service' },
     { value: JOB_TYPE.BODY_WASH, label: 'Body Wash' },
 ];
-const isCommissionType = (value: string): value is CommissionType =>
-    Object.values(COMMISSION_TYPE).includes(value as CommissionType);
+const FULL_SERVICE_MILEAGE_INTERVAL = '5000';
+const DISABLED_MILEAGE_CLASS = 'disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 disabled:opacity-100';
 const today = businessDateInputValue;
 const decimal = (value: string, fallback = ZERO_AMOUNT) => value.trim() || fallback;
+const suggestedNextServiceMileage = (odometerReading: string): string => {
+    const value = odometerReading.trim();
+
+    return value !== '' && isDecimalString(value)
+        ? addDecimal(value, FULL_SERVICE_MILEAGE_INTERVAL)
+        : '';
+};
 const customerLabel = (customer: NamedResource | null) => customer ? `${customer.code ?? ''} ${customer.name}`.trim() : '';
 const vehicleCustomer = (selectedVehicle: VehicleLookupResource | null, fallback: NamedResource | null): NamedResource | null => {
     if (selectedVehicle?.current_customer) {
@@ -71,11 +69,6 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
     const supervisorRequiredMessage = 'Select a valid supervisor from the list.';
     const navigate = useNavigate();
     const isCreating = job === undefined;
-    const organizationDefault = useApi(
-        (signal) => getVehicleServiceJobCreateDefaults(signal),
-        [],
-        isCreating,
-    );
     const [customer, setCustomer] = useState<NamedResource | null>(vehicleCustomer(job?.vehicle ?? null, job?.customer ?? null));
     const [billToCustomer, setBillToCustomer] = useState<NamedResource | null>(job?.bill_to_customer ?? vehicleCustomer(job?.vehicle ?? null, job?.customer ?? null));
     const [vehicle, setVehicle] = useState<VehicleLookupResource | null>(job?.vehicle ?? null);
@@ -88,7 +81,9 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
         type: job?.type ?? JOB_TYPE.FULL_SERVICE,
         supervisor_commission_type: (job?.supervisor_commission_type ?? null) as CommissionType | null,
         supervisor_commission_value: (job?.supervisor_commission_value ?? null) as string | null,
-        odometer_reading: job?.odometer_reading ?? '',
+        odometer_reading: job?.type === JOB_TYPE.BODY_WASH ? '' : job?.odometer_reading ?? '',
+        next_service_mileage: job?.type === JOB_TYPE.BODY_WASH ? '' : job?.next_service_mileage ?? '',
+        manual_job_card: job?.manual_job_card ?? '',
         fuel_level: job?.fuel_level ?? '',
         priority: job?.priority ?? 'normal',
         customer_complaint: job?.inspection?.customer_complaint ?? '',
@@ -105,9 +100,6 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
     }, [formGuard]);
     const errorFor = (key: string) => fieldError(error, key);
 
-    const searchCustomer = useCallback((params: LookupLoadParams) => {
-        return lookupApi.customers(params);
-    }, []);
     const searchVehicle = useCallback((params: LookupLoadParams) => {
         return lookupApi.serviceVehicles(params);
     }, []);
@@ -115,39 +107,20 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
         return lookupApi.availableEmployeesLocallyFiltered(params);
     }, []);
 
-    const usesOrganizationDefault = isCreating
-        && form.supervisor_commission_type === null
-        && form.supervisor_commission_value === null;
-    const displayedCommissionType: CommissionType | '' = usesOrganizationDefault
-        ? organizationDefault.data?.commission_type ?? ''
-        : form.supervisor_commission_type ?? '';
-    const displayedCommissionValue = usesOrganizationDefault
-        ? organizationDefault.data?.commission_value ?? ''
-        : form.supervisor_commission_value ?? '';
-    const commissionUnavailable = supervisor !== null && displayedCommissionType === '';
-    const supervisorCommissionHint = job
-        ? 'Stored job commission snapshot.'
-        : usesOrganizationDefault && organizationDefault.loading
-            ? 'Loading organization default...'
-            : usesOrganizationDefault && organizationDefault.error
-                ? 'Unable to load the organization default. Select a commission type or retry.'
-                : usesOrganizationDefault
-                    ? 'Loaded from organization default.'
-                    : 'Custom value for this job.';
-
     const supervisorCommissionPayload = (): Partial<Pick<
         VehicleServiceJobPayload,
         'supervisor_commission_type' | 'supervisor_commission_value'
     >> => {
-        if (supervisor === null || displayedCommissionType === '') {
+        const commissionType = form.supervisor_commission_type;
+        if (isCreating || supervisor === null || commissionType === null) {
             return {};
         }
 
         return {
-            supervisor_commission_type: displayedCommissionType,
-            supervisor_commission_value: displayedCommissionType === COMMISSION_TYPE.NONE
+            supervisor_commission_type: commissionType,
+            supervisor_commission_value: commissionType === NO_COMMISSION_TYPE
                 ? ZERO_AMOUNT
-                : decimal(displayedCommissionValue),
+                : decimal(form.supervisor_commission_value ?? ''),
         };
     };
 
@@ -162,6 +135,8 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
         supervisor_employee_id: supervisor?.id,
         ...supervisorCommissionPayload(),
         odometer_reading: form.odometer_reading || undefined,
+        next_service_mileage: form.next_service_mileage || undefined,
+        manual_job_card: form.manual_job_card || undefined,
         fuel_level: form.fuel_level || undefined,
         priority: form.priority || undefined,
         customer_complaint: form.customer_complaint,
@@ -174,30 +149,31 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
         setVehicle(value);
         setCustomer(nextCustomer);
         setBillToCustomer(nextCustomer);
-        if (value?.odometer_reading && !form.odometer_reading) {
-            updateForm((current) => ({ ...current, odometer_reading: value.odometer_reading ?? '' }));
+        if (value?.odometer_reading && !form.odometer_reading && form.type === JOB_TYPE.FULL_SERVICE) {
+            updateForm((current) => ({
+                ...current,
+                odometer_reading: value.odometer_reading ?? '',
+                next_service_mileage: suggestedNextServiceMileage(value.odometer_reading ?? ''),
+            }));
         }
-    }, [form.odometer_reading, formGuard, updateForm]);
+    }, [form.odometer_reading, form.type, formGuard, updateForm]);
 
-    const applySupervisorCommissionType = useCallback((next: string) => {
-        if (!isCommissionType(next)) return;
-
+    const applyJobType = useCallback((next: VehicleServiceJobType) => {
         updateForm((current) => ({
             ...current,
-            supervisor_commission_type: next,
-            supervisor_commission_value: ZERO_AMOUNT,
+            type: next,
+            odometer_reading: '',
+            next_service_mileage: '',
         }));
     }, [updateForm]);
 
-    const applySupervisorCommissionValue = useCallback((next: string) => {
-        if (displayedCommissionType === '') return;
-
+    const applyOdometerReading = useCallback((next: string) => {
         updateForm((current) => ({
             ...current,
-            supervisor_commission_type: displayedCommissionType,
-            supervisor_commission_value: next,
+            odometer_reading: next,
+            next_service_mileage: suggestedNextServiceMileage(next),
         }));
-    }, [displayedCommissionType, updateForm]);
+    }, [updateForm]);
 
     return (
         <>
@@ -205,7 +181,6 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
                 event.preventDefault();
                 setAttemptedSubmit(true);
                 if (supervisor === null) return;
-                if (commissionUnavailable) return;
 
                 setSubmitting(true);
                 setError(null);
@@ -271,7 +246,6 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
                             }}
                         />
                         <Input label="Customer" value={customerLabel(customer)} error={errorFor('customer_id')} placeholder="Selected vehicle owner" readOnly />
-                        <GenericLookupSelect label="Bill-to customer" value={billToCustomer} onChange={(value) => { formGuard.markDirty(); setBillToCustomer(value); }} search={searchCustomer} formatLabel={(value) => `${value.code ?? ''} ${value.name}`.trim()} error={errorFor('bill_to_customer_id')} placeholder="Defaults to vehicle owner" loadOnOpen minSearchLength={0} />
                         <GenericLookupSelect
                             label="Supervisor"
                             value={supervisor}
@@ -290,45 +264,27 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
                             minSearchLength={0}
                             debounceMs={0}
                         />
-                        <Input label="Job date" type="date" value={form.job_date} error={errorFor('job_date')} onChange={(event) => updateForm({ ...form, job_date: event.target.value })} />
-                        <Input label="Expected delivery" type="date" value={form.expected_delivery_date} error={errorFor('expected_delivery_date')} onChange={(event) => updateForm({ ...form, expected_delivery_date: event.target.value })} />
-                        <DecimalInput label="Odometer" value={form.odometer_reading} error={errorFor('odometer_reading')} onChange={(event) => updateForm({ ...form, odometer_reading: event.target.value })} />
-                        <Input label="Fuel level" value={form.fuel_level} error={errorFor('fuel_level')} onChange={(event) => updateForm({ ...form, fuel_level: event.target.value })} />
-                        <Select label="Type" value={form.type} options={JOB_TYPE_OPTIONS} error={errorFor('type')} onChange={(event) => updateForm({ ...form, type: event.target.value as VehicleServiceJobType })} />
-                        <Select label="Priority" value={form.priority} options={[
-                            { value: 'low', label: 'Low' },
-                            { value: 'normal', label: 'Normal' },
-                            { value: 'high', label: 'High' },
-                            { value: 'urgent', label: 'Urgent' },
-                        ]} onChange={(event) => updateForm({ ...form, priority: event.target.value })} />
-                        <div>
-                            <Select
-                                label="Supervisor commission"
-                                value={displayedCommissionType}
-                                options={SUPERVISOR_COMMISSION_OPTIONS}
-                                placeholder={usesOrganizationDefault && organizationDefault.loading
-                                    ? 'Loading organization default...'
-                                    : 'Select commission type'}
-                                hint={supervisorCommissionHint}
-                                onChange={(event) => applySupervisorCommissionType(event.target.value)}
-                            />
-                            {isCreating && usesOrganizationDefault && organizationDefault.error && (
-                                <button
-                                    type="button"
-                                    className="mt-1 text-xs font-semibold text-sky-700 hover:text-sky-900"
-                                    onClick={organizationDefault.reload}
-                                >
-                                    Retry organization default
-                                </button>
-                            )}
-                        </div>
                         <DecimalInput
-                            label="Commission value"
-                            value={displayedCommissionValue}
-                            error={errorFor('supervisor_commission_value')}
-                            disabled={displayedCommissionType === '' || displayedCommissionType === COMMISSION_TYPE.NONE}
-                            onChange={(event) => applySupervisorCommissionValue(event.target.value)}
+                            label="Odometer"
+                            value={form.odometer_reading}
+                            error={errorFor('odometer_reading')}
+                            hint={form.type === JOB_TYPE.BODY_WASH ? 'Not applicable to Body Wash.' : undefined}
+                            className={DISABLED_MILEAGE_CLASS}
+                            required={form.type === JOB_TYPE.FULL_SERVICE}
+                            disabled={form.type === JOB_TYPE.BODY_WASH}
+                            onChange={(event) => applyOdometerReading(event.target.value)}
                         />
+                        <DecimalInput
+                            label="Next Service Mileage"
+                            value={form.next_service_mileage}
+                            error={errorFor('next_service_mileage')}
+                            hint={form.type === JOB_TYPE.BODY_WASH ? 'Not applicable to Body Wash.' : undefined}
+                            className={DISABLED_MILEAGE_CLASS}
+                            disabled={form.type === JOB_TYPE.BODY_WASH}
+                            onChange={(event) => updateForm({ ...form, next_service_mileage: event.target.value })}
+                        />
+                        <Input label="Manual Job Card" value={form.manual_job_card} error={errorFor('manual_job_card')} onChange={(event) => updateForm({ ...form, manual_job_card: event.target.value })} />
+                        <Select label="Type" value={form.type} options={JOB_TYPE_OPTIONS} error={errorFor('type')} onChange={(event) => applyJobType(event.target.value as VehicleServiceJobType)} />
                     </div>
                     {vehicle && <div className="mt-4 grid gap-3 rounded-lg border border-sky-100 bg-sky-50 p-4 text-sm sm:grid-cols-2 xl:grid-cols-5">
                         <VehicleContext label="Registration" value={vehicle.registration_number ?? vehicle.name} />
@@ -344,7 +300,7 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
                 </Panel>
                 <div className="flex justify-end gap-2">
                     <Button type="button" variant="secondary" onClick={() => navigate(-1)}>Cancel</Button>
-                    <Button type="submit" loading={submitting} disabled={commissionUnavailable}>{job ? 'Save job' : 'Save draft'}</Button>
+                    <Button type="submit" loading={submitting}>{job ? 'Save job' : 'Save draft'}</Button>
                 </div>
             </form>
             <VehicleServiceQuickVehicleModal

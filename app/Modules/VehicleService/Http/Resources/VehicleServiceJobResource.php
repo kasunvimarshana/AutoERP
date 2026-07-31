@@ -33,6 +33,8 @@ final class VehicleServiceJobResource extends JsonResource
             'status' => $this->enum($this->status),
             'status_label' => str((string) $this->enum($this->status))->replace('_', ' ')->title()->toString(),
             'odometer_reading' => $this->odometer_reading === null ? null : (string) $this->odometer_reading,
+            'next_service_mileage' => $this->next_service_mileage === null ? null : (string) $this->next_service_mileage,
+            'manual_job_card' => $this->manual_job_card,
             'fuel_level' => $this->fuel_level,
             'priority' => $this->priority,
             'subtotal' => (string) $this->subtotal,
