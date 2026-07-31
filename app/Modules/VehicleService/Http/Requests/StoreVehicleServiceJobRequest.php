@@ -17,6 +17,9 @@ final class StoreVehicleServiceJobRequest extends TenantScopedRequest
 
     public function rules(): array
     {
+        $jobType = VehicleServiceJobType::tryFrom((string) $this->input('type'));
+        $tracksMileage = $jobType?->tracksMileage() ?? false;
+
         return [
             'tenant_id' => ['required', 'integer', 'min:1'],
             'organization_unit_id' => ['nullable', 'integer', 'min:1'],
@@ -40,7 +43,20 @@ final class StoreVehicleServiceJobRequest extends TenantScopedRequest
                 'decimal:0,6',
                 'min:0',
             ],
-            'odometer_reading' => ['nullable', 'decimal:0,6', 'min:0'],
+            'odometer_reading' => [
+                'nullable',
+                Rule::requiredIf($tracksMileage),
+                Rule::prohibitedIf(! $tracksMileage),
+                'decimal:0,6',
+                'min:0',
+            ],
+            'next_service_mileage' => [
+                'nullable',
+                Rule::prohibitedIf(! $tracksMileage),
+                'decimal:0,6',
+                'min:0',
+            ],
+            'manual_job_card' => ['nullable', 'string', 'max:100'],
             'fuel_level' => ['nullable', 'string', 'max:100'],
             'priority' => ['nullable', 'string', 'max:30'],
             'notes' => ['nullable', 'string'],
@@ -68,6 +84,8 @@ final class StoreVehicleServiceJobRequest extends TenantScopedRequest
                 ? (string) $this->input('supervisor_commission_value')
                 : null,
             odometerReading: $this->stringOrNull('odometer_reading'),
+            nextServiceMileage: $this->stringOrNull('next_service_mileage'),
+            manualJobCard: $this->stringOrNull('manual_job_card'),
             fuelLevel: $this->stringOrNull('fuel_level'),
             priority: $this->stringOrNull('priority'),
             notes: $this->stringOrNull('notes'),

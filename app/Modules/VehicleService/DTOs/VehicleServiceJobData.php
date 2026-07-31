@@ -23,6 +23,8 @@ final readonly class VehicleServiceJobData
         public ?VehicleServiceCommissionType $supervisorCommissionType = null,
         public ?string $supervisorCommissionValue = null,
         public ?string $odometerReading = null,
+        public ?string $nextServiceMileage = null,
+        public ?string $manualJobCard = null,
         public ?string $fuelLevel = null,
         public ?string $priority = null,
         public ?string $notes = null,

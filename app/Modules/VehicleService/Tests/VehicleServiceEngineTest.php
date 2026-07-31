@@ -468,6 +468,7 @@ final class VehicleServiceEngineTest extends TestCase
                 vehicleId: $context['vehicle_id'],
                 billToCustomerId: $billToCustomerId,
                 supervisorEmployeeId: $context['employee_id'],
+                odometerReading: '12000.000000',
             )),
         );
         $this->assertSame($billToCustomerId, (int) $job->bill_to_customer_id);
@@ -549,7 +550,7 @@ final class VehicleServiceEngineTest extends TestCase
         }
     }
 
-    public function test_nullable_commission_request_fields_default_to_none(): void
+    public function test_optional_job_fields_persist_and_nullable_commission_fields_default_to_none(): void
     {
         $this->withoutMiddleware();
         $context = $this->context();
@@ -564,15 +565,22 @@ final class VehicleServiceEngineTest extends TestCase
             'supervisor_employee_id' => $context['employee_id'],
             'supervisor_commission_type' => null,
             'supervisor_commission_value' => null,
+            'odometer_reading' => '10000',
+            'next_service_mileage' => '15000',
+            'manual_job_card' => 'MJC-1042',
         ])->assertCreated()
             ->assertJsonPath('data.supervisor_commission_type', VehicleServiceCommissionType::None->value)
             ->assertJsonPath('data.supervisor_commission_value', '0.000000')
+            ->assertJsonPath('data.next_service_mileage', '15000.000000')
+            ->assertJsonPath('data.manual_job_card', 'MJC-1042')
             ->json('data.id');
 
         $job = $this->withTenantExecutionContext(
             (int) $context['tenant_id'],
             fn (): VehicleServiceJob => VehicleServiceJob::query()->findOrFail($createdJobId),
         );
+        $this->assertSame('15000.000000', (string) $job->next_service_mileage);
+        $this->assertSame('MJC-1042', $job->manual_job_card);
         $line = $this->line($job, VehicleServiceLineSourceType::ServiceItem, $context['service'], '1.000000', '25.000000');
 
         $this->tenantPostJson($context['tenant_id'], "/api/v1/vehicle-service/jobs/{$job->getKey()}/lines/{$line->getKey()}/employees", [
@@ -585,6 +593,51 @@ final class VehicleServiceEngineTest extends TestCase
         ])->assertCreated()
             ->assertJsonPath('data.commission_type', VehicleServiceCommissionType::None->value)
             ->assertJsonPath('data.commission_value', '0.000000');
+    }
+
+    public function test_job_type_enforces_mileage_field_rules(): void
+    {
+        $this->withoutMiddleware();
+        $context = $this->context();
+        $this->actingAsTenantUser($context['tenant_id']);
+        $basePayload = [
+            'tenant_id' => $context['tenant_id'],
+            'job_date' => '2026-06-07',
+            'customer_id' => $context['customer_id'],
+            'vehicle_id' => $context['vehicle_id'],
+        ];
+
+        $this->tenantPostJson($context['tenant_id'], '/api/v1/vehicle-service/jobs', [
+            ...$basePayload,
+            'type' => 'full_service',
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors('odometer_reading');
+
+        $this->tenantPostJson($context['tenant_id'], '/api/v1/vehicle-service/jobs', [
+            ...$basePayload,
+            'type' => 'body_wash',
+            'odometer_reading' => '10000',
+            'next_service_mileage' => '15000',
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['odometer_reading', 'next_service_mileage']);
+
+        $this->tenantPostJson($context['tenant_id'], '/api/v1/vehicle-service/jobs', [
+            ...$basePayload,
+            'type' => 'oil_change',
+            'odometer_reading' => '10000',
+            'next_service_mileage' => '15500',
+        ])->assertCreated()
+            ->assertJsonPath('data.type', 'oil_change')
+            ->assertJsonPath('data.odometer_reading', '10000.000000')
+            ->assertJsonPath('data.next_service_mileage', '15500.000000');
+
+        $this->tenantPostJson($context['tenant_id'], '/api/v1/vehicle-service/jobs', [
+            ...$basePayload,
+            'type' => 'accessories',
+            'odometer_reading' => '10000',
+            'next_service_mileage' => '15000',
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['odometer_reading', 'next_service_mileage']);
     }
 
     public function test_line_sources_enforce_inventory_and_customer_supplied_rules(): void

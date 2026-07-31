@@ -10,7 +10,7 @@ export type VehicleServiceJobStatus =
     | 'paid'
     | 'cancelled';
 
-export type VehicleServiceJobType = 'full_service' | 'body_wash';
+export type VehicleServiceJobType = 'full_service' | 'body_wash' | 'oil_change' | 'accessories';
 
 export type VehicleServiceLineSourceType =
     | 'inventory_item'
@@ -182,6 +182,8 @@ export interface VehicleServiceJob {
     status: VehicleServiceJobStatus;
     status_label?: string;
     odometer_reading?: string | null;
+    next_service_mileage?: string | null;
+    manual_job_card?: string | null;
     fuel_level?: string | null;
     priority?: string | null;
     subtotal: string;
@@ -209,6 +211,8 @@ export interface VehicleServiceJobPayload {
     supervisor_commission_type?: CommissionType;
     supervisor_commission_value?: string;
     odometer_reading?: string;
+    next_service_mileage?: string;
+    manual_job_card?: string;
     fuel_level?: string;
     priority?: string;
     notes?: string;

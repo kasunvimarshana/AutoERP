@@ -45,6 +45,7 @@ final class VehicleServiceJob extends TenantOwnedModel
             'supervisor_commission_amount' => 'decimal:6',
             'status' => VehicleServiceJobStatus::class,
             'odometer_reading' => 'decimal:6',
+            'next_service_mileage' => 'decimal:6',
             'subtotal' => 'decimal:6',
             'discount_total' => 'decimal:6',
             'tax_total' => 'decimal:6',
