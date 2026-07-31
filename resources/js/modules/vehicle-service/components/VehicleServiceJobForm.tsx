@@ -28,20 +28,26 @@ const NO_COMMISSION_TYPE: CommissionType = 'none';
 const JOB_TYPE = {
     FULL_SERVICE: 'full_service',
     BODY_WASH: 'body_wash',
+    OIL_CHANGE: 'oil_change',
+    ACCESSORIES: 'accessories',
 } as const satisfies Record<string, VehicleServiceJobType>;
 const JOB_TYPE_OPTIONS = [
     { value: JOB_TYPE.FULL_SERVICE, label: 'Full Service' },
     { value: JOB_TYPE.BODY_WASH, label: 'Body Wash' },
+    { value: JOB_TYPE.OIL_CHANGE, label: 'Oil Change' },
+    { value: JOB_TYPE.ACCESSORIES, label: 'Accessories' },
 ];
-const FULL_SERVICE_MILEAGE_INTERVAL = '5000';
+const MILEAGE_TRACKED_JOB_TYPES: VehicleServiceJobType[] = [JOB_TYPE.FULL_SERVICE, JOB_TYPE.OIL_CHANGE];
+const SERVICE_MILEAGE_INTERVAL = '5000';
 const DISABLED_MILEAGE_CLASS = 'disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 disabled:opacity-100';
 const today = businessDateInputValue;
 const decimal = (value: string, fallback = ZERO_AMOUNT) => value.trim() || fallback;
+const tracksMileage = (jobType: VehicleServiceJobType): boolean => MILEAGE_TRACKED_JOB_TYPES.includes(jobType);
 const suggestedNextServiceMileage = (odometerReading: string): string => {
     const value = odometerReading.trim();
 
     return value !== '' && isDecimalString(value)
-        ? addDecimal(value, FULL_SERVICE_MILEAGE_INTERVAL)
+        ? addDecimal(value, SERVICE_MILEAGE_INTERVAL)
         : '';
 };
 const customerLabel = (customer: NamedResource | null) => customer ? `${customer.code ?? ''} ${customer.name}`.trim() : '';
@@ -81,8 +87,8 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
         type: job?.type ?? JOB_TYPE.FULL_SERVICE,
         supervisor_commission_type: (job?.supervisor_commission_type ?? null) as CommissionType | null,
         supervisor_commission_value: (job?.supervisor_commission_value ?? null) as string | null,
-        odometer_reading: job?.type === JOB_TYPE.BODY_WASH ? '' : job?.odometer_reading ?? '',
-        next_service_mileage: job?.type === JOB_TYPE.BODY_WASH ? '' : job?.next_service_mileage ?? '',
+        odometer_reading: job && !tracksMileage(job.type) ? '' : job?.odometer_reading ?? '',
+        next_service_mileage: job && !tracksMileage(job.type) ? '' : job?.next_service_mileage ?? '',
         manual_job_card: job?.manual_job_card ?? '',
         fuel_level: job?.fuel_level ?? '',
         priority: job?.priority ?? 'normal',
@@ -149,7 +155,7 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
         setVehicle(value);
         setCustomer(nextCustomer);
         setBillToCustomer(nextCustomer);
-        if (value?.odometer_reading && !form.odometer_reading && form.type === JOB_TYPE.FULL_SERVICE) {
+        if (value?.odometer_reading && !form.odometer_reading && tracksMileage(form.type)) {
             updateForm((current) => ({
                 ...current,
                 odometer_reading: value.odometer_reading ?? '',
@@ -268,19 +274,19 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
                             label="Odometer"
                             value={form.odometer_reading}
                             error={errorFor('odometer_reading')}
-                            hint={form.type === JOB_TYPE.BODY_WASH ? 'Not applicable to Body Wash.' : undefined}
+                            hint={!tracksMileage(form.type) ? `Not applicable to ${JOB_TYPE_OPTIONS.find((option) => option.value === form.type)?.label}.` : undefined}
                             className={DISABLED_MILEAGE_CLASS}
-                            required={form.type === JOB_TYPE.FULL_SERVICE}
-                            disabled={form.type === JOB_TYPE.BODY_WASH}
+                            required={tracksMileage(form.type)}
+                            disabled={!tracksMileage(form.type)}
                             onChange={(event) => applyOdometerReading(event.target.value)}
                         />
                         <DecimalInput
                             label="Next Service Mileage"
                             value={form.next_service_mileage}
                             error={errorFor('next_service_mileage')}
-                            hint={form.type === JOB_TYPE.BODY_WASH ? 'Not applicable to Body Wash.' : undefined}
+                            hint={!tracksMileage(form.type) ? `Not applicable to ${JOB_TYPE_OPTIONS.find((option) => option.value === form.type)?.label}.` : undefined}
                             className={DISABLED_MILEAGE_CLASS}
-                            disabled={form.type === JOB_TYPE.BODY_WASH}
+                            disabled={!tracksMileage(form.type)}
                             onChange={(event) => updateForm({ ...form, next_service_mileage: event.target.value })}
                         />
                         <Input label="Manual Job Card" value={form.manual_job_card} error={errorFor('manual_job_card')} onChange={(event) => updateForm({ ...form, manual_job_card: event.target.value })} />

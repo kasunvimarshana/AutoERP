@@ -11,7 +11,6 @@ use Modules\VehicleService\DTOs\VehicleServiceInspectionData;
 use Modules\VehicleService\DTOs\VehicleServiceJobData;
 use Modules\VehicleService\Enums\VehicleServiceCommissionType;
 use Modules\VehicleService\Enums\VehicleServiceJobStatus;
-use Modules\VehicleService\Enums\VehicleServiceJobType;
 use Modules\VehicleService\Models\VehicleServiceInspection;
 use Modules\VehicleService\Models\VehicleServiceJob;
 use Modules\VehicleService\Services\Concerns\AssertsVehicleServiceExpectedVersion;
@@ -200,16 +199,16 @@ final class VehicleServiceJobService
 
     private function validateMileageFields(VehicleServiceJobData $data): void
     {
-        if ($data->type === VehicleServiceJobType::BodyWash) {
+        if (! $data->type->tracksMileage()) {
             if ($data->odometerReading !== null || $data->nextServiceMileage !== null) {
-                throw new InvalidArgumentException('Mileage fields are not applicable to body wash jobs.');
+                throw new InvalidArgumentException('Mileage fields are not applicable to this job type.');
             }
 
             return;
         }
 
         if ($data->odometerReading === null) {
-            throw new InvalidArgumentException('Odometer reading is required for full service jobs.');
+            throw new InvalidArgumentException('Odometer reading is required for mileage-tracked service jobs.');
         }
 
         $this->validator->nonNegative($data->odometerReading, 'Odometer reading cannot be negative.');

@@ -620,6 +620,24 @@ final class VehicleServiceEngineTest extends TestCase
             'next_service_mileage' => '15000',
         ])->assertUnprocessable()
             ->assertJsonValidationErrors(['odometer_reading', 'next_service_mileage']);
+
+        $this->tenantPostJson($context['tenant_id'], '/api/v1/vehicle-service/jobs', [
+            ...$basePayload,
+            'type' => 'oil_change',
+            'odometer_reading' => '10000',
+            'next_service_mileage' => '15500',
+        ])->assertCreated()
+            ->assertJsonPath('data.type', 'oil_change')
+            ->assertJsonPath('data.odometer_reading', '10000.000000')
+            ->assertJsonPath('data.next_service_mileage', '15500.000000');
+
+        $this->tenantPostJson($context['tenant_id'], '/api/v1/vehicle-service/jobs', [
+            ...$basePayload,
+            'type' => 'accessories',
+            'odometer_reading' => '10000',
+            'next_service_mileage' => '15000',
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['odometer_reading', 'next_service_mileage']);
     }
 
     public function test_line_sources_enforce_inventory_and_customer_supplied_rules(): void

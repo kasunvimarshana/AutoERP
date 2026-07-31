@@ -17,7 +17,7 @@ export function VehicleServiceSummaryPanel({ job }: { job: VehicleServiceJob }) 
                 { label: 'Make / model', value: `${job.vehicle?.make?.name ?? '-'} / ${job.vehicle?.model?.name ?? '-'}` },
                 { label: 'Registered owner', value: readableRelation(currentCustomerOwner) },
                 { label: 'Supervisor', value: readableRelation(job.supervisor) },
-                ...(job.type === 'full_service' ? [
+                ...(['full_service', 'oil_change'].includes(job.type) ? [
                     { label: 'Odometer', value: job.odometer_reading ?? '-' },
                     { label: 'Next service mileage', value: job.next_service_mileage ?? '-' },
                 ] : []),

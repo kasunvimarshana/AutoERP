@@ -144,7 +144,7 @@ export default function VehicleServiceJobDetailPage() {
                     { label: 'Registration', value: job.vehicle?.registration_number ?? readableRelation(job.vehicle) },
                     { label: 'Make / model', value: `${job.vehicle?.make?.name ?? '-'} / ${job.vehicle?.model?.name ?? '-'}` },
                     { label: 'Vehicle owner', value: readableRelation(currentCustomerOwner) },
-                    ...(job.type === 'full_service' ? [{
+                    ...(['full_service', 'oil_change'].includes(job.type) ? [{
                         label: 'Odometer',
                         value: `${job.odometer_reading ?? job.vehicle?.odometer_reading ?? '-'} ${job.vehicle?.odometer_unit ?? ''}`.trim(),
                     }] : []),

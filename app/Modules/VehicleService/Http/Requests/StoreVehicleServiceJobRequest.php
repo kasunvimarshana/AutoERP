@@ -17,6 +17,9 @@ final class StoreVehicleServiceJobRequest extends TenantScopedRequest
 
     public function rules(): array
     {
+        $jobType = VehicleServiceJobType::tryFrom((string) $this->input('type'));
+        $tracksMileage = $jobType?->tracksMileage() ?? false;
+
         return [
             'tenant_id' => ['required', 'integer', 'min:1'],
             'organization_unit_id' => ['nullable', 'integer', 'min:1'],
@@ -42,14 +45,14 @@ final class StoreVehicleServiceJobRequest extends TenantScopedRequest
             ],
             'odometer_reading' => [
                 'nullable',
-                'required_if:type,'.VehicleServiceJobType::FullService->value,
-                'prohibited_unless:type,'.VehicleServiceJobType::FullService->value,
+                Rule::requiredIf($tracksMileage),
+                Rule::prohibitedIf(! $tracksMileage),
                 'decimal:0,6',
                 'min:0',
             ],
             'next_service_mileage' => [
                 'nullable',
-                'prohibited_unless:type,'.VehicleServiceJobType::FullService->value,
+                Rule::prohibitedIf(! $tracksMileage),
                 'decimal:0,6',
                 'min:0',
             ],

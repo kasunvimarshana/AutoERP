@@ -10,7 +10,7 @@ export type VehicleServiceJobStatus =
     | 'paid'
     | 'cancelled';
 
-export type VehicleServiceJobType = 'full_service' | 'body_wash';
+export type VehicleServiceJobType = 'full_service' | 'body_wash' | 'oil_change' | 'accessories';
 
 export type VehicleServiceLineSourceType =
     | 'inventory_item'

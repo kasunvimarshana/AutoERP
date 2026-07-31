@@ -97,6 +97,8 @@ describe('VehicleServiceJobForm', () => {
         expect(screen.getByLabelText('Next Service Mileage')).toBeEnabled();
         expect(screen.getByLabelText('Next Service Mileage')).not.toBeRequired();
         expect(screen.getByLabelText('Manual Job Card')).not.toBeRequired();
+        expect(screen.getByRole('option', { name: 'Oil Change' })).toHaveValue('oil_change');
+        expect(screen.getByRole('option', { name: 'Accessories' })).toHaveValue('accessories');
         expect(apiMocks.getVehicleServiceJobCreateDefaults).not.toHaveBeenCalled();
 
         await user.click(screen.getByRole('button', { name: 'Choose Vehicle' }));
@@ -142,12 +144,35 @@ describe('VehicleServiceJobForm', () => {
         expect(screen.getByLabelText('Next Service Mileage')).toBeDisabled();
         expect(screen.getByLabelText('Next Service Mileage')).toHaveValue('');
 
+        await user.selectOptions(screen.getByLabelText('Type'), 'accessories');
+        expect(screen.getByLabelText('Odometer')).toBeDisabled();
+        expect(screen.getByLabelText('Next Service Mileage')).toBeDisabled();
+        expect(screen.getAllByText('Not applicable to Accessories.')).toHaveLength(2);
+
         await user.selectOptions(screen.getByLabelText('Type'), 'full_service');
         expect(screen.getByLabelText('Odometer')).toBeEnabled();
         expect(screen.getByLabelText('Odometer')).toBeRequired();
         expect(screen.getByLabelText('Odometer')).toHaveValue('');
         expect(screen.getByLabelText('Next Service Mileage')).toBeEnabled();
         expect(screen.getByLabelText('Next Service Mileage')).toHaveValue('');
+    });
+
+    it('applies the editable mileage suggestion to oil change jobs', async () => {
+        const user = userEvent.setup();
+        render(
+            <TestRouter initialEntries={['/vehicle-service/jobs/create']}>
+                <VehicleServiceJobForm />
+            </TestRouter>,
+        );
+
+        await user.selectOptions(screen.getByLabelText('Type'), 'oil_change');
+        expect(screen.getByLabelText('Odometer')).toBeEnabled();
+        expect(screen.getByLabelText('Odometer')).toBeRequired();
+        await user.type(screen.getByLabelText('Odometer'), '7000');
+        expect(screen.getByLabelText('Next Service Mileage')).toHaveValue('12000.000000');
+        await user.clear(screen.getByLabelText('Next Service Mileage'));
+        await user.type(screen.getByLabelText('Next Service Mileage'), '12500');
+        expect(screen.getByLabelText('Next Service Mileage')).toHaveValue('12500');
     });
 
     it('keeps hidden fields out of edit mode and clearly styles disabled body wash mileage fields', () => {
@@ -227,11 +252,11 @@ describe('VehicleServiceJobForm', () => {
         expect(screen.getByText('Type')).toBeInTheDocument();
     });
 
-    it('shows mileage values in a full service overview', () => {
+    it('shows mileage values in an oil change overview', () => {
         render(<VehicleServiceSummaryPanel job={{
             ...existingJob,
-            type: 'full_service',
-            type_label: 'Full Service',
+            type: 'oil_change',
+            type_label: 'Oil Change',
             odometer_reading: '4000.000000',
             next_service_mileage: '9500.000000',
         }} />);
