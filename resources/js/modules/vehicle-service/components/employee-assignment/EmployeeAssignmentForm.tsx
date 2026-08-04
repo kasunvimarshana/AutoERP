@@ -49,7 +49,7 @@ export function EmployeeAssignmentForm({ value, mode, lines, error, saving, onSa
                 <div>
                     <h3 className="font-semibold text-slate-900">Assignment details</h3>
                     <p className="text-sm text-slate-500">
-                        Select the service line, employee, operational role, hours, rate, and commission. The labor-item commission default is applied when the line changes and remains editable before saving.
+                        Select the service line, employee, operational role, hours, rate, and commission. Combo labour roles are suggested but remain editable; their configured commission cost is fixed by the Job Card snapshot.
                     </p>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
@@ -107,6 +107,7 @@ export function EmployeeAssignmentForm({ value, mode, lines, error, saving, onSa
                     <Select
                         label="Commission"
                         value={draft.commissionType}
+                        disabled={draft.commissionLocked}
                         options={['none', 'fixed', 'percentage'].map((type) => ({
                             value: type,
                             label: type,
@@ -120,7 +121,7 @@ export function EmployeeAssignmentForm({ value, mode, lines, error, saving, onSa
                     <DecimalInput
                         label="Commission value"
                         value={draft.commissionValue}
-                        disabled={draft.commissionType === 'none'}
+                        disabled={draft.commissionType === 'none' || draft.commissionLocked}
                         error={fieldError(error, 'commission_value')}
                         onChange={(event) => set('commissionValue', event.target.value)}
                     />

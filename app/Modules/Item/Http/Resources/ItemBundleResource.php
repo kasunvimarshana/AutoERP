@@ -21,6 +21,8 @@ final class ItemBundleResource extends JsonResource
             'quantity' => (string) $this->quantity,
             'uom' => $this->whenLoaded('uom', fn () => $this->namedResource($this->uom, true)),
             'line_type' => $this->line_type,
+            'unit_cost' => (string) $this->unit_cost,
+            'default_workforce_role' => $this->default_workforce_role,
             'is_required' => (bool) $this->is_required,
             'sort_order' => (int) $this->sort_order,
         ];

@@ -51,6 +51,8 @@ final class VehicleServiceJob extends TenantOwnedModel
             'tax_total' => 'decimal:6',
             'charge_total' => 'decimal:6',
             'grand_total' => 'decimal:6',
+            'commission_cost_total' => 'decimal:6',
+            'net_after_commission' => 'decimal:6',
             'approved_at' => 'datetime',
             'completed_at' => 'datetime',
         ]);

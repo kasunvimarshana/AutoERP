@@ -76,4 +76,28 @@ describe('Vehicle Service assignment commission defaults', () => {
         expect(result.commissionType).toBe('none');
         expect(result.commissionValue).toBe('0.000000');
     });
+
+    it('prefills an editable combo role while locking its snapshotted commission cost', () => {
+        const comboLine: CommissionAwareVehicleServiceJobLine = {
+            ...line('JOB'),
+            line_source_type: 'combo_child',
+            default_workforce_role: 'body_wash',
+            commission_default: {
+                commission_type: 'fixed',
+                commission_value: '150.000000',
+                locked: true,
+            },
+        };
+
+        const result = applyAssignmentCommissionDefault(
+            { ...emptyAssignmentForm(), role: 'helper' },
+            [comboLine],
+            comboLine.id,
+        );
+
+        expect(result.role).toBe('body_wash');
+        expect(result.commissionType).toBe('fixed');
+        expect(result.commissionValue).toBe('150.000000');
+        expect(result.commissionLocked).toBe(true);
+    });
 });

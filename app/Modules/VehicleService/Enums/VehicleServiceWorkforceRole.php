@@ -6,9 +6,13 @@ namespace Modules\VehicleService\Enums;
 
 enum VehicleServiceWorkforceRole: string
 {
+    case Supervisor = 'supervisor';
     case Technician = 'technician';
     case Helper = 'helper';
     case Inspector = 'inspector';
+    case UnderWash = 'under_wash';
+    case BodyWash = 'body_wash';
+    case Finishing = 'finishing';
     case Custom = 'custom';
 
     /** @return list<string> */

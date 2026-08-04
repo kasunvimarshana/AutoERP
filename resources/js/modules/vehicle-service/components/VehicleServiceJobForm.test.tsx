@@ -61,6 +61,8 @@ const existingJob: VehicleServiceJob = {
     tax_total: '0.000000',
     charge_total: '0.000000',
     grand_total: '0.000000',
+    commission_cost_total: '0.000000',
+    net_after_commission: '0.000000',
 };
 
 describe('VehicleServiceJobForm', () => {

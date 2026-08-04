@@ -101,6 +101,8 @@ export interface ItemBundle {
     quantity: string;
     uom: NamedResource | null;
     line_type: string;
+    unit_cost: string;
+    default_workforce_role?: string | null;
     is_required: boolean;
     sort_order: number;
 }
@@ -111,6 +113,8 @@ export interface ItemBundlePayload {
     quantity: string;
     uom_id?: number | null;
     line_type: string;
+    unit_cost?: string;
+    default_workforce_role?: string | null;
     is_required: boolean;
     sort_order: number;
 }

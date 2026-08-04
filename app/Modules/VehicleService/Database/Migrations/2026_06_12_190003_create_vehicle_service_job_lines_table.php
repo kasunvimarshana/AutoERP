@@ -24,6 +24,7 @@ return new class extends Migration
             $table->text('description');
             $table->decimal('quantity', 20, 6);
             $table->decimal('unit_cost', 20, 6)->default('0.000000');
+            $table->string('default_workforce_role', 30)->nullable();
             $table->decimal('unit_price', 20, 6)->default('0.000000');
             $table->string('discount_calculation_type', 20)->nullable();
             $table->decimal('discount_rate', 20, 6)->default('0.000000');

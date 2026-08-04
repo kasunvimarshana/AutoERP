@@ -104,6 +104,7 @@ export interface VehicleServiceJobLine {
     description: string;
     quantity: string;
     unit_cost: string;
+    default_workforce_role?: string | null;
     unit_price: string;
     discount_calculation_type?: 'fixed' | 'percentage' | null;
     discount_rate: string;
@@ -191,6 +192,8 @@ export interface VehicleServiceJob {
     tax_total: string;
     charge_total: string;
     grand_total: string;
+    commission_cost_total: string;
+    net_after_commission: string;
     notes?: string | null;
     completed_at?: string | null;
     inspection?: VehicleServiceInspection | null;

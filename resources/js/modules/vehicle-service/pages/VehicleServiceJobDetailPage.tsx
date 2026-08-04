@@ -150,6 +150,8 @@ export default function VehicleServiceJobDetailPage() {
                     }] : []),
                     { label: 'Supervisor', value: readableRelation(job.supervisor) },
                     { label: 'Grand total', value: <MoneyDisplay value={job.grand_total} /> },
+                    { label: 'Commission cost', value: <MoneyDisplay value={job.commission_cost_total} /> },
+                    { label: 'After commission', value: <MoneyDisplay value={job.net_after_commission} /> },
                 ]} />
             </div>
         </Panel>

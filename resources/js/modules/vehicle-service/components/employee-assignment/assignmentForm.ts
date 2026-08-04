@@ -26,6 +26,7 @@ export interface AssignmentFormValue {
     commissionType: CommissionType;
     commissionValue: string;
     status: 'assigned' | 'completed' | 'cancelled';
+    commissionLocked: boolean;
 }
 
 export function emptyAssignmentForm(): AssignmentFormValue {
@@ -38,6 +39,7 @@ export function emptyAssignmentForm(): AssignmentFormValue {
         commissionType: 'none',
         commissionValue: ZERO_AMOUNT,
         status: 'assigned',
+        commissionLocked: false,
     };
 }
 
@@ -51,6 +53,9 @@ export function assignmentToForm(row: AssignmentRow): AssignmentFormValue {
         commissionType: row.commission_type,
         commissionValue: row.commission_value,
         status: isAssignmentStatus(row.status) ? row.status : 'assigned',
+        commissionLocked: Boolean(
+            (row.line as CommissionAwareVehicleServiceJobLine).commission_default?.locked,
+        ),
     };
 }
 
@@ -67,6 +72,10 @@ export function applyAssignmentCommissionDefault(
         lineId,
         commissionType: commission?.commission_type ?? 'none',
         commissionValue: commission?.commission_value ?? ZERO_AMOUNT,
+        role: isWorkforceRole(line?.default_workforce_role ?? '')
+            ? line!.default_workforce_role as VehicleServiceWorkforceRole
+            : current.role,
+        commissionLocked: commission?.locked === true,
     };
 }
 
@@ -96,5 +105,14 @@ function isAssignmentStatus(
 }
 
 function isWorkforceRole(value: string): value is VehicleServiceWorkforceRole {
-    return ['technician', 'helper', 'inspector', 'custom'].includes(value);
+    return [
+        'supervisor',
+        'technician',
+        'helper',
+        'inspector',
+        'under_wash',
+        'body_wash',
+        'finishing',
+        'custom',
+    ].includes(value);
 }

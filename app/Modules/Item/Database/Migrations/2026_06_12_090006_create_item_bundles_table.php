@@ -20,6 +20,8 @@ return new class extends Migration
             $table->decimal('quantity', 20, 6);
             $table->foreignId('uom_id')->nullable();
             $table->string('line_type', 30);
+            $table->decimal('unit_cost', 20, 6)->default('0.000000');
+            $table->string('default_workforce_role', 30)->nullable();
             $table->boolean('is_required')->default(true);
             $table->unsignedInteger('sort_order')->default(0);
             $table->timestamps();

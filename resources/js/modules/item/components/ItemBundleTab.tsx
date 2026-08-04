@@ -16,6 +16,10 @@ import { ItemLookupSelect } from './ItemLookupSelect';
 import { ItemRelationHeader } from './ItemRelationHeader';
 import { ItemUomSelect } from './ItemUomSelect';
 import { useItemRelationCrud } from './useItemRelationCrud';
+import {
+    vehicleServiceWorkforceRoles,
+    type VehicleServiceWorkforceRole,
+} from '@/modules/vehicle-service/commissionTypes';
 
 const list = (itemId: number, page: number, signal: AbortSignal) => listItemBundles(itemId, { page, per_page: 20 }, signal);
 type BundleLineType = (typeof bundleLineTypes)[number];
@@ -26,6 +30,8 @@ export default function ItemBundleTab({ itemId, canBundle, readOnly = false }: {
         { key: 'child', header: 'Item', render: (row) => row.child_item ? `${row.child_item.code} - ${row.child_item.name}` : '-' },
         { key: 'quantity', header: 'Quantity', render: (row) => row.quantity },
         { key: 'uom', header: 'UOM', render: (row) => row.uom ? `${row.uom.code} - ${row.uom.name}` : '-' },
+        { key: 'role', header: 'Default role', render: (row) => formatRole(row.default_workforce_role) },
+        { key: 'cost', header: 'Commission cost', render: (row) => row.line_type === 'labour' ? row.unit_cost : '-' },
     ];
     if (!readOnly) {
         columns.push({ key: 'actions', header: '', className: 'text-right', render: (row) => <Actions edit={() => crud.startEdit(row)} remove={() => crud.destroy(row)} /> });
@@ -57,6 +63,10 @@ function BundleForm({ row, itemId, error, submitting, onCancel, onSubmit }: {
     const [uom, setUom] = useState<NamedResource | null>(row?.uom ?? null);
     const [quantity, setQuantity] = useState(row?.quantity ?? '1.000000');
     const [lineType, setLineType] = useState<BundleLineType>((row?.line_type as BundleLineType | undefined) ?? 'labour');
+    const [unitCost, setUnitCost] = useState(row?.unit_cost ?? '0.000000');
+    const [defaultWorkforceRole, setDefaultWorkforceRole] = useState<VehicleServiceWorkforceRole>(
+        isWorkforceRole(row?.default_workforce_role) ? row.default_workforce_role : 'technician',
+    );
     const [required, setRequired] = useState(row?.is_required ?? true);
     const [sortOrder, setSortOrder] = useState(row?.sort_order ?? 0);
     return <form className="space-y-4" onSubmit={(event) => {
@@ -67,6 +77,8 @@ function BundleForm({ row, itemId, error, submitting, onCancel, onSubmit }: {
             quantity,
             uom_id: uom ? Number(uom.id) : null,
             line_type: lineType,
+            unit_cost: lineType === 'labour' ? unitCost : '0.000000',
+            default_workforce_role: lineType === 'labour' ? defaultWorkforceRole : null,
             is_required: required,
             sort_order: sortOrder,
         });
@@ -82,6 +94,8 @@ function BundleForm({ row, itemId, error, submitting, onCancel, onSubmit }: {
                 setQuantity(defaultBundleQuantity());
                 setUom(nextChild.base_uom ?? null);
                 setLineType(resolveBundleLineType(nextChild));
+                setUnitCost('0.000000');
+                setDefaultWorkforceRole('technician');
             }}
             excludeId={itemId}
             error={fieldError(error, 'child_item_id')}
@@ -91,6 +105,25 @@ function BundleForm({ row, itemId, error, submitting, onCancel, onSubmit }: {
             <DecimalInput label="Quantity" value={quantity} onChange={(event) => setQuantity(event.target.value)} error={fieldError(error, 'quantity')} required />
             <ItemUomSelect value={uom} onChange={setUom} error={fieldError(error, 'uom_id')} />
         </div>
+        {lineType === 'labour' && (
+            <div className="grid gap-4 sm:grid-cols-2">
+                <Select
+                    label="Default workforce role"
+                    value={defaultWorkforceRole}
+                    options={vehicleServiceWorkforceRoles.map((role) => ({ value: role, label: formatRole(role) }))}
+                    error={fieldError(error, 'default_workforce_role')}
+                    onChange={(event) => setDefaultWorkforceRole(event.target.value as VehicleServiceWorkforceRole)}
+                />
+                <DecimalInput
+                    label="Commission cost"
+                    value={unitCost}
+                    min="0"
+                    error={fieldError(error, 'unit_cost')}
+                    onChange={(event) => setUnitCost(event.target.value)}
+                    required
+                />
+            </div>
+        )}
         <details className="rounded-lg border border-slate-200 bg-slate-50 p-4">
             <summary className="cursor-pointer font-semibold text-slate-800">Advanced</summary>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
@@ -121,4 +154,12 @@ function resolveBundleLineType(item: ItemSummary): BundleLineType {
 
 function defaultBundleQuantity(): string {
     return '1.000000';
+}
+
+function isWorkforceRole(value?: string | null): value is VehicleServiceWorkforceRole {
+    return vehicleServiceWorkforceRoles.includes(value as VehicleServiceWorkforceRole);
+}
+
+function formatRole(value?: string | null): string {
+    return value ? value.replaceAll('_', ' ') : '-';
 }

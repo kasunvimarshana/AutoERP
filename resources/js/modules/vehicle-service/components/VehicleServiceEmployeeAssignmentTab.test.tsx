@@ -109,6 +109,8 @@ function refreshedJob(rowVersion: number): VehicleServiceJob {
         tax_total: '0.000000',
         charge_total: '0.000000',
         grand_total: '1000.000000',
+        commission_cost_total: '0.000000',
+        net_after_commission: '1000.000000',
     };
 }
 

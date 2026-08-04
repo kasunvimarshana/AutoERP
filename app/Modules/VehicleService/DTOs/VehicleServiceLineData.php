@@ -18,6 +18,7 @@ final readonly class VehicleServiceLineData
         public ?int $itemVariantId = null,
         public ?int $uomId = null,
         public string $unitCost = '0.000000',
+        public ?string $defaultWorkforceRole = null,
         public ?string $discountCalculationType = null,
         public string $discountRate = '0.000000',
         public string $discountAmount = '0.000000',

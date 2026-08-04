@@ -25,6 +25,7 @@ final class VehicleServiceJobLineResource extends JsonResource
             'description' => $this->description,
             'quantity' => (string) $this->quantity,
             'unit_cost' => (string) $this->unit_cost,
+            'default_workforce_role' => $this->enum($this->default_workforce_role),
             'unit_price' => (string) $this->unit_price,
             'discount_calculation_type' => $this->discount_calculation_type,
             'discount_rate' => (string) $this->discount_rate,

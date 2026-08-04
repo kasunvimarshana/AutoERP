@@ -6,6 +6,9 @@ namespace Modules\VehicleService\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Modules\Core\Services\DecimalMath;
+use Modules\Item\Enums\ItemType;
+use Modules\VehicleService\Enums\VehicleServiceLineSourceType;
 use Modules\VehicleService\Http\Requests\ListVehicleServiceJobRequest;
 use Modules\VehicleService\Http\Requests\StoreVehicleServiceEmployeeRequest;
 use Modules\VehicleService\Http\Requests\VehicleServiceActionRequest;
@@ -81,6 +84,7 @@ final class VehicleServiceWorkforceController extends VehicleServiceController
         ListVehicleServiceJobRequest $request,
         int $job,
         VehicleServiceCommissionPolicyService $commissionPolicies,
+        DecimalMath $math,
     ): AnonymousResourceCollection {
         $jobModel = $this->job($request, $job);
         $lines = $jobModel->lines()
@@ -95,7 +99,15 @@ final class VehicleServiceWorkforceController extends VehicleServiceController
         );
 
         foreach ($lines as $line) {
-            $line->setAttribute('commission_default', $defaults[(int) $line->item_id] ?? null);
+            $comboLabour = $line->line_source_type === VehicleServiceLineSourceType::ComboChild
+                && $line->item?->item_type === ItemType::Labour;
+            $line->setAttribute('commission_default', $comboLabour
+                ? [
+                    'commission_type' => 'fixed',
+                    'commission_value' => $math->mul((string) $line->quantity, (string) $line->unit_cost),
+                    'locked' => true,
+                ]
+                : ($defaults[(int) $line->item_id] ?? null));
         }
 
         return VehicleServiceJobLineResource::collection($lines);

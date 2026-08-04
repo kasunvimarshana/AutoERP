@@ -30,6 +30,8 @@ final class ItemBundleService
             'quantity' => $this->math->normalize($data->quantity),
             'uom_id' => $data->uomId,
             'line_type' => $data->lineType,
+            'unit_cost' => $this->math->normalize($data->unitCost),
+            'default_workforce_role' => $data->defaultWorkforceRole,
             'is_required' => $data->isRequired,
             'sort_order' => $data->sortOrder,
         ]);
@@ -45,6 +47,8 @@ final class ItemBundleService
             'quantity' => $this->math->normalize($data->quantity),
             'uom_id' => $data->uomId,
             'line_type' => $data->lineType,
+            'unit_cost' => $this->math->normalize($data->unitCost),
+            'default_workforce_role' => $data->defaultWorkforceRole,
             'is_required' => $data->isRequired,
             'sort_order' => $data->sortOrder,
         ])->save();

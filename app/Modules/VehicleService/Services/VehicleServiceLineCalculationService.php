@@ -10,6 +10,7 @@ use Modules\Item\Models\Item;
 use Modules\VehicleService\DTOs\VehicleServiceLineData;
 use Modules\VehicleService\Enums\VehicleServiceLineSourceType;
 use Modules\VehicleService\Enums\VehicleServiceLineStatus;
+use Modules\VehicleService\Enums\VehicleServiceWorkforceRole;
 use Modules\VehicleService\Models\VehicleServiceJob;
 use Modules\VehicleService\Models\VehicleServiceJobLine;
 use Modules\VehicleService\Models\VehicleServiceLineEmployee;
@@ -69,6 +70,7 @@ final class VehicleServiceLineCalculationService
             'description' => trim($data->description),
             'quantity' => $this->math->normalize($data->quantity),
             'unit_cost' => $this->math->normalize($data->unitCost),
+            'default_workforce_role' => $data->defaultWorkforceRole,
             'unit_price' => $this->math->normalize($data->unitPrice),
             'discount_calculation_type' => $data->discountCalculationType,
             'discount_rate' => $this->math->normalize($data->discountRate),
@@ -90,7 +92,7 @@ final class VehicleServiceLineCalculationService
 
     public function recalculateJob(VehicleServiceJob $job): VehicleServiceJob
     {
-        $job->load('lines');
+        $job->load('lines.employeeAssignments');
         $billable = $job->lines->where('is_billable', true)
             ->where('status', '!=', VehicleServiceLineStatus::Cancelled);
         $subtotal = '0.000000';
@@ -110,17 +112,55 @@ final class VehicleServiceLineCalculationService
             $grand = $this->math->add($grand, (string) $line->line_total);
         }
 
+        $comboSupervisorLines = $job->lines
+            ->where('line_source_type', VehicleServiceLineSourceType::ComboChild)
+            ->where('default_workforce_role', VehicleServiceWorkforceRole::Supervisor)
+            ->where('status', '!=', VehicleServiceLineStatus::Cancelled);
+        $employeeCommission = $job->lines
+            ->where('status', '!=', VehicleServiceLineStatus::Cancelled)
+            ->reduce(
+                fn (string $total, VehicleServiceJobLine $line): string => $line->employeeAssignments
+                    ->where('status', '!=', self::CANCELLED_ASSIGNMENT_STATUS)
+                    ->reduce(
+                        fn (string $lineTotal, VehicleServiceLineEmployee $assignment): string => $this->math->add(
+                            $lineTotal,
+                            (string) $assignment->commission_amount,
+                        ),
+                        $total,
+                    ),
+                self::ZERO_AMOUNT,
+            );
+        $supervisorCommission = $comboSupervisorLines->isEmpty()
+            ? $this->commissions->calculate(
+                $job->supervisor_commission_type,
+                (string) $job->supervisor_commission_value,
+                $grand,
+            )
+            : $comboSupervisorLines->reduce(
+                fn (string $total, VehicleServiceJobLine $line): string => $line->employeeAssignments
+                    ->where('status', '!=', self::CANCELLED_ASSIGNMENT_STATUS)
+                    ->reduce(
+                        fn (string $lineTotal, VehicleServiceLineEmployee $assignment): string => $this->math->add(
+                            $lineTotal,
+                            (string) $assignment->commission_amount,
+                        ),
+                        $total,
+                    ),
+                self::ZERO_AMOUNT,
+            );
+        $commissionCost = $comboSupervisorLines->isEmpty()
+            ? $this->math->add($employeeCommission, $supervisorCommission)
+            : $employeeCommission;
+
         $job->forceFill([
             'subtotal' => $subtotal,
             'discount_total' => $discount,
             'tax_total' => $tax,
             'charge_total' => $charge,
             'grand_total' => $grand,
-            'supervisor_commission_amount' => $this->commissions->calculate(
-                $job->supervisor_commission_type,
-                (string) $job->supervisor_commission_value,
-                $grand,
-            ),
+            'supervisor_commission_amount' => $supervisorCommission,
+            'commission_cost_total' => $commissionCost,
+            'net_after_commission' => $this->math->sub($grand, $commissionCost),
         ])->save();
 
         return $job->refresh();

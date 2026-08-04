@@ -13,6 +13,7 @@ use Modules\Item\Models\ItemVariant;
 use Modules\UOM\Models\UnitOfMeasureModel;
 use Modules\VehicleService\Enums\VehicleServiceLineSourceType;
 use Modules\VehicleService\Enums\VehicleServiceLineStatus;
+use Modules\VehicleService\Enums\VehicleServiceWorkforceRole;
 
 final class VehicleServiceJobLine extends TenantOwnedModel
 {
@@ -34,6 +35,7 @@ final class VehicleServiceJobLine extends TenantOwnedModel
             'uom_id' => 'integer',
             'quantity' => 'decimal:6',
             'unit_cost' => 'decimal:6',
+            'default_workforce_role' => VehicleServiceWorkforceRole::class,
             'unit_price' => 'decimal:6',
             'discount_rate' => 'decimal:6',
             'discount_amount' => 'decimal:6',

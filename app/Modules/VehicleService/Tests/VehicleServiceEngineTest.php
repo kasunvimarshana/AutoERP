@@ -175,8 +175,6 @@ final class VehicleServiceEngineTest extends TestCase
     public function test_combo_parent_expands_children_with_inventory_and_workforce_flags(): void
     {
         $context = $this->context();
-        $currencyId = $this->setTenantBaseCurrency($context['tenant_id']);
-        $this->servicePrice($context['labour'], $currencyId, $context['uom_id'], '125.000000');
         $combo = $this->item($context['tenant_id'], 'COMBO', ItemType::Combo, false, $context['uom_id']);
         DB::table('item_bundles')->insert([
             [
@@ -186,6 +184,8 @@ final class VehicleServiceEngineTest extends TestCase
                 'quantity' => '2.000000',
                 'uom_id' => $context['uom_id'],
                 'line_type' => 'item',
+                'unit_cost' => '0.000000',
+                'default_workforce_role' => null,
                 'is_required' => true,
                 'sort_order' => 1,
                 'created_at' => now(),
@@ -198,6 +198,8 @@ final class VehicleServiceEngineTest extends TestCase
                 'quantity' => '1.000000',
                 'uom_id' => $context['uom_id'],
                 'line_type' => 'labour',
+                'unit_cost' => '125.000000',
+                'default_workforce_role' => 'body_wash',
                 'is_required' => true,
                 'sort_order' => 2,
                 'created_at' => now(),
@@ -218,8 +220,10 @@ final class VehicleServiceEngineTest extends TestCase
         $this->assertFalse((bool) $children[0]->is_billable);
         $this->assertTrue((bool) $children[1]->is_employee_assignable);
         $this->assertFalse((bool) $children[1]->is_billable);
-        $this->assertSame('125.000000', (string) $children[1]->unit_price);
-        $this->assertSame('375.000000', (string) $children[1]->line_total);
+        $this->assertSame('125.000000', (string) $children[1]->unit_cost);
+        $this->assertSame('body_wash', $children[1]->default_workforce_role->value);
+        $this->assertSame('0.000000', (string) $children[1]->unit_price);
+        $this->assertSame('0.000000', (string) $children[1]->line_total);
         $this->assertSame('1500.000000', (string) $this->refreshJob($job)->grand_total);
 
         $assignment = $this->assignEmployee(
@@ -228,6 +232,8 @@ final class VehicleServiceEngineTest extends TestCase
             new VehicleServiceEmployeeAssignmentData($context['employee_id'], 'technician'),
         );
         $this->assertSame($children[1]->getKey(), $assignment->vehicle_service_job_line_id);
+        $this->assertSame('375.000000', (string) $assignment->commission_amount);
+        $this->assertSame('375.000000', (string) $this->refreshJob($job)->commission_cost_total);
 
         $this->expectException(InvalidArgumentException::class);
         $this->assignEmployee(
@@ -237,11 +243,51 @@ final class VehicleServiceEngineTest extends TestCase
         );
     }
 
-    public function test_combo_expansion_rejects_labour_child_without_an_effective_service_price_atomically(): void
+    public function test_combo_labour_cost_is_snapshotted_before_later_bundle_changes(): void
     {
         $context = $this->context();
-        $this->setTenantBaseCurrency($context['tenant_id']);
         $combo = $this->item($context['tenant_id'], 'COMBO-NO-PRICE', ItemType::Combo, false, $context['uom_id']);
+        $bundleId = (int) DB::table('item_bundles')->insertGetId([
+            'tenant_id' => $context['tenant_id'],
+            'parent_item_id' => $combo->getKey(),
+            'child_item_id' => $context['labour']->getKey(),
+            'quantity' => '1.000000',
+            'uom_id' => $context['uom_id'],
+            'line_type' => 'labour',
+            'unit_cost' => '80.000000',
+            'default_workforce_role' => 'under_wash',
+            'is_required' => true,
+            'sort_order' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $job = $this->createJob($context);
+        $parent = $this->line($job, VehicleServiceLineSourceType::ComboParent, $combo, '1.000000', '500.000000');
+        $child = $this->withTenantExecutionContext(
+            (int) $context['tenant_id'],
+            fn (): VehicleServiceJobLine => $parent->children()->firstOrFail(),
+        );
+        DB::table('item_bundles')->where('id', $bundleId)->update([
+            'unit_cost' => '120.000000',
+            'default_workforce_role' => 'technician',
+        ]);
+
+        $assignment = $this->assignEmployee(
+            $job,
+            $child,
+            new VehicleServiceEmployeeAssignmentData($context['employee_id'], 'helper'),
+        );
+
+        $this->assertSame('80.000000', (string) $child->unit_cost);
+        $this->assertSame('under_wash', $child->default_workforce_role->value);
+        $this->assertSame('helper', $assignment->role_type);
+        $this->assertSame('80.000000', (string) $assignment->commission_amount);
+    }
+
+    public function test_combo_supervisor_labour_replaces_global_supervisor_commission_without_locking_role(): void
+    {
+        $context = $this->context();
+        $combo = $this->item($context['tenant_id'], 'COMBO-SUPERVISOR', ItemType::Combo, false, $context['uom_id']);
         DB::table('item_bundles')->insert([
             'tenant_id' => $context['tenant_id'],
             'parent_item_id' => $combo->getKey(),
@@ -249,27 +295,31 @@ final class VehicleServiceEngineTest extends TestCase
             'quantity' => '1.000000',
             'uom_id' => $context['uom_id'],
             'line_type' => 'labour',
+            'unit_cost' => '60.000000',
+            'default_workforce_role' => 'supervisor',
             'is_required' => true,
             'sort_order' => 1,
             'created_at' => now(),
             'updated_at' => now(),
         ]);
-        $job = $this->createJob($context);
-
-        try {
-            $this->line($job, VehicleServiceLineSourceType::ComboParent, $combo, '1.000000', '500.000000');
-            $this->fail('Expected combo expansion without a labour service price to fail.');
-        } catch (InvalidArgumentException $exception) {
-            $this->assertSame(
-                "Combo child item {$context['labour']->code} requires an effective service price for the selected UOM.",
-                $exception->getMessage(),
-            );
-        }
-
-        $this->assertSame(0, $this->withTenantExecutionContext(
+        $job = $this->createJob($context, VehicleServiceCommissionType::Fixed, '25.000000');
+        $parent = $this->line($job, VehicleServiceLineSourceType::ComboParent, $combo, '1.000000', '500.000000');
+        $child = $this->withTenantExecutionContext(
             (int) $context['tenant_id'],
-            fn (): int => $job->lines()->count(),
-        ));
+            fn (): VehicleServiceJobLine => $parent->children()->firstOrFail(),
+        );
+
+        $assignment = $this->assignEmployee(
+            $job,
+            $child,
+            new VehicleServiceEmployeeAssignmentData($context['employee_id'], 'technician'),
+        );
+        $job = $this->refreshJob($job);
+
+        $this->assertSame('technician', $assignment->role_type);
+        $this->assertSame('60.000000', (string) $job->supervisor_commission_amount);
+        $this->assertSame('60.000000', (string) $job->commission_cost_total);
+        $this->assertSame('440.000000', (string) $job->net_after_commission);
     }
 
     public function test_inventory_issue_only_posts_inventory_lines_and_enforces_availability(): void
