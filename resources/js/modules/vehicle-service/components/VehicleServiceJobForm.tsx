@@ -10,7 +10,6 @@ import { Input } from '@/shared/components/Input';
 import { Panel } from '@/shared/components/Panel';
 import { Select } from '@/shared/components/Select';
 import { Textarea } from '@/shared/components/Textarea';
-import { useApi } from '@/shared/hooks/useApi';
 import { useMutationFormGuard } from '@/shared/hooks/useMutationFormGuard';
 import type { NamedResource } from '@/shared/types/common';
 import type { LookupLoadParams } from '@/shared/types/lookup';
@@ -99,7 +98,6 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
     const [error, setError] = useState<ApiError | null>(null);
     const [attemptedSubmit, setAttemptedSubmit] = useState(false);
     const formGuard = useMutationFormGuard(submitting);
-    useApi((signal) => lookupApi.preloadAvailableEmployees(signal), []);
     const updateForm = useCallback((next: Parameters<typeof setForm>[0]) => {
         formGuard.markDirty();
         setForm(next);
@@ -110,7 +108,7 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
         return lookupApi.serviceVehicles(params);
     }, []);
     const searchSupervisor = useCallback((params: LookupLoadParams) => {
-        return lookupApi.availableEmployeesLocallyFiltered(params);
+        return lookupApi.availableSupervisors(params);
     }, []);
 
     const supervisorCommissionPayload = (): Partial<Pick<

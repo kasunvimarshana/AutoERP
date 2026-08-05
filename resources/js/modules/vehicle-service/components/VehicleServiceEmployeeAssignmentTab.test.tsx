@@ -65,7 +65,10 @@ function assignment(
     };
 }
 
-function line(employeeAssignments: VehicleServiceEmployeeAssignment[]): VehicleServiceJobLine {
+function line(
+    employeeAssignments: VehicleServiceEmployeeAssignment[],
+    usesJobSupervisor = false,
+): VehicleServiceJobLine {
     return {
         id: 11,
         line_number: 1,
@@ -86,6 +89,7 @@ function line(employeeAssignments: VehicleServiceEmployeeAssignment[]): VehicleS
         is_external: false,
         is_billable: true,
         is_employee_assignable: true,
+        uses_job_supervisor: usesJobSupervisor,
         status: 'pending',
         employee_assignments: employeeAssignments,
     };
@@ -100,6 +104,8 @@ function refreshedJob(rowVersion: number): VehicleServiceJob {
         type: 'full_service',
         customer_id: 5,
         vehicle_id: 9,
+        supervisor_employee_id: 31,
+        supervisor: { id: 31, code: 'EMP-31', name: 'Service Supervisor' },
         supervisor_commission_type: 'none',
         supervisor_commission_value: '0.000000',
         supervisor_commission_amount: '0.000000',
@@ -117,6 +123,7 @@ function refreshedJob(rowVersion: number): VehicleServiceJob {
 async function submitNewAssignment() {
     const user = userEvent.setup();
     await user.click(await screen.findByRole('button', { name: 'Assign employee' }));
+    expect(screen.queryByLabelText('Role')).not.toBeInTheDocument();
     await user.selectOptions(screen.getByLabelText('Service / labour line'), '11');
     await user.click(screen.getByRole('button', { name: 'Choose Employee' }));
     await user.click(screen.getByRole('button', { name: 'Save assignment' }));
@@ -170,6 +177,7 @@ describe('VehicleServiceEmployeeAssignmentTab', () => {
             11,
             expect.objectContaining({ expected_version: 9, employee_id: 22 }),
         ));
+        expect(apiMocks.createVehicleServiceEmployee.mock.calls[0]?.[2]).not.toHaveProperty('role_type');
         expect(onVersionChanged).toHaveBeenNthCalledWith(1, 9);
         await waitFor(() => expect(onVersionChanged).toHaveBeenLastCalledWith(10));
         expect(apiMocks.listEmployeeAssignableLines).toHaveBeenCalledTimes(2);
@@ -204,4 +212,5 @@ describe('VehicleServiceEmployeeAssignmentTab', () => {
         );
         expect(screen.getByRole('button', { name: 'Save assignment' })).toBeInTheDocument();
     });
+
 });

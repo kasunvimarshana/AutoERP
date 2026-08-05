@@ -13,6 +13,7 @@ use Modules\Item\Enums\ItemType;
 use Modules\Vehicle\Enums\VehicleStatus;
 use Modules\Vehicle\Models\Vehicle;
 use Modules\VehicleService\Enums\VehicleServiceLineSourceType;
+use Modules\VehicleService\Enums\VehicleServiceDesignationCode;
 use Modules\VehicleService\Models\VehicleServiceJob;
 use Modules\VehicleService\Models\VehicleServiceJobLine;
 
@@ -49,6 +50,49 @@ final class VehicleServiceValidationService
         $employee = $this->scoped(HrEmployee::query(), $tenantId, $organizationUnitId)->findOrFail($employeeId);
         if ($employee->status !== EmployeeStatus::Active) {
             throw new InvalidArgumentException('Only active employees can be assigned to service jobs.');
+        }
+
+        return $employee;
+    }
+
+    public function supervisorEmployee(int $tenantId, ?int $organizationUnitId, int $employeeId): HrEmployee
+    {
+        $employee = $this->employee($tenantId, $organizationUnitId, $employeeId);
+        $employee->loadMissing('designation');
+        if ($employee->designation?->code !== VehicleServiceDesignationCode::Supervisor->value) {
+            throw new InvalidArgumentException('Only employees with the Supervisor designation can supervise service jobs.');
+        }
+
+        return $employee;
+    }
+
+    public function workforceEmployee(
+        VehicleServiceJob $job,
+        VehicleServiceJobLine $line,
+        int $employeeId,
+    ): HrEmployee {
+        $employee = $this->employee(
+            (int) $job->tenant_id,
+            $job->organization_unit_id,
+            $employeeId,
+        );
+        $employee->loadMissing('designation');
+        if ($employee->designation === null) {
+            throw new InvalidArgumentException('Assign a designation to the employee before adding them to service workforce.');
+        }
+
+        if ($line->uses_job_supervisor) {
+            if ($job->supervisor_employee_id === null
+                || (int) $job->supervisor_employee_id !== $employeeId
+                || $employee->designation->code !== VehicleServiceDesignationCode::Supervisor->value) {
+                throw new InvalidArgumentException('This labour line must use the supervisor selected on the service job.');
+            }
+
+            return $employee;
+        }
+
+        if ($employee->designation->code === VehicleServiceDesignationCode::Supervisor->value) {
+            throw new InvalidArgumentException('Supervisor employees can only be assigned to job-supervisor labour lines.');
         }
 
         return $employee;

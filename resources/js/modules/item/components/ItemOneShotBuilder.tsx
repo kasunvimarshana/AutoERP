@@ -23,10 +23,6 @@ import {
 import { ItemLookupSelect } from './ItemLookupSelect';
 import { ItemCurrencySelect } from './ItemCurrencySelect';
 import { ItemUomSelect } from './ItemUomSelect';
-import {
-    vehicleServiceWorkforceRoles,
-    type VehicleServiceWorkforceRole,
-} from '@/modules/vehicle-service/commissionTypes';
 type BundleLineType = (typeof bundleLineTypes)[number];
 
 export interface OneShotDraft {
@@ -106,8 +102,8 @@ function BundleDraft({ value, onChange }: DraftProps) {
     const [quantity, setQuantity] = useState(defaultBundleQuantity());
     const [lineType, setLineType] = useState<BundleLineType>('labour');
     const [unitCost, setUnitCost] = useState('0.000000');
-    const [defaultWorkforceRole, setDefaultWorkforceRole] = useState<VehicleServiceWorkforceRole>('technician');
-    return <DraftSection title="Initial bundle lines" rows={value.bundles.map((row) => `${row.child_item.code} - ${row.child_item.name} / ${row.quantity} / ${row.default_workforce_role?.replaceAll('_', ' ') ?? '-'} / ${row.unit_cost ?? '0.000000'}`)} remove={(index) => onChange({ ...value, bundles: value.bundles.filter((_, rowIndex) => rowIndex !== index) })}>
+    const [usesJobSupervisor, setUsesJobSupervisor] = useState(false);
+    return <DraftSection title="Initial bundle lines" rows={value.bundles.map((row) => `${row.child_item.code} - ${row.child_item.name} / ${row.quantity} / ${row.uses_job_supervisor ? 'job supervisor' : 'select employee'} / ${row.unit_cost ?? '0.000000'}`)} remove={(index) => onChange({ ...value, bundles: value.bundles.filter((_, rowIndex) => rowIndex !== index) })}>
         <ItemLookupSelect
             label="Child item"
             value={child}
@@ -124,13 +120,13 @@ function BundleDraft({ value, onChange }: DraftProps) {
         <ItemUomSelect value={uom} onChange={setUom} />
         <Select label="Line type" value={lineType} onChange={(event) => setLineType(event.target.value as BundleLineType)} options={options(bundleLineTypes)} />
         {lineType === 'labour' && <>
-            <Select label="Default workforce role" value={defaultWorkforceRole} onChange={(event) => setDefaultWorkforceRole(event.target.value as VehicleServiceWorkforceRole)} options={options(vehicleServiceWorkforceRoles)} />
+            <label className="flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" checked={usesJobSupervisor} onChange={(event) => setUsesJobSupervisor(event.target.checked)} />Use the supervisor selected on the service job</label>
             <Input label="Commission cost" value={unitCost} onChange={(event) => setUnitCost(event.target.value)} />
         </>}
         <Button type="button" disabled={!child} onClick={() => {
             if (!child) return;
-            onChange({ ...value, bundles: [...value.bundles, { child_item: child, child_item_id: Number(child.id), quantity, uom, uom_id: uom ? Number(uom.id) : null, line_type: lineType, unit_cost: lineType === 'labour' ? unitCost : '0.000000', default_workforce_role: lineType === 'labour' ? defaultWorkforceRole : null, is_required: true, sort_order: value.bundles.length }] });
-            setChild(null); setUom(null); setQuantity(defaultBundleQuantity()); setLineType('labour'); setUnitCost('0.000000'); setDefaultWorkforceRole('technician');
+            onChange({ ...value, bundles: [...value.bundles, { child_item: child, child_item_id: Number(child.id), quantity, uom, uom_id: uom ? Number(uom.id) : null, line_type: lineType, unit_cost: lineType === 'labour' ? unitCost : '0.000000', uses_job_supervisor: lineType === 'labour' && usesJobSupervisor, is_required: true, sort_order: value.bundles.length }] });
+            setChild(null); setUom(null); setQuantity(defaultBundleQuantity()); setLineType('labour'); setUnitCost('0.000000'); setUsesJobSupervisor(false);
         }}>Add bundle line</Button>
     </DraftSection>;
 }

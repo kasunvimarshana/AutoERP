@@ -38,7 +38,7 @@ final class VehicleServiceJobService
             $this->validator->customer($data->tenantId, $data->organizationUnitId, $this->billToCustomerId($data));
             $this->validator->vehicle($data->tenantId, $data->organizationUnitId, $data->vehicleId, $data->customerId);
             if ($data->supervisorEmployeeId !== null) {
-                $this->validator->employee($data->tenantId, $data->organizationUnitId, $data->supervisorEmployeeId);
+                $this->validator->supervisorEmployee($data->tenantId, $data->organizationUnitId, $data->supervisorEmployeeId);
             }
             $this->validateMileageFields($data);
 
@@ -71,7 +71,7 @@ final class VehicleServiceJobService
             $this->validator->customer($data->tenantId, $data->organizationUnitId, $this->billToCustomerId($data));
             $this->validator->vehicle($data->tenantId, $data->organizationUnitId, $data->vehicleId, $data->customerId);
             if ($data->supervisorEmployeeId !== null) {
-                $this->validator->employee($data->tenantId, $data->organizationUnitId, $data->supervisorEmployeeId);
+                $this->validator->supervisorEmployee($data->tenantId, $data->organizationUnitId, $data->supervisorEmployeeId);
             }
             $this->validateMileageFields($data);
 

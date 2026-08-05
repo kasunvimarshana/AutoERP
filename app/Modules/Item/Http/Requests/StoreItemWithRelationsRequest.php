@@ -14,7 +14,6 @@ use Modules\Item\Enums\ItemType;
 use Modules\Item\Enums\ItemUnitRole;
 use Modules\Item\Enums\TrackingType;
 use Modules\Item\Http\Requests\Concerns\MapsItemData;
-use Modules\VehicleService\Enums\VehicleServiceWorkforceRole;
 
 final class StoreItemWithRelationsRequest extends TenantScopedRequest
 {
@@ -66,7 +65,7 @@ final class StoreItemWithRelationsRequest extends TenantScopedRequest
             'bundles.*.uom_id' => ['nullable', 'integer', 'min:1'],
             'bundles.*.line_type' => ['required', Rule::in(['stock', 'service', 'labour', 'non_stock', 'charge'])],
             'bundles.*.unit_cost' => ['nullable', 'decimal:0,6', 'min:0'],
-            'bundles.*.default_workforce_role' => ['nullable', Rule::enum(VehicleServiceWorkforceRole::class)],
+            'bundles.*.uses_job_supervisor' => ['nullable', 'boolean'],
             'bundles.*.is_required' => ['nullable', 'boolean'],
             'bundles.*.sort_order' => ['nullable', 'integer', 'min:0'],
             'prices' => ['nullable', 'array'],

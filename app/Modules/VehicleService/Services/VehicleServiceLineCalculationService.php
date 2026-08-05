@@ -10,7 +10,6 @@ use Modules\Item\Models\Item;
 use Modules\VehicleService\DTOs\VehicleServiceLineData;
 use Modules\VehicleService\Enums\VehicleServiceLineSourceType;
 use Modules\VehicleService\Enums\VehicleServiceLineStatus;
-use Modules\VehicleService\Enums\VehicleServiceWorkforceRole;
 use Modules\VehicleService\Models\VehicleServiceJob;
 use Modules\VehicleService\Models\VehicleServiceJobLine;
 use Modules\VehicleService\Models\VehicleServiceLineEmployee;
@@ -70,7 +69,7 @@ final class VehicleServiceLineCalculationService
             'description' => trim($data->description),
             'quantity' => $this->math->normalize($data->quantity),
             'unit_cost' => $this->math->normalize($data->unitCost),
-            'default_workforce_role' => $data->defaultWorkforceRole,
+            'uses_job_supervisor' => $data->usesJobSupervisor,
             'unit_price' => $this->math->normalize($data->unitPrice),
             'discount_calculation_type' => $data->discountCalculationType,
             'discount_rate' => $this->math->normalize($data->discountRate),
@@ -114,7 +113,7 @@ final class VehicleServiceLineCalculationService
 
         $comboSupervisorLines = $job->lines
             ->where('line_source_type', VehicleServiceLineSourceType::ComboChild)
-            ->where('default_workforce_role', VehicleServiceWorkforceRole::Supervisor)
+            ->where('uses_job_supervisor', true)
             ->where('status', '!=', VehicleServiceLineStatus::Cancelled);
         $employeeCommission = $job->lines
             ->where('status', '!=', VehicleServiceLineStatus::Cancelled)

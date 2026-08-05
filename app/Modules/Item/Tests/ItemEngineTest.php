@@ -167,7 +167,7 @@ final class ItemEngineTest extends TestCase
         ));
     }
 
-    public function test_labour_bundle_line_stores_combo_specific_cost_and_default_role(): void
+    public function test_labour_bundle_line_stores_combo_specific_cost_and_supervisor_assignment_source(): void
     {
         $tenantId = $this->createTenant();
         $uomId = $this->createUom($tenantId, null, 'JOB');
@@ -186,14 +186,14 @@ final class ItemEngineTest extends TestCase
                     lineType: ItemType::Labour->value,
                     uomId: $uomId,
                     unitCost: '150.000000',
-                    defaultWorkforceRole: 'body_wash',
+                    usesJobSupervisor: true,
                 ),
             ],
         ));
 
         $line = $combo->bundleLines->firstOrFail();
         $this->assertSame('150.000000', (string) $line->unit_cost);
-        $this->assertSame('body_wash', $line->default_workforce_role);
+        $this->assertTrue((bool) $line->uses_job_supervisor);
     }
 
     public function test_it_rejects_invalid_item_rules(): void

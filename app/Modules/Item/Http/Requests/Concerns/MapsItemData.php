@@ -68,9 +68,7 @@ trait MapsItemData
                 isRequired: (bool) ($row['is_required'] ?? true),
                 sortOrder: (int) ($row['sort_order'] ?? 0),
                 unitCost: (string) ($row['unit_cost'] ?? '0.000000'),
-                defaultWorkforceRole: isset($row['default_workforce_role'])
-                    ? (string) $row['default_workforce_role']
-                    : null,
+                usesJobSupervisor: (bool) ($row['uses_job_supervisor'] ?? false),
             ), $relations['bundles'] ?? []),
             prices: array_map(fn (array $row): ItemPriceData => new ItemPriceData(
                 priceType: ItemPriceType::from((string) $row['price_type']),

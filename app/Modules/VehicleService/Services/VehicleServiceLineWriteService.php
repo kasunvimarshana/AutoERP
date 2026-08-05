@@ -134,7 +134,7 @@ final class VehicleServiceLineWriteService
                 itemVariantId: $bundleLine->child_variant_id,
                 uomId: $bundleLine->uom_id ?? $child->base_uom_id,
                 unitCost: (string) $bundleLine->unit_cost,
-                defaultWorkforceRole: $bundleLine->default_workforce_role,
+                usesJobSupervisor: (bool) $bundleLine->uses_job_supervisor,
                 isBillable: false,
                 expandCombo: false,
             ));

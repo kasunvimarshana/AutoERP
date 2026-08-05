@@ -1,18 +1,6 @@
 import type { NamedResource } from '@/shared/types/common';
 import type { CommissionType, VehicleServiceJobLine } from './vehicleServiceTypes';
 
-export const vehicleServiceWorkforceRoles = [
-    'supervisor',
-    'technician',
-    'helper',
-    'inspector',
-    'under_wash',
-    'body_wash',
-    'finishing',
-    'custom',
-] as const;
-export type VehicleServiceWorkforceRole = typeof vehicleServiceWorkforceRoles[number];
-
 export interface VehicleServiceCommissionDefault {
     commission_type: CommissionType;
     commission_value: string;

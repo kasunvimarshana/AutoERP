@@ -1,5 +1,5 @@
 import { endpoints } from './endpoints';
-import { createLocallyFilteredLookupLoader, createQueryCachedLookupLoader, prefetchLocallyFilteredLookupDataset } from './lookupCache';
+import { createQueryCachedLookupLoader } from './lookupCache';
 import { mapLookupResult, requestLookup } from './lookupRequest';
 import type { NamedResource } from '@/shared/types/common';
 import type { LookupLoadParams, LookupResult } from '@/shared/types/lookup';
@@ -47,20 +47,13 @@ async function mappedLookup<T extends NamedResource>(
     return mapLookupResult(result, map);
 }
 
-const AVAILABLE_EMPLOYEES_LOOKUP_KEY = 'lookup:employees:available';
-const AVAILABLE_EMPLOYEES_DATASET_KEY = 'lookup:employees:available:dataset';
+const SUPERVISOR_DESIGNATION_CODE = 'SUPERVISOR';
 
 const mapAvailableEmployeeResource = (resource: Record<string, unknown>): NamedResource => ({
     id: Number(resource.id),
     code: String(resource.employee_number ?? resource.code ?? ''),
     name: String(resource.display_name ?? resource.name ?? ''),
 });
-
-const loadAvailableEmployees = (params: LookupLoadParams) => mappedLookup(
-    `${endpoints.hrEmployees}/lookup/available`,
-    params,
-    mapAvailableEmployeeResource,
-);
 
 export const lookupApi = {
     items: createQueryCachedLookupLoader<ItemLookupResource>({
@@ -107,18 +100,23 @@ export const lookupApi = {
         key: 'lookup:customers:active',
         load: (params) => lookup(`${endpoints.customers}/lookup/active`, params),
     }),
-    availableEmployees: createQueryCachedLookupLoader<NamedResource>({
-        key: AVAILABLE_EMPLOYEES_LOOKUP_KEY,
-        load: loadAvailableEmployees,
+    availableNonSupervisorEmployees: createQueryCachedLookupLoader<NamedResource>({
+        key: 'lookup:employees:available:non-supervisors',
+        load: (params) => mappedLookup(
+            `${endpoints.hrEmployees}/lookup/available`,
+            params,
+            mapAvailableEmployeeResource,
+            { exclude_designation_code: SUPERVISOR_DESIGNATION_CODE },
+        ),
     }),
-    availableEmployeesLocallyFiltered: createLocallyFilteredLookupLoader<NamedResource>({
-        key: AVAILABLE_EMPLOYEES_DATASET_KEY,
-        load: loadAvailableEmployees,
-    }),
-    preloadAvailableEmployees: (signal: AbortSignal): Promise<NamedResource[]> => prefetchLocallyFilteredLookupDataset<NamedResource>({
-        key: AVAILABLE_EMPLOYEES_DATASET_KEY,
-        load: loadAvailableEmployees,
-        signal,
+    availableSupervisors: createQueryCachedLookupLoader<NamedResource>({
+        key: 'lookup:employees:available:supervisors',
+        load: (params) => mappedLookup(
+            `${endpoints.hrEmployees}/lookup/available`,
+            params,
+            mapAvailableEmployeeResource,
+            { designation_code: SUPERVISOR_DESIGNATION_CODE },
+        ),
     }),
     serviceVehicles: (params: LookupLoadParams, customerId?: number | null): Promise<LookupResult<VehicleLookupResource>> => {
         const loader = createQueryCachedLookupLoader<VehicleLookupResource>({

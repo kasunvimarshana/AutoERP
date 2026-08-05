@@ -5,13 +5,14 @@ declare(strict_types=1);
 namespace Modules\VehicleService\Services;
 
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Item\Enums\ItemType;
 use Modules\VehicleService\DTOs\VehicleServiceEmployeeAssignmentData;
 use Modules\VehicleService\Enums\VehicleServiceCommissionType;
 use Modules\VehicleService\Enums\VehicleServiceLineSourceType;
-use Modules\VehicleService\Enums\VehicleServiceWorkforceRole;
+use Modules\Hr\Models\HrEmployee;
 use Modules\VehicleService\Models\VehicleServiceJob;
 use Modules\VehicleService\Models\VehicleServiceJobLine;
 use Modules\VehicleService\Models\VehicleServiceLineEmployee;
@@ -44,9 +45,9 @@ final class VehicleServiceEmployeeAssignmentService
             $this->assertLine($job, $line);
             $this->validator->assertMutable($job);
             $this->validator->assertEmployeeAssignable($line);
-            $this->validator->employee((int) $job->tenant_id, $job->organization_unit_id, $data->employeeId);
+            $employee = $this->validator->workforceEmployee($job, $line, $data->employeeId);
 
-            $assignment = VehicleServiceLineEmployee::query()->create(array_merge($this->attributes($line, $data), [
+            $assignment = VehicleServiceLineEmployee::query()->create(array_merge($this->attributes($line, $data, $employee), [
                 'tenant_id' => $job->tenant_id,
                 'organization_unit_id' => $job->organization_unit_id,
                 'vehicle_service_job_id' => $job->getKey(),
@@ -76,9 +77,9 @@ final class VehicleServiceEmployeeAssignmentService
             $this->assertAssignment($job, $line, $assignment);
             $this->validator->assertMutable($job);
             $this->validator->assertEmployeeAssignable($line);
-            $this->validator->employee((int) $job->tenant_id, $job->organization_unit_id, $data->employeeId);
+            $employee = $this->validator->workforceEmployee($job, $line, $data->employeeId);
 
-            $assignment->fill($this->attributes($line, $data, $assignment));
+            $assignment->fill($this->attributes($line, $data, $employee, $assignment));
             $assignment->completed_at = $data->status === 'completed' ? now() : null;
             $assignment->save();
             $this->calculations->recalculateAssignments($line);
@@ -114,20 +115,24 @@ final class VehicleServiceEmployeeAssignmentService
     private function attributes(
         VehicleServiceJobLine $line,
         VehicleServiceEmployeeAssignmentData $data,
+        HrEmployee $employee,
         ?VehicleServiceLineEmployee $existing = null,
     ): array {
         foreach ([$data->assignedHours, $data->rate] as $value) {
             $this->validator->nonNegative($value, 'Employee assignment values cannot be negative.');
         }
-        $role = VehicleServiceWorkforceRole::tryFrom($data->roleType);
-        if (! $role instanceof VehicleServiceWorkforceRole) {
-            throw new InvalidArgumentException('Invalid Vehicle Service workforce role.');
-        }
         $commission = $this->commission($line, $data, $existing);
+        $roleType = $existing instanceof VehicleServiceLineEmployee
+            && (int) $existing->employee_id === (int) $employee->getKey()
+                ? (string) $existing->role_type
+                : Str::of((string) $employee->designation->code)
+                    ->lower()
+                    ->replace(['-', ' '], '_')
+                    ->toString();
 
         return [
             'employee_id' => $data->employeeId,
-            'role_type' => $role->value,
+            'role_type' => $roleType,
             'assigned_hours' => $this->math->normalize($data->assignedHours),
             'rate' => $this->math->normalize($data->rate),
             'commission_type' => $commission['type']->value,

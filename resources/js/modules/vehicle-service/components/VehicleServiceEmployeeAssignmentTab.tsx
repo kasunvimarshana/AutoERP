@@ -11,6 +11,7 @@ import {
     updateVehicleServiceEmployee,
 } from '../vehicleServiceApi';
 import type { VehicleServiceJobLine } from '../vehicleServiceTypes';
+import type { NamedResource } from '@/shared/types/common';
 import {
     assignmentFormToPayload,
     assignmentToForm,
@@ -29,6 +30,7 @@ const MISSING_JOB_VERSION_MESSAGE = 'The refreshed service job did not include i
 interface WorkforceSnapshot {
     lines: VehicleServiceJobLine[];
     rowVersion: number;
+    supervisor: NamedResource | null;
 }
 
 export default function VehicleServiceEmployeeAssignmentTab({
@@ -40,8 +42,10 @@ export default function VehicleServiceEmployeeAssignmentTab({
     expectedVersion: number;
     onChanged: (nextVersion: number) => void;
 }) {
+    const [jobSupervisor, setJobSupervisor] = useState<NamedResource | null>(null);
     const result = useApi(async (signal) => {
         const snapshot = await loadWorkforceSnapshot(jobId, signal);
+        setJobSupervisor(snapshot.supervisor);
         onChanged(snapshot.rowVersion);
 
         return snapshot.lines;
@@ -56,6 +60,7 @@ export default function VehicleServiceEmployeeAssignmentTab({
 
     const synchronize = async () => {
         const snapshot = await loadWorkforceSnapshot(jobId);
+        setJobSupervisor(snapshot.supervisor);
         result.setData(snapshot.lines);
         onChanged(snapshot.rowVersion);
     };
@@ -143,6 +148,7 @@ export default function VehicleServiceEmployeeAssignmentTab({
             <EmployeeAssignmentDialog
                 dialog={dialog}
                 lines={result.data ?? []}
+                jobSupervisor={jobSupervisor}
                 error={error}
                 saving={saving}
                 onClose={() => setDialog(null)}
@@ -170,5 +176,5 @@ async function loadWorkforceSnapshot(jobId: number, signal?: AbortSignal): Promi
         throw new Error(MISSING_JOB_VERSION_MESSAGE);
     }
 
-    return { lines, rowVersion: job.row_version };
+    return { lines, rowVersion: job.row_version, supervisor: job.supervisor ?? null };
 }

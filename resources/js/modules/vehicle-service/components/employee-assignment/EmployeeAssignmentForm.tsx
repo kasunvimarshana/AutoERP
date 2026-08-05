@@ -8,19 +8,17 @@ import { GenericLookupSelect } from '@/shared/components/GenericLookupSelect';
 import { Select } from '@/shared/components/Select';
 import type { LookupLoadParams } from '@/shared/types/lookup';
 import type { CommissionType, VehicleServiceJobLine } from '../../vehicleServiceTypes';
-import {
-    vehicleServiceWorkforceRoles,
-    type VehicleServiceWorkforceRole,
-} from '../../commissionTypes';
+import type { NamedResource } from '@/shared/types/common';
 import {
     applyAssignmentCommissionDefault,
     type AssignmentFormValue,
 } from './assignmentForm';
 
-export function EmployeeAssignmentForm({ value, mode, lines, error, saving, onSave, onCancel }: {
+export function EmployeeAssignmentForm({ value, mode, lines, jobSupervisor, error, saving, onSave, onCancel }: {
     value: AssignmentFormValue;
     mode: 'create' | 'edit';
     lines: VehicleServiceJobLine[];
+    jobSupervisor: NamedResource | null;
     error: ApiError | null;
     saving: boolean;
     onSave: (value: AssignmentFormValue) => void;
@@ -28,13 +26,14 @@ export function EmployeeAssignmentForm({ value, mode, lines, error, saving, onSa
 }) {
     const [draft, setDraft] = useState(value);
     const search = useCallback(
-        (params: LookupLoadParams) => lookupApi.availableEmployees(params),
+        (params: LookupLoadParams) => lookupApi.availableNonSupervisorEmployees(params),
         [],
     );
     const set = <K extends keyof AssignmentFormValue>(
         key: K,
         next: AssignmentFormValue[K],
     ) => setDraft((current) => ({ ...current, [key]: next }));
+    const selectedLine = lines.find((line) => line.id === draft.lineId);
 
     return (
         <form
@@ -49,7 +48,7 @@ export function EmployeeAssignmentForm({ value, mode, lines, error, saving, onSa
                 <div>
                     <h3 className="font-semibold text-slate-900">Assignment details</h3>
                     <p className="text-sm text-slate-500">
-                        Select the service line, employee, operational role, hours, rate, and commission. Combo labour roles are suggested but remain editable; their configured commission cost is fixed by the Job Card snapshot.
+                        Select the service line and employee. The employee designation is recorded automatically; combo labour commission is fixed by the Job Card snapshot and split across assigned employees.
                     </p>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
@@ -67,6 +66,7 @@ export function EmployeeAssignmentForm({ value, mode, lines, error, saving, onSa
                                 current,
                                 lines,
                                 lineId,
+                                jobSupervisor,
                             ));
                         }}
                     />
@@ -76,21 +76,9 @@ export function EmployeeAssignmentForm({ value, mode, lines, error, saving, onSa
                         error={fieldError(error, 'employee_id')}
                         onChange={(employee) => set('employee', employee)}
                         search={search}
+                        disabled={selectedLine?.uses_job_supervisor === true}
                         formatLabel={(employee) =>
                             [employee.code, employee.name].filter(Boolean).join(' - ')}
-                    />
-                    <Select
-                        label="Role"
-                        value={draft.role}
-                        options={vehicleServiceWorkforceRoles.map((role) => ({
-                            value: role,
-                            label: role.replaceAll('_', ' '),
-                        }))}
-                        error={fieldError(error, 'role_type')}
-                        onChange={(event) => set(
-                            'role',
-                            event.target.value as VehicleServiceWorkforceRole,
-                        )}
                     />
                     <DecimalInput
                         label="Assigned hours"

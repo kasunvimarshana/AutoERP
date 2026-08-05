@@ -31,7 +31,6 @@ use Modules\Item\Services\ItemUsageModuleCatalogue;
 use Modules\ReferenceData\Models\CurrencyModel;
 use Modules\Tax\Models\TaxGroup;
 use Modules\UOM\Models\UnitOfMeasureModel;
-use Modules\VehicleService\Enums\VehicleServiceWorkforceRole;
 
 final class ItemValidationService
 {
@@ -192,16 +191,11 @@ final class ItemValidationService
             throw new InvalidArgumentException('Item bundle line type is invalid.');
         }
 
-        if ($data->lineType === ItemType::Labour->value) {
-            if (! VehicleServiceWorkforceRole::tryFrom((string) $data->defaultWorkforceRole)) {
-                throw ValidationException::withMessages([
-                    'default_workforce_role' => ['A valid default workforce role is required for labour bundle lines.'],
-                ]);
-            }
-        } elseif ($data->defaultWorkforceRole !== null || ! $this->math->isZero($data->unitCost)) {
+        if ($data->lineType !== ItemType::Labour->value
+            && ($data->usesJobSupervisor || ! $this->math->isZero($data->unitCost))) {
             throw ValidationException::withMessages([
                 'unit_cost' => ['Bundle commission cost is only available for labour lines.'],
-                'default_workforce_role' => ['Default workforce role is only available for labour lines.'],
+                'uses_job_supervisor' => ['Job supervisor assignment is only available for labour lines.'],
             ]);
         }
 

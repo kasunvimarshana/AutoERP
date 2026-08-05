@@ -135,13 +135,11 @@ final class VehicleServiceEngineTest extends TestCase
         $line = $this->line($fixedJob, VehicleServiceLineSourceType::LabourItem, $context['labour'], '2.000000', '100.000000');
         $fixed = $this->assignEmployee($fixedJob, $line, new VehicleServiceEmployeeAssignmentData(
             employeeId: $context['employee_id'],
-            roleType: 'technician',
             commissionType: VehicleServiceCommissionType::Fixed,
             commissionValue: '25.000000',
         ));
         $percentage = $this->assignEmployee($fixedJob, $line, new VehicleServiceEmployeeAssignmentData(
-            employeeId: $context['employee_id'],
-            roleType: 'helper',
+            employeeId: $context['helper_employee_id'],
             commissionType: VehicleServiceCommissionType::Percentage,
             commissionValue: '12.500000',
         ));
@@ -149,6 +147,26 @@ final class VehicleServiceEngineTest extends TestCase
         $this->assertSame('75.000000', (string) $this->refreshJob($fixedJob)->supervisor_commission_amount);
         $this->assertSame('25.000000', (string) $fixed->commission_amount);
         $this->assertSame('25.000000', (string) $percentage->commission_amount);
+    }
+
+    public function test_job_supervisor_must_have_the_supervisor_designation(): void
+    {
+        $context = $this->context();
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Only employees with the Supervisor designation can supervise service jobs.');
+
+        $this->withTenantExecutionContext(
+            (int) $context['tenant_id'],
+            fn (): VehicleServiceJob => app(VehicleServiceJobService::class)->create(new VehicleServiceJobData(
+                tenantId: $context['tenant_id'],
+                jobDate: '2026-06-07',
+                customerId: $context['customer_id'],
+                vehicleId: $context['vehicle_id'],
+                supervisorEmployeeId: $context['employee_id'],
+                odometerReading: '12000.000000',
+            )),
+        );
     }
 
     public function test_employee_assignment_is_restricted_to_service_labour_and_service_combo_children(): void
@@ -161,14 +179,14 @@ final class VehicleServiceEngineTest extends TestCase
 
         foreach ([$inventory, $external] as $line) {
             try {
-                $this->assignEmployee($job, $line, new VehicleServiceEmployeeAssignmentData($context['employee_id'], 'technician'));
+                $this->assignEmployee($job, $line, new VehicleServiceEmployeeAssignmentData($context['employee_id']));
                 $this->fail('Expected non-service employee assignment to fail.');
             } catch (InvalidArgumentException $exception) {
                 $this->assertSame('Employees can only be assigned to service or labour lines.', $exception->getMessage());
             }
         }
 
-        $allowed = $this->assignEmployee($job, $service, new VehicleServiceEmployeeAssignmentData($context['employee_id'], 'technician'));
+        $allowed = $this->assignEmployee($job, $service, new VehicleServiceEmployeeAssignmentData($context['employee_id']));
         $this->assertSame($context['employee_id'], (int) $allowed->employee_id);
     }
 
@@ -185,7 +203,7 @@ final class VehicleServiceEngineTest extends TestCase
                 'uom_id' => $context['uom_id'],
                 'line_type' => 'item',
                 'unit_cost' => '0.000000',
-                'default_workforce_role' => null,
+                'uses_job_supervisor' => false,
                 'is_required' => true,
                 'sort_order' => 1,
                 'created_at' => now(),
@@ -199,7 +217,7 @@ final class VehicleServiceEngineTest extends TestCase
                 'uom_id' => $context['uom_id'],
                 'line_type' => 'labour',
                 'unit_cost' => '125.000000',
-                'default_workforce_role' => 'body_wash',
+                'uses_job_supervisor' => false,
                 'is_required' => true,
                 'sort_order' => 2,
                 'created_at' => now(),
@@ -221,7 +239,7 @@ final class VehicleServiceEngineTest extends TestCase
         $this->assertTrue((bool) $children[1]->is_employee_assignable);
         $this->assertFalse((bool) $children[1]->is_billable);
         $this->assertSame('125.000000', (string) $children[1]->unit_cost);
-        $this->assertSame('body_wash', $children[1]->default_workforce_role->value);
+        $this->assertFalse((bool) $children[1]->uses_job_supervisor);
         $this->assertSame('0.000000', (string) $children[1]->unit_price);
         $this->assertSame('0.000000', (string) $children[1]->line_total);
         $this->assertSame('1500.000000', (string) $this->refreshJob($job)->grand_total);
@@ -229,7 +247,7 @@ final class VehicleServiceEngineTest extends TestCase
         $assignment = $this->assignEmployee(
             $job,
             $children[1],
-            new VehicleServiceEmployeeAssignmentData($context['employee_id'], 'technician'),
+            new VehicleServiceEmployeeAssignmentData($context['employee_id']),
         );
         $this->assertSame($children[1]->getKey(), $assignment->vehicle_service_job_line_id);
         $this->assertSame('375.000000', (string) $assignment->commission_amount);
@@ -239,7 +257,7 @@ final class VehicleServiceEngineTest extends TestCase
         $this->assignEmployee(
             $job,
             $parent,
-            new VehicleServiceEmployeeAssignmentData($context['employee_id'], 'technician'),
+            new VehicleServiceEmployeeAssignmentData($context['employee_id']),
         );
     }
 
@@ -255,7 +273,7 @@ final class VehicleServiceEngineTest extends TestCase
             'uom_id' => $context['uom_id'],
             'line_type' => 'labour',
             'unit_cost' => '80.000000',
-            'default_workforce_role' => 'under_wash',
+            'uses_job_supervisor' => false,
             'is_required' => true,
             'sort_order' => 1,
             'created_at' => now(),
@@ -269,22 +287,22 @@ final class VehicleServiceEngineTest extends TestCase
         );
         DB::table('item_bundles')->where('id', $bundleId)->update([
             'unit_cost' => '120.000000',
-            'default_workforce_role' => 'technician',
+            'uses_job_supervisor' => true,
         ]);
 
         $assignment = $this->assignEmployee(
             $job,
             $child,
-            new VehicleServiceEmployeeAssignmentData($context['employee_id'], 'helper'),
+            new VehicleServiceEmployeeAssignmentData($context['helper_employee_id']),
         );
 
         $this->assertSame('80.000000', (string) $child->unit_cost);
-        $this->assertSame('under_wash', $child->default_workforce_role->value);
+        $this->assertFalse((bool) $child->uses_job_supervisor);
         $this->assertSame('helper', $assignment->role_type);
         $this->assertSame('80.000000', (string) $assignment->commission_amount);
     }
 
-    public function test_combo_supervisor_labour_replaces_global_supervisor_commission_without_locking_role(): void
+    public function test_combo_supervisor_labour_uses_job_supervisor_and_replaces_global_commission(): void
     {
         $context = $this->context();
         $combo = $this->item($context['tenant_id'], 'COMBO-SUPERVISOR', ItemType::Combo, false, $context['uom_id']);
@@ -296,7 +314,7 @@ final class VehicleServiceEngineTest extends TestCase
             'uom_id' => $context['uom_id'],
             'line_type' => 'labour',
             'unit_cost' => '60.000000',
-            'default_workforce_role' => 'supervisor',
+            'uses_job_supervisor' => true,
             'is_required' => true,
             'sort_order' => 1,
             'created_at' => now(),
@@ -312,11 +330,11 @@ final class VehicleServiceEngineTest extends TestCase
         $assignment = $this->assignEmployee(
             $job,
             $child,
-            new VehicleServiceEmployeeAssignmentData($context['employee_id'], 'technician'),
+            new VehicleServiceEmployeeAssignmentData($context['supervisor_employee_id']),
         );
         $job = $this->refreshJob($job);
 
-        $this->assertSame('technician', $assignment->role_type);
+        $this->assertSame('supervisor', $assignment->role_type);
         $this->assertSame('60.000000', (string) $job->supervisor_commission_amount);
         $this->assertSame('60.000000', (string) $job->commission_cost_total);
         $this->assertSame('440.000000', (string) $job->net_after_commission);
@@ -468,7 +486,7 @@ final class VehicleServiceEngineTest extends TestCase
                     jobDate: '2026-06-07',
                     customerId: $context['customer_id'],
                     vehicleId: $context['vehicle_id'],
-                    supervisorEmployeeId: $context['employee_id'],
+                    supervisorEmployeeId: $context['supervisor_employee_id'],
                     odometerReading: '12000.000000',
                     fuelLevel: 'half',
                     customerComplaint: 'New complaint',
@@ -491,7 +509,7 @@ final class VehicleServiceEngineTest extends TestCase
                     jobDate: '2026-06-07',
                     customerId: $context['customer_id'],
                     vehicleId: $context['vehicle_id'],
-                    supervisorEmployeeId: $context['employee_id'],
+                    supervisorEmployeeId: $context['supervisor_employee_id'],
                     odometerReading: '12000.000000',
                     fuelLevel: 'half',
                     customerComplaint: null,
@@ -517,7 +535,7 @@ final class VehicleServiceEngineTest extends TestCase
                 customerId: $context['customer_id'],
                 vehicleId: $context['vehicle_id'],
                 billToCustomerId: $billToCustomerId,
-                supervisorEmployeeId: $context['employee_id'],
+                supervisorEmployeeId: $context['supervisor_employee_id'],
                 odometerReading: '12000.000000',
             )),
         );
@@ -612,7 +630,7 @@ final class VehicleServiceEngineTest extends TestCase
             'type' => 'full_service',
             'customer_id' => $context['customer_id'],
             'vehicle_id' => $context['vehicle_id'],
-            'supervisor_employee_id' => $context['employee_id'],
+            'supervisor_employee_id' => $context['supervisor_employee_id'],
             'supervisor_commission_type' => null,
             'supervisor_commission_value' => null,
             'odometer_reading' => '10000',
@@ -637,7 +655,6 @@ final class VehicleServiceEngineTest extends TestCase
             'tenant_id' => $context['tenant_id'],
             'expected_version' => $this->currentJobVersion($job),
             'employee_id' => $context['employee_id'],
-            'role_type' => 'technician',
             'commission_type' => null,
             'commission_value' => null,
         ])->assertCreated()
@@ -1007,7 +1024,12 @@ final class VehicleServiceEngineTest extends TestCase
         $warehouseLocationId = $this->warehouseLocation($tenantId, $warehouseId, 'BIN-'.$suffix);
         $customerId = $this->customer($tenantId, 'CUS-'.$suffix);
         $vehicleId = $this->vehicle($tenantId, $customerId, 'VEH-'.$suffix);
-        $employeeId = $this->employee($tenantId, 'EMP-'.$suffix);
+        $supervisorDesignationId = $this->designation($tenantId, 'SUPERVISOR', 'Service Supervisor');
+        $technicianDesignationId = $this->designation($tenantId, 'TECHNICIAN', 'Technician');
+        $helperDesignationId = $this->designation($tenantId, 'HELPER', 'Helper');
+        $supervisorEmployeeId = $this->employee($tenantId, 'EMP-SUP-'.$suffix, $supervisorDesignationId);
+        $employeeId = $this->employee($tenantId, 'EMP-TECH-'.$suffix, $technicianDesignationId);
+        $helperEmployeeId = $this->employee($tenantId, 'EMP-HELP-'.$suffix, $helperDesignationId);
 
         return [
             'tenant_id' => $tenantId,
@@ -1017,6 +1039,8 @@ final class VehicleServiceEngineTest extends TestCase
             'customer_id' => $customerId,
             'vehicle_id' => $vehicleId,
             'employee_id' => $employeeId,
+            'helper_employee_id' => $helperEmployeeId,
+            'supervisor_employee_id' => $supervisorEmployeeId,
             'stock' => $this->item($tenantId, 'STOCK-'.$suffix, ItemType::Stock, true, $uomId),
             'service' => $this->item($tenantId, 'SERVICE-'.$suffix, ItemType::Service, false, $uomId),
             'labour' => $this->item($tenantId, 'LABOUR-'.$suffix, ItemType::Labour, false, $uomId),
@@ -1035,7 +1059,7 @@ final class VehicleServiceEngineTest extends TestCase
                 jobDate: '2026-06-07',
                 customerId: $context['customer_id'],
                 vehicleId: $context['vehicle_id'],
-                supervisorEmployeeId: $context['employee_id'],
+                supervisorEmployeeId: $context['supervisor_employee_id'],
                 supervisorCommissionType: $commissionType,
                 supervisorCommissionValue: $commissionValue,
                 odometerReading: '12000.000000',
@@ -1384,7 +1408,19 @@ final class VehicleServiceEngineTest extends TestCase
         return $vehicleId;
     }
 
-    private function employee(int $tenantId, string $code): int
+    private function designation(int $tenantId, string $code, string $name): int
+    {
+        return (int) DB::table('hr_designations')->insertGetId([
+            'tenant_id' => $tenantId,
+            'code' => $code,
+            'name' => $name,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    private function employee(int $tenantId, string $code, int $designationId): int
     {
         return (int) DB::table('hr_employees')->insertGetId([
             'tenant_id' => $tenantId,
@@ -1392,6 +1428,7 @@ final class VehicleServiceEngineTest extends TestCase
             'code' => $code,
             'first_name' => 'Tech',
             'display_name' => 'Technician '.$code,
+            'designation_id' => $designationId,
             'status' => 'active',
             'availability_status' => 'available',
             'created_at' => now(),

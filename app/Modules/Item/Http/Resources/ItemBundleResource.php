@@ -22,7 +22,7 @@ final class ItemBundleResource extends JsonResource
             'uom' => $this->whenLoaded('uom', fn () => $this->namedResource($this->uom, true)),
             'line_type' => $this->line_type,
             'unit_cost' => (string) $this->unit_cost,
-            'default_workforce_role' => $this->default_workforce_role,
+            'uses_job_supervisor' => (bool) $this->uses_job_supervisor,
             'is_required' => (bool) $this->is_required,
             'sort_order' => (int) $this->sort_order,
         ];

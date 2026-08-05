@@ -7,7 +7,6 @@ namespace Modules\Item\Http\Requests;
 use Illuminate\Validation\Rule;
 use Modules\Core\Http\Requests\TenantScopedRequest;
 use Modules\Item\DTOs\ItemBundleData;
-use Modules\VehicleService\Enums\VehicleServiceWorkforceRole;
 
 abstract class ItemBundleRequest extends TenantScopedRequest
 {
@@ -22,7 +21,7 @@ abstract class ItemBundleRequest extends TenantScopedRequest
             'uom_id' => ['nullable', 'integer', 'min:1'],
             'line_type' => ['required', Rule::in(['stock', 'service', 'labour', 'non_stock', 'charge'])],
             'unit_cost' => ['nullable', 'decimal:0,6', 'min:0'],
-            'default_workforce_role' => ['nullable', Rule::enum(VehicleServiceWorkforceRole::class)],
+            'uses_job_supervisor' => ['nullable', 'boolean'],
             'is_required' => ['nullable', 'boolean'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
         ];
@@ -39,9 +38,7 @@ abstract class ItemBundleRequest extends TenantScopedRequest
             isRequired: $this->boolean('is_required', true),
             sortOrder: (int) $this->input('sort_order', 0),
             unitCost: (string) $this->input('unit_cost', '0.000000'),
-            defaultWorkforceRole: $this->filled('default_workforce_role')
-                ? (string) $this->input('default_workforce_role')
-                : null,
+            usesJobSupervisor: $this->boolean('uses_job_supervisor'),
         );
     }
 }

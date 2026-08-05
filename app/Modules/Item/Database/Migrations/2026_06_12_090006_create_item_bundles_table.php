@@ -21,7 +21,7 @@ return new class extends Migration
             $table->foreignId('uom_id')->nullable();
             $table->string('line_type', 30);
             $table->decimal('unit_cost', 20, 6)->default('0.000000');
-            $table->string('default_workforce_role', 30)->nullable();
+            $table->boolean('uses_job_supervisor')->default(false);
             $table->boolean('is_required')->default(true);
             $table->unsignedInteger('sort_order')->default(0);
             $table->timestamps();

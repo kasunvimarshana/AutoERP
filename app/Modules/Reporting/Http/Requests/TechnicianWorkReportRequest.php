@@ -36,7 +36,7 @@ final class TechnicianWorkReportRequest extends TenantScopedRequest
             'customer_id' => ['nullable', 'integer', 'min:1'],
             'vehicle_id' => ['nullable', 'integer', 'min:1'],
             'job_status' => ['nullable', Rule::enum(VehicleServiceJobStatus::class)],
-            'role_type' => ['nullable', 'string', 'max:80'],
+            'role_type' => ['nullable', 'string', 'max:255'],
             'commission_type' => ['nullable', Rule::enum(VehicleServiceCommissionType::class)],
             'invoice_status' => ['nullable', Rule::enum(InvoiceStatus::class)],
             'payment_document_status' => ['nullable', Rule::enum(PaymentDocumentStatus::class)],
