@@ -46,6 +46,7 @@ use Modules\VehicleService\DTOs\VehicleServicePaymentData;
 use Modules\VehicleService\Enums\VehicleServiceCommissionType;
 use Modules\VehicleService\Enums\VehicleServiceJobStatus;
 use Modules\VehicleService\Enums\VehicleServiceLineSourceType;
+use Modules\VehicleService\Http\Resources\VehicleServiceJobLineResource;
 use Modules\VehicleService\Http\Resources\VehicleServiceJobResource;
 use Modules\VehicleService\Models\VehicleServiceInvoiceLink;
 use Modules\VehicleService\Models\VehicleServiceJob;
@@ -243,6 +244,13 @@ final class VehicleServiceEngineTest extends TestCase
         $this->assertSame('0.000000', (string) $children[1]->unit_price);
         $this->assertSame('0.000000', (string) $children[1]->line_total);
         $this->assertSame('1500.000000', (string) $this->refreshJob($job)->grand_total);
+
+        $workforceLine = $this->withTenantExecutionContext(
+            (int) $context['tenant_id'],
+            fn (): array => (new VehicleServiceJobLineResource($children[1]->load('parent')))->resolve(),
+        );
+        $this->assertSame($parent->getKey(), $workforceLine['parent_line']['id']);
+        $this->assertSame($parent->description, $workforceLine['parent_line']['description']);
 
         $assignment = $this->assignEmployee(
             $job,

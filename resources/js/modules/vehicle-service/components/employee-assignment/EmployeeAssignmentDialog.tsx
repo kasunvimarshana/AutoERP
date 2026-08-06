@@ -20,14 +20,13 @@ export function EmployeeAssignmentDialog({ dialog, lines, jobSupervisor, error, 
     return (
         <FormDrawer
             open={Boolean(dialog)}
-            title={dialog?.mode === 'edit' ? 'Edit assignment' : 'Assign employee'}
+            title="Edit assignment"
             onClose={() => !saving && onClose()}
         >
             {dialog && (
                 <EmployeeAssignmentForm
-                    key={dialog.mode === 'edit' ? `edit-${dialog.assignmentId}` : 'create'}
+                    key={`edit-${dialog.assignmentId}`}
                     value={dialog.value}
-                    mode={dialog.mode}
                     lines={lines}
                     jobSupervisor={jobSupervisor}
                     error={error}

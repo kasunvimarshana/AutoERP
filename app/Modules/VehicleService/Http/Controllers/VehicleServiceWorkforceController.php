@@ -89,7 +89,7 @@ final class VehicleServiceWorkforceController extends VehicleServiceController
         $jobModel = $this->job($request, $job);
         $lines = $jobModel->lines()
             ->where('is_employee_assignable', true)
-            ->with(['item', 'variant', 'uom', 'employeeAssignments.employee'])
+            ->with(['parent', 'item', 'variant', 'uom', 'employeeAssignments.employee'])
             ->get();
         $itemIds = $lines->pluck('item_id')->filter()->map(static fn ($id): int => (int) $id)->values()->all();
         $defaults = $commissionPolicies->laborDefaultsForItems(

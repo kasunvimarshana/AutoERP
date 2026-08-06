@@ -13,6 +13,7 @@ import {
 import type { VehicleServiceJobLine } from '../vehicleServiceTypes';
 import type { NamedResource } from '@/shared/types/common';
 import {
+    applyAssignmentCommissionDefault,
     assignmentFormToPayload,
     assignmentToForm,
     emptyAssignmentForm,
@@ -53,11 +54,9 @@ export default function VehicleServiceEmployeeAssignmentTab({
     const [dialog, setDialog] = useState<AssignmentDialogState | null>(null);
     const [removeTarget, setRemoveTarget] = useState<AssignmentRow | null>(null);
     const [saving, setSaving] = useState(false);
+    const [assigningLineId, setAssigningLineId] = useState<number | null>(null);
     const [removing, setRemoving] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
-    const assignments = (result.data ?? []).flatMap((line) =>
-        (line.employee_assignments ?? []).map((assignment) => ({ ...assignment, line })));
-
     const synchronize = async () => {
         const snapshot = await loadWorkforceSnapshot(jobId);
         setJobSupervisor(snapshot.supervisor);
@@ -85,22 +84,52 @@ export default function VehicleServiceEmployeeAssignmentTab({
         }
     };
 
+    const createAssignment = async (
+        line: VehicleServiceJobLine,
+        employee: NamedResource,
+    ): Promise<boolean> => {
+        if (assigningLineId !== null) return false;
+
+        const value = {
+            ...applyAssignmentCommissionDefault(
+                emptyAssignmentForm(),
+                result.data ?? [],
+                line.id,
+                jobSupervisor,
+            ),
+            employee,
+        };
+        setAssigningLineId(line.id);
+        setError(null);
+        try {
+            await createVehicleServiceEmployee(jobId, line.id, {
+                ...assignmentFormToPayload(value),
+                expected_version: expectedVersion,
+            });
+            await synchronize();
+
+            return true;
+        } catch (requestError) {
+            await handleMutationError(requestError);
+
+            return false;
+        } finally {
+            setAssigningLineId(null);
+        }
+    };
+
     const saveAssignment = async (value: AssignmentFormValue) => {
         if (!dialog || value.lineId === null || !value.employee || saving) return;
         setSaving(true);
         setError(null);
         try {
             const payload = { ...assignmentFormToPayload(value), expected_version: expectedVersion };
-            if (dialog.mode === 'edit') {
-                await updateVehicleServiceEmployee(
-                    jobId,
-                    value.lineId,
-                    dialog.assignmentId,
-                    payload,
-                );
-            } else {
-                await createVehicleServiceEmployee(jobId, value.lineId, payload);
-            }
+            await updateVehicleServiceEmployee(
+                jobId,
+                value.lineId,
+                dialog.assignmentId,
+                payload,
+            );
             setDialog(null);
             await synchronize();
         } catch (requestError) {
@@ -130,15 +159,13 @@ export default function VehicleServiceEmployeeAssignmentTab({
             <ErrorAlert error={error ?? result.error} />
             <EmployeeAssignmentTable
                 loading={result.loading}
-                rows={assignments}
-                onAdd={() => {
-                    setError(null);
-                    setDialog({ mode: 'create', value: emptyAssignmentForm() });
-                }}
+                lines={result.data ?? []}
+                jobSupervisor={jobSupervisor}
+                assigningLineId={assigningLineId}
+                onAssign={createAssignment}
                 onEdit={(row) => {
                     setError(null);
                     setDialog({
-                        mode: 'edit',
                         assignmentId: row.id,
                         value: assignmentToForm(row),
                     });

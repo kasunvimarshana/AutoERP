@@ -23,15 +23,18 @@ const apiMocks = vi.hoisted(() => ({
 vi.mock('../vehicleServiceApi', () => apiMocks);
 
 vi.mock('@/shared/components/GenericLookupSelect', () => ({
-    GenericLookupSelect: ({ label, onChange }: {
+    GenericLookupSelect: ({ label, value, disabled, onChange }: {
         label: string;
+        value: NamedResource | null;
+        disabled?: boolean;
         onChange: (value: NamedResource | null) => void;
     }) => (
         <button
             type="button"
+            disabled={disabled}
             onClick={() => onChange({ id: 22, code: 'EMP-22', name: 'Second technician' })}
         >
-            Choose {label}
+            {value ? `${value.code} - ${value.name}` : `Choose ${label}`}
         </button>
     ),
 }));
@@ -122,11 +125,8 @@ function refreshedJob(rowVersion: number): VehicleServiceJob {
 
 async function submitNewAssignment() {
     const user = userEvent.setup();
-    await user.click(await screen.findByRole('button', { name: 'Assign employee' }));
-    expect(screen.queryByLabelText('Role')).not.toBeInTheDocument();
-    await user.selectOptions(screen.getByLabelText('Service / labour line'), '11');
-    await user.click(screen.getByRole('button', { name: 'Choose Employee' }));
-    await user.click(screen.getByRole('button', { name: 'Save assignment' }));
+    await user.click(await screen.findByRole('button', { name: 'Choose Employee' }));
+    await user.click(screen.getByRole('button', { name: 'Add' }));
 }
 
 function WorkforceHarness({ onVersionChanged }: { onVersionChanged: (nextVersion: number) => void }) {
@@ -210,7 +210,76 @@ describe('VehicleServiceEmployeeAssignmentTab', () => {
             11,
             expect.objectContaining({ expected_version: 9 }),
         );
-        expect(screen.getByRole('button', { name: 'Save assignment' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Add' })).toBeInTheDocument();
+        expect(screen.queryByRole('heading', { name: 'Assign employee' })).not.toBeInTheDocument();
+    });
+
+    it('groups combo labour lines under the human-readable combo name', async () => {
+        apiMocks.listEmployeeAssignableLines.mockReset().mockResolvedValue([
+            {
+                ...line([]),
+                parent_line_id: 90,
+                parent_line: { id: 90, line_number: 1, description: 'ACID RAIN REMOVER L' },
+                commission_default: {
+                    commission_type: 'fixed',
+                    commission_value: '400.000000',
+                    locked: true,
+                },
+            },
+        ]);
+
+        renderTab(vi.fn());
+
+        expect(await screen.findByRole('heading', { name: 'ACID RAIN REMOVER L' })).toBeInTheDocument();
+        expect(screen.getByText('Combo line 1')).toBeInTheDocument();
+        expect(screen.getByText('Commission pool: 400.000000')).toBeInTheDocument();
+        expect(screen.getByText('Not assigned')).toBeInTheDocument();
+    });
+
+    it('manually assigns the selected Job Card supervisor from a supervisor labour line', async () => {
+        apiMocks.listEmployeeAssignableLines
+            .mockReset()
+            .mockResolvedValueOnce([line([], true)])
+            .mockResolvedValue([line([], true)]);
+        const user = userEvent.setup();
+        renderTab(vi.fn());
+
+        expect(await screen.findByLabelText('Employee')).toHaveValue('EMP-31 - Service Supervisor');
+        expect(screen.getByLabelText('Employee')).toBeDisabled();
+        await user.click(screen.getByRole('button', { name: 'Add' }));
+        expect(screen.queryByRole('heading', { name: 'Assign job supervisor' })).not.toBeInTheDocument();
+
+        await waitFor(() => expect(apiMocks.createVehicleServiceEmployee).toHaveBeenCalledWith(
+            7,
+            11,
+            expect.objectContaining({ employee_id: 31, expected_version: 9 }),
+        ));
+    });
+
+    it('blocks supervisor-line assignment until the Job Card has a supervisor', async () => {
+        apiMocks.listEmployeeAssignableLines.mockReset().mockResolvedValue([line([], true)]);
+        apiMocks.getVehicleServiceJob.mockReset().mockResolvedValue({
+            ...refreshedJob(9),
+            supervisor_employee_id: null,
+            supervisor: null,
+        });
+
+        renderTab(vi.fn());
+
+        expect(await screen.findByText('Job supervisor required')).toBeInTheDocument();
+        expect(screen.getByPlaceholderText('Select a supervisor on the Job Card')).toBeDisabled();
+        expect(screen.getByRole('button', { name: 'Add' })).toBeDisabled();
+    });
+
+    it('keeps the drawer only for editing advanced assignment details', async () => {
+        const user = userEvent.setup();
+        renderTab(vi.fn());
+
+        await user.click(await screen.findByRole('button', { name: 'Edit' }));
+
+        expect(screen.getByRole('heading', { name: 'Edit assignment' })).toBeInTheDocument();
+        expect(screen.getByLabelText('Assigned hours')).toHaveValue('1.000000');
+        expect(screen.getByLabelText('Service / labour line')).toBeDisabled();
     });
 
 });

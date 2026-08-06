@@ -14,9 +14,8 @@ import {
     type AssignmentFormValue,
 } from './assignmentForm';
 
-export function EmployeeAssignmentForm({ value, mode, lines, jobSupervisor, error, saving, onSave, onCancel }: {
+export function EmployeeAssignmentForm({ value, lines, jobSupervisor, error, saving, onSave, onCancel }: {
     value: AssignmentFormValue;
-    mode: 'create' | 'edit';
     lines: VehicleServiceJobLine[];
     jobSupervisor: NamedResource | null;
     error: ApiError | null;
@@ -48,14 +47,14 @@ export function EmployeeAssignmentForm({ value, mode, lines, jobSupervisor, erro
                 <div>
                     <h3 className="font-semibold text-slate-900">Assignment details</h3>
                     <p className="text-sm text-slate-500">
-                        Select the service line and employee. The employee designation is recorded automatically; combo labour commission is fixed by the Job Card snapshot and split across assigned employees.
+                        Assign an employee to this labour line. The employee designation is recorded automatically; combo labour commission is fixed by the Job Card snapshot and split across assigned employees.
                     </p>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                     <Select
                         label="Service / labour line"
                         value={draft.lineId ?? ''}
-                        disabled={mode === 'edit'}
+                        disabled
                         options={lines.map((line) => ({
                             value: line.id,
                             label: `${line.line_number}. ${line.description}`,
@@ -80,6 +79,11 @@ export function EmployeeAssignmentForm({ value, mode, lines, jobSupervisor, erro
                         formatLabel={(employee) =>
                             [employee.code, employee.name].filter(Boolean).join(' - ')}
                     />
+                    {selectedLine?.uses_job_supervisor === true && (
+                        <p className="text-sm text-slate-500 sm:col-span-2">
+                            This line uses the supervisor selected on the Job Card. The employee cannot be changed here.
+                        </p>
+                    )}
                     <DecimalInput
                         label="Assigned hours"
                         value={draft.hours}

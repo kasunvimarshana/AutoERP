@@ -92,6 +92,11 @@ export interface VehicleServiceEmployeeAssignmentPayload {
 export interface VehicleServiceJobLine {
     id: number;
     parent_line_id?: number | null;
+    parent_line?: {
+        id: number;
+        line_number: number;
+        description: string;
+    } | null;
     line_number: number;
     line_source_type: VehicleServiceLineSourceType;
     item_id?: number | null;

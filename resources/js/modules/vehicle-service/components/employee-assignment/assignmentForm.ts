@@ -10,9 +10,10 @@ import type { CommissionAwareVehicleServiceJobLine } from '../../commissionTypes
 const ZERO_AMOUNT = '0.000000';
 export type AssignmentRow = VehicleServiceEmployeeAssignment & { line: VehicleServiceJobLine };
 
-export type AssignmentDialogState =
-    | { mode: 'create'; value: AssignmentFormValue }
-    | { mode: 'edit'; assignmentId: number; value: AssignmentFormValue };
+export interface AssignmentDialogState {
+    assignmentId: number;
+    value: AssignmentFormValue;
+}
 
 export interface AssignmentFormValue {
     lineId: number | null;
