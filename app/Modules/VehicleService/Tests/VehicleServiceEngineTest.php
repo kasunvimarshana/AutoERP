@@ -313,6 +313,11 @@ final class VehicleServiceEngineTest extends TestCase
     public function test_combo_supervisor_labour_uses_job_supervisor_and_replaces_global_commission(): void
     {
         $context = $this->context();
+        $alternateSupervisorEmployeeId = $this->employee(
+            $context['tenant_id'],
+            'EMP-ALT-SUPERVISOR',
+            $context['supervisor_designation_id'],
+        );
         $combo = $this->item($context['tenant_id'], 'COMBO-SUPERVISOR', ItemType::Combo, false, $context['uom_id']);
         DB::table('item_bundles')->insert([
             'tenant_id' => $context['tenant_id'],
@@ -338,14 +343,30 @@ final class VehicleServiceEngineTest extends TestCase
         $assignment = $this->assignEmployee(
             $job,
             $child,
-            new VehicleServiceEmployeeAssignmentData($context['supervisor_employee_id']),
+            new VehicleServiceEmployeeAssignmentData($alternateSupervisorEmployeeId),
         );
         $job = $this->refreshJob($job);
 
+        $this->assertNotSame($context['supervisor_employee_id'], $assignment->employee_id);
+        $this->assertSame($alternateSupervisorEmployeeId, $assignment->employee_id);
         $this->assertSame('supervisor', $assignment->role_type);
         $this->assertSame('60.000000', (string) $job->supervisor_commission_amount);
         $this->assertSame('60.000000', (string) $job->commission_cost_total);
         $this->assertSame('440.000000', (string) $job->net_after_commission);
+
+        try {
+            $this->assignEmployee(
+                $job,
+                $child,
+                new VehicleServiceEmployeeAssignmentData($context['employee_id']),
+            );
+            $this->fail('Expected a non-supervisor assignment to be rejected.');
+        } catch (InvalidArgumentException $exception) {
+            $this->assertSame(
+                'Only employees with the Supervisor designation can be assigned to this labour line.',
+                $exception->getMessage(),
+            );
+        }
     }
 
     public function test_inventory_issue_only_posts_inventory_lines_and_enforces_availability(): void
@@ -1049,6 +1070,7 @@ final class VehicleServiceEngineTest extends TestCase
             'employee_id' => $employeeId,
             'helper_employee_id' => $helperEmployeeId,
             'supervisor_employee_id' => $supervisorEmployeeId,
+            'supervisor_designation_id' => $supervisorDesignationId,
             'stock' => $this->item($tenantId, 'STOCK-'.$suffix, ItemType::Stock, true, $uomId),
             'service' => $this->item($tenantId, 'SERVICE-'.$suffix, ItemType::Service, false, $uomId),
             'labour' => $this->item($tenantId, 'LABOUR-'.$suffix, ItemType::Labour, false, $uomId),

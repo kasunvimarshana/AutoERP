@@ -2,7 +2,6 @@ import { useCallback, useState } from 'react';
 import { lookupApi } from '@/shared/api/lookupApi';
 import { Button } from '@/shared/components/Button';
 import { GenericLookupSelect } from '@/shared/components/GenericLookupSelect';
-import { Input } from '@/shared/components/Input';
 import { LoadingState } from '@/shared/components/LoadingState';
 import type { NamedResource } from '@/shared/types/common';
 import type { LookupLoadParams } from '@/shared/types/lookup';
@@ -49,19 +48,8 @@ export function EmployeeAssignmentTable({
     }
 
     const groups = groupLines(lines);
-    const needsJobSupervisor = lines.some((line) => line.uses_job_supervisor) && !jobSupervisor;
-
     return (
         <div className="space-y-5">
-            {needsJobSupervisor && (
-                <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
-                    <p className="font-semibold text-amber-900">Job supervisor required</p>
-                    <p className="mt-1 text-sm text-amber-800">
-                        Select a supervisor on the Job Card before assigning supervisor labour lines.
-                    </p>
-                </div>
-            )}
-
             {groups.map((group) => (
                 <section key={group.key} className="overflow-hidden rounded-xl border border-slate-200 bg-white">
                     <header className="border-b border-slate-200 bg-slate-50 px-4 py-3 sm:px-5">
@@ -105,10 +93,15 @@ function WorkforceLine({
     onEdit: (row: AssignmentRow) => void;
     onRemove: (row: AssignmentRow) => void;
 }) {
-    const [selectedEmployee, setSelectedEmployee] = useState<NamedResource | null>(null);
+    const [selectedEmployeeOverride, setSelectedEmployeeOverride] = useState<NamedResource | null>();
+    const selectedEmployee = selectedEmployeeOverride === undefined
+        ? (line.uses_job_supervisor === true ? jobSupervisor : null)
+        : selectedEmployeeOverride;
     const searchEmployees = useCallback(
-        (params: LookupLoadParams) => lookupApi.availableNonSupervisorEmployees(params),
-        [],
+        (params: LookupLoadParams) => line.uses_job_supervisor === true
+            ? lookupApi.availableSupervisors(params)
+            : lookupApi.availableNonSupervisorEmployees(params),
+        [line.uses_job_supervisor],
     );
     const assignments = (line.employee_assignments ?? []).map((assignment) => ({ ...assignment, line }));
     const supervisorAssigned = line.uses_job_supervisor === true && assignments.length > 0;
@@ -117,7 +110,7 @@ function WorkforceLine({
 
     const submitAssignment = async (employee: NamedResource | null) => {
         if (!employee || assignmentLocked) return;
-        if (await onAssign(employee)) setSelectedEmployee(null);
+        if (await onAssign(employee)) setSelectedEmployeeOverride(undefined);
     };
 
     return (
@@ -130,7 +123,7 @@ function WorkforceLine({
                         </h4>
                         {line.uses_job_supervisor === true && (
                             <span className="rounded-full bg-sky-100 px-2 py-1 text-xs font-semibold text-sky-800">
-                                Job supervisor
+                                Supervisor
                             </span>
                         )}
                     </div>
@@ -145,22 +138,26 @@ function WorkforceLine({
                     className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end"
                     onSubmit={(event) => {
                         event.preventDefault();
-                        void submitAssignment(jobSupervisor);
+                        void submitAssignment(selectedEmployee);
                     }}
                 >
                     <div className="min-w-0 flex-1">
-                        <Input
+                        <GenericLookupSelect
                             label="Employee"
-                            value={jobSupervisor ? formatNamedResource(jobSupervisor) : ''}
-                            placeholder="Select a supervisor on the Job Card"
-                            disabled
-                            readOnly
+                            value={selectedEmployee}
+                            onChange={setSelectedEmployeeOverride}
+                            search={searchEmployees}
+                            formatLabel={formatNamedResource}
+                            excludeIds={assignedEmployeeIds}
+                            placeholder="Search supervisors by code or name"
+                            loadOnOpen
+                            disabled={assignmentLocked}
                         />
                     </div>
                     <Button
                         type="submit"
                         loading={assigning}
-                        disabled={!jobSupervisor || assignmentLocked}
+                        disabled={!selectedEmployee || assignmentLocked}
                         className="shrink-0 sm:min-w-24"
                     >
                         Add
@@ -180,7 +177,7 @@ function WorkforceLine({
                         <GenericLookupSelect
                             label="Employee"
                             value={selectedEmployee}
-                            onChange={setSelectedEmployee}
+                            onChange={setSelectedEmployeeOverride}
                             search={searchEmployees}
                             formatLabel={formatNamedResource}
                             excludeIds={assignedEmployeeIds}

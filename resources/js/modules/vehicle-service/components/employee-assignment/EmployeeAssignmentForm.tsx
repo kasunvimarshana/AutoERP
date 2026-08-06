@@ -24,8 +24,12 @@ export function EmployeeAssignmentForm({ value, lines, jobSupervisor, error, sav
     onCancel: () => void;
 }) {
     const [draft, setDraft] = useState(value);
-    const search = useCallback(
+    const searchNonSupervisors = useCallback(
         (params: LookupLoadParams) => lookupApi.availableNonSupervisorEmployees(params),
+        [],
+    );
+    const searchSupervisors = useCallback(
+        (params: LookupLoadParams) => lookupApi.availableSupervisors(params),
         [],
     );
     const set = <K extends keyof AssignmentFormValue>(
@@ -74,14 +78,19 @@ export function EmployeeAssignmentForm({ value, lines, jobSupervisor, error, sav
                         value={draft.employee}
                         error={fieldError(error, 'employee_id')}
                         onChange={(employee) => set('employee', employee)}
-                        search={search}
-                        disabled={selectedLine?.uses_job_supervisor === true}
+                        search={selectedLine?.uses_job_supervisor === true
+                            ? searchSupervisors
+                            : searchNonSupervisors}
+                        placeholder={selectedLine?.uses_job_supervisor === true
+                            ? 'Search supervisors by code or name'
+                            : 'Search by code or name'}
+                        loadOnOpen
                         formatLabel={(employee) =>
                             [employee.code, employee.name].filter(Boolean).join(' - ')}
                     />
                     {selectedLine?.uses_job_supervisor === true && (
                         <p className="text-sm text-slate-500 sm:col-span-2">
-                            This line uses the supervisor selected on the Job Card. The employee cannot be changed here.
+                            Only active employees with the Supervisor designation can be selected for this line.
                         </p>
                     )}
                     <DecimalInput

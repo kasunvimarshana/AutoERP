@@ -82,10 +82,8 @@ final class VehicleServiceValidationService
         }
 
         if ($line->uses_job_supervisor) {
-            if ($job->supervisor_employee_id === null
-                || (int) $job->supervisor_employee_id !== $employeeId
-                || $employee->designation->code !== VehicleServiceDesignationCode::Supervisor->value) {
-                throw new InvalidArgumentException('This labour line must use the supervisor selected on the service job.');
+            if ($employee->designation->code !== VehicleServiceDesignationCode::Supervisor->value) {
+                throw new InvalidArgumentException('Only employees with the Supervisor designation can be assigned to this labour line.');
             }
 
             return $employee;
