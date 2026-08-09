@@ -6,15 +6,12 @@ namespace Modules\VehicleService\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
-use Modules\Core\Services\DecimalMath;
-use Modules\Item\Enums\ItemType;
-use Modules\VehicleService\Enums\VehicleServiceLineSourceType;
 use Modules\VehicleService\Http\Requests\ListVehicleServiceJobRequest;
 use Modules\VehicleService\Http\Requests\StoreVehicleServiceEmployeeRequest;
 use Modules\VehicleService\Http\Requests\VehicleServiceActionRequest;
 use Modules\VehicleService\Http\Resources\VehicleServiceEmployeeAssignmentResource;
 use Modules\VehicleService\Http\Resources\VehicleServiceJobLineResource;
-use Modules\VehicleService\Services\VehicleServiceCommissionPolicyService;
+use Modules\VehicleService\Services\VehicleServiceAssignableLineService;
 use Modules\VehicleService\Services\VehicleServiceEmployeeAssignmentService;
 
 final class VehicleServiceWorkforceController extends VehicleServiceController
@@ -83,33 +80,10 @@ final class VehicleServiceWorkforceController extends VehicleServiceController
     public function assignableLines(
         ListVehicleServiceJobRequest $request,
         int $job,
-        VehicleServiceCommissionPolicyService $commissionPolicies,
-        DecimalMath $math,
+        VehicleServiceAssignableLineService $assignableLines,
     ): AnonymousResourceCollection {
         $jobModel = $this->job($request, $job);
-        $lines = $jobModel->lines()
-            ->where('is_employee_assignable', true)
-            ->with(['parent', 'item', 'variant', 'uom', 'employeeAssignments.employee'])
-            ->get();
-        $itemIds = $lines->pluck('item_id')->filter()->map(static fn ($id): int => (int) $id)->values()->all();
-        $defaults = $commissionPolicies->laborDefaultsForItems(
-            $request->tenantId(),
-            (int) $request->organizationUnitId(),
-            $itemIds,
-        );
 
-        foreach ($lines as $line) {
-            $comboLabour = $line->line_source_type === VehicleServiceLineSourceType::ComboChild
-                && $line->item?->item_type === ItemType::Labour;
-            $line->setAttribute('commission_default', $comboLabour
-                ? [
-                    'commission_type' => 'fixed',
-                    'commission_value' => $math->mul((string) $line->quantity, (string) $line->unit_cost),
-                    'locked' => true,
-                ]
-                : ($defaults[(int) $line->item_id] ?? null));
-        }
-
-        return VehicleServiceJobLineResource::collection($lines);
+        return VehicleServiceJobLineResource::collection($assignableLines->forJob($jobModel));
     }
 }

@@ -11,6 +11,7 @@ import type {
     VehicleServiceJobLine,
 } from '../vehicleServiceTypes';
 import VehicleServiceEmployeeAssignmentTab from './VehicleServiceEmployeeAssignmentTab';
+import { createVehicleServiceJobStore } from '../state/vehicleServiceJobStore';
 
 const apiMocks = vi.hoisted(() => ({
     createVehicleServiceEmployee: vi.fn(),
@@ -132,13 +133,22 @@ async function submitNewAssignment() {
     await user.click(screen.getByRole('button', { name: 'Add' }));
 }
 
-function WorkforceHarness({ onVersionChanged }: { onVersionChanged: (nextVersion: number) => void }) {
+function WorkforceHarness({
+    onVersionChanged,
+    active = true,
+}: {
+    onVersionChanged: (nextVersion: number) => void;
+    active?: boolean;
+}) {
     const [expectedVersion, setExpectedVersion] = useState(7);
+    const [jobStore] = useState(() => createVehicleServiceJobStore(7));
 
     return (
         <VehicleServiceEmployeeAssignmentTab
             jobId={7}
             expectedVersion={expectedVersion}
+            active={active}
+            jobStore={jobStore}
             onChanged={(nextVersion) => {
                 setExpectedVersion(nextVersion);
                 onVersionChanged(nextVersion);
@@ -186,6 +196,30 @@ describe('VehicleServiceEmployeeAssignmentTab', () => {
         expect(apiMocks.listEmployeeAssignableLines).toHaveBeenCalledTimes(2);
         expect(apiMocks.getVehicleServiceJob).toHaveBeenCalledTimes(2);
         expect((await screen.findAllByText('fixed: 50.000000')).length).toBeGreaterThanOrEqual(2);
+    });
+
+    it('keeps cached workforce visible and revalidates when the tab becomes active again', async () => {
+        const onVersionChanged = vi.fn();
+        const view = render(
+            <TestRouter>
+                <WorkforceHarness active onVersionChanged={onVersionChanged} />
+            </TestRouter>,
+        );
+        expect((await screen.findAllByText('fixed: 100.000000')).length).toBeGreaterThanOrEqual(1);
+
+        view.rerender(
+            <TestRouter>
+                <WorkforceHarness active={false} onVersionChanged={onVersionChanged} />
+            </TestRouter>,
+        );
+        view.rerender(
+            <TestRouter>
+                <WorkforceHarness active onVersionChanged={onVersionChanged} />
+            </TestRouter>,
+        );
+
+        await waitFor(() => expect(apiMocks.listEmployeeAssignableLines).toHaveBeenCalledTimes(2));
+        expect((await screen.findAllByText('fixed: 50.000000')).length).toBeGreaterThanOrEqual(1);
     });
 
     it('reloads the latest state after a genuine stale-version rejection and keeps the form retryable', async () => {

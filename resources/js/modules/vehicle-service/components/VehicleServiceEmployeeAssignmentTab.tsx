@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useStore } from 'zustand';
 import { ApiError, hasFieldError, toApiError } from '@/shared/api/apiError';
 import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
@@ -12,6 +13,7 @@ import {
 } from '../vehicleServiceApi';
 import type { VehicleServiceJobLine } from '../vehicleServiceTypes';
 import type { NamedResource } from '@/shared/types/common';
+import type { VehicleServiceJobStore, WorkforceSnapshot } from '../state/vehicleServiceJobStore';
 import {
     applyAssignmentCommissionDefault,
     assignmentFormToPayload,
@@ -28,39 +30,46 @@ const STALE_VERSION_FIELD = 'expected_version';
 const STALE_VERSION_RECOVERY_MESSAGE = 'The service job changed while this request was open. Latest job and workforce data has been loaded. Review and try again.';
 const MISSING_JOB_VERSION_MESSAGE = 'The refreshed service job did not include its row version.';
 
-interface WorkforceSnapshot {
-    lines: VehicleServiceJobLine[];
-    rowVersion: number;
-    supervisor: NamedResource | null;
-}
-
 export default function VehicleServiceEmployeeAssignmentTab({
     jobId,
     expectedVersion,
     onChanged,
+    active,
+    jobStore,
 }: {
     jobId: number;
     expectedVersion: number;
     onChanged: (nextVersion: number) => void;
+    active: boolean;
+    jobStore: VehicleServiceJobStore;
 }) {
-    const [jobSupervisor, setJobSupervisor] = useState<NamedResource | null>(null);
+    const workforce = useStore(jobStore, (state) => state.workforce);
     const result = useApi(async (signal) => {
         const snapshot = await loadWorkforceSnapshot(jobId, signal);
-        setJobSupervisor(snapshot.supervisor);
+        jobStore.getState().replaceWorkforce(snapshot);
         onChanged(snapshot.rowVersion);
 
-        return snapshot.lines;
-    }, [jobId]);
+        return snapshot;
+    }, [jobId], true, false);
+    const wasActive = useRef(active);
     const [dialog, setDialog] = useState<AssignmentDialogState | null>(null);
     const [removeTarget, setRemoveTarget] = useState<AssignmentRow | null>(null);
     const [saving, setSaving] = useState(false);
     const [assigningLineId, setAssigningLineId] = useState<number | null>(null);
     const [removing, setRemoving] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
+    const reload = result.reload;
+
+    useEffect(() => {
+        const becameActive = active && !wasActive.current;
+        wasActive.current = active;
+        if (becameActive) reload();
+    }, [active, reload]);
+
     const synchronize = async () => {
         const snapshot = await loadWorkforceSnapshot(jobId);
-        setJobSupervisor(snapshot.supervisor);
-        result.setData(snapshot.lines);
+        jobStore.getState().replaceWorkforce(snapshot);
+        result.setData(snapshot);
         onChanged(snapshot.rowVersion);
     };
 
@@ -93,9 +102,9 @@ export default function VehicleServiceEmployeeAssignmentTab({
         const value = {
             ...applyAssignmentCommissionDefault(
                 emptyAssignmentForm(),
-                result.data ?? [],
+                workforce?.lines ?? [],
                 line.id,
-                jobSupervisor,
+                workforce?.supervisor ?? null,
             ),
             employee,
         };
@@ -158,9 +167,9 @@ export default function VehicleServiceEmployeeAssignmentTab({
         <div className="space-y-5">
             <ErrorAlert error={error ?? result.error} />
             <EmployeeAssignmentTable
-                loading={result.loading}
-                lines={result.data ?? []}
-                jobSupervisor={jobSupervisor}
+                loading={result.loading && workforce === null}
+                lines={workforce?.lines ?? []}
+                jobSupervisor={workforce?.supervisor ?? null}
                 assigningLineId={assigningLineId}
                 onAssign={createAssignment}
                 onEdit={(row) => {
@@ -174,8 +183,8 @@ export default function VehicleServiceEmployeeAssignmentTab({
             />
             <EmployeeAssignmentDialog
                 dialog={dialog}
-                lines={result.data ?? []}
-                jobSupervisor={jobSupervisor}
+                lines={workforce?.lines ?? []}
+                jobSupervisor={workforce?.supervisor ?? null}
                 error={error}
                 saving={saving}
                 onClose={() => setDialog(null)}

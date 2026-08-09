@@ -647,6 +647,50 @@ final class VehicleServiceEngineTest extends TestCase
         }
     }
 
+    public function test_line_mutations_return_authoritative_workforce_snapshots(): void
+    {
+        $this->withoutMiddleware();
+        $context = $this->context();
+        $this->actingAsTenantUser($context['tenant_id']);
+        $job = $this->createJob($context);
+        $payload = [
+            'tenant_id' => $context['tenant_id'],
+            'line_source_type' => VehicleServiceLineSourceType::LabourItem->value,
+            'item_id' => $context['labour']->getKey(),
+            'description' => 'Technician labour',
+            'quantity' => '1.000000',
+            'unit_price' => '100.000000',
+        ];
+
+        $created = $this->tenantPostJson(
+            $context['tenant_id'],
+            "/api/v1/vehicle-service/jobs/{$job->getKey()}/lines",
+            [...$payload, 'expected_version' => $this->currentJobVersion($job)],
+        )->assertCreated()
+            ->assertJsonPath('meta.workforce_lines.0.description', 'Technician labour')
+            ->assertJsonCount(1, 'meta.workforce_lines');
+        $lineId = (int) $created->json('data.id');
+        $createdVersion = (int) $created->json('meta.row_version');
+
+        $updated = $this->withTenantExecutionContext(
+            (int) $context['tenant_id'],
+            fn () => $this->putJson(
+                "/api/v1/vehicle-service/jobs/{$job->getKey()}/lines/{$lineId}",
+                [...$payload, 'description' => 'Senior technician labour', 'expected_version' => $createdVersion],
+            ),
+        )->assertOk()
+            ->assertJsonPath('meta.workforce_lines.0.id', $lineId)
+            ->assertJsonPath('meta.workforce_lines.0.description', 'Senior technician labour');
+
+        $this->tenantDeleteJson(
+            $context['tenant_id'],
+            "/api/v1/vehicle-service/jobs/{$job->getKey()}/lines/{$lineId}",
+            ['tenant_id' => $context['tenant_id'], 'expected_version' => (int) $updated->json('meta.row_version')],
+        )->assertOk()
+            ->assertJsonPath('data', null)
+            ->assertJsonCount(0, 'meta.workforce_lines');
+    }
+
     public function test_optional_job_fields_persist_and_nullable_commission_fields_default_to_none(): void
     {
         $this->withoutMiddleware();

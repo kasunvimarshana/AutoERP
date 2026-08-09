@@ -10,6 +10,9 @@ use Modules\VehicleService\Http\Requests\ListVehicleServiceJobRequest;
 use Modules\VehicleService\Http\Requests\StoreVehicleServiceLineRequest;
 use Modules\VehicleService\Http\Requests\VehicleServiceActionRequest;
 use Modules\VehicleService\Http\Resources\VehicleServiceJobLineResource;
+use Modules\VehicleService\Models\VehicleServiceJob;
+use Modules\VehicleService\Models\VehicleServiceJobLine;
+use Modules\VehicleService\Services\VehicleServiceAssignableLineService;
 use Modules\VehicleService\Services\VehicleServiceLineService;
 
 final class VehicleServiceLineController extends VehicleServiceController
@@ -35,10 +38,12 @@ final class VehicleServiceLineController extends VehicleServiceController
         StoreVehicleServiceLineRequest $request,
         int $job,
         VehicleServiceLineService $service,
+        VehicleServiceAssignableLineService $assignableLines,
     ): JsonResponse {
-        return (new VehicleServiceJobLineResource(
-            $service->create($this->job($request, $job), $request->toData(), $request->expectedVersion()),
-        ))->response()->setStatusCode(201);
+        $jobModel = $this->job($request, $job);
+        $line = $service->create($jobModel, $request->toData(), $request->expectedVersion());
+
+        return $this->mutationResponse($request, $jobModel, $line, $assignableLines, 201);
     }
 
     public function update(
@@ -46,12 +51,17 @@ final class VehicleServiceLineController extends VehicleServiceController
         int $job,
         int $line,
         VehicleServiceLineService $service,
-    ): VehicleServiceJobLineResource {
+        VehicleServiceAssignableLineService $assignableLines,
+    ): JsonResponse {
         $jobModel = $this->job($request, $job);
-
-        return new VehicleServiceJobLineResource(
-            $service->update($jobModel, $this->line($jobModel, $line), $request->toData(), $request->expectedVersion()),
+        $updatedLine = $service->update(
+            $jobModel,
+            $this->line($jobModel, $line),
+            $request->toData(),
+            $request->expectedVersion(),
         );
+
+        return $this->mutationResponse($request, $jobModel, $updatedLine, $assignableLines);
     }
 
     public function destroy(
@@ -59,10 +69,31 @@ final class VehicleServiceLineController extends VehicleServiceController
         int $job,
         int $line,
         VehicleServiceLineService $service,
+        VehicleServiceAssignableLineService $assignableLines,
     ): JsonResponse {
         $jobModel = $this->job($request, $job);
         $service->delete($jobModel, $this->line($jobModel, $line), $request->expectedVersion());
 
-        return response()->json(status: 204);
+        return $this->mutationResponse($request, $jobModel, null, $assignableLines);
+    }
+
+    private function mutationResponse(
+        StoreVehicleServiceLineRequest|VehicleServiceActionRequest $request,
+        VehicleServiceJob $job,
+        ?VehicleServiceJobLine $line,
+        VehicleServiceAssignableLineService $assignableLines,
+        int $status = 200,
+    ): JsonResponse {
+        $job->refresh();
+
+        return response()->json([
+            'data' => $line === null ? null : (new VehicleServiceJobLineResource($line))->resolve($request),
+            'meta' => [
+                'row_version' => (int) $job->row_version,
+                'workforce_lines' => VehicleServiceJobLineResource::collection(
+                    $assignableLines->forJob($job),
+                )->resolve($request),
+            ],
+        ], $status);
     }
 }
