@@ -24,7 +24,9 @@ describe('Vehicle Service job-line inventory flow', () => {
     });
 
     it('offers add-and-issue only for permitted newly created inventory lines', () => {
-        expect(lineFormSource).toContain("canIssueInventory && mode === 'create' && draft.source === 'inventory_item'");
+        expect(lineFormSource).toContain("&& mode === 'create'");
+        expect(lineFormSource).toContain('&& draft.item !== null');
+        expect(lineFormSource).toContain("&& draft.source === 'inventory_item'");
         expect(lineFormSource).toContain('Add & issue stock');
         expect(lineFormSource).toContain('draft.issueWarehouse !== null');
         expect(lineFormSource).toContain('draft.issueLocation !== null');

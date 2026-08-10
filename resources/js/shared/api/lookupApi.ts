@@ -21,8 +21,10 @@ export interface VehicleLookupResource extends NamedResource {
 }
 
 export interface ItemLookupResource extends NamedResource {
+    item_type?: 'stock' | 'non_stock' | 'service' | 'labour' | 'asset' | 'consumable' | 'package' | 'combo';
     base_uom?: NamedResource | null;
     is_stockable?: boolean;
+    is_combo?: boolean;
     resolved_service_unit_price?: string | null;
     resolved_purchase_unit_price?: string | null;
     available_stock_quantity?: string | null;
