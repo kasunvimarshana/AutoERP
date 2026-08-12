@@ -38,4 +38,6 @@ export type {
     SummaryPaymentMethod,
     SummaryPaymentMetrics,
     SummaryReportResult,
+    SalesSettlementBreakdown,
+    SalesSettlementMetric,
 } from './summaryReportTypes';

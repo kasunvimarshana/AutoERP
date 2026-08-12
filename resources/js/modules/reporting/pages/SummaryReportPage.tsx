@@ -159,6 +159,11 @@ export default function SummaryReportPage() {
                                 compact
                             />
                         </div>
+                        <SalesSettlementStrip
+                            settlement={result.sales_settlement}
+                            salesTotal={result.documents.sales.grand_total}
+                            currency={currency}
+                        />
                     </section>
 
                     <section className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
@@ -233,6 +238,113 @@ export default function SummaryReportPage() {
                 </div>
             ) : null}
         </>
+    );
+}
+
+function SalesSettlementStrip({
+    settlement,
+    salesTotal,
+    currency,
+}: {
+    settlement: SummaryReportResult['sales_settlement'];
+    salesTotal: string;
+    currency: string;
+}) {
+    const supportingItems = [
+        Number(settlement.other_paid.amount) !== 0
+            ? `Other paid methods ${money(settlement.other_paid.amount, currency)}`
+            : null,
+        Number(settlement.credits_applied) !== 0
+            ? `Credits applied ${money(settlement.credits_applied, currency)}`
+            : null,
+    ].filter((item): item is string => item !== null);
+
+    return (
+        <div className="mt-4 overflow-hidden rounded-2xl border border-emerald-200 bg-emerald-50/60 shadow-sm">
+            <div className="flex flex-col gap-2 border-b border-emerald-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.17em] text-emerald-700">Sales settlement mix</p>
+                    <p className="mt-1 text-sm text-slate-600">How the selected sales are currently settled.</p>
+                </div>
+                <p className="text-sm font-semibold tabular-nums text-slate-700">
+                    Sales total {money(salesTotal, currency)}
+                </p>
+            </div>
+            <div className="grid gap-px bg-emerald-100 sm:grid-cols-3">
+                <SettlementTile
+                    label="Cash"
+                    description="Allocated cash receipts"
+                    amount={settlement.cash.amount}
+                    documentCount={settlement.cash.document_count}
+                    currency={currency}
+                    accent="emerald"
+                />
+                <SettlementTile
+                    label="Card"
+                    description="Allocated card receipts"
+                    amount={settlement.card.amount}
+                    documentCount={settlement.card.document_count}
+                    currency={currency}
+                    accent="sky"
+                />
+                <SettlementTile
+                    label="On credit"
+                    description="Current balance outstanding"
+                    amount={settlement.credit.amount}
+                    documentCount={settlement.credit.document_count}
+                    currency={currency}
+                    accent="amber"
+                />
+            </div>
+            <div className="flex flex-col gap-2 bg-white px-5 py-3 text-xs text-slate-500 lg:flex-row lg:items-center lg:justify-between">
+                <p className="max-w-4xl leading-5">{settlement.source_note}</p>
+                {supportingItems.length > 0 ? (
+                    <p className="shrink-0 font-medium text-slate-600">{supportingItems.join(' · ')}</p>
+                ) : null}
+            </div>
+        </div>
+    );
+}
+
+function SettlementTile({
+    label,
+    description,
+    amount,
+    documentCount,
+    currency,
+    accent,
+}: {
+    label: string;
+    description: string;
+    amount: string;
+    documentCount: number;
+    currency: string;
+    accent: 'emerald' | 'sky' | 'amber';
+}) {
+    const accentClasses = {
+        emerald: 'bg-emerald-500',
+        sky: 'bg-sky-500',
+        amber: 'bg-amber-500',
+    };
+
+    return (
+        <article className="relative bg-white px-5 py-5">
+            <div className={`absolute inset-y-5 left-0 w-1 rounded-r-full ${accentClasses[accent]}`} />
+            <div className="pl-2">
+                <div className="flex items-start justify-between gap-3">
+                    <div>
+                        <h3 className="font-bold text-slate-950">{label}</h3>
+                        <p className="mt-0.5 text-xs text-slate-500">{description}</p>
+                    </div>
+                    <span className="rounded-full bg-slate-100 px-2 py-1 text-[0.68rem] font-semibold text-slate-500">
+                        {documentCount} sales
+                    </span>
+                </div>
+                <p className="mt-4 text-xl font-bold tabular-nums tracking-tight text-slate-950">
+                    {money(amount, currency)}
+                </p>
+            </div>
+        </article>
     );
 }
 

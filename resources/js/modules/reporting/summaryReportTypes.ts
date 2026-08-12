@@ -22,6 +22,20 @@ export interface SummaryPaymentMetrics {
     methods: SummaryPaymentMethod[];
 }
 
+export interface SalesSettlementMetric {
+    amount: string;
+    document_count: number;
+}
+
+export interface SalesSettlementBreakdown {
+    cash: SalesSettlementMetric;
+    card: SalesSettlementMetric;
+    credit: SalesSettlementMetric;
+    other_paid: SalesSettlementMetric;
+    credits_applied: string;
+    source_note: string;
+}
+
 export interface SummaryCapability {
     available: boolean;
     source: string | null;
@@ -40,6 +54,7 @@ export interface SummaryReportResult {
         sales_returns: SummaryDocumentMetrics;
         purchase_returns: SummaryDocumentMetrics;
     };
+    sales_settlement: SalesSettlementBreakdown;
     payments: {
         received: SummaryPaymentMetrics;
         sent: SummaryPaymentMetrics;

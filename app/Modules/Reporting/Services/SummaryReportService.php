@@ -30,6 +30,7 @@ final class SummaryReportService
         private readonly DecimalMath $math,
         private readonly FinanceStatementService $statements,
         private readonly ReportBrandingResolver $branding,
+        private readonly SalesSettlementBreakdownService $salesSettlements,
     ) {}
 
     /**
@@ -99,6 +100,12 @@ final class SummaryReportService
                 'sales_returns' => $salesReturns,
                 'purchase_returns' => $purchaseReturns,
             ],
+            'sales_settlement' => $this->salesSettlements->run(
+                $tenantId,
+                $organizationUnitId,
+                $dateFrom,
+                $dateTo,
+            ),
             'payments' => [
                 'received' => $this->paymentSummary(
                     $tenantId,
