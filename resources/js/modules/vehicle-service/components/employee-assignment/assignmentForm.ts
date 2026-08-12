@@ -5,39 +5,37 @@ import type {
     VehicleServiceEmployeeAssignmentPayload,
     VehicleServiceJobLine,
 } from '../../vehicleServiceTypes';
-import type {
-    CommissionAwareVehicleServiceJobLine,
-    VehicleServiceWorkforceRole,
-} from '../../commissionTypes';
+import type { CommissionAwareVehicleServiceJobLine } from '../../commissionTypes';
 
 const ZERO_AMOUNT = '0.000000';
 export type AssignmentRow = VehicleServiceEmployeeAssignment & { line: VehicleServiceJobLine };
 
-export type AssignmentDialogState =
-    | { mode: 'create'; value: AssignmentFormValue }
-    | { mode: 'edit'; assignmentId: number; value: AssignmentFormValue };
+export interface AssignmentDialogState {
+    assignmentId: number;
+    value: AssignmentFormValue;
+}
 
 export interface AssignmentFormValue {
     lineId: number | null;
     employee: NamedResource | null;
-    role: VehicleServiceWorkforceRole;
     hours: string;
     rate: string;
     commissionType: CommissionType;
     commissionValue: string;
     status: 'assigned' | 'completed' | 'cancelled';
+    commissionLocked: boolean;
 }
 
 export function emptyAssignmentForm(): AssignmentFormValue {
     return {
         lineId: null,
         employee: null,
-        role: 'technician',
         hours: ZERO_AMOUNT,
         rate: ZERO_AMOUNT,
         commissionType: 'none',
         commissionValue: ZERO_AMOUNT,
         status: 'assigned',
+        commissionLocked: false,
     };
 }
 
@@ -45,12 +43,14 @@ export function assignmentToForm(row: AssignmentRow): AssignmentFormValue {
     return {
         lineId: row.line.id,
         employee: row.employee ?? null,
-        role: isWorkforceRole(row.role_type) ? row.role_type : 'custom',
         hours: row.assigned_hours,
         rate: row.rate,
         commissionType: row.commission_type,
         commissionValue: row.commission_value,
         status: isAssignmentStatus(row.status) ? row.status : 'assigned',
+        commissionLocked: Boolean(
+            (row.line as CommissionAwareVehicleServiceJobLine).commission_default?.locked,
+        ),
     };
 }
 
@@ -58,6 +58,7 @@ export function applyAssignmentCommissionDefault(
     current: AssignmentFormValue,
     lines: VehicleServiceJobLine[],
     lineId: number | null,
+    jobSupervisor: NamedResource | null,
 ): AssignmentFormValue {
     const line = lines.find((candidate) => candidate.id === lineId) as CommissionAwareVehicleServiceJobLine | undefined;
     const commission = line?.commission_default;
@@ -67,6 +68,8 @@ export function applyAssignmentCommissionDefault(
         lineId,
         commissionType: commission?.commission_type ?? 'none',
         commissionValue: commission?.commission_value ?? ZERO_AMOUNT,
+        employee: line?.uses_job_supervisor ? jobSupervisor : current.employee,
+        commissionLocked: commission?.locked === true,
     };
 }
 
@@ -75,7 +78,6 @@ export function assignmentFormToPayload(
 ): VehicleServiceEmployeeAssignmentPayload {
     return {
         employee_id: value.employee?.id ?? 0,
-        role_type: value.role,
         assigned_hours: value.hours,
         rate: value.rate,
         commission_type: value.commissionType,
@@ -93,8 +95,4 @@ function isAssignmentStatus(
     value: string,
 ): value is AssignmentFormValue['status'] {
     return ['assigned', 'completed', 'cancelled'].includes(value);
-}
-
-function isWorkforceRole(value: string): value is VehicleServiceWorkforceRole {
-    return ['technician', 'helper', 'inspector', 'custom'].includes(value);
 }

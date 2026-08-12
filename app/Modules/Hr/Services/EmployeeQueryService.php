@@ -81,6 +81,12 @@ final class EmployeeQueryService
         foreach (['department_id', 'designation_id', 'employment_type_id', 'status', 'availability_status'] as $key) {
             if (isset($criteria[$key]) && $criteria[$key] !== '') { $query->where($key, $criteria[$key]); }
         }
+        if (isset($criteria['designation_code']) && $criteria['designation_code'] !== '') {
+            $query->whereHas('designation', fn (Builder $q) => $q->where('code', $criteria['designation_code']));
+        }
+        if (isset($criteria['exclude_designation_code']) && $criteria['exclude_designation_code'] !== '') {
+            $query->whereHas('designation', fn (Builder $q) => $q->where('code', '!=', $criteria['exclude_designation_code']));
+        }
         if (isset($criteria['skill_id'])) { $query->whereHas('skillAssignments', fn (Builder $q) => $q->where('skill_id', $criteria['skill_id'])); }
         if (isset($criteria['certification_id'])) { $query->whereHas('certificationAssignments', fn (Builder $q) => $q->where('certification_id', $criteria['certification_id'])); }
         if (isset($criteria['license_id'])) { $query->whereHas('licenseAssignments', fn (Builder $q) => $q->where('license_id', $criteria['license_id'])); }

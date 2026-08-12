@@ -42,6 +42,8 @@ final class VehicleServiceJobResource extends JsonResource
             'tax_total' => (string) $this->tax_total,
             'charge_total' => (string) $this->charge_total,
             'grand_total' => (string) $this->grand_total,
+            'commission_cost_total' => (string) $this->commission_cost_total,
+            'net_after_commission' => (string) $this->net_after_commission,
             'notes' => $this->notes,
             'approved_by' => $this->approved_by,
             'approved_at' => $this->approved_at?->toISOString(),

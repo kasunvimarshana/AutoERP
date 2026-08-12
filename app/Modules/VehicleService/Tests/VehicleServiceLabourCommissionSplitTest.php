@@ -68,7 +68,6 @@ final class VehicleServiceLabourCommissionSplitTest extends TestCase
                 $third,
                 new VehicleServiceEmployeeAssignmentData(
                     employeeId: $fixture['employee_ids'][2],
-                    roleType: 'technician',
                     commissionType: VehicleServiceCommissionType::Fixed,
                     commissionValue: '100.000000',
                     status: 'cancelled',
@@ -94,7 +93,6 @@ final class VehicleServiceLabourCommissionSplitTest extends TestCase
     {
         return new VehicleServiceEmployeeAssignmentData(
             employeeId: $employeeId,
-            roleType: 'technician',
             commissionType: VehicleServiceCommissionType::Fixed,
             commissionValue: '100.000000',
         );
@@ -146,6 +144,14 @@ final class VehicleServiceLabourCommissionSplitTest extends TestCase
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+        $designationId = (int) DB::table('hr_designations')->insertGetId([
+            'tenant_id' => $tenantId,
+            'code' => 'TECHNICIAN',
+            'name' => 'Technician',
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
         $employeeIds = [];
         foreach (range(1, 3) as $number) {
             $employeeIds[] = (int) DB::table('hr_employees')->insertGetId([
@@ -154,6 +160,7 @@ final class VehicleServiceLabourCommissionSplitTest extends TestCase
                 'code' => 'EMP-'.$number.'-'.$suffix,
                 'first_name' => 'Technician '.$number,
                 'display_name' => 'Technician '.$number,
+                'designation_id' => $designationId,
                 'status' => 'active',
                 'availability_status' => 'available',
                 'created_at' => now(),

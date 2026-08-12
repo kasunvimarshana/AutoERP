@@ -17,6 +17,7 @@ import {
     updateVehicleServiceLine,
 } from '../vehicleServiceApi';
 import { vehicleServicePermissions } from '../vehicleServicePermissions';
+import type { VehicleServiceJobStore } from '../state/vehicleServiceJobStore';
 import type { VehicleServiceJobLine } from '../vehicleServiceTypes';
 import { VehicleServiceInventoryIssueDrawer } from './VehicleServiceInventoryIssueDrawer';
 import {
@@ -47,11 +48,13 @@ export default function VehicleServiceLineEditor({
     expectedVersion,
     onChanged,
     onVersionChanged,
+    jobStore,
 }: {
     jobId: number;
     expectedVersion: number;
     onChanged: (lines: VehicleServiceJobLine[], nextVersion: number) => void;
     onVersionChanged: (nextVersion: number) => void;
+    jobStore: VehicleServiceJobStore;
 }) {
     const { permissions } = useAuth();
     const canViewLines = permissions.includes(vehicleServicePermissions.linesView);
@@ -98,15 +101,24 @@ export default function VehicleServiceLineEditor({
         try {
             const payload = { ...lineFormToPayload(value), expected_version: expectedVersion };
             if (dialog.mode === 'edit') {
-                const saved = await updateVehicleServiceLine(jobId, dialog.lineId, payload);
-                const nextLines = replaceLine(linesResult.data ?? [], saved);
+                const mutation = await updateVehicleServiceLine(jobId, dialog.lineId, payload);
+                const nextLines = replaceLine(linesResult.data ?? [], mutation.line);
+                jobStore.getState().replaceWorkforceLines({
+                    lines: mutation.workforceLines,
+                    rowVersion: mutation.rowVersion,
+                });
                 linesResult.setData(nextLines);
                 setToast('Job line updated.');
-                onChanged(nextLines, expectedVersion + 1);
+                onChanged(nextLines, mutation.rowVersion);
             } else {
-                const saved = await createVehicleServiceLine(jobId, payload);
+                const mutation = await createVehicleServiceLine(jobId, payload);
+                const saved = mutation.line;
                 const nextLines = appendLine(linesResult.data ?? [], saved);
-                const lineVersion = expectedVersion + 1;
+                const lineVersion = mutation.rowVersion;
+                jobStore.getState().replaceWorkforceLines({
+                    lines: mutation.workforceLines,
+                    rowVersion: mutation.rowVersion,
+                });
 
                 if (issueStock && canIssueInventory && value.issueWarehouse && value.issueLocation) {
                     try {
@@ -153,12 +165,16 @@ export default function VehicleServiceLineEditor({
         setRemoving(true);
         setError(null);
         try {
-            await deleteVehicleServiceLine(jobId, line.id, expectedVersion);
+            const mutation = await deleteVehicleServiceLine(jobId, line.id, expectedVersion);
             const nextLines = removeLineFromList(linesResult.data ?? [], line.id);
+            jobStore.getState().replaceWorkforceLines({
+                lines: mutation.workforceLines,
+                rowVersion: mutation.rowVersion,
+            });
             linesResult.setData(nextLines);
             setToast('Job line removed.');
             setRemoveTarget(null);
-            onChanged(nextLines, expectedVersion + 1);
+            onChanged(nextLines, mutation.rowVersion);
         } catch (requestError) {
             setError(toApiError(requestError));
         } finally {
@@ -307,9 +323,27 @@ function VehicleServiceLineTable({
     onRemove: (line: VehicleServiceJobLine) => void;
     onIssue: (line: VehicleServiceJobLine) => void;
 }) {
-    const rows = buildVehicleServiceLineDisplayRows(lines);
+    const [expandedComboIds, setExpandedComboIds] = useState<Set<number>>(() => new Set());
+    const allRows = buildVehicleServiceLineDisplayRows(lines);
+    const rows = filterCollapsedComboChildren(allRows, expandedComboIds);
+    const toggleCombo = (comboId: number) => {
+        setExpandedComboIds((current) => {
+            const next = new Set(current);
+            if (next.has(comboId)) next.delete(comboId);
+            else next.add(comboId);
+            return next;
+        });
+    };
     const columns: DataColumn<VehicleServiceLineDisplayRow>[] = [
-        { key: 'item', header: 'Item', render: renderLineItemCell },
+        {
+            key: 'item',
+            header: 'Item',
+            render: (row) => renderLineItemCell(
+                row,
+                expandedComboIds.has(row.line.id),
+                () => toggleCombo(row.line.id),
+            ),
+        },
         { key: 'quantity', header: 'Qty', render: (row) => renderLineMetric(row, row.line.quantity), className: 'tabular-nums' },
         { key: 'uom', header: 'UOM', render: (row) => renderLineMetric(row, row.line.uom?.code ?? '-') },
         ...(canViewInventory ? [{ key: 'stock', header: 'Stock', render: (row: VehicleServiceLineDisplayRow) => renderStockState(row.line) }] : []),
@@ -348,7 +382,11 @@ function VehicleServiceLineTable({
                         emptyMessage={inventoryOnly
                             ? 'No inventory lines remain to issue.'
                             : 'No lines added yet. Click Add line to start.'}
-                        mobileSummary={(row) => renderMobileSummary(row)}
+                        mobileSummary={(row) => renderMobileSummary(
+                            row,
+                            expandedComboIds.has(row.line.id),
+                            () => toggleCombo(row.line.id),
+                        )}
                         mobileDetails={(row) => <LineMobileDetails row={row} showStock={canViewInventory} showPricing={!inventoryOnly} />}
                         mobileActions={(row) => (
                             <LineActions
@@ -357,6 +395,8 @@ function VehicleServiceLineTable({
                                 onIssue={canIssueInventory && canIssueLine(row.line) ? () => onIssue(row.line) : undefined}
                             />
                         )}
+                        onRowClick={(row) => toggleCombo(row.line.id)}
+                        rowClickEnabled={(row) => row.isComboParent}
                         rowClassName={lineRowClassName}
                     />
                 )}
@@ -450,7 +490,7 @@ function ToastNotice({ message }: { message: string }) {
     );
 }
 
-function buildVehicleServiceLineDisplayRows(lines: VehicleServiceJobLine[]): VehicleServiceLineDisplayRow[] {
+export function buildVehicleServiceLineDisplayRows(lines: VehicleServiceJobLine[]): VehicleServiceLineDisplayRow[] {
     const byId = new Map(lines.map((line) => [line.id, line]));
     const childCountByParentId = new Map<number, number>();
 
@@ -475,23 +515,24 @@ function buildVehicleServiceLineDisplayRows(lines: VehicleServiceJobLine[]): Veh
     });
 }
 
-function renderLineItemCell(row: VehicleServiceLineDisplayRow) {
+export function filterCollapsedComboChildren(
+    rows: VehicleServiceLineDisplayRow[],
+    expandedComboIds: ReadonlySet<number>,
+): VehicleServiceLineDisplayRow[] {
+    return rows.filter((row) => !row.isComboChild
+        || row.parent === null
+        || expandedComboIds.has(row.parent.id));
+}
+
+function renderLineItemCell(
+    row: VehicleServiceLineDisplayRow,
+    expanded: boolean,
+    onToggle: () => void,
+) {
     const itemLabel = formatLineItem(row.line);
 
     if (row.isComboParent) {
-        return (
-            <div className="space-y-1">
-                <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-semibold text-slate-900">{itemLabel}</span>
-                    <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-sky-700">
-                        Combo pack
-                    </span>
-                </div>
-                <p className="text-xs text-slate-500">
-                    Bundle price covers {row.childCount} included item{row.childCount === 1 ? '' : 's'}.
-                </p>
-            </div>
-        );
+        return <ComboDisclosure row={row} expanded={expanded} onToggle={onToggle} showDescription />;
     }
 
     if (row.isComboChild) {
@@ -544,18 +585,13 @@ function renderLineTotal(row: VehicleServiceLineDisplayRow) {
     return <span className={row.isComboChild ? 'text-slate-600' : 'text-slate-900'}>{row.line.line_total}</span>;
 }
 
-function renderMobileSummary(row: VehicleServiceLineDisplayRow) {
+function renderMobileSummary(
+    row: VehicleServiceLineDisplayRow,
+    expanded: boolean,
+    onToggle: () => void,
+) {
     if (row.isComboParent) {
-        return (
-            <div className="space-y-1">
-                <div className="flex flex-wrap items-center gap-2">
-                    <span>{formatLineItem(row.line)}</span>
-                    <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-sky-700">
-                        Combo pack
-                    </span>
-                </div>
-            </div>
-        );
+        return <ComboDisclosure row={row} expanded={expanded} onToggle={onToggle} showDescription={false} />;
     }
 
     if (row.isComboChild) {
@@ -568,6 +604,55 @@ function renderMobileSummary(row: VehicleServiceLineDisplayRow) {
     }
 
     return formatLineItem(row.line);
+}
+
+function ComboDisclosure({
+    row,
+    expanded,
+    onToggle,
+    showDescription,
+}: {
+    row: VehicleServiceLineDisplayRow;
+    expanded: boolean;
+    onToggle: () => void;
+    showDescription: boolean;
+}) {
+    const itemLabel = formatLineItem(row.line);
+    const childLabel = `${row.childCount} included item${row.childCount === 1 ? '' : 's'}`;
+
+    return (
+        <button
+            type="button"
+            className="group -m-2 flex max-w-full items-start gap-2 rounded-lg p-2 text-left outline-none transition hover:bg-sky-100/70 focus-visible:ring-2 focus-visible:ring-sky-500"
+            aria-expanded={expanded}
+            aria-label={`${expanded ? 'Collapse' : 'Expand'} ${itemLabel}, ${childLabel}`}
+            onClick={onToggle}
+        >
+            <svg
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                className={`mt-0.5 h-4 w-4 shrink-0 text-sky-700 transition-transform ${expanded ? 'rotate-90' : ''}`}
+                aria-hidden="true"
+            >
+                <path strokeLinecap="round" strokeLinejoin="round" d="m7.5 5 5 5-5 5" />
+            </svg>
+            <span className="min-w-0 space-y-1">
+                <span className="flex flex-wrap items-center gap-2">
+                    <span className="font-semibold text-slate-900">{itemLabel}</span>
+                    <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-sky-700">
+                        Combo pack
+                    </span>
+                </span>
+                {showDescription && (
+                    <span className="block text-xs font-normal text-slate-500">
+                        Bundle price covers {childLabel}.
+                    </span>
+                )}
+            </span>
+        </button>
+    );
 }
 
 function lineRowClassName(row: VehicleServiceLineDisplayRow): string | undefined {

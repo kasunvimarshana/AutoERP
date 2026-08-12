@@ -67,6 +67,8 @@ trait MapsItemData
                 uomId: isset($row['uom_id']) ? (int) $row['uom_id'] : null,
                 isRequired: (bool) ($row['is_required'] ?? true),
                 sortOrder: (int) ($row['sort_order'] ?? 0),
+                unitCost: (string) ($row['unit_cost'] ?? '0.000000'),
+                usesJobSupervisor: (bool) ($row['uses_job_supervisor'] ?? false),
             ), $relations['bundles'] ?? []),
             prices: array_map(fn (array $row): ItemPriceData => new ItemPriceData(
                 priceType: ItemPriceType::from((string) $row['price_type']),

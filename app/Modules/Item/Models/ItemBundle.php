@@ -26,6 +26,8 @@ final class ItemBundle extends TenantOwnedModel
             'child_variant_id' => 'integer',
             'quantity' => 'decimal:6',
             'uom_id' => 'integer',
+            'unit_cost' => 'decimal:6',
+            'uses_job_supervisor' => 'boolean',
             'is_required' => 'boolean',
             'sort_order' => 'integer',
         ]);

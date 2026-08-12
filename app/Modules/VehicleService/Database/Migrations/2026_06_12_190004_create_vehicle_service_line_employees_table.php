@@ -17,7 +17,7 @@ return new class extends Migration
             $table->foreignId('vehicle_service_job_id');
             $table->foreignId('vehicle_service_job_line_id');
             $table->foreignId('employee_id');
-            $table->string('role_type', 30);
+            $table->string('role_type');
             $table->decimal('assigned_hours', 20, 6)->default('0.000000');
             $table->decimal('rate', 20, 6)->default('0.000000');
             $table->string('commission_type', 20)->default('none');
@@ -29,7 +29,7 @@ return new class extends Migration
             $table->timestamps();
 
             $table->unique(
-                ['vehicle_service_job_line_id', 'employee_id', 'role_type'],
+                ['vehicle_service_job_line_id', 'employee_id'],
                 'vehicle_service_line_employees_assignment_uk',
             );
             $table->index(['tenant_id', 'organization_unit_id'], 'vehicle_service_line_employees_tenant_org_ix');

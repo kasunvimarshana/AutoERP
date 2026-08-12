@@ -26,6 +26,8 @@ export default function ItemBundleTab({ itemId, canBundle, readOnly = false }: {
         { key: 'child', header: 'Item', render: (row) => row.child_item ? `${row.child_item.code} - ${row.child_item.name}` : '-' },
         { key: 'quantity', header: 'Quantity', render: (row) => row.quantity },
         { key: 'uom', header: 'UOM', render: (row) => row.uom ? `${row.uom.code} - ${row.uom.name}` : '-' },
+        { key: 'supervisor', header: 'Assignment', render: (row) => row.uses_job_supervisor ? 'Job supervisor' : 'Select employee' },
+        { key: 'cost', header: 'Commission cost', render: (row) => row.line_type === 'labour' ? row.unit_cost : '-' },
     ];
     if (!readOnly) {
         columns.push({ key: 'actions', header: '', className: 'text-right', render: (row) => <Actions edit={() => crud.startEdit(row)} remove={() => crud.destroy(row)} /> });
@@ -57,6 +59,8 @@ function BundleForm({ row, itemId, error, submitting, onCancel, onSubmit }: {
     const [uom, setUom] = useState<NamedResource | null>(row?.uom ?? null);
     const [quantity, setQuantity] = useState(row?.quantity ?? '1.000000');
     const [lineType, setLineType] = useState<BundleLineType>((row?.line_type as BundleLineType | undefined) ?? 'labour');
+    const [unitCost, setUnitCost] = useState(row?.unit_cost ?? '0.000000');
+    const [usesJobSupervisor, setUsesJobSupervisor] = useState(row?.uses_job_supervisor ?? false);
     const [required, setRequired] = useState(row?.is_required ?? true);
     const [sortOrder, setSortOrder] = useState(row?.sort_order ?? 0);
     return <form className="space-y-4" onSubmit={(event) => {
@@ -67,6 +71,8 @@ function BundleForm({ row, itemId, error, submitting, onCancel, onSubmit }: {
             quantity,
             uom_id: uom ? Number(uom.id) : null,
             line_type: lineType,
+            unit_cost: lineType === 'labour' ? unitCost : '0.000000',
+            uses_job_supervisor: lineType === 'labour' && usesJobSupervisor,
             is_required: required,
             sort_order: sortOrder,
         });
@@ -82,6 +88,8 @@ function BundleForm({ row, itemId, error, submitting, onCancel, onSubmit }: {
                 setQuantity(defaultBundleQuantity());
                 setUom(nextChild.base_uom ?? null);
                 setLineType(resolveBundleLineType(nextChild));
+                setUnitCost('0.000000');
+                setUsesJobSupervisor(false);
             }}
             excludeId={itemId}
             error={fieldError(error, 'child_item_id')}
@@ -91,6 +99,26 @@ function BundleForm({ row, itemId, error, submitting, onCancel, onSubmit }: {
             <DecimalInput label="Quantity" value={quantity} onChange={(event) => setQuantity(event.target.value)} error={fieldError(error, 'quantity')} required />
             <ItemUomSelect value={uom} onChange={setUom} error={fieldError(error, 'uom_id')} />
         </div>
+        {lineType === 'labour' && (
+            <div className="grid gap-4 sm:grid-cols-2">
+                <DecimalInput
+                    label="Commission cost"
+                    value={unitCost}
+                    min="0"
+                    error={fieldError(error, 'unit_cost')}
+                    onChange={(event) => setUnitCost(event.target.value)}
+                    required
+                />
+                <label className="flex items-center gap-2 text-sm text-slate-700">
+                    <input
+                        type="checkbox"
+                        checked={usesJobSupervisor}
+                        onChange={(event) => setUsesJobSupervisor(event.target.checked)}
+                    />
+                    Use the supervisor selected on the service job
+                </label>
+            </div>
+        )}
         <details className="rounded-lg border border-slate-200 bg-slate-50 p-4">
             <summary className="cursor-pointer font-semibold text-slate-800">Advanced</summary>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">

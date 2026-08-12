@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useState } from 'react';
+import { lazy, Suspense, useCallback, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ApiError, toApiError, type ApiError as ApiErrorShape } from '@/shared/api/apiError';
 import { ActionMenu } from '@/shared/components/ActionMenu';
@@ -20,6 +20,7 @@ import { VehicleServiceSummaryPanel } from '../components/VehicleServiceSummaryP
 import { VehicleServiceStatusBadge } from '../components/VehicleServiceStatusBadge';
 import type { VehicleServiceInspection, VehicleServiceJob, VehicleServiceJobLine, VehicleServiceJobStatus } from '../vehicleServiceTypes';
 import { cancelVehicleServiceJob, completeVehicleServiceJob, deleteVehicleServiceJob, getVehicleServiceJob, inspectVehicleServiceJob, listEmployeeAssignableLines, startVehicleServiceJob } from '../vehicleServiceApi';
+import { createVehicleServiceJobStore } from '../state/vehicleServiceJobStore';
 
 const InspectionTab = lazy(() => import('../components/VehicleServiceInspectionTab'));
 const LinesTab = lazy(() => import('../components/VehicleServiceLineEditor'));
@@ -35,6 +36,7 @@ const INSPECT_WORKFORCE_REQUIRED_MESSAGE = 'Assign at least one labour employee 
 export default function VehicleServiceJobDetailPage() {
     const id = Number(useParams().id);
     const navigate = useNavigate();
+    const jobStore = useMemo(() => createVehicleServiceJobStore(id), [id]);
     const result = useApi((signal) => getVehicleServiceJob(id, signal), [id], true, false);
     const job = result.data;
     const setJob = result.setData;
@@ -150,6 +152,8 @@ export default function VehicleServiceJobDetailPage() {
                     }] : []),
                     { label: 'Supervisor', value: readableRelation(job.supervisor) },
                     { label: 'Grand total', value: <MoneyDisplay value={job.grand_total} /> },
+                    { label: 'Commission cost', value: <MoneyDisplay value={job.commission_cost_total} /> },
+                    { label: 'After commission', value: <MoneyDisplay value={job.net_after_commission} /> },
                 ]} />
             </div>
         </Panel>
@@ -201,8 +205,8 @@ export default function VehicleServiceJobDetailPage() {
                         <Suspense fallback={<LoadingState />}>
                             <TabPanel tabsId="service-job-tabs" tabId="summary" active={tabs.activeTab} keepMounted><VehicleServiceSummaryPanel job={job} /></TabPanel>
                             {tabs.openedTabs.has('inspection') && <TabPanel tabsId="service-job-tabs" tabId="inspection" active={tabs.activeTab} keepMounted><InspectionTab jobId={job.id} expectedVersion={expectedVersion} initialValue={job.inspection ?? null} onSaved={handleInspectionSaved} /></TabPanel>}
-                            {tabs.openedTabs.has('lines') && <TabPanel tabsId="service-job-tabs" tabId="lines" active={tabs.activeTab} keepMounted><LinesTab jobId={job.id} expectedVersion={expectedVersion} onChanged={handleLinesChanged} onVersionChanged={updateJobVersion} /></TabPanel>}
-                            {tabs.openedTabs.has('workforce') && <TabPanel tabsId="service-job-tabs" tabId="workforce" active={tabs.activeTab} keepMounted><WorkforceTab jobId={job.id} expectedVersion={expectedVersion} onChanged={updateJobVersion} /></TabPanel>}
+                            {tabs.openedTabs.has('lines') && <TabPanel tabsId="service-job-tabs" tabId="lines" active={tabs.activeTab} keepMounted><LinesTab jobId={job.id} expectedVersion={expectedVersion} onChanged={handleLinesChanged} onVersionChanged={updateJobVersion} jobStore={jobStore} /></TabPanel>}
+                            {tabs.openedTabs.has('workforce') && <TabPanel tabsId="service-job-tabs" tabId="workforce" active={tabs.activeTab} keepMounted><WorkforceTab jobId={job.id} expectedVersion={expectedVersion} onChanged={updateJobVersion} active={tabs.activeTab === 'workforce'} jobStore={jobStore} /></TabPanel>}
                             {tabs.openedTabs.has('invoice') && <TabPanel tabsId="service-job-tabs" tabId="invoice" active={tabs.activeTab} keepMounted><InvoiceTab job={job} /></TabPanel>}
                             {tabs.openedTabs.has('payments') && <TabPanel tabsId="service-job-tabs" tabId="payments" active={tabs.activeTab} keepMounted><PaymentTab job={job} /></TabPanel>}
                             {tabs.openedTabs.has('documents') && <TabPanel tabsId="service-job-tabs" tabId="documents" active={tabs.activeTab} keepMounted><DocumentTab jobId={job.id} expectedVersion={expectedVersion} onChanged={updateJobVersion} /></TabPanel>}

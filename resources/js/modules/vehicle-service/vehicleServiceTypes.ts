@@ -82,7 +82,6 @@ export interface VehicleServiceEmployeeAssignment {
 export interface VehicleServiceEmployeeAssignmentPayload {
     expected_version?: number;
     employee_id: number;
-    role_type: string;
     assigned_hours?: string;
     rate?: string;
     commission_type?: CommissionType;
@@ -93,6 +92,11 @@ export interface VehicleServiceEmployeeAssignmentPayload {
 export interface VehicleServiceJobLine {
     id: number;
     parent_line_id?: number | null;
+    parent_line?: {
+        id: number;
+        line_number: number;
+        description: string;
+    } | null;
     line_number: number;
     line_source_type: VehicleServiceLineSourceType;
     item_id?: number | null;
@@ -104,6 +108,7 @@ export interface VehicleServiceJobLine {
     description: string;
     quantity: string;
     unit_cost: string;
+    uses_job_supervisor?: boolean;
     unit_price: string;
     discount_calculation_type?: 'fixed' | 'percentage' | null;
     discount_rate: string;
@@ -191,6 +196,8 @@ export interface VehicleServiceJob {
     tax_total: string;
     charge_total: string;
     grand_total: string;
+    commission_cost_total: string;
+    net_after_commission: string;
     notes?: string | null;
     completed_at?: string | null;
     inspection?: VehicleServiceInspection | null;

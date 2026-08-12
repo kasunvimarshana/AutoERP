@@ -7,9 +7,6 @@ namespace Modules\VehicleService\Services;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
-use Modules\Item\Enums\ItemType;
-use Modules\Item\Models\Item;
-use Modules\Item\Services\ItemPriceResolutionService;
 use Modules\VehicleService\DTOs\VehicleServiceLineData;
 use Modules\VehicleService\Enums\VehicleServiceLineSourceType;
 use Modules\VehicleService\Enums\VehicleServiceLineStatus;
@@ -29,7 +26,6 @@ final class VehicleServiceLineWriteService
         private readonly VehicleServiceLineValidator $lineValidator,
         private readonly VehicleServiceLineRuleService $rules,
         private readonly VehicleServiceLineCalculationService $calculations,
-        private readonly ItemPriceResolutionService $prices,
     ) {}
 
     public function create(
@@ -132,47 +128,17 @@ final class VehicleServiceLineWriteService
                 lineSourceType: VehicleServiceLineSourceType::ComboChild,
                 description: (string) $child->name,
                 quantity: $this->math->mul((string) $parent->quantity, (string) $bundleLine->quantity),
-                unitPrice: $this->comboChildUnitPrice(
-                    $job,
-                    $child,
-                    $bundleLine->uom_id ?? $child->base_uom_id,
-                    $bundleLine->child_variant_id,
-                ),
+                unitPrice: self::ZERO_AMOUNT,
                 parentLineId: (int) $parent->getKey(),
                 itemId: (int) $child->getKey(),
                 itemVariantId: $bundleLine->child_variant_id,
                 uomId: $bundleLine->uom_id ?? $child->base_uom_id,
+                unitCost: (string) $bundleLine->unit_cost,
+                usesJobSupervisor: (bool) $bundleLine->uses_job_supervisor,
                 isBillable: false,
                 expandCombo: false,
             ));
         }
-    }
-
-    private function comboChildUnitPrice(
-        VehicleServiceJob $job,
-        Item $child,
-        ?int $uomId,
-        ?int $variantId,
-    ): string {
-        if (! in_array($child->item_type, [ItemType::Service, ItemType::Labour], true)) {
-            return self::ZERO_AMOUNT;
-        }
-
-        $price = $this->prices->resolvePrice(
-            item: $child,
-            context: ItemPriceResolutionService::CONTEXT_SERVICE,
-            uomId: $uomId,
-            organizationUnitId: $job->organization_unit_id,
-            date: $job->job_date?->toDateString(),
-            variantId: $variantId,
-        );
-        if ($price->amount === null) {
-            throw new InvalidArgumentException(
-                "Combo child item {$child->code} requires an effective service price for the selected UOM.",
-            );
-        }
-
-        return $price->amount;
     }
 
     private function renumber(VehicleServiceJob $job): void

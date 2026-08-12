@@ -60,8 +60,8 @@ final class TechnicianWorkReportTest extends TestCase
         $job = $this->createJob($context, date: '2026-06-01', supervisorCommissionType: VehicleServiceCommissionType::Fixed, supervisorCommissionValue: '15.000000');
         $line = $this->line($job, $context['labour'], '2.000000', '100.000000', 'Engine tune labour');
 
-        $assignment = $this->assignment($job, $line, $context['employee_id'], 'technician', '2.000000', '50.000000', VehicleServiceCommissionType::Fixed, '30.000000');
-        $this->assignment($job, $line, $context['employee_id'], 'helper', '1.000000', '25.000000', VehicleServiceCommissionType::Fixed, '10.000000');
+        $assignment = $this->assignment($job, $line, $context['employee_id'], '2.000000', '50.000000', VehicleServiceCommissionType::Fixed, '30.000000');
+        $this->assignment($job, $line, $context['helper_employee_id'], '1.000000', '25.000000', VehicleServiceCommissionType::Fixed, '10.000000');
         $this->linkInvoiceAndPayment($context, $job, InvoiceStatus::Posted);
 
         $this->reportGetJson($context, '/api/v1/reports/vehicle-service/technician-work?'.http_build_query($this->scope($context)))
@@ -101,7 +101,7 @@ final class TechnicianWorkReportTest extends TestCase
         $this->authorize($context);
         $matchingJob = $this->createJob($context, date: '2026-06-03', supervisorCommissionType: VehicleServiceCommissionType::Fixed, supervisorCommissionValue: '5.000000');
         $matchingLine = $this->line($matchingJob, $context['labour'], '1.000000', '100.000000', 'Precision alignment');
-        $matching = $this->assignment($matchingJob, $matchingLine, $context['employee_id'], 'technician', '1.000000', '40.000000', VehicleServiceCommissionType::Percentage, '10.000000');
+        $matching = $this->assignment($matchingJob, $matchingLine, $context['employee_id'], '1.000000', '40.000000', VehicleServiceCommissionType::Percentage, '10.000000');
         $matchingJob = $this->withTenantExecutionContext((int) $context['tenant_id'], function () use ($matchingJob): VehicleServiceJob {
             $matchingJob->forceFill(['status' => VehicleServiceJobStatus::Completed])->save();
 
@@ -112,7 +112,7 @@ final class TechnicianWorkReportTest extends TestCase
         $other = $this->alternateResources($context, 'ALT');
         $otherJob = $this->createJob($other, date: '2026-05-20', status: VehicleServiceJobStatus::Draft);
         $otherLine = $this->line($otherJob, $other['labour'], '1.000000', '80.000000', 'Oil service');
-        $this->assignment($otherJob, $otherLine, $other['employee_id'], 'helper', '1.000000', '20.000000', VehicleServiceCommissionType::None, '0.000000');
+        $this->assignment($otherJob, $otherLine, $other['helper_employee_id'], '1.000000', '20.000000', VehicleServiceCommissionType::None, '0.000000');
         $this->linkInvoiceAndPayment(
             $other,
             $otherJob,
@@ -176,8 +176,8 @@ final class TechnicianWorkReportTest extends TestCase
             supervisorCommissionValue: '25.000000',
         );
         $line = $this->line($job, $context['labour'], '2.000000', '100.000000', 'Commission labour');
-        $top = $this->assignment($job, $line, $context['employee_id'], 'technician', '2.000000', '50.000000', VehicleServiceCommissionType::Fixed, '30.000000');
-        $helper = $this->assignment($job, $line, $other['employee_id'], 'helper', '1.000000', '40.000000', VehicleServiceCommissionType::Fixed, '10.000000');
+        $top = $this->assignment($job, $line, $context['employee_id'], '2.000000', '50.000000', VehicleServiceCommissionType::Fixed, '30.000000');
+        $helper = $this->assignment($job, $line, $other['helper_employee_id'], '1.000000', '40.000000', VehicleServiceCommissionType::Fixed, '10.000000');
         $this->linkInvoiceAndPayment($context, $job, InvoiceStatus::Posted);
 
         $response = $this->reportGetJson($context, '/api/v1/reports/vehicle-service/employee-commissions?'.http_build_query([
@@ -289,7 +289,6 @@ final class TechnicianWorkReportTest extends TestCase
             $job,
             $line,
             $context['employee_id'],
-            'technician',
             '1.000000',
             '100.000000',
             VehicleServiceCommissionType::Fixed,
@@ -359,9 +358,12 @@ final class TechnicianWorkReportTest extends TestCase
         $customerId = $this->customer($tenantId, $organizationUnitId, 'CUS-'.$suffix);
         $vehicleId = $this->vehicle($tenantId, $organizationUnitId, $customerId, 'VEH-'.$suffix);
         $departmentId = $this->hrMaster($tenantId, $organizationUnitId, 'hr_departments', 'DEP-'.$suffix, 'Department '.$suffix);
-        $designationId = $this->hrMaster($tenantId, $organizationUnitId, 'hr_designations', 'DES-'.$suffix, 'Designation '.$suffix);
+        $designationId = $this->hrMaster($tenantId, $organizationUnitId, 'hr_designations', 'TECHNICIAN', 'Technician');
+        $helperDesignationId = $this->hrMaster($tenantId, $organizationUnitId, 'hr_designations', 'HELPER', 'Helper');
+        $supervisorDesignationId = $this->hrMaster($tenantId, $organizationUnitId, 'hr_designations', 'SUPERVISOR', 'Service Supervisor');
         $employeeId = $this->employee($tenantId, $organizationUnitId, 'EMP-'.$suffix, $departmentId, $designationId);
-        $supervisorId = $this->employee($tenantId, $organizationUnitId, 'SUP-'.$suffix, $departmentId, $designationId);
+        $helperEmployeeId = $this->employee($tenantId, $organizationUnitId, 'HELP-'.$suffix, $departmentId, $helperDesignationId);
+        $supervisorId = $this->employee($tenantId, $organizationUnitId, 'SUP-'.$suffix, $departmentId, $supervisorDesignationId);
 
         return [
             'tenant_id' => $tenantId,
@@ -369,9 +371,12 @@ final class TechnicianWorkReportTest extends TestCase
             'customer_id' => $customerId,
             'vehicle_id' => $vehicleId,
             'employee_id' => $employeeId,
+            'helper_employee_id' => $helperEmployeeId,
             'supervisor_id' => $supervisorId,
             'department_id' => $departmentId,
             'designation_id' => $designationId,
+            'helper_designation_id' => $helperDesignationId,
+            'supervisor_designation_id' => $supervisorDesignationId,
             'uom_id' => $uomId,
             'labour' => $this->item($tenantId, $organizationUnitId, 'LAB-'.$suffix, $uomId),
         ];
@@ -390,9 +395,12 @@ final class TechnicianWorkReportTest extends TestCase
         $customerId = $this->customer($context['tenant_id'], $organizationUnitId, 'CUS-'.$suffix);
         $vehicleId = $this->vehicle($context['tenant_id'], $organizationUnitId, $customerId, 'VEH-'.$suffix);
         $departmentId = $this->hrMaster($context['tenant_id'], $organizationUnitId, 'hr_departments', 'DEP-'.$suffix, 'Department '.$suffix);
-        $designationId = $this->hrMaster($context['tenant_id'], $organizationUnitId, 'hr_designations', 'DES-'.$suffix, 'Designation '.$suffix);
+        $designationId = $context['designation_id'];
+        $helperDesignationId = $context['helper_designation_id'];
+        $supervisorDesignationId = $context['supervisor_designation_id'];
         $employeeId = $this->employee($context['tenant_id'], $organizationUnitId, 'EMP-'.$suffix, $departmentId, $designationId);
-        $supervisorId = $this->employee($context['tenant_id'], $organizationUnitId, 'SUP-'.$suffix, $departmentId, $designationId);
+        $helperEmployeeId = $this->employee($context['tenant_id'], $organizationUnitId, 'HELP-'.$suffix, $departmentId, $helperDesignationId);
+        $supervisorId = $this->employee($context['tenant_id'], $organizationUnitId, 'SUP-'.$suffix, $departmentId, $supervisorDesignationId);
 
         return [
             ...$context,
@@ -400,6 +408,7 @@ final class TechnicianWorkReportTest extends TestCase
             'customer_id' => $customerId,
             'vehicle_id' => $vehicleId,
             'employee_id' => $employeeId,
+            'helper_employee_id' => $helperEmployeeId,
             'supervisor_id' => $supervisorId,
             'department_id' => $departmentId,
             'designation_id' => $designationId,
@@ -455,7 +464,7 @@ final class TechnicianWorkReportTest extends TestCase
         $job = $this->createJob($context);
         $line = $this->line($job, $context['labour'], '1.000000', '10.000000', $description);
 
-        return $this->assignment($job, $line, $context['employee_id'], 'technician', '1.000000', '10.000000', VehicleServiceCommissionType::Fixed, '1.000000');
+        return $this->assignment($job, $line, $context['employee_id'], '1.000000', '10.000000', VehicleServiceCommissionType::Fixed, '1.000000');
     }
 
     /**
@@ -478,6 +487,7 @@ final class TechnicianWorkReportTest extends TestCase
                 supervisorEmployeeId: $context['supervisor_id'],
                 supervisorCommissionType: $supervisorCommissionType,
                 supervisorCommissionValue: $supervisorCommissionValue,
+                odometerReading: '10000.000000',
             ));
 
             if ($status !== VehicleServiceJobStatus::Draft) {
@@ -504,7 +514,6 @@ final class TechnicianWorkReportTest extends TestCase
         VehicleServiceJob $job,
         mixed $line,
         int $employeeId,
-        string $roleType,
         string $assignedHours,
         string $rate,
         VehicleServiceCommissionType $commissionType,
@@ -512,7 +521,6 @@ final class TechnicianWorkReportTest extends TestCase
     ): VehicleServiceLineEmployee {
         return $this->withTenantExecutionContext((int) $job->tenant_id, fn (): VehicleServiceLineEmployee => app(VehicleServiceEmployeeAssignmentService::class)->create($job, $line, new VehicleServiceEmployeeAssignmentData(
             employeeId: $employeeId,
-            roleType: $roleType,
             assignedHours: $assignedHours,
             rate: $rate,
             commissionType: $commissionType,

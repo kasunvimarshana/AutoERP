@@ -46,7 +46,7 @@ final class EmployeeCommissionReportRequest extends TenantScopedRequest
             'payment_instrument_status' => ['nullable', Rule::enum(PaymentInstrumentStatus::class)],
             'commission_type' => ['nullable', Rule::enum(VehicleServiceCommissionType::class)],
             'commission_source' => ['nullable', Rule::in(['technician', 'supervisor'])],
-            'role_type' => ['nullable', Rule::in(['technician', 'helper', 'inspector', 'custom', 'supervisor'])],
+            'role_type' => ['nullable', 'string', 'max:255'],
             'commission_status' => ['nullable', Rule::in(['pending', 'earned', 'cancelled'])],
             'include_cancelled' => ['nullable', 'boolean'],
         ];

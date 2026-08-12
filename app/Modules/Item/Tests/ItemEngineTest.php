@@ -167,6 +167,35 @@ final class ItemEngineTest extends TestCase
         ));
     }
 
+    public function test_labour_bundle_line_stores_combo_specific_cost_and_supervisor_assignment_source(): void
+    {
+        $tenantId = $this->createTenant();
+        $uomId = $this->createUom($tenantId, null, 'JOB');
+        $labour = $this->createBasicItem($tenantId, 'BODY-WASH', ItemType::Labour, false, $uomId);
+
+        $combo = $this->createItem(new CreateItemData(
+            tenantId: $tenantId,
+            code: 'FULL-WASH',
+            name: 'Full Wash',
+            itemType: ItemType::Combo,
+            isStockable: false,
+            bundles: [
+                new ItemBundleData(
+                    childItemId: (int) $labour->getKey(),
+                    quantity: '1.000000',
+                    lineType: ItemType::Labour->value,
+                    uomId: $uomId,
+                    unitCost: '150.000000',
+                    usesJobSupervisor: true,
+                ),
+            ],
+        ));
+
+        $line = $combo->bundleLines->firstOrFail();
+        $this->assertSame('150.000000', (string) $line->unit_cost);
+        $this->assertTrue((bool) $line->uses_job_supervisor);
+    }
+
     public function test_it_rejects_invalid_item_rules(): void
     {
         $tenantId = $this->createTenant();

@@ -14,6 +14,7 @@ final class VehicleServiceJobLineResource extends JsonResource
         return [
             'id' => (int) $this->getKey(),
             'parent_line_id' => $this->parent_line_id,
+            'parent_line' => $this->whenLoaded('parent', fn () => $this->lineSummary($this->parent)),
             'line_number' => (int) $this->line_number,
             'line_source_type' => $this->enum($this->line_source_type),
             'item_id' => $this->item_id,
@@ -25,6 +26,7 @@ final class VehicleServiceJobLineResource extends JsonResource
             'description' => $this->description,
             'quantity' => (string) $this->quantity,
             'unit_cost' => (string) $this->unit_cost,
+            'uses_job_supervisor' => (bool) $this->uses_job_supervisor,
             'unit_price' => (string) $this->unit_price,
             'discount_calculation_type' => $this->discount_calculation_type,
             'discount_rate' => (string) $this->discount_rate,
@@ -75,6 +77,19 @@ final class VehicleServiceJobLineResource extends JsonResource
             'id' => (int) $model->getKey(),
             'code' => $model->code ?? $model->sku ?? $model->symbol ?? null,
             'name' => $model->name ?? $model->description ?? null,
+        ];
+    }
+
+    private function lineSummary(mixed $line): ?array
+    {
+        if ($line === null) {
+            return null;
+        }
+
+        return [
+            'id' => (int) $line->getKey(),
+            'line_number' => (int) $line->line_number,
+            'description' => $line->description,
         ];
     }
 }

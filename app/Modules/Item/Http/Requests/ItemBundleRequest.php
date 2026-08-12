@@ -20,6 +20,8 @@ abstract class ItemBundleRequest extends TenantScopedRequest
             'quantity' => ['required', 'decimal:0,6', 'gt:0'],
             'uom_id' => ['nullable', 'integer', 'min:1'],
             'line_type' => ['required', Rule::in(['stock', 'service', 'labour', 'non_stock', 'charge'])],
+            'unit_cost' => ['nullable', 'decimal:0,6', 'min:0'],
+            'uses_job_supervisor' => ['nullable', 'boolean'],
             'is_required' => ['nullable', 'boolean'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
         ];
@@ -35,6 +37,8 @@ abstract class ItemBundleRequest extends TenantScopedRequest
             uomId: $this->filled('uom_id') ? (int) $this->input('uom_id') : null,
             isRequired: $this->boolean('is_required', true),
             sortOrder: (int) $this->input('sort_order', 0),
+            unitCost: (string) $this->input('unit_cost', '0.000000'),
+            usesJobSupervisor: $this->boolean('uses_job_supervisor'),
         );
     }
 }
