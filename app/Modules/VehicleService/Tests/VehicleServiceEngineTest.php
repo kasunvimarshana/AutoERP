@@ -482,6 +482,51 @@ final class VehicleServiceEngineTest extends TestCase
         $this->changeStatus($this->refreshJob($job), VehicleServiceJobStatus::Draft);
     }
 
+    public function test_job_completion_requires_all_inventory_lines_to_be_issued(): void
+    {
+        $this->withoutMiddleware();
+        $context = $this->context();
+        $this->actingAsTenantUser($context['tenant_id']);
+        $this->receiveStock($context, '1.000000');
+        $job = $this->createJob($context);
+        $line = $this->line(
+            $job,
+            VehicleServiceLineSourceType::InventoryItem,
+            $context['stock'],
+            '1.000000',
+            '20.000000',
+        );
+        $this->changeStatus($this->refreshJob($job), VehicleServiceJobStatus::InProgress);
+
+        $this->tenantPatchJson($context['tenant_id'], "/api/v1/vehicle-service/jobs/{$job->getKey()}/complete", [
+            'tenant_id' => $context['tenant_id'],
+            'expected_version' => $this->currentJobVersion($job),
+        ])->assertUnprocessable()
+            ->assertJsonPath('error.code', 'DOMAIN_RULE_FAILED')
+            ->assertJsonPath('error.message', 'Issue all required stock items before completing this job.');
+
+        $blockedJob = $this->refreshJob($job);
+        $this->assertSame(VehicleServiceJobStatus::InProgress, $blockedJob->status);
+        $this->assertNull($blockedJob->completed_at);
+        $this->assertNull($line->refresh()->inventory_movement_id);
+
+        $this->issueInventory(
+            $blockedJob,
+            $context['warehouse_id'],
+            $context['warehouse_location_id'],
+            lineIds: [(int) $line->getKey()],
+        );
+
+        $this->tenantPatchJson($context['tenant_id'], "/api/v1/vehicle-service/jobs/{$job->getKey()}/complete", [
+            'tenant_id' => $context['tenant_id'],
+            'expected_version' => $this->currentJobVersion($job),
+        ])->assertOk()
+            ->assertJsonPath('data.status', VehicleServiceJobStatus::Completed->value);
+
+        $this->assertNotNull($line->refresh()->inventory_movement_id);
+        $this->assertSame(VehicleServiceJobStatus::Completed, $this->refreshJob($job)->status);
+    }
+
     public function test_tenant_and_organization_isolation_reject_cross_scope_references(): void
     {
         $context = $this->context();

@@ -13,6 +13,7 @@ use Modules\Vehicle\Services\VehicleStatusService;
 use Modules\VehicleService\Enums\VehicleServiceJobStatus;
 use Modules\VehicleService\Enums\VehicleServiceLineStatus;
 use Modules\VehicleService\Models\VehicleServiceJob;
+use Modules\VehicleService\Models\VehicleServiceJobLine;
 use Modules\VehicleService\Models\VehicleServiceStatusHistory;
 use Modules\VehicleService\Services\Concerns\AssertsVehicleServiceExpectedVersion;
 
@@ -28,6 +29,8 @@ final class VehicleServiceStatusService
 
     private const WORKFORCE_REQUIRED_MESSAGE = 'Assign at least one labour employee before marking this job as inspected.';
 
+    private const INVENTORY_ISSUE_REQUIRED_MESSAGE = 'Issue all required stock items before completing this job.';
+
     /** @var array<string, list<string>> */
     private const TRANSITIONS = [
         'draft' => ['inspected', 'in_progress', 'cancelled'],
@@ -40,7 +43,10 @@ final class VehicleServiceStatusService
         'cancelled' => [],
     ];
 
-    public function __construct(private readonly VehicleStatusService $vehicleStatuses) {}
+    public function __construct(
+        private readonly VehicleStatusService $vehicleStatuses,
+        private readonly VehicleServiceLineRuleService $lineRules,
+    ) {}
 
     public function change(
         VehicleServiceJob $job,
@@ -83,6 +89,10 @@ final class VehicleServiceStatusService
 
             if ($status === VehicleServiceJobStatus::InProgress) {
                 $this->assertVehicleCanEnterService($vehicle);
+            }
+
+            if ($status === VehicleServiceJobStatus::Completed) {
+                $this->assertInventoryIssuedForCompletion($job);
             }
 
             $job->status = $status;
@@ -158,6 +168,20 @@ final class VehicleServiceStatusService
     {
         if (! in_array($vehicle->status, [VehicleStatus::Active, VehicleStatus::UnderService], true)) {
             throw new InvalidArgumentException('Only an active vehicle can enter an in-progress service job.');
+        }
+    }
+
+    private function assertInventoryIssuedForCompletion(VehicleServiceJob $job): void
+    {
+        $hasUnissuedInventory = $job->lines()
+            ->with('item')
+            ->whereNull('inventory_movement_id')
+            ->where('status', '!=', VehicleServiceLineStatus::Cancelled->value)
+            ->get()
+            ->contains(fn (VehicleServiceJobLine $line): bool => $this->lineRules->isInventoryIssueLine($line));
+
+        if ($hasUnissuedInventory) {
+            throw new InvalidArgumentException(self::INVENTORY_ISSUE_REQUIRED_MESSAGE);
         }
     }
 
