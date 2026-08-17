@@ -15,10 +15,10 @@ import { WorkflowHeader } from '@/shared/components/WorkflowHeader';
 import { useApi } from '@/shared/hooks/useApi';
 import { useOnDemandTab } from '@/shared/hooks/useOnDemandTab';
 import { readableRelation } from '@/shared/utils/object';
-import { compareDecimalStrings, multiplyDecimal, sumDecimals } from '@/shared/utils/decimal';
+import { compareDecimalStrings } from '@/shared/utils/decimal';
 import { VehicleServiceSummaryPanel } from '../components/VehicleServiceSummaryPanel';
 import { VehicleServiceStatusBadge } from '../components/VehicleServiceStatusBadge';
-import type { VehicleServiceInspection, VehicleServiceJob, VehicleServiceJobLine, VehicleServiceJobStatus } from '../vehicleServiceTypes';
+import type { VehicleServiceInspection, VehicleServiceJob, VehicleServiceJobLine, VehicleServiceJobStatus, VehicleServiceJobTotals } from '../vehicleServiceTypes';
 import { cancelVehicleServiceJob, completeVehicleServiceJob, deleteVehicleServiceJob, getVehicleServiceJob, inspectVehicleServiceJob, listEmployeeAssignableLines, startVehicleServiceJob } from '../vehicleServiceApi';
 import { createVehicleServiceJobStore } from '../state/vehicleServiceJobStore';
 
@@ -67,8 +67,8 @@ export default function VehicleServiceJobDetailPage() {
         } : current);
     }, [setJob]);
 
-    const handleLinesChanged = useCallback((lines: VehicleServiceJobLine[], nextVersion: number) => {
-        setJob((current) => current ? withJobLines(current, lines, nextVersion) : current);
+    const handleLinesChanged = useCallback((lines: VehicleServiceJobLine[], nextVersion: number, totals?: VehicleServiceJobTotals) => {
+        setJob((current) => current ? withJobLines(current, lines, nextVersion, totals) : current);
     }, [setJob]);
 
     if (result.loading && job === null) return <LoadingState />;
@@ -203,7 +203,7 @@ export default function VehicleServiceJobDetailPage() {
                     ]} active={tabs.activeTab} onChange={tabs.openTab} />
                     <div className="p-5">
                         <Suspense fallback={<LoadingState />}>
-                            <TabPanel tabsId="service-job-tabs" tabId="summary" active={tabs.activeTab} keepMounted><VehicleServiceSummaryPanel job={job} /></TabPanel>
+                            <TabPanel tabsId="service-job-tabs" tabId="summary" active={tabs.activeTab} keepMounted><VehicleServiceSummaryPanel job={job} onJobChanged={setJob} /></TabPanel>
                             {tabs.openedTabs.has('inspection') && <TabPanel tabsId="service-job-tabs" tabId="inspection" active={tabs.activeTab} keepMounted><InspectionTab jobId={job.id} expectedVersion={expectedVersion} initialValue={job.inspection ?? null} onSaved={handleInspectionSaved} /></TabPanel>}
                             {tabs.openedTabs.has('lines') && <TabPanel tabsId="service-job-tabs" tabId="lines" active={tabs.activeTab} keepMounted><LinesTab jobId={job.id} expectedVersion={expectedVersion} onChanged={handleLinesChanged} onVersionChanged={updateJobVersion} jobStore={jobStore} /></TabPanel>}
                             {tabs.openedTabs.has('workforce') && <TabPanel tabsId="service-job-tabs" tabId="workforce" active={tabs.activeTab} keepMounted><WorkforceTab jobId={job.id} expectedVersion={expectedVersion} onChanged={updateJobVersion} active={tabs.activeTab === 'workforce'} jobStore={jobStore} /></TabPanel>}
@@ -237,23 +237,22 @@ function withStatusUpdate(
     };
 }
 
-export function withJobLines(job: VehicleServiceJob, lines: VehicleServiceJobLine[], rowVersion: number): VehicleServiceJob {
-    const billableLines = lines.filter((line) => line.is_billable && line.status !== 'cancelled');
-    const subtotal = sumDecimals(billableLines.map((line) => multiplyDecimal(line.quantity, line.unit_price)));
-    const discountTotal = sumDecimals(billableLines.map((line) => line.discount_amount));
-    const taxTotal = sumDecimals(billableLines.map((line) => line.tax_amount));
-    const chargeTotal = sumDecimals(billableLines.map((line) => line.charge_amount));
-    const grandTotal = sumDecimals(billableLines.map((line) => line.line_total));
-
+export function withJobLines(
+    job: VehicleServiceJob,
+    lines: VehicleServiceJobLine[],
+    rowVersion: number,
+    totals?: VehicleServiceJobTotals,
+): VehicleServiceJob {
     return {
         ...job,
         row_version: rowVersion,
         lines,
-        subtotal,
-        discount_total: discountTotal,
-        tax_total: taxTotal,
-        charge_total: chargeTotal,
-        grand_total: grandTotal,
+        ...(totals ?? {}),
+        job_discount: job.job_discount && totals ? {
+            ...job.job_discount,
+            calculation_base: totals.job_discount_base,
+            calculated_amount: totals.job_discount_amount,
+        } : job.job_discount,
     };
 }
 

@@ -41,21 +41,25 @@ use Modules\User\Models\UserModel;
 use Modules\VehicleService\DTOs\VehicleServiceEmployeeAssignmentData;
 use Modules\VehicleService\DTOs\VehicleServiceInspectionData;
 use Modules\VehicleService\DTOs\VehicleServiceJobData;
+use Modules\VehicleService\DTOs\VehicleServiceJobDiscountData;
 use Modules\VehicleService\DTOs\VehicleServiceLineData;
 use Modules\VehicleService\DTOs\VehicleServicePaymentData;
 use Modules\VehicleService\Enums\VehicleServiceCommissionType;
+use Modules\VehicleService\Enums\VehicleServiceDiscountCalculationType;
 use Modules\VehicleService\Enums\VehicleServiceJobStatus;
 use Modules\VehicleService\Enums\VehicleServiceLineSourceType;
 use Modules\VehicleService\Http\Resources\VehicleServiceJobLineResource;
 use Modules\VehicleService\Http\Resources\VehicleServiceJobResource;
 use Modules\VehicleService\Models\VehicleServiceInvoiceLink;
 use Modules\VehicleService\Models\VehicleServiceJob;
+use Modules\VehicleService\Models\VehicleServiceJobDiscount;
 use Modules\VehicleService\Models\VehicleServiceJobLine;
 use Modules\VehicleService\Models\VehicleServicePaymentLink;
 use Modules\VehicleService\Services\VehicleServiceEmployeeAssignmentService;
 use Modules\VehicleService\Services\VehicleServiceInspectionService;
 use Modules\VehicleService\Services\VehicleServiceInventoryIntegrationService;
 use Modules\VehicleService\Services\VehicleServiceInvoiceIntegrationService;
+use Modules\VehicleService\Services\VehicleServiceJobDiscountService;
 use Modules\VehicleService\Services\VehicleServiceJobService;
 use Modules\VehicleService\Services\VehicleServiceLineService;
 use Modules\VehicleService\Services\VehicleServicePaymentIntegrationService;
@@ -127,6 +131,66 @@ final class VehicleServiceEngineTest extends TestCase
         $this->assertSame('5.000000', (string) $job->charge_total);
         $this->assertSame('465.000000', (string) $job->grand_total);
         $this->assertSame('46.500000', (string) $job->supervisor_commission_amount);
+    }
+
+    public function test_whole_job_discount_combines_with_line_discounts_and_keeps_immutable_revisions(): void
+    {
+        $context = $this->context();
+        $job = $this->createJob($context);
+        $this->withTenantExecutionContext(
+            (int) $job->tenant_id,
+            fn () => app(VehicleServiceLineService::class)->create($job, new VehicleServiceLineData(
+                lineSourceType: VehicleServiceLineSourceType::ServiceItem,
+                description: 'Discounted service',
+                quantity: '1.000000',
+                unitPrice: '200.000000',
+                itemId: (int) $context['service']->getKey(),
+                discountCalculationType: 'percentage',
+                discountRate: '10.000000',
+            )),
+        );
+
+        $job = $this->withTenantExecutionContext(
+            (int) $job->tenant_id,
+            fn () => app(VehicleServiceJobDiscountService::class)->set(
+                $this->refreshJob($job),
+                new VehicleServiceJobDiscountData(
+                    calculationType: VehicleServiceDiscountCalculationType::Percentage,
+                    rate: '10.000000',
+                    fixedAmount: '0.000000',
+                    reason: 'Approved loyalty discount',
+                ),
+            ),
+        );
+
+        $this->assertSame('200.000000', (string) $job->subtotal);
+        $this->assertSame('20.000000', (string) $job->line_discount_total);
+        $this->assertSame('180.000000', (string) $job->job_discount_base);
+        $this->assertSame('18.000000', (string) $job->job_discount_amount);
+        $this->assertSame('38.000000', (string) $job->discount_total);
+        $this->assertSame('162.000000', (string) $job->grand_total);
+
+        $this->line($job, VehicleServiceLineSourceType::ExternalItem, null, '1.000000', '100.000000');
+        $job = $this->refreshJob($job);
+        $this->assertSame('280.000000', (string) $job->job_discount_base);
+        $this->assertSame('28.000000', (string) $job->job_discount_amount);
+        $this->assertSame('252.000000', (string) $job->grand_total);
+
+        $job = $this->withTenantExecutionContext(
+            (int) $job->tenant_id,
+            fn () => app(VehicleServiceJobDiscountService::class)->remove(
+                $job,
+                'Customer no longer qualifies',
+            ),
+        );
+        $this->assertSame('0.000000', (string) $job->job_discount_amount);
+        $this->assertSame('280.000000', (string) $job->grand_total);
+        $this->assertSame(2, $this->withTenantExecutionContext(
+            (int) $job->tenant_id,
+            fn (): int => VehicleServiceJobDiscount::query()
+                ->where('vehicle_service_job_id', $job->getKey())
+                ->count(),
+        ));
     }
 
     public function test_supervisor_and_employee_fixed_and_percentage_commissions(): void
@@ -914,6 +978,49 @@ final class VehicleServiceEngineTest extends TestCase
         $second = $this->createServiceInvoice($this->refreshJob($job), '2026-06-07', [(int) $line->getKey() => '2.500000']);
         $this->assertSame(InvoiceStatus::Posted, $second->status);
         $this->assertSame(VehicleServiceJobStatus::Invoiced, $this->refreshJob($job)->status);
+    }
+
+    public function test_whole_job_discount_is_allocated_across_partial_invoices_with_exact_remainder(): void
+    {
+        $context = $this->context();
+        $job = $this->createJob($context);
+        $line = $this->line($job, VehicleServiceLineSourceType::ServiceItem, $context['service'], '4.000000', '50.000000');
+        $job = $this->withTenantExecutionContext(
+            (int) $job->tenant_id,
+            fn () => app(VehicleServiceJobDiscountService::class)->set(
+                $this->refreshJob($job),
+                new VehicleServiceJobDiscountData(
+                    calculationType: VehicleServiceDiscountCalculationType::Percentage,
+                    rate: '10.000000',
+                    fixedAmount: '0.000000',
+                    reason: 'Approved whole-job discount',
+                ),
+            ),
+        );
+        $this->changeStatus($job, VehicleServiceJobStatus::InProgress);
+        $this->changeStatus($this->refreshJob($job), VehicleServiceJobStatus::Completed);
+
+        $first = $this->createServiceInvoice(
+            $this->refreshJob($job),
+            '2026-06-07',
+            [(int) $line->getKey() => '1.500000'],
+        );
+        $second = $this->createServiceInvoice(
+            $this->refreshJob($job),
+            '2026-06-08',
+            [(int) $line->getKey() => '2.500000'],
+        );
+
+        $this->assertSame('7.500000', (string) $first->adjustments->first()->amount);
+        $this->assertSame('67.500000', (string) $first->grand_total);
+        $this->assertSame('12.500000', (string) $second->adjustments->first()->amount);
+        $this->assertSame('112.500000', (string) $second->grand_total);
+        $this->assertSame('20', $this->withTenantExecutionContext(
+            (int) $job->tenant_id,
+            fn (): string => (string) VehicleServiceInvoiceLink::query()
+                ->where('vehicle_service_job_id', $job->getKey())
+                ->sum('allocated_adjustment_total'),
+        ));
     }
 
     public function test_cancelled_invoice_source_quantity_can_be_invoiced_again(): void

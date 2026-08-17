@@ -18,7 +18,7 @@ import {
 } from '../vehicleServiceApi';
 import { vehicleServicePermissions } from '../vehicleServicePermissions';
 import type { VehicleServiceJobStore } from '../state/vehicleServiceJobStore';
-import type { VehicleServiceJobLine } from '../vehicleServiceTypes';
+import type { VehicleServiceJobLine, VehicleServiceJobTotals } from '../vehicleServiceTypes';
 import { VehicleServiceInventoryIssueDrawer } from './VehicleServiceInventoryIssueDrawer';
 import {
     emptyLineForm,
@@ -52,7 +52,7 @@ export default function VehicleServiceLineEditor({
 }: {
     jobId: number;
     expectedVersion: number;
-    onChanged: (lines: VehicleServiceJobLine[], nextVersion: number) => void;
+    onChanged: (lines: VehicleServiceJobLine[], nextVersion: number, totals?: VehicleServiceJobTotals) => void;
     onVersionChanged: (nextVersion: number) => void;
     jobStore: VehicleServiceJobStore;
 }) {
@@ -109,7 +109,7 @@ export default function VehicleServiceLineEditor({
                 });
                 linesResult.setData(nextLines);
                 setToast('Job line updated.');
-                onChanged(nextLines, mutation.rowVersion);
+                onChanged(nextLines, mutation.rowVersion, mutation.jobTotals);
             } else {
                 const mutation = await createVehicleServiceLine(jobId, payload);
                 const saved = mutation.line;
@@ -139,17 +139,17 @@ export default function VehicleServiceLineEditor({
                         const issuedLines = replaceLine(nextLines, issuedLine);
                         linesResult.setData(issuedLines);
                         setToast('Job line added and stock issued.');
-                        onChanged(issuedLines, lineVersion + 1);
+                        onChanged(issuedLines, lineVersion + 1, mutation.jobTotals);
                     } catch (requestError) {
                         linesResult.setData(nextLines);
                         setToast('Job line added. Stock issue is still pending.');
                         setError(toApiError(requestError));
-                        onChanged(nextLines, lineVersion);
+                        onChanged(nextLines, lineVersion, mutation.jobTotals);
                     }
                 } else {
                     linesResult.setData(nextLines);
                     setToast('Job line added.');
-                    onChanged(nextLines, lineVersion);
+                    onChanged(nextLines, lineVersion, mutation.jobTotals);
                 }
             }
             setDialog(null);
@@ -174,7 +174,7 @@ export default function VehicleServiceLineEditor({
             linesResult.setData(nextLines);
             setToast('Job line removed.');
             setRemoveTarget(null);
-            onChanged(nextLines, mutation.rowVersion);
+            onChanged(nextLines, mutation.rowVersion, mutation.jobTotals);
         } catch (requestError) {
             setError(toApiError(requestError));
         } finally {

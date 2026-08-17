@@ -7,22 +7,41 @@ namespace Modules\VehicleService\Constants;
 final class VehicleServicePermission
 {
     public const JOBS_VIEW = 'vehicle_service.jobs.view';
+
     public const JOBS_CREATE = 'vehicle_service.jobs.create';
+
     public const JOBS_UPDATE = 'vehicle_service.jobs.update';
+
     public const JOBS_TRANSITION = 'vehicle_service.jobs.transition';
+
+    public const DISCOUNTS_MANAGE = 'vehicle_service.discounts.manage';
+
     public const LINES_VIEW = 'vehicle_service.lines.view';
+
     public const LINES_MANAGE = 'vehicle_service.lines.manage';
+
     public const WORKFORCE_VIEW = 'vehicle_service.workforce.view';
+
     public const WORKFORCE_MANAGE = 'vehicle_service.workforce.manage';
+
     public const COMMISSIONS_VIEW = 'vehicle_service.commissions.view';
+
     public const COMMISSIONS_MANAGE = 'vehicle_service.commissions.manage';
+
     public const INVENTORY_VIEW = 'vehicle_service.inventory.view';
+
     public const INVENTORY_ISSUE = 'vehicle_service.inventory.issue';
+
     public const INVOICES_VIEW = 'vehicle_service.invoices.view';
+
     public const INVOICES_CREATE = 'vehicle_service.invoices.create';
+
     public const PAYMENTS_VIEW = 'vehicle_service.payments.view';
+
     public const PAYMENTS_CREATE = 'vehicle_service.payments.create';
+
     public const DOCUMENTS_VIEW = 'vehicle_service.documents.view';
+
     public const DOCUMENTS_MANAGE = 'vehicle_service.documents.manage';
 
     public static function descriptions(): array
@@ -32,6 +51,7 @@ final class VehicleServicePermission
             self::JOBS_CREATE => 'Create vehicle service jobs.',
             self::JOBS_UPDATE => 'Update draft or active vehicle service jobs.',
             self::JOBS_TRANSITION => 'Inspect, start, complete, or cancel vehicle service jobs.',
+            self::DISCOUNTS_MANAGE => 'Add, change, or remove whole-job Vehicle Service discounts.',
             self::LINES_VIEW => 'View service job lines.',
             self::LINES_MANAGE => 'Create, update, and remove service job lines.',
             self::WORKFORCE_VIEW => 'View service workforce assignments.',

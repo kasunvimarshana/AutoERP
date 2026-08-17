@@ -5,6 +5,8 @@ import type {
     VehicleServiceInspection,
     VehicleServiceInspectionPayload,
     VehicleServiceJob,
+    VehicleServiceJobDiscount,
+    VehicleServiceJobDiscountPayload,
     VehicleServiceJobPayload,
     VehicleServiceStatusHistory,
 } from '../vehicleServiceTypes';
@@ -28,6 +30,19 @@ export const createVehicleServiceJob = (payload: VehicleServiceJobPayload) =>
 
 export const updateVehicleServiceJob = (id: number, payload: VehicleServiceJobPayload) =>
     apiClient.put<ApiResource<VehicleServiceJob>>(`${jobs}/${id}`, payload)
+        .then((response) => response.data.data);
+
+export const setVehicleServiceJobDiscount = (id: number, payload: VehicleServiceJobDiscountPayload) =>
+    apiClient.put<ApiResource<VehicleServiceJob>>(`${jobs}/${id}/discount`, payload)
+        .then((response) => response.data.data);
+
+export const removeVehicleServiceJobDiscount = (id: number, expectedVersion: number, reason: string) =>
+    apiClient.delete<ApiResource<VehicleServiceJob>>(`${jobs}/${id}/discount`, {
+        data: { expected_version: expectedVersion, reason },
+    }).then((response) => response.data.data);
+
+export const listVehicleServiceJobDiscountHistory = (id: number, signal?: AbortSignal) =>
+    apiClient.get<ApiCollection<VehicleServiceJobDiscount>>(`${jobs}/${id}/discount-history`, { signal })
         .then((response) => response.data.data);
 
 export const deleteVehicleServiceJob = (id: number, expectedVersion: number) =>

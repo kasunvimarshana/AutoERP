@@ -3,6 +3,7 @@ export const vehicleServicePermissions = {
     jobsCreate: 'vehicle_service.jobs.create',
     jobsUpdate: 'vehicle_service.jobs.update',
     jobsTransition: 'vehicle_service.jobs.transition',
+    discountsManage: 'vehicle_service.discounts.manage',
     linesView: 'vehicle_service.lines.view',
     linesManage: 'vehicle_service.lines.manage',
     workforceView: 'vehicle_service.workforce.view',

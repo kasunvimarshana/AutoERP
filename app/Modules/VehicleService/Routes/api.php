@@ -9,6 +9,7 @@ use Modules\VehicleService\Http\Controllers\VehicleServiceDocumentController;
 use Modules\VehicleService\Http\Controllers\VehicleServiceInventoryController;
 use Modules\VehicleService\Http\Controllers\VehicleServiceInvoiceController;
 use Modules\VehicleService\Http\Controllers\VehicleServiceJobController;
+use Modules\VehicleService\Http\Controllers\VehicleServiceJobDiscountController;
 use Modules\VehicleService\Http\Controllers\VehicleServiceLineController;
 use Modules\VehicleService\Http\Controllers\VehicleServicePaymentController;
 use Modules\VehicleService\Http\Controllers\VehicleServiceWorkforceController;
@@ -31,6 +32,11 @@ Route::prefix('api/v1/vehicle-service')->middleware($middleware)->name('api.v1.v
         Route::get('jobs/{job}', [VehicleServiceJobController::class, 'show'])->whereNumber('job')->name('jobs.show');
         Route::get('jobs/{job}/inspection', [VehicleServiceJobController::class, 'inspection'])->whereNumber('job')->name('inspection.show');
         Route::get('jobs/{job}/status-history', [VehicleServiceJobController::class, 'statusHistory'])->whereNumber('job')->name('status-history.index');
+        Route::get('jobs/{job}/discount-history', [VehicleServiceJobDiscountController::class, 'history'])->whereNumber('job')->name('discount-history.index');
+    });
+    Route::middleware($requires(VehicleServicePermission::DISCOUNTS_MANAGE))->group(function (): void {
+        Route::put('jobs/{job}/discount', [VehicleServiceJobDiscountController::class, 'update'])->whereNumber('job')->name('discount.update');
+        Route::delete('jobs/{job}/discount', [VehicleServiceJobDiscountController::class, 'destroy'])->whereNumber('job')->name('discount.destroy');
     });
     Route::get('jobs/create-defaults', [VehicleServiceJobController::class, 'createDefaults'])
         ->middleware($requires(VehicleServicePermission::JOBS_CREATE))->name('jobs.create-defaults');

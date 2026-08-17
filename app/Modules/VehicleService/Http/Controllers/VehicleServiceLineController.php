@@ -90,6 +90,18 @@ final class VehicleServiceLineController extends VehicleServiceController
             'data' => $line === null ? null : (new VehicleServiceJobLineResource($line))->resolve($request),
             'meta' => [
                 'row_version' => (int) $job->row_version,
+                'job_totals' => [
+                    'subtotal' => (string) $job->subtotal,
+                    'line_discount_total' => (string) $job->line_discount_total,
+                    'job_discount_base' => (string) $job->job_discount_base,
+                    'job_discount_amount' => (string) $job->job_discount_amount,
+                    'discount_total' => (string) $job->discount_total,
+                    'tax_total' => (string) $job->tax_total,
+                    'charge_total' => (string) $job->charge_total,
+                    'grand_total' => (string) $job->grand_total,
+                    'commission_cost_total' => (string) $job->commission_cost_total,
+                    'net_after_commission' => (string) $job->net_after_commission,
+                ],
                 'workforce_lines' => VehicleServiceJobLineResource::collection(
                     $assignableLines->forJob($job),
                 )->resolve($request),

@@ -192,6 +192,9 @@ export interface VehicleServiceJob {
     fuel_level?: string | null;
     priority?: string | null;
     subtotal: string;
+    line_discount_total: string;
+    job_discount_base: string;
+    job_discount_amount: string;
     discount_total: string;
     tax_total: string;
     charge_total: string;
@@ -200,10 +203,48 @@ export interface VehicleServiceJob {
     net_after_commission: string;
     notes?: string | null;
     completed_at?: string | null;
+    job_discount?: VehicleServiceJobDiscount | null;
     inspection?: VehicleServiceInspection | null;
     lines?: VehicleServiceJobLine[];
     invoice_links?: VehicleServiceInvoiceLink[];
     payment_links?: VehicleServicePaymentLink[];
+}
+
+export type VehicleServiceDiscountCalculationType = 'fixed' | 'percentage';
+
+export interface VehicleServiceJobDiscount {
+    id: number;
+    revision: number;
+    action: 'set' | 'removed';
+    calculation_type: VehicleServiceDiscountCalculationType;
+    rate: string;
+    fixed_amount: string;
+    calculation_base: string;
+    calculated_amount: string;
+    reason: string;
+    changed_by?: NamedResource | null;
+    changed_at?: string | null;
+}
+
+export interface VehicleServiceJobDiscountPayload {
+    expected_version: number;
+    calculation_type: VehicleServiceDiscountCalculationType;
+    rate: string;
+    fixed_amount: string;
+    reason: string;
+}
+
+export interface VehicleServiceJobTotals {
+    subtotal: string;
+    line_discount_total: string;
+    job_discount_base: string;
+    job_discount_amount: string;
+    discount_total: string;
+    tax_total: string;
+    charge_total: string;
+    grand_total: string;
+    commission_cost_total: string;
+    net_after_commission: string;
 }
 
 export interface VehicleServiceJobPayload {

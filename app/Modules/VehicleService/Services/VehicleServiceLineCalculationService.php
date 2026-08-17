@@ -8,6 +8,8 @@ use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Item\Models\Item;
 use Modules\VehicleService\DTOs\VehicleServiceLineData;
+use Modules\VehicleService\Enums\VehicleServiceDiscountCalculationType;
+use Modules\VehicleService\Enums\VehicleServiceDiscountRevisionAction;
 use Modules\VehicleService\Enums\VehicleServiceLineSourceType;
 use Modules\VehicleService\Enums\VehicleServiceLineStatus;
 use Modules\VehicleService\Models\VehicleServiceJob;
@@ -17,6 +19,7 @@ use Modules\VehicleService\Models\VehicleServiceLineEmployee;
 final class VehicleServiceLineCalculationService
 {
     private const CANCELLED_ASSIGNMENT_STATUS = 'cancelled';
+
     private const ZERO_AMOUNT = '0.000000';
 
     public function __construct(
@@ -111,6 +114,13 @@ final class VehicleServiceLineCalculationService
             $grand = $this->math->add($grand, (string) $line->line_total);
         }
 
+        $discountBase = $this->math->sub($subtotal, $discount);
+        $jobDiscount = $this->currentJobDiscountAmount($job, $discountBase);
+        $grand = $this->math->sub($grand, $jobDiscount);
+        if ($this->math->isNegative($grand)) {
+            throw new InvalidArgumentException('Whole-job discount cannot make the service job total negative.');
+        }
+
         $comboSupervisorLines = $job->lines
             ->where('line_source_type', VehicleServiceLineSourceType::ComboChild)
             ->where('uses_job_supervisor', true)
@@ -153,7 +163,10 @@ final class VehicleServiceLineCalculationService
 
         $job->forceFill([
             'subtotal' => $subtotal,
-            'discount_total' => $discount,
+            'line_discount_total' => $discount,
+            'job_discount_base' => $discountBase,
+            'job_discount_amount' => $jobDiscount,
+            'discount_total' => $this->math->add($discount, $jobDiscount),
             'tax_total' => $tax,
             'charge_total' => $charge,
             'grand_total' => $grand,
@@ -163,6 +176,52 @@ final class VehicleServiceLineCalculationService
         ])->save();
 
         return $job->refresh();
+    }
+
+    public function discountBase(VehicleServiceJob $job): string
+    {
+        $job->load('lines');
+        $billable = $job->lines->where('is_billable', true)
+            ->where('status', '!=', VehicleServiceLineStatus::Cancelled);
+        $subtotal = self::ZERO_AMOUNT;
+        $lineDiscount = self::ZERO_AMOUNT;
+
+        foreach ($billable as $line) {
+            $subtotal = $this->math->add(
+                $subtotal,
+                $this->math->mul((string) $line->quantity, (string) $line->unit_price),
+            );
+            $lineDiscount = $this->math->add($lineDiscount, (string) $line->discount_amount);
+        }
+
+        return $this->math->sub($subtotal, $lineDiscount);
+    }
+
+    public function discountAmount(
+        VehicleServiceDiscountCalculationType $type,
+        string $rate,
+        string $fixedAmount,
+        string $base,
+    ): string {
+        if ($this->math->isNegative($base)) {
+            throw new InvalidArgumentException('Whole-job discount base cannot be negative.');
+        }
+        if ($this->math->isNegative($rate) || $this->math->compare($rate, '100') > 0) {
+            throw new InvalidArgumentException('Whole-job discount percentage must be between 0 and 100.');
+        }
+        if ($this->math->isNegative($fixedAmount)) {
+            throw new InvalidArgumentException('Whole-job fixed discount cannot be negative.');
+        }
+
+        $amount = $type === VehicleServiceDiscountCalculationType::Percentage
+            ? $this->math->div($this->math->mul($base, $rate, 12), '100')
+            : $this->math->normalize($fixedAmount);
+
+        if ($this->math->compare($amount, $base) > 0) {
+            throw new InvalidArgumentException('Whole-job discount cannot exceed the eligible amount after line discounts.');
+        }
+
+        return $amount;
     }
 
     public function recalculateAssignments(VehicleServiceJobLine $line): void
@@ -233,5 +292,20 @@ final class VehicleServiceLineCalculationService
         }
 
         return $this->math->normalize($amount);
+    }
+
+    private function currentJobDiscountAmount(VehicleServiceJob $job, string $base): string
+    {
+        $revision = $job->discountRevisions()->first();
+        if ($revision === null || $revision->action === VehicleServiceDiscountRevisionAction::Removed) {
+            return self::ZERO_AMOUNT;
+        }
+
+        return $this->discountAmount(
+            $revision->calculation_type,
+            (string) $revision->rate,
+            (string) $revision->fixed_amount,
+            $base,
+        );
     }
 }
