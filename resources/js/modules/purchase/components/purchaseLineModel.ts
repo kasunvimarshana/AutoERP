@@ -77,6 +77,7 @@ export interface PurchaseLineTaxGroupOption {
 export interface PurchaseLineEditorConfig {
     unitLabel: string;
     taxMode: PurchaseLineTaxMode;
+    continuousCreate?: boolean;
     taxGroupOptions?: PurchaseLineTaxGroupOption[];
     defaultLine?: Partial<EditablePurchaseLine>;
     unitPriceMustBePositive?: boolean;

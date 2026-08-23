@@ -20,6 +20,7 @@ export function VehicleServiceLineForm({
     saving,
     canIssueInventory,
     onSave,
+    onClear,
     onCancel,
 }: {
     value: VehicleServiceLineFormValue;
@@ -28,6 +29,7 @@ export function VehicleServiceLineForm({
     saving: boolean;
     canIssueInventory: boolean;
     onSave: (value: VehicleServiceLineFormValue, issueStock: boolean) => void;
+    onClear: () => void;
     onCancel: () => void;
 }) {
     const [draft, setDraft] = useState(value);
@@ -62,7 +64,12 @@ export function VehicleServiceLineForm({
                     </p>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    <LineItemFields value={draft} error={error} onChange={setDraft} />
+                    <LineItemFields
+                        value={draft}
+                        error={error}
+                        autoFocus={mode === 'create'}
+                        onChange={setDraft}
+                    />
                     {showIssueControls && (
                         <div className="sm:col-span-2 lg:col-span-3">
                             <VehicleServiceInventoryLocationFields
@@ -90,6 +97,9 @@ export function VehicleServiceLineForm({
             <LineSummary preview={preview} />
 
             <div className="flex flex-wrap justify-end gap-2">
+                {mode === 'create' && (
+                    <Button type="button" variant="secondary" disabled={saving} onClick={onClear}>Clear</Button>
+                )}
                 <Button type="button" variant="secondary" disabled={saving} onClick={onCancel}>Cancel</Button>
                 <Button type="submit" loading={saving}>
                     {mode === 'edit' ? 'Save line' : 'Add line'}

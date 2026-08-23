@@ -22,6 +22,7 @@ interface LookupProps extends LookupBehaviorOptions {
     excludeIds?: Array<number | string>;
     disabled?: boolean;
     required?: boolean;
+    autoFocus?: boolean;
 }
 
 interface WarehouseLocationLookupProps extends LookupProps {

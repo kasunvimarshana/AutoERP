@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -11,7 +11,8 @@ import VehicleServiceLineEditor, {
     filterCollapsedComboChildren,
 } from './VehicleServiceLineEditor';
 
-const { jobLines, setData } = vi.hoisted(() => ({
+const { createLine, jobLines, setData } = vi.hoisted(() => ({
+    createLine: vi.fn(),
     setData: vi.fn(),
     jobLines: [
         {
@@ -90,7 +91,18 @@ const { jobLines, setData } = vi.hoisted(() => ({
 }));
 
 vi.mock('@/modules/auth/AuthProvider', () => ({
-    useAuth: () => ({ permissions: [vehicleServicePermissions.linesView] }),
+    useAuth: () => ({
+        permissions: [vehicleServicePermissions.linesView, vehicleServicePermissions.linesManage],
+    }),
+}));
+
+vi.mock('../vehicleServiceApi', () => ({
+    createVehicleServiceLine: createLine,
+    deleteVehicleServiceLine: vi.fn(),
+    issueVehicleServiceInventory: vi.fn(),
+    listInventoryIssueLines: vi.fn(),
+    listVehicleServiceLines: vi.fn(),
+    updateVehicleServiceLine: vi.fn(),
 }));
 
 vi.mock('@/shared/hooks/useApi', () => ({
@@ -105,6 +117,7 @@ vi.mock('@/shared/hooks/useApi', () => ({
 describe('VehicleServiceLineEditor combo disclosure', () => {
     beforeEach(() => {
         setData.mockClear();
+        createLine.mockReset();
     });
 
     it('hides resolved combo children until their parent is expanded', () => {
@@ -185,5 +198,87 @@ describe('VehicleServiceLineEditor combo disclosure', () => {
 
         await user.click(screen.getAllByText('Combo row')[0]);
         expect(toggleRow).toHaveBeenCalledOnce();
+    });
+
+    it('keeps the create drawer open and resets and focuses the form after adding or clearing', async () => {
+        const user = userEvent.setup();
+        const onChanged = vi.fn();
+        const createdLine = {
+            ...jobLines[1],
+            id: 200,
+            parent_line_id: null,
+            line_number: 4,
+            line_source_type: 'external_item' as const,
+            item: null,
+            description: 'Customer supplied oil',
+            is_external: true,
+        };
+        createLine.mockResolvedValueOnce({
+            line: createdLine,
+            rowVersion: 2,
+            workforceLines: [],
+            jobTotals: undefined,
+        });
+
+        render(
+            <MemoryRouter>
+                <VehicleServiceLineEditor
+                    jobId={13}
+                    expectedVersion={1}
+                    onChanged={onChanged}
+                    onVersionChanged={vi.fn()}
+                    jobStore={createVehicleServiceJobStore(13)}
+                />
+            </MemoryRouter>,
+        );
+
+        await user.click(screen.getByRole('button', { name: 'Add line' }));
+        await user.click(screen.getByRole('button', { name: 'Enter an external or customer-supplied item' }));
+        await user.type(screen.getByLabelText('External item description'), 'Customer supplied oil');
+        await user.click(screen.getAllByRole('button', { name: 'Add line' })
+            .find((button) => button.getAttribute('type') === 'submit')!);
+
+        await waitFor(() => expect(createLine).toHaveBeenCalledOnce());
+        const resetItemInput = await screen.findByRole('combobox', { name: 'Item' });
+        expect(resetItemInput).toHaveFocus();
+        expect(screen.getByRole('heading', { name: 'Add line' })).toBeInTheDocument();
+        expect(screen.queryByLabelText('External item description')).not.toBeInTheDocument();
+        await waitFor(() => expect(screen.getAllByRole('button', { name: 'Add line' })
+            .find((button) => button.getAttribute('type') === 'submit')).toBeEnabled());
+
+        await user.type(resetItemInput, 'oil');
+        await user.click(screen.getByRole('button', { name: 'Clear' }));
+        expect(screen.getByRole('combobox', { name: 'Item' })).toHaveValue('');
+        expect(screen.getByRole('combobox', { name: 'Item' })).toHaveFocus();
+    });
+
+    it('keeps the drawer and entered values when creating a line fails', async () => {
+        const user = userEvent.setup();
+        createLine.mockRejectedValueOnce(new Error('Could not add line.'));
+
+        render(
+            <MemoryRouter>
+                <VehicleServiceLineEditor
+                    jobId={13}
+                    expectedVersion={1}
+                    onChanged={vi.fn()}
+                    onVersionChanged={vi.fn()}
+                    jobStore={createVehicleServiceJobStore(13)}
+                />
+            </MemoryRouter>,
+        );
+
+        await user.click(screen.getByRole('button', { name: 'Add line' }));
+        await user.click(screen.getByRole('button', { name: 'Enter an external or customer-supplied item' }));
+        const descriptionInput = screen.getByLabelText('External item description');
+        await user.type(descriptionInput, 'Keep this value');
+        await user.click(screen.getAllByRole('button', { name: 'Add line' })
+            .find((button) => button.getAttribute('type') === 'submit')!);
+
+        await waitFor(() => expect(createLine).toHaveBeenCalledOnce());
+        await waitFor(() => expect(screen.getAllByRole('button', { name: 'Add line' })
+            .find((button) => button.getAttribute('type') === 'submit')).toBeEnabled());
+        expect(descriptionInput).toHaveValue('Keep this value');
+        expect(screen.getByRole('heading', { name: 'Add line' })).toBeInTheDocument();
     });
 });

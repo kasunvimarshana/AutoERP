@@ -10,9 +10,10 @@ import {
     type VehicleServiceLineFormValue,
 } from './lineForm';
 
-export function LineItemFields({ value, error, onChange }: {
+export function LineItemFields({ value, error, autoFocus = false, onChange }: {
     value: VehicleServiceLineFormValue;
     error: ApiError | null;
+    autoFocus?: boolean;
     onChange: (value: VehicleServiceLineFormValue) => void;
 }) {
     const external = value.source === 'external_item';
@@ -52,6 +53,7 @@ export function LineItemFields({ value, error, onChange }: {
                 recentResultsKey="vehicle-service:job-line-items"
                 placeholder="Search inventory, service, labour, or package items..."
                 required
+                autoFocus={autoFocus}
             />
             <Button
                 type="button"

@@ -80,6 +80,7 @@ export default function VehicleServiceLineEditor({
     const loading = canViewLines ? linesResult.loading : inventoryOnlyResult.loading;
     const loadError = canViewLines ? linesResult.error : inventoryOnlyResult.error;
     const [dialog, setDialog] = useState<LineDialog | null>(null);
+    const [createFormRevision, setCreateFormRevision] = useState(0);
     const [removeTarget, setRemoveTarget] = useState<VehicleServiceJobLine | null>(null);
     const [issueTarget, setIssueTarget] = useState<VehicleServiceJobLine | null>(null);
     const [saving, setSaving] = useState(false);
@@ -110,6 +111,7 @@ export default function VehicleServiceLineEditor({
                 linesResult.setData(nextLines);
                 setToast('Job line updated.');
                 onChanged(nextLines, mutation.rowVersion, mutation.jobTotals);
+                setDialog(null);
             } else {
                 const mutation = await createVehicleServiceLine(jobId, payload);
                 const saved = mutation.line;
@@ -151,8 +153,9 @@ export default function VehicleServiceLineEditor({
                     setToast('Job line added.');
                     onChanged(nextLines, lineVersion, mutation.jobTotals);
                 }
+                setDialog({ mode: 'create', value: emptyLineForm() });
+                setCreateFormRevision((current) => current + 1);
             }
-            setDialog(null);
         } catch (requestError) {
             setError(toApiError(requestError));
         } finally {
@@ -247,12 +250,17 @@ export default function VehicleServiceLineEditor({
                 >
                     {dialog && (
                         <VehicleServiceLineForm
-                            key={dialog.mode === 'edit' ? `edit-${dialog.lineId}` : 'create'}
+                            key={dialog.mode === 'edit' ? `edit-${dialog.lineId}` : `create-${createFormRevision}`}
                             value={dialog.value}
                             mode={dialog.mode}
                             error={error}
                             saving={saving}
                             canIssueInventory={canIssueInventory}
+                            onClear={() => {
+                                setError(null);
+                                setDialog({ mode: 'create', value: emptyLineForm() });
+                                setCreateFormRevision((current) => current + 1);
+                            }}
                             onCancel={() => setDialog(null)}
                             onSave={(value, issueStock) => void saveLine(value, issueStock)}
                         />
