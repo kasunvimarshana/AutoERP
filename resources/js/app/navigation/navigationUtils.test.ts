@@ -4,6 +4,7 @@ import { financePermissions } from '@/modules/finance/financePermissions';
 import { inventoryPermissions } from '@/modules/inventory/inventoryPermissions';
 import { invoicePermissions } from '@/modules/invoice/invoicePermissions';
 import { purchasePermissions } from '@/modules/purchase/purchasePermissions';
+import { reportingPermissions } from '@/modules/reporting/reportingPermissions';
 import { tenantNavigationSections } from './navigationConfig';
 import {
     filterNavigation,
@@ -169,6 +170,29 @@ describe('navigation access and matching', () => {
             'Account Balances',
             'Financial Reports',
         ]);
+    });
+
+    it('shows Summary Reports under the reporting workspace', () => {
+        const sections = filterNavigation(tenantNavigationSections, {
+            tenantId: 10,
+            isPlatformOperator: false,
+            organizationUnitId: 20,
+            roles: [],
+            permissions: [reportingPermissions.view],
+            permissionsLoaded: true,
+            enabledModules: ['reporting'],
+            enabledModulesLoaded: true,
+        });
+        const reports = sections
+            .flatMap((section) => section.items)
+            .find((item) => item.id === 'reports');
+
+        expect(reports?.type).toBe('module');
+        expect(reports?.type === 'module' ? reports.children.map((child) => child.label) : []).toEqual([
+            'Summary Reports',
+            'All Reports',
+        ]);
+        expect(findNavigationMatch('/reports/summary', '', tenantNavigationSections)?.item.id).toBe('summary-reports');
     });
 
     it('requires an Inventory permission before showing Inventory navigation', () => {

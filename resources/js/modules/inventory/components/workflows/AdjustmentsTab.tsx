@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type ReactNode } from 'react';
+import { useCallback, useState, type FormEvent, type ReactNode } from 'react';
 import { Button } from '@/shared/components/Button';
 import { DecimalInput } from '@/shared/components/DecimalInput';
 import { Input } from '@/shared/components/Input';
@@ -7,12 +7,14 @@ import { Select } from '@/shared/components/Select';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { fieldError, type ApiError } from '@/shared/api/apiError';
 import { lookupApi } from '@/shared/api/lookupApi';
-import { searchWarehouses } from '@/shared/api/referenceApi';
+import { searchWarehouseLocations, searchWarehouses } from '@/shared/api/referenceApi';
 import { compactObject } from '@/shared/utils/object';
 import type { NamedResource } from '@/shared/types/common';
+import type { LookupLoadParams } from '@/shared/types/lookup';
 import { createAdjustment, postAdjustment } from '../../inventoryApi';
 import type { AdjustmentPayload, InventoryRecord } from '../../inventoryTypes';
 import { emptyInventoryDimensions, InventoryDimensionFields } from '../InventoryDimensionFields';
+import { OpeningStockImportPanel } from './OpeningStockImportPanel';
 import {
     label,
     localToday,
@@ -40,6 +42,10 @@ export function AdjustmentsTab({ data, loading, error, reload, canManage, canPos
     const [busy, setBusy] = useState(false);
     const [actionError, setActionError] = useState<ApiError | null>(null);
     const recordAction = useRecordAction(reload, setActionError);
+    const locationSearch = useCallback(
+        (params: LookupLoadParams) => searchWarehouseLocations(params, warehouse?.id),
+        [warehouse?.id],
+    );
     const submit = (event: FormEvent) => void runFormAction(event, setBusy, setActionError, async () => {
         await createAdjustment(compactObject({
             adjustment_date: form.adjustment_date,
@@ -66,9 +72,22 @@ export function AdjustmentsTab({ data, loading, error, reload, canManage, canPos
     return (
         <WorkflowPanel title="Stock adjustment workflow" loading={loading} error={error} actionError={actionError}>
             {canManage && (
-                <form className="grid gap-4 xl:grid-cols-[1fr_1fr_10rem_9rem_9rem_9rem_1fr_1fr_auto]" onSubmit={submit}>
+                <div className="space-y-4">
+                    <OpeningStockImportPanel reload={reload} />
+                    <form className="grid gap-4 xl:grid-cols-[1fr_1fr_1fr_10rem_9rem_9rem_9rem_1fr_1fr_auto]" onSubmit={submit}>
                     <LookupSelect label="Item" value={item} onChange={(value) => { setItem(value); setDimensions(emptyInventoryDimensions()); }} search={lookupApi.stockableItems} error={fieldError(actionError, 'lines.0.item_id')} />
-                    <LookupSelect label="Warehouse" value={warehouse} onChange={(value) => { setWarehouse(value); setDimensions({ ...dimensions, warehouseLocation: null, serial: null }); }} search={searchWarehouses} error={fieldError(actionError, 'warehouse_id')} loadOnOpen minSearchLength={0} />
+                    <LookupSelect label="Warehouse" value={warehouse} onChange={(value) => { setWarehouse(value); setDimensions((current) => ({ ...current, warehouseLocation: null, serial: null })); }} search={searchWarehouses} error={fieldError(actionError, 'warehouse_id')} loadOnOpen minSearchLength={0} />
+                    <LookupSelect
+                        label="Location"
+                        value={dimensions.warehouseLocation}
+                        onChange={(warehouseLocation) => setDimensions((current) => ({ ...current, warehouseLocation, serial: null }))}
+                        search={locationSearch}
+                        placeholder="Search locations..."
+                        error={fieldError(actionError, 'warehouse_location_id')}
+                        disabled={!warehouse}
+                        loadOnOpen
+                        minSearchLength={0}
+                    />
                     <Select
                         label="Type"
                         value={form.adjustment_type}
@@ -86,16 +105,17 @@ export function AdjustmentsTab({ data, loading, error, reload, canManage, canPos
                         warehouse={warehouse}
                         value={dimensions}
                         onChange={setDimensions}
+                        includeLocation={false}
                         includeSerial
                         errors={{
                             itemVariant: fieldError(actionError, 'lines.0.item_variant_id'),
-                            warehouseLocation: fieldError(actionError, 'warehouse_location_id'),
                             batch: fieldError(actionError, 'lines.0.batch_id'),
                             serial: fieldError(actionError, 'lines.0.serial_number_id'),
                             uom: fieldError(actionError, 'lines.0.uom_id'),
                         }}
                     />
-                </form>
+                    </form>
+                </div>
             )}
             <RecordList rows={data} columns={columns((row) => {
                 if (!canPost) return null;

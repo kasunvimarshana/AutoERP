@@ -7,11 +7,13 @@ namespace Modules\Reporting\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
 use Modules\Reporting\Http\Requests\OperationalReportRequest;
+use Modules\Reporting\Http\Requests\SummaryReportRequest;
 use Modules\Reporting\Services\DetailedPurchaseReportService;
 use Modules\Reporting\Services\DetailedVehicleServiceReportService;
 use Modules\Reporting\Services\EmployeeIncentiveReportService;
 use Modules\Reporting\Services\ReportExport;
 use Modules\Reporting\Services\ReportingAuthorizationService;
+use Modules\Reporting\Services\SummaryReportService;
 
 final class OperationalReportController
 {
@@ -19,9 +21,29 @@ final class OperationalReportController
         private readonly DetailedPurchaseReportService $purchase,
         private readonly DetailedVehicleServiceReportService $vehicleService,
         private readonly EmployeeIncentiveReportService $incentives,
+        private readonly SummaryReportService $summary,
         private readonly ReportExport $export,
         private readonly ReportingAuthorizationService $authorization,
     ) {}
+
+    public function summary(SummaryReportRequest $request): JsonResponse
+    {
+        $this->authorization->assert(
+            $request->currentUserId(),
+            $request->tenantId(),
+            ReportingAuthorizationService::REPORTS_VIEW,
+        );
+        $validated = $request->validated();
+
+        return response()->json([
+            'data' => $this->summary->run(
+                $request->tenantId(),
+                $request->organizationUnitId(),
+                (string) $validated['date_from'],
+                (string) $validated['date_to'],
+            ),
+        ]);
+    }
 
     public function detailedPurchase(OperationalReportRequest $request): JsonResponse
     {

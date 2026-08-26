@@ -811,14 +811,37 @@ export const tenantNavigationSections: NavigationSection[] = [
             },
             {
                 id: "reports",
-                type: "link",
+                type: "module",
                 label: "Reports",
-                to: "/reports",
                 icon: "list",
                 access: {
-                    ...operationalAccess([]),
+                    ...operationalAccess(["reporting"]),
                     permissions: [reportingPermissions.view],
                 },
+                children: [
+                    {
+                        id: "summary-reports",
+                        type: "link",
+                        label: "Summary Reports",
+                        to: "/reports/summary",
+                        match: ["/reports/summary"],
+                        access: {
+                            ...operationalAccess(["reporting"]),
+                            permissions: [reportingPermissions.view],
+                        },
+                    },
+                    {
+                        id: "all-reports",
+                        type: "link",
+                        label: "All Reports",
+                        to: "/reports",
+                        match: ["/reports"],
+                        access: {
+                            ...operationalAccess(["reporting"]),
+                            permissions: [reportingPermissions.view],
+                        },
+                    },
+                ],
             },
             {
                 id: "payments",

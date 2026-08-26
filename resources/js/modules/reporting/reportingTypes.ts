@@ -32,3 +32,10 @@ export type {
     OperationalReportResult,
     OperationalReportSummary,
 } from './operationalReportTypes';
+export type {
+    SummaryCapability,
+    SummaryDocumentMetrics,
+    SummaryPaymentMethod,
+    SummaryPaymentMetrics,
+    SummaryReportResult,
+} from './summaryReportTypes';

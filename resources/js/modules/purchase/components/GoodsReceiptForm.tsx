@@ -237,7 +237,7 @@ export function GoodsReceiptForm() {
                 )}
             </Panel>
             <Panel title="Receivable lines">
-                {loadingLines ? <div className="text-sm text-slate-500">Loading source lines...</div> : <GoodsReceiptLineEditor lines={lines} onChange={setLines} errorFor={errorFor} />}
+                {loadingLines ? <div className="text-sm text-slate-500">Loading source lines...</div> : <GoodsReceiptLineEditor lines={lines} currencyCode={sourceOrder?.currency?.code ?? undefined} onChange={setLines} errorFor={errorFor} />}
             </Panel>
             <Panel title="Notes">
                 <Textarea label="Notes" value={notes} error={errorFor('notes')} onChange={(event) => setNotes(event.target.value)} />

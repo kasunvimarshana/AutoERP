@@ -15,6 +15,11 @@ use Modules\Inventory\Strategies\Valuation\WeightedAverageValuationMethod;
 return [
     'allow_negative_stock' => (bool) env('INVENTORY_ALLOW_NEGATIVE_STOCK', false),
 
+    'opening_stock_import' => [
+        'max_file_kilobytes' => 2048,
+        'max_rows' => 1000,
+    ],
+
     'valuation' => [
         'default' => 'fifo',
         'strategies' => [
