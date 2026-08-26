@@ -18,8 +18,8 @@ abstract class RentalRunningChartMutationRequest extends TenantScopedRequest
             'operational_date' => ['required', 'date'],
             'starts_at' => RentalDateTimeRules::required(),
             'ends_at' => [...RentalDateTimeRules::required(), 'after:starts_at'],
-            'start_odometer' => ['required', 'numeric', 'min:0'],
-            'end_odometer' => ['required', 'numeric', 'min:0'],
+            'start_odometer' => ['nullable', 'numeric', 'min:0'],
+            'end_odometer' => ['nullable', 'numeric', 'min:0'],
             'garage_km' => ['nullable', 'numeric', 'min:0'],
             'normal_overtime_hours' => ['nullable', 'numeric', 'min:0'],
             'double_overtime_hours' => ['nullable', 'numeric', 'min:0'],
@@ -53,9 +53,9 @@ abstract class RentalRunningChartMutationRequest extends TenantScopedRequest
             operationalDate: (string) $this->validated('operational_date'),
             startsAt: (string) $this->validated('starts_at'),
             endsAt: (string) $this->validated('ends_at'),
-            startOdometer: (string) $this->validated('start_odometer'),
-            endOdometer: (string) $this->validated('end_odometer'),
-            garageKm: (string) ($this->validated('garage_km') ?? '0'),
+            startOdometer: $this->nullableDecimal('start_odometer'),
+            endOdometer: $this->nullableDecimal('end_odometer'),
+            garageKm: $this->nullableDecimal('garage_km'),
             normalOvertimeHours: (string) ($this->validated('normal_overtime_hours') ?? '0'),
             doubleOvertimeHours: (string) ($this->validated('double_overtime_hours') ?? '0'),
             tripleOvertimeHours: (string) ($this->validated('triple_overtime_hours') ?? '0'),
@@ -68,6 +68,13 @@ abstract class RentalRunningChartMutationRequest extends TenantScopedRequest
             remarks: $this->nullableString('remarks'),
             actorId: $this->currentUserId(),
         );
+    }
+
+    private function nullableDecimal(string $key): ?string
+    {
+        $value = $this->validated($key);
+
+        return is_scalar($value) && trim((string) $value) !== '' ? (string) $value : null;
     }
 
     private function nullableString(string $key): ?string

@@ -11,14 +11,14 @@ final class VehicleRentalReportValueFormatter
 {
     public function __construct(private readonly DecimalMath $math) {}
 
-    public function decimal(mixed $value): string
+    public function decimal(mixed $value): ?string
     {
-        return $this->math->normalize((string) ($value ?? 0));
+        return $value === null ? null : $this->math->normalize((string) $value);
     }
 
     public function nullableDecimal(mixed $value): ?string
     {
-        return $value === null ? null : $this->decimal($value);
+        return $this->decimal($value);
     }
 
     public function party(mixed $code, mixed $name): ?string

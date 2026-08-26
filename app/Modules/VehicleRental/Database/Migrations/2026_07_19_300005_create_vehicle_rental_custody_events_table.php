@@ -17,7 +17,7 @@ return new class extends Migration
             $table->foreignId('assignment_id');
             $table->string('event_type', 30);
             $table->dateTime('event_at');
-            $table->decimal('odometer', 20, 6);
+            $table->decimal('odometer', 20, 6)->nullable();
             $table->string('fuel_level', 50)->nullable();
             $table->text('condition_notes')->nullable();
             $table->text('damage_notes')->nullable();

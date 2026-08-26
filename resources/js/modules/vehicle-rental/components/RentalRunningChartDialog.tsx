@@ -57,7 +57,16 @@ function RentalRunningChartDialogForm({
     const [error, setError] = useState<ApiError | null>(null);
     const [submitting, setSubmitting] = useState(false);
     const selfDrive = state.assignment?.selfDrive ?? (chart ? chart.driver == null : false);
-    const distance = distancePreview(state.startOdometer, state.endOdometer, state.garageKm);
+    const odometerAvailable = chart
+        ? chart.start_odometer !== null
+        : state.assignment?.odometerAvailable === true;
+    const distance = odometerAvailable
+        ? distancePreview(state.startOdometer, state.endOdometer, state.garageKm)
+        : null;
+    const startOdometerOverridden = state.startOdometer.trim() !== ''
+        && (chart === null || state.startOdometer !== (chart.start_odometer ?? ''));
+    const showVarianceReason = odometerAvailable
+        && (startOdometerOverridden || state.odometerVarianceReason.trim() !== '');
 
     const submit = async (event: FormEvent) => {
         event.preventDefault();
@@ -69,9 +78,9 @@ function RentalRunningChartDialogForm({
                 operational_date: localDate(state.startsAt),
                 starts_at: state.startsAt,
                 ends_at: state.endsAt,
-                start_odometer: state.startOdometer,
-                end_odometer: state.endOdometer,
-                garage_km: state.garageKm || '0',
+                start_odometer: odometerAvailable ? nullable(state.startOdometer) : null,
+                end_odometer: odometerAvailable ? nullable(state.endOdometer) : null,
+                garage_km: odometerAvailable ? nullable(state.garageKm) : null,
                 normal_overtime_hours: selfDrive ? '0' : state.normalOvertimeHours || '0',
                 double_overtime_hours: selfDrive ? '0' : state.doubleOvertimeHours || '0',
                 triple_overtime_hours: selfDrive ? '0' : state.tripleOvertimeHours || '0',
@@ -80,7 +89,7 @@ function RentalRunningChartDialogForm({
                 trip_origin: nullable(state.tripOrigin),
                 trip_destination: nullable(state.tripDestination),
                 purpose: nullable(state.purpose),
-                odometer_variance_reason: nullable(state.odometerVarianceReason),
+                odometer_variance_reason: showVarianceReason ? nullable(state.odometerVarianceReason) : null,
                 remarks: nullable(state.remarks),
                 expected_version: chart?.row_version,
             };
@@ -101,7 +110,10 @@ function RentalRunningChartDialogForm({
         setState((current) => ({
             ...current,
             assignment: value,
-            startOdometer: current.startOdometer || value?.handoverOdometer || '',
+            startOdometer: '',
+            endOdometer: '',
+            garageKm: value?.odometerAvailable === true ? '0' : '',
+            odometerVarianceReason: '',
             normalOvertimeHours: value?.selfDrive ? '0' : current.normalOvertimeHours,
             doubleOvertimeHours: value?.selfDrive ? '0' : current.doubleOvertimeHours,
             tripleOvertimeHours: value?.selfDrive ? '0' : current.tripleOvertimeHours,
@@ -143,9 +155,6 @@ function RentalRunningChartDialogForm({
                         error={fieldError(error, 'ends_at')}
                         onChange={(event) => setState((current) => ({ ...current, endsAt: event.target.value }))}
                     />
-                    <Input label="Start odometer" type="number" min="0" step="0.000001" required value={state.startOdometer} error={fieldError(error, 'start_odometer')} onChange={(event) => setState((current) => ({ ...current, startOdometer: event.target.value }))} />
-                    <Input label="End odometer" type="number" min="0" step="0.000001" required value={state.endOdometer} error={fieldError(error, 'end_odometer')} onChange={(event) => setState((current) => ({ ...current, endOdometer: event.target.value }))} />
-                    <Input label="Garage KM" type="number" min="0" step="0.000001" value={state.garageKm} error={fieldError(error, 'garage_km')} onChange={(event) => setState((current) => ({ ...current, garageKm: event.target.value }))} />
                     <Select label="AC mode" value={state.acMode} placeholder="Not applicable" options={[{ value: 'non_ac', label: 'Non-AC' }, { value: 'front_ac', label: 'Front AC' }, { value: 'dual_ac', label: 'Dual AC' }]} error={fieldError(error, 'ac_mode')} onChange={(event) => setState((current) => ({ ...current, acMode: event.target.value as RentalAcMode | '' }))} />
                 </div>
 
@@ -158,11 +167,31 @@ function RentalRunningChartDialogForm({
                     </div>
                 )}
 
-                <div className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 md:grid-cols-2">
-                    <Summary label="Total KM" value={distance?.total ?? '—'} />
-                    <Summary label="Commercial KM" value={distance?.commercial ?? '—'} />
-                    {distance?.error && <p className="text-sm text-rose-600 md:col-span-2">{distance.error}</p>}
-                </div>
+                {odometerAvailable ? (
+                    <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
+                        <div className="grid gap-4 md:grid-cols-3">
+                            <div>
+                                <Input label="Start KM" type="number" min="0" step="0.000001" placeholder="Auto from previous chart" value={state.startOdometer} error={fieldError(error, 'start_odometer')} onChange={(event) => setState((current) => ({ ...current, startOdometer: event.target.value }))} />
+                                <p className="mt-1 text-xs text-slate-500">Leave blank to continue from the previous finalized chart.</p>
+                            </div>
+                            <Input label="End KM" type="number" min="0" step="0.000001" required value={state.endOdometer} error={fieldError(error, 'end_odometer')} onChange={(event) => setState((current) => ({ ...current, endOdometer: event.target.value }))} />
+                            <Input label="Garage KM" type="number" min="0" step="0.000001" value={state.garageKm} error={fieldError(error, 'garage_km')} onChange={(event) => setState((current) => ({ ...current, garageKm: event.target.value }))} />
+                        </div>
+                        <div className="grid gap-3 md:grid-cols-2">
+                            <Summary label="Total KM" value={distance?.total ?? 'Calculated after save'} />
+                            <Summary label="Commercial KM" value={distance?.commercial ?? 'Calculated after save'} />
+                            {distance?.error && <p className="text-sm text-rose-600 md:col-span-2">{distance.error}</p>}
+                        </div>
+                    </div>
+                ) : state.assignment ? (
+                    <p className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+                        This vehicle has no available odometer. Kilometre fields are not required.
+                    </p>
+                ) : null}
+
+                {showVarianceReason && (
+                    <Textarea label="Odometer variance reason" maxLength={500} hint="Required only when the entered Start KM differs from the previous finalized chart." value={state.odometerVarianceReason} error={fieldError(error, 'odometer_variance_reason')} onChange={(event) => setState((current) => ({ ...current, odometerVarianceReason: event.target.value }))} />
+                )}
 
                 {selfDrive ? (
                     <p className="rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900">
@@ -182,7 +211,6 @@ function RentalRunningChartDialogForm({
                     <Input label="Trip destination" maxLength={255} value={state.tripDestination} error={fieldError(error, 'trip_destination')} onChange={(event) => setState((current) => ({ ...current, tripDestination: event.target.value }))} />
                     <Input label="Purpose" maxLength={255} value={state.purpose} error={fieldError(error, 'purpose')} onChange={(event) => setState((current) => ({ ...current, purpose: event.target.value }))} />
                 </div>
-                <Textarea label="Odometer variance reason" maxLength={500} hint="Required when the start odometer intentionally differs from the previous finalized chart." value={state.odometerVarianceReason} error={fieldError(error, 'odometer_variance_reason')} onChange={(event) => setState((current) => ({ ...current, odometerVarianceReason: event.target.value }))} />
                 <Textarea label="Remarks" maxLength={5000} value={state.remarks} error={fieldError(error, 'remarks')} onChange={(event) => setState((current) => ({ ...current, remarks: event.target.value }))} />
                 <div className="flex justify-end gap-2">
                     <Button type="button" variant="secondary" disabled={submitting} onClick={onClose}>Cancel</Button>
@@ -212,6 +240,8 @@ function initialState(chart: RentalRunningChart | null): RunningChartFormState {
         ownerAgreement: chart.assignment.owner_agreement ?? null,
         driver: chart.driver ?? null,
         selfDrive: chart.driver == null,
+        odometerAvailable: chart.start_odometer !== null,
+        vehicleOdometerReading: chart.assignment.vehicle?.odometer_reading ?? null,
     } : null;
     return {
         assignment,
@@ -219,7 +249,7 @@ function initialState(chart: RentalRunningChart | null): RunningChartFormState {
         endsAt: toLocalDateTime(chart?.ends_at),
         startOdometer: chart?.start_odometer ?? '',
         endOdometer: chart?.end_odometer ?? '',
-        garageKm: chart?.garage_km ?? '0',
+        garageKm: chart?.garage_km ?? '',
         normalOvertimeHours: chart?.normal_overtime_hours ?? '0',
         doubleOvertimeHours: chart?.double_overtime_hours ?? '0',
         tripleOvertimeHours: chart?.triple_overtime_hours ?? '0',
@@ -234,14 +264,15 @@ function initialState(chart: RentalRunningChart | null): RunningChartFormState {
 }
 
 function distancePreview(start: string, end: string, garage: string): { total: string; commercial: string; error?: string } | null {
-    if (!start.trim() || !end.trim() || !isDecimalString(start) || !isDecimalString(end) || !isDecimalString(garage)) return null;
+    if (!start.trim() || !end.trim() || !isDecimalString(start) || !isDecimalString(end)) return null;
+    const garageKm = garage.trim() || '0';
+    if (!isDecimalString(garageKm)) return null;
     if (compareDecimalStrings(end, start) < 0) {
-        return { total: '—', commercial: '—', error: 'End odometer cannot be lower than start odometer.' };
+        return { total: '—', commercial: '—', error: 'End KM cannot be lower than Start KM.' };
     }
     const total = subtractDecimal(end, start);
-    const garageKm = garage.trim() || '0';
     if (compareDecimalStrings(garageKm, total) > 0) {
-        return { total, commercial: '—', error: 'Garage KM cannot exceed total KM.' };
+        return { total, commercial: '—', error: 'Garage KM cannot exceed Total KM.' };
     }
     return { total, commercial: subtractDecimal(total, garageKm) };
 }

@@ -11,7 +11,7 @@ final readonly class RentalCustodyData
     public function __construct(
         public RentalCustodyEventType $eventType,
         public string $eventAt,
-        public string $odometer,
+        public ?string $odometer,
         public ?string $fuelLevel,
         public ?string $conditionNotes,
         public ?string $damageNotes,

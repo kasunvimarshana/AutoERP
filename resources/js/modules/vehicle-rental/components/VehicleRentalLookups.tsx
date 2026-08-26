@@ -21,6 +21,7 @@ import type {
     RentalAssignmentSide,
     RentalBillingBasis,
     RentalReference,
+    RentalVehicleReference,
 } from '../vehicleRentalTypes';
 
 export interface RentalLookupOption extends NamedResource {
@@ -33,8 +34,10 @@ export interface RentalLookupOption extends NamedResource {
     assignmentStartsAt?: string | null;
     assignmentEndsAt?: string | null;
     handoverOdometer?: string | null;
+    odometerAvailable?: boolean;
+    vehicleOdometerReading?: string | null;
     driver?: RentalReference | null;
-    vehicle?: RentalReference | null;
+    vehicle?: RentalVehicleReference | null;
     agreement?: RentalReference | null;
     ownerAgreement?: RentalReference | null;
     party?: RentalReference | null;
@@ -293,16 +296,17 @@ function agreementOption(agreement: RentalAgreement): RentalLookupOption {
 }
 
 function vehicleOption(item: VehicleSummary): RentalLookupOption {
+    const odometer = item.odometer_reading === null
+        ? 'Odometer unavailable'
+        : `${item.odometer_reading} ${item.odometer_unit ?? 'km'}`;
+
     return {
         id: item.id,
         code: item.vehicle_number,
         name: item.registration_number || item.vehicle_number,
-        subtitle: [
-            item.make?.name,
-            item.model?.name,
-            item.status,
-            `${item.odometer_reading} ${item.odometer_unit ?? 'km'}`,
-        ].filter(Boolean).join(' • '),
+        subtitle: [item.make?.name, item.model?.name, item.status, odometer].filter(Boolean).join(' • '),
+        odometerAvailable: item.odometer_reading !== null,
+        vehicleOdometerReading: item.odometer_reading,
     };
 }
 
@@ -318,6 +322,8 @@ export function rentalAssignmentOption(assignment: RentalAssignment): RentalLook
         assignmentStartsAt: assignment.starts_at,
         assignmentEndsAt: assignment.ends_at,
         handoverOdometer: assignment.handover_odometer,
+        odometerAvailable: assignment.vehicle?.odometer_reading != null,
+        vehicleOdometerReading: assignment.vehicle?.odometer_reading ?? null,
         driver: assignment.driver ?? null,
         vehicle: assignment.vehicle ?? null,
         agreement: assignment.agreement ?? null,

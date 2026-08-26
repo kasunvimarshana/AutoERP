@@ -38,9 +38,9 @@ final class RentalCalculationResource extends JsonResource
             'period_end' => $this->period_end?->toDateString(),
             'chart_count' => (int) $this->chart_count,
             'operating_days' => (int) $this->operating_days,
-            'commercial_km' => (string) $this->commercial_km,
+            'commercial_km' => $this->decimalOrNull($this->commercial_km),
             'included_km' => (string) $this->included_km,
-            'excess_km' => (string) $this->excess_km,
+            'excess_km' => $this->decimalOrNull($this->excess_km),
             'subtotal_amount' => (string) $this->subtotal_amount,
             'lines' => $this->whenLoaded('lines', fn () => $this->lines->map(fn ($line) => [
                 'id' => (int) $line->getKey(),
@@ -68,6 +68,11 @@ final class RentalCalculationResource extends JsonResource
             'cancelled_at' => $this->cancelled_at?->toISOString(),
             'cancellation_reason' => $this->cancellation_reason,
         ];
+    }
+
+    private function decimalOrNull(mixed $value): ?string
+    {
+        return $value === null ? null : (string) $value;
     }
 
     private function enum(mixed $value): mixed

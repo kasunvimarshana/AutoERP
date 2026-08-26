@@ -42,7 +42,8 @@ final class RentalCustodyService
                 ->lockForUpdate()
                 ->findOrFail($assignment->getKey());
             $this->timeline->assertExpectedVersion($assignment, $expectedVersion);
-            $this->assertTransition($assignment, $data);
+            $odometer = $this->resolveOdometer($assignment, $data->odometer);
+            $this->assertTransition($assignment, $data, $odometer);
             $eventAt = $this->timeline->dateTime($data->eventAt);
 
             if ($data->eventType === RentalCustodyEventType::Handover) {
@@ -50,7 +51,9 @@ final class RentalCustodyService
             }
             if ($data->eventType === RentalCustodyEventType::Return) {
                 $this->runningCharts->assertNoChartsAfterClosure($assignment, $eventAt);
-                $this->runningCharts->assertClosureOdometer($assignment, $eventAt, $data->odometer);
+                if ($odometer !== null) {
+                    $this->runningCharts->assertClosureOdometer($assignment, $eventAt, $odometer);
+                }
                 if ($assignment->side === RentalAssignmentSide::OwnerSupply) {
                     $this->sources->assertNoActiveDependents($assignment);
                 }
@@ -60,7 +63,7 @@ final class RentalCustodyService
                 $assignment,
                 $data->eventType,
                 $eventAt,
-                $data->odometer,
+                $odometer,
                 $data->fuelLevel,
                 $data->conditionNotes,
                 $data->damageNotes,
@@ -71,13 +74,13 @@ final class RentalCustodyService
             if ($data->eventType === RentalCustodyEventType::Handover) {
                 $updates += [
                     'status' => RentalAssignmentStatus::Active->value,
-                    'handover_odometer' => $this->math->normalize($data->odometer),
+                    'handover_odometer' => $odometer,
                     'starts_at' => $eventAt->toDateTimeString(),
                 ];
             } else {
                 $updates += [
                     'status' => RentalAssignmentStatus::Returned->value,
-                    'return_odometer' => $this->math->normalize($data->odometer),
+                    'return_odometer' => $odometer,
                     'ends_at' => $eventAt->toDateTimeString(),
                     'closed_by' => $data->actorId,
                     'closed_at' => now(),
@@ -93,7 +96,7 @@ final class RentalCustodyService
         RentalAssignment $assignment,
         RentalCustodyEventType $type,
         CarbonImmutable $eventAt,
-        string $odometer,
+        ?string $odometer,
         ?string $fuelLevel,
         ?string $conditionNotes,
         ?string $damageNotes,
@@ -106,7 +109,7 @@ final class RentalCustodyService
             'assignment_id' => $assignment->getKey(),
             'event_type' => $type->value,
             'event_at' => $eventAt->toDateTimeString(),
-            'odometer' => $this->math->normalize($odometer),
+            'odometer' => $odometer,
             'fuel_level' => $fuelLevel,
             'condition_notes' => $conditionNotes,
             'damage_notes' => $damageNotes,
@@ -114,8 +117,11 @@ final class RentalCustodyService
         ])->save();
     }
 
-    private function assertTransition(RentalAssignment $assignment, RentalCustodyData $data): void
-    {
+    private function assertTransition(
+        RentalAssignment $assignment,
+        RentalCustodyData $data,
+        ?string $odometer,
+    ): void {
         if ($data->eventType === RentalCustodyEventType::Handover
             && $assignment->status !== RentalAssignmentStatus::Planned) {
             throw new InvalidArgumentException('Only planned assignments can be handed over.');
@@ -126,7 +132,8 @@ final class RentalCustodyService
         }
         if ($data->eventType === RentalCustodyEventType::Return
             && $assignment->handover_odometer !== null
-            && $this->math->compare($data->odometer, (string) $assignment->handover_odometer) < 0) {
+            && $odometer !== null
+            && $this->math->compare($odometer, (string) $assignment->handover_odometer) < 0) {
             throw new InvalidArgumentException('Return odometer cannot be lower than the handover odometer.');
         }
         $eventAt = $this->timeline->dateTime($data->eventAt);
@@ -134,6 +141,28 @@ final class RentalCustodyService
             || ($assignment->ends_at !== null && $eventAt->gt($assignment->ends_at))) {
             throw new InvalidArgumentException('Custody event must occur within the assignment period.');
         }
+    }
+
+    private function resolveOdometer(RentalAssignment $assignment, ?string $value): ?string
+    {
+        $assignment->loadMissing('vehicle');
+        if ($assignment->vehicle === null) {
+            throw new InvalidArgumentException('The assigned vehicle is unavailable.');
+        }
+
+        if ($assignment->vehicle->odometer_reading === null) {
+            if ($value !== null) {
+                throw new InvalidArgumentException('This vehicle has no available odometer. Leave the odometer field blank.');
+            }
+
+            return null;
+        }
+
+        if ($value === null) {
+            throw new InvalidArgumentException('Odometer reading is required while this vehicle odometer is available.');
+        }
+
+        return $this->math->normalize($value);
     }
 
     private function revalidateForHandover(

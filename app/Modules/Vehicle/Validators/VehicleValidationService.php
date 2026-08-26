@@ -34,7 +34,9 @@ final class VehicleValidationService
         $this->assertUniqueNullable('chassis_number', $data->tenantId, $data->chassisNumber, 'Vehicle chassis number already exists for this tenant.');
         $this->assertUniqueNullable('engine_number', $data->tenantId, $data->engineNumber, 'Vehicle engine number already exists for this tenant.');
         $this->assertUniqueNullable('vin_number', $data->tenantId, $data->vinNumber, 'Vehicle VIN already exists for this tenant.');
-        $this->assertNonNegative($data->odometerReading, 'Vehicle odometer reading cannot be negative.');
+        if ($data->odometerReading !== null) {
+            $this->assertNonNegative($data->odometerReading, 'Vehicle odometer reading cannot be negative.');
+        }
         $this->assertManufactureYear($data->manufactureYear);
         $this->assertOrganizationUsable($data->tenantId, $data->organizationUnitId);
         $this->assertReferences($data->tenantId, $data->organizationUnitId, $data->vehicleMakeId, $data->vehicleModelId, $data->vehicleTypeId, $data->vehicleCategoryId);
