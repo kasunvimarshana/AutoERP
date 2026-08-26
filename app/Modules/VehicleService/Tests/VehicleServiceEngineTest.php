@@ -19,6 +19,7 @@ use Modules\Inventory\Services\StockMovementService;
 use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Models\Invoice;
 use Modules\Invoice\Models\InvoiceSourceLine;
+use Modules\Invoice\Services\InvoicePrintService;
 use Modules\Item\DTOs\CreateItemData;
 use Modules\Item\DTOs\ItemPriceData;
 use Modules\Item\Enums\CostingMethod;
@@ -524,6 +525,64 @@ final class VehicleServiceEngineTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('No billable service job lines remain to invoice.');
         $this->createServiceInvoice($this->refreshJob($job), '2026-06-07');
+    }
+
+    public function test_service_invoice_prints_immutable_job_vehicle_and_mileage_references_in_purchaser_box(): void
+    {
+        $context = $this->context();
+        DB::table('vehicles')->where('id', $context['vehicle_id'])->update([
+            'odometer_unit' => 'km',
+            'updated_at' => now(),
+        ]);
+        $job = $this->createJob($context, nextServiceMileage: '17000.000000');
+        $vehicleNumber = (string) DB::table('vehicles')
+            ->where('id', $context['vehicle_id'])
+            ->value('registration_number');
+        $this->line($job, VehicleServiceLineSourceType::ServiceItem, $context['service'], '1.000000', '250.000000');
+        $this->changeStatus($job, VehicleServiceJobStatus::InProgress);
+        $this->changeStatus($this->refreshJob($job), VehicleServiceJobStatus::Completed);
+
+        $invoice = $this->createServiceInvoice($this->refreshJob($job), '2026-06-07');
+        $expectedFields = [
+            ['label' => 'Job No', 'value' => (string) $job->job_number],
+            ['label' => 'Vehicle No', 'value' => $vehicleNumber],
+            ['label' => 'Mileage', 'value' => '12,000 km'],
+            ['label' => 'Next Service Mileage', 'value' => '17,000 km'],
+        ];
+
+        DB::table('vehicle_service_jobs')->where('id', $job->getKey())->update([
+            'job_number' => 'CHANGED-JOB',
+            'odometer_reading' => '99000.000000',
+            'next_service_mileage' => '199000.000000',
+            'updated_at' => now(),
+        ]);
+        DB::table('vehicles')->where('id', $context['vehicle_id'])->update([
+            'registration_number' => 'CHANGED-VEHICLE',
+            'odometer_unit' => 'mi',
+            'updated_at' => now(),
+        ]);
+
+        $document = $this->withTenantExecutionContext(
+            (int) $context['tenant_id'],
+            function () use ($invoice): array {
+                $invoice = Invoice::query()
+                    ->with(['tenant', 'organizationUnit', 'lines', 'documentSnapshot'])
+                    ->findOrFail($invoice->getKey());
+
+                return app(InvoicePrintService::class)->viewData($invoice)['document'];
+            },
+        );
+        $html = view('invoice.print', ['mode' => 'pdf', 'document' => $document])->render();
+
+        $this->assertSame($expectedFields, $document['purchaser_reference_fields']);
+        $this->assertStringContainsString('Job No:</span> '.$expectedFields[0]['value'], $html);
+        $this->assertStringContainsString('Vehicle No:</span> '.$vehicleNumber, $html);
+        $this->assertStringContainsString('Mileage:</span> 12,000 km', $html);
+        $this->assertStringContainsString('Next Service Mileage:</span> 17,000 km', $html);
+        $this->assertStringNotContainsString('CHANGED-JOB', $html);
+        $this->assertStringNotContainsString('CHANGED-VEHICLE', $html);
+        $this->assertStringNotContainsString('99,000 mi', $html);
+        $this->assertStringNotContainsString('199,000 mi', $html);
     }
 
     public function test_status_workflow_rejects_invalid_transitions_and_records_history(): void
@@ -1277,6 +1336,7 @@ final class VehicleServiceEngineTest extends TestCase
         array $context,
         VehicleServiceCommissionType $commissionType = VehicleServiceCommissionType::None,
         string $commissionValue = '0.000000',
+        ?string $nextServiceMileage = null,
     ): VehicleServiceJob {
         return $this->withTenantExecutionContext(
             (int) $context['tenant_id'],
@@ -1289,6 +1349,7 @@ final class VehicleServiceEngineTest extends TestCase
                 supervisorCommissionType: $commissionType,
                 supervisorCommissionValue: $commissionValue,
                 odometerReading: '12000.000000',
+                nextServiceMileage: $nextServiceMileage,
                 fuelLevel: 'half',
             )),
         );

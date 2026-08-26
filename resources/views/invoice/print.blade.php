@@ -68,6 +68,7 @@
         .party-line { min-height: 17px; }
         .party-address { min-height: 34px; }
         .party-phone { margin-top: 8px; }
+        .purchaser-reference-fields { margin-top: 8px; }
         .additional-field { min-height: 18mm; }
         .additional-content { margin-top: 5px; }
         .invoice-lines { margin-top: 14px; }
@@ -147,6 +148,13 @@
                     <div class="party-line"><span class="label">{{ $label }}'s Name:</span> {{ $party['name'] }}</div>
                     <div class="party-address"><span class="label">Address:</span> {{ $party['address'] ?? '' }}</div>
                     <div class="party-phone"><span class="label">Telephone No:</span> {{ $party['phone'] ?? '' }}</div>
+                    @if ($key === 'purchaser' && ! empty($document['purchaser_reference_fields']))
+                        <div class="purchaser-reference-fields">
+                            @foreach ($document['purchaser_reference_fields'] as $field)
+                                <div class="party-line"><span class="label">{{ $field['label'] }}:</span> {{ $field['value'] }}</div>
+                            @endforeach
+                        </div>
+                    @endif
                 </td>
                 @if ($key === 'supplier')
                     <td class="gap"></td>

@@ -75,6 +75,7 @@ final class VehicleServiceInvoiceSourceMapper
         ?int $createdBy = null,
     ): CreateInvoiceData {
         $this->assertInvoiceable($job);
+        $job->loadMissing('vehicle');
 
         $lines = $job->lines()
             ->where('is_billable', true)
@@ -265,6 +266,7 @@ final class VehicleServiceInvoiceSourceMapper
                 $taxAmount,
                 description: 'Vehicle service invoice '.$job->job_number,
             ),
+            purchaserReferenceFields: $this->purchaserReferenceFields($job),
         );
     }
 
@@ -330,5 +332,61 @@ final class VehicleServiceInvoiceSourceMapper
         ], true)) {
             throw new InvalidArgumentException('Only completed service jobs can be invoiced.');
         }
+    }
+
+    /** @return list<array{label: string, value: string}> */
+    private function purchaserReferenceFields(VehicleServiceJob $job): array
+    {
+        $fields = [[
+            'label' => 'Job No',
+            'value' => (string) $job->job_number,
+        ]];
+
+        $vehicleNumber = $this->nullableString($job->vehicle?->registration_number)
+            ?? $this->nullableString($job->vehicle?->vehicle_number);
+        if ($vehicleNumber !== null) {
+            $fields[] = ['label' => 'Vehicle No', 'value' => $vehicleNumber];
+        }
+
+        if ($job->odometer_reading !== null) {
+            $unit = $this->nullableString($job->vehicle?->odometer_unit);
+            $fields[] = [
+                'label' => 'Mileage',
+                'value' => trim($this->formatReferenceDecimal((string) $job->odometer_reading).' '.($unit ?? '')),
+            ];
+        }
+
+        if ($job->next_service_mileage !== null) {
+            $unit = $this->nullableString($job->vehicle?->odometer_unit);
+            $fields[] = [
+                'label' => 'Next Service Mileage',
+                'value' => trim($this->formatReferenceDecimal((string) $job->next_service_mileage).' '.($unit ?? '')),
+            ];
+        }
+
+        return $fields;
+    }
+
+    private function formatReferenceDecimal(string $value): string
+    {
+        $normalized = $this->math->normalize($value);
+        $negative = str_starts_with($normalized, '-');
+        $absolute = ltrim($normalized, '-');
+        [$whole, $fraction] = array_pad(explode('.', $absolute, 2), 2, '');
+        $whole = preg_replace('/\B(?=(\d{3})+(?!\d))/', ',', $whole) ?? $whole;
+        $fraction = rtrim($fraction, '0');
+
+        return ($negative ? '-' : '').$whole.($fraction === '' ? '' : '.'.$fraction);
+    }
+
+    private function nullableString(mixed $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $value = trim((string) $value);
+
+        return $value === '' ? null : $value;
     }
 }

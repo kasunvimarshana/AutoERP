@@ -55,6 +55,7 @@ final class InvoicePrintServiceTest extends TestCase
         $this->assertSame('5.000000', $data['document']['amounts']['discount_total']['raw']);
         $this->assertSame('95.000000', $data['document']['amounts']['grand_total']['raw']);
         $this->assertSame($originalName, $data['document']['purchaser']['name']);
+        $this->assertSame([], $data['document']['purchaser_reference_fields']);
         $this->assertStringContainsString('Tax Invoice', $html);
         $this->assertStringContainsString('Tax Invoice No.', $html);
         $this->assertStringContainsString('Total Value of Supply', $html);
@@ -67,6 +68,7 @@ final class InvoicePrintServiceTest extends TestCase
         $this->assertStringNotContainsString('Total Value of Supply @ 18%', $html);
         $this->assertStringNotContainsString('SAMPLE', $html);
         $this->assertStringNotContainsString('EOG', $html);
+        $this->assertStringNotContainsString('Job No:</span>', $html);
     }
 
     public function test_signed_print_link_is_issued_only_for_the_current_organization_scope(): void

@@ -18,10 +18,15 @@ use Modules\Invoice\Models\InvoiceLine;
 final class InvoicePrintService
 {
     private const DEFAULT_TAX_LABEL = 'Tax';
+
     public const SIGNED_URL_TTL_MINUTES = 15;
+
     public const PDF_PAPER_SIZE = 'A4';
+
     public const PDF_ORIENTATION = 'portrait';
+
     private const MONEY_SCALE = 2;
+
     private const QUANTITY_SCALE = 3;
 
     public function __construct(private readonly InvoiceAmountInWordsFormatter $amountInWords) {}
@@ -87,6 +92,9 @@ final class InvoicePrintService
                 'currency' => $currency,
                 'supplier' => $supplier,
                 'purchaser' => $purchaser,
+                'purchaser_reference_fields' => $snapshot instanceof InvoiceDocumentSnapshot
+                    ? ($snapshot->purchaser_reference_fields ?? [])
+                    : [],
                 'supply_date' => $snapshot instanceof InvoiceDocumentSnapshot ? $this->dateString($snapshot->supply_date) : null,
                 'supply_period_start' => $snapshot instanceof InvoiceDocumentSnapshot ? $this->dateString($snapshot->supply_period_start) : null,
                 'supply_period_end' => $snapshot instanceof InvoiceDocumentSnapshot ? $this->dateString($snapshot->supply_period_end) : null,
