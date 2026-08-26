@@ -34,6 +34,7 @@ final class VehicleServiceJobLine extends TenantOwnedModel
             'uom_id' => 'integer',
             'quantity' => 'decimal:6',
             'unit_cost' => 'decimal:6',
+            'uses_job_supervisor' => 'boolean',
             'unit_price' => 'decimal:6',
             'discount_rate' => 'decimal:6',
             'discount_amount' => 'decimal:6',

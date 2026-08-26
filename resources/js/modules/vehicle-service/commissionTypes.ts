@@ -1,12 +1,10 @@
 import type { NamedResource } from '@/shared/types/common';
 import type { CommissionType, VehicleServiceJobLine } from './vehicleServiceTypes';
 
-export const vehicleServiceWorkforceRoles = ['technician', 'helper', 'inspector', 'custom'] as const;
-export type VehicleServiceWorkforceRole = typeof vehicleServiceWorkforceRoles[number];
-
 export interface VehicleServiceCommissionDefault {
     commission_type: CommissionType;
     commission_value: string;
+    locked?: boolean;
 }
 
 export interface VehicleServiceSupervisorCommissionPolicy extends VehicleServiceCommissionDefault {

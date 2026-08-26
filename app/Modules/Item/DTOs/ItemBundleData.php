@@ -14,5 +14,7 @@ final readonly class ItemBundleData
         public ?int $uomId = null,
         public bool $isRequired = true,
         public int $sortOrder = 0,
+        public string $unitCost = '0.000000',
+        public bool $usesJobSupervisor = false,
     ) {}
 }

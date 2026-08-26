@@ -176,6 +176,7 @@ final class ItemValidationService
     public function validateBundle(Item $parent, ItemBundleData $data): void
     {
         $this->assertPositiveDecimal($data->quantity, 'Item bundle quantity must be greater than zero.');
+        $this->assertNotNegativeDecimal($data->unitCost, 'Item bundle unit cost cannot be negative.');
 
         $parentType = $parent->item_type instanceof ItemType ? $parent->item_type->value : (string) $parent->item_type;
         if (! in_array($parentType, self::BUNDLE_PARENT_TYPES, true)) {
@@ -188,6 +189,14 @@ final class ItemValidationService
 
         if (! in_array($data->lineType, self::BUNDLE_LINE_TYPES, true)) {
             throw new InvalidArgumentException('Item bundle line type is invalid.');
+        }
+
+        if ($data->lineType !== ItemType::Labour->value
+            && ($data->usesJobSupervisor || ! $this->math->isZero($data->unitCost))) {
+            throw ValidationException::withMessages([
+                'unit_cost' => ['Bundle commission cost is only available for labour lines.'],
+                'uses_job_supervisor' => ['Job supervisor assignment is only available for labour lines.'],
+            ]);
         }
 
         $child = Item::query()->findOrFail($data->childItemId);

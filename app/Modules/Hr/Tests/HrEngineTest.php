@@ -136,6 +136,10 @@ final class HrEngineTest extends TestCase
         $id = (int) $response->json('data.id');
         $this->tenantGetJson($tenantId, "/api/v1/hr/employees/lookup/service-available?tenant_id={$tenantId}&organization_unit_id={$organizationId}&skill_id={$skill->getKey()}")
             ->assertOk()->assertJsonFragment(['employee_number' => 'EMP-API-1']);
+        $this->tenantGetJson($tenantId, "/api/v1/hr/employees/lookup/available?tenant_id={$tenantId}&organization_unit_id={$organizationId}&designation_code={$designation->code}")
+            ->assertOk()->assertJsonFragment(['employee_number' => 'EMP-API-1']);
+        $this->tenantGetJson($tenantId, "/api/v1/hr/employees/lookup/available?tenant_id={$tenantId}&organization_unit_id={$organizationId}&exclude_designation_code={$designation->code}")
+            ->assertOk()->assertJsonMissing(['employee_number' => 'EMP-API-1']);
         $this->tenantGetJson($tenantId, "/api/v1/hr/employees/{$id}/contacts?tenant_id={$tenantId}&organization_unit_id={$organizationId}")
             ->assertOk()->assertJsonPath('data.0.contact_name', 'Emergency Contact');
     }

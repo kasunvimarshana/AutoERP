@@ -27,7 +27,6 @@ const invoiceStatuses = ['draft', 'approved', 'posted', 'partially_paid', 'paid'
 const commissionTypes = ['none', 'fixed', 'percentage'];
 const commissionSources = ['technician', 'supervisor'];
 const commissionStatuses = ['pending', 'earned', 'cancelled'];
-const roleTypes = ['technician', 'helper', 'inspector', 'custom', 'supervisor'];
 const enumOptions = (values: string[]) => values.map((value) => ({ value, label: humanize(value) }));
 
 interface EmployeeCommissionFiltersProps {
@@ -143,7 +142,6 @@ export function EmployeeCommissionFilters({
                 <Select label="Invoice status" value={value.invoice_status ?? ''} options={enumOptions(invoiceStatuses)} onChange={(event) => onChange({ invoice_status: event.target.value })} />
                 <PaymentLifecycleFilters value={value} onChange={onChange} />
                 <Select label="Commission source" value={value.commission_source ?? ''} options={enumOptions(commissionSources)} onChange={(event) => onChange({ commission_source: event.target.value as EmployeeCommissionReportParams['commission_source'] })} />
-                <Select label="Role" value={value.role_type ?? ''} options={enumOptions(roleTypes)} onChange={(event) => onChange({ role_type: event.target.value })} />
                 <Select label="Commission type" value={value.commission_type ?? ''} options={enumOptions(commissionTypes)} onChange={(event) => onChange({ commission_type: event.target.value })} />
                 <Select label="Commission status" value={value.commission_status ?? ''} options={enumOptions(commissionStatuses)} onChange={(event) => onChange({ commission_status: event.target.value as EmployeeCommissionReportParams['commission_status'] })} />
                 <Select label="Include cancelled" value={value.include_cancelled ? '1' : '0'} options={[{ value: '0', label: 'No' }, { value: '1', label: 'Yes' }]} onChange={(event) => onChange({ include_cancelled: event.target.value === '1' })} />

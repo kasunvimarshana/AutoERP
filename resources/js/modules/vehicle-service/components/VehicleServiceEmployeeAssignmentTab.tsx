@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useStore } from 'zustand';
 import { ApiError, hasFieldError, toApiError } from '@/shared/api/apiError';
 import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
@@ -11,7 +12,10 @@ import {
     updateVehicleServiceEmployee,
 } from '../vehicleServiceApi';
 import type { VehicleServiceJobLine } from '../vehicleServiceTypes';
+import type { NamedResource } from '@/shared/types/common';
+import type { VehicleServiceJobStore, WorkforceSnapshot } from '../state/vehicleServiceJobStore';
 import {
+    applyAssignmentCommissionDefault,
     assignmentFormToPayload,
     assignmentToForm,
     emptyAssignmentForm,
@@ -26,37 +30,46 @@ const STALE_VERSION_FIELD = 'expected_version';
 const STALE_VERSION_RECOVERY_MESSAGE = 'The service job changed while this request was open. Latest job and workforce data has been loaded. Review and try again.';
 const MISSING_JOB_VERSION_MESSAGE = 'The refreshed service job did not include its row version.';
 
-interface WorkforceSnapshot {
-    lines: VehicleServiceJobLine[];
-    rowVersion: number;
-}
-
 export default function VehicleServiceEmployeeAssignmentTab({
     jobId,
     expectedVersion,
     onChanged,
+    active,
+    jobStore,
 }: {
     jobId: number;
     expectedVersion: number;
     onChanged: (nextVersion: number) => void;
+    active: boolean;
+    jobStore: VehicleServiceJobStore;
 }) {
+    const workforce = useStore(jobStore, (state) => state.workforce);
     const result = useApi(async (signal) => {
         const snapshot = await loadWorkforceSnapshot(jobId, signal);
+        jobStore.getState().replaceWorkforce(snapshot);
         onChanged(snapshot.rowVersion);
 
-        return snapshot.lines;
-    }, [jobId]);
+        return snapshot;
+    }, [jobId], true, false);
+    const wasActive = useRef(active);
     const [dialog, setDialog] = useState<AssignmentDialogState | null>(null);
     const [removeTarget, setRemoveTarget] = useState<AssignmentRow | null>(null);
     const [saving, setSaving] = useState(false);
+    const [assigningLineId, setAssigningLineId] = useState<number | null>(null);
     const [removing, setRemoving] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
-    const assignments = (result.data ?? []).flatMap((line) =>
-        (line.employee_assignments ?? []).map((assignment) => ({ ...assignment, line })));
+    const reload = result.reload;
+
+    useEffect(() => {
+        const becameActive = active && !wasActive.current;
+        wasActive.current = active;
+        if (becameActive) reload();
+    }, [active, reload]);
 
     const synchronize = async () => {
         const snapshot = await loadWorkforceSnapshot(jobId);
-        result.setData(snapshot.lines);
+        jobStore.getState().replaceWorkforce(snapshot);
+        result.setData(snapshot);
         onChanged(snapshot.rowVersion);
     };
 
@@ -80,22 +93,52 @@ export default function VehicleServiceEmployeeAssignmentTab({
         }
     };
 
+    const createAssignment = async (
+        line: VehicleServiceJobLine,
+        employee: NamedResource,
+    ): Promise<boolean> => {
+        if (assigningLineId !== null) return false;
+
+        const value = {
+            ...applyAssignmentCommissionDefault(
+                emptyAssignmentForm(),
+                workforce?.lines ?? [],
+                line.id,
+                workforce?.supervisor ?? null,
+            ),
+            employee,
+        };
+        setAssigningLineId(line.id);
+        setError(null);
+        try {
+            await createVehicleServiceEmployee(jobId, line.id, {
+                ...assignmentFormToPayload(value),
+                expected_version: expectedVersion,
+            });
+            await synchronize();
+
+            return true;
+        } catch (requestError) {
+            await handleMutationError(requestError);
+
+            return false;
+        } finally {
+            setAssigningLineId(null);
+        }
+    };
+
     const saveAssignment = async (value: AssignmentFormValue) => {
         if (!dialog || value.lineId === null || !value.employee || saving) return;
         setSaving(true);
         setError(null);
         try {
             const payload = { ...assignmentFormToPayload(value), expected_version: expectedVersion };
-            if (dialog.mode === 'edit') {
-                await updateVehicleServiceEmployee(
-                    jobId,
-                    value.lineId,
-                    dialog.assignmentId,
-                    payload,
-                );
-            } else {
-                await createVehicleServiceEmployee(jobId, value.lineId, payload);
-            }
+            await updateVehicleServiceEmployee(
+                jobId,
+                value.lineId,
+                dialog.assignmentId,
+                payload,
+            );
             setDialog(null);
             await synchronize();
         } catch (requestError) {
@@ -124,16 +167,14 @@ export default function VehicleServiceEmployeeAssignmentTab({
         <div className="space-y-5">
             <ErrorAlert error={error ?? result.error} />
             <EmployeeAssignmentTable
-                loading={result.loading}
-                rows={assignments}
-                onAdd={() => {
-                    setError(null);
-                    setDialog({ mode: 'create', value: emptyAssignmentForm() });
-                }}
+                loading={result.loading && workforce === null}
+                lines={workforce?.lines ?? []}
+                jobSupervisor={workforce?.supervisor ?? null}
+                assigningLineId={assigningLineId}
+                onAssign={createAssignment}
                 onEdit={(row) => {
                     setError(null);
                     setDialog({
-                        mode: 'edit',
                         assignmentId: row.id,
                         value: assignmentToForm(row),
                     });
@@ -142,7 +183,8 @@ export default function VehicleServiceEmployeeAssignmentTab({
             />
             <EmployeeAssignmentDialog
                 dialog={dialog}
-                lines={result.data ?? []}
+                lines={workforce?.lines ?? []}
+                jobSupervisor={workforce?.supervisor ?? null}
                 error={error}
                 saving={saving}
                 onClose={() => setDialog(null)}
@@ -170,5 +212,5 @@ async function loadWorkforceSnapshot(jobId: number, signal?: AbortSignal): Promi
         throw new Error(MISSING_JOB_VERSION_MESSAGE);
     }
 
-    return { lines, rowVersion: job.row_version };
+    return { lines, rowVersion: job.row_version, supervisor: job.supervisor ?? null };
 }

@@ -46,6 +46,7 @@ use Modules\VehicleService\DTOs\VehicleServicePaymentData;
 use Modules\VehicleService\Enums\VehicleServiceCommissionType;
 use Modules\VehicleService\Enums\VehicleServiceJobStatus;
 use Modules\VehicleService\Enums\VehicleServiceLineSourceType;
+use Modules\VehicleService\Http\Resources\VehicleServiceJobLineResource;
 use Modules\VehicleService\Http\Resources\VehicleServiceJobResource;
 use Modules\VehicleService\Models\VehicleServiceInvoiceLink;
 use Modules\VehicleService\Models\VehicleServiceJob;
@@ -135,13 +136,11 @@ final class VehicleServiceEngineTest extends TestCase
         $line = $this->line($fixedJob, VehicleServiceLineSourceType::LabourItem, $context['labour'], '2.000000', '100.000000');
         $fixed = $this->assignEmployee($fixedJob, $line, new VehicleServiceEmployeeAssignmentData(
             employeeId: $context['employee_id'],
-            roleType: 'technician',
             commissionType: VehicleServiceCommissionType::Fixed,
             commissionValue: '25.000000',
         ));
         $percentage = $this->assignEmployee($fixedJob, $line, new VehicleServiceEmployeeAssignmentData(
-            employeeId: $context['employee_id'],
-            roleType: 'helper',
+            employeeId: $context['helper_employee_id'],
             commissionType: VehicleServiceCommissionType::Percentage,
             commissionValue: '12.500000',
         ));
@@ -149,6 +148,26 @@ final class VehicleServiceEngineTest extends TestCase
         $this->assertSame('75.000000', (string) $this->refreshJob($fixedJob)->supervisor_commission_amount);
         $this->assertSame('25.000000', (string) $fixed->commission_amount);
         $this->assertSame('25.000000', (string) $percentage->commission_amount);
+    }
+
+    public function test_job_supervisor_must_have_the_supervisor_designation(): void
+    {
+        $context = $this->context();
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Only employees with the Supervisor designation can supervise service jobs.');
+
+        $this->withTenantExecutionContext(
+            (int) $context['tenant_id'],
+            fn (): VehicleServiceJob => app(VehicleServiceJobService::class)->create(new VehicleServiceJobData(
+                tenantId: $context['tenant_id'],
+                jobDate: '2026-06-07',
+                customerId: $context['customer_id'],
+                vehicleId: $context['vehicle_id'],
+                supervisorEmployeeId: $context['employee_id'],
+                odometerReading: '12000.000000',
+            )),
+        );
     }
 
     public function test_employee_assignment_is_restricted_to_service_labour_and_service_combo_children(): void
@@ -161,22 +180,20 @@ final class VehicleServiceEngineTest extends TestCase
 
         foreach ([$inventory, $external] as $line) {
             try {
-                $this->assignEmployee($job, $line, new VehicleServiceEmployeeAssignmentData($context['employee_id'], 'technician'));
+                $this->assignEmployee($job, $line, new VehicleServiceEmployeeAssignmentData($context['employee_id']));
                 $this->fail('Expected non-service employee assignment to fail.');
             } catch (InvalidArgumentException $exception) {
                 $this->assertSame('Employees can only be assigned to service or labour lines.', $exception->getMessage());
             }
         }
 
-        $allowed = $this->assignEmployee($job, $service, new VehicleServiceEmployeeAssignmentData($context['employee_id'], 'technician'));
+        $allowed = $this->assignEmployee($job, $service, new VehicleServiceEmployeeAssignmentData($context['employee_id']));
         $this->assertSame($context['employee_id'], (int) $allowed->employee_id);
     }
 
     public function test_combo_parent_expands_children_with_inventory_and_workforce_flags(): void
     {
         $context = $this->context();
-        $currencyId = $this->setTenantBaseCurrency($context['tenant_id']);
-        $this->servicePrice($context['labour'], $currencyId, $context['uom_id'], '125.000000');
         $combo = $this->item($context['tenant_id'], 'COMBO', ItemType::Combo, false, $context['uom_id']);
         DB::table('item_bundles')->insert([
             [
@@ -186,6 +203,8 @@ final class VehicleServiceEngineTest extends TestCase
                 'quantity' => '2.000000',
                 'uom_id' => $context['uom_id'],
                 'line_type' => 'item',
+                'unit_cost' => '0.000000',
+                'uses_job_supervisor' => false,
                 'is_required' => true,
                 'sort_order' => 1,
                 'created_at' => now(),
@@ -198,6 +217,8 @@ final class VehicleServiceEngineTest extends TestCase
                 'quantity' => '1.000000',
                 'uom_id' => $context['uom_id'],
                 'line_type' => 'labour',
+                'unit_cost' => '125.000000',
+                'uses_job_supervisor' => false,
                 'is_required' => true,
                 'sort_order' => 2,
                 'created_at' => now(),
@@ -218,30 +239,86 @@ final class VehicleServiceEngineTest extends TestCase
         $this->assertFalse((bool) $children[0]->is_billable);
         $this->assertTrue((bool) $children[1]->is_employee_assignable);
         $this->assertFalse((bool) $children[1]->is_billable);
-        $this->assertSame('125.000000', (string) $children[1]->unit_price);
-        $this->assertSame('375.000000', (string) $children[1]->line_total);
+        $this->assertSame('125.000000', (string) $children[1]->unit_cost);
+        $this->assertFalse((bool) $children[1]->uses_job_supervisor);
+        $this->assertSame('0.000000', (string) $children[1]->unit_price);
+        $this->assertSame('0.000000', (string) $children[1]->line_total);
         $this->assertSame('1500.000000', (string) $this->refreshJob($job)->grand_total);
+
+        $workforceLine = $this->withTenantExecutionContext(
+            (int) $context['tenant_id'],
+            fn (): array => (new VehicleServiceJobLineResource($children[1]->load('parent')))->resolve(),
+        );
+        $this->assertSame($parent->getKey(), $workforceLine['parent_line']['id']);
+        $this->assertSame($parent->description, $workforceLine['parent_line']['description']);
 
         $assignment = $this->assignEmployee(
             $job,
             $children[1],
-            new VehicleServiceEmployeeAssignmentData($context['employee_id'], 'technician'),
+            new VehicleServiceEmployeeAssignmentData($context['employee_id']),
         );
         $this->assertSame($children[1]->getKey(), $assignment->vehicle_service_job_line_id);
+        $this->assertSame('375.000000', (string) $assignment->commission_amount);
+        $this->assertSame('375.000000', (string) $this->refreshJob($job)->commission_cost_total);
 
         $this->expectException(InvalidArgumentException::class);
         $this->assignEmployee(
             $job,
             $parent,
-            new VehicleServiceEmployeeAssignmentData($context['employee_id'], 'technician'),
+            new VehicleServiceEmployeeAssignmentData($context['employee_id']),
         );
     }
 
-    public function test_combo_expansion_rejects_labour_child_without_an_effective_service_price_atomically(): void
+    public function test_combo_labour_cost_is_snapshotted_before_later_bundle_changes(): void
     {
         $context = $this->context();
-        $this->setTenantBaseCurrency($context['tenant_id']);
         $combo = $this->item($context['tenant_id'], 'COMBO-NO-PRICE', ItemType::Combo, false, $context['uom_id']);
+        $bundleId = (int) DB::table('item_bundles')->insertGetId([
+            'tenant_id' => $context['tenant_id'],
+            'parent_item_id' => $combo->getKey(),
+            'child_item_id' => $context['labour']->getKey(),
+            'quantity' => '1.000000',
+            'uom_id' => $context['uom_id'],
+            'line_type' => 'labour',
+            'unit_cost' => '80.000000',
+            'uses_job_supervisor' => false,
+            'is_required' => true,
+            'sort_order' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $job = $this->createJob($context);
+        $parent = $this->line($job, VehicleServiceLineSourceType::ComboParent, $combo, '1.000000', '500.000000');
+        $child = $this->withTenantExecutionContext(
+            (int) $context['tenant_id'],
+            fn (): VehicleServiceJobLine => $parent->children()->firstOrFail(),
+        );
+        DB::table('item_bundles')->where('id', $bundleId)->update([
+            'unit_cost' => '120.000000',
+            'uses_job_supervisor' => true,
+        ]);
+
+        $assignment = $this->assignEmployee(
+            $job,
+            $child,
+            new VehicleServiceEmployeeAssignmentData($context['helper_employee_id']),
+        );
+
+        $this->assertSame('80.000000', (string) $child->unit_cost);
+        $this->assertFalse((bool) $child->uses_job_supervisor);
+        $this->assertSame('helper', $assignment->role_type);
+        $this->assertSame('80.000000', (string) $assignment->commission_amount);
+    }
+
+    public function test_combo_supervisor_labour_uses_job_supervisor_and_replaces_global_commission(): void
+    {
+        $context = $this->context();
+        $alternateSupervisorEmployeeId = $this->employee(
+            $context['tenant_id'],
+            'EMP-ALT-SUPERVISOR',
+            $context['supervisor_designation_id'],
+        );
+        $combo = $this->item($context['tenant_id'], 'COMBO-SUPERVISOR', ItemType::Combo, false, $context['uom_id']);
         DB::table('item_bundles')->insert([
             'tenant_id' => $context['tenant_id'],
             'parent_item_id' => $combo->getKey(),
@@ -249,27 +326,47 @@ final class VehicleServiceEngineTest extends TestCase
             'quantity' => '1.000000',
             'uom_id' => $context['uom_id'],
             'line_type' => 'labour',
+            'unit_cost' => '60.000000',
+            'uses_job_supervisor' => true,
             'is_required' => true,
             'sort_order' => 1,
             'created_at' => now(),
             'updated_at' => now(),
         ]);
-        $job = $this->createJob($context);
+        $job = $this->createJob($context, VehicleServiceCommissionType::Fixed, '25.000000');
+        $parent = $this->line($job, VehicleServiceLineSourceType::ComboParent, $combo, '1.000000', '500.000000');
+        $child = $this->withTenantExecutionContext(
+            (int) $context['tenant_id'],
+            fn (): VehicleServiceJobLine => $parent->children()->firstOrFail(),
+        );
+
+        $assignment = $this->assignEmployee(
+            $job,
+            $child,
+            new VehicleServiceEmployeeAssignmentData($alternateSupervisorEmployeeId),
+        );
+        $job = $this->refreshJob($job);
+
+        $this->assertNotSame($context['supervisor_employee_id'], $assignment->employee_id);
+        $this->assertSame($alternateSupervisorEmployeeId, $assignment->employee_id);
+        $this->assertSame('supervisor', $assignment->role_type);
+        $this->assertSame('60.000000', (string) $job->supervisor_commission_amount);
+        $this->assertSame('60.000000', (string) $job->commission_cost_total);
+        $this->assertSame('440.000000', (string) $job->net_after_commission);
 
         try {
-            $this->line($job, VehicleServiceLineSourceType::ComboParent, $combo, '1.000000', '500.000000');
-            $this->fail('Expected combo expansion without a labour service price to fail.');
+            $this->assignEmployee(
+                $job,
+                $child,
+                new VehicleServiceEmployeeAssignmentData($context['employee_id']),
+            );
+            $this->fail('Expected a non-supervisor assignment to be rejected.');
         } catch (InvalidArgumentException $exception) {
             $this->assertSame(
-                "Combo child item {$context['labour']->code} requires an effective service price for the selected UOM.",
+                'Only employees with the Supervisor designation can be assigned to this labour line.',
                 $exception->getMessage(),
             );
         }
-
-        $this->assertSame(0, $this->withTenantExecutionContext(
-            (int) $context['tenant_id'],
-            fn (): int => $job->lines()->count(),
-        ));
     }
 
     public function test_inventory_issue_only_posts_inventory_lines_and_enforces_availability(): void
@@ -418,7 +515,7 @@ final class VehicleServiceEngineTest extends TestCase
                     jobDate: '2026-06-07',
                     customerId: $context['customer_id'],
                     vehicleId: $context['vehicle_id'],
-                    supervisorEmployeeId: $context['employee_id'],
+                    supervisorEmployeeId: $context['supervisor_employee_id'],
                     odometerReading: '12000.000000',
                     fuelLevel: 'half',
                     customerComplaint: 'New complaint',
@@ -441,7 +538,7 @@ final class VehicleServiceEngineTest extends TestCase
                     jobDate: '2026-06-07',
                     customerId: $context['customer_id'],
                     vehicleId: $context['vehicle_id'],
-                    supervisorEmployeeId: $context['employee_id'],
+                    supervisorEmployeeId: $context['supervisor_employee_id'],
                     odometerReading: '12000.000000',
                     fuelLevel: 'half',
                     customerComplaint: null,
@@ -467,7 +564,8 @@ final class VehicleServiceEngineTest extends TestCase
                 customerId: $context['customer_id'],
                 vehicleId: $context['vehicle_id'],
                 billToCustomerId: $billToCustomerId,
-                supervisorEmployeeId: $context['employee_id'],
+                supervisorEmployeeId: $context['supervisor_employee_id'],
+                odometerReading: '12000.000000',
             )),
         );
         $this->assertSame($billToCustomerId, (int) $job->bill_to_customer_id);
@@ -549,7 +647,51 @@ final class VehicleServiceEngineTest extends TestCase
         }
     }
 
-    public function test_nullable_commission_request_fields_default_to_none(): void
+    public function test_line_mutations_return_authoritative_workforce_snapshots(): void
+    {
+        $this->withoutMiddleware();
+        $context = $this->context();
+        $this->actingAsTenantUser($context['tenant_id']);
+        $job = $this->createJob($context);
+        $payload = [
+            'tenant_id' => $context['tenant_id'],
+            'line_source_type' => VehicleServiceLineSourceType::LabourItem->value,
+            'item_id' => $context['labour']->getKey(),
+            'description' => 'Technician labour',
+            'quantity' => '1.000000',
+            'unit_price' => '100.000000',
+        ];
+
+        $created = $this->tenantPostJson(
+            $context['tenant_id'],
+            "/api/v1/vehicle-service/jobs/{$job->getKey()}/lines",
+            [...$payload, 'expected_version' => $this->currentJobVersion($job)],
+        )->assertCreated()
+            ->assertJsonPath('meta.workforce_lines.0.description', 'Technician labour')
+            ->assertJsonCount(1, 'meta.workforce_lines');
+        $lineId = (int) $created->json('data.id');
+        $createdVersion = (int) $created->json('meta.row_version');
+
+        $updated = $this->withTenantExecutionContext(
+            (int) $context['tenant_id'],
+            fn () => $this->putJson(
+                "/api/v1/vehicle-service/jobs/{$job->getKey()}/lines/{$lineId}",
+                [...$payload, 'description' => 'Senior technician labour', 'expected_version' => $createdVersion],
+            ),
+        )->assertOk()
+            ->assertJsonPath('meta.workforce_lines.0.id', $lineId)
+            ->assertJsonPath('meta.workforce_lines.0.description', 'Senior technician labour');
+
+        $this->tenantDeleteJson(
+            $context['tenant_id'],
+            "/api/v1/vehicle-service/jobs/{$job->getKey()}/lines/{$lineId}",
+            ['tenant_id' => $context['tenant_id'], 'expected_version' => (int) $updated->json('meta.row_version')],
+        )->assertOk()
+            ->assertJsonPath('data', null)
+            ->assertJsonCount(0, 'meta.workforce_lines');
+    }
+
+    public function test_optional_job_fields_persist_and_nullable_commission_fields_default_to_none(): void
     {
         $this->withoutMiddleware();
         $context = $this->context();
@@ -561,30 +703,81 @@ final class VehicleServiceEngineTest extends TestCase
             'type' => 'full_service',
             'customer_id' => $context['customer_id'],
             'vehicle_id' => $context['vehicle_id'],
-            'supervisor_employee_id' => $context['employee_id'],
+            'supervisor_employee_id' => $context['supervisor_employee_id'],
             'supervisor_commission_type' => null,
             'supervisor_commission_value' => null,
+            'odometer_reading' => '10000',
+            'next_service_mileage' => '15000',
+            'manual_job_card' => 'MJC-1042',
         ])->assertCreated()
             ->assertJsonPath('data.supervisor_commission_type', VehicleServiceCommissionType::None->value)
             ->assertJsonPath('data.supervisor_commission_value', '0.000000')
+            ->assertJsonPath('data.next_service_mileage', '15000.000000')
+            ->assertJsonPath('data.manual_job_card', 'MJC-1042')
             ->json('data.id');
 
         $job = $this->withTenantExecutionContext(
             (int) $context['tenant_id'],
             fn (): VehicleServiceJob => VehicleServiceJob::query()->findOrFail($createdJobId),
         );
+        $this->assertSame('15000.000000', (string) $job->next_service_mileage);
+        $this->assertSame('MJC-1042', $job->manual_job_card);
         $line = $this->line($job, VehicleServiceLineSourceType::ServiceItem, $context['service'], '1.000000', '25.000000');
 
         $this->tenantPostJson($context['tenant_id'], "/api/v1/vehicle-service/jobs/{$job->getKey()}/lines/{$line->getKey()}/employees", [
             'tenant_id' => $context['tenant_id'],
             'expected_version' => $this->currentJobVersion($job),
             'employee_id' => $context['employee_id'],
-            'role_type' => 'technician',
             'commission_type' => null,
             'commission_value' => null,
         ])->assertCreated()
             ->assertJsonPath('data.commission_type', VehicleServiceCommissionType::None->value)
             ->assertJsonPath('data.commission_value', '0.000000');
+    }
+
+    public function test_job_type_enforces_mileage_field_rules(): void
+    {
+        $this->withoutMiddleware();
+        $context = $this->context();
+        $this->actingAsTenantUser($context['tenant_id']);
+        $basePayload = [
+            'tenant_id' => $context['tenant_id'],
+            'job_date' => '2026-06-07',
+            'customer_id' => $context['customer_id'],
+            'vehicle_id' => $context['vehicle_id'],
+        ];
+
+        $this->tenantPostJson($context['tenant_id'], '/api/v1/vehicle-service/jobs', [
+            ...$basePayload,
+            'type' => 'full_service',
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors('odometer_reading');
+
+        $this->tenantPostJson($context['tenant_id'], '/api/v1/vehicle-service/jobs', [
+            ...$basePayload,
+            'type' => 'body_wash',
+            'odometer_reading' => '10000',
+            'next_service_mileage' => '15000',
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['odometer_reading', 'next_service_mileage']);
+
+        $this->tenantPostJson($context['tenant_id'], '/api/v1/vehicle-service/jobs', [
+            ...$basePayload,
+            'type' => 'oil_change',
+            'odometer_reading' => '10000',
+            'next_service_mileage' => '15500',
+        ])->assertCreated()
+            ->assertJsonPath('data.type', 'oil_change')
+            ->assertJsonPath('data.odometer_reading', '10000.000000')
+            ->assertJsonPath('data.next_service_mileage', '15500.000000');
+
+        $this->tenantPostJson($context['tenant_id'], '/api/v1/vehicle-service/jobs', [
+            ...$basePayload,
+            'type' => 'accessories',
+            'odometer_reading' => '10000',
+            'next_service_mileage' => '15000',
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['odometer_reading', 'next_service_mileage']);
     }
 
     public function test_line_sources_enforce_inventory_and_customer_supplied_rules(): void
@@ -904,7 +1097,12 @@ final class VehicleServiceEngineTest extends TestCase
         $warehouseLocationId = $this->warehouseLocation($tenantId, $warehouseId, 'BIN-'.$suffix);
         $customerId = $this->customer($tenantId, 'CUS-'.$suffix);
         $vehicleId = $this->vehicle($tenantId, $customerId, 'VEH-'.$suffix);
-        $employeeId = $this->employee($tenantId, 'EMP-'.$suffix);
+        $supervisorDesignationId = $this->designation($tenantId, 'SUPERVISOR', 'Service Supervisor');
+        $technicianDesignationId = $this->designation($tenantId, 'TECHNICIAN', 'Technician');
+        $helperDesignationId = $this->designation($tenantId, 'HELPER', 'Helper');
+        $supervisorEmployeeId = $this->employee($tenantId, 'EMP-SUP-'.$suffix, $supervisorDesignationId);
+        $employeeId = $this->employee($tenantId, 'EMP-TECH-'.$suffix, $technicianDesignationId);
+        $helperEmployeeId = $this->employee($tenantId, 'EMP-HELP-'.$suffix, $helperDesignationId);
 
         return [
             'tenant_id' => $tenantId,
@@ -914,6 +1112,9 @@ final class VehicleServiceEngineTest extends TestCase
             'customer_id' => $customerId,
             'vehicle_id' => $vehicleId,
             'employee_id' => $employeeId,
+            'helper_employee_id' => $helperEmployeeId,
+            'supervisor_employee_id' => $supervisorEmployeeId,
+            'supervisor_designation_id' => $supervisorDesignationId,
             'stock' => $this->item($tenantId, 'STOCK-'.$suffix, ItemType::Stock, true, $uomId),
             'service' => $this->item($tenantId, 'SERVICE-'.$suffix, ItemType::Service, false, $uomId),
             'labour' => $this->item($tenantId, 'LABOUR-'.$suffix, ItemType::Labour, false, $uomId),
@@ -932,7 +1133,7 @@ final class VehicleServiceEngineTest extends TestCase
                 jobDate: '2026-06-07',
                 customerId: $context['customer_id'],
                 vehicleId: $context['vehicle_id'],
-                supervisorEmployeeId: $context['employee_id'],
+                supervisorEmployeeId: $context['supervisor_employee_id'],
                 supervisorCommissionType: $commissionType,
                 supervisorCommissionValue: $commissionValue,
                 odometerReading: '12000.000000',
@@ -1281,7 +1482,19 @@ final class VehicleServiceEngineTest extends TestCase
         return $vehicleId;
     }
 
-    private function employee(int $tenantId, string $code): int
+    private function designation(int $tenantId, string $code, string $name): int
+    {
+        return (int) DB::table('hr_designations')->insertGetId([
+            'tenant_id' => $tenantId,
+            'code' => $code,
+            'name' => $name,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    private function employee(int $tenantId, string $code, int $designationId): int
     {
         return (int) DB::table('hr_employees')->insertGetId([
             'tenant_id' => $tenantId,
@@ -1289,6 +1502,7 @@ final class VehicleServiceEngineTest extends TestCase
             'code' => $code,
             'first_name' => 'Tech',
             'display_name' => 'Technician '.$code,
+            'designation_id' => $designationId,
             'status' => 'active',
             'availability_status' => 'available',
             'created_at' => now(),

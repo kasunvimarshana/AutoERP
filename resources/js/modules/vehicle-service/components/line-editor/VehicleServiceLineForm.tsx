@@ -6,7 +6,7 @@ import { VehicleServiceInventoryLocationFields } from '../VehicleServiceInventor
 import { LineAdvancedFields } from './LineAdvancedFields';
 import { LineBasicFields } from './LineBasicFields';
 import { LinePricingFields } from './LinePricingFields';
-import { LineSourceTypeFields } from './LineSourceTypeFields';
+import { isInventoryLineItem, LineItemFields } from './LineItemFields';
 import { LineSummary } from './LineSummary';
 import {
     calculateLinePreview,
@@ -36,7 +36,11 @@ export function VehicleServiceLineForm({
         next: VehicleServiceLineFormValue[K],
     ) => setDraft((current) => ({ ...current, [key]: next }));
     const preview = calculateLinePreview(draft);
-    const showIssueControls = canIssueInventory && mode === 'create' && draft.source === 'inventory_item';
+    const showIssueControls = canIssueInventory
+        && mode === 'create'
+        && draft.item !== null
+        && draft.source === 'inventory_item'
+        && isInventoryLineItem(draft.item);
     const canIssueOnCreate = showIssueControls
         && draft.issueWarehouse !== null
         && draft.issueLocation !== null;
@@ -54,11 +58,11 @@ export function VehicleServiceLineForm({
                 <div>
                     <h3 className="font-semibold text-slate-900">Line details</h3>
                     <p className="text-sm text-slate-500">
-                        Select the source and item, then enter quantity, UOM, and pricing.
+                        Search for an item, then enter quantity, UOM, and pricing.
                     </p>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    <LineSourceTypeFields value={draft} error={error} onChange={setDraft} />
+                    <LineItemFields value={draft} error={error} onChange={setDraft} />
                     {showIssueControls && (
                         <div className="sm:col-span-2 lg:col-span-3">
                             <VehicleServiceInventoryLocationFields

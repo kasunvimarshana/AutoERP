@@ -51,7 +51,7 @@ export function emptyLineForm(): VehicleServiceLineFormValue {
         source: 'inventory_item',
         item: null,
         uom: null,
-        description: lineTypeLabel('inventory_item'),
+        description: '',
         quantity: '1.000000',
         unit_cost: '0.000000',
         unit_price: '0.000000',

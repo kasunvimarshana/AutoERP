@@ -36,6 +36,8 @@ return new class extends Migration
             $table->decimal('tax_total', 20, 6)->default('0.000000');
             $table->decimal('charge_total', 20, 6)->default('0.000000');
             $table->decimal('grand_total', 20, 6)->default('0.000000');
+            $table->decimal('commission_cost_total', 20, 6)->default('0.000000');
+            $table->decimal('net_after_commission', 20, 6)->default('0.000000');
             $table->text('notes')->nullable();
             $table->unsignedBigInteger('created_by')->nullable();
             $table->unsignedBigInteger('approved_by')->nullable();

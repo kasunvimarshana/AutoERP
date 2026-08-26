@@ -29,6 +29,7 @@ const line = (uomCode: string, withDefault = true): CommissionAwareVehicleServic
     is_external: false,
     is_billable: true,
     is_employee_assignable: true,
+    uses_job_supervisor: false,
     status: 'active',
     commission_default: withDefault ? {
         commission_type: 'percentage',
@@ -42,28 +43,11 @@ describe('Vehicle Service assignment commission defaults', () => {
             emptyAssignmentForm(),
             [line(uomCode)],
             15,
+            null,
         );
 
         expect(result.commissionType).toBe('percentage');
         expect(result.commissionValue).toBe('10.000000');
-    });
-
-    it('keeps the labor-item default independent of the operational assignment role', () => {
-        const helperAssignment = applyAssignmentCommissionDefault(
-            { ...emptyAssignmentForm(), role: 'helper' },
-            [line('JOB')],
-            15,
-        );
-        const inspectorAssignment = applyAssignmentCommissionDefault(
-            { ...helperAssignment, role: 'inspector' },
-            [line('JOB')],
-            15,
-        );
-
-        expect(helperAssignment.role).toBe('helper');
-        expect(inspectorAssignment.role).toBe('inspector');
-        expect(helperAssignment.commissionType).toBe('percentage');
-        expect(inspectorAssignment.commissionValue).toBe('10.000000');
     });
 
     it('fails closed when the selected labor item has no active default', () => {
@@ -71,9 +55,36 @@ describe('Vehicle Service assignment commission defaults', () => {
             { ...emptyAssignmentForm(), commissionType: 'fixed', commissionValue: '500.000000' },
             [line('JOB', false)],
             15,
+            null,
         );
 
         expect(result.commissionType).toBe('none');
         expect(result.commissionValue).toBe('0.000000');
+    });
+
+    it('prefills the job supervisor while locking the combo commission pool', () => {
+        const supervisor = { id: 42, code: 'EMP-SUP', name: 'Service Supervisor' };
+        const comboLine: CommissionAwareVehicleServiceJobLine = {
+            ...line('JOB'),
+            line_source_type: 'combo_child',
+            uses_job_supervisor: true,
+            commission_default: {
+                commission_type: 'fixed',
+                commission_value: '150.000000',
+                locked: true,
+            },
+        };
+
+        const result = applyAssignmentCommissionDefault(
+            emptyAssignmentForm(),
+            [comboLine],
+            comboLine.id,
+            supervisor,
+        );
+
+        expect(result.employee).toEqual(supervisor);
+        expect(result.commissionType).toBe('fixed');
+        expect(result.commissionValue).toBe('150.000000');
+        expect(result.commissionLocked).toBe(true);
     });
 });

@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace Modules\VehicleService\Services;
 
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Item\Enums\ItemType;
 use Modules\VehicleService\DTOs\VehicleServiceEmployeeAssignmentData;
 use Modules\VehicleService\Enums\VehicleServiceCommissionType;
-use Modules\VehicleService\Enums\VehicleServiceWorkforceRole;
+use Modules\VehicleService\Enums\VehicleServiceLineSourceType;
+use Modules\Hr\Models\HrEmployee;
 use Modules\VehicleService\Models\VehicleServiceJob;
 use Modules\VehicleService\Models\VehicleServiceJobLine;
 use Modules\VehicleService\Models\VehicleServiceLineEmployee;
@@ -43,9 +45,9 @@ final class VehicleServiceEmployeeAssignmentService
             $this->assertLine($job, $line);
             $this->validator->assertMutable($job);
             $this->validator->assertEmployeeAssignable($line);
-            $this->validator->employee((int) $job->tenant_id, $job->organization_unit_id, $data->employeeId);
+            $employee = $this->validator->workforceEmployee($job, $line, $data->employeeId);
 
-            $assignment = VehicleServiceLineEmployee::query()->create(array_merge($this->attributes($line, $data), [
+            $assignment = VehicleServiceLineEmployee::query()->create(array_merge($this->attributes($line, $data, $employee), [
                 'tenant_id' => $job->tenant_id,
                 'organization_unit_id' => $job->organization_unit_id,
                 'vehicle_service_job_id' => $job->getKey(),
@@ -53,6 +55,7 @@ final class VehicleServiceEmployeeAssignmentService
                 'assigned_at' => now(),
             ]));
             $this->calculations->recalculateAssignments($line);
+            $this->calculations->recalculateJob($job);
             $this->bumpJobVersion($job);
 
             return $assignment->refresh()->load('employee');
@@ -74,12 +77,13 @@ final class VehicleServiceEmployeeAssignmentService
             $this->assertAssignment($job, $line, $assignment);
             $this->validator->assertMutable($job);
             $this->validator->assertEmployeeAssignable($line);
-            $this->validator->employee((int) $job->tenant_id, $job->organization_unit_id, $data->employeeId);
+            $employee = $this->validator->workforceEmployee($job, $line, $data->employeeId);
 
-            $assignment->fill($this->attributes($line, $data, $assignment));
+            $assignment->fill($this->attributes($line, $data, $employee, $assignment));
             $assignment->completed_at = $data->status === 'completed' ? now() : null;
             $assignment->save();
             $this->calculations->recalculateAssignments($line);
+            $this->calculations->recalculateJob($job);
             $this->bumpJobVersion($job);
 
             return $assignment->refresh()->load('employee');
@@ -102,6 +106,7 @@ final class VehicleServiceEmployeeAssignmentService
             $this->validator->assertMutable($job);
             $assignment->delete();
             $this->calculations->recalculateAssignments($line);
+            $this->calculations->recalculateJob($job);
             $this->bumpJobVersion($job);
         });
     }
@@ -110,20 +115,24 @@ final class VehicleServiceEmployeeAssignmentService
     private function attributes(
         VehicleServiceJobLine $line,
         VehicleServiceEmployeeAssignmentData $data,
+        HrEmployee $employee,
         ?VehicleServiceLineEmployee $existing = null,
     ): array {
         foreach ([$data->assignedHours, $data->rate] as $value) {
             $this->validator->nonNegative($value, 'Employee assignment values cannot be negative.');
         }
-        $role = VehicleServiceWorkforceRole::tryFrom($data->roleType);
-        if (! $role instanceof VehicleServiceWorkforceRole) {
-            throw new InvalidArgumentException('Invalid Vehicle Service workforce role.');
-        }
         $commission = $this->commission($line, $data, $existing);
+        $roleType = $existing instanceof VehicleServiceLineEmployee
+            && (int) $existing->employee_id === (int) $employee->getKey()
+                ? (string) $existing->role_type
+                : Str::of((string) $employee->designation->code)
+                    ->lower()
+                    ->replace(['-', ' '], '_')
+                    ->toString();
 
         return [
             'employee_id' => $data->employeeId,
-            'role_type' => $role->value,
+            'role_type' => $roleType,
             'assigned_hours' => $this->math->normalize($data->assignedHours),
             'rate' => $this->math->normalize($data->rate),
             'commission_type' => $commission['type']->value,
@@ -143,6 +152,23 @@ final class VehicleServiceEmployeeAssignmentService
         VehicleServiceEmployeeAssignmentData $data,
         ?VehicleServiceLineEmployee $existing,
     ): array {
+        $line->loadMissing('item');
+        if ($line->line_source_type === VehicleServiceLineSourceType::ComboChild
+            && $line->item?->item_type === ItemType::Labour) {
+            $pool = $this->math->mul((string) $line->quantity, (string) $line->unit_cost);
+            if ($data->commissionType !== null && (
+                $data->commissionType !== VehicleServiceCommissionType::Fixed
+                || $data->commissionValue === null
+                || $this->math->compare($data->commissionValue, $pool) !== 0
+            )) {
+                throw new InvalidArgumentException(
+                    'Combo labour commission is fixed by the Job Card line and cannot be overridden.',
+                );
+            }
+
+            return ['type' => VehicleServiceCommissionType::Fixed, 'value' => $pool];
+        }
+
         if ($data->commissionType !== null) {
             if ($data->commissionValue === null) {
                 throw new InvalidArgumentException('Employee commission value is required.');
@@ -165,7 +191,6 @@ final class VehicleServiceEmployeeAssignmentService
             ];
         }
 
-        $line->loadMissing('item');
         if ($line->item?->item_type !== ItemType::Labour || $line->organization_unit_id === null) {
             return ['type' => VehicleServiceCommissionType::None, 'value' => self::ZERO_AMOUNT];
         }

@@ -8,33 +8,35 @@ import { GenericLookupSelect } from '@/shared/components/GenericLookupSelect';
 import { Select } from '@/shared/components/Select';
 import type { LookupLoadParams } from '@/shared/types/lookup';
 import type { CommissionType, VehicleServiceJobLine } from '../../vehicleServiceTypes';
-import {
-    vehicleServiceWorkforceRoles,
-    type VehicleServiceWorkforceRole,
-} from '../../commissionTypes';
+import type { NamedResource } from '@/shared/types/common';
 import {
     applyAssignmentCommissionDefault,
     type AssignmentFormValue,
 } from './assignmentForm';
 
-export function EmployeeAssignmentForm({ value, mode, lines, error, saving, onSave, onCancel }: {
+export function EmployeeAssignmentForm({ value, lines, jobSupervisor, error, saving, onSave, onCancel }: {
     value: AssignmentFormValue;
-    mode: 'create' | 'edit';
     lines: VehicleServiceJobLine[];
+    jobSupervisor: NamedResource | null;
     error: ApiError | null;
     saving: boolean;
     onSave: (value: AssignmentFormValue) => void;
     onCancel: () => void;
 }) {
     const [draft, setDraft] = useState(value);
-    const search = useCallback(
-        (params: LookupLoadParams) => lookupApi.availableEmployees(params),
+    const searchNonSupervisors = useCallback(
+        (params: LookupLoadParams) => lookupApi.availableNonSupervisorEmployees(params),
+        [],
+    );
+    const searchSupervisors = useCallback(
+        (params: LookupLoadParams) => lookupApi.availableSupervisors(params),
         [],
     );
     const set = <K extends keyof AssignmentFormValue>(
         key: K,
         next: AssignmentFormValue[K],
     ) => setDraft((current) => ({ ...current, [key]: next }));
+    const selectedLine = lines.find((line) => line.id === draft.lineId);
 
     return (
         <form
@@ -49,14 +51,14 @@ export function EmployeeAssignmentForm({ value, mode, lines, error, saving, onSa
                 <div>
                     <h3 className="font-semibold text-slate-900">Assignment details</h3>
                     <p className="text-sm text-slate-500">
-                        Select the service line, employee, operational role, hours, rate, and commission. The labor-item commission default is applied when the line changes and remains editable before saving.
+                        Assign an employee to this labour line. The employee designation is recorded automatically; combo labour commission is fixed by the Job Card snapshot and split across assigned employees.
                     </p>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                     <Select
                         label="Service / labour line"
                         value={draft.lineId ?? ''}
-                        disabled={mode === 'edit'}
+                        disabled
                         options={lines.map((line) => ({
                             value: line.id,
                             label: `${line.line_number}. ${line.description}`,
@@ -67,6 +69,7 @@ export function EmployeeAssignmentForm({ value, mode, lines, error, saving, onSa
                                 current,
                                 lines,
                                 lineId,
+                                jobSupervisor,
                             ));
                         }}
                     />
@@ -75,23 +78,21 @@ export function EmployeeAssignmentForm({ value, mode, lines, error, saving, onSa
                         value={draft.employee}
                         error={fieldError(error, 'employee_id')}
                         onChange={(employee) => set('employee', employee)}
-                        search={search}
+                        search={selectedLine?.uses_job_supervisor === true
+                            ? searchSupervisors
+                            : searchNonSupervisors}
+                        placeholder={selectedLine?.uses_job_supervisor === true
+                            ? 'Search supervisors by code or name'
+                            : 'Search by code or name'}
+                        loadOnOpen
                         formatLabel={(employee) =>
                             [employee.code, employee.name].filter(Boolean).join(' - ')}
                     />
-                    <Select
-                        label="Role"
-                        value={draft.role}
-                        options={vehicleServiceWorkforceRoles.map((role) => ({
-                            value: role,
-                            label: role.replaceAll('_', ' '),
-                        }))}
-                        error={fieldError(error, 'role_type')}
-                        onChange={(event) => set(
-                            'role',
-                            event.target.value as VehicleServiceWorkforceRole,
-                        )}
-                    />
+                    {selectedLine?.uses_job_supervisor === true && (
+                        <p className="text-sm text-slate-500 sm:col-span-2">
+                            Only active employees with the Supervisor designation can be selected for this line.
+                        </p>
+                    )}
                     <DecimalInput
                         label="Assigned hours"
                         value={draft.hours}
@@ -107,6 +108,7 @@ export function EmployeeAssignmentForm({ value, mode, lines, error, saving, onSa
                     <Select
                         label="Commission"
                         value={draft.commissionType}
+                        disabled={draft.commissionLocked}
                         options={['none', 'fixed', 'percentage'].map((type) => ({
                             value: type,
                             label: type,
@@ -120,7 +122,7 @@ export function EmployeeAssignmentForm({ value, mode, lines, error, saving, onSa
                     <DecimalInput
                         label="Commission value"
                         value={draft.commissionValue}
-                        disabled={draft.commissionType === 'none'}
+                        disabled={draft.commissionType === 'none' || draft.commissionLocked}
                         error={fieldError(error, 'commission_value')}
                         onChange={(event) => set('commissionValue', event.target.value)}
                     />
