@@ -157,6 +157,8 @@ describe('Purchase source create flows', () => {
         expect(screen.getByTestId('location-search')).toHaveTextContent('tab=source');
         expect(screen.getByTestId('location-search')).not.toHaveTextContent('purchase_order_id');
         fireEvent.click(screen.getByRole('button', { name: 'Clear PO' }));
+        expect(await screen.findByText('Change purchase order?')).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Change purchase order' }));
         await waitFor(() => expect(screen.queryByText('PO-31 - Supplier A')).not.toBeInTheDocument());
         expect(purchaseApiMocks.getPurchaseOrder).toHaveBeenCalledTimes(1);
     });
