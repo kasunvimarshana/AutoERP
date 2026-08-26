@@ -153,10 +153,12 @@ describe('Purchase source create flows', () => {
         await waitFor(() => expect(screen.getAllByText('Widget')).toHaveLength(2));
         expect(screen.getByRole('columnheader', { name: 'Accepted amount' })).toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: 'Receive All Remaining' }));
-        expect(await screen.findByText('$50.00')).toBeInTheDocument();
+        expect(await screen.findAllByText('$50.00')).not.toHaveLength(0);
         expect(screen.getByTestId('location-search')).toHaveTextContent('tab=source');
         expect(screen.getByTestId('location-search')).not.toHaveTextContent('purchase_order_id');
         fireEvent.click(screen.getByRole('button', { name: 'Clear PO' }));
+        expect(await screen.findByText('Change purchase order?')).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Change purchase order' }));
         await waitFor(() => expect(screen.queryByText('PO-31 - Supplier A')).not.toBeInTheDocument());
         expect(purchaseApiMocks.getPurchaseOrder).toHaveBeenCalledTimes(1);
     });
