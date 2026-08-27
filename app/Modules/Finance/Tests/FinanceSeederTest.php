@@ -23,9 +23,6 @@ final class FinanceSeederTest extends TestCase
     private const ACCOUNT_SUPPLIER_ADVANCE = '1400';
     private const ACCOUNT_PAYABLE = '2100';
     private const ACCOUNT_CUSTOMER_ADVANCE = '2300';
-    private const ACCOUNT_CUSTOMER_DEPOSIT = '2350';
-    private const ACCOUNT_RENTAL_REVENUE = '4300';
-    private const ACCOUNT_RENTAL_EXPENSE = '5300';
 
     public function test_default_posting_profiles_are_seeded_for_the_protected_root_organization_unit(): void
     {
@@ -45,9 +42,6 @@ final class FinanceSeederTest extends TestCase
             FinancePostingProfileCode::SupplierPayment->value,
             FinancePostingProfileCode::CustomerAdvance->value,
             FinancePostingProfileCode::SupplierAdvance->value,
-            FinancePostingProfileCode::CustomerRentalInvoice->value,
-            FinancePostingProfileCode::SupplierRentalInvoice->value,
-            FinancePostingProfileCode::RentalDeposit->value,
         ] as $profileCode) {
             $this->assertDatabaseHas('finance_posting_profiles', [
                 'tenant_id' => $tenantId,
@@ -63,9 +57,6 @@ final class FinanceSeederTest extends TestCase
             self::ACCOUNT_SUPPLIER_ADVANCE,
             self::ACCOUNT_PAYABLE,
             self::ACCOUNT_CUSTOMER_ADVANCE,
-            self::ACCOUNT_CUSTOMER_DEPOSIT,
-            self::ACCOUNT_RENTAL_REVENUE,
-            self::ACCOUNT_RENTAL_EXPENSE,
         ] as $accountCode) {
             $this->assertGreaterThan(0, $this->accountId($tenantId, $organizationUnitId, $accountCode));
         }
@@ -74,13 +65,10 @@ final class FinanceSeederTest extends TestCase
         $this->assertActiveAssignment($tenantId, $organizationUnitId, FinanceAccountRoleCode::Payable->value, self::ACCOUNT_PAYABLE);
         $this->assertActiveAssignment($tenantId, $organizationUnitId, FinanceAccountRoleCode::SupplierAdvance->value, self::ACCOUNT_SUPPLIER_ADVANCE);
         $this->assertActiveAssignment($tenantId, $organizationUnitId, FinanceAccountRoleCode::CustomerAdvance->value, self::ACCOUNT_CUSTOMER_ADVANCE);
-        $this->assertActiveAssignment($tenantId, $organizationUnitId, FinanceAccountRoleCode::CustomerDeposit->value, self::ACCOUNT_CUSTOMER_DEPOSIT);
-        $this->assertActiveAssignment($tenantId, $organizationUnitId, FinanceAccountRoleCode::RentalRevenue->value, self::ACCOUNT_RENTAL_REVENUE);
-        $this->assertActiveAssignment($tenantId, $organizationUnitId, FinanceAccountRoleCode::RentalExpense->value, self::ACCOUNT_RENTAL_EXPENSE);
         $this->assertSame(0, DB::table('finance_account_assignments')->whereNull('organization_unit_id')->count());
     }
 
-    public function test_semantic_payment_withholding_and_rental_profiles_have_complete_role_mappings(): void
+    public function test_semantic_payment_and_withholding_profiles_have_complete_role_mappings(): void
     {
         $tenantId = $this->createTenant('AUTOERP');
 
@@ -120,23 +108,6 @@ final class FinanceSeederTest extends TestCase
                 FinanceAccountRoleCode::Payable->value,
                 FinanceAccountRoleCode::TaxReceivable->value,
                 FinanceAccountRoleCode::WithholdingPayable->value,
-            ],
-            FinancePostingProfileCode::CustomerRentalInvoice->value => [
-                FinanceAccountRoleCode::Receivable->value,
-                FinanceAccountRoleCode::RentalRevenue->value,
-                FinanceAccountRoleCode::TaxPayable->value,
-                FinanceAccountRoleCode::WithholdingReceivable->value,
-            ],
-            FinancePostingProfileCode::SupplierRentalInvoice->value => [
-                FinanceAccountRoleCode::RentalExpense->value,
-                FinanceAccountRoleCode::TaxReceivable->value,
-                FinanceAccountRoleCode::Payable->value,
-                FinanceAccountRoleCode::WithholdingPayable->value,
-            ],
-            FinancePostingProfileCode::RentalDeposit->value => [
-                FinanceAccountRoleCode::Cash->value,
-                FinanceAccountRoleCode::Bank->value,
-                FinanceAccountRoleCode::CustomerDeposit->value,
             ],
         ] as $profileCode => $lineKeys) {
             $profileId = (int) DB::table('finance_posting_profiles')

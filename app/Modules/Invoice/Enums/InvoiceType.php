@@ -17,6 +17,6 @@ enum InvoiceType: string
 
     public function belongsToRetiredSourceModule(): bool
     {
-        return $this === self::VehicleFinance;
+        return in_array($this, [self::Rental, self::VehicleFinance], true);
     }
 }

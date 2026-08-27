@@ -351,9 +351,6 @@ const VehicleServicePaymentPreparePage = lazy(
     () =>
         import("@/modules/vehicle-service/pages/VehicleServicePaymentPreparePage"),
 );
-const VehicleRentalWorkspacePage = lazy(
-    () => import("@/modules/vehicle-rental/pages/VehicleRentalWorkspacePage"),
-);
 const NotFoundPage = lazy(() => import("@/modules/not-found/NotFoundPage"));
 
 
@@ -923,10 +920,6 @@ const appRouter = createBrowserRouter(
                         <Route
                             path="/vehicle-service/jobs/:id"
                             element={<VehicleServiceJobDetailPage />}
-                        />
-                        <Route
-                            path="/vehicle-rental/*"
-                            element={<VehicleRentalWorkspacePage />}
                         />
                             </Route>
                         </Route>
