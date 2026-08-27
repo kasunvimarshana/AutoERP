@@ -17,6 +17,7 @@ return new class extends Migration
             $table->foreignId('tenant_id')->constrained('tenants', indexName: 'vehicle_service_jobs_tenant_fk')->restrictOnDelete();
             $table->foreignId('organization_unit_id')->nullable();
             $table->string('job_number', 100);
+            $table->string('manual_job_card', 100)->nullable();
             $table->date('job_date');
             $table->date('expected_delivery_date')->nullable();
             $table->string('type', 30)->default(VehicleServiceJobType::FullService->value);
@@ -29,6 +30,7 @@ return new class extends Migration
             $table->decimal('supervisor_commission_amount', 20, 6)->default('0.000000');
             $table->string('status', 30)->default('draft');
             $table->decimal('odometer_reading', 20, 6)->nullable();
+            $table->decimal('next_service_mileage', 20, 6)->nullable();
             $table->string('fuel_level')->nullable();
             $table->string('priority', 30)->nullable();
             $table->decimal('subtotal', 20, 6)->default('0.000000');

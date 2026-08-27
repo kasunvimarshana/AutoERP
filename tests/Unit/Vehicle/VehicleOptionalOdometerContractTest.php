@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Vehicle;
 
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
 use Modules\Vehicle\DTOs\CreateVehicleData;
 use Tests\TestCase;
 
 final class VehicleOptionalOdometerContractTest extends TestCase
 {
+    use RefreshDatabase;
+
     public function test_missing_vehicle_odometer_is_not_fabricated_as_zero(): void
     {
         self::assertNull((new CreateVehicleData(tenantId: 1))->odometerReading);
