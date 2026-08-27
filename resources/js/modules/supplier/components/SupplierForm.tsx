@@ -21,12 +21,10 @@ export function SupplierForm({ value, onChange, currency, onCurrencyChange, erro
     return <div className="space-y-5">
         <Panel title="Supplier identity">
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                <Input label="Supplier number" value={value.supplier_number ?? ''} onChange={(event) => set('supplier_number', event.target.value || null)} error={fieldError(error, 'supplier_number') ?? fieldError(error, 'supplier.supplier_number')} />
-                <Input label="Code" value={value.code} onChange={(event) => set('code', event.target.value)} error={fieldError(error, 'code') ?? fieldError(error, 'supplier.code')} required />
-                <Input label="Name" value={value.name} onChange={(event) => set('name', event.target.value)} error={fieldError(error, 'name') ?? fieldError(error, 'supplier.name')} required />
+                <Input label="Code" value={value.code} onChange={(event) => set('code', event.target.value)} placeholder="Auto-generated when left blank" hint="Leave blank for an automatic code, or enter a custom code." error={fieldError(error, 'code') ?? fieldError(error, 'supplier.code')} />
+                <Input label="Legal Name" value={value.name} onChange={(event) => set('name', event.target.value)} error={fieldError(error, 'name') ?? fieldError(error, 'supplier.name')} required />
                 <Select label="Supplier type" value={value.supplier_type} onChange={(event) => set('supplier_type', event.target.value)} options={options(supplierTypes)} error={fieldError(error, 'supplier_type') ?? fieldError(error, 'supplier.supplier_type')} />
                 {creating && <Select label="Initial status" value={value.status ?? 'pending_approval'} onChange={(event) => set('status', event.target.value)} options={options(supplierStatuses)} error={fieldError(error, 'status') ?? fieldError(error, 'supplier.status')} />}
-                <Input label="Legal name" value={value.legal_name ?? ''} onChange={(event) => set('legal_name', event.target.value || null)} />
                 <Input label="Display name" value={value.display_name ?? ''} onChange={(event) => set('display_name', event.target.value || null)} />
             </div>
         </Panel>

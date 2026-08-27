@@ -7,6 +7,11 @@ namespace Tests\Feature\Supplier;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Modules\Invoice\Enums\InvoiceBalanceStatus;
+use Modules\Invoice\Enums\InvoiceDirection;
+use Modules\Invoice\Enums\InvoicePartyType;
+use Modules\Invoice\Enums\InvoiceStatus;
+use Modules\Invoice\Enums\InvoiceType;
 use Modules\Item\Services\ItemAuthorizationService;
 use Modules\Supplier\Services\SupplierAuthorizationService;
 use Modules\User\Constants\UserGuard;
@@ -23,6 +28,7 @@ final class SupplierApiTest extends TestCase
         $response = $this->withAuth($context)->postJson('/api/v1/suppliers', $this->supplierPayload())
             ->assertCreated()
             ->assertJsonPath('data.code', 'SUP-001')
+            ->assertJsonPath('data.legal_name', 'Test Supplier')
             ->assertJsonPath('data.status', 'active');
 
         $supplierId = (int) $response->json('data.id');
@@ -35,6 +41,7 @@ final class SupplierApiTest extends TestCase
             'phone' => '+94 11 555 1111',
         ])->assertOk()
             ->assertJsonPath('data.name', 'Updated Supplier')
+            ->assertJsonPath('data.legal_name', 'Updated Supplier')
             ->assertJsonPath('data.phone', '+94 11 555 1111')
             ->assertJsonPath('data.row_version', $rowVersion + 1);
 
@@ -47,6 +54,62 @@ final class SupplierApiTest extends TestCase
         $this->withAuth($context)->getJson('/api/v1/suppliers/lookup?search=SUP-001')
             ->assertOk()
             ->assertJsonPath('data.0.code', 'SUP-001');
+    }
+
+    public function test_supplier_code_and_number_are_generated_without_overriding_custom_codes(): void
+    {
+        $context = $this->createAuthContext();
+
+        $this->withAuth($context)->postJson('/api/v1/suppliers', $this->supplierPayload([
+            'supplier_number' => 'MANUAL-001',
+            'code' => 'SUP-000001',
+            'name' => 'Custom Code Supplier',
+        ]))->assertCreated()
+            ->assertJsonPath('data.code', 'SUP-000001')
+            ->assertJsonPath('data.supplier_number', 'MANUAL-001');
+
+        $payload = $this->supplierPayload([
+            'name' => 'Generated Code Supplier',
+            'email' => 'generated-code@example.test',
+        ]);
+        unset($payload['supplier_number'], $payload['code']);
+
+        $this->withAuth($context)->postJson('/api/v1/suppliers', $payload)
+            ->assertCreated()
+            ->assertJsonPath('data.code', 'SUP-000002')
+            ->assertJsonPath('data.legal_name', 'Generated Code Supplier')
+            ->assertJsonPath('data.supplier_number', 'SUP-000001');
+    }
+
+    public function test_supplier_list_returns_total_due_from_open_invoice_balances(): void
+    {
+        $context = $this->createAuthContext();
+        $currencyId = $this->createCurrency('LKR');
+        $foreignCurrencyId = $this->createCurrency('USD');
+        $supplierId = $this->createSupplier($context, [
+            'default_currency_id' => $currencyId,
+        ]);
+
+        $this->createSupplierInvoiceBalance($context, $supplierId, $currencyId, 'PINV-OPEN-1', '125.000000');
+        $this->createSupplierInvoiceBalance($context, $supplierId, $currencyId, 'PINV-OPEN-2', '75.500000');
+        $this->createSupplierInvoiceBalance($context, $supplierId, $foreignCurrencyId, 'PINV-USD', '10.000000', currencyCode: 'USD');
+        $this->createSupplierInvoiceBalance(
+            $context,
+            $supplierId,
+            $currencyId,
+            'PINV-CANCELLED',
+            '50.000000',
+            InvoiceStatus::Cancelled,
+        );
+
+        $this->withAuth($context)->getJson('/api/v1/suppliers?search=SUP-001')
+            ->assertOk()
+            ->assertJsonPath('data.0.id', $supplierId)
+            ->assertJsonPath('data.0.total_due.0.amount', '200.500000')
+            ->assertJsonPath('data.0.total_due.0.currency_code', 'LKR')
+            ->assertJsonPath('data.0.total_due.1.amount', '10.000000')
+            ->assertJsonPath('data.0.total_due.1.currency_code', 'USD')
+            ->assertJsonPath('data.0.default_currency.code', 'LKR');
     }
 
     public function test_supplier_with_relations_is_created_transactionally_and_readably(): void
@@ -303,7 +366,7 @@ final class SupplierApiTest extends TestCase
             ->assertUnprocessable()
             ->assertJsonPath('success', false)
             ->assertJsonPath('message', 'Validation failed.')
-            ->assertJsonStructure(['errors' => ['code', 'name', 'supplier_type']]);
+            ->assertJsonStructure(['errors' => ['name', 'supplier_type']]);
     }
 
     public function test_supplier_rejects_finance_owned_opening_balance(): void
@@ -332,10 +395,50 @@ final class SupplierApiTest extends TestCase
         ];
     }
 
-    private function createSupplier(array $context): int
+    private function createSupplier(array $context, array $overrides = []): int
     {
-        return (int) $this->withAuth($context)->postJson('/api/v1/suppliers', $this->supplierPayload())
+        return (int) $this->withAuth($context)->postJson('/api/v1/suppliers', $this->supplierPayload($overrides))
             ->assertCreated()->json('data.id');
+    }
+
+    private function createSupplierInvoiceBalance(
+        array $context,
+        int $supplierId,
+        int $currencyId,
+        string $invoiceNumber,
+        string $remainingAmount,
+        InvoiceStatus $status = InvoiceStatus::Posted,
+        string $currencyCode = 'LKR',
+    ): void {
+        $now = now();
+        $invoiceId = (int) DB::table('invoices')->insertGetId([
+            'tenant_id' => $context['tenant_id'],
+            'organization_unit_id' => $context['organization_unit_id'],
+            'invoice_number' => $invoiceNumber,
+            'invoice_type' => InvoiceType::Purchase->value,
+            'direction' => InvoiceDirection::Inbound->value,
+            'party_type' => InvoicePartyType::Supplier->value,
+            'party_id' => $supplierId,
+            'invoice_date' => $now->toDateString(),
+            'currency_id' => $currencyId,
+            'currency_code_snapshot' => $currencyCode,
+            'status' => $status->value,
+            'grand_total' => $remainingAmount,
+            'balance_due' => $remainingAmount,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        DB::table('invoice_balances')->insert([
+            'tenant_id' => $context['tenant_id'],
+            'organization_unit_id' => $context['organization_unit_id'],
+            'invoice_id' => $invoiceId,
+            'invoice_total' => $remainingAmount,
+            'remaining_amount' => $remainingAmount,
+            'status' => InvoiceBalanceStatus::Unpaid->value,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
     }
 
     private function createSupplierCategory(array $context, string $code): int

@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace Modules\Supplier\Http\Controllers;
 
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Modules\Invoice\Contracts\InvoiceBalanceProviderInterface;
+use Modules\Invoice\Enums\InvoicePartyType;
 use Modules\Supplier\Enums\SupplierStatus;
 use Modules\Supplier\Http\Requests\ChangeSupplierStatusRequest;
 use Modules\Supplier\Http\Requests\ListSupplierRequest;
@@ -31,18 +34,22 @@ final class SupplierController
         private readonly SupplierStatusService $statuses,
         private readonly SupplierAuthorizationService $authorization,
         private readonly SupplierBlockerService $blockers,
+        private readonly InvoiceBalanceProviderInterface $invoiceBalances,
     ) {}
 
     public function index(ListSupplierRequest $request): AnonymousResourceCollection
     {
         $this->authorize($request, SupplierAuthorizationService::VIEW);
 
-        return SupplierSummaryResource::collection($this->queries->paginate(
+        $suppliers = $this->queries->paginate(
             $request->validated(),
             $request->tenantId(),
             $request->organizationUnitId(),
             $request->perPage(),
-        ));
+        );
+        $this->attachTotalDue($suppliers, $request->tenantId(), $request->organizationUnitId());
+
+        return SupplierSummaryResource::collection($suppliers);
     }
 
     public function store(StoreSupplierRequest $request): JsonResponse
@@ -141,6 +148,29 @@ final class SupplierController
     private function created(Supplier $supplier): JsonResponse
     {
         return (new SupplierResource($supplier))->response()->setStatusCode(201);
+    }
+
+    private function attachTotalDue(
+        LengthAwarePaginator $suppliers,
+        int $tenantId,
+        ?int $organizationUnitId,
+    ): void {
+        $supplierIds = $suppliers->getCollection()
+            ->map(static fn (Supplier $supplier): int => (int) $supplier->getKey())
+            ->all();
+        $totals = $this->invoiceBalances->getOutstandingTotalsForParties(
+            $tenantId,
+            $organizationUnitId,
+            InvoicePartyType::Supplier->value,
+            $supplierIds,
+        );
+
+        $suppliers->getCollection()->each(static function (Supplier $supplier) use ($totals): void {
+            $supplier->setAttribute('total_due', $totals[(int) $supplier->getKey()] ?? [[
+                'amount' => '0.000000',
+                'currency_code' => $supplier->defaultCurrency?->code,
+            ]]);
+        });
     }
 
     private function authorize(ListSupplierRequest|StoreSupplierRequest|StoreSupplierWithRelationsRequest|UpdateSupplierRequest|ChangeSupplierStatusRequest $request, string $permission): void

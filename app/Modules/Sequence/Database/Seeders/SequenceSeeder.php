@@ -61,6 +61,7 @@ final class SequenceSeeder extends Seeder
     {
         return [
             ['document_type' => 'supplier', 'prefix' => 'SUP'],
+            ['document_type' => 'supplier_code', 'prefix' => 'SUP'],
             ['document_type' => 'customer', 'prefix' => 'CUS'],
             ['document_type' => 'item', 'prefix' => 'ITEM'],
             ['document_type' => 'vehicle', 'prefix' => 'VEH'],

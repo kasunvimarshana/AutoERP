@@ -23,7 +23,7 @@ trait MapsSupplierData
     {
         return new CreateSupplierData(
             tenantId: $this->tenantId(),
-            code: (string) $supplier['code'],
+            code: $this->nullableString($supplier, 'code'),
             name: (string) $supplier['name'],
             supplierType: SupplierType::from((string) $supplier['supplier_type']),
             organizationUnitId: $this->organizationUnitId(),

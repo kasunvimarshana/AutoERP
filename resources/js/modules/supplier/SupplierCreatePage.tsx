@@ -35,7 +35,6 @@ const tabs = [
 const relatedTabs = tabs.filter((tab) => tab.id !== 'basic') as { id: RelatedTab; label: string }[];
 
 const initialSupplier: SupplierPayload = {
-    supplier_number: null,
     code: '',
     name: '',
     supplier_type: 'company',

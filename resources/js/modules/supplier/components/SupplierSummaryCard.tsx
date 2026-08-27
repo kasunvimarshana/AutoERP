@@ -9,7 +9,7 @@ export function SupplierSummaryCard({ supplier }: { supplier: Supplier }) {
         { label: 'Supplier number', value: supplier.supplier_number },
         { label: 'Status', value: <StatusBadge status={supplier.status} /> },
         { label: 'Type', value: supplier.supplier_type.replaceAll('_', ' ') },
-        { label: 'Legal name', value: supplier.legal_name },
+        { label: 'Legal name', value: supplier.name },
         { label: 'Email', value: supplier.email },
         { label: 'Phone', value: supplier.phone ?? supplier.mobile },
         { label: 'Currency', value: readableRelation(supplier.default_currency) },

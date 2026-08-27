@@ -28,6 +28,17 @@ interface InvoiceBalanceProviderInterface
     public function getInvoiceStatus(int $invoiceId): string;
 
     /**
+     * @param  list<int>  $partyIds
+     * @return array<int, list<array{amount: string, currency_code: string|null}>>
+     */
+    public function getOutstandingTotalsForParties(
+        int $tenantId,
+        ?int $organizationUnitId,
+        string $partyType,
+        array $partyIds,
+    ): array;
+
+    /**
      * @return list<BalanceResultData>
      */
     public function getPayableBalancesForParty(

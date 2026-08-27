@@ -6,6 +6,11 @@ export const supplierAddressTypes = ['billing', 'shipping', 'registered', 'wareh
 export const supplierDocumentTypes = ['business_registration', 'tax_certificate', 'vat_certificate', 'svat_certificate', 'contract', 'license', 'insurance', 'other'] as const;
 export const supplierDocumentStatuses = ['active', 'expired', 'revoked', 'pending'] as const;
 
+export interface SupplierDueTotal {
+    amount: string;
+    currency_code?: string | null;
+}
+
 export interface SupplierSummary extends NamedResource {
     row_version: number;
     supplier_number: string;
@@ -20,6 +25,7 @@ export interface SupplierSummary extends NamedResource {
     categories?: SupplierCategory[];
     is_credit_allowed: boolean;
     is_advance_allowed: boolean;
+    total_due?: SupplierDueTotal[];
 }
 
 export interface Supplier extends SupplierSummary {
