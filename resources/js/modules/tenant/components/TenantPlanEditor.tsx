@@ -39,7 +39,7 @@ const LIMIT_OPTIONS: Array<{ key: keyof TenantPlanLimits; label: string; hint: s
 const MODULE_GROUPS: Array<{ label: string; modules: TenantModuleCode[] }> = [
     { label: 'Master data', modules: [TENANT_MODULE_CODE.CUSTOMER, TENANT_MODULE_CODE.SUPPLIER, TENANT_MODULE_CODE.ITEM, TENANT_MODULE_CODE.WAREHOUSE, TENANT_MODULE_CODE.VEHICLE] },
     { label: 'People', modules: [TENANT_MODULE_CODE.HR] },
-    { label: 'Operations', modules: [TENANT_MODULE_CODE.INVENTORY, TENANT_MODULE_CODE.PURCHASE, TENANT_MODULE_CODE.VEHICLE_SERVICE, TENANT_MODULE_CODE.VEHICLE_RENTAL] },
+    { label: 'Operations', modules: [TENANT_MODULE_CODE.INVENTORY, TENANT_MODULE_CODE.PURCHASE, TENANT_MODULE_CODE.VEHICLE_SERVICE] },
     { label: 'Billing and finance', modules: [TENANT_MODULE_CODE.INVOICE, TENANT_MODULE_CODE.PAYMENT, TENANT_MODULE_CODE.FINANCE] },
     { label: 'Insights', modules: [TENANT_MODULE_CODE.REPORTING] },
 ];
