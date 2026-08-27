@@ -45,6 +45,7 @@ Route::prefix('api/v1/purchase')->middleware($middleware)->name('api.v1.purchase
     Route::get('orders', [PurchaseOrderController::class, 'index'])->middleware($requires(PurchaseAuthorizationService::ORDERS_VIEW))->name('orders.index');
     Route::post('orders', [PurchaseOrderController::class, 'store'])->middleware($requires(PurchaseAuthorizationService::ORDERS_CREATE))->name('orders.store');
     Route::get('orders/{order}', [PurchaseOrderController::class, 'show'])->whereNumber('order')->middleware($requires(PurchaseAuthorizationService::ORDERS_VIEW))->name('orders.show');
+    Route::get('orders/{order}/pdf', [PurchaseOrderController::class, 'pdf'])->whereNumber('order')->middleware($requires(PurchaseAuthorizationService::ORDERS_VIEW))->name('orders.pdf');
     Route::put('orders/{order}', [PurchaseOrderController::class, 'update'])->whereNumber('order')->middleware($requires(PurchaseAuthorizationService::ORDERS_UPDATE))->name('orders.update');
     Route::delete('orders/{order}', [PurchaseOrderController::class, 'destroy'])->whereNumber('order')->middleware($requires(PurchaseAuthorizationService::ORDERS_DELETE))->name('orders.destroy');
     Route::patch('orders/{order}/submit', [PurchaseOrderController::class, 'submit'])->whereNumber('order')->middleware($requires(PurchaseAuthorizationService::ORDERS_SUBMIT))->name('orders.submit');

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { approvePurchaseOrder, cancelPurchaseOrder, closePurchaseOrder, deletePurchaseOrder, getPurchaseOrder, submitPurchaseOrder } from '../purchaseApi';
+import { approvePurchaseOrder, cancelPurchaseOrder, closePurchaseOrder, deletePurchaseOrder, downloadPurchaseOrderPdf, getPurchaseOrder, submitPurchaseOrder } from '../purchaseApi';
 import { useAuth } from '@/modules/auth/AuthProvider';
 import { useApi } from '@/shared/hooks/useApi';
 import { ContentHeader } from '@/shared/components/ContentHeader';
@@ -28,6 +28,7 @@ export default function PurchaseOrderDetailPage() {
     const auth = useAuth();
     const result = useApi((signal) => getPurchaseOrder(id, signal), [id]);
     const [busy, setBusy] = useState(false);
+    const [downloadingPdf, setDownloadingPdf] = useState(false);
     const [actionError, setActionError] = useState<ApiError | null>(null);
 
     const run = async (action: 'submit' | 'approve' | 'cancel' | 'close' | 'delete') => {
@@ -54,6 +55,19 @@ export default function PurchaseOrderDetailPage() {
             setActionError(toApiError(error));
         } finally {
             setBusy(false);
+        }
+    };
+
+    const downloadPdf = async () => {
+        if (!result.data) return;
+        setDownloadingPdf(true);
+        setActionError(null);
+        try {
+            await downloadPurchaseOrderPdf(result.data.id, result.data.purchase_order_number);
+        } catch (error) {
+            setActionError(toApiError(error));
+        } finally {
+            setDownloadingPdf(false);
         }
     };
 
@@ -97,6 +111,8 @@ export default function PurchaseOrderDetailPage() {
                     <PurchaseOrderActions
                         order={order}
                         busy={busy}
+                        downloadingPdf={downloadingPdf}
+                        onDownloadPdf={downloadPdf}
                         canUpdate={hasPurchasePermission(auth, purchasePermissions.ordersUpdate)}
                         onSubmit={hasPurchasePermission(auth, purchasePermissions.ordersSubmit) ? () => run('submit') : undefined}
                         onApprove={hasPurchasePermission(auth, purchasePermissions.ordersApprove) ? () => run('approve') : undefined}

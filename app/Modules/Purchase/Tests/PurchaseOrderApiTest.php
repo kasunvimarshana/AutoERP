@@ -45,6 +45,36 @@ final class PurchaseOrderApiTest extends TestCase
             ->assertJsonPath('data.grand_total', '101.100000');
     }
 
+    public function test_purchase_order_pdf_can_be_downloaded_with_view_permission(): void
+    {
+        $context = $this->context();
+        $order = $this->withAuth($context)
+            ->postJson('/api/v1/purchase/orders', $this->payload($context, ['notes' => 'Deliver before month end']))
+            ->assertCreated()
+            ->json('data');
+
+        $response = $this->withAuth($context)->get('/api/v1/purchase/orders/'.$order['id'].'/pdf');
+
+        $response->assertOk()
+            ->assertHeader('Content-Type', 'application/pdf')
+            ->assertHeader('Content-Disposition', 'attachment; filename="purchase-order-'.$order['purchase_order_number'].'.pdf"');
+        self::assertStringStartsWith('%PDF-', $response->getContent());
+    }
+
+    public function test_purchase_order_pdf_is_tenant_scoped(): void
+    {
+        $owner = $this->context('PDFOWNER');
+        $other = $this->context('PDFOTHER');
+        $orderId = $this->withAuth($owner)
+            ->postJson('/api/v1/purchase/orders', $this->payload($owner))
+            ->assertCreated()
+            ->json('data.id');
+
+        $this->withAuth($other)
+            ->get('/api/v1/purchase/orders/'.$orderId.'/pdf')
+            ->assertNotFound();
+    }
+
     public function test_create_purchase_order_with_header_adjustments_is_decimal_safe(): void
     {
         $context = $this->context();

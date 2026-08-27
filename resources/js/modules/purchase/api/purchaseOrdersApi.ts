@@ -40,6 +40,21 @@ export async function getPurchaseOrder(id: number, signal?: AbortSignal) {
     return response.data.data;
 }
 
+export async function downloadPurchaseOrderPdf(id: number, purchaseOrderNumber?: string | null): Promise<void> {
+    const response = await apiClient.get<Blob>(`${endpoints.purchase}/orders/${id}/pdf`, {
+        responseType: 'blob',
+    });
+    const url = URL.createObjectURL(response.data);
+    const link = window.document.createElement('a');
+    const safeNumber = purchaseOrderNumber?.trim().replace(/[^A-Za-z0-9._-]+/g, '-') || String(id);
+    link.href = url;
+    link.download = `purchase-order-${safeNumber}.pdf`;
+    window.document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
+}
+
 export async function getPurchaseOrderCreateContext(signal?: AbortSignal) {
     const response = await apiClient.get<ApiResource<PurchaseOrderCreateContext>>(`${endpoints.purchase}/orders/create-context`, { signal });
     return response.data.data;

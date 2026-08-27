@@ -4,23 +4,26 @@ declare(strict_types=1);
 
 namespace Modules\Purchase\Http\Controllers;
 
+use Dompdf\Dompdf;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Http\Response;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use Modules\Purchase\Constants\PurchaseAuditEvent;
+use Modules\Purchase\Enums\PurchaseOrderStatus;
 use Modules\Purchase\Http\Controllers\Concerns\ScopesPurchaseRequests;
 use Modules\Purchase\Http\Requests\ListPurchaseDocumentRequest;
 use Modules\Purchase\Http\Requests\PurchaseActionRequest;
 use Modules\Purchase\Http\Requests\StorePurchaseOrderRequest;
 use Modules\Purchase\Http\Requests\UpdatePurchaseOrderRequest;
 use Modules\Purchase\Http\Resources\PurchaseOrderResource;
-use Modules\Purchase\Enums\PurchaseOrderStatus;
 use Modules\Purchase\Models\PurchaseOrder;
-use Modules\Purchase\Services\PurchaseAuthorizationService;
 use Modules\Purchase\Services\PurchaseAuditService;
+use Modules\Purchase\Services\PurchaseAuthorizationService;
 use Modules\Purchase\Services\PurchaseDocumentPresentationService;
+use Modules\Purchase\Services\PurchaseOrderPrintService;
 use Modules\Purchase\Services\PurchaseOrderService;
 use Modules\Purchase\Services\PurchaseProcurementBalanceService;
 use Modules\Supplier\Http\Resources\SupplierItemMappingResource;
@@ -45,9 +48,9 @@ final class PurchaseOrderController
         $query = $this->scope(PurchaseOrder::query(), $request)
             ->select('purchase_orders.*')
             ->with([
-            'supplier', 'warehouse', 'warehouseLocation', 'currency', 'createdBy', 'approvedBy',
-            'lines.item', 'lines.variant', 'lines.uom', 'adjustments',
-        ])
+                'supplier', 'warehouse', 'warehouseLocation', 'currency', 'createdBy', 'approvedBy',
+                'lines.item', 'lines.variant', 'lines.uom', 'adjustments',
+            ])
             ->withSum('lines as received_quantity', 'received_quantity')
             ->withSum('lines as invoiced_quantity', 'invoiced_quantity')
             ->withSum('lines as returned_quantity', 'returned_quantity');
@@ -118,6 +121,27 @@ final class PurchaseOrderController
             ->findOrFail($order);
 
         return new PurchaseOrderResource($this->presentation->preparePurchaseOrder($order, true));
+    }
+
+    public function pdf(
+        ListPurchaseDocumentRequest $request,
+        int $order,
+        PurchaseOrderPrintService $prints,
+    ): Response {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PurchaseAuthorizationService::ORDERS_VIEW);
+
+        $model = $prints->findScoped($order, $request->tenantId(), $request->organizationUnitId());
+        abort_if($model === null, 404);
+
+        $html = view('purchase.order-pdf', $prints->viewData($model))->render();
+        $dompdf = new Dompdf;
+        $dompdf->loadHtml($html);
+        $dompdf->setPaper(PurchaseOrderPrintService::PDF_PAPER_SIZE, PurchaseOrderPrintService::PDF_ORIENTATION);
+        $dompdf->render();
+
+        return response($dompdf->output(), 200)
+            ->header('Content-Type', 'application/pdf')
+            ->header('Content-Disposition', 'attachment; filename="'.$prints->filename($model).'"');
     }
 
     public function update(UpdatePurchaseOrderRequest $request, int $order, PurchaseOrderService $service): PurchaseOrderResource

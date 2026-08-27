@@ -7,10 +7,11 @@ namespace Modules\Purchase\Models;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Modules\ReferenceData\Models\CurrencyModel;
 use Modules\Core\Models\TenantOwnedModel;
+use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Purchase\Enums\PurchaseOrderStatus;
 use Modules\Purchase\Models\Concerns\HasPurchaseRowVersion;
+use Modules\ReferenceData\Models\CurrencyModel;
 use Modules\Supplier\Models\Supplier;
 use Modules\User\Models\UserModel;
 use Modules\Warehouse\Models\WarehouseLocationModel;
@@ -63,6 +64,11 @@ final class PurchaseOrder extends TenantOwnedModel
     public function supplier(): BelongsTo
     {
         return $this->belongsTo(Supplier::class, 'supplier_id')->withTrashed();
+    }
+
+    public function organizationUnit(): BelongsTo
+    {
+        return $this->belongsTo(OrganizationUnitModel::class, 'organization_unit_id');
     }
 
     public function warehouse(): BelongsTo
