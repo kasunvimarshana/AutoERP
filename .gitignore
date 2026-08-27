@@ -26,4 +26,4 @@ Thumbs.db
 .env.local
 *.zip
 
-/tmp
+# /tmp
