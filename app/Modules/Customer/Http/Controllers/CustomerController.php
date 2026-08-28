@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Customer\Http\Controllers;
 
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Modules\Customer\Enums\CustomerStatus;
@@ -21,6 +22,7 @@ use Modules\Customer\Services\CustomerCreationService;
 use Modules\Customer\Services\CustomerQueryService;
 use Modules\Customer\Services\CustomerStatusService;
 use Modules\Customer\Services\CustomerUpdateService;
+use Modules\Vehicle\Contracts\CustomerVehicleProviderInterface;
 
 final class CustomerController
 {
@@ -31,18 +33,22 @@ final class CustomerController
         private readonly CustomerStatusService $statuses,
         private readonly CustomerAuthorizationService $authorization,
         private readonly CustomerBlockerService $blockers,
+        private readonly CustomerVehicleProviderInterface $customerVehicles,
     ) {}
 
     public function index(ListCustomerRequest $request): AnonymousResourceCollection
     {
         $this->authorize($request, CustomerAuthorizationService::VIEW);
 
-        return CustomerSummaryResource::collection($this->queries->paginate(
+        $customers = $this->queries->paginate(
             $request->validated(),
             $request->tenantId(),
             $request->organizationUnitId(),
             $request->perPage(),
-        ));
+        );
+        $this->attachCurrentVehicles($customers, $request->tenantId(), $request->organizationUnitId());
+
+        return CustomerSummaryResource::collection($customers);
     }
 
     public function store(StoreCustomerRequest $request): JsonResponse
@@ -141,6 +147,25 @@ final class CustomerController
     private function created(Customer $customer): JsonResponse
     {
         return (new CustomerResource($customer))->response()->setStatusCode(201);
+    }
+
+    private function attachCurrentVehicles(
+        LengthAwarePaginator $customers,
+        int $tenantId,
+        ?int $organizationUnitId,
+    ): void {
+        $customerIds = $customers->getCollection()
+            ->map(static fn (Customer $customer): int => (int) $customer->getKey())
+            ->all();
+        $vehicles = $this->customerVehicles->getCurrentVehiclesForCustomers(
+            $tenantId,
+            $organizationUnitId,
+            $customerIds,
+        );
+
+        $customers->getCollection()->each(static function (Customer $customer) use ($vehicles): void {
+            $customer->setAttribute('current_vehicles', $vehicles[(int) $customer->getKey()] ?? []);
+        });
     }
 
     private function authorize(ListCustomerRequest|StoreCustomerRequest|StoreCustomerWithRelationsRequest|UpdateCustomerRequest|ChangeCustomerStatusRequest $request, string $permission): void

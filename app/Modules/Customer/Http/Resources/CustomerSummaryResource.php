@@ -34,6 +34,10 @@ final class CustomerSummaryResource extends JsonResource
             'categories' => $this->whenLoaded('categories', fn () => CustomerCategoryResource::collection($this->categories)->resolve($request)),
             'credit_allowed' => (bool) ($creditProfile?->credit_allowed ?? false),
             'advance_allowed' => (bool) ($creditProfile?->advance_allowed ?? false),
+            'current_vehicles' => $this->when(
+                $this->resource->getAttribute('current_vehicles') !== null,
+                fn (): array => (array) $this->resource->getAttribute('current_vehicles'),
+            ),
             'is_tax_exempt' => (bool) $this->is_tax_exempt,
             'marketing_consent' => (bool) $this->marketing_consent,
             'created_at' => $this->created_at?->toISOString(),

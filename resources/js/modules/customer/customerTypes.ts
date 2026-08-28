@@ -7,6 +7,11 @@ export const customerDocumentTypes = ['business_registration', 'tax_certificate'
 export const customerDocumentStatuses = ['active', 'expired', 'revoked', 'pending'] as const;
 export const preferredCommunicationChannels = ['email', 'phone', 'mobile', 'sms', 'whatsapp', 'other'] as const;
 
+export interface CustomerVehicleSummary {
+    id: number;
+    registration_number?: string | null;
+}
+
 export interface CustomerSummary extends NamedResource {
     row_version: number;
     customer_number: string;
@@ -21,6 +26,7 @@ export interface CustomerSummary extends NamedResource {
     categories?: CustomerCategory[];
     credit_allowed: boolean;
     advance_allowed: boolean;
+    current_vehicles?: CustomerVehicleSummary[];
     is_tax_exempt: boolean;
     marketing_consent: boolean;
 }

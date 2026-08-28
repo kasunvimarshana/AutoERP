@@ -6,8 +6,10 @@ namespace Modules\Vehicle\Providers;
 
 use Illuminate\Support\ServiceProvider;
 use Modules\Core\Contracts\PermissionDefinitionRegistryInterface;
+use Modules\Vehicle\Contracts\CustomerVehicleProviderInterface;
 use Modules\Vehicle\Contracts\VehicleAvailabilityBlockerInterface;
 use Modules\Vehicle\Contracts\VehicleOwnerResolverInterface;
+use Modules\Vehicle\Services\CustomerVehicleProvider;
 use Modules\Vehicle\Services\Ownership\VehicleOwnerResolverRegistry;
 use Modules\Vehicle\Services\VehicleAuthorizationService;
 use Modules\Vehicle\Services\VehicleAvailabilityService;
@@ -16,6 +18,7 @@ final class VehicleServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        $this->app->singleton(CustomerVehicleProviderInterface::class, CustomerVehicleProvider::class);
         $this->app->singleton(VehicleOwnerResolverRegistry::class,
             fn ($app): VehicleOwnerResolverRegistry => new VehicleOwnerResolverRegistry(
                 $app->tagged(VehicleOwnerResolverInterface::TAG),
