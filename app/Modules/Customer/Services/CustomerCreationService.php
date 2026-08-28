@@ -26,14 +26,15 @@ final class CustomerCreationService
 
     public function create(CreateCustomerData $data): Customer
     {
-        $this->validator->validateCreate($data);
+        $code = $data->code ?? $this->numbers->nextCode($data->tenantId);
+        $this->validator->validateCreate($data, $code);
 
-        return DB::transaction(function () use ($data): Customer {
+        return DB::transaction(function () use ($data, $code): Customer {
             $customer = Customer::query()->create([
                 'tenant_id' => $data->tenantId,
                 'organization_unit_id' => $data->organizationUnitId,
                 'customer_number' => $data->customerNumber ?? $this->numbers->next($data->tenantId),
-                'code' => $data->code,
+                'code' => $code,
                 'name' => $data->name,
                 'legal_name' => $data->legalName,
                 'display_name' => $data->displayName,
@@ -71,7 +72,7 @@ final class CustomerCreationService
             foreach ($data->documents as $document) {
                 $this->documents->create($customer, $document);
             }
-            $this->creditProfiles->set($customer, $data->creditProfile ?? new CustomerCreditProfileData());
+            $this->creditProfiles->set($customer, $data->creditProfile ?? new CustomerCreditProfileData);
             $this->statuses->recordInitial($customer, $data->createdBy);
 
             return $customer->refresh()->load([

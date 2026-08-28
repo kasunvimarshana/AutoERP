@@ -24,6 +24,9 @@ Route::prefix('api/v1')->middleware($middleware)->name('api.v1.')->group(functio
         ->whereIn('kind', ['active', 'credit-allowed'])
         ->middleware($requires(CustomerAuthorizationService::VIEW))
         ->name('customers.lookup');
+    Route::post('customers/code-reservations', [CustomerController::class, 'generateCode'])
+        ->middleware($requires(CustomerAuthorizationService::CREATE))
+        ->name('customers.code-reservations.store');
     Route::post('customers/with-relations', [CustomerController::class, 'storeWithRelations'])
         ->middleware($requires(CustomerAuthorizationService::CREATE))
         ->name('customers.with-relations.store');

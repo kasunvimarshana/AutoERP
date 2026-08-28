@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Modules\Sequence\Database\Seeders;
 
+use Database\Seeders\Concerns\ResolvesSeedContext;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Database\Seeders\Concerns\ResolvesSeedContext;
 use Modules\Sequence\Models\SequenceModel;
 use Modules\Sequence\Services\Contracts\SequenceDomainServiceInterface;
 
@@ -63,8 +63,10 @@ final class SequenceSeeder extends Seeder
             ['document_type' => 'supplier', 'prefix' => 'SUP'],
             ['document_type' => 'supplier_code', 'prefix' => 'SUP'],
             ['document_type' => 'customer', 'prefix' => 'CUS'],
+            ['document_type' => 'customer_code', 'prefix' => 'CUS'],
             ['document_type' => 'item', 'prefix' => 'ITEM'],
             ['document_type' => 'vehicle', 'prefix' => 'VEH'],
+            ['document_type' => 'vehicle_code', 'prefix' => 'VEH'],
             ['document_type' => 'employee', 'prefix' => 'EMP'],
             ['document_type' => 'purchase_order', 'prefix' => 'PO'],
             ['document_type' => 'goods_receipt_note', 'prefix' => 'GRN'],

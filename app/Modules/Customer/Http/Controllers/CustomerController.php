@@ -9,6 +9,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Modules\Customer\Enums\CustomerStatus;
 use Modules\Customer\Http\Requests\ChangeCustomerStatusRequest;
+use Modules\Customer\Http\Requests\GenerateCustomerCodeRequest;
 use Modules\Customer\Http\Requests\ListCustomerRequest;
 use Modules\Customer\Http\Requests\StoreCustomerRequest;
 use Modules\Customer\Http\Requests\StoreCustomerWithRelationsRequest;
@@ -19,6 +20,7 @@ use Modules\Customer\Models\Customer;
 use Modules\Customer\Services\CustomerAuthorizationService;
 use Modules\Customer\Services\CustomerBlockerService;
 use Modules\Customer\Services\CustomerCreationService;
+use Modules\Customer\Services\CustomerNumberService;
 use Modules\Customer\Services\CustomerQueryService;
 use Modules\Customer\Services\CustomerStatusService;
 use Modules\Customer\Services\CustomerUpdateService;
@@ -29,6 +31,7 @@ final class CustomerController
     public function __construct(
         private readonly CustomerQueryService $queries,
         private readonly CustomerCreationService $creation,
+        private readonly CustomerNumberService $numbers,
         private readonly CustomerUpdateService $updates,
         private readonly CustomerStatusService $statuses,
         private readonly CustomerAuthorizationService $authorization,
@@ -40,8 +43,19 @@ final class CustomerController
     {
         $this->authorize($request, CustomerAuthorizationService::VIEW);
 
+        $criteria = $request->validated();
+        $search = trim((string) ($criteria['search'] ?? ''));
+        if ($search !== '') {
+            $criteria['current_vehicle_customer_ids'] = $this->customerVehicles
+                ->findCurrentCustomerIdsByVehicleNumber(
+                    $request->tenantId(),
+                    $request->organizationUnitId(),
+                    $search,
+                );
+        }
+
         $customers = $this->queries->paginate(
-            $request->validated(),
+            $criteria,
             $request->tenantId(),
             $request->organizationUnitId(),
             $request->perPage(),
@@ -56,6 +70,15 @@ final class CustomerController
         $this->authorize($request, CustomerAuthorizationService::CREATE);
 
         return $this->created($this->creation->create($request->toData()));
+    }
+
+    public function generateCode(GenerateCustomerCodeRequest $request): JsonResponse
+    {
+        $this->authorize($request, CustomerAuthorizationService::CREATE);
+
+        return response()->json([
+            'data' => ['code' => $this->numbers->nextCode($request->tenantId())],
+        ]);
     }
 
     public function storeWithRelations(StoreCustomerWithRelationsRequest $request): JsonResponse
@@ -168,7 +191,7 @@ final class CustomerController
         });
     }
 
-    private function authorize(ListCustomerRequest|StoreCustomerRequest|StoreCustomerWithRelationsRequest|UpdateCustomerRequest|ChangeCustomerStatusRequest $request, string $permission): void
+    private function authorize(ListCustomerRequest|StoreCustomerRequest|StoreCustomerWithRelationsRequest|UpdateCustomerRequest|ChangeCustomerStatusRequest|GenerateCustomerCodeRequest $request, string $permission): void
     {
         $this->authorization->assert($request->currentUserId(), $request->tenantId(), $permission);
     }

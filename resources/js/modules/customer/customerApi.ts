@@ -37,6 +37,10 @@ export const createCustomer = (payload: CustomerPayload) =>
 export const createCustomerWithRelations = (payload: CustomerWithRelationsPayload) =>
     apiClient.post<ApiResource<Customer>>(`${endpoints.customers}/with-relations`, payload).then((response) => response.data.data);
 
+export const generateCustomerCode = (signal?: AbortSignal) =>
+    apiClient.post<ApiResource<{ code: string }>>(`${endpoints.customers}/code-reservations`, undefined, { signal })
+        .then((response) => response.data.data.code);
+
 export const updateCustomer = (id: number, payload: Partial<CustomerPayload>) =>
     apiClient.put<ApiResource<Customer>>(`${endpoints.customers}/${id}`, payload).then((response) => response.data.data);
 

@@ -7,6 +7,15 @@ namespace Modules\Vehicle\Contracts;
 interface CustomerVehicleProviderInterface
 {
     /**
+     * @return list<int>
+     */
+    public function findCurrentCustomerIdsByVehicleNumber(
+        int $tenantId,
+        ?int $organizationUnitId,
+        string $search,
+    ): array;
+
+    /**
      * @param  list<int>  $customerIds
      * @return array<int, list<array{
      *     id: int,

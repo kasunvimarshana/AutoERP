@@ -51,6 +51,10 @@ export const createVehicleWithRelations = (payload: VehicleWithRelationsPayload)
         hasDocumentFiles(payload.documents) ? vehicleWithRelationsFormData(payload) : payload
     ).then((response) => response.data.data);
 
+export const generateVehicleCode = (signal?: AbortSignal) =>
+    apiClient.post<ApiResource<{ code: string }>>(`${endpoints.vehicles}/code-reservations`, undefined, { signal })
+        .then((response) => response.data.data.code);
+
 export const updateVehicle = (id: number, payload: Partial<VehiclePayload>) =>
     apiClient.put<ApiResource<Vehicle>>(`${endpoints.vehicles}/${id}`, payload).then((response) => response.data.data);
 

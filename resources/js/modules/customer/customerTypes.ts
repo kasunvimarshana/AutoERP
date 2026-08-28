@@ -179,7 +179,7 @@ export interface CustomerWithRelationsPayload {
     contacts: CustomerContactPayload[];
     addresses: CustomerAddressPayload[];
     bank_accounts: CustomerBankAccountPayload[];
-    categories: number[];
-    documents: CustomerDocumentPayload[];
+    categories?: number[];
+    documents?: CustomerDocumentPayload[];
     credit_profile?: Omit<CustomerCreditProfile, 'id' | 'row_version'> | null;
 }

@@ -66,7 +66,7 @@ export default function CustomerListPage() {
         finally { setSubmitting(false); }
     }
     return <><ContentHeader title="Customers" description="Customer identity, compliance, status, and credit policy." actions={canCreate ? <LinkButton to="/customers/create">New customer</LinkButton> : undefined} />
-        <div className="mb-5 max-w-xl"><Input type="search" label="Search" placeholder="Number, code, name, email, phone" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} /></div>
+        <div className="mb-5 max-w-xl"><Input type="search" label="Search" placeholder="Customer number, name, contact, or vehicle number" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} /></div>
         <ErrorAlert error={actionError ?? result.error} />{result.loading && !customers ? <LoadingState /> : <DataTable rows={customers?.data ?? []} columns={columns} rowKey={(row) => row.id} />}<Pagination meta={customers?.meta} onPageChange={setPage} />
         <Modal open={Boolean(statusCustomer)} title="Change customer status" onClose={() => !submitting && setStatusCustomer(null)}><div className="space-y-4"><ErrorAlert error={actionError} /><Select label="New status" value={nextStatus} onChange={(event) => setNextStatus(event.target.value)} options={options(customerStatuses)} /><Input label="Reason" value={reason} onChange={(event) => setReason(event.target.value)} /><div className="flex justify-end gap-2"><Button variant="secondary" onClick={() => setStatusCustomer(null)}>Cancel</Button><Button loading={submitting} onClick={() => void saveStatus()}>Change status</Button></div></div></Modal>
     </>;

@@ -74,6 +74,29 @@ final class CustomerListCurrentVehicleTest extends TestCase
             'registration_number' => 'WP-CAB-1234',
         ]], $customers->get($customerId)['current_vehicles']);
         $this->assertSame([], $customers->get($customerWithoutVehiclesId)['current_vehicles']);
+
+        $this->tenantGetJson($tenantId, '/api/v1/customers?'.http_build_query([
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => $organizationUnitId,
+            'search' => 'WP-CAB-1234',
+        ]))->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $customerId);
+
+        $this->tenantGetJson($tenantId, '/api/v1/customers?'.http_build_query([
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => $organizationUnitId,
+            'search' => 'VEH-CURRENT',
+        ]))->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $customerId);
+
+        $this->tenantGetJson($tenantId, '/api/v1/customers?'.http_build_query([
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => $organizationUnitId,
+            'search' => 'WP-CAB-5678',
+        ]))->assertOk()
+            ->assertJsonCount(0, 'data');
     }
 
     /**

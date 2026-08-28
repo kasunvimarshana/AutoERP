@@ -6,16 +6,11 @@ import { Select } from '@/shared/components/Select';
 import type { NamedResource } from '@/shared/types/common';
 import {
     customerAddressTypes,
-    customerDocumentStatuses,
-    customerDocumentTypes,
     type CustomerAddressPayload,
     type CustomerBankAccountPayload,
-    type CustomerCategory,
     type CustomerContactPayload,
     type CustomerCreditProfile,
-    type CustomerDocumentPayload,
 } from '../customerTypes';
-import { CustomerCategorySelect } from './CustomerCategorySelect';
 import { CustomerCurrencySelect } from './CustomerCurrencySelect';
 
 type CreditProfileDraft = Omit<CustomerCreditProfile, 'id' | 'row_version'>;
@@ -24,8 +19,6 @@ export interface CustomerOneShotDraft {
     contacts: CustomerContactPayload[];
     addresses: CustomerAddressPayload[];
     bankAccounts: Array<CustomerBankAccountPayload & { currency?: NamedResource | null }>;
-    categories: CustomerCategory[];
-    documents: CustomerDocumentPayload[];
     creditProfile: CreditProfileDraft;
 }
 
@@ -33,23 +26,19 @@ export const emptyCustomerOneShotDraft: CustomerOneShotDraft = {
     contacts: [],
     addresses: [],
     bankAccounts: [],
-    categories: [],
-    documents: [],
     creditProfile: { credit_limit: '0.000000', credit_period_days: null, warning_threshold_percent: '80.000000', credit_allowed: true, advance_allowed: true, allow_over_credit: false, allow_partial_payment: true, is_active: true },
 };
 
 export function CustomerOneShotBuilder({ section, value, onChange }: {
-    section: 'contacts' | 'addresses' | 'bank_accounts' | 'categories' | 'documents' | 'credit_profile' | 'review';
+    section: 'contacts' | 'addresses' | 'bank_accounts' | 'credit_profile' | 'review';
     value: CustomerOneShotDraft;
     onChange: (value: CustomerOneShotDraft) => void;
 }) {
     if (section === 'contacts') return <ContactDraft value={value} onChange={onChange} />;
     if (section === 'addresses') return <AddressDraft value={value} onChange={onChange} />;
     if (section === 'bank_accounts') return <BankDraft value={value} onChange={onChange} />;
-    if (section === 'categories') return <CategoryDraft value={value} onChange={onChange} />;
-    if (section === 'documents') return <DocumentDraft value={value} onChange={onChange} />;
     if (section === 'credit_profile') return <CreditDraft value={value} onChange={onChange} />;
-    return <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"><Count label="Contacts" value={value.contacts.length} /><Count label="Addresses" value={value.addresses.length} /><Count label="Bank accounts" value={value.bankAccounts.length} /><Count label="Categories" value={value.categories.length} /><Count label="Documents" value={value.documents.length} /></div>;
+    return <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"><Count label="Contacts" value={value.contacts.length} /><Count label="Addresses" value={value.addresses.length} /><Count label="Bank accounts" value={value.bankAccounts.length} /></div>;
 }
 
 type Props = { value: CustomerOneShotDraft; onChange: (value: CustomerOneShotDraft) => void };
@@ -64,14 +53,6 @@ function AddressDraft({ value, onChange }: Props) {
 function BankDraft({ value, onChange }: Props) {
     const [bank, setBank] = useState(''); const [accountName, setAccountName] = useState(''); const [number, setNumber] = useState(''); const [currency, setCurrency] = useState<NamedResource | null>(null);
     return <Draft title="Initial bank accounts" rows={value.bankAccounts.map((row) => `${row.bank_name} / ${row.account_number}${row.currency ? ` / ${row.currency.code}` : ''}`)} remove={(index) => onChange({ ...value, bankAccounts: value.bankAccounts.filter((_, i) => i !== index) })}><Input label="Bank name" value={bank} onChange={(event) => setBank(event.target.value)} /><Input label="Account name" value={accountName} onChange={(event) => setAccountName(event.target.value)} /><Input label="Account number" value={number} onChange={(event) => setNumber(event.target.value)} /><CustomerCurrencySelect value={currency} onChange={setCurrency} /><Button type="button" disabled={!bank || !accountName || !number} onClick={() => { onChange({ ...value, bankAccounts: [...value.bankAccounts, { bank_name: bank, account_name: accountName, account_number: number, currency, currency_id: currency ? Number(currency.id) : null, is_primary: value.bankAccounts.length === 0, is_active: true }] }); setBank(''); setAccountName(''); setNumber(''); setCurrency(null); }}>Add bank account</Button></Draft>;
-}
-function CategoryDraft({ value, onChange }: Props) {
-    const [category, setCategory] = useState<CustomerCategory | null>(null);
-    return <Draft title="Initial categories" rows={value.categories.map((row) => `${row.code} - ${row.name}`)} remove={(index) => onChange({ ...value, categories: value.categories.filter((_, i) => i !== index) })}><CustomerCategorySelect value={category} onChange={setCategory} /><Button type="button" disabled={!category || value.categories.some((row) => row.id === category.id)} onClick={() => { if (category) onChange({ ...value, categories: [...value.categories, category] }); setCategory(null); }}>Add category</Button></Draft>;
-}
-function DocumentDraft({ value, onChange }: Props) {
-    const [type, setType] = useState('business_registration'); const [number, setNumber] = useState(''); const [status, setStatus] = useState('pending');
-    return <Draft title="Initial documents" rows={value.documents.map((row) => `${row.document_type} / ${row.document_number ?? '-'}`)} remove={(index) => onChange({ ...value, documents: value.documents.filter((_, i) => i !== index) })}><Select label="Type" value={type} onChange={(event) => setType(event.target.value)} options={options(customerDocumentTypes)} /><Input label="Document number" value={number} onChange={(event) => setNumber(event.target.value)} /><Select label="Status" value={status} onChange={(event) => setStatus(event.target.value)} options={options(customerDocumentStatuses)} /><Button type="button" onClick={() => { onChange({ ...value, documents: [...value.documents, { document_type: type, document_number: number || null, status }] }); setNumber(''); }}>Add document</Button></Draft>;
 }
 function CreditDraft({ value, onChange }: Props) {
     const profile = value.creditProfile;
