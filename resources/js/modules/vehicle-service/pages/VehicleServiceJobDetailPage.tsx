@@ -4,17 +4,13 @@ import { ApiError, toApiError, type ApiError as ApiErrorShape } from '@/shared/a
 import { ActionMenu } from '@/shared/components/ActionMenu';
 import { Button, LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
-import { DetailGrid } from '@/shared/components/DetailGrid';
-import { EntityDetailLayout } from '@/shared/components/EntityDetailLayout';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
-import { MoneyDisplay } from '@/shared/components/MoneyDisplay';
 import { Panel } from '@/shared/components/Panel';
 import { TabPanel, Tabs } from '@/shared/components/Tabs';
 import { WorkflowHeader } from '@/shared/components/WorkflowHeader';
 import { useApi } from '@/shared/hooks/useApi';
 import { useOnDemandTab } from '@/shared/hooks/useOnDemandTab';
-import { readableRelation } from '@/shared/utils/object';
 import { compareDecimalStrings } from '@/shared/utils/decimal';
 import { VehicleServiceSummaryPanel } from '../components/VehicleServiceSummaryPanel';
 import { VehicleServiceStatusBadge } from '../components/VehicleServiceStatusBadge';
@@ -74,7 +70,6 @@ export default function VehicleServiceJobDetailPage() {
     if (result.loading && job === null) return <LoadingState />;
     if (!job) return <ErrorAlert error={result.error} />;
     const expectedVersion = job.row_version ?? 0;
-    const currentCustomerOwner = job.vehicle?.current_ownerships?.find((ownership) => ownership.owner_type === 'customer')?.owner ?? job.customer;
 
     const action = async (name: 'inspect' | 'start' | 'complete' | 'cancel' | 'delete') => {
         setBusy(true);
@@ -134,31 +129,6 @@ export default function VehicleServiceJobDetailPage() {
             : job.status === 'in_progress'
                 ? { label: 'Complete job', action: 'complete' as const }
                 : null;
-    const sideSummary = (
-        <Panel className="rounded-lg">
-            <div className="space-y-4">
-                <div>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Workshop status</p>
-                    <div className="mt-2"><VehicleServiceStatusBadge status={job.status} /></div>
-                </div>
-                <DetailGrid items={[
-                    { label: 'Customer', value: readableRelation(job.customer) },
-                    { label: 'Registration', value: job.vehicle?.registration_number ?? readableRelation(job.vehicle) },
-                    { label: 'Make / model', value: `${job.vehicle?.make?.name ?? '-'} / ${job.vehicle?.model?.name ?? '-'}` },
-                    { label: 'Vehicle owner', value: readableRelation(currentCustomerOwner) },
-                    ...(['full_service', 'oil_change'].includes(job.type) ? [{
-                        label: 'Odometer',
-                        value: `${job.odometer_reading ?? job.vehicle?.odometer_reading ?? '-'} ${job.vehicle?.odometer_unit ?? ''}`.trim(),
-                    }] : []),
-                    { label: 'Supervisor', value: readableRelation(job.supervisor) },
-                    { label: 'Grand total', value: <MoneyDisplay value={job.grand_total} /> },
-                    { label: 'Commission cost', value: <MoneyDisplay value={job.commission_cost_total} /> },
-                    { label: 'After commission', value: <MoneyDisplay value={job.net_after_commission} /> },
-                ]} />
-            </div>
-        </Panel>
-    );
-
     return (
         <>
             <ContentHeader title={job.job_number} description={`${job.customer?.name ?? 'Customer'} / ${job.vehicle?.name ?? 'Vehicle'}`} />
@@ -178,43 +148,40 @@ export default function VehicleServiceJobDetailPage() {
                 blockedReason={job.status === 'cancelled' ? 'No further actions are available for a cancelled job.' : undefined}
             />
             <ErrorAlert error={actionError ?? result.error} />
-            <EntityDetailLayout
-                summary={sideSummary}
-                actions={
-                    <>
-                        <Button type="button" variant="secondary" className="w-full" onClick={() => tabs.openTab('inspection')}>Open inspection</Button>
-                        <Button type="button" variant="secondary" className="w-full" onClick={() => tabs.openTab('lines')}>Open job lines</Button>
-                        <Button type="button" variant="secondary" className="w-full" onClick={() => tabs.openTab('workforce')}>Assign workforce</Button>
-                        {['completed', 'invoiced'].includes(job.status) && <LinkButton to={`/vehicle-service/jobs/${job.id}/invoice`} variant="secondary" className="w-full">Create & post invoice</LinkButton>}
-                        {(job.invoice_links ?? []).some((link) => link.status === 'active' && compareDecimalStrings(link.balance_due ?? '0', '0') > 0) && <LinkButton to={`/vehicle-service/jobs/${job.id}/payment`} variant="secondary" className="w-full">Receive payment</LinkButton>}
-                    </>
-                }
-            >
-                <Panel className="p-0">
-                    <Tabs id="service-job-tabs" tabs={[
-                        { id: 'summary', label: 'Overview' },
-                        { id: 'inspection', label: 'Inspection' },
-                        { id: 'lines', label: 'Job lines' },
-                        { id: 'workforce', label: 'Workforce' },
-                        { id: 'invoice', label: 'Invoice' },
-                        { id: 'payments', label: 'Payments' },
-                        { id: 'documents', label: 'Documents' },
-                        { id: 'history', label: 'Timeline' },
-                    ]} active={tabs.activeTab} onChange={tabs.openTab} />
-                    <div className="p-5">
-                        <Suspense fallback={<LoadingState />}>
-                            <TabPanel tabsId="service-job-tabs" tabId="summary" active={tabs.activeTab} keepMounted><VehicleServiceSummaryPanel job={job} onJobChanged={setJob} /></TabPanel>
-                            {tabs.openedTabs.has('inspection') && <TabPanel tabsId="service-job-tabs" tabId="inspection" active={tabs.activeTab} keepMounted><InspectionTab jobId={job.id} expectedVersion={expectedVersion} initialValue={job.inspection ?? null} onSaved={handleInspectionSaved} /></TabPanel>}
-                            {tabs.openedTabs.has('lines') && <TabPanel tabsId="service-job-tabs" tabId="lines" active={tabs.activeTab} keepMounted><LinesTab jobId={job.id} expectedVersion={expectedVersion} onChanged={handleLinesChanged} onVersionChanged={updateJobVersion} jobStore={jobStore} /></TabPanel>}
-                            {tabs.openedTabs.has('workforce') && <TabPanel tabsId="service-job-tabs" tabId="workforce" active={tabs.activeTab} keepMounted><WorkforceTab jobId={job.id} expectedVersion={expectedVersion} onChanged={updateJobVersion} active={tabs.activeTab === 'workforce'} jobStore={jobStore} /></TabPanel>}
-                            {tabs.openedTabs.has('invoice') && <TabPanel tabsId="service-job-tabs" tabId="invoice" active={tabs.activeTab} keepMounted><InvoiceTab job={job} /></TabPanel>}
-                            {tabs.openedTabs.has('payments') && <TabPanel tabsId="service-job-tabs" tabId="payments" active={tabs.activeTab} keepMounted><PaymentTab job={job} /></TabPanel>}
-                            {tabs.openedTabs.has('documents') && <TabPanel tabsId="service-job-tabs" tabId="documents" active={tabs.activeTab} keepMounted><DocumentTab jobId={job.id} expectedVersion={expectedVersion} onChanged={updateJobVersion} /></TabPanel>}
-                            {tabs.openedTabs.has('history') && <TabPanel tabsId="service-job-tabs" tabId="history" active={tabs.activeTab} keepMounted><StatusHistoryTab jobId={job.id} refreshKey={historyRefreshKey} /></TabPanel>}
-                        </Suspense>
-                    </div>
-                </Panel>
-            </EntityDetailLayout>
+            <Panel className="p-0">
+                <Tabs id="service-job-tabs" tabs={[
+                    { id: 'summary', label: 'Overview' },
+                    { id: 'inspection', label: 'Inspection' },
+                    { id: 'lines', label: 'Job lines' },
+                    { id: 'workforce', label: 'Workforce' },
+                    { id: 'invoice', label: 'Invoice' },
+                    { id: 'payments', label: 'Payments' },
+                    { id: 'documents', label: 'Documents' },
+                    { id: 'history', label: 'Timeline' },
+                ]} active={tabs.activeTab} onChange={tabs.openTab} />
+                <div className="p-5">
+                    <Suspense fallback={<LoadingState />}>
+                        <TabPanel tabsId="service-job-tabs" tabId="summary" active={tabs.activeTab} keepMounted><VehicleServiceSummaryPanel job={job} onJobChanged={setJob} /></TabPanel>
+                        {tabs.openedTabs.has('inspection') && <TabPanel tabsId="service-job-tabs" tabId="inspection" active={tabs.activeTab} keepMounted><InspectionTab jobId={job.id} expectedVersion={expectedVersion} initialValue={job.inspection ?? null} onSaved={handleInspectionSaved} /></TabPanel>}
+                        {tabs.openedTabs.has('lines') && <TabPanel tabsId="service-job-tabs" tabId="lines" active={tabs.activeTab} keepMounted><LinesTab jobId={job.id} expectedVersion={expectedVersion} onChanged={handleLinesChanged} onVersionChanged={updateJobVersion} jobStore={jobStore} /></TabPanel>}
+                        {tabs.openedTabs.has('workforce') && <TabPanel tabsId="service-job-tabs" tabId="workforce" active={tabs.activeTab} keepMounted><WorkforceTab jobId={job.id} expectedVersion={expectedVersion} onChanged={updateJobVersion} active={tabs.activeTab === 'workforce'} jobStore={jobStore} /></TabPanel>}
+                        {tabs.openedTabs.has('invoice') && <TabPanel tabsId="service-job-tabs" tabId="invoice" active={tabs.activeTab} keepMounted><InvoiceTab job={job} /></TabPanel>}
+                        {tabs.openedTabs.has('payments') && <TabPanel tabsId="service-job-tabs" tabId="payments" active={tabs.activeTab} keepMounted><PaymentTab job={job} /></TabPanel>}
+                        {tabs.openedTabs.has('documents') && <TabPanel tabsId="service-job-tabs" tabId="documents" active={tabs.activeTab} keepMounted><DocumentTab jobId={job.id} expectedVersion={expectedVersion} onChanged={updateJobVersion} /></TabPanel>}
+                        {tabs.openedTabs.has('history') && <TabPanel tabsId="service-job-tabs" tabId="history" active={tabs.activeTab} keepMounted><StatusHistoryTab jobId={job.id} refreshKey={historyRefreshKey} /></TabPanel>}
+                    </Suspense>
+                </div>
+            </Panel>
+            <section className="mt-5 flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+                <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Quick actions</h2>
+                <div className="flex flex-wrap items-center gap-2">
+                    <Button type="button" variant="secondary" onClick={() => tabs.openTab('inspection')}>Open inspection</Button>
+                    <Button type="button" variant="secondary" onClick={() => tabs.openTab('lines')}>Open job lines</Button>
+                    <Button type="button" variant="secondary" onClick={() => tabs.openTab('workforce')}>Assign workforce</Button>
+                    {['completed', 'invoiced'].includes(job.status) && <LinkButton to={`/vehicle-service/jobs/${job.id}/invoice`} variant="secondary">Create & post invoice</LinkButton>}
+                    {(job.invoice_links ?? []).some((link) => link.status === 'active' && compareDecimalStrings(link.balance_due ?? '0', '0') > 0) && <LinkButton to={`/vehicle-service/jobs/${job.id}/payment`} variant="secondary">Receive payment</LinkButton>}
+                </div>
+            </section>
         </>
     );
 }
