@@ -1,21 +1,14 @@
-import { useAuth } from '@/modules/auth/AuthProvider';
 import { DetailGrid } from '@/shared/components/DetailGrid';
 import { MoneyDisplay } from '@/shared/components/MoneyDisplay';
 import { formatDate } from '@/shared/utils/formatDate';
 import { readableRelation } from '@/shared/utils/object';
 import type { VehicleServiceJob } from '../vehicleServiceTypes';
-import { vehicleServicePermissions } from '../vehicleServicePermissions';
-import { VehicleServiceJobDiscountEditor } from './VehicleServiceJobDiscountEditor';
 import { VehicleServiceStatusBadge } from './VehicleServiceStatusBadge';
 
-export function VehicleServiceSummaryPanel({ job, onJobChanged }: {
+export function VehicleServiceSummaryPanel({ job }: {
     job: VehicleServiceJob;
-    onJobChanged?: (job: VehicleServiceJob) => void;
 }) {
-    const { permissions } = useAuth();
     const currentCustomerOwner = job.vehicle?.current_ownerships?.find((ownership) => ownership.owner_type === 'customer')?.owner ?? job.customer;
-    const canManageDiscount = permissions.includes(vehicleServicePermissions.discountsManage)
-        && ['draft', 'inspected', 'in_progress'].includes(job.status);
 
     return (
         <div>
@@ -42,11 +35,6 @@ export function VehicleServiceSummaryPanel({ job, onJobChanged }: {
                 { label: 'Completed at', value: formatDate(job.completed_at) },
                 { label: 'Notes', value: job.notes ?? '-' },
             ]} />
-            {canManageDiscount && onJobChanged && (
-                <div className="mt-5 flex justify-end">
-                    <VehicleServiceJobDiscountEditor job={job} onChanged={onJobChanged} />
-                </div>
-            )}
         </div>
     );
 }

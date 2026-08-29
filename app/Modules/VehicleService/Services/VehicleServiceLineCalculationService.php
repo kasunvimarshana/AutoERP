@@ -6,8 +6,10 @@ namespace Modules\VehicleService\Services;
 
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
+use Modules\Item\Enums\ItemType;
 use Modules\Item\Models\Item;
 use Modules\VehicleService\DTOs\VehicleServiceLineData;
+use Modules\VehicleService\Enums\VehicleServiceCommissionType;
 use Modules\VehicleService\Enums\VehicleServiceDiscountCalculationType;
 use Modules\VehicleService\Enums\VehicleServiceDiscountRevisionAction;
 use Modules\VehicleService\Enums\VehicleServiceLineSourceType;
@@ -279,6 +281,23 @@ final class VehicleServiceLineCalculationService
             $assignment->commission_amount = $amounts[$index];
             $assignment->save();
         }
+    }
+
+    public function recalculateComboChildAssignments(VehicleServiceJobLine $line): void
+    {
+        $line->loadMissing('item');
+        if ($line->line_source_type === VehicleServiceLineSourceType::ComboChild
+            && $line->item?->item_type === ItemType::Labour) {
+            $commissionPool = $this->math->mul((string) $line->quantity, (string) $line->unit_cost);
+            $line->employeeAssignments()
+                ->where('status', '!=', self::CANCELLED_ASSIGNMENT_STATUS)
+                ->update([
+                    'commission_type' => VehicleServiceCommissionType::Fixed->value,
+                    'commission_value' => $commissionPool,
+                ]);
+        }
+
+        $this->recalculateAssignments($line);
     }
 
     private function adjustment(?string $type, string $rate, string $amount, string $base): string

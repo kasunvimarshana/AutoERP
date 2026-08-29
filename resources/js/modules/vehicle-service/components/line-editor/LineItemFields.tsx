@@ -43,16 +43,10 @@ export function LineItemFields({ value, error, autoFocus = false, onChange }: {
 
     return (
         <div className="space-y-3 sm:col-span-2 lg:col-span-3">
-            <LookupSelect
-                label="Item"
+            <VehicleServiceLineItemLookup
                 value={value.item}
                 error={fieldError(error, 'item_id') ?? fieldError(error, 'line_source_type')}
                 onChange={(item) => onChange(lineValueWithItem(value, item))}
-                search={searchVehicleServiceLineItems}
-                renderOption={(item, state) => <ItemOption option={item} active={state.active} />}
-                recentResultsKey="vehicle-service:job-line-items"
-                placeholder="Search inventory, service, labour, or package items..."
-                required
                 autoFocus={autoFocus}
             />
             <Button
@@ -64,6 +58,36 @@ export function LineItemFields({ value, error, autoFocus = false, onChange }: {
                 Enter an external or customer-supplied item
             </Button>
         </div>
+    );
+}
+
+export function VehicleServiceLineItemLookup({
+    value,
+    error,
+    disabled = false,
+    autoFocus = false,
+    onChange,
+}: {
+    value: ItemLookupResource | null;
+    error?: string;
+    disabled?: boolean;
+    autoFocus?: boolean;
+    onChange: (item: ItemLookupResource | null) => void;
+}) {
+    return (
+        <LookupSelect
+            label="Item"
+            value={value}
+            error={error}
+            onChange={onChange}
+            search={searchVehicleServiceLineItems}
+            renderOption={(item, state) => <ItemOption option={item} active={state.active} />}
+            recentResultsKey="vehicle-service:job-line-items"
+            placeholder="Search inventory, service, labour, or package items..."
+            required
+            disabled={disabled}
+            autoFocus={autoFocus}
+        />
     );
 }
 

@@ -5,6 +5,7 @@ export interface DataColumn<T> {
     key: string;
     header: ReactNode;
     render: (row: T) => ReactNode;
+    footer?: ReactNode;
     className?: string;
     mobile?: boolean;
 }
@@ -97,6 +98,17 @@ export function DataTable<T>({ rows, columns, rowKey, emptyMessage = 'No records
                             </tr>;
                         })}
                     </tbody>
+                    {columns.some((column) => column.footer !== undefined) && (
+                        <tfoot className="border-t border-slate-200 bg-slate-50 font-semibold text-slate-900">
+                            <tr>
+                                {columns.map((column) => (
+                                    <td key={column.key} className={`px-4 py-3 ${column.className ?? ''}`}>
+                                        {column.footer}
+                                    </td>
+                                ))}
+                            </tr>
+                        </tfoot>
+                    )}
                 </table>
             </div>
         </div>

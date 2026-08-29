@@ -49,6 +49,10 @@ final class VehicleServiceJobLineResource extends JsonResource
                 null,
             ),
             'inventory_movement_id' => $this->inventory_movement_id,
+            'available_stock_quantity' => $this->when(
+                $this->offsetExists('available_stock_quantity'),
+                fn () => $this->available_stock_quantity === null ? null : (string) $this->available_stock_quantity,
+            ),
             'stock_on_hand' => $this->when($this->offsetExists('stock_on_hand'), fn () => (string) $this->stock_on_hand),
             'stock_available' => $this->when($this->offsetExists('stock_available'), fn () => (string) $this->stock_available),
             'issue_eligible' => $this->when($this->offsetExists('issue_eligible'), fn () => (bool) $this->issue_eligible),

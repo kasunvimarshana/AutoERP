@@ -62,6 +62,7 @@ final class VehicleServiceLineWriteService
             $this->jobValidator->assertMutable($job);
             $this->rules->assertCanUpdate($line, $data);
 
+            $originalQuantity = (string) $line->quantity;
             $item = $this->lineValidator->validate($job, $data);
             $attributes = $this->calculations->attributes($data, $item);
             if ($line->employeeAssignments()->exists() && ! $attributes['is_employee_assignable']) {
@@ -72,6 +73,7 @@ final class VehicleServiceLineWriteService
 
             $line->fill($attributes);
             $line->save();
+            $this->rescaleComboChildren($line, $originalQuantity, (string) $line->quantity);
             $this->calculations->recalculateAssignments($line);
             $this->calculations->recalculateJob($job);
 
@@ -138,6 +140,29 @@ final class VehicleServiceLineWriteService
                 isBillable: false,
                 expandCombo: false,
             ));
+        }
+    }
+
+    private function rescaleComboChildren(
+        VehicleServiceJobLine $parent,
+        string $originalParentQuantity,
+        string $nextParentQuantity,
+    ): void {
+        if ($parent->line_source_type !== VehicleServiceLineSourceType::ComboParent
+            || $this->math->compare($originalParentQuantity, $nextParentQuantity) === 0) {
+            return;
+        }
+
+        $children = $parent->children()->with(['item', 'employeeAssignments'])->get();
+        foreach ($children as $child) {
+            $quantityPerParent = $this->math->div(
+                (string) $child->quantity,
+                $originalParentQuantity,
+                DecimalMath::MAX_SCALE,
+            );
+            $child->quantity = $this->math->mul($quantityPerParent, $nextParentQuantity);
+            $child->save();
+            $this->calculations->recalculateComboChildAssignments($child);
         }
     }
 

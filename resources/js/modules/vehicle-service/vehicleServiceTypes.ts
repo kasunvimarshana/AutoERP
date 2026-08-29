@@ -126,6 +126,7 @@ export interface VehicleServiceJobLine {
     is_billable: boolean;
     is_employee_assignable: boolean;
     inventory_movement_id?: number | null;
+    available_stock_quantity?: string | null;
     stock_on_hand?: string;
     stock_available?: string;
     issue_eligible?: boolean;

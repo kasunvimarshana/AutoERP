@@ -12,6 +12,7 @@ import { WorkflowHeader } from '@/shared/components/WorkflowHeader';
 import { useApi } from '@/shared/hooks/useApi';
 import { useOnDemandTab } from '@/shared/hooks/useOnDemandTab';
 import { compareDecimalStrings } from '@/shared/utils/decimal';
+import { VehicleServiceJobDiscountValue } from '../components/VehicleServiceJobDiscountValue';
 import { VehicleServiceSummaryPanel } from '../components/VehicleServiceSummaryPanel';
 import { VehicleServiceStatusBadge } from '../components/VehicleServiceStatusBadge';
 import type { VehicleServiceInspection, VehicleServiceJob, VehicleServiceJobLine, VehicleServiceJobStatus, VehicleServiceJobTotals } from '../vehicleServiceTypes';
@@ -161,9 +162,16 @@ export default function VehicleServiceJobDetailPage() {
                 ]} active={tabs.activeTab} onChange={tabs.openTab} />
                 <div className="p-5">
                     <Suspense fallback={<LoadingState />}>
-                        <TabPanel tabsId="service-job-tabs" tabId="summary" active={tabs.activeTab} keepMounted><VehicleServiceSummaryPanel job={job} onJobChanged={setJob} /></TabPanel>
+                        <TabPanel tabsId="service-job-tabs" tabId="summary" active={tabs.activeTab} keepMounted><VehicleServiceSummaryPanel job={job} /></TabPanel>
                         {tabs.openedTabs.has('inspection') && <TabPanel tabsId="service-job-tabs" tabId="inspection" active={tabs.activeTab} keepMounted><InspectionTab jobId={job.id} expectedVersion={expectedVersion} initialValue={job.inspection ?? null} onSaved={handleInspectionSaved} /></TabPanel>}
-                        {tabs.openedTabs.has('lines') && <TabPanel tabsId="service-job-tabs" tabId="lines" active={tabs.activeTab} keepMounted><LinesTab jobId={job.id} expectedVersion={expectedVersion} onChanged={handleLinesChanged} onVersionChanged={updateJobVersion} jobStore={jobStore} /></TabPanel>}
+                        {tabs.openedTabs.has('lines') && (
+                            <TabPanel tabsId="service-job-tabs" tabId="lines" active={tabs.activeTab} keepMounted>
+                                <div className="space-y-5">
+                                    <LinesTab jobId={job.id} expectedVersion={expectedVersion} onChanged={handleLinesChanged} onVersionChanged={updateJobVersion} jobStore={jobStore} />
+                                    <VehicleServiceJobDiscountValue job={job} onChanged={setJob} />
+                                </div>
+                            </TabPanel>
+                        )}
                         {tabs.openedTabs.has('workforce') && <TabPanel tabsId="service-job-tabs" tabId="workforce" active={tabs.activeTab} keepMounted><WorkforceTab jobId={job.id} expectedVersion={expectedVersion} onChanged={updateJobVersion} active={tabs.activeTab === 'workforce'} jobStore={jobStore} /></TabPanel>}
                         {tabs.openedTabs.has('invoice') && <TabPanel tabsId="service-job-tabs" tabId="invoice" active={tabs.activeTab} keepMounted><InvoiceTab job={job} /></TabPanel>}
                         {tabs.openedTabs.has('payments') && <TabPanel tabsId="service-job-tabs" tabId="payments" active={tabs.activeTab} keepMounted><PaymentTab job={job} /></TabPanel>}

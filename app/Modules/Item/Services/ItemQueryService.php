@@ -6,8 +6,8 @@ namespace Modules\Item\Services;
 
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -60,7 +60,7 @@ final class ItemQueryService
         }
 
         $this->assertItemIsNotOwnedByAnotherScope($id, $tenantId, $organizationUnitId);
-        throw (new ModelNotFoundException())->setModel(Item::class, [$id]);
+        throw (new ModelNotFoundException)->setModel(Item::class, [$id]);
     }
 
     public function item(int $id, int $tenantId, ?int $organizationUnitId): Item
@@ -72,7 +72,7 @@ final class ItemQueryService
         }
 
         $this->assertItemIsNotOwnedByAnotherScope($id, $tenantId, $organizationUnitId);
-        throw (new ModelNotFoundException())->setModel(Item::class, [$id]);
+        throw (new ModelNotFoundException)->setModel(Item::class, [$id]);
     }
 
     public function delete(Item $item): void
@@ -133,7 +133,11 @@ final class ItemQueryService
         $tenantId = $items->first()?->tenant_id;
         $availableStockByItemId = $tenantId === null
             ? []
-            : $this->availableStockByItemId($items, (int) $tenantId, $organizationUnitId);
+            : $this->availableStockByItemIds(
+                $items->modelKeys(),
+                (int) $tenantId,
+                $organizationUnitId,
+            );
 
         $items->each(function (Item $item) use ($organizationUnitId, $availableStockByItemId): void {
             $resolvedServicePrice = $this->prices->resolvePrice(
@@ -160,13 +164,12 @@ final class ItemQueryService
         return $paginator->setCollection($items);
     }
 
-    /**
-     * @param  Collection<int, Item>  $items
+    /** @param list<int> $itemIds
      * @return array<int, string>
      */
-    private function availableStockByItemId(Collection $items, int $tenantId, ?int $organizationUnitId): array
+    public function availableStockByItemIds(array $itemIds, int $tenantId, ?int $organizationUnitId): array
     {
-        $itemIds = $items->pluck('id')->map(static fn ($id): int => (int) $id)->all();
+        $itemIds = array_values(array_unique(array_map('intval', $itemIds)));
         if ($itemIds === []) {
             return [];
         }

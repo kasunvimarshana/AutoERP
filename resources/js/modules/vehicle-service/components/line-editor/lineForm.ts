@@ -29,9 +29,10 @@ export interface VehicleServiceLineFormValue {
     issueLocation: NamedResource | null;
 }
 
-export type LineDialog =
-    | { mode: 'create'; value: VehicleServiceLineFormValue }
-    | { mode: 'edit'; lineId: number; value: VehicleServiceLineFormValue };
+export interface LineDialog {
+    lineId: number;
+    value: VehicleServiceLineFormValue;
+}
 
 export const calculationOptions = [
     { value: 'fixed', label: 'Fixed' },

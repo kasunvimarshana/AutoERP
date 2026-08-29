@@ -7,6 +7,7 @@ import { emptyLineForm, lineFormToPayload } from './components/line-editor/lineF
 const source = (path: string) => readFileSync(resolve(cwd(), path), 'utf8');
 const detailPageSource = source('resources/js/modules/vehicle-service/pages/VehicleServiceJobDetailPage.tsx');
 const lineEditorSource = source('resources/js/modules/vehicle-service/components/VehicleServiceLineEditor.tsx');
+const inventoryIssueDrawerSource = source('resources/js/modules/vehicle-service/components/VehicleServiceInventoryIssueDrawer.tsx');
 const lineFormSource = source('resources/js/modules/vehicle-service/components/line-editor/VehicleServiceLineForm.tsx');
 
 describe('Vehicle Service job-line inventory flow', () => {
@@ -23,24 +24,22 @@ describe('Vehicle Service job-line inventory flow', () => {
         expect(payload).not.toHaveProperty('warehouse_location_id');
     });
 
-    it('offers add-and-issue only for permitted newly created inventory lines', () => {
-        expect(lineFormSource).toContain("&& mode === 'create'");
-        expect(lineFormSource).toContain('&& draft.item !== null');
-        expect(lineFormSource).toContain("&& draft.source === 'inventory_item'");
-        expect(lineFormSource).toContain('Add & issue stock');
-        expect(lineFormSource).toContain('draft.issueWarehouse !== null');
-        expect(lineFormSource).toContain('draft.issueLocation !== null');
+    it('uses direct item selection for creation and keeps stock issue as a permitted row action', () => {
+        expect(lineEditorSource).toContain('<VehicleServiceLineItemLookup');
+        expect(lineEditorSource).toContain('lineValueWithItem(emptyLineForm(), item)');
+        expect(lineEditorSource).toContain('createVehicleServiceLine(jobId');
+        expect(lineEditorSource).toContain('canIssueInventory && canIssueLine(row.line)');
+        expect(lineEditorSource).toContain('<VehicleServiceInventoryIssueDrawer');
+        expect(lineFormSource).not.toContain('Add & issue stock');
         expect(lineEditorSource).toContain('vehicleServicePermissions.inventoryView');
         expect(lineEditorSource).toContain('vehicleServicePermissions.inventoryIssue');
     });
 
-    it('uses the existing Inventory issue API after line creation and preserves pending recovery on failure', () => {
-        expect(lineEditorSource).toContain('const lineVersion = expectedVersion + 1');
-        expect(lineEditorSource).toContain('expected_version: lineVersion');
-        expect(lineEditorSource).toContain('line_ids: [saved.id]');
-        expect(lineEditorSource).toContain("status: 'issued'");
-        expect(lineEditorSource).toContain('Job line added. Stock issue is still pending.');
-        expect(lineEditorSource).toContain('onChanged(nextLines, lineVersion)');
+    it('adds inventory items as pending lines before the explicit stock-issue workflow', () => {
+        expect(lineEditorSource).toContain('onChanged(nextLines, mutation.rowVersion, mutation.jobTotals)');
+        expect(lineEditorSource).toContain("setToast('Job line added.')");
+        expect(lineEditorSource).toContain("line.inventory_movement_id == null ? 'Pending issue' : 'Issued'");
+        expect(lineEditorSource).toContain('onIssued={(nextVersion) => void handleStockIssued(nextVersion)}');
     });
 
     it('keeps stock issue recovery available for combo child inventory lines', () => {
@@ -61,7 +60,7 @@ describe('Vehicle Service job-line inventory flow', () => {
         expect(detailPageSource).not.toContain('VehicleServiceInventoryIssueTab');
         expect(detailPageSource).not.toContain("{ id: 'inventory', label: 'Inventory' }");
         expect(detailPageSource).not.toContain("tabs.openedTabs.has('inventory')");
-        expect(lineEditorSource).toContain('issueVehicleServiceInventory');
+        expect(inventoryIssueDrawerSource).toContain('issueVehicleServiceInventory');
         expect(lineEditorSource).toContain('listInventoryIssueLines');
         expect(lineEditorSource).toContain('listVehicleServiceLines');
     });

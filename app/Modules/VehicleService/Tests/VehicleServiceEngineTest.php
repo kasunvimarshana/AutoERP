@@ -326,6 +326,36 @@ final class VehicleServiceEngineTest extends TestCase
         $this->assertSame('375.000000', (string) $assignment->commission_amount);
         $this->assertSame('375.000000', (string) $this->refreshJob($job)->commission_cost_total);
 
+        $currentJob = $this->refreshJob($job);
+        $updatedParent = $this->withTenantExecutionContext(
+            (int) $context['tenant_id'],
+            fn (): VehicleServiceJobLine => app(VehicleServiceLineService::class)->update(
+                $currentJob,
+                $parent,
+                new VehicleServiceLineData(
+                    lineSourceType: VehicleServiceLineSourceType::ComboParent,
+                    description: (string) $parent->description,
+                    quantity: '2.000000',
+                    unitPrice: (string) $parent->unit_price,
+                    itemId: (int) $combo->getKey(),
+                    uomId: $context['uom_id'],
+                ),
+                (int) $currentJob->row_version,
+            ),
+        );
+        $rescaledChildren = $this->withTenantExecutionContext(
+            (int) $context['tenant_id'],
+            fn () => $updatedParent->children()->with('employeeAssignments')->orderBy('line_number')->get(),
+        );
+        $rescaledAssignment = $rescaledChildren[1]->employeeAssignments->firstOrFail();
+
+        $this->assertSame('4.000000', (string) $rescaledChildren[0]->quantity);
+        $this->assertSame('2.000000', (string) $rescaledChildren[1]->quantity);
+        $this->assertSame('250.000000', (string) $rescaledAssignment->commission_value);
+        $this->assertSame('250.000000', (string) $rescaledAssignment->commission_amount);
+        $this->assertSame('1000.000000', (string) $this->refreshJob($job)->grand_total);
+        $this->assertSame('250.000000', (string) $this->refreshJob($job)->commission_cost_total);
+
         $this->expectException(InvalidArgumentException::class);
         $this->assignEmployee(
             $job,
@@ -1270,11 +1300,12 @@ final class VehicleServiceEngineTest extends TestCase
         $this->withoutMiddleware();
         $context = $this->context();
         $this->actingAsTenantUser($context['tenant_id']);
+        $this->receiveStock($context, '7.000000');
         $job = $this->createJob($context);
         $line = $this->line(
             $job,
-            VehicleServiceLineSourceType::ServiceItem,
-            $context['service'],
+            VehicleServiceLineSourceType::InventoryItem,
+            $context['stock'],
             '1.000000',
             '25.000000',
         );
@@ -1283,6 +1314,8 @@ final class VehicleServiceEngineTest extends TestCase
         $this->tenantGetJson($context['tenant_id'], "/api/v1/vehicle-service/jobs/{$job->getKey()}/lines?{$query}")
             ->assertOk()
             ->assertJsonPath('data.0.id', $line->getKey())
+            ->assertJsonPath('data.0.item.code', $context['stock']->code)
+            ->assertJsonPath('data.0.available_stock_quantity', '7.000000')
             ->assertJsonPath('data.0.line_total', '25.000000');
 
         $this->tenantGetJson($context['tenant_id'], "/api/v1/vehicle-service/jobs/{$job->getKey()}/status-history?{$query}")

@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Modules\VehicleService\Http\Controllers;
 
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Modules\Item\Services\ItemQueryService;
 use Modules\VehicleService\Http\Requests\ListVehicleServiceJobRequest;
 use Modules\VehicleService\Http\Requests\StoreVehicleServiceLineRequest;
 use Modules\VehicleService\Http\Requests\VehicleServiceActionRequest;
@@ -17,20 +19,26 @@ use Modules\VehicleService\Services\VehicleServiceLineService;
 
 final class VehicleServiceLineController extends VehicleServiceController
 {
+    public function __construct(private readonly ItemQueryService $items) {}
+
     public function index(ListVehicleServiceJobRequest $request, int $job): AnonymousResourceCollection
     {
+        $jobModel = $this->job($request, $job);
+        $lines = $jobModel->lines()
+            ->whereNull('parent_line_id')
+            ->with([
+                'item',
+                'variant',
+                'uom',
+                'children.item',
+                'children.uom',
+                'employeeAssignments.employee',
+            ])
+            ->get();
+        $this->addAvailableStock($jobModel, $lines);
+
         return VehicleServiceJobLineResource::collection(
-            $this->job($request, $job)->lines()
-                ->whereNull('parent_line_id')
-                ->with([
-                    'item',
-                    'variant',
-                    'uom',
-                    'children.item',
-                    'children.uom',
-                    'employeeAssignments.employee',
-                ])
-                ->get(),
+            $lines,
         );
     }
 
@@ -85,6 +93,9 @@ final class VehicleServiceLineController extends VehicleServiceController
         int $status = 200,
     ): JsonResponse {
         $job->refresh();
+        if ($line !== null) {
+            $this->addAvailableStock($job, new Collection([$line]));
+        }
 
         return response()->json([
             'data' => $line === null ? null : (new VehicleServiceJobLineResource($line))->resolve($request),
@@ -107,5 +118,36 @@ final class VehicleServiceLineController extends VehicleServiceController
                 )->resolve($request),
             ],
         ], $status);
+    }
+
+    /** @param Collection<int, VehicleServiceJobLine> $lines */
+    private function addAvailableStock(VehicleServiceJob $job, Collection $lines): void
+    {
+        /** @var Collection<int, VehicleServiceJobLine> $allLines */
+        $allLines = $lines->flatMap(
+            static fn (VehicleServiceJobLine $line): array => [$line, ...$line->children->all()],
+        );
+        $itemIds = $allLines
+            ->filter(static fn (VehicleServiceJobLine $line): bool => $line->is_inventory_tracked && $line->item_id !== null)
+            ->pluck('item_id')
+            ->map(static fn ($itemId): int => (int) $itemId)
+            ->values()
+            ->all();
+        $availableByItemId = $this->items->availableStockByItemIds(
+            $itemIds,
+            (int) $job->tenant_id,
+            $job->organization_unit_id === null ? null : (int) $job->organization_unit_id,
+        );
+
+        foreach ($allLines as $serviceLine) {
+            if (! $serviceLine->is_inventory_tracked || $serviceLine->item_id === null) {
+                continue;
+            }
+
+            $serviceLine->setAttribute(
+                'available_stock_quantity',
+                $availableByItemId[(int) $serviceLine->item_id] ?? '0.000000',
+            );
+        }
     }
 }

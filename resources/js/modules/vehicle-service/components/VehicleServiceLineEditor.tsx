@@ -1,17 +1,20 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
-import { Button } from '@/shared/components/Button';
+import type { ItemLookupResource } from '@/shared/api/lookupApi';
 import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
 import { FormDrawer } from '@/shared/components/Drawer';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
+import { MoneyDisplay } from '@/shared/components/MoneyDisplay';
+import { QuantityDisplay } from '@/shared/components/QuantityDisplay';
 import { useApi } from '@/shared/hooks/useApi';
+import { addDecimal, compareDecimalStrings, subtractDecimal, sumDecimals } from '@/shared/utils/decimal';
+import { formatQuantity } from '@/shared/utils/formatQuantity';
 import { useAuth } from '@/modules/auth/AuthProvider';
 import {
     createVehicleServiceLine,
     deleteVehicleServiceLine,
-    issueVehicleServiceInventory,
     listInventoryIssueLines,
     listVehicleServiceLines,
     updateVehicleServiceLine,
@@ -20,6 +23,10 @@ import { vehicleServicePermissions } from '../vehicleServicePermissions';
 import type { VehicleServiceJobStore } from '../state/vehicleServiceJobStore';
 import type { VehicleServiceJobLine, VehicleServiceJobTotals } from '../vehicleServiceTypes';
 import { VehicleServiceInventoryIssueDrawer } from './VehicleServiceInventoryIssueDrawer';
+import {
+    lineValueWithItem,
+    VehicleServiceLineItemLookup,
+} from './line-editor/LineItemFields';
 import {
     emptyLineForm,
     formatLineItem,
@@ -33,6 +40,8 @@ import { VehicleServiceLineForm } from './line-editor/VehicleServiceLineForm';
 
 const TOAST_DURATION_MS = 2500;
 const CHILD_LINE_INDENT_CLASS = 'pl-7 md:pl-9';
+const DEFAULT_QUANTITY = '1.000000';
+const MINIMUM_QUANTITY = '0.000001';
 
 interface VehicleServiceLineDisplayRow {
     line: VehicleServiceJobLine;
@@ -80,13 +89,14 @@ export default function VehicleServiceLineEditor({
     const loading = canViewLines ? linesResult.loading : inventoryOnlyResult.loading;
     const loadError = canViewLines ? linesResult.error : inventoryOnlyResult.error;
     const [dialog, setDialog] = useState<LineDialog | null>(null);
-    const [createFormRevision, setCreateFormRevision] = useState(0);
+    const [quickAddItem, setQuickAddItem] = useState<ItemLookupResource | null>(null);
     const [removeTarget, setRemoveTarget] = useState<VehicleServiceJobLine | null>(null);
     const [issueTarget, setIssueTarget] = useState<VehicleServiceJobLine | null>(null);
     const [saving, setSaving] = useState(false);
     const [removing, setRemoving] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
     const [toast, setToast] = useState('');
+    const mutationInFlight = useRef(false);
 
     useEffect(() => {
         if (toast === '') return;
@@ -95,76 +105,92 @@ export default function VehicleServiceLineEditor({
         return () => window.clearTimeout(timeout);
     }, [toast]);
 
-    const saveLine = async (value: VehicleServiceLineFormValue, issueStock: boolean) => {
-        if (!canManageLines || !dialog || saving) return;
+    const addSelectedItem = async (item: ItemLookupResource | null) => {
+        setQuickAddItem(item);
+        if (!item || !canManageLines || mutationInFlight.current) return;
+
+        mutationInFlight.current = true;
+        setSaving(true);
+        setError(null);
+        try {
+            const value = lineValueWithItem(emptyLineForm(), item);
+            const mutation = await createVehicleServiceLine(jobId, {
+                ...lineFormToPayload(value),
+                expected_version: expectedVersion,
+            });
+            const nextLines = appendLine(linesResult.data ?? [], mutation.line);
+            jobStore.getState().replaceWorkforceLines({
+                lines: mutation.workforceLines,
+                rowVersion: mutation.rowVersion,
+            });
+            linesResult.setData(nextLines);
+            onChanged(nextLines, mutation.rowVersion, mutation.jobTotals);
+            setQuickAddItem(null);
+            setToast('Job line added.');
+        } catch (requestError) {
+            setQuickAddItem(null);
+            setError(toApiError(requestError));
+        } finally {
+            mutationInFlight.current = false;
+            setSaving(false);
+        }
+    };
+
+    const saveLine = async (value: VehicleServiceLineFormValue) => {
+        if (!canManageLines || !dialog || mutationInFlight.current) return;
+        mutationInFlight.current = true;
         setSaving(true);
         setError(null);
         try {
             const payload = { ...lineFormToPayload(value), expected_version: expectedVersion };
-            if (dialog.mode === 'edit') {
-                const mutation = await updateVehicleServiceLine(jobId, dialog.lineId, payload);
-                const nextLines = replaceLine(linesResult.data ?? [], mutation.line);
-                jobStore.getState().replaceWorkforceLines({
-                    lines: mutation.workforceLines,
-                    rowVersion: mutation.rowVersion,
-                });
-                linesResult.setData(nextLines);
-                setToast('Job line updated.');
-                onChanged(nextLines, mutation.rowVersion, mutation.jobTotals);
-                setDialog(null);
-            } else {
-                const mutation = await createVehicleServiceLine(jobId, payload);
-                const saved = mutation.line;
-                const nextLines = appendLine(linesResult.data ?? [], saved);
-                const lineVersion = mutation.rowVersion;
-                jobStore.getState().replaceWorkforceLines({
-                    lines: mutation.workforceLines,
-                    rowVersion: mutation.rowVersion,
-                });
-
-                if (issueStock && canIssueInventory && value.issueWarehouse && value.issueLocation) {
-                    try {
-                        const movements = await issueVehicleServiceInventory(jobId, {
-                            expected_version: lineVersion,
-                            warehouse_id: value.issueWarehouse.id,
-                            warehouse_location_id: value.issueLocation.id,
-                            line_ids: [saved.id],
-                        });
-                        const movement = movements.find((candidate) => candidate.source_line_id === saved.id);
-                        const issuedLine = {
-                            ...saved,
-                            inventory_movement_id: movement?.id ?? saved.inventory_movement_id ?? null,
-                            issue_eligible: false,
-                            inventory_warning: null,
-                            status: 'issued',
-                        };
-                        const issuedLines = replaceLine(nextLines, issuedLine);
-                        linesResult.setData(issuedLines);
-                        setToast('Job line added and stock issued.');
-                        onChanged(issuedLines, lineVersion + 1, mutation.jobTotals);
-                    } catch (requestError) {
-                        linesResult.setData(nextLines);
-                        setToast('Job line added. Stock issue is still pending.');
-                        setError(toApiError(requestError));
-                        onChanged(nextLines, lineVersion, mutation.jobTotals);
-                    }
-                } else {
-                    linesResult.setData(nextLines);
-                    setToast('Job line added.');
-                    onChanged(nextLines, lineVersion, mutation.jobTotals);
-                }
-                setDialog({ mode: 'create', value: emptyLineForm() });
-                setCreateFormRevision((current) => current + 1);
-            }
+            const mutation = await updateVehicleServiceLine(jobId, dialog.lineId, payload);
+            const nextLines = replaceLine(linesResult.data ?? [], mutation.line);
+            jobStore.getState().replaceWorkforceLines({
+                lines: mutation.workforceLines,
+                rowVersion: mutation.rowVersion,
+            });
+            linesResult.setData(nextLines);
+            setToast('Job line updated.');
+            onChanged(nextLines, mutation.rowVersion, mutation.jobTotals);
+            setDialog(null);
         } catch (requestError) {
             setError(toApiError(requestError));
         } finally {
+            mutationInFlight.current = false;
+            setSaving(false);
+        }
+    };
+
+    const updateQuantity = async (line: VehicleServiceJobLine, quantity: string) => {
+        if (!canManageLines || mutationInFlight.current || compareDecimalStrings(quantity, MINIMUM_QUANTITY) < 0) return;
+        mutationInFlight.current = true;
+        setSaving(true);
+        setError(null);
+        try {
+            const value = { ...lineToForm(line), quantity };
+            const mutation = await updateVehicleServiceLine(jobId, line.id, {
+                ...lineFormToPayload(value),
+                expected_version: expectedVersion,
+            });
+            const nextLines = replaceLine(linesResult.data ?? [], mutation.line);
+            jobStore.getState().replaceWorkforceLines({
+                lines: mutation.workforceLines,
+                rowVersion: mutation.rowVersion,
+            });
+            linesResult.setData(nextLines);
+            onChanged(nextLines, mutation.rowVersion, mutation.jobTotals);
+            setToast('Quantity updated.');
+        } catch (requestError) {
+            setError(toApiError(requestError));
+        } finally {
+            mutationInFlight.current = false;
             setSaving(false);
         }
     };
 
     const removeLine = async (line: VehicleServiceJobLine) => {
-        if (!canManageLines || removing) return;
+        if (!canManageLines || mutationInFlight.current) return;
+        mutationInFlight.current = true;
         setRemoving(true);
         setError(null);
         try {
@@ -181,6 +207,7 @@ export default function VehicleServiceLineEditor({
         } catch (requestError) {
             setError(toApiError(requestError));
         } finally {
+            mutationInFlight.current = false;
             setRemoving(false);
         }
     };
@@ -220,6 +247,13 @@ export default function VehicleServiceLineEditor({
                     Showing inventory lines that are still pending stock issue.
                 </div>
             )}
+            {canManageLines && (
+                <VehicleServiceLineItemLookup
+                    value={quickAddItem}
+                    disabled={saving || removing}
+                    onChange={(item) => void addSelectedItem(item)}
+                />
+            )}
             <VehicleServiceLineTable
                 lines={visibleLines}
                 loading={loading}
@@ -227,14 +261,12 @@ export default function VehicleServiceLineEditor({
                 canViewInventory={canViewInventory}
                 canIssueInventory={canIssueInventory}
                 inventoryOnly={!canViewLines}
-                onAdd={() => {
-                    setError(null);
-                    setDialog({ mode: 'create', value: emptyLineForm() });
-                }}
+                mutationDisabled={saving || removing}
                 onEdit={(line) => {
                     setError(null);
-                    setDialog({ mode: 'edit', lineId: line.id, value: lineToForm(line) });
+                    setDialog({ lineId: line.id, value: lineToForm(line) });
                 }}
+                onQuantityChange={(line, quantity) => void updateQuantity(line, quantity)}
                 onRemove={setRemoveTarget}
                 onIssue={(line) => {
                     setError(null);
@@ -244,25 +276,18 @@ export default function VehicleServiceLineEditor({
             {canManageLines && (
                 <FormDrawer
                     open={Boolean(dialog)}
-                    title={dialog?.mode === 'edit' ? 'Edit line' : 'Add line'}
+                    title="Edit line"
                     onClose={() => !saving && setDialog(null)}
                     closeDisabled={saving}
                 >
                     {dialog && (
                         <VehicleServiceLineForm
-                            key={dialog.mode === 'edit' ? `edit-${dialog.lineId}` : `create-${createFormRevision}`}
+                            key={`edit-${dialog.lineId}`}
                             value={dialog.value}
-                            mode={dialog.mode}
                             error={error}
                             saving={saving}
-                            canIssueInventory={canIssueInventory}
-                            onClear={() => {
-                                setError(null);
-                                setDialog({ mode: 'create', value: emptyLineForm() });
-                                setCreateFormRevision((current) => current + 1);
-                            }}
                             onCancel={() => setDialog(null)}
-                            onSave={(value, issueStock) => void saveLine(value, issueStock)}
+                            onSave={(value) => void saveLine(value)}
                         />
                     )}
                 </FormDrawer>
@@ -315,8 +340,9 @@ function VehicleServiceLineTable({
     canViewInventory,
     canIssueInventory,
     inventoryOnly,
-    onAdd,
+    mutationDisabled,
     onEdit,
+    onQuantityChange,
     onRemove,
     onIssue,
 }: {
@@ -326,14 +352,22 @@ function VehicleServiceLineTable({
     canViewInventory: boolean;
     canIssueInventory: boolean;
     inventoryOnly: boolean;
-    onAdd: () => void;
+    mutationDisabled: boolean;
     onEdit: (line: VehicleServiceJobLine) => void;
+    onQuantityChange: (line: VehicleServiceJobLine, quantity: string) => void;
     onRemove: (line: VehicleServiceJobLine) => void;
     onIssue: (line: VehicleServiceJobLine) => void;
 }) {
     const [expandedComboIds, setExpandedComboIds] = useState<Set<number>>(() => new Set());
     const allRows = buildVehicleServiceLineDisplayRows(lines);
     const rows = filterCollapsedComboChildren(allRows, expandedComboIds);
+    const totalLines = allRows
+        .map((row) => row.line)
+        .filter((line) => line.parent_line_id == null && line.status !== 'cancelled');
+    const billableTotalLines = totalLines.filter((line) => line.is_billable);
+    const quantityTotal = sumDecimals(totalLines.map((line) => line.quantity));
+    const discountTotal = sumDecimals(billableTotalLines.map((line) => line.discount_amount));
+    const subtotalTotal = sumDecimals(billableTotalLines.map((line) => line.line_total));
     const toggleCombo = (comboId: number) => {
         setExpandedComboIds((current) => {
             const next = new Set(current);
@@ -346,18 +380,38 @@ function VehicleServiceLineTable({
         {
             key: 'item',
             header: 'Item',
+            footer: 'Total',
             render: (row) => renderLineItemCell(
                 row,
                 expandedComboIds.has(row.line.id),
                 () => toggleCombo(row.line.id),
+                canViewInventory,
             ),
         },
-        { key: 'quantity', header: 'Qty', render: (row) => renderLineMetric(row, row.line.quantity), className: 'tabular-nums' },
-        { key: 'uom', header: 'UOM', render: (row) => renderLineMetric(row, row.line.uom?.code ?? '-') },
-        ...(canViewInventory ? [{ key: 'stock', header: 'Stock', render: (row: VehicleServiceLineDisplayRow) => renderStockState(row.line) }] : []),
+        {
+            key: 'quantity',
+            header: 'Quantity',
+            footer: <QuantityDisplay value={quantityTotal} precision={6} minimumPrecision={1} />,
+            render: (row) => canManageLines && !row.isComboChild
+                ? <QuantityControl key={`${row.line.id}-${row.line.quantity}`} line={row.line} disabled={mutationDisabled} onChange={(quantity) => onQuantityChange(row.line, quantity)} />
+                : renderLineMetric(row, `${formatQuantity(row.line.quantity, 6, 1)} ${row.line.uom?.code ?? ''}`.trim()),
+        },
         ...(!inventoryOnly ? [
             { key: 'price', header: 'Unit price', render: renderLineUnitPrice, className: 'tabular-nums' },
-            { key: 'total', header: 'Total', render: renderLineTotal, className: 'tabular-nums font-semibold' },
+            {
+                key: 'discount',
+                header: 'Discount',
+                footer: <MoneyDisplay value={discountTotal} />,
+                render: renderLineDiscount,
+                className: 'tabular-nums',
+            },
+            {
+                key: 'total',
+                header: 'Subtotal',
+                footer: <MoneyDisplay value={subtotalTotal} />,
+                render: renderLineTotal,
+                className: 'tabular-nums font-semibold',
+            },
         ] : []),
         {
             key: 'actions',
@@ -365,9 +419,9 @@ function VehicleServiceLineTable({
             className: 'text-right',
             render: (row) => (
                 <LineActions
-                    onEdit={canManageLines && !row.isComboChild ? () => onEdit(row.line) : undefined}
-                    onRemove={canManageLines && !row.isComboChild ? () => onRemove(row.line) : undefined}
-                    onIssue={canIssueInventory && canIssueLine(row.line) ? () => onIssue(row.line) : undefined}
+                    onEdit={canManageLines && !row.isComboChild && !mutationDisabled ? () => onEdit(row.line) : undefined}
+                    onRemove={canManageLines && !row.isComboChild && !mutationDisabled ? () => onRemove(row.line) : undefined}
+                    onIssue={canIssueInventory && canIssueLine(row.line) && !mutationDisabled ? () => onIssue(row.line) : undefined}
                 />
             ),
         },
@@ -375,11 +429,6 @@ function VehicleServiceLineTable({
 
     return (
         <div className="space-y-3">
-            {canManageLines && (
-                <div className="flex justify-end">
-                    <Button type="button" onClick={onAdd}>Add line</Button>
-                </div>
-            )}
             {loading
                 ? <LoadingState />
                 : (
@@ -389,18 +438,27 @@ function VehicleServiceLineTable({
                         rowKey={(row) => row.line.id}
                         emptyMessage={inventoryOnly
                             ? 'No inventory lines remain to issue.'
-                            : 'No lines added yet. Click Add line to start.'}
+                            : 'No lines added yet. Search for an item above to start.'}
                         mobileSummary={(row) => renderMobileSummary(
                             row,
                             expandedComboIds.has(row.line.id),
                             () => toggleCombo(row.line.id),
                         )}
-                        mobileDetails={(row) => <LineMobileDetails row={row} showStock={canViewInventory} showPricing={!inventoryOnly} />}
+                        mobileDetails={(row) => (
+                            <LineMobileDetails
+                                row={row}
+                                showStock={canViewInventory}
+                                showPricing={!inventoryOnly}
+                                quantityControl={canManageLines && !row.isComboChild
+                                    ? <QuantityControl key={`${row.line.id}-${row.line.quantity}`} line={row.line} disabled={mutationDisabled} onChange={(quantity) => onQuantityChange(row.line, quantity)} />
+                                    : undefined}
+                            />
+                        )}
                         mobileActions={(row) => (
                             <LineActions
-                                onEdit={canManageLines && !row.isComboChild ? () => onEdit(row.line) : undefined}
-                                onRemove={canManageLines && !row.isComboChild ? () => onRemove(row.line) : undefined}
-                                onIssue={canIssueInventory && canIssueLine(row.line) ? () => onIssue(row.line) : undefined}
+                                onEdit={canManageLines && !row.isComboChild && !mutationDisabled ? () => onEdit(row.line) : undefined}
+                                onRemove={canManageLines && !row.isComboChild && !mutationDisabled ? () => onRemove(row.line) : undefined}
+                                onIssue={canIssueInventory && canIssueLine(row.line) && !mutationDisabled ? () => onIssue(row.line) : undefined}
                             />
                         )}
                         onRowClick={(row) => toggleCombo(row.line.id)}
@@ -467,22 +525,96 @@ function LineActions({ onEdit, onRemove, onIssue }: {
     );
 }
 
+function QuantityControl({ line, disabled, onChange }: {
+    line: VehicleServiceJobLine;
+    disabled: boolean;
+    onChange: (quantity: string) => void;
+}) {
+    const [draft, setDraft] = useState(() => formatQuantity(line.quantity, 6, 1));
+
+    const commit = () => {
+        if (compareDecimalStrings(draft, MINIMUM_QUANTITY) < 0) {
+            setDraft(formatQuantity(line.quantity, 6, 1));
+            return;
+        }
+        if (compareDecimalStrings(draft, line.quantity) !== 0) onChange(draft);
+    };
+    const decrease = () => {
+        const next = subtractDecimal(line.quantity, DEFAULT_QUANTITY);
+        if (compareDecimalStrings(next, MINIMUM_QUANTITY) < 0) return;
+        setDraft(formatQuantity(next, 6, 1));
+        onChange(next);
+    };
+    const increase = () => {
+        const next = addDecimal(line.quantity, DEFAULT_QUANTITY);
+        setDraft(formatQuantity(next, 6, 1));
+        onChange(next);
+    };
+
+    return (
+        <div className="flex items-center gap-1.5">
+            <button
+                type="button"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-sky-100 text-lg font-semibold text-sky-700 transition hover:bg-sky-200 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={disabled || compareDecimalStrings(line.quantity, DEFAULT_QUANTITY) <= 0}
+                aria-label={`Decrease quantity for ${formatLineItem(line)}`}
+                onClick={decrease}
+            >
+                −
+            </button>
+            <input
+                type="text"
+                inputMode="decimal"
+                className="h-9 w-20 rounded-lg border border-slate-300 bg-white px-2 text-center tabular-nums outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100 disabled:bg-slate-100"
+                value={draft}
+                disabled={disabled}
+                aria-label={`Quantity for ${formatLineItem(line)}`}
+                onChange={(event) => setDraft(event.target.value.replace(/[^\d.]/g, ''))}
+                onBlur={commit}
+                onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                        event.preventDefault();
+                        commit();
+                    }
+                    if (event.key === 'Escape') setDraft(formatQuantity(line.quantity, 6, 1));
+                }}
+            />
+            <button
+                type="button"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-sky-100 text-lg font-semibold text-sky-700 transition hover:bg-sky-200 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={disabled}
+                aria-label={`Increase quantity for ${formatLineItem(line)}`}
+                onClick={increase}
+            >
+                +
+            </button>
+            <span className="ml-1 text-xs font-medium text-slate-500">{line.uom?.code ?? ''}</span>
+        </div>
+    );
+}
+
 function LineMobileDetails({
     row,
     showStock,
     showPricing,
+    quantityControl,
 }: {
     row: VehicleServiceLineDisplayRow;
     showStock: boolean;
     showPricing: boolean;
+    quantityControl?: ReactNode;
 }) {
     const { line } = row;
     return (
         <div className={`grid grid-cols-2 gap-2 ${row.isComboChild ? CHILD_LINE_INDENT_CLASS : ''}`}>
-            <SummaryValue label="Qty" value={line.quantity} />
+            <SummaryValue
+                label="Quantity"
+                value={quantityControl ?? <QuantityDisplay value={line.quantity} precision={6} minimumPrecision={1} />}
+            />
             <SummaryValue label="UOM" value={line.uom?.code ?? '-'} />
             {showStock && <SummaryValue label="Stock" value={stockStateLabel(line)} />}
             {showPricing && <SummaryValue label="Price" value={row.isComboChild && !line.is_billable ? 'Included in pack' : line.unit_price} />}
+            {showPricing && <SummaryValue label="Discount" value={line.discount_amount} />}
             {showPricing && <SummaryValue label="Total" value={line.line_total} />}
         </div>
     );
@@ -536,9 +668,8 @@ function renderLineItemCell(
     row: VehicleServiceLineDisplayRow,
     expanded: boolean,
     onToggle: () => void,
+    showStock: boolean,
 ) {
-    const itemLabel = formatLineItem(row.line);
-
     if (row.isComboParent) {
         return <ComboDisclosure row={row} expanded={expanded} onToggle={onToggle} showDescription />;
     }
@@ -548,19 +679,35 @@ function renderLineItemCell(
             <div className={`${CHILD_LINE_INDENT_CLASS} relative space-y-1`}>
                 <span className="pointer-events-none absolute left-2 top-1 h-5 w-4 border-b border-l border-slate-300" aria-hidden="true" />
                 <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-medium text-slate-700">{itemLabel}</span>
+                    <span className="font-medium text-slate-700">{lineItemName(row.line)}</span>
                     <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-slate-600">
                         Included
                     </span>
                 </div>
+                {lineItemMetadata(row.line) && (
+                    <p className="text-xs text-slate-500">{lineItemMetadata(row.line)}</p>
+                )}
                 <p className="text-xs text-slate-500">
                     Under {formatLineItem(row.parent ?? row.line)}
                 </p>
+                {showStock && row.line.is_inventory_tracked && (
+                    <p className="text-xs text-slate-500">{stockStateLabel(row.line)}</p>
+                )}
             </div>
         );
     }
 
-    return <span className="text-slate-900">{itemLabel}</span>;
+    return (
+        <div className="space-y-1">
+            <span className="font-medium text-slate-900">{lineItemName(row.line)}</span>
+            {lineItemMetadata(row.line) && (
+                <p className="text-xs text-slate-500">{lineItemMetadata(row.line)}</p>
+            )}
+            {showStock && row.line.is_inventory_tracked && (
+                <p className="text-xs text-slate-500">{stockStateLabel(row.line)}</p>
+            )}
+        </div>
+    );
 }
 
 function renderLineMetric(row: VehicleServiceLineDisplayRow, value: string) {
@@ -577,7 +724,15 @@ function renderLineUnitPrice(row: VehicleServiceLineDisplayRow) {
         );
     }
 
-    return <span className={row.isComboChild ? 'text-slate-500' : ''}>{row.line.unit_price}</span>;
+    return <span className={row.isComboChild ? 'text-slate-500' : ''}><MoneyDisplay value={row.line.unit_price} /></span>;
+}
+
+function renderLineDiscount(row: VehicleServiceLineDisplayRow) {
+    if (row.isComboChild && !row.line.is_billable) {
+        return <span className="text-slate-400">-</span>;
+    }
+
+    return <span className={row.isComboChild ? 'text-slate-500' : ''}><MoneyDisplay value={row.line.discount_amount} /></span>;
 }
 
 function renderLineTotal(row: VehicleServiceLineDisplayRow) {
@@ -590,7 +745,7 @@ function renderLineTotal(row: VehicleServiceLineDisplayRow) {
         );
     }
 
-    return <span className={row.isComboChild ? 'text-slate-600' : 'text-slate-900'}>{row.line.line_total}</span>;
+    return <span className={row.isComboChild ? 'text-slate-600' : 'text-slate-900'}><MoneyDisplay value={row.line.line_total} /></span>;
 }
 
 function renderMobileSummary(
@@ -604,14 +759,24 @@ function renderMobileSummary(
 
     if (row.isComboChild) {
         return (
-            <div className={`${CHILD_LINE_INDENT_CLASS} relative`}>
+            <div className={`${CHILD_LINE_INDENT_CLASS} relative space-y-1`}>
                 <span className="pointer-events-none absolute left-2 top-1 h-5 w-4 border-b border-l border-slate-300" aria-hidden="true" />
-                <span className="font-medium text-slate-700">{formatLineItem(row.line)}</span>
+                <span className="font-medium text-slate-700">{lineItemName(row.line)}</span>
+                {lineItemMetadata(row.line) && (
+                    <span className="block text-xs font-normal text-slate-500">{lineItemMetadata(row.line)}</span>
+                )}
             </div>
         );
     }
 
-    return formatLineItem(row.line);
+    return (
+        <div className="space-y-1">
+            <span>{lineItemName(row.line)}</span>
+            {lineItemMetadata(row.line) && (
+                <span className="block text-xs font-normal text-slate-500">{lineItemMetadata(row.line)}</span>
+            )}
+        </div>
+    );
 }
 
 function ComboDisclosure({
@@ -626,6 +791,8 @@ function ComboDisclosure({
     showDescription: boolean;
 }) {
     const itemLabel = formatLineItem(row.line);
+    const itemName = lineItemName(row.line);
+    const itemMetadata = lineItemMetadata(row.line);
     const childLabel = `${row.childCount} included item${row.childCount === 1 ? '' : 's'}`;
 
     return (
@@ -648,11 +815,14 @@ function ComboDisclosure({
             </svg>
             <span className="min-w-0 space-y-1">
                 <span className="flex flex-wrap items-center gap-2">
-                    <span className="font-semibold text-slate-900">{itemLabel}</span>
+                    <span className="font-semibold text-slate-900">{itemName}</span>
                     <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-sky-700">
                         Combo pack
                     </span>
                 </span>
+                {itemMetadata && (
+                    <span className="block text-xs font-normal text-slate-500">{itemMetadata}</span>
+                )}
                 {showDescription && (
                     <span className="block text-xs font-normal text-slate-500">
                         Bundle price covers {childLabel}.
@@ -676,18 +846,24 @@ function canIssueLine(line: VehicleServiceJobLine): boolean {
         && line.status !== 'cancelled';
 }
 
+function lineItemName(line: VehicleServiceJobLine): string {
+    return line.item?.name?.trim() || line.description;
+}
+
+function lineItemMetadata(line: VehicleServiceJobLine): string {
+    const details = [line.item?.code?.trim()].filter(Boolean) as string[];
+    if (line.is_inventory_tracked) {
+        const quantity = line.available_stock_quantity == null
+            ? '-'
+            : formatQuantity(line.available_stock_quantity, 6, 1);
+        const uom = line.uom?.code ?? line.uom?.name ?? '';
+        details.push(`In stock: ${quantity}${uom ? ` ${uom}` : ''}`);
+    }
+
+    return details.join(' | ');
+}
+
 function stockStateLabel(line: VehicleServiceJobLine): string {
     if (!line.is_inventory_tracked || line.is_customer_supplied) return '-';
     return line.inventory_movement_id == null ? 'Pending issue' : 'Issued';
-}
-
-function renderStockState(line: VehicleServiceJobLine) {
-    const label = stockStateLabel(line);
-    if (label === '-') return <span className="text-slate-400">-</span>;
-
-    return (
-        <span className={`rounded-full px-2 py-1 text-xs font-semibold ${label === 'Issued' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-800'}`}>
-            {label}
-        </span>
-    );
 }
