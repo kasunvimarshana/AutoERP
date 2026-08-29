@@ -1,10 +1,11 @@
 # AutoERP Vehicle Rental Domain Knowledge Base
 
 **Status:** Canonical Vehicle Rental business/domain knowledge for a future clean implementation  
-**Knowledge refresh date:** 2026-08-27  
+**Knowledge refresh date:** 2026-08-29  
 **Authoritative engineering branch at refresh:** `worktree-0.0.8`  
-**Authoritative engineering commit reviewed before refresh:** `0b805561c622826d416fbdc4a7e39e83a291fe3f`  
-**Business evidence:** all four supplied Vehicle Rental videos plus the supplied TACGL legacy application/data archive  
+**Authoritative engineering commit reviewed before refresh:** `dee566f982e5fd6fec001b8c09b7ffd41676805e`  
+**Business evidence:** all four supplied Vehicle Rental videos plus the supplied/re-supplied TACGL legacy application/data archive  
+**Latest TACGL re-supply verified:** `TACGL(10).zip`  
 **Architecture policy:** `RULES.md` and `AGENTS.md`
 
 ---
@@ -25,6 +26,7 @@ The project rules remain binding:
 - make writes atomic, version checked and conflict aware;
 - keep module ownership explicit;
 - never expose raw IDs or database structures to ordinary users;
+- do not embed hardcoded business magic values when a named enum, constant, configuration source or approved policy is the correct owner;
 - prefer the simplest clean solution that preserves data integrity.
 
 As of the engineering commit named above, Vehicle Rental is intentionally retired from the active AutoERP runtime. This knowledge base therefore describes the **business domain and clean target foundation for a future rebuild**. It does not claim that the described Rental workflows are currently active in AutoERP.
@@ -46,30 +48,58 @@ The following four videos are authoritative business evidence:
 
 Total reviewed footage represented by the audit evidence is approximately **1 hour 56 minutes 26 seconds**.
 
+The video evidence was reviewed end-to-end through full-timeline visual auditing, transition-focused inspection and full-resolution review of business-significant screens. The workshop-focused recording is authoritative only for shared vehicle/workshop availability implications; it is not used to invent Rental-specific formulas.
+
 The strongest video-level domain conclusion is:
 
 > **One physical Daily Running Chart is shared operational evidence, while customer billing and owner settlement are independent commercial calculations using different agreements/rates.**
 
 ### 2.2 TACGL business source
 
-The supplied TACGL archives are authoritative legacy business/accounting evidence. The latest supplied `TACGL(6).zip` was independently hashed and is byte-identical to the previously audited TACGL archive. SHA-256:
+The supplied TACGL archives are authoritative legacy business/accounting evidence. The latest supplied `TACGL(10).zip` was independently re-audited and hashed.
+
+SHA-256:
 
 `0e0733fff720072af4c3aaa787995ff128bfa79060a37739d6d2ebbe18a25313`
 
-Therefore `TACGL(3).zip`, the later re-supplied TACGL copies with this exact hash, and `TACGL(6).zip` represent the same evidence corpus rather than independent conflicting datasets.
+Archive-level verification for `TACGL(10).zip`:
+
+- compressed size: **59,554,116 bytes**;
+- total archive entries: **456**;
+- non-directory files: **452**;
+- directories: **4**;
+- uncompressed size: **420,055,750 bytes**;
+- 114 DBF files;
+- 109 FRT files;
+- 109 FRX files;
+- 46 IDX files;
+- 32 CDX files;
+- 16 PDFs;
+- 5 XLS exports;
+- Visual FoxPro DBC/DCT/DCX, runtime/application and backup artifacts.
+
+This hash is byte-identical to the previously audited canonical TACGL archive. Therefore earlier re-supplied TACGL copies with this exact hash, including `TACGL(6).zip` and the latest `TACGL(10).zip`, are the **same evidence corpus**, not independent corroborating datasets.
+
+The 2026-08-29 re-audit independently reproduced the existing key evidence: exact customer Rental lineage, non-calendar billing cycles, partial-period arithmetic precedents, Rental Payment activity, Outside Work semantics, duplicate registration groups, deleted/replaced transactions, and legacy workshop-account routing. No conflicting business evidence was found.
 
 TACGL is a Visual FoxPro-era operational/accounting system containing vehicle, workshop, customer, creditor, invoice, subledger and General Ledger data. It is highly valuable as evidence of actual business usage, but it is not a clean Vehicle Rental architecture.
 
 ### 2.3 Engineering source
 
-The latest `worktree-0.0.8` branch is authoritative for current AutoERP engineering state, ownership boundaries and existing module capabilities. Business source evidence does not override current project architecture rules.
+The latest `worktree-0.0.8` branch is authoritative for current AutoERP engineering state, ownership boundaries and existing module capabilities. Before this refresh its verified HEAD was:
+
+`dee566f982e5fd6fec001b8c09b7ffd41676805e` (`Deepen Vehicle Rental TACGL knowledge`).
+
+At that state the active `app/Modules/VehicleRental` runtime is absent. The active Vehicle module does expose the shared `VehicleAvailabilityBlockerInterface`, which is the correct cross-module boundary for Rental/Vehicle Service availability integration rather than moving one module's business rules into the other.
+
+Business source evidence does not override current project architecture rules.
 
 ### 2.4 Evidence labels
 
 This knowledge base uses these meanings:
 
-- **Observed — Video:** directly visible in supplied video screens, reports, menus or printed outputs.
-- **Observed — TACGL:** directly found in supplied TACGL tables, reports or exports.
+- **Observed - Video:** directly visible in supplied video screens, reports, menus or printed outputs.
+- **Observed - TACGL:** directly found in supplied TACGL tables, reports or exports.
 - **Cross-source conclusion:** supported by both source sets or by multiple independent source facts.
 - **Derived integrity requirement:** required to preserve observed business meaning safely; not a claim that legacy systems enforced it correctly.
 - **Target design:** recommended AutoERP responsibility/architecture derived from business evidence plus project rules.
@@ -209,7 +239,7 @@ Customer billing and owner settlement are parallel consumers of shared usage evi
 
 ### 6.1 Vehicle
 
-**Observed — Video** Vehicle Register concepts include:
+**Observed - Video** Vehicle Register concepts include:
 
 - registration/vehicle number;
 - registered owner;
@@ -231,7 +261,7 @@ Customer billing and owner settlement are parallel consumers of shared usage evi
 - revenue licence expiry;
 - insurance expiry.
 
-**Observed — TACGL:** `scfveh` contains vehicle registration, debtor/commercial context, make/name/address/contact and vehicle-type data.
+**Observed - TACGL:** `scfveh` contains vehicle registration, debtor/commercial context, make/name/address/contact and vehicle-type data.
 
 The separate `vehtyp` vocabulary defines Own/Hired/Outside labels, but all **1,076 non-deleted `scfveh` rows** in the inspected archive carry `VEHTYP = 03` (`OUTSIDE VEHICAL`). Therefore that field is not trustworthy as authoritative ownership/supply truth.
 
@@ -296,7 +326,7 @@ Employee driver identity belongs to HR; Vehicle Rental references approved drive
 
 ## 7. Lessee / Customer Agreement
 
-**Observed — Video** concepts include:
+**Observed - Video** concepts include:
 
 - agreement date and number;
 - customer/lessee;
@@ -331,7 +361,7 @@ Employee driver identity belongs to HR; Vehicle Rental references approved drive
 
 ## 8. Lessor / Vehicle Owner Agreement
 
-**Observed — Video** concepts include:
+**Observed - Video** concepts include:
 
 - lessor/owner;
 - agreement number/date/period;
@@ -391,7 +421,7 @@ Preserve that practical simplicity in the UI while maintaining a clean backend r
 
 ## 10. Handover, return and replacement
 
-**Observed — Video:** self-drive handover/return concepts, Daily Running Chart, Replacement Running Chart and original/replacement reporting exist.
+**Observed - Video:** self-drive handover/return concepts, Daily Running Chart, Replacement Running Chart and original/replacement reporting exist.
 
 ### Target behavior
 
@@ -407,7 +437,7 @@ The sources do not prove exact customer charging, owner payment, KM entitlement,
 
 ---
 
-## 11. Daily Running Chart — central operational evidence
+## 11. Daily Running Chart - central operational evidence
 
 The Running Chart is the core physical evidence of Vehicle Rental operations.
 
@@ -455,7 +485,7 @@ The videos do not prove a mandatory maker-checker chain. Use the minimum approve
 
 ## 12. Customer billing
 
-**Observed — Video:** customer Credit Invoice processing includes customer/agreement/period, total/excess KM, overtime, night-outs, days/hires, rental/excess rates, driver-related recovery, tax, total, Running Chart import and print/PDF output.
+**Observed - Video:** customer Credit Invoice processing includes customer/agreement/period, total/excess KM, overtime, night-outs, days/hires, rental/excess rates, driver-related recovery, tax, total, Running Chart import and print/PDF output.
 
 Representative component model:
 
@@ -480,7 +510,7 @@ This is a component vocabulary, not permission to invent unknown formulas.
 
 - Effective Lessee Agreement/rate version determines commercial rates.
 - Only eligible finalized customer-side unconsumed usage is selectable.
-- Operator sees a human-readable quantity × rate breakdown.
+- Operator sees a human-readable quantity x rate breakdown.
 - Exact source identities, quantities, rates, period and tax snapshots persist.
 - Same-side duplicate consumption is impossible.
 - Vehicle Rental owns the source/calculation plan; Invoice owns financial document lifecycle/balance/reversal.
@@ -511,7 +541,7 @@ Persist enough facts to reproduce the posted value:
 
 The owner side is an independent payable/cost calculation.
 
-**Observed — Video:** owner payable processing, statements, cash/petty-cash/cheque payments, receipts, debit/credit notes, fuel/repair deductions, allocations, vehicle-wise statements and unallocated transaction reports.
+**Observed - Video:** owner payable processing, statements, cash/petty-cash/cheque payments, receipts, debit/credit notes, fuel/repair deductions, allocations, vehicle-wise statements and unallocated transaction reports.
 
 Representative component vocabulary:
 
@@ -545,7 +575,7 @@ Exact tax/withholding order and rounding are policy decisions unless explicitly 
 
 ---
 
-## 14. TACGL archive structure — deep audit
+## 14. TACGL archive structure - deep audit
 
 The byte-identical TACGL archive contains **452 non-directory files**.
 
@@ -586,7 +616,7 @@ These counts describe this evidence archive; they are not a target schema.
 
 ### Legacy PDF/XLS evidence
 
-The archive has 16 PDFs totaling **63 pages**. The readable PDFs are predominantly `Debtor's Outstanding Age Analysis` outputs and confirm customer/reference/job/vehicle aging and receivable traceability. They do not establish a new Rental pricing formula.
+The archive has 16 PDFs totaling **63 pages**. The readable PDFs are predominantly `Debtor's Outstanding Age Analysis` outputs and confirm customer/reference/job/vehicle aging and receivable traceability. One PDF in the supplied archive renders as an empty page and adds no Rental rule. The PDF set does not establish a new Rental pricing formula.
 
 The five XLS files are legacy exports/report artifacts; their existence supports export/report operations but is not a reason to reproduce legacy report storage patterns.
 
@@ -620,7 +650,7 @@ Active `jobtxn` references map as:
 
 ---
 
-## 16. TACGL customer Rental billing — exact lineage
+## 16. TACGL customer Rental billing - exact lineage
 
 TACGL embeds many Rental charges inside workshop-style RMS jobs and `LCH` lines.
 
@@ -645,7 +675,7 @@ Example:
 - stored line value: `105,480`;
 - invoice: `INV2005519`.
 
-Arithmetic: `1,172 × 90 = 105,480`.
+Arithmetic: `1,172 x 90 = 105,480`.
 
 That line flowed to:
 
@@ -654,6 +684,8 @@ That line flowed to:
 - later receipt `REC2003089` allocating `105,480` against `INV2005519`;
 - GL credit `0001-005 SALES: - BREAKDOWN` for `105,480`;
 - GL debit `5000-000 TRADE DEBTORS` for `105,480`.
+
+The re-audit of `TACGL(10).zip` independently reproduced these exact references and amounts.
 
 This proves the end-to-end legacy customer chain:
 
@@ -679,14 +711,14 @@ For `LCH2005407`:
 - `TXNQTY` is empty;
 - `TXNRATE = 105,480`;
 - `TXNVAL = 105,480`;
-- the meaningful quantity/rate `1,172 KM × 90` exists in text.
+- the meaningful quantity/rate `1,172 KM x 90` exists in text.
 
 Other correct arithmetic examples include:
 
-- `1,165 KM × 65 = 75,725`;
-- `1,082 KM × 90 = 97,380`;
-- `1,962 KM × 75 = 147,150`;
-- `635 KM × 65 = 41,275`.
+- `1,165 KM x 65 = 75,725`;
+- `1,082 KM x 90 = 97,380`;
+- `1,962 KM x 75 = 147,150`;
+- `635 KM x 65 = 41,275`.
 
 At least one observed legacy line has **text/amount disagreement**: a detail describes `1,080KM *90.00` while the stored value is `81,000`, which does not match that textual arithmetic. This is direct evidence that free-text calculation narratives are not a safe source of truth.
 
@@ -733,19 +765,18 @@ For vehicle `CBM-9887`, full monthly lines show `225,000` for 18th-to-17th perio
 
 This exactly matches:
 
-`225,000 × 13 / 30 = 97,500`.
+`225,000 x 13 / 30 = 97,500`.
 
 ### 18.2 Owner/payment-side partial-period precedent
 
 A `PRB` rental-payment row shows:
 
-- payee `B M K M BALASOORIYA...`;
 - description `RENTAL PAYMENT 21DAYS`;
 - amount `126,000`.
 
-The same payee later has full-month Rental Payment entries of `180,000`. Arithmetic matches:
+The same recurring payment context has full-month Rental Payment entries of `180,000`. Arithmetic matches:
 
-`180,000 × 21 / 30 = 126,000`.
+`180,000 x 21 / 30 = 126,000`.
 
 ### Policy boundary
 
@@ -777,6 +808,8 @@ The active Outside Work amount `119,250` flowed to:
 
 The same job produced customer invoice `INV2005580` for `289,400`.
 
+The re-audit of `TACGL(10).zip` reproduced `TXNTYPE = 2`, the active cost lines, the deleted excess-KM line, creditor entry and GL Pending Jobs/Trade Creditors postings. Therefore `OWN...` is definitively Outside Work evidence in this corpus.
+
 This demonstrates a valid business need for:
 
 - sourcing a third-party vehicle/hire service;
@@ -795,7 +828,7 @@ The GL account master contains:
 
 `7048-000 RENTAL PAYMENT`
 
-The inspected active GL data has **25 positive debit rows across 21 `PRB...` bank-payment vouchers** to this account.
+The inspected active GL data has **25 positive debit rows across 21 `PRB...` bank-payment vouchers** to this account. The 2026-08-29 re-audit reproduced the same counts and account description.
 
 Descriptions include:
 
@@ -806,8 +839,6 @@ Descriptions include:
 - Hiring Payment Van.
 
 Some vouchers aggregate multiple vehicle detail lines. Example `PRB1000970` contains separate Rental Payment lines for `CBD-3677`, `CAD-1608` and `CBJ-6594` against one payment reference/payee context.
-
-The counterpart is a bank account such as `4202-000 BANK BALANCE - 1`.
 
 This proves an actual legacy practice:
 
@@ -861,7 +892,7 @@ The legacy system therefore demonstrates real correction/re-entry behavior but n
 
 ## 22. Deposits, advances, refunds and adjustments
 
-**Observed — Video:** security-deposit fields exist; both lessor and lessee menus contain receipts, payments, debit notes and credit notes.
+**Observed - Video:** security-deposit fields exist; both lessor and lessee menus contain receipts, payments, debit notes and credit notes.
 
 TACGL narratives additionally contain examples suggesting rental deductions/claims/excess/write-off handling. Those narratives prove adjustment capability is needed but do not prove the exact liability policy.
 
@@ -890,7 +921,7 @@ TACGL narratives additionally contain examples suggesting rental deductions/clai
 
 ## 23. Receipts, payments and allocations
 
-**Observed — Video:** cash, petty cash, cheque, receipts, payments, debit/credit notes, allocations and unallocated-transaction reports exist on both commercial sides.
+**Observed - Video:** cash, petty cash, cheque, receipts, payments, debit/credit notes, allocations and unallocated-transaction reports exist on both commercial sides.
 
 ### Customer-side semantics
 
@@ -929,7 +960,7 @@ TACGL exact trace `INV2005519 -> REC2003089` confirms that allocation history is
 
 ## 24. Cheque lifecycle and bank reconciliation
 
-**Observed — Video:** payment date, voucher/reference, bank, cheque number/date, crossed/bearer/account-payee-style options, payee, amount, detail lines, print and realization/reconciliation workflows exist.
+**Observed - Video:** payment date, voucher/reference, bank, cheque number/date, crossed/bearer/account-payee-style options, payee, amount, detail lines, print and realization/reconciliation workflows exist.
 
 ### Target rules
 
@@ -996,8 +1027,8 @@ A business source must not be marked financially posted if required Tax/Finance 
 
 ### Operational/Running Chart reports observed
 
-- Log Sheet — Lessee;
-- Log Sheet — Lessor;
+- Log Sheet - Lessee;
+- Log Sheet - Lessor;
 - replacement by original vehicle;
 - replacement by replacement vehicle;
 - vehicle log-entry checks;
@@ -1068,6 +1099,8 @@ Customer + Vehicle
 
 A vehicle under a blocking workshop/off-road/breakdown condition is not eligible for conflicting Rental allocation/use. Vehicle Service publishes/owns its hold through the Vehicle availability boundary. Rental queries/enforces it without importing workshop business logic.
 
+The current authoritative branch already exposes `Modules\Vehicle\Contracts\VehicleAvailabilityBlockerInterface` with the shared `vehicle.availability_blocker` tag. A future Rental module should integrate through this owned contract rather than adding Workshop logic inside Rental or Rental logic inside Vehicle Service.
+
 Rental must never clear a hold it does not own.
 
 ---
@@ -1125,6 +1158,7 @@ Unless later explicit business evidence supersedes them:
 21. Billing period boundaries come from the agreement cycle/policy, not an assumption that every monthly cycle is calendar month.
 22. Commercial component quantity/rate/amount facts are structured; free text is explanatory only.
 23. Third-party hire cost and customer recovery may be related for profitability but one side does not calculate the other.
+24. Predefined option sets are represented by named domain enums/value types; shared immutable values use named constants; environment/changing values belong to configuration, not embedded raw literals.
 
 ---
 
@@ -1172,7 +1206,7 @@ Rules:
 - show only relevant rate fields;
 - progressive disclosure for optional/advanced data;
 - show eligible source Running Charts before posting;
-- show quantity × rate breakdown from structured facts;
+- show quantity x rate breakdown from structured facts;
 - show agreement/rate effective dates;
 - explain blockers such as overlap, stale version, workshop hold, closed period or already-consumed source;
 - keep handover/return/replacement contextual;
@@ -1191,7 +1225,7 @@ Rules:
 - early return/extension treatment;
 - minimum billable period.
 
-TACGL now provides fixed-30-day arithmetic **precedents**, but not enough evidence to promote them to a universal rule.
+TACGL provides fixed-30-day arithmetic **precedents**, but not enough evidence to promote them to a universal rule.
 
 ### Included/free kilometres and excess kilometres
 
@@ -1287,12 +1321,12 @@ Strong evidence around:
 
 Representative timeline evidence includes approximately:
 
-- 03-04 min — Lessee Agreement;
-- 05-06 min — customer invoice/calculation;
-- 11-15 min — owner agreement/Running Chart context;
-- 24-27 min — owner agreement/payable;
-- 30-36 min — owner statement/deductions/allocation;
-- final minutes — cheque/GL/bank reconciliation.
+- 03-04 min - Lessee Agreement;
+- 05-06 min - customer invoice/calculation;
+- 11-15 min - owner agreement/Running Chart context;
+- 24-27 min - owner agreement/payable;
+- 30-36 min - owner statement/deductions/allocation;
+- final minutes - cheque/GL/bank reconciliation.
 
 ### `Recording 2026-06-21 132314.mp4`
 
@@ -1358,14 +1392,14 @@ It does not define Rental agreement/billing/settlement formulas.
 | `tacdata/scfglt.DBF` | Invoice GL lineage and direct `PRB` Rental Payment evidence |
 | `tacdata/password.DBF` | Legacy security pattern that must not be copied |
 | `del_*`, temp/backup artifacts | Mutable/repair-oriented legacy operational patterns, not target architecture |
-| `PDFFILES/*.PDF` | Debtor Outstanding Age Analysis exports; 16 PDFs / 63 pages |
+| `PDFFILES/*.PDF` | Debtor Outstanding Age Analysis exports; 16 PDFs / 63 pages, plus one empty-page artifact |
 | `PDFFILES/*.XLS` | Legacy report/export artifacts |
 
 ---
 
 ## 35. Current AutoERP implementation status
 
-At the authoritative engineering state reviewed before this refresh:
+At the authoritative engineering state reviewed before this refresh (`dee566f982e5fd6fec001b8c09b7ffd41676805e`):
 
 - active `app/Modules/VehicleRental` runtime is removed;
 - active `resources/js/modules/vehicle-rental` frontend is removed;
@@ -1373,9 +1407,10 @@ At the authoritative engineering state reviewed before this refresh:
 - Rental-specific Reporting runtime/tests are removed;
 - new-tenant Rental-specific Finance seeds are removed;
 - fresh-install Rental source migrations are removed;
-- historical `InvoiceType::Rental` and necessary Finance/Payment vocabulary remain only for already-posted history;
-- no destructive migration blindly drops already-deployed Rental historical tables/data;
-- Vehicle and Vehicle Service remain active.
+- historical Rental-related Finance/Payment vocabulary may remain only where required for already-posted history;
+- no destructive migration should blindly drop already-deployed Rental historical tables/data;
+- Vehicle and Vehicle Service remain active;
+- Vehicle exposes the shared availability-blocker contract used by active modules.
 
 This documentation refresh does **not** restore the retired Rental runtime.
 
@@ -1438,6 +1473,8 @@ Do not call the implementation complete until it proves:
 10. Keep `/docs/changes` append-only.
 11. When a re-supplied TACGL archive has the same SHA-256, treat it as the same evidence corpus; do not pretend it is independent corroboration.
 12. New deep-audit findings should strengthen or narrow evidence confidence without turning a single historical example into a universal rule.
+13. If a policy would otherwise require a hardcoded number/string, first identify the correct owning enum, constant, configuration source or approved policy object.
+14. Relationship changes require evidence of ownership/purpose and impact; do not simplify by deleting a relationship that represents a valid business invariant.
 
 ---
 
