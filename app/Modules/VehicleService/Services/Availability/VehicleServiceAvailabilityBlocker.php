@@ -26,7 +26,7 @@ final class VehicleServiceAvailabilityBlocker implements VehicleAvailabilityBloc
         $startsOn = substr($startsAt, 0, 10);
         $endsOn = substr($endsAt ?? $startsAt, 0, 10);
         $blocked = VehicleServiceJob::query()
-            ->forContext($tenantId, $organizationUnitId)
+            ->where('tenant_id', $tenantId)
             ->where('vehicle_id', $vehicleId)
             ->whereIn('status', self::BLOCKING_STATUSES)
             ->whereDate('job_date', '<=', $endsOn)
