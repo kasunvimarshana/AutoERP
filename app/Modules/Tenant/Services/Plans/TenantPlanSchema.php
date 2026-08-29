@@ -10,14 +10,15 @@ use Modules\Core\Tenancy\TenantPlanLimit;
 
 final class TenantPlanSchema
 {
-    public const SCHEMA_VERSION = 3;
+    public const SCHEMA_VERSION = 4;
 
-    private const RETIRED_VEHICLE_RENTAL_MODULE = 'vehicle-rental';
+    private const LEGACY_VEHICLE_RENTAL_MODULE = 'vehicle-rental';
 
     /** @var array<int, list<string>> */
     private const RETIRED_MODULES_BY_SCHEMA_VERSION = [
-        1 => [self::RETIRED_VEHICLE_RENTAL_MODULE],
-        2 => [self::RETIRED_VEHICLE_RENTAL_MODULE],
+        1 => [self::LEGACY_VEHICLE_RENTAL_MODULE],
+        2 => [self::LEGACY_VEHICLE_RENTAL_MODULE],
+        3 => [self::LEGACY_VEHICLE_RENTAL_MODULE],
     ];
 
     /** @var list<string> */
@@ -42,6 +43,7 @@ final class TenantPlanSchema
         TenantFeature::PURCHASE => 'Purchasing',
         TenantFeature::VEHICLE => 'Vehicles',
         TenantFeature::VEHICLE_SERVICE => 'Vehicle service',
+        TenantFeature::VEHICLE_RENTAL => 'Vehicle rental',
         TenantFeature::INVOICE => 'Invoicing',
         TenantFeature::PAYMENT => 'Payments',
         TenantFeature::FINANCE => 'Finance',
