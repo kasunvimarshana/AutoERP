@@ -70,6 +70,8 @@ final class VehicleServiceLineCalculationService
             'line_source_type' => $data->lineSourceType->value,
             'item_id' => $data->itemId,
             'item_variant_id' => $data->itemVariantId,
+            'batch_id' => $data->batchId,
+            'batch_price_revision_id' => $data->batchPriceRevisionId,
             'uom_id' => $data->uomId ?? $item?->base_uom_id,
             'description' => trim($data->description),
             'quantity' => $this->math->normalize($data->quantity),

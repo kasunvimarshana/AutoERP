@@ -103,6 +103,9 @@ export interface VehicleServiceJobLine {
     item?: NamedResource | null;
     item_variant_id?: number | null;
     item_variant?: NamedResource | null;
+    batch_id?: number | null;
+    batch?: (NamedResource & { batch_number?: string; lot_number?: string }) | null;
+    batch_price_revision_id?: number | null;
     uom_id?: number | null;
     uom?: NamedResource | null;
     description: string;
@@ -272,6 +275,9 @@ export interface VehicleServiceLinePayload {
     expected_version?: number;
     line_source_type: VehicleServiceLineSourceType;
     item_id?: number;
+    item_variant_id?: number;
+    batch_id?: number;
+    batch_price_revision_id?: number;
     uom_id?: number;
     description: string;
     quantity: string;

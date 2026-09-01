@@ -77,7 +77,8 @@ describe('LineItemFields', () => {
         const stock = { id: 1, name: 'Oil', item_type: 'stock', is_stockable: true } satisfies ItemLookupResource;
         const invalid = { id: 2, name: 'Invalid non-stock', item_type: 'non_stock', is_stockable: true } satisfies ItemLookupResource;
         const service = { id: 3, name: 'Inspection', item_type: 'service' } satisfies ItemLookupResource;
-        vi.spyOn(lookupApi, 'stockableItems').mockResolvedValue({ data: [stock, invalid] });
+        vi.spyOn(lookupApi, 'untrackedStockableItems').mockResolvedValue({ data: [stock, invalid] });
+        vi.spyOn(lookupApi, 'serviceBatchItems').mockResolvedValue({ data: [] });
         vi.spyOn(lookupApi, 'serviceItems').mockResolvedValue({ data: [service] });
         vi.spyOn(lookupApi, 'labourItems').mockResolvedValue({ data: [] });
         vi.spyOn(lookupApi, 'comboItems').mockResolvedValue({ data: [stock] });

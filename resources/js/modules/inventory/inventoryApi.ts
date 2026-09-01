@@ -9,6 +9,9 @@ import type {
     AdjustmentPayload,
     CostAdjustmentPayload,
     InventoryAvailability,
+    InventoryBatchPayload,
+    InventoryBatchPricePayload,
+    InventoryBatchPrice,
     InventoryRecord,
     OpeningStockImportPreview,
     ReservationPayload,
@@ -120,6 +123,18 @@ export const postStockCount = (id: number) =>
 export const listBatches = (params: ListParams, signal?: AbortSignal) =>
     apiClient.get<ApiCollection<InventoryRecord>>(`${endpoints.inventory}/batches`, { params, signal }).then((response) => response.data);
 
+export const createInventoryBatch = (payload: InventoryBatchPayload) =>
+    apiClient.post<ApiResource<InventoryRecord>>(`${endpoints.inventory}/batches`, payload).then((response) => response.data.data);
+
+export const listBatchPrices = (params: ListParams, signal?: AbortSignal) =>
+    apiClient.get<ApiCollection<InventoryBatchPrice>>(`${endpoints.inventory}/batch-prices`, { params, signal }).then((response) => response.data);
+
+export const createBatchPrice = (payload: InventoryBatchPricePayload) =>
+    apiClient.post<ApiResource<InventoryBatchPrice>>(`${endpoints.inventory}/batch-prices`, payload).then((response) => response.data.data);
+
+export const supersedeBatchPrice = (id: number, payload: InventoryBatchPricePayload) =>
+    apiClient.post<ApiResource<InventoryBatchPrice>>(`${endpoints.inventory}/batch-prices/${id}/supersede`, payload).then((response) => response.data.data);
+
 export const listSerials = (params: ListParams, signal?: AbortSignal) =>
     apiClient.get<ApiCollection<InventoryRecord>>(`${endpoints.inventory}/serials`, { params, signal }).then((response) => response.data);
 
@@ -181,7 +196,10 @@ function toNamedResource(row: InventoryRecord, primaryKey: string, fallbackKey?:
     const code = String(row[primaryKey] ?? (fallbackKey ? row[fallbackKey] : '') ?? '');
     const item = readableRelation(row.item);
     const variant = readableRelation(row.variant);
-    const context = [item, variant].filter((value) => value !== '-').join(' / ');
+    const lot = primaryKey === 'batch_number' && typeof row.lot_number === 'string' && row.lot_number.trim()
+        ? `Lot ${row.lot_number.trim()}`
+        : null;
+    const context = [item, variant, lot].filter((value) => value !== '-' && value !== null).join(' / ');
 
     return {
         id: Number(row.id),

@@ -30,6 +30,7 @@ final class VehicleServiceLineController extends VehicleServiceController
                 'item',
                 'variant',
                 'uom',
+                'batch',
                 'children.item',
                 'children.uom',
                 'employeeAssignments.employee',

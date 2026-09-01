@@ -14,7 +14,7 @@ import { decimalOr, todayDate } from '../purchaseFormUtils';
 import { normalizeSourceId, sourceKey } from '../sourceIdentity';
 import { useInitialSourceParam, type InitialSourceCommand, type InitialSourceParamDefinition } from '../hooks/useInitialSourceParam';
 import { PurchaseOrderLookupSelect, WarehouseLocationLookupSelect } from './PurchaseLookups';
-import { GoodsReceiptLineEditor, type EditableGoodsReceiptLine } from './GoodsReceiptLineEditor';
+import { batchAllocationIssue, GoodsReceiptLineEditor, type EditableGoodsReceiptLine } from './GoodsReceiptLineEditor';
 
 const initialSourceParams: Array<InitialSourceParamDefinition<'purchase_order'>> = [
     { sourceType: 'purchase_order', paramNames: ['purchase_order_id', 'source_id'] },
@@ -31,7 +31,7 @@ function orderLabel(order: PurchaseOrder): NamedResource {
 function editableLine(line: PurchaseOrderLine): EditableGoodsReceiptLine | null {
     if (normalizeSourceId(line.id) === null) return null;
 
-    return { source: line, include: false, received_quantity: '0.000000', accepted_quantity: '0.000000', rejected_quantity: '0.000000' };
+    return { source: line, include: false, received_quantity: '0.000000', accepted_quantity: '0.000000', rejected_quantity: '0.000000', batch_allocations: [] };
 }
 
 export function GoodsReceiptForm() {
@@ -60,6 +60,11 @@ export function GoodsReceiptForm() {
         isPositiveDecimal(line.received_quantity)
         || isPositiveDecimal(line.accepted_quantity)
         || isPositiveDecimal(line.rejected_quantity)
+    ));
+    const incompleteBatchLines = lines.filter((line) => (
+        line.include
+        && isPositiveDecimal(line.received_quantity)
+        && batchAllocationIssue(line) !== null
     ));
 
     const setPurchaseOrder = useCallback((next: NamedResource | null) => {
@@ -180,6 +185,14 @@ export function GoodsReceiptForm() {
             accepted_quantity: decimalOr(line.accepted_quantity),
             rejected_quantity: decimalOr(line.rejected_quantity),
             unit_price: decimalOr(line.source.unit_price),
+            batch_allocations: line.batch_allocations.map((allocation) => ({
+                batch_id: allocation.batch?.id,
+                batch_number: allocation.batch ? undefined : allocation.batch_number.trim() || undefined,
+                lot_number: allocation.batch ? undefined : allocation.lot_number.trim() || undefined,
+                manufacture_date: allocation.batch ? undefined : allocation.manufacture_date || undefined,
+                expiry_date: allocation.batch ? undefined : allocation.expiry_date || undefined,
+                quantity: decimalOr(allocation.quantity),
+            })),
         })),
     });
     const changePurchaseOrder = async (next: NamedResource | null) => {
@@ -237,6 +250,11 @@ export function GoodsReceiptForm() {
                 )}
             </Panel>
             <Panel title="Receivable lines">
+                {incompleteBatchLines.length > 0 && (
+                    <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                        {incompleteBatchLines.length} batch/lot tracked line{incompleteBatchLines.length === 1 ? '' : 's'} need a complete allocation. Open <strong>Edit line</strong> and allocate the full accepted quantity before creating the GRN.
+                    </div>
+                )}
                 {loadingLines ? <div className="text-sm text-slate-500">Loading source lines...</div> : <GoodsReceiptLineEditor lines={lines} currencyCode={sourceOrder?.currency?.code ?? undefined} onChange={setLines} errorFor={errorFor} />}
             </Panel>
             <Panel title="Notes">
@@ -244,7 +262,7 @@ export function GoodsReceiptForm() {
             </Panel>
             <div className="flex justify-end gap-2">
                 <Button type="button" variant="secondary" onClick={() => navigate('/purchase/goods-receipts')}>Cancel</Button>
-                <Button type="submit" loading={submitting} disabled={loadingLines}>Create GRN</Button>
+                <Button type="submit" loading={submitting} disabled={loadingLines || incompleteBatchLines.length > 0}>Create GRN</Button>
             </div>
             {confirmDialog}
         </form>

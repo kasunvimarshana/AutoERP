@@ -7,28 +7,52 @@ namespace Modules\Inventory\Constants;
 final class InventoryPermission
 {
     public const STOCK_VIEW = 'inventory.stock.view';
+
     public const AUDIT_VIEW = 'inventory.audit.view';
+
     public const RESERVATIONS_VIEW = 'inventory.reservations.view';
+
     public const RESERVATIONS_MANAGE = 'inventory.reservations.manage';
+
     public const ALLOCATIONS_VIEW = 'inventory.allocations.view';
+
     public const ALLOCATIONS_MANAGE = 'inventory.allocations.manage';
+
     public const ALLOCATIONS_ISSUE = 'inventory.allocations.issue';
+
     public const ADJUSTMENTS_VIEW = 'inventory.adjustments.view';
+
     public const ADJUSTMENTS_MANAGE = 'inventory.adjustments.manage';
+
     public const ADJUSTMENTS_POST = 'inventory.adjustments.post';
+
     public const TRANSFERS_VIEW = 'inventory.transfers.view';
+
     public const TRANSFERS_MANAGE = 'inventory.transfers.manage';
+
     public const TRANSFERS_DISPATCH = 'inventory.transfers.dispatch';
+
     public const TRANSFERS_RECEIVE = 'inventory.transfers.receive';
+
     public const VALUATION_VIEW = 'inventory.valuation.view';
+
     public const COST_ADJUSTMENTS_VIEW = 'inventory.cost_adjustments.view';
+
     public const COST_ADJUSTMENTS_MANAGE = 'inventory.cost_adjustments.manage';
+
     public const COST_ADJUSTMENTS_POST = 'inventory.cost_adjustments.post';
+
     public const STOCK_COUNTS_VIEW = 'inventory.stock_counts.view';
+
     public const STOCK_COUNTS_MANAGE = 'inventory.stock_counts.manage';
+
     public const STOCK_COUNTS_APPROVE = 'inventory.stock_counts.approve';
+
     public const STOCK_COUNTS_POST = 'inventory.stock_counts.post';
+
     public const TRACKING_VIEW = 'inventory.tracking.view';
+
+    public const TRACKING_MANAGE = 'inventory.tracking.manage';
 
     /** @return array<string, string> */
     public static function descriptions(): array
@@ -57,6 +81,7 @@ final class InventoryPermission
             self::STOCK_COUNTS_APPROVE => 'Approve stock counts.',
             self::STOCK_COUNTS_POST => 'Post stock counts.',
             self::TRACKING_VIEW => 'View inventory batch and serial tracking records.',
+            self::TRACKING_MANAGE => 'Create inventory batches and maintain batch price revisions.',
         ];
     }
 }

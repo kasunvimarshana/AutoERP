@@ -20,7 +20,7 @@ $middleware = [
 
 Route::prefix('api/v1')->middleware($middleware)->name('api.v1.')->group(function (): void {
     Route::get('items/lookup/{kind?}', [ItemController::class, 'lookup'])
-        ->whereIn('kind', ['stockable', 'service', 'labour', 'combo', 'package'])
+        ->whereIn('kind', ['stockable', 'untracked-stockable', 'batch-tracked-stockable', 'service', 'labour', 'combo', 'package'])
         ->name('items.lookup');
     Route::get('items/usage-modules', [ItemController::class, 'usageModules'])->name('items.usage-modules');
     Route::post('items/with-relations', [ItemController::class, 'storeWithRelations'])->name('items.with-relations.store');

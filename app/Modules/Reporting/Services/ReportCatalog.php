@@ -17,6 +17,7 @@ use Modules\Hr\Models\HrEmployee;
 use Modules\Inventory\Models\InventoryAllocation;
 use Modules\Inventory\Models\InventoryAllocationIssue;
 use Modules\Inventory\Models\InventoryBatch;
+use Modules\Inventory\Models\InventoryBatchPriceRevision;
 use Modules\Inventory\Models\InventoryMovement;
 use Modules\Inventory\Models\InventoryReservation;
 use Modules\Inventory\Models\InventorySerialNumber;
@@ -44,7 +45,6 @@ use Modules\Supplier\Models\SupplierItemMapping;
 use Modules\Tax\Models\TaxTransaction;
 use Modules\UOM\Models\UnitOfMeasureModel;
 use Modules\Vehicle\Models\Vehicle;
-use Modules\Vehicle\Models\VehicleDocument;
 use Modules\VehicleService\Models\VehicleServiceJob;
 use Modules\VehicleService\Models\VehicleServiceJobLine;
 use Modules\VehicleService\Models\VehicleServiceLineEmployee;
@@ -175,6 +175,14 @@ final class ReportCatalog
                 ),
                 $this->col('status', 'Status', format: 'enum', sort: 'status'),
             ], ['batch_number', 'lot_number', 'item.code', 'item.name'], ['item'], 'expiry_date'),
+            $this->inventory('inventory.batch-price', 'Batch Price Revisions', InventoryBatchPriceRevision::class, [
+                $this->col('batch', 'Batch', 'batch.batch_number'), $this->col('lot', 'Lot', 'batch.lot_number'),
+                $this->col('item', 'Item', 'batch.item.name'), $this->col('price_type', 'Price Type', format: 'enum', sort: 'price_type'),
+                $this->col('currency', 'Currency', 'currency.code'), $this->col('uom', 'UOM', 'uom.code'),
+                $this->money('amount', 'Price', false), $this->col('effective_from', 'Effective From', format: 'date', sort: 'effective_from'),
+                $this->col('effective_to', 'Effective To', format: 'date', sort: 'effective_to'),
+                $this->col('revision', 'Revision', sort: 'revision'), $this->col('is_current', 'Current', format: 'boolean', sort: 'is_current'),
+            ], ['batch.batch_number', 'batch.lot_number', 'batch.item.code', 'batch.item.name'], ['batch', 'batch.item', 'currency', 'uom'], 'effective_from'),
             $this->inventory('inventory.serial', 'Serial', InventorySerialNumber::class, [
                 $this->col('serial_number', 'Serial', sort: 'serial_number'), $this->itemCol(), $this->col('batch', 'Batch', 'batch.batch_number'),
                 $this->col('warehouse', 'Warehouse', 'warehouse.name'), $this->col('status', 'Status', format: 'enum', sort: 'status'),
@@ -250,7 +258,6 @@ final class ReportCatalog
             $this->definition('vehicle-service.parts-usage', 'Parts Usage', 'Vehicle Service', VehicleServiceJobLine::class, [
                 $this->col('job', 'Job', 'job.job_number'), $this->itemCol(), $this->qty('quantity', 'Quantity'), $this->money('unit_cost', 'Unit Cost', false), $this->money('line_total', 'Line Total'), $this->col('status', 'Status', format: 'enum', sort: 'status'),
             ], ['job.job_number', 'item.code', 'item.name'], ['job', 'item'], constraints: ['is_inventory_tracked' => true]),
-
 
             $this->invoice('invoice.register', 'Invoice Register', Invoice::class, 'invoice_date', 'invoice_number', 'grand_total'),
             $this->definition('invoice.balance', 'Invoice Balance', 'Invoice & Payment', InvoiceBalance::class, [

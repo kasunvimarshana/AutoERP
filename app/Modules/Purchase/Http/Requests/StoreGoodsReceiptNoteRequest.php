@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Purchase\Http\Requests;
 
 use Modules\Purchase\DTOs\CreateGoodsReceiptNoteData;
+use Modules\Purchase\DTOs\GoodsReceiptBatchAllocationData;
 use Modules\Purchase\DTOs\GoodsReceiptNoteLineData;
 
 final class StoreGoodsReceiptNoteRequest extends PurchaseRequest
@@ -37,6 +38,13 @@ final class StoreGoodsReceiptNoteRequest extends PurchaseRequest
             'lines.*.tax_amount' => ['nullable', 'decimal:0,6', 'min:0'],
             'lines.*.tax_group_id' => ['nullable', 'integer', 'min:1'],
             'lines.*.charge_amount' => ['nullable', 'decimal:0,6', 'min:0'],
+            'lines.*.batch_allocations' => ['nullable', 'array'],
+            'lines.*.batch_allocations.*.batch_id' => ['nullable', 'integer', 'min:1', 'required_without:lines.*.batch_allocations.*.batch_number'],
+            'lines.*.batch_allocations.*.batch_number' => ['nullable', 'string', 'max:120', 'required_without:lines.*.batch_allocations.*.batch_id'],
+            'lines.*.batch_allocations.*.lot_number' => ['nullable', 'string', 'max:120'],
+            'lines.*.batch_allocations.*.manufacture_date' => ['nullable', 'date'],
+            'lines.*.batch_allocations.*.expiry_date' => ['nullable', 'date'],
+            'lines.*.batch_allocations.*.quantity' => ['required', 'decimal:0,6', 'gt:0'],
         ]);
     }
 
@@ -71,6 +79,14 @@ final class StoreGoodsReceiptNoteRequest extends PurchaseRequest
                 taxAmount: (string) ($row['tax_amount'] ?? '0.000000'),
                 chargeAmount: (string) ($row['charge_amount'] ?? '0.000000'),
                 taxGroupId: isset($row['tax_group_id']) ? (int) $row['tax_group_id'] : null,
+                batchAllocations: array_map(static fn (array $allocation): GoodsReceiptBatchAllocationData => new GoodsReceiptBatchAllocationData(
+                    quantity: (string) $allocation['quantity'],
+                    batchId: isset($allocation['batch_id']) ? (int) $allocation['batch_id'] : null,
+                    batchNumber: isset($allocation['batch_number']) ? (string) $allocation['batch_number'] : null,
+                    lotNumber: isset($allocation['lot_number']) ? (string) $allocation['lot_number'] : null,
+                    manufactureDate: isset($allocation['manufacture_date']) ? (string) $allocation['manufacture_date'] : null,
+                    expiryDate: isset($allocation['expiry_date']) ? (string) $allocation['expiry_date'] : null,
+                ), $row['batch_allocations'] ?? []),
             ), $this->input('lines')),
         );
     }

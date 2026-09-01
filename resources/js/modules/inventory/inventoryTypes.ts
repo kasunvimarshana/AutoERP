@@ -1,3 +1,5 @@
+import type { NamedResource } from '@/shared/types/common';
+
 export interface InventoryRelation extends Record<string, unknown> {
     id: number;
     name?: string;
@@ -43,6 +45,43 @@ export interface InventoryAvailability extends Record<string, unknown> {
 }
 
 export type InventoryRecord = Record<string, unknown> & { id: number; status?: string };
+
+export interface InventoryBatchPayload {
+    item_id: number;
+    item_variant_id?: number;
+    batch_number: string;
+    lot_number?: string;
+    manufacture_date?: string;
+    expiry_date?: string;
+}
+
+export interface InventoryBatchPricePayload {
+    batch_id: number;
+    price_type: 'sales' | 'service';
+    currency_id: number;
+    uom_id: number;
+    amount: string;
+    effective_from: string;
+    effective_to?: string | null;
+    expected_version?: number;
+    correction_reason?: string;
+}
+
+export interface InventoryBatchPrice {
+    id: number;
+    batch: NamedResource & { batch_number?: string; lot_number?: string };
+    organization_unit?: NamedResource | null;
+    price_type: 'sales' | 'service';
+    currency: NamedResource;
+    uom: NamedResource;
+    amount: string;
+    effective_from: string;
+    effective_to?: string | null;
+    revision_no: number;
+    row_version: number;
+    is_current_revision: boolean;
+    correction_reason?: string | null;
+}
 
 export interface ReservationPayload {
     reservation_date: string;

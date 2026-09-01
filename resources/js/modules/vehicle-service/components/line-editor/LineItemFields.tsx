@@ -95,12 +95,13 @@ export async function searchVehicleServiceLineItems(
     params: LookupLoadParams,
 ): Promise<LookupResult<ItemLookupResource>> {
     const results = await Promise.all([
-        lookupApi.stockableItems(params),
+        lookupApi.untrackedStockableItems(params),
+        lookupApi.serviceBatchItems(params),
         lookupApi.serviceItems(params),
         lookupApi.labourItems(params),
         lookupApi.comboItems(params),
     ]);
-    const data = dedupeById(results.flatMap((result) => result.data).filter(isSupportedLineItem));
+    const data = dedupeLineOptions(results.flatMap((result) => result.data).filter(isSupportedLineItem));
     const metas = results.map((result) => result.meta).filter((meta) => meta !== undefined);
 
     return {
@@ -204,9 +205,15 @@ function ItemOption({ option, active }: { option: ItemLookupResource; active: bo
                 <div className={`truncate font-medium ${active ? 'text-sky-900' : 'text-slate-900'}`}>
                     {option.code ? `${option.code} - ${option.name}` : option.name}
                 </div>
-                <div className="mt-1 text-xs text-slate-500">
-                    {stockNotice(option)}
-                </div>
+                {option.batch ? (
+                    <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+                        <span className="font-medium text-sky-700">Batch {option.batch.batch_number ?? option.batch.code}{option.batch.lot_number ? ` / Lot ${option.batch.lot_number}` : ''}</span>
+                        <span className="text-slate-500">{stockNotice(option)}</span>
+                        <span className="font-semibold text-emerald-700">Service price: {option.resolved_service_unit_price ?? '0.000000'}</span>
+                    </div>
+                ) : (
+                    <div className="mt-1 text-xs text-slate-500">{stockNotice(option)}</div>
+                )}
             </div>
             <span className={`shrink-0 rounded-full px-2 py-1 text-xs font-semibold ${
                 option.is_stockable
@@ -230,13 +237,13 @@ function stockNotice(option: ItemLookupResource): string {
     return `Available stock: ${quantity} ${unit}`.trim();
 }
 
-function dedupeById<T extends ItemLookupResource>(options: T[]): T[] {
-    const seen = new Set<number>();
+function dedupeLineOptions<T extends ItemLookupResource>(options: T[]): T[] {
+    const seen = new Set<string>();
 
     return options.filter((option) => {
-        const id = Number(option.id);
-        if (seen.has(id)) return false;
-        seen.add(id);
+        const key = option.batch ? `batch:${option.batch.id}` : `item:${option.id}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
 
         return true;
     });

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Inventory\Http\Controllers;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Modules\Inventory\DTOs\StockBalanceData;
@@ -75,7 +76,10 @@ final class StockController extends InventoryQueryController
         $query = $this->scope(InventoryBatch::query(), $request)->with(['item', 'variant']);
         $this->filters($query, $request, ['item_id', 'item_variant_id', 'status']);
         if ($request->filled('search')) {
-            $query->where('batch_number', 'like', '%'.trim((string) $request->input('search')).'%');
+            $search = '%'.trim((string) $request->input('search')).'%';
+            $query->where(static fn (Builder $searchQuery): Builder => $searchQuery
+                ->where('batch_number', 'like', $search)
+                ->orWhere('lot_number', 'like', $search));
         }
 
         return InventoryBatchResource::collection($query->orderBy('batch_number')->paginate($request->perPage()));

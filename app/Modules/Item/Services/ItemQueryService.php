@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
+use Modules\Item\Enums\TrackingType;
 use Modules\Item\Models\Item;
 
 final class ItemQueryService
@@ -40,6 +41,8 @@ final class ItemQueryService
         $criteria['is_active'] = true;
         match ($kind) {
             'stockable' => $criteria['is_stockable'] = true,
+            'untracked-stockable' => [$criteria['is_stockable'] = true, $criteria['tracking_type'] = TrackingType::None->value],
+            'batch-tracked-stockable' => [$criteria['is_stockable'] = true, $criteria['tracking_types'] = [TrackingType::Batch->value, TrackingType::Lot->value]],
             'service', 'labour', 'combo', 'package' => $criteria['item_type'] = $kind,
             default => null,
         };
@@ -106,10 +109,13 @@ final class ItemQueryService
             });
         }
 
-        foreach (['item_type', 'is_stockable', 'is_active'] as $filter) {
+        foreach (['item_type', 'tracking_type', 'is_stockable', 'is_active'] as $filter) {
             if (array_key_exists($filter, $criteria) && $criteria[$filter] !== null && $criteria[$filter] !== '') {
                 $query->where($filter, $criteria[$filter]);
             }
+        }
+        if (! empty($criteria['tracking_types'])) {
+            $query->whereIn('tracking_type', $criteria['tracking_types']);
         }
         if (! empty($criteria['category_id'])) {
             $query->where('item_category_id', (int) $criteria['category_id']);

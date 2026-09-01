@@ -4,6 +4,7 @@ import { TENANT_MODULE_CODE } from '@/app/access/tenantModules';
 import { hasPermission } from '@/modules/auth/accessControl';
 import { useAuth } from '@/modules/auth/AuthProvider';
 import { vehicleServicePermissions } from '@/modules/vehicle-service/vehicleServicePermissions';
+import { inventoryPermissions } from '@/modules/inventory/inventoryPermissions';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { CapabilityNotice } from '@/shared/components/CapabilityNotice';
@@ -46,6 +47,8 @@ export default function ItemEditPage() {
     const canManageVariants = hasItemPermission(auth, itemPermissions.manageVariants);
     const canManageBundles = hasItemPermission(auth, itemPermissions.manageBundles);
     const canManagePrices = hasItemPermission(auth, itemPermissions.managePrices);
+    const canViewBatchPrices = hasPermission(auth, inventoryPermissions.trackingView);
+    const canManageBatchPrices = hasPermission(auth, inventoryPermissions.trackingManage);
     const canManageCodes = hasItemPermission(auth, itemPermissions.manageCodes);
     const canManageUsageRules = hasItemPermission(auth, itemPermissions.manageUsageRules);
     const vehicleServiceEnabled = auth.enabledModules?.includes(TENANT_MODULE_CODE.VEHICLE_SERVICE) === true;
@@ -61,6 +64,7 @@ export default function ItemEditPage() {
     const [category, setCategory] = useState<NamedResource | null>(null);
     const [brand, setBrand] = useState<NamedResource | null>(null);
     const [baseUom, setBaseUom] = useState<NamedResource | null>(null);
+    const [priceDefaults, setPriceDefaults] = useState<{ currency: NamedResource | null; uom: NamedResource | null }>({ currency: null, uom: null });
     const [baseUomAudit, setBaseUomAudit] = useState<BaseUomUsageAudit | null>(null);
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
@@ -100,6 +104,7 @@ export default function ItemEditPage() {
                 setCategory(item.category ?? null);
                 setBrand(item.brand ?? null);
                 setBaseUom(item.base_uom ?? null);
+                setPriceDefaults({ currency: item.tenant_base_currency ?? null, uom: item.base_uom ?? null });
                 setBaseUomAudit(audit);
             })
             .catch((requestError) => !controller.signal.aborted && setError(toApiError(requestError)))
@@ -142,7 +147,7 @@ export default function ItemEditPage() {
                     </div>}
                     {tab.openedTabs.has('variants') && <div hidden={displayedTab !== 'variants'}><ItemVariantTab itemId={itemId} readOnly={!canManageVariants} /></div>}
                     {tab.openedTabs.has('bundles') && <div hidden={displayedTab !== 'bundles'}><ItemBundleTab itemId={itemId} canBundle={['combo', 'package'].includes(form.item_type)} readOnly={!canManageBundles} /></div>}
-                    {tab.openedTabs.has('prices') && <div hidden={displayedTab !== 'prices'}><ItemPriceTab itemId={itemId} readOnly={!canManagePrices} /></div>}
+                    {tab.openedTabs.has('prices') && <div hidden={displayedTab !== 'prices'}><ItemPriceTab itemId={itemId} trackingType={form.tracking_type} defaultCurrency={priceDefaults.currency} defaultUom={priceDefaults.uom} readOnly={!canManagePrices} canViewBatchPrices={canViewBatchPrices} canManageBatchPrices={canManageBatchPrices} /></div>}
                     {tab.openedTabs.has('codes') && <div hidden={displayedTab !== 'codes'}><ItemCodeTab itemId={itemId} readOnly={!canManageCodes} /></div>}
                     {tab.openedTabs.has('usage_rules') && <div hidden={displayedTab !== 'usage_rules'}><ItemUsageRuleTab itemId={itemId} readOnly={!canManageUsageRules} /></div>}
                     {tab.openedTabs.has('commission') && canViewLaborCommission && form.item_type === 'labour' && (

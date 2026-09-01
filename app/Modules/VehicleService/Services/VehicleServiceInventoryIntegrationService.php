@@ -16,7 +16,6 @@ use Modules\Inventory\Models\InventoryMovement;
 use Modules\Inventory\Services\InventoryAvailabilityService;
 use Modules\Inventory\Services\InventoryFacade;
 use Modules\Inventory\Services\InventoryUomService;
-use Modules\Item\Enums\TrackingType;
 use Modules\VehicleService\Constants\VehicleServiceFinanceSource;
 use Modules\VehicleService\Enums\VehicleServiceLineStatus;
 use Modules\VehicleService\Models\VehicleServiceJob;
@@ -54,11 +53,6 @@ final class VehicleServiceInventoryIntegrationService
                     ? 'Select a warehouse to check stock availability.'
                     : ($warehouseLocationId === null ? 'Select a warehouse location to check exact stock availability.' : null));
 
-                if ($line->item?->tracking_type !== TrackingType::None) {
-                    $line->setAttribute('inventory_warning', 'Batch, lot, and serial tracked items require tracking references in the Inventory workflow.');
-
-                    return;
-                }
                 if ($warehouseId === null || $warehouseLocationId === null) {
                     return;
                 }
@@ -70,6 +64,7 @@ final class VehicleServiceInventoryIntegrationService
                     organizationUnitId: $job->organization_unit_id,
                     itemVariantId: $line->item_variant_id,
                     warehouseLocationId: $warehouseLocationId,
+                    batchId: $line->batch_id,
                 ));
                 $required = $this->uoms->quantity(
                     (int) $job->tenant_id,
@@ -104,7 +99,7 @@ final class VehicleServiceInventoryIntegrationService
             $this->assertExpectedVersion($job, $expectedVersion);
             $this->validator->assertMutable($job);
 
-            $query = $job->lines()->with('item')->whereNull('inventory_movement_id');
+            $query = $job->lines()->with(['item', 'batch'])->whereNull('inventory_movement_id');
             if ($lineIds !== []) {
                 $lineIds = array_values(array_unique($lineIds));
                 $query->whereIn('id', $lineIds);
@@ -135,6 +130,7 @@ final class VehicleServiceInventoryIntegrationService
                     organizationUnitId: $job->organization_unit_id,
                     itemVariantId: $line->item_variant_id,
                     warehouseLocationId: $warehouseLocationId,
+                    batchId: $line->batch_id,
                     unitCost: (string) $line->unit_cost,
                     sourceType: VehicleServiceFinanceSource::JOB,
                     sourceId: (int) $job->getKey(),

@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Route;
 use Modules\Inventory\Constants\InventoryPermission;
 use Modules\Inventory\Http\Controllers\AdjustmentController;
 use Modules\Inventory\Http\Controllers\AllocationController;
+use Modules\Inventory\Http\Controllers\BatchController;
 use Modules\Inventory\Http\Controllers\OpeningStockImportController;
 use Modules\Inventory\Http\Controllers\ReservationController;
 use Modules\Inventory\Http\Controllers\StockController;
@@ -132,6 +133,22 @@ Route::prefix('api/v1/inventory')->middleware($middleware)->name('api.v1.invento
     Route::get('batches', [StockController::class, 'batches'])
         ->middleware($requires(InventoryPermission::TRACKING_VIEW))
         ->name('batches.index');
+    Route::get('batches/service-options', [BatchController::class, 'serviceOptions'])
+        ->middleware($requires(InventoryPermission::STOCK_VIEW))
+        ->name('batches.service-options');
+    Route::post('batches', [BatchController::class, 'store'])
+        ->middleware($requires(InventoryPermission::TRACKING_MANAGE))
+        ->name('batches.store');
+    Route::get('batch-prices', [BatchController::class, 'prices'])
+        ->middleware($requires(InventoryPermission::TRACKING_VIEW))
+        ->name('batch-prices.index');
+    Route::post('batch-prices', [BatchController::class, 'storePrice'])
+        ->middleware($requires(InventoryPermission::TRACKING_MANAGE))
+        ->name('batch-prices.store');
+    Route::post('batch-prices/{price}/supersede', [BatchController::class, 'supersedePrice'])
+        ->whereNumber('price')
+        ->middleware($requires(InventoryPermission::TRACKING_MANAGE))
+        ->name('batch-prices.supersede');
     Route::get('serials', [StockController::class, 'serials'])
         ->middleware($requires(InventoryPermission::TRACKING_VIEW))
         ->name('serials.index');

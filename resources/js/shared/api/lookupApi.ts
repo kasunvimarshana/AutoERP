@@ -21,13 +21,19 @@ export interface VehicleLookupResource extends NamedResource {
 }
 
 export interface ItemLookupResource extends NamedResource {
+    item_id?: number;
+    item_variant_id?: number | null;
     item_type?: 'stock' | 'non_stock' | 'service' | 'labour' | 'asset' | 'consumable' | 'package' | 'combo';
+    tracking_type?: 'none' | 'batch' | 'lot' | 'serial';
     base_uom?: NamedResource | null;
     is_stockable?: boolean;
     is_combo?: boolean;
     resolved_service_unit_price?: string | null;
     resolved_purchase_unit_price?: string | null;
     available_stock_quantity?: string | null;
+    batch?: (NamedResource & { batch_number?: string; lot_number?: string; expiry_date?: string | null }) | null;
+    batch_price_revision_id?: number | null;
+    price_source?: string | null;
 }
 
 const lookup = <T extends NamedResource = NamedResource>(
@@ -65,6 +71,18 @@ export const lookupApi = {
     stockableItems: createQueryCachedLookupLoader<ItemLookupResource>({
         key: 'lookup:items:stockable',
         load: (params) => itemLookup(`${endpoints.items}/lookup/stockable`, params),
+    }),
+    untrackedStockableItems: createQueryCachedLookupLoader<ItemLookupResource>({
+        key: 'lookup:items:untracked-stockable',
+        load: (params) => itemLookup(`${endpoints.items}/lookup/untracked-stockable`, params),
+    }),
+    batchTrackedStockableItems: createQueryCachedLookupLoader<ItemLookupResource>({
+        key: 'lookup:items:batch-tracked-stockable',
+        load: (params) => itemLookup(`${endpoints.items}/lookup/batch-tracked-stockable`, params),
+    }),
+    serviceBatchItems: createQueryCachedLookupLoader<ItemLookupResource>({
+        key: 'lookup:inventory:service-batches',
+        load: (params) => itemLookup(`${endpoints.inventory}/batches/service-options`, params),
     }),
     serviceItems: createQueryCachedLookupLoader<ItemLookupResource>({
         key: 'lookup:items:service',

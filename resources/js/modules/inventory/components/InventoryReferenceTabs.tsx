@@ -1,6 +1,8 @@
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/shared/components/Button';
+import { LookupSelect } from '@/shared/components/LookupSelect';
+import { lookupApi, type ItemLookupResource } from '@/shared/api/lookupApi';
 import { DecimalInput } from '@/shared/components/DecimalInput';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
@@ -12,6 +14,7 @@ import { fieldError, type ApiError } from '@/shared/api/apiError';
 import { compactObject, humanize } from '@/shared/utils/object';
 import {
     createCostAdjustment,
+    createInventoryBatch,
     listBatches,
     listSerials,
     listStateChanges,
@@ -119,12 +122,51 @@ export function CostingTab({
 export function TrackingTab({
     batches,
     serials,
+    canManage,
+    reload,
 }: {
     batches: ApiResult<Awaited<ReturnType<typeof listBatches>>>;
     serials: ApiResult<Awaited<ReturnType<typeof listSerials>>>;
+    canManage: boolean;
+    reload: () => void;
 }) {
+    const [item, setItem] = useState<ItemLookupResource | null>(null);
+    const [form, setForm] = useState({ batch_number: '', lot_number: '', manufacture_date: '', expiry_date: '' });
+    const [busy, setBusy] = useState(false);
+    const [actionError, setActionError] = useState<ApiError | null>(null);
+
+    const submit = async (event: FormEvent) => {
+        if (!item) return;
+        await runFormAction(event, setBusy, setActionError, async () => {
+            await createInventoryBatch({
+                item_id: item.id,
+                batch_number: form.batch_number.trim(),
+                lot_number: form.lot_number.trim() || undefined,
+                manufacture_date: form.manufacture_date || undefined,
+                expiry_date: form.expiry_date || undefined,
+            });
+            setItem(null);
+            setForm({ batch_number: '', lot_number: '', manufacture_date: '', expiry_date: '' });
+            reload();
+        });
+    };
+
     return (
-        <div className="grid gap-5 xl:grid-cols-2">
+        <div className="space-y-5">
+            {canManage && <WorkflowPanel title="Create batch or lot" loading={false} error={null} actionError={actionError}>
+                <form className="space-y-4" onSubmit={submit}>
+                    <p className="text-sm text-slate-600">Register a tracking reference before stock entry, or create it while receiving a purchase.</p>
+                    <div className="grid gap-4 md:grid-cols-3">
+                        <LookupSelect<ItemLookupResource> label="Tracked item" value={item} onChange={setItem} search={lookupApi.batchTrackedStockableItems} placeholder="Search batch-tracked items..." error={fieldError(actionError, 'item_id')} required />
+                        <Input label="Batch / tracking number" value={form.batch_number} onChange={(event) => setForm({ ...form, batch_number: event.target.value })} error={fieldError(actionError, 'batch_number')} required />
+                        <Input label="Supplier lot number" value={form.lot_number} onChange={(event) => setForm({ ...form, lot_number: event.target.value })} error={fieldError(actionError, 'lot_number')} />
+                        <Input label="Manufacture date" type="date" value={form.manufacture_date} onChange={(event) => setForm({ ...form, manufacture_date: event.target.value })} error={fieldError(actionError, 'manufacture_date')} />
+                        <Input label="Expiry date" type="date" value={form.expiry_date} onChange={(event) => setForm({ ...form, expiry_date: event.target.value })} error={fieldError(actionError, 'expiry_date')} />
+                    </div>
+                    <Button type="submit" loading={busy} disabled={!item || !form.batch_number.trim()}>Create batch</Button>
+                </form>
+            </WorkflowPanel>}
+            <div className="grid gap-5 xl:grid-cols-2">
             <Panel title="Batches and lots">
                 <ErrorAlert error={batches.error} />
                 {batches.loading ? <LoadingState /> : <RecordList rows={batches.data?.data ?? []} columns={[
@@ -144,6 +186,7 @@ export function TrackingTab({
                     { key: 'status', header: 'Status', render: (row) => <StatusBadge status={String(row.status ?? '')} /> },
                 ]} />}
             </Panel>
+            </div>
         </div>
     );
 }
@@ -175,6 +218,7 @@ export function ReportsTab() {
         ['Inventory Aging Report', 'inventory.aging'],
         ['Reservation Report', 'inventory.reservation'],
         ['Allocation Report', 'inventory.allocation'],
+        ['Batch Price Revision Report', 'inventory.batch-price'],
         ['Batch Expiry Report', 'inventory.batch-expiry'],
         ['Serial Tracking Report', 'inventory.serial'],
         ['Low Stock Report', 'inventory.low-stock'],

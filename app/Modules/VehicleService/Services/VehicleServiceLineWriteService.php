@@ -44,7 +44,7 @@ final class VehicleServiceLineWriteService
             }
             $this->calculations->recalculateJob($job);
 
-            return $line->refresh()->load(['item', 'variant', 'uom', 'children.item', 'children.uom']);
+            return $line->refresh()->load(['item', 'variant', 'uom', 'batch', 'children.item', 'children.uom']);
         });
     }
 
@@ -77,7 +77,7 @@ final class VehicleServiceLineWriteService
             $this->calculations->recalculateAssignments($line);
             $this->calculations->recalculateJob($job);
 
-            return $line->refresh()->load(['item', 'variant', 'uom', 'children.item', 'children.uom']);
+            return $line->refresh()->load(['item', 'variant', 'uom', 'batch', 'children.item', 'children.uom']);
         });
     }
 

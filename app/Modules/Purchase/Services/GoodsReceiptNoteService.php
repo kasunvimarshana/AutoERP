@@ -41,6 +41,7 @@ final class GoodsReceiptNoteService
         private readonly GoodsReceiptNoteTaxDocumentMapper $taxDocumentMapper,
         private readonly PurchaseDocumentLockService $locks,
         private readonly PurchaseDocumentBlockerService $blockers,
+        private readonly PurchaseBatchAllocationService $batchAllocations,
     ) {}
 
     public function create(CreateGoodsReceiptNoteData $data): GoodsReceiptNote
@@ -112,6 +113,8 @@ final class GoodsReceiptNoteService
 
                 $this->assertSourceLineMatchesPayload($poLine, $line);
                 $this->validator->assertReceiptWithinOrder($poLine, $line->receivedQuantity);
+                $sourceItem = $this->validator->item($data->tenantId, $data->organizationUnitId, (int) $poLine->item_id, "lines.{$index}.item_id");
+                $this->batchAllocations->assertValid($sourceItem, $line->acceptedQuantity, $line->batchAllocations, "lines.{$index}.batch_allocations");
                 $sourceLines[$sourceKey] = $poLine;
 
                 continue;
@@ -135,6 +138,7 @@ final class GoodsReceiptNoteService
                 $this->validator->taxGroup($data->tenantId, $data->organizationUnitId, $line->taxGroupId, "lines.{$index}.tax_group_id");
             }
             $this->uoms->resolveLineUom($data->tenantId, $item, $uomId, $line->acceptedQuantity);
+            $this->batchAllocations->assertValid($item, $line->acceptedQuantity, $line->batchAllocations, "lines.{$index}.batch_allocations");
         }
 
         return DB::transaction(function () use ($data, $order, $sourceLines): GoodsReceiptNote {
@@ -222,7 +226,7 @@ final class GoodsReceiptNoteService
                     'taxAmount' => $taxAmount,
                     'chargeAmount' => $chargeAmount,
                 ]);
-                $grn->lines()->create([
+                $storedLine = $grn->lines()->create([
                     'tenant_id' => $data->tenantId,
                     'organization_unit_id' => $data->organizationUnitId,
                     'purchase_order_line_id' => $line->purchaseOrderLineId,
@@ -249,6 +253,7 @@ final class GoodsReceiptNoteService
                     'line_total' => $calculation->lineTotals[$index],
                     'status' => GoodsReceiptNoteLineStatus::Open,
                 ]);
+                $this->batchAllocations->store($storedLine, $line->batchAllocations);
             }
 
             $this->copyOrderAdjustments($order, $grn);
@@ -282,9 +287,17 @@ final class GoodsReceiptNoteService
                     $line->setRelation('purchaseOrderLine', $sourceLine);
                 }
 
-                $movement = $this->inventory->receipt($locked, $line, $postedBy);
-                if ($movement !== null) {
-                    $line->inventory_movement_id = $movement->getKey();
+                if ($line->batchAllocations->isNotEmpty()) {
+                    foreach ($line->batchAllocations as $allocation) {
+                        $movement = $this->inventory->receiptBatchAllocation($locked, $line, $allocation, $postedBy);
+                        $allocation->inventory_movement_id = $movement->getKey();
+                        $allocation->save();
+                    }
+                } else {
+                    $movement = $this->inventory->receipt($locked, $line, $postedBy);
+                    if ($movement !== null) {
+                        $line->inventory_movement_id = $movement->getKey();
+                    }
                 }
                 $line->status = GoodsReceiptNoteLineStatus::Posted;
                 $line->save();
@@ -333,7 +346,13 @@ final class GoodsReceiptNoteService
                     throw new InvalidArgumentException('GRNs with invoiced or returned lines cannot be reversed.');
                 }
 
-                $this->inventory->reverseReceipt($locked, $line, $reversedBy);
+                if ($line->batchAllocations->isNotEmpty()) {
+                    foreach ($line->batchAllocations as $allocation) {
+                        $this->inventory->reverseReceiptBatchAllocation($allocation, $reversedBy);
+                    }
+                } else {
+                    $this->inventory->reverseReceipt($locked, $line, $reversedBy);
+                }
                 if ($line->purchaseOrderLine instanceof PurchaseOrderLine) {
                     $this->orderQuantities->reverseReceived($line->purchaseOrderLine, (string) $line->accepted_quantity);
                 }
@@ -360,7 +379,7 @@ final class GoodsReceiptNoteService
     private function lockGoodsReceiptForMutation(GoodsReceiptNote $grn): GoodsReceiptNote
     {
         $snapshot = GoodsReceiptNote::query()
-            ->with('lines.purchaseOrderLine')
+            ->with(['lines.purchaseOrderLine', 'lines.batchAllocations.inventoryMovement'])
             ->findOrFail($grn->getKey());
         $purchaseOrderLineIds = $snapshot->lines
             ->map(fn (GoodsReceiptNoteLine $line): ?int => $line->purchase_order_line_id === null ? null : (int) $line->purchase_order_line_id)
@@ -383,6 +402,7 @@ final class GoodsReceiptNoteService
         }
 
         $lines = $this->locks->goodsReceiptLines($snapshot->lines->pluck('id')->map(fn ($id): int => (int) $id)->all());
+        $lines->load('batchAllocations.inventoryMovement');
         foreach ($lines as $line) {
             if ($line->purchase_order_line_id === null) {
                 continue;

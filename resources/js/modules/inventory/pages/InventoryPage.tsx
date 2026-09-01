@@ -82,6 +82,7 @@ export default function InventoryPage() {
     const canStockCountsApprove = can(inventoryPermissions.stockCountsApprove);
     const canStockCountsPost = can(inventoryPermissions.stockCountsPost);
     const canTrackingView = can(inventoryPermissions.trackingView);
+    const canTrackingManage = can(inventoryPermissions.trackingManage);
     const canOpenInventory = canAny(Object.values(inventoryPermissions));
 
     const tabAccess: Record<Tab, boolean> = {
@@ -93,7 +94,7 @@ export default function InventoryPage() {
         transfers: canTransfersView || canTransfersManage || canTransfersDispatch || canTransfersReceive,
         counts: canStockCountsView || canStockCountsManage || canStockCountsApprove || canStockCountsPost,
         costing: canValuationView || canCostAdjustmentsView || canCostAdjustmentsManage || canCostAdjustmentsPost,
-        tracking: canTrackingView,
+        tracking: canTrackingView || canTrackingManage,
         audit: canAuditView,
         reports: canOpenInventory,
     };
@@ -233,7 +234,7 @@ export default function InventoryPage() {
                                 canPost={canCostAdjustmentsPost}
                             />
                         )}
-                        {activeTab === 'tracking' && <TrackingTab batches={batches} serials={serials} />}
+                        {activeTab === 'tracking' && <TrackingTab batches={batches} serials={serials} canManage={canTrackingManage} reload={reloadInventory} />}
                         {activeTab === 'audit' && <AuditTab states={states} />}
                         {activeTab === 'reports' && <ReportsTab />}
                     </div>

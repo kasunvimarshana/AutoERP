@@ -17,8 +17,12 @@ use Modules\Purchase\Services\PurchaseAuthorizationService;
 use Modules\Purchase\Services\PurchaseOrderService;
 use Modules\Supplier\Services\SupplierAuthorizationService;
 use Modules\User\Services\UserAccessResolver;
+use Tests\Support\ActiveTenantSubscriptionFixture;
 use Tests\Support\CurrencyFixture;
 use Tests\Support\FinancePostingFixture;
+use Tests\Support\OrganizationUnitFixture;
+use Tests\Support\TenantAuthenticationFixture;
+use Tests\Support\TenantUserFixture;
 use Tests\TestCase;
 
 final class PurchaseOrderApiTest extends TestCase
@@ -314,6 +318,37 @@ final class PurchaseOrderApiTest extends TestCase
             ->assertOk()
             ->json('data');
         $this->assertNull(collect($eligible)->firstWhere('id', $orderId));
+    }
+
+    public function test_batch_receivable_line_exposes_tracking_and_indexes_missing_allocation_error(): void
+    {
+        $context = $this->context('HTTPBATCHRECV');
+        DB::table('items')->where('id', $context['item_id'])->update(['tracking_type' => 'batch']);
+        $order = $this->createApprovedHttpOrder($context, '4.000000');
+        $orderId = (int) $order['id'];
+        $lineId = (int) $order['lines'][0]['id'];
+
+        $this->withAuth($context)->getJson('/api/v1/purchase/orders/'.$orderId.'/receivable-lines')
+            ->assertOk()
+            ->assertJsonPath('data.0.item.tracking_type', 'batch');
+
+        $this->withAuth($context)->postJson('/api/v1/purchase/goods-receipts', [
+            'tenant_id' => $context['tenant_id'],
+            'organization_unit_id' => $context['organization_unit_id'],
+            'received_date' => '2026-06-18',
+            'warehouse_id' => $context['warehouse_id'],
+            'purchase_order_id' => $orderId,
+            'lines' => [[
+                'item_id' => $context['item_id'],
+                'uom_id' => $context['uom_id'],
+                'purchase_order_line_id' => $lineId,
+                'ordered_quantity' => '4.000000',
+                'received_quantity' => '4.000000',
+                'accepted_quantity' => '4.000000',
+                'unit_price' => '10.000000',
+            ]],
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['lines.0.batch_allocations']);
     }
 
     public function test_partial_grn_invoice_http_flow_keeps_remaining_invoiceable_eligible(): void
@@ -1162,7 +1197,7 @@ final class PurchaseOrderApiTest extends TestCase
 
     private function createOrganizationUnit(int $tenantId, string $suffix): int
     {
-        return (int) \Tests\Support\OrganizationUnitFixture::create([
+        return (int) OrganizationUnitFixture::create([
             'tenant_id' => $tenantId,
             'name' => 'Main '.$suffix,
             'code' => 'MAIN-'.$suffix,
@@ -1312,7 +1347,7 @@ final class PurchaseOrderApiTest extends TestCase
     {
         $suffix = $suffix !== '' ? $suffix : Str::upper(Str::random(4));
         $tenantId = $this->createTenant($suffix);
-        \Tests\Support\ActiveTenantSubscriptionFixture::create($tenantId);
+        ActiveTenantSubscriptionFixture::create($tenantId);
         $organizationUnitId = $this->createOrganizationUnit($tenantId, $suffix);
         FinancePostingFixture::seedPurchasePostingProfiles($tenantId, $organizationUnitId);
         $user = $this->createAuthContext($tenantId, $organizationUnitId, $suffix, $permissions);
@@ -1341,14 +1376,13 @@ final class PurchaseOrderApiTest extends TestCase
 
     /**
      * @param  list<string>|null  $permissions
-     *
      * @return array{token: string, user_id: int, role_id: int}
      */
     private function createAuthContext(int $tenantId, int $organizationUnitId, string $suffix, ?array $permissions = null): array
     {
         $now = now();
         $email = 'purchase-'.Str::lower($suffix).'@example.test';
-        $userId = (int) \Tests\Support\TenantUserFixture::create([
+        $userId = (int) TenantUserFixture::create([
             'tenant_id' => $tenantId,
             'first_name' => 'Purchase',
             'last_name' => 'Tester',
@@ -1402,7 +1436,7 @@ final class PurchaseOrderApiTest extends TestCase
             'updated_at' => $now,
         ]);
 
-        \Tests\Support\TenantAuthenticationFixture::provision($tenantId, $userId, $email);
+        TenantAuthenticationFixture::provision($tenantId, $userId, $email);
 
         $token = (string) $this->withHeader('X-Tenant-Id', (string) $tenantId)->postJson('/api/v1/auth/login', [
             'organization_unit_id' => $organizationUnitId,
@@ -1456,7 +1490,6 @@ final class PurchaseOrderApiTest extends TestCase
 
     /**
      * @param  list<string>  $names
-     *
      * @return list<int>
      */
     private function seedPurchasePermissions(int $tenantId, array $names): array

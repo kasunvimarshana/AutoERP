@@ -15,8 +15,8 @@ use Modules\Purchase\Http\Requests\StoreGoodsReceiptNoteRequest;
 use Modules\Purchase\Http\Resources\GoodsReceiptNoteResource;
 use Modules\Purchase\Models\GoodsReceiptNote;
 use Modules\Purchase\Services\GoodsReceiptNoteService;
-use Modules\Purchase\Services\PurchaseAuthorizationService;
 use Modules\Purchase\Services\PurchaseAuditService;
+use Modules\Purchase\Services\PurchaseAuthorizationService;
 use Modules\Purchase\Services\PurchaseDocumentPresentationService;
 use Modules\Purchase\Services\PurchaseGoodsReceiptPostingCoordinator;
 use Modules\Purchase\Services\PurchaseProcurementBalanceService;
@@ -128,7 +128,7 @@ final class GoodsReceiptNoteController
 
     private function relations(): array
     {
-        return ['purchaseOrder', 'supplier', 'warehouse', 'warehouseLocation', 'lines.item', 'lines.variant', 'lines.uom', 'lines.purchaseOrderLine', 'adjustments'];
+        return ['purchaseOrder', 'supplier', 'warehouse', 'warehouseLocation', 'lines.item', 'lines.variant', 'lines.uom', 'lines.purchaseOrderLine', 'lines.batchAllocations.batch', 'adjustments'];
     }
 
     private function applyProgressFilters(Builder $query, ListPurchaseDocumentRequest $request): void

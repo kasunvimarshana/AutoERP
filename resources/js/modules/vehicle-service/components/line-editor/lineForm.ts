@@ -72,7 +72,14 @@ export function emptyLineForm(): VehicleServiceLineFormValue {
 export function lineToForm(line: VehicleServiceJobLine): VehicleServiceLineFormValue {
     return {
         source: line.line_source_type,
-        item: line.item ?? null,
+        item: line.item ? {
+            ...line.item,
+            item_id: line.item_id ?? line.item.id,
+            item_variant_id: line.item_variant_id,
+            batch: line.batch ?? null,
+            batch_price_revision_id: line.batch_price_revision_id,
+            is_stockable: line.is_inventory_tracked,
+        } : null,
         uom: line.uom ?? null,
         description: line.description,
         quantity: line.quantity,
@@ -106,7 +113,10 @@ export function lineFormToPayload(form: VehicleServiceLineFormValue): VehicleSer
 
     return {
         line_source_type: form.source,
-        item_id: external ? undefined : form.item?.id,
+        item_id: external ? undefined : form.item?.item_id ?? form.item?.id,
+        item_variant_id: external ? undefined : form.item?.item_variant_id ?? undefined,
+        batch_id: external ? undefined : form.item?.batch?.id,
+        batch_price_revision_id: external ? undefined : form.item?.batch_price_revision_id ?? undefined,
         uom_id: form.uom?.id,
         description,
         quantity: form.quantity,
@@ -149,9 +159,14 @@ export function calculateLinePreview(line: VehicleServiceLineFormValue) {
 }
 
 export function formatLineItem(line: VehicleServiceJobLine): string {
-    return line.item
+    const itemLabel = line.item
         ? [line.item.code, line.item.name].filter(Boolean).join(' - ')
         : line.description || line.line_source_type.replaceAll('_', ' ');
+    const batchLabel = line.batch
+        ? `Batch ${line.batch.batch_number ?? line.batch.code}${line.batch.lot_number ? ` / Lot ${line.batch.lot_number}` : ''}`
+        : null;
+
+    return [itemLabel, batchLabel].filter(Boolean).join(' / ');
 }
 
 export function lineTypeLabel(source: VehicleServiceLineSourceType): string {
