@@ -229,6 +229,123 @@ final class TechnicianWorkReportTest extends TestCase
             ->assertJsonPath('data.0.commission_amount', '25.000000');
     }
 
+    public function test_employee_commission_report_uses_combo_supervisor_assignment_without_repeating_job_summary(): void
+    {
+        $context = $this->context('COM-COMBO-SUP');
+        $this->authorize($context);
+        $technicianLabour = $this->item(
+            $context['tenant_id'],
+            $context['organization_unit_id'],
+            'LAB-COM-COMBO-TECH',
+            $context['uom_id'],
+        );
+        $combo = $this->item(
+            $context['tenant_id'],
+            $context['organization_unit_id'],
+            'COMBO-COM-COMBO-SUP',
+            $context['uom_id'],
+            ItemType::Combo,
+        );
+        DB::table('item_bundles')->insert([
+            [
+                'tenant_id' => $context['tenant_id'],
+                'parent_item_id' => $combo->getKey(),
+                'child_item_id' => $context['labour']->getKey(),
+                'quantity' => '1.000000',
+                'uom_id' => $context['uom_id'],
+                'line_type' => 'labour',
+                'unit_cost' => '80.000000',
+                'uses_job_supervisor' => true,
+                'is_required' => true,
+                'sort_order' => 1,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'tenant_id' => $context['tenant_id'],
+                'parent_item_id' => $combo->getKey(),
+                'child_item_id' => $technicianLabour->getKey(),
+                'quantity' => '1.000000',
+                'uom_id' => $context['uom_id'],
+                'line_type' => 'labour',
+                'unit_cost' => '120.000000',
+                'uses_job_supervisor' => false,
+                'is_required' => true,
+                'sort_order' => 2,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ]);
+        $job = $this->createJob(
+            $context,
+            supervisorCommissionType: VehicleServiceCommissionType::Fixed,
+            supervisorCommissionValue: '50.000000',
+        );
+        $parent = $this->withTenantExecutionContext(
+            (int) $context['tenant_id'],
+            fn () => app(VehicleServiceLineService::class)->create($job, new VehicleServiceLineData(
+                lineSourceType: VehicleServiceLineSourceType::ComboParent,
+                description: 'Supervisor and technician combo',
+                quantity: '1.000000',
+                unitPrice: '2900.000000',
+                itemId: (int) $combo->getKey(),
+                uomId: (int) $combo->base_uom_id,
+            )),
+        );
+        $children = $this->withTenantExecutionContext(
+            (int) $context['tenant_id'],
+            fn () => $parent->children()->orderBy('line_number')->get(),
+        );
+        $supervisorLine = $children->firstWhere('uses_job_supervisor', true);
+        $technicianLine = $children->firstWhere('uses_job_supervisor', false);
+        $supervisorAssignment = $this->assignment(
+            $job,
+            $supervisorLine,
+            $context['supervisor_id'],
+            '0.000000',
+            '0.000000',
+            VehicleServiceCommissionType::Fixed,
+            '80.000000',
+        );
+        $technicianAssignment = $this->assignment(
+            $job,
+            $technicianLine,
+            $context['employee_id'],
+            '0.000000',
+            '0.000000',
+            VehicleServiceCommissionType::Fixed,
+            '120.000000',
+        );
+
+        $response = $this->reportGetJson(
+            $context,
+            '/api/v1/reports/vehicle-service/employee-commissions?'.http_build_query($this->scope($context)),
+        )
+            ->assertOk()
+            ->assertJsonPath('meta.total', 2)
+            ->assertJsonPath('summary.total_entries', 2)
+            ->assertJsonPath('summary.technician_commission', '120.000000')
+            ->assertJsonPath('summary.supervisor_commission', '80.000000')
+            ->assertJsonPath('summary.total_commission', '200.000000');
+
+        $response
+            ->assertJsonFragment([
+                'id' => 'supervisor-assignment-'.$supervisorAssignment->getKey(),
+                'commission_source' => 'supervisor',
+                'employee_code' => 'SUP-COM-COMBO-SUP',
+                'commission_amount' => '80.000000',
+            ])
+            ->assertJsonFragment([
+                'id' => 'technician-'.$technicianAssignment->getKey(),
+                'commission_source' => 'technician',
+                'employee_code' => 'EMP-COM-COMBO-SUP',
+                'commission_amount' => '120.000000',
+            ])
+            ->assertJsonMissing([
+                'line_description' => 'Job supervision',
+            ]);
+    }
+
     public function test_employee_commission_report_filters_exports_and_isolates_scope(): void
     {
         $context = $this->context('COM-FILT');
@@ -602,15 +719,20 @@ final class TechnicianWorkReportTest extends TestCase
         ]);
     }
 
-    private function item(int $tenantId, int $organizationUnitId, string $code, int $uomId): Item
-    {
+    private function item(
+        int $tenantId,
+        int $organizationUnitId,
+        string $code,
+        int $uomId,
+        ItemType $itemType = ItemType::Labour,
+    ): Item {
         return $this->withTenantExecutionContext(
             $tenantId,
             fn (): Item => app(ItemCreationService::class)->create(new CreateItemData(
                 tenantId: $tenantId,
                 code: $code,
                 name: str_replace('-', ' ', $code),
-                itemType: ItemType::Labour,
+                itemType: $itemType,
                 organizationUnitId: $organizationUnitId,
                 trackingType: TrackingType::None,
                 costingMethod: CostingMethod::None,
