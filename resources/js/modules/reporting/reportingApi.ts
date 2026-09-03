@@ -13,6 +13,8 @@ import type {
     TechnicianWorkReportParams,
     TechnicianWorkReportResult,
     SummaryReportResult,
+    GrnPayablesReportParams,
+    GrnPayablesReportResult,
 } from './reportingTypes';
 
 export async function listReports(signal?: AbortSignal): Promise<ReportDefinition[]> {
@@ -33,7 +35,7 @@ export async function runReport(key: string, params: ReportParams, signal?: Abor
 export async function exportReport(
     key: string,
     format: ReportFormat,
-    params: ReportParams | TechnicianWorkReportParams | EmployeeCommissionReportParams | OperationalReportParams,
+    params: ReportParams | TechnicianWorkReportParams | EmployeeCommissionReportParams | OperationalReportParams | GrnPayablesReportParams,
     previewWindow?: Window | null,
 ): Promise<void> {
     const response = await apiClient.get<Blob>(`${endpoints.reports}/${key}/export/${format}`, {
@@ -102,6 +104,18 @@ export async function runEmployeeCommissionReport(params: EmployeeCommissionRepo
 
 export async function runOperationalReport(key: string, params: OperationalReportParams, signal?: AbortSignal): Promise<OperationalReportResult> {
     const response = await apiClient.get<OperationalReportResult>(`${endpoints.reports}/${key}`, { params, signal });
+    return response.data;
+}
+
+export async function runGrnPayablesReport(
+    params: GrnPayablesReportParams,
+    signal?: AbortSignal,
+): Promise<GrnPayablesReportResult> {
+    const response = await apiClient.get<GrnPayablesReportResult>(`${endpoints.reports}/purchase/grn-payables`, {
+        params,
+        signal,
+    });
+
     return response.data;
 }
 

@@ -41,3 +41,11 @@ export type {
     SalesSettlementBreakdown,
     SalesSettlementMetric,
 } from './summaryReportTypes';
+export type {
+    GrnExposureStatus,
+    GrnInvoiceProgress,
+    GrnPayablesReportParams,
+    GrnPayablesReportResult,
+    GrnPayablesSummary,
+    GrnPayablesSupplierRow,
+} from './grnPayablesReportTypes';

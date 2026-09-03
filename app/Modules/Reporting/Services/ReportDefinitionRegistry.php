@@ -12,6 +12,7 @@ final class ReportDefinitionRegistry
     public function __construct(
         private readonly ReportCatalog $catalog,
         private readonly DetailedPurchaseReportService $detailedPurchase,
+        private readonly GrnPayablesReportService $grnPayables,
         private readonly DetailedVehicleServiceReportService $detailedVehicleService,
     ) {}
 
@@ -52,6 +53,7 @@ final class ReportDefinitionRegistry
     {
         return [
             $this->detailedPurchase->definition(),
+            $this->grnPayables->definition(),
             $this->detailedVehicleService->definition(),
         ];
     }

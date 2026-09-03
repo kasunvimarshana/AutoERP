@@ -841,6 +841,17 @@ export const tenantNavigationSections: NavigationSection[] = [
                             permissions: [reportingPermissions.view],
                         },
                     },
+                    {
+                        id: "grn-payables-report",
+                        type: "link",
+                        label: "GRN Payables",
+                        to: "/reports/purchase/grn-payables",
+                        match: ["/reports/purchase/grn-payables"],
+                        access: {
+                            ...operationalAccess(["reporting"]),
+                            permissions: [reportingPermissions.view],
+                        },
+                    },
                 ],
             },
             {

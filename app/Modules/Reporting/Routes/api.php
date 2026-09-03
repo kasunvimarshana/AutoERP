@@ -27,6 +27,7 @@ Route::prefix('api/v1/reports')->middleware($middleware)->name('api.v1.reports.'
         Route::get('/', [ReportController::class, 'index'])->name('index');
         Route::get('summary', [OperationalReportController::class, 'summary'])->name('summary');
         Route::get('purchase/detailed', [OperationalReportController::class, 'detailedPurchase'])->name('purchase.detailed');
+        Route::get('purchase/grn-payables', [OperationalReportController::class, 'grnPayables'])->name('purchase.grn-payables');
         Route::get('vehicle-service/detailed', [OperationalReportController::class, 'detailedVehicleService'])->name('vehicle-service.detailed');
         Route::get('vehicle-service/employee-incentives', [OperationalReportController::class, 'employeeIncentives'])->name('vehicle-service.employee-incentives');
         Route::get('vehicle-service/technician-work', [TechnicianWorkReportController::class, 'index'])->name('vehicle-service.technician-work');
@@ -49,6 +50,9 @@ Route::prefix('api/v1/reports')->middleware($middleware)->name('api.v1.reports.'
         Route::get('purchase/detailed/export/{format}', [OperationalReportController::class, 'exportDetailedPurchase'])
             ->whereIn('format', $exportFormats)
             ->name('purchase.detailed.export');
+        Route::get('purchase/grn-payables/export/{format}', [OperationalReportController::class, 'exportGrnPayables'])
+            ->whereIn('format', $exportFormats)
+            ->name('purchase.grn-payables.export');
         Route::get('vehicle-service/detailed/export/{format}', [OperationalReportController::class, 'exportDetailedVehicleService'])
             ->whereIn('format', $exportFormats)
             ->name('vehicle-service.detailed.export');

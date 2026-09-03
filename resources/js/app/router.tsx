@@ -314,6 +314,9 @@ const ReportPage = lazy(() => import("@/modules/reporting/pages/ReportPage"));
 const SummaryReportPage = lazy(
     () => import("@/modules/reporting/pages/SummaryReportPage"),
 );
+const GrnPayablesReportPage = lazy(
+    () => import("@/modules/reporting/pages/GrnPayablesReportPage"),
+);
 const TechnicianWorkReportPage = lazy(
     () => import("@/modules/reporting/pages/TechnicianWorkReportPage"),
 );
@@ -857,6 +860,10 @@ const appRouter = createBrowserRouter(
                                     reportKey="purchase/detailed"
                                     kind="purchase"
                                 />}
+                        />
+                        <Route
+                            path="/reports/purchase/grn-payables"
+                            element={<GrnPayablesReportPage />}
                         />
                         <Route
                             path="/reports/vehicle-service/detailed"
