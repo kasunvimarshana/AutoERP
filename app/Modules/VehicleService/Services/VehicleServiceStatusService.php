@@ -31,6 +31,8 @@ final class VehicleServiceStatusService
 
     private const INVENTORY_ISSUE_REQUIRED_MESSAGE = 'Issue all required stock items before completing this job.';
 
+    private const TRANSACTION_ATTEMPTS = 3;
+
     /** @var array<string, list<string>> */
     private const TRANSITIONS = [
         'draft' => ['inspected', 'in_progress', 'cancelled'],
@@ -46,6 +48,8 @@ final class VehicleServiceStatusService
     public function __construct(
         private readonly VehicleStatusService $vehicleStatuses,
         private readonly VehicleServiceLineRuleService $lineRules,
+        private readonly VehicleServiceJobCancellationService $cancellations,
+        private readonly VehicleServiceBillingProtection $billing,
     ) {}
 
     public function change(
@@ -76,6 +80,12 @@ final class VehicleServiceStatusService
             $this->assertExpectedVersion($job, $expectedVersion);
 
             $old = $job->status;
+            if ($status === VehicleServiceJobStatus::Cancelled) {
+                if ($expectedVersion === null) {
+                    throw new InvalidArgumentException('An expected job version is required for cancellation.');
+                }
+                $this->cancellations->reverse($job, $changedBy, $reason);
+            }
             if ($old === $status) {
                 return $job;
             }
@@ -113,19 +123,50 @@ final class VehicleServiceStatusService
                 $changedBy,
             );
 
-            VehicleServiceStatusHistory::query()->create([
-                'tenant_id' => $job->tenant_id,
-                'organization_unit_id' => $job->organization_unit_id,
-                'vehicle_service_job_id' => $job->getKey(),
-                'old_status' => $old->value,
-                'new_status' => $status->value,
-                'reason' => $reason,
-                'changed_by' => $changedBy,
-                'changed_at' => now(),
-            ]);
+            $this->recordTransition($job, $old, $changedBy, $reason);
 
             return $job->refresh();
-        });
+        }, self::TRANSACTION_ATTEMPTS);
+    }
+
+    /** Internal billing reconciliation, not a new completion or a job reopen action. */
+    public function restoreCompletedAfterBillingReversal(VehicleServiceJob $job, ?int $actorId, string $reason): VehicleServiceJob
+    {
+        return DB::transaction(function () use ($job, $actorId, $reason): VehicleServiceJob {
+            $job = VehicleServiceJob::query()->lockForUpdate()->findOrFail($job->getKey());
+            if (! in_array($job->status, [
+                VehicleServiceJobStatus::Invoiced, VehicleServiceJobStatus::PartiallyPaid, VehicleServiceJobStatus::Paid,
+            ], true)) {
+                // In particular, cancelled is terminal, even on repeated callbacks.
+                return $job;
+            }
+            if ($this->billing->blockers($job, true) !== []) {
+                return $job;
+            }
+
+            $old = $job->status;
+            $job->status = VehicleServiceJobStatus::Completed;
+            $job->save();
+            $this->recordTransition($job, $old, $actorId, $reason);
+
+            // Do not overwrite completion timestamps, lines, or vehicle state.
+            // The locked save increments the version and invalidates stale actions.
+            return $job->refresh();
+        }, self::TRANSACTION_ATTEMPTS);
+    }
+
+    private function recordTransition(VehicleServiceJob $job, VehicleServiceJobStatus $old, ?int $actorId, ?string $reason): void
+    {
+        VehicleServiceStatusHistory::query()->create([
+            'tenant_id' => $job->tenant_id,
+            'organization_unit_id' => $job->organization_unit_id,
+            'vehicle_service_job_id' => $job->getKey(),
+            'old_status' => $old->value,
+            'new_status' => $job->status->value,
+            'reason' => $reason,
+            'changed_by' => $actorId,
+            'changed_at' => now(),
+        ]);
     }
 
     public function recordCreated(VehicleServiceJob $job, ?int $changedBy = null): void

@@ -129,6 +129,7 @@ export interface VehicleServiceJobLine {
     is_billable: boolean;
     is_employee_assignable: boolean;
     inventory_movement_id?: number | null;
+    inventory_movement?: { id: number; status: string; reversed_at: string | null } | null;
     available_stock_quantity?: string | null;
     stock_on_hand?: string;
     stock_available?: string;
@@ -418,4 +419,12 @@ export interface VehicleServiceDocument {
     description?: string | null;
     uploaded_by?: number | null;
     created_at?: string | null;
+}
+export interface VehicleServiceCancellationPreview {
+    row_version: number;
+    can_cancel: boolean;
+    blockers: string[];
+    stock_returns: { description: string; quantity: string; uom: string | null; warehouse: string | null; location: string | null }[];
+    inventory_value: string;
+    commission_amount: string;
 }

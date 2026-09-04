@@ -72,6 +72,8 @@ use Tests\TestCase;
 
 final class VehicleServiceEngineTest extends TestCase
 {
+    use Concerns\TestsVehicleServiceBillingReversal;
+    use Concerns\TestsVehicleServiceCancellation;
     use RefreshDatabase;
 
     protected function setUp(): void

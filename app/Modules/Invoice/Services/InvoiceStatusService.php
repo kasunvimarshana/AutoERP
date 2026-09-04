@@ -14,6 +14,8 @@ use Modules\Tax\Services\TaxDocumentIntegrationService;
 
 final class InvoiceStatusService
 {
+    private const TRANSACTION_ATTEMPTS = 3;
+
     public function __construct(
         private readonly TaxDocumentIntegrationService $taxDocuments,
         private readonly InvoiceSourceRestorationService $sourceRestoration,
@@ -138,7 +140,7 @@ final class InvoiceStatusService
 
             $invoice->forceFill($updates)->save();
             if (in_array($to, [InvoiceStatus::Cancelled, InvoiceStatus::Void], true)) {
-                $this->sourceRestoration->restore($invoice, $to);
+                $this->sourceRestoration->restore($invoice, $to, $actorId, $reason);
             }
             if ($to === InvoiceStatus::Posted) {
                 $postedInvoice = $invoice->refresh();
@@ -147,7 +149,7 @@ final class InvoiceStatusService
             }
 
             return $invoice->refresh();
-        });
+        }, self::TRANSACTION_ATTEMPTS);
     }
 
     public function assertEditable(Invoice $invoice): void

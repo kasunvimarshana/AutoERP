@@ -14,6 +14,8 @@ final class VehicleServicePermission
 
     public const JOBS_TRANSITION = 'vehicle_service.jobs.transition';
 
+    public const JOBS_CANCEL_COMPLETED = 'vehicle_service.jobs.cancel_completed';
+
     public const DISCOUNTS_MANAGE = 'vehicle_service.discounts.manage';
 
     public const LINES_VIEW = 'vehicle_service.lines.view';
@@ -51,6 +53,7 @@ final class VehicleServicePermission
             self::JOBS_CREATE => 'Create vehicle service jobs.',
             self::JOBS_UPDATE => 'Update draft or active vehicle service jobs.',
             self::JOBS_TRANSITION => 'Inspect, start, complete, or cancel vehicle service jobs.',
+            self::JOBS_CANCEL_COMPLETED => 'Cancel completed vehicle service jobs and reverse their issued stock and commissions.',
             self::DISCOUNTS_MANAGE => 'Add, change, or remove whole-job Vehicle Service discounts.',
             self::LINES_VIEW => 'View service job lines.',
             self::LINES_MANAGE => 'Create, update, and remove service job lines.',

@@ -1,5 +1,7 @@
 import { lazy, Suspense, useCallback, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { hasPermission } from '@/modules/auth/accessControl';
+import { useAuth } from '@/modules/auth/AuthProvider';
 import { ApiError, toApiError, type ApiError as ApiErrorShape } from '@/shared/api/apiError';
 import { ActionMenu } from '@/shared/components/ActionMenu';
 import { Button, LinkButton } from '@/shared/components/Button';
@@ -13,10 +15,12 @@ import { useApi } from '@/shared/hooks/useApi';
 import { useOnDemandTab } from '@/shared/hooks/useOnDemandTab';
 import { compareDecimalStrings } from '@/shared/utils/decimal';
 import { VehicleServiceJobDiscountValue } from '../components/VehicleServiceJobDiscountValue';
+import { VehicleServiceCancellationDialog } from '../components/VehicleServiceCancellationDialog';
 import { VehicleServiceSummaryPanel } from '../components/VehicleServiceSummaryPanel';
 import { VehicleServiceStatusBadge } from '../components/VehicleServiceStatusBadge';
 import type { VehicleServiceInspection, VehicleServiceJob, VehicleServiceJobLine, VehicleServiceJobStatus, VehicleServiceJobTotals } from '../vehicleServiceTypes';
-import { cancelVehicleServiceJob, completeVehicleServiceJob, deleteVehicleServiceJob, getVehicleServiceJob, inspectVehicleServiceJob, listEmployeeAssignableLines, startVehicleServiceJob } from '../vehicleServiceApi';
+import { completeVehicleServiceJob, deleteVehicleServiceJob, getVehicleServiceJob, inspectVehicleServiceJob, listEmployeeAssignableLines, startVehicleServiceJob } from '../vehicleServiceApi';
+import { vehicleServicePermissions } from '../vehicleServicePermissions';
 import { createVehicleServiceJobStore } from '../state/vehicleServiceJobStore';
 
 const InspectionTab = lazy(() => import('../components/VehicleServiceInspectionTab'));
@@ -33,6 +37,9 @@ const INSPECT_WORKFORCE_REQUIRED_MESSAGE = 'Assign at least one labour employee 
 export default function VehicleServiceJobDetailPage() {
     const id = Number(useParams().id);
     const navigate = useNavigate();
+    const auth = useAuth();
+    const [contentVersion, setContentVersion] = useState(0);
+    const [cancelOpen, setCancelOpen] = useState(false);
     const jobStore = useMemo(() => createVehicleServiceJobStore(id), [id]);
     const result = useApi((signal) => getVehicleServiceJob(id, signal), [id], true, false);
     const job = result.data;
@@ -72,7 +79,29 @@ export default function VehicleServiceJobDetailPage() {
     if (!job) return <ErrorAlert error={result.error} />;
     const expectedVersion = job.row_version ?? 0;
 
-    const action = async (name: 'inspect' | 'start' | 'complete' | 'cancel' | 'delete') => {
+    const canCancel = hasPermission(auth, vehicleServicePermissions.jobsTransition)
+        && (['draft', 'inspected', 'in_progress'].includes(job.status)
+            || (job.status === 'completed' && hasPermission(auth, vehicleServicePermissions.jobsCancelCompleted)));
+    const needsBillingReversal = ['invoiced', 'partially_paid', 'paid'].includes(job.status)
+        && hasPermission(auth, vehicleServicePermissions.jobsTransition)
+        && hasPermission(auth, vehicleServicePermissions.jobsCancelCompleted);
+
+    const handleCancelled = async (cancelled: VehicleServiceJob) => {
+        // Apply the committed status even if the following refresh fails. Never
+        // invite a second cancellation because a read request failed.
+        setJob(cancelled);
+        setCancelOpen(false);
+        jobStore.setState({ workforce: null });
+        setContentVersion((current) => current + 1);
+        bumpHistory();
+        try {
+            await refreshJobSilently();
+        } catch (failure) {
+            setActionError(toApiError(failure));
+        }
+    };
+
+    const action = async (name: 'inspect' | 'start' | 'complete' | 'delete') => {
         setBusy(true);
         setActionError(null);
         try {
@@ -105,12 +134,6 @@ export default function VehicleServiceJobDetailPage() {
                 bumpHistory();
                 return;
             }
-            if (name === 'cancel') {
-                const updated = await cancelVehicleServiceJob(job.id, expectedVersion);
-                setJob((current) => current ? withStatusUpdate(current, updated.status, updated.row_version ?? expectedVersion + 1, updated.completed_at ?? current.completed_at ?? null) : current);
-                bumpHistory();
-                return;
-            }
             if (name === 'delete') {
                 await deleteVehicleServiceJob(job.id, expectedVersion);
                 navigate('/vehicle-service/jobs');
@@ -139,9 +162,9 @@ export default function VehicleServiceJobDetailPage() {
                 historyAction={<Button type="button" variant="ghost" onClick={() => tabs.openTab('history')}>History</Button>}
                 secondaryActions={<>
                     {['draft', 'inspected', 'in_progress'].includes(job.status) && <LinkButton to={`/vehicle-service/jobs/${job.id}/edit`} variant="secondary">Edit</LinkButton>}
-                    {!['paid', 'cancelled'].includes(job.status) && (
+                    {(canCancel || job.status === 'draft') && (
                         <ActionMenu>
-                            <Button type="button" variant="ghost" className="w-full justify-start text-rose-700" loading={busy} onClick={() => action('cancel')}>Cancel job</Button>
+                            {canCancel && <Button type="button" variant="ghost" className="w-full justify-start text-rose-700" loading={busy} onClick={() => { setActionError(null); setCancelOpen(true); }}>Cancel job</Button>}
                             {job.status === 'draft' && <Button type="button" variant="ghost" className="w-full justify-start text-rose-700" loading={busy} onClick={() => action('delete')}>Delete draft</Button>}
                         </ActionMenu>
                     )}
@@ -149,7 +172,16 @@ export default function VehicleServiceJobDetailPage() {
                 blockedReason={job.status === 'cancelled' ? 'No further actions are available for a cancelled job.' : undefined}
             />
             <ErrorAlert error={actionError ?? result.error} />
-            <Panel className="p-0">
+            {needsBillingReversal && <section className="mb-5 space-y-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950" aria-label="Job cancellation steps">
+                <p><strong>Need to cancel this job?</strong> Resolve linked payments first, then reverse or void the invoices using their own actions. Those actions require their respective permissions.</p>
+                <p>After all linked billing documents are reversed or voided, return here: the job will be Completed and an authorized administrator can cancel it. A cancelled job stays Cancelled.</p>
+                <div className="flex flex-wrap gap-2">
+                    <Button type="button" variant="secondary" onClick={() => tabs.openTab('payments')}>Open linked payments</Button>
+                    <Button type="button" variant="secondary" onClick={() => tabs.openTab('invoice')}>Open linked invoices</Button>
+                </div>
+            </section>}
+            {cancelOpen && <VehicleServiceCancellationDialog job={job} onClose={() => setCancelOpen(false)} onCancelled={handleCancelled} />}
+            <Panel key={contentVersion} className="p-0">
                 <Tabs id="service-job-tabs" tabs={[
                     { id: 'summary', label: 'Overview' },
                     { id: 'inspection', label: 'Inspection' },

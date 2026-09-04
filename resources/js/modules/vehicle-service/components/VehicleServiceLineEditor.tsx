@@ -865,5 +865,6 @@ function lineItemMetadata(line: VehicleServiceJobLine): string {
 
 function stockStateLabel(line: VehicleServiceJobLine): string {
     if (!line.is_inventory_tracked || line.is_customer_supplied) return '-';
+    if (line.inventory_movement?.status === 'reversed') return 'Returned';
     return line.inventory_movement_id == null ? 'Pending issue' : 'Issued';
 }

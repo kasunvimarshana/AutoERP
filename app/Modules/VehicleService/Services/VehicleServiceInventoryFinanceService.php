@@ -6,6 +6,7 @@ namespace Modules\VehicleService\Services;
 
 use Modules\Core\Services\DecimalMath;
 use Modules\Finance\Contracts\FinancePostingInterface;
+use Modules\Finance\Contracts\FinanceSourceReversalInterface;
 use Modules\Finance\DTOs\PostingContext;
 use Modules\Finance\DTOs\PostingLine;
 use Modules\Finance\DTOs\PostingResultData;
@@ -26,7 +27,27 @@ final class VehicleServiceInventoryFinanceService
     public function __construct(
         private readonly DecimalMath $math,
         private readonly FinancePostingInterface $postings,
+        private readonly FinanceSourceReversalInterface $reversals,
     ) {}
+
+    public function reverseIssue(VehicleServiceJob $job, InventoryMovement $movement, int $actorId, string $reason): void
+    {
+        // Zero-cost issues deliberately have no finance posting (see postIssue).
+        if ($this->math->isZero((string) $movement->total_cost)) {
+            return;
+        }
+
+        $this->reversals->reverseSource(
+            (int) $job->tenant_id,
+            $job->organization_unit_id,
+            VehicleServiceFinanceSource::MODULE,
+            VehicleServiceFinanceSource::INVENTORY_ISSUE,
+            (int) $movement->getKey(),
+            now()->toDateString(),
+            $actorId,
+            $reason,
+        );
+    }
 
     public function postIssue(
         VehicleServiceJob $job,

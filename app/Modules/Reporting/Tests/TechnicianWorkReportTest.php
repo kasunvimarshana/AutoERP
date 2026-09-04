@@ -8,6 +8,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
+use Modules\Core\Contracts\PermissionCheckerInterface;
 use Modules\Invoice\Enums\InvoiceDirection;
 use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Enums\InvoiceType;
@@ -37,6 +38,7 @@ use Modules\VehicleService\Models\VehicleServiceLineEmployee;
 use Modules\VehicleService\Services\VehicleServiceEmployeeAssignmentService;
 use Modules\VehicleService\Services\VehicleServiceJobService;
 use Modules\VehicleService\Services\VehicleServiceLineService;
+use Modules\VehicleService\Services\VehicleServiceStatusService;
 use Spatie\LaravelPdf\Facades\Pdf;
 use Spatie\LaravelPdf\PdfBuilder;
 use Tests\TestCase;
@@ -344,6 +346,21 @@ final class TechnicianWorkReportTest extends TestCase
             ->assertJsonMissing([
                 'line_description' => 'Job supervision',
             ]);
+
+        $this->cancelCommissionJob($context, $job);
+        $this->reportGetJson($context, '/api/v1/reports/vehicle-service/employee-commissions?'.http_build_query($this->scope($context)))
+            ->assertOk()->assertJsonPath('meta.total', 0)->assertJsonPath('summary.total_commission', '0.000000');
+        $this->reportGetJson($context, '/api/v1/reports/vehicle-service/employee-commissions?'.http_build_query([
+            ...$this->scope($context), 'include_cancelled' => true,
+        ]))->assertOk()->assertJsonPath('meta.total', 2)
+            ->assertJsonPath('summary.total_commission', '0.000000')
+            ->assertJsonPath('summary.cancelled_commission', '200.000000')
+            ->assertJsonFragment(['id' => 'supervisor-assignment-'.$supervisorAssignment->getKey(), 'commission_status' => 'cancelled', 'commission_amount' => '80.000000'])
+            ->assertJsonFragment(['id' => 'technician-'.$technicianAssignment->getKey(), 'commission_status' => 'cancelled', 'commission_amount' => '120.000000']);
+        $this->withTenantExecutionContext((int) $context['tenant_id'], function () use ($supervisorAssignment, $technicianAssignment): void {
+            $this->assertSame('80.000000', $supervisorAssignment->fresh()->commission_amount);
+            $this->assertSame('120.000000', $technicianAssignment->fresh()->commission_amount);
+        });
     }
 
     public function test_employee_commission_report_filters_exports_and_isolates_scope(): void
@@ -411,9 +428,7 @@ final class TechnicianWorkReportTest extends TestCase
             VehicleServiceCommissionType::Fixed,
             '20.000000',
         );
-        $this->withTenantExecutionContext((int) $context['tenant_id'], function () use ($job): void {
-            $job->forceFill(['status' => VehicleServiceJobStatus::Cancelled])->save();
-        });
+        $this->cancelCommissionJob($context, $job);
 
         $this->reportGetJson($context, '/api/v1/reports/vehicle-service/employee-commissions?'.http_build_query($this->scope($context)))
             ->assertOk()
@@ -868,6 +883,17 @@ final class TechnicianWorkReportTest extends TestCase
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+    }
+
+    private function cancelCommissionJob(array $context, VehicleServiceJob $job): void
+    {
+        $this->mock(PermissionCheckerInterface::class, fn ($mock) => $mock->shouldReceive('allows')->andReturnTrue());
+        $this->withTenantExecutionContext((int) $context['tenant_id'], function () use ($context, $job): void {
+            $job->refresh();
+            app(VehicleServiceStatusService::class)->change(
+                $job, VehicleServiceJobStatus::Cancelled, $context['user_id'], 'Customer cancelled', (int) $job->row_version,
+            );
+        });
     }
 
     /** @param array<string, mixed> $context */

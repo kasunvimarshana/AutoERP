@@ -31,8 +31,10 @@ final class VehicleServiceLineController extends VehicleServiceController
                 'variant',
                 'uom',
                 'batch',
+                'inventoryMovement',
                 'children.item',
                 'children.uom',
+                'children.inventoryMovement',
                 'employeeAssignments.employee',
             ])
             ->get();

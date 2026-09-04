@@ -2,6 +2,7 @@ import { apiClient } from '@/shared/api/apiClient';
 import type { ApiCollection, ApiResource, ListParams } from '@/shared/types/api';
 import type { VehicleServiceCommissionDefault } from '../commissionTypes';
 import type {
+    VehicleServiceCancellationPreview,
     VehicleServiceInspection,
     VehicleServiceInspectionPayload,
     VehicleServiceJob,
@@ -60,7 +61,11 @@ export const completeVehicleServiceJob = (id: number, expectedVersion: number) =
     apiClient.patch<ApiResource<VehicleServiceJob>>(`${jobs}/${id}/complete`, { expected_version: expectedVersion })
         .then((response) => response.data.data);
 
-export const cancelVehicleServiceJob = (id: number, expectedVersion: number, reason?: string) =>
+export const getVehicleServiceCancellationPreview = (id: number, signal?: AbortSignal) =>
+    apiClient.get<ApiResource<VehicleServiceCancellationPreview>>(`${jobs}/${id}/cancellation-preview`, { signal })
+        .then((response) => response.data.data);
+
+export const cancelVehicleServiceJob = (id: number, expectedVersion: number, reason: string) =>
     apiClient.patch<ApiResource<VehicleServiceJob>>(`${jobs}/${id}/cancel`, { expected_version: expectedVersion, reason })
         .then((response) => response.data.data);
 

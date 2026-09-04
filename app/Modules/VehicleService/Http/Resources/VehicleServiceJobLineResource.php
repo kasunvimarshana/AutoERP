@@ -58,6 +58,11 @@ final class VehicleServiceJobLineResource extends JsonResource
                 null,
             ),
             'inventory_movement_id' => $this->inventory_movement_id,
+            'inventory_movement' => $this->whenLoaded('inventoryMovement', fn () => $this->inventoryMovement === null ? null : [
+                'id' => (int) $this->inventoryMovement->getKey(),
+                'status' => $this->enum($this->inventoryMovement->status),
+                'reversed_at' => $this->inventoryMovement->reversed_at?->toIso8601String(),
+            ]),
             'available_stock_quantity' => $this->when(
                 $this->offsetExists('available_stock_quantity'),
                 fn () => $this->available_stock_quantity === null ? null : (string) $this->available_stock_quantity,
