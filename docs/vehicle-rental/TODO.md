@@ -1,11 +1,20 @@
 # Vehicle Rental clean rebuild — authoritative production TODO
 
-**Status:** Prioritized implementation backlog for a fresh Vehicle Rental module  
-**Business authority:** TACGL is primary/tie-breaker; the four supplied videos are authoritative workflow evidence  
-**Engineering authority:** latest `worktree-0.0.8`  
-**Engineering baseline audited before this update:** `e8edc66fb7a82bf97176cfa2303c7add1c683952`  
-**Old Rental implementation:** must not be restored, copied, revived, cherry-picked, or used as an implementation dependency  
-**Canonical domain reference:** `docs/knowledgebase.md`
+**Status:** Prioritized implementation backlog for a fresh Vehicle Rental module
+
+**Business authority:** TACGL is primary/tie-breaker; the four supplied videos are authoritative workflow evidence
+
+**Engineering authority:** latest `worktree-0.0.8`
+
+**Engineering baseline audited before this update:** `d4aaa693706c2d3fe693244c8ea0f8d9e4ae326c`
+
+**Old Rental implementation:** must not be restored, copied, revived, cherry-picked, or used as an implementation dependency
+
+**Canonical domain reference:** [knowledgebase.md](../knowledgebase.md)
+
+**Last evidence/reconciliation update:** 2026-09-06
+
+**Delivery status:** Documentation updated; fresh runtime implementation and production verification remain outstanding.
 
 ---
 
@@ -48,6 +57,36 @@ Do not make one side depend on the amount or completion state of the other side.
 
 ---
 
+## Execution order and acceptance gates
+
+This is a backlog, not a claim that any runtime slice is complete. A checked documentation item does not satisfy implementation, database, API or browser acceptance.
+
+| Order | Deliverable / owner | Dependencies | Concrete acceptance |
+|---|---|---|---|
+| 1 | Complete source audit / analyst | Mounted archives/videos; dedicated rental dataset and audio evidence | Rule ledger cites table/reference or media position, covers narration and conflicts, and explicitly marks every uninspected area |
+| 2 | Domain design / Rental + responsible modules | Verified rules from step 1 | Entity/relationship cardinalities, date/time units, transitions, permissions, ownership and API contracts reviewed; no removed code dependency |
+| 3 | Operational vertical slice / Rental, Vehicle, HR, Tenant, UI | Step 2; runtime/test environment | Create customer/owner agreements, select vehicle, record/correct usage through authenticated UI/API; tenant, version, overlap and source-history tests pass |
+| 4 | Commercial calculations / Rental | Step 3; confirmed policies for enabled modes | Golden cases cite TACGL/video evidence; customer and owner snapshots independent; missing policies prevent affected financial processing |
+| 5 | Financial handoffs / Invoice, Payment, Tax, Finance, Voucher | Step 4; new-source contracts | Exactly-once invoice/payable, receipt/payment allocation, rollback/retry/reversal and source-to-GL tests pass |
+| 6 | Remaining business scope / Rental + owners | Relevant confirmed policies | Replacements, deposits, adjustments, driver components, reports and all required exception flows work end-to-end |
+| 7 | Release / QA + owning modules | All required scope above | Clean install and upgrade rehearsal, SQLite/MySQL concurrency, API/UI regression, authorization and UAT pass; docs match shipped behaviour |
+
+### Current source-work status
+
+- [x] Compare all 452 inner files across `TACGL.rar`, `TACGL.zip`, `TACGL(9).zip`; identical content confirmed.
+- [x] Verify hashes/durations of the four supplied videos and matching instruction files.
+- [x] Independently reproduce knowledge-base E01–E16 transaction examples and the two documented invoice line reconciliations.
+- [x] Survey the full video durations with interval frames and inspect selected full-resolution anchors V01–V07.
+- [ ] Complete continuous video and narration review, including the long unchanged-screen discussion in `2.mp4`; interval frames are not complete audiovisual evidence.
+- [ ] Extract and inspect the nested solid-RAR backup with a supported free reader; retain any failure in the coverage ledger.
+- [ ] Obtain/inspect the dedicated AT Tours rental agreement and Running Chart dataset/application represented in the videos; do not equate archive `scfcon` company configuration with video aliases.
+- [ ] Inspect executable decision logic or gather demonstrated edge-case outputs where rules remain hidden. Do not execute an unknown legacy application against live business data.
+- [ ] Obtain a PHP/Composer and isolated database test environment before shipping new PHP runtime code. Do not substitute a documentation check for tests.
+
+Unresolved pricing does not prohibit designing/capturing proven nonfinancial facts. It does prohibit silently choosing formulas for a supposedly complete production module. Missing source review must not be presented as completed audit work.
+
+---
+
 # P0 — Source authority and policy gates
 
 ## 1. Freeze the source registry
@@ -84,6 +123,14 @@ These are **not optional guesses**. Implement only after business evidence/confi
 - [ ] **VR-U18/19:** Do not make Insurance/Revenue Licence Rental blockers without explicit business evidence.
 - [ ] **VR-U20:** Confirm any real commercial difference between individual owner and leasing-company settlement; otherwise use one Lessor/Supplier engine.
 - [ ] **VR-U21:** Confirm whether company-owned vehicles need internal transfer-cost accounting; default is no artificial owner payable.
+- [ ] **VR-U22:** Confirm which miscellaneous/meal/highway/parking recoveries apply and who bears them; E03/E05/E06 plus `OWN2003538` demonstrate itemized recovery, not automatic entitlement.
+- [ ] **VR-U23:** Confirm distance-priced hire versus excess-distance tariffs, minimums and applicable quantity unit. E08 must not be silently treated as excess KM.
+- [ ] **VR-U24:** Define explicit duration units. E06 uses an `hh.mm`-consistent precedent while E07 uses a decimal-hour-consistent precedent; no universal dotted-text parser.
+- [ ] **VR-U25:** Resolve unknown/blank/zero mileage, allowance and rate semantics for each mode; do not make zero mean unlimited or waived by default.
+- [ ] **VR-U26:** Define reviewed correction handling for conflicting narratives/invalid dates while preserving posted historical facts.
+- [ ] **VR-U27:** Confirm external-driver identity ownership and recording requirements without manufacturing payroll employees.
+- [ ] **VR-U28:** Confirm timezone, interval endpoints, overnight duration, breaks and work/OT calendar rules for enabled modes.
+- [ ] **VR-U29:** Require identity/label consistency; a conflicting legacy display is not authority to link different parties.
 
 ### Gate behavior
 
@@ -117,6 +164,17 @@ These are **not optional guesses**. Implement only after business evidence/confi
 - [ ] Integrate journals/accounts/periods/bank reconciliation through Finance.
 - [ ] Integrate cross-module reports through Reporting infrastructure.
 - [ ] Add module dependency tests to keep the dependency graph acyclic.
+
+### Explicit current-contract integration work
+
+- [ ] **Vehicle / Vehicle Service:** test same physical vehicle across organization contexts, open-ended periods, touching boundaries and simultaneous starts. Resolve gaps inside the owning availability/status services; Rental must not add direct workshop-table workarounds.
+- [ ] **Vehicle / Rental:** establish one deterministic vehicle-first lock order and persist use in the same transaction as availability validation.
+- [ ] **Invoice:** design the new source identity, creation/issuance and reversal/restoration contract alongside current retired-source guards. Do not remove `InvoiceType::Rental` restrictions merely to bypass an error.
+- [ ] **Invoice / Rental:** lock the source aggregate before `InvoiceSourceAllocationService`; prove independent commercial-side namespaces and rollback/retry semantics.
+- [ ] **Payment:** define an authorized Rental handoff using owner services. `StorePaymentRequest` currently rejects retired `RentalReceipt` and prohibits source fields; the UI must not forge those fields.
+- [ ] **Tenant:** add the fresh module entitlement/catalogue through Tenant's schema/version rules and verify both new and persisted plans; do not resurrect removed feature code by copying it.
+- [ ] **Invoice UI:** coordinate new-source lifecycle display/actions with backend policy; historical retired records remain explicitly distinguishable.
+- [ ] **Finance / Voucher:** verify posting profiles, tax context, voucher rendering and reversal lineage with the actual new source documents; enums alone do not prove integration.
 
 ## 4. Historical-data boundary
 
@@ -645,6 +703,23 @@ Select/derive Owner Agreement + Period
 - [ ] Exact decimal/rounding behavior.
 
 Each test must reference the authoritative policy/source it validates.
+
+### Evidence-specific acceptance cases
+
+- [ ] E01: selected excess quantity 1,172 and explicit rate 90 produce 105,480, using exact decimal arithmetic and the correct agreement side.
+- [ ] E02: narrative 1,080 × 90 alongside posted 81,000 is flagged, never silently rewritten to 97,200 or “fixed” by inferring rate 75.
+- [ ] E03/E04: preserve the distinction between the with-driver jeep 3-day precedent and self-drive 14-day precedent.
+- [ ] E05: deleted and active records remain distinguishable during any optional source import; no double counting or fabricated historical reversal relationship.
+- [ ] E06/E07: explicit 24 h 30 min at 500 gives 12,250; explicit 7.5 decimal hours at 250 gives 1,875. Ambiguous untyped input is rejected for review.
+- [ ] E08: whole-distance hire and excess-distance charges cannot be conflated just because both use KM.
+- [ ] E09/E10: support an explicit non-calendar commercial cycle without inventing KM carry-forward/reset.
+- [ ] E11/E12: an arithmetic fit is not policy confirmation; September's 30 days must not silently establish a universal fixed-30 divisor.
+- [ ] E13: 31 September is invalid as a structured date; legacy narrative is preserved and flagged rather than clamped.
+- [ ] E15: normalization collisions prompt identity/history reconciliation, not blind merging.
+- [ ] `REC2003089`: allocations sum to the receipt once; repeated header amount is not summed as separate receipts.
+- [ ] `INV2005580`: all six active source lines, including meal 3,800 and highway/parking 3,150, reconcile to 289,400; no invented balancing/tax charge.
+
+These are source-based acceptance examples, not global rate defaults or permission to import the old Rental implementation.
 
 ## 43. Owner-module integration tests
 
