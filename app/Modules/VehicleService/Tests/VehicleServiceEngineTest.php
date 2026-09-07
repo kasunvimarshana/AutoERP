@@ -38,6 +38,8 @@ use Modules\Payment\Models\Payment;
 use Modules\Payment\Models\PaymentMethod;
 use Modules\Payment\Services\PaymentMethodService;
 use Modules\User\Models\UserModel;
+use Modules\Vehicle\Enums\VehicleStatus;
+use Modules\Vehicle\Services\VehicleAvailabilityService;
 use Modules\VehicleService\DTOs\VehicleServiceEmployeeAssignmentData;
 use Modules\VehicleService\DTOs\VehicleServiceInspectionData;
 use Modules\VehicleService\DTOs\VehicleServiceJobData;
@@ -52,6 +54,7 @@ use Modules\VehicleService\Models\VehicleServiceInvoiceLink;
 use Modules\VehicleService\Models\VehicleServiceJob;
 use Modules\VehicleService\Models\VehicleServiceJobLine;
 use Modules\VehicleService\Models\VehicleServicePaymentLink;
+use Modules\VehicleService\Services\Availability\VehicleServiceAvailabilityBlocker;
 use Modules\VehicleService\Services\VehicleServiceEmployeeAssignmentService;
 use Modules\VehicleService\Services\VehicleServiceInspectionService;
 use Modules\VehicleService\Services\VehicleServiceInventoryIntegrationService;
@@ -62,6 +65,7 @@ use Modules\VehicleService\Services\VehicleServicePaymentIntegrationService;
 use Modules\VehicleService\Services\VehicleServiceStatusService;
 use Tests\Support\CurrencyFixture;
 use Tests\Support\FinancePostingFixture;
+use Tests\Support\OrganizationUnitFixture;
 use Tests\Support\TenantUserFixture;
 use Tests\TestCase;
 
@@ -1084,6 +1088,56 @@ final class VehicleServiceEngineTest extends TestCase
             'document_type' => 'image',
         ])->assertUnprocessable()
             ->assertJsonValidationErrors('file');
+    }
+
+    public function test_open_ended_availability_includes_future_workshop_jobs(): void
+    {
+        $context = $this->context();
+        $job = $this->createJob($context);
+        $this->changeStatus($job, VehicleServiceJobStatus::Inspected);
+
+        $this->withTenantExecutionContext($context['tenant_id'], function () use ($context): void {
+            $blocker = app(VehicleServiceAvailabilityBlocker::class);
+            $this->assertNotNull($blocker->blockingReason($context['tenant_id'], null, $context['vehicle_id'], '2026-06-01', null));
+            $this->assertNull($blocker->blockingReason($context['tenant_id'], null, $context['vehicle_id'], '2026-06-01', '2026-06-06'));
+            $this->assertNotNull($blocker->blockingReason($context['tenant_id'], null, $context['vehicle_id'], '2026-06-01', '2026-06-07'));
+        });
+    }
+
+    public function test_shared_vehicle_workshop_block_is_independent_of_requesting_organization(): void
+    {
+        $context = $this->context();
+        $job = $this->createJob($context);
+        $this->changeStatus($job, VehicleServiceJobStatus::Inspected);
+        $organizationId = OrganizationUnitFixture::create([
+            'tenant_id' => $context['tenant_id'], 'code' => 'RENTAL-BRANCH', 'name' => 'Rental Branch',
+        ]);
+
+        $this->withTenantExecutionContext($context['tenant_id'], function () use ($context, $organizationId): void {
+            $this->expectException(InvalidArgumentException::class);
+            $this->expectExceptionMessage('blocked by an active Vehicle Service job');
+            DB::transaction(fn () => app(VehicleAvailabilityService::class)->assertAvailable(
+                $context['tenant_id'], $organizationId, $context['vehicle_id'], '2026-06-07', '2026-06-08',
+            ));
+        });
+    }
+
+    public function test_completing_one_branch_job_does_not_release_vehicle_in_service_elsewhere(): void
+    {
+        $context = $this->context();
+        $first = $this->createJob($context);
+        $second = $this->createJob($context);
+        $organizationId = OrganizationUnitFixture::create([
+            'tenant_id' => $context['tenant_id'], 'code' => 'WORKSHOP-BRANCH', 'name' => 'Workshop Branch',
+        ]);
+        // Existing jobs may belong to different branches while referring to one tenant-wide vehicle.
+        DB::table('vehicle_service_jobs')->where('id', $second->getKey())->update(['organization_unit_id' => $organizationId]);
+        $this->changeStatus($first, VehicleServiceJobStatus::InProgress);
+        $this->changeStatus($second, VehicleServiceJobStatus::InProgress);
+        $this->changeStatus($first, VehicleServiceJobStatus::Completed);
+        $this->assertDatabaseHas('vehicles', ['id' => $context['vehicle_id'], 'status' => VehicleStatus::UnderService->value]);
+        $this->changeStatus($second, VehicleServiceJobStatus::Completed);
+        $this->assertDatabaseHas('vehicles', ['id' => $context['vehicle_id'], 'status' => VehicleStatus::Active->value]);
     }
 
     /** @return array<string, mixed> */

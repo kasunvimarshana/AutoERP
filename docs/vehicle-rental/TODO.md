@@ -12,9 +12,9 @@
 
 **Canonical domain reference:** [knowledgebase.md](../knowledgebase.md)
 
-**Last evidence/reconciliation update:** 2026-09-06
+**Last evidence/reconciliation update:** 2026-09-07
 
-**Delivery status:** Documentation updated; fresh runtime implementation and production verification remain outstanding.
+**Delivery status:** Documentation and verified Vehicle Service availability fixes delivered; fresh Vehicle Rental runtime and production verification remain outstanding.
 
 ---
 
@@ -78,10 +78,10 @@ This is a backlog, not a claim that any runtime slice is complete. A checked doc
 - [x] Independently reproduce knowledge-base E01–E16 transaction examples and the two documented invoice line reconciliations.
 - [x] Survey the full video durations with interval frames and inspect selected full-resolution anchors V01–V07.
 - [ ] Complete continuous video and narration review, including the long unchanged-screen discussion in `2.mp4`; interval frames are not complete audiovisual evidence.
-- [ ] Extract and inspect the nested solid-RAR backup with a supported free reader; retain any failure in the coverage ledger.
+- [ ] Extract and inspect the password-protected nested backup. Free 7-Zip listed 86 entries, but extraction requires the source owner’s password; contents remain uninspected.
 - [ ] Obtain/inspect the dedicated AT Tours rental agreement and Running Chart dataset/application represented in the videos; do not equate archive `scfcon` company configuration with video aliases.
 - [ ] Inspect executable decision logic or gather demonstrated edge-case outputs where rules remain hidden. Do not execute an unknown legacy application against live business data.
-- [ ] Obtain a PHP/Composer and isolated database test environment before shipping new PHP runtime code. Do not substitute a documentation check for tests.
+- [x] Establish free local PHP/Composer/SQLite verification. Vehicle and Vehicle Service suites pass (55 tests, 411 assertions); MySQL and complete Rental runtime verification remain open.
 
 Unresolved pricing does not prohibit designing/capturing proven nonfinancial facts. It does prohibit silently choosing formulas for a supposedly complete production module. Missing source review must not be presented as completed audit work.
 
@@ -167,7 +167,8 @@ These are **not optional guesses**. Implement only after business evidence/confi
 
 ### Explicit current-contract integration work
 
-- [ ] **Vehicle / Vehicle Service:** test same physical vehicle across organization contexts, open-ended periods, touching boundaries and simultaneous starts. Resolve gaps inside the owning availability/status services; Rental must not add direct workshop-table workarounds.
+- [x] **Vehicle Service:** reproduce and fix missed cross-organization workshop blockers, open-ended requests missing future jobs, and premature release while another branch has an InProgress job. Three regression tests fail before and pass after the owner-module changes.
+- [ ] **Vehicle / Vehicle Service / Rental:** verify exact handover boundaries and simultaneous workshop/rental starts on MySQL with the new Rental publisher. Rental must not add direct workshop-table workarounds.
 - [ ] **Vehicle / Rental:** establish one deterministic vehicle-first lock order and persist use in the same transaction as availability validation.
 - [ ] **Invoice:** design the new source identity, creation/issuance and reversal/restoration contract alongside current retired-source guards. Do not remove `InvoiceType::Rental` restrictions merely to bypass an error.
 - [ ] **Invoice / Rental:** lock the source aggregate before `InvoiceSourceAllocationService`; prove independent commercial-side namespaces and rollback/retry semantics.

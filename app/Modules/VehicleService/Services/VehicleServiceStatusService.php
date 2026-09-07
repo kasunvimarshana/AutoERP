@@ -58,7 +58,8 @@ final class VehicleServiceStatusService
                 ->lockForUpdate()
                 ->findOrFail($snapshot->vehicle_id);
             $vehicleJobs = VehicleServiceJob::query()
-                ->forContext((int) $snapshot->tenant_id, $snapshot->organization_unit_id)
+                // A branch's completed job must not release a shared vehicle still in service elsewhere.
+                ->forTenant((int) $snapshot->tenant_id)
                 ->where('vehicle_id', $snapshot->vehicle_id)
                 ->orderBy('id')
                 ->lockForUpdate()

@@ -2,7 +2,7 @@
 
 **Status:** Canonical working domain reference; evidence gaps remain; not a completed implementation or exhaustive audiovisual audit
 
-**Knowledge refresh date:** 2026-09-06
+**Knowledge refresh date:** 2026-09-07
 
 **Primary business source of truth and conflict tie-breaker:** TACGL legacy application/data corpus
 
@@ -150,7 +150,7 @@ Inspection performed in this refresh:
 - Extracted text from all 16 PDFs (63 pages). Fifteen are debtor outstanding age-analysis exports; `45827284.PDF` is a one-page artifact without extracted text. Inspected all five XLS inventories and column headers: they are debtor/transaction extracts, with 4, 4, 4, 340 and 8 rows including headers. These are not a complete contract/rate catalogue.
 - Visually surveyed frames at approximately 30-second intervals across all four videos and inspected selected native-resolution frames. This can locate workflows but cannot prove every short-lived action or validation.
 - No full audio transcription or continuous audiovisual review was completed in this refresh. Spoken-only rules, especially long discussion segments with unchanged screens, remain unverified. Earlier audit documents are secondary claims to cross-check, not substitutes for direct evidence.
-- The nested `DATABACKUP/!   CTACGLDATABACKUP202503271759.rar` could not be fully extracted: the available reader reported `RAR solid archive support unavailable`. Its contents are not claimed as audited.
+- The nested `DATABACKUP/!   CTACGLDATABACKUP202503271759.rar` remains uninspected. On 2026-09-07 the free 7-Zip 26.03 reader successfully listed 86 entries totaling 150,606,473 uncompressed bytes, then requested a password during extraction. No password was supplied and no password recovery was attempted. This supersedes the earlier libarchive solid-RAR reader limitation; directory visibility is not content inspection.
 - Compiled executables/application files were not executed or decompiled. The mere presence of an executable does not establish its hidden validation or decision logic.
 
 Consequently, neither this refresh nor archive/file counts justify claiming exhaustive end-to-end business verification. Keep the remaining source work open in the TODO. An unchecked source area is unknown, not evidence that a capability or rule does not exist.
@@ -1259,8 +1259,8 @@ The following paths were inspected at the stated baseline. These are current eng
 | Module registration | `bootstrap/providers.php` | Vehicle and Vehicle Service are registered; no VehicleRental provider. A directory alone is not an active feature |
 | Vehicle | `app/Modules/Vehicle/Contracts/VehicleAvailabilityBlockerInterface.php` | Shared `vehicle.availability_blocker` tag and `blockingReason(tenant, organization, vehicle, startsAt, endsAt)` contract |
 | Vehicle | `app/Modules/Vehicle/Services/VehicleAvailabilityService.php` | Locks the vehicle, validates active status and asks tagged blockers. Call inside the transaction that persists use; a prior UI availability check is insufficient |
-| Vehicle Service | `app/Modules/VehicleService/Services/Availability/VehicleServiceAvailabilityBlocker.php` | Blocks Inspected/InProgress jobs using date overlap and expected delivery; not every maintenance record. Current query is organization-context scoped |
-| Vehicle Service | `app/Modules/VehicleService/Services/VehicleServiceStatusService.php` | Locks vehicle then contextual jobs during transitions. A future Rental integration must verify the common lock order and reciprocal conflict checks |
+| Vehicle Service | `app/Modules/VehicleService/Services/Availability/VehicleServiceAvailabilityBlocker.php` | Blocks Inspected/InProgress jobs using date overlap and expected delivery; not every maintenance record. The 2026-09-07 fix checks the physical vehicle across the tenant’s organization contexts and treats a null requested end as open-ended |
+| Vehicle Service | `app/Modules/VehicleService/Services/VehicleServiceStatusService.php` | Locks vehicle then its tenant-scoped jobs in ID order. The 2026-09-07 fix prevents release while another branch still has an InProgress job. Future Rental integration still needs reciprocal conflict checks |
 | Vehicle | `app/Modules/Vehicle/Models/VehicleOwnership.php` | Owns physical/legal party history and ownership classification. This is not the Lessor commercial agreement or its rate/supply coverage |
 | Invoice | `app/Modules/Invoice/Enums/InvoiceType.php` and `Services/InvoiceStatusService.php`, `Services/InvoiceReversalService.php` | Rental is a retired source type with lifecycle/reversal restrictions. Do not remove guards simply to make a new route work; design new source lifecycle and restoration integration within Invoice |
 | Invoice | `app/Modules/Invoice/Services/InvoiceCreationService.php` | Owns invoice persistence, line calculation, balances, snapshots, tax and issuance. Rental must use the owner service, not insert financial tables itself |
@@ -1272,13 +1272,13 @@ The following paths were inspected at the stated baseline. These are current eng
 
 Open engineering risks requiring focused tests before activation:
 
-- The same tenant-wide physical vehicle may be visible across organization contexts. Prove that a workshop/rental use in another context cannot be missed; the current availability blocker uses exact job context. Resolve any gap in Vehicle/Vehicle Service ownership, not by querying workshop tables from Rental.
+- Cross-organization workshop blocking and premature release were reproduced and fixed within Vehicle Service on 2026-09-07. Job-list authorization is unchanged; availability returns only a generic reason. The fresh Rental publisher and reciprocal concurrency tests remain outstanding.
 - Prove open-ended interval semantics, adjacent handover/return boundaries, timezone conversion and concurrent workshop/rental starts. The interface alone does not prove all these cases safe.
 - Keep historical retired document hydration separate from authorization to create or reverse new documents. Do not revive removed source classes or repurpose old source IDs.
 - Existing source-allocation logic must preserve independent customer/owner consumption namespaces and exactly-once handoffs, including retry after failure and reversal.
 - Inspect the actual target database for old table collisions before a fresh migration is deployed. No production database was accessed in this refresh.
 
-The local review environment has no `php` or `composer` executable on PATH, so no Laravel, database or runtime integration suite was run. This documentation-only change cannot establish runtime readiness.
+On 2026-09-07 a free local PHP 8.3/Composer/SQLite environment was established and locked dependencies installed. Three new regression tests failed before the Vehicle Service fixes and passed afterward. The Vehicle and Vehicle Service suites passed: 55 tests, 411 assertions. This verifies the narrow owner-module fixes, not a fresh Rental runtime, MySQL locking, production migrations or browser acceptance. No schema relationships were added or removed: the existing vehicle-to-service-job relationship is now evaluated across its physical resource scope while remaining tenant-isolated.
 
 ### 29.4 Why full runtime code is not generated from this document alone
 

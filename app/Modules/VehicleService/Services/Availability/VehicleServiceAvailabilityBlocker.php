@@ -11,6 +11,8 @@ use Modules\VehicleService\Models\VehicleServiceJob;
 
 final class VehicleServiceAvailabilityBlocker implements VehicleAvailabilityBlockerInterface
 {
+    private const DATE_PREFIX_LENGTH = 10;
+
     private const BLOCKING_STATUSES = [
         VehicleServiceJobStatus::Inspected->value,
         VehicleServiceJobStatus::InProgress->value,
@@ -23,13 +25,15 @@ final class VehicleServiceAvailabilityBlocker implements VehicleAvailabilityBloc
         string $startsAt,
         ?string $endsAt,
     ): ?string {
-        $startsOn = substr($startsAt, 0, 10);
-        $endsOn = substr($endsAt ?? $startsAt, 0, 10);
+        $startsOn = substr($startsAt, 0, self::DATE_PREFIX_LENGTH);
+        $endsOn = $endsAt === null ? null : substr($endsAt, 0, self::DATE_PREFIX_LENGTH);
         $blocked = VehicleServiceJob::query()
-            ->forContext($tenantId, $organizationUnitId)
+            // Availability belongs to the physical vehicle, including jobs in other branches.
+            // Return only the generic blocking reason, never another branch's job details.
+            ->forTenant($tenantId)
             ->where('vehicle_id', $vehicleId)
             ->whereIn('status', self::BLOCKING_STATUSES)
-            ->whereDate('job_date', '<=', $endsOn)
+            ->when($endsOn !== null, fn (Builder $query) => $query->whereDate('job_date', '<=', $endsOn))
             ->where(function (Builder $query) use ($startsOn): void {
                 $query->whereNull('expected_delivery_date')
                     ->orWhereDate('expected_delivery_date', '>=', $startsOn);
