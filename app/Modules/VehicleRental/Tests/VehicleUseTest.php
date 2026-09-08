@@ -6,7 +6,11 @@ namespace Modules\VehicleRental\Tests;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Modules\Vehicle\Enums\VehicleOwnershipType;
+use Modules\Vehicle\Enums\VehicleOwnerType;
+use Modules\Vehicle\Enums\VehicleStatus;
 use Modules\VehicleRental\Enums\AgreementAction;
 use Modules\VehicleRental\Enums\AgreementKind;
 use Modules\VehicleRental\Enums\VehicleUseAction;
@@ -165,6 +169,55 @@ final class VehicleUseTest extends TestCase
             $response->assertCreated()->assertJsonPath('data.customer_agreement.reference', $customer->reference);
             $id = $response->json('data.id');
             $this->tenantGetJson($context->tenantId, '/api/v1/vehicle-rental/vehicle-uses/'.$id.'/history')->assertOk()->assertJsonPath('data.0.action', 'plan')->assertJsonPath('data.0.actor.name', 'Test User');
+        });
+    }
+
+    public function test_open_ended_plan_blocks_future_use_and_requires_open_source_coverage(): void
+    {
+        $this->activeFixture(function ($context, $customer, $owner, $input): void {
+            $service = app(VehicleUseService::class);
+            $input['ends_at'] = null;
+            $use = $service->plan($context, $customer->id, $customer->row_version, $input);
+            self::assertNull($use->ends_at);
+            self::assertTrue(app(VehicleUseAvailabilityBlocker::class)->conflicts($context->tenantId, $input['vehicle_id'], '2027-01-01 00:00:00', null));
+            $service->transition($context, $use->id, $use->row_version, VehicleUseAction::Cancel, ['reason' => 'Change to bounded supply']);
+            // Simulate a source limit to verify that an unbounded request is never silently truncated.
+            DB::table('vehicle_rental_owner_agreements')->where('id', $owner->id)->update(['ends_on' => '2026-09-09']);
+            try {
+                $service->plan($context, $customer->id, $customer->row_version, $input);
+                self::fail('Unbounded use exceeded finite source');
+            } catch (ValidationException) {
+                $this->assertDatabaseCount('vehicle_rental_uses', 1);
+            }
+        });
+    }
+
+    public function test_replacement_rolls_back_return_on_invalid_supply_and_preserves_both_vehicles(): void
+    {
+        $this->activeFixture(function ($context, $customer, $owner, $input): void {
+            $service = app(VehicleUseService::class);
+            $old = $service->plan($context, $customer->id, $customer->row_version, $input);
+            $old = $service->transition($context, $old->id, $old->row_version, VehicleUseAction::Handover, ['occurred_at' => $input['starts_at'], 'reason' => 'Collected']);
+            $vehicle = DB::table('vehicles')->insertGetId(['tenant_id' => $context->tenantId, 'vehicle_number' => 'REPLACEMENT', 'registration_number' => 'REPLACEMENT', 'status' => VehicleStatus::Active->value]);
+            $replacement = array_replace($input, ['vehicle_id' => $vehicle, 'starts_at' => '2026-09-07T12:00:00+05:30', 'reason' => 'Vehicle exchange']);
+            try {
+                $service->replace($context, $old->id, $old->row_version, $replacement);
+                self::fail('Used wrong owner agreement');
+            } catch (ValidationException) {
+                self::assertSame(VehicleUseStatus::InCustody, $old->refresh()->status);
+                self::assertSame(2, $old->history()->count());
+                $this->assertDatabaseCount('vehicle_rental_uses', 1);
+            }
+            DB::table('vehicle_ownerships')->insert(['tenant_id' => $context->tenantId, 'vehicle_id' => $vehicle, 'owner_type' => VehicleOwnerType::Company->value, 'owner_key' => 'company', 'owner_code_snapshot' => 'COMPANY', 'owner_name_snapshot' => 'Company', 'ownership_type' => VehicleOwnershipType::CompanyOwned->value, 'started_at' => '2026-09-01 00:00:00']);
+            $replacement['owner_agreement_id'] = null;
+            $next = $service->replace($context, $old->id, $old->row_version, $replacement);
+            self::assertSame($old->id, (int) $next->replaces_use_id);
+            self::assertSame(VehicleUseStatus::InCustody, $next->status);
+            self::assertSame(VehicleUseStatus::Returned, $old->refresh()->status);
+            self::assertSame($input['vehicle_id'], (int) $old->vehicle_id);
+            self::assertSame($old->returned_at->toIso8601String(), $next->handed_over_at->toIso8601String());
+            self::assertSame(3, $old->history()->count());
+            self::assertSame(2, $next->history()->count());
         });
     }
 }

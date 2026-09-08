@@ -14,7 +14,7 @@
 
 **Last evidence/reconciliation update:** 2026-09-08 (operational slice; audiovisual coverage incomplete)
 
-**Delivery status:** Fresh agreement and bounded vehicle-use/custody APIs/UI, Running Chart draft/finalize/reverse/correction history, permissions and reciprocal workshop admission are implemented. Financial calculations/handoffs, atomic replacements, driver identity and production acceptance remain outstanding.
+**Delivery status:** Fresh agreement and bounded/open-ended vehicle-use/custody and atomic replacement APIs/UI, Running Chart draft/finalize/reverse/correction history, permissions and reciprocal workshop admission are implemented. Financial calculations/handoffs, replacement charging, driver identity and production acceptance remain outstanding.
 
 ---
 
@@ -78,7 +78,7 @@ The detailed contract and rollout requirements are in [agreements.md](agreements
 - [x] Running Chart physical observations, exact decimal distance, explicit minute units, unknown/zero distinction and original offset/second retention.
 - [x] Versioned draft/finalize/reverse/correction commands, immutable history, physical overlap and odometer continuity checks.
 - [x] Guided operational UI, independent chart permissions, readable history and stale request feedback.
-- [ ] Atomic replacements and open-ended plan entry; do not treat bounded plan/return as their completion.
+- [x] Atomic physical replacement with predecessor lineage, failed-source rollback and open-ended plan/source coverage. Replacement charging remains gated by VR-U04.
 - [ ] HR/external-driver identity, effective successor agreement terms, commercial calculations and financial integration.
 - [ ] Real MySQL concurrency, production upgrade and authenticated browser/UAT acceptance.
 

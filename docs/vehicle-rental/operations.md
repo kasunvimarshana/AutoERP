@@ -1,6 +1,6 @@
 # Fresh Vehicle Rental operational contract
 
-Implementation update: 2026-09-08, based on `worktree-0.0.8` at `55166a8506303f7f40d149b31ab119682aa118b5`. This contract describes the newly written operational slice. It is not evidence that every video, pricing policy or production environment has been verified. Business authority and unresolved rules remain in [the knowledge base](../knowledgebase.md).
+Implementation update: 2026-09-08, based on `worktree-0.0.8` at `7a9edc1acc1048ac73418ec1780c297241e7d976`, with the replacement/open-ended extension. This contract describes the newly written operational slice. It is not evidence that every video, pricing policy or production environment has been verified. Business authority and unresolved rules remain in [the knowledge base](../knowledgebase.md).
 
 ## Evidence and decision boundaries
 
@@ -25,7 +25,7 @@ The generic immutable-history base was renamed from `AgreementHistory` to `Immut
 ## Vehicle-use workflow
 
 1. Activate the customer agreement; for externally supplied vehicles activate the correct owner agreement.
-2. In customer agreement review choose **Assigned vehicles → Assign vehicle**. Select a canonical vehicle and owner agreement through guided lookups, or explicitly select company supply. Supply planned start/end instants with offsets. The current form requires a bounded period.
+2. In customer agreement review choose **Assigned vehicles → Assign vehicle**. Select a canonical vehicle and owner agreement through guided lookups, or explicitly select company supply. Supply planned start/end instants with offsets. Planned end may be omitted only when the customer agreement and selected supply are both open-ended.
 3. Save the plan with the displayed customer-agreement version. The backend locks the physical vehicle, customer agreement and owner agreement, checks full agreement/source coverage and tenant-wide availability, then writes the plan and its history atomically.
 4. Record actual handover with a reason, explicit timestamp and optional odometer. It must fall inside the planned period and cannot be in the future. Recheck active agreements, source and availability. Vehicle's status service records `Rented`; Rental owns custody evidence, not the Vehicle status implementation.
 5. Record actual return after handover and no later than now. Known odometers cannot move backwards. Return cannot precede finalized usage or contradict a known finalized finish reading. Release `Rented` to `Active` through Vehicle; preserve any different status such as an independently imposed hold.
@@ -33,7 +33,9 @@ The generic immutable-history base was renamed from `AgreementHistory` to `Immut
 
 Physical occupancy uses `[start, end)` instants. Exact adjacent handover boundaries do not overlap. Actual custody remains open-ended until actual return, regardless of expected return. Returned actual periods remain protected historical occupancy; cancelled plans do not block. Cross-organization conflicts disclose a generic reason rather than another branch's business details.
 
-The bounded plan is immutable: cancel and create a corrected plan. An atomic replacement workflow and open-ended plan entry are not yet delivered by this slice. Do not interpret manual return/plan as an atomic replacement or infer replacement charging.
+The plan is immutable: cancel and create a corrected plan. For actual exchange, choose **Replace vehicle**, select a different vehicle and its valid source, record the actual exchange time, optional old/new odometers and a reason. The backend locks both physical vehicles in ID order, returns the old use, plans and hands over the new use in one transaction. Failure at any stage rolls back both histories and both Vehicle status changes. The new use has a unique, tenant-safe `replaces_use_id` pointing to the returned predecessor; no reverse pointer or mutated vehicle identity is stored. Both use periods meet at the actual exchange instant and share the customer agreement. This establishes operational replacement only, not replacement charging (VR-U04).
+
+Open-ended planned use blocks future conflicting occupancy. An open-ended request against finite agreement or supply coverage fails rather than being silently truncated.
 
 ## Running Chart workflow
 
@@ -55,6 +57,7 @@ All routes use the existing authenticated tenant/organization/feature middleware
 | GET/POST `customer/agreements/{agreement}/vehicles` | Use view/manage; POST requires customer agreement `expected_version` |
 | GET `vehicles/{vehicle}/sources` | Use view; scoped active owner reference/name/date lookup, no owner rates |
 | POST `vehicle-uses/{use}/{handover\|return\|cancel}` | Use manage; current use `expected_version`, reason and applicable actual observations |
+| POST `vehicle-uses/{use}/replace` | Use manage; old use version, actual exchange time, new vehicle/source, reason and optional separate odometers |
 | GET `vehicle-uses/{use}/history` | Use view; paginated readable history |
 | GET/POST `vehicle-uses/{use}/running-charts` | Chart view/manage; POST requires current use version; optional guided correction predecessor |
 | PUT `running-charts/{chart}` | Chart manage; current chart version; draft only |
@@ -70,3 +73,7 @@ Vehicle owns the availability contract. Rental and Vehicle Service publish their
 Writes acquire the physical vehicle mutex before dependent source/use/history rows. Vehicle ownership changes use the same vehicle-first order, fixing the previous ownership-then-vehicle inversion. Integrity queries use current locking reads after that mutex rather than potentially stale consistent reads. Owner agreement draft vehicle changes prelock old/new vehicle IDs in deterministic order. Agreement closure checks active use under locks. These are owner-specific fixes with no added circular module dependency.
 
 SQLite regression coverage verifies command behavior and rollback, not InnoDB contention. MySQL/MariaDB concurrency execution, production migration rehearsal and authenticated browser/UAT are still required. These fresh migrations must not be blindly applied to an uninspected production schema containing historical Rental tables.
+
+## Fresh-baseline migration boundary
+
+The repository's mandatory migration architecture permits explicit fresh table creation only. Replacement provenance and nullable planned ends are therefore integrated into the original fresh `vehicle_rental_uses` creation migration. This is not an automatic upgrade for an already migrated database. No production schema was inspected or changed. If the earlier operational commit was applied, compare the actual schema and migration journal and prepare a deployment-specific, evidence-preserving upgrade before using this revision. Do not drop operational tables or erase history to satisfy the fresh baseline.

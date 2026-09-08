@@ -43,6 +43,11 @@ final class VehicleUse extends TenantOwnedModel
         return $this->belongsTo(Vehicle::class)->withTrashed();
     }
 
+    public function replacesUse(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'replaces_use_id');
+    }
+
     public function history(): HasMany
     {
         return $this->hasMany(VehicleUseHistory::class)->orderBy('row_version');

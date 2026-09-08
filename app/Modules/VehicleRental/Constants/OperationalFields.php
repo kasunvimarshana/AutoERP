@@ -18,5 +18,5 @@ final class OperationalFields
 
     public const MUTABLE_USE = ['vehicle_id', 'owner_agreement_id', 'starts_at', 'ends_at', 'notes'];
 
-    public const USE_RELATIONS = ['customerAgreement', 'ownerAgreement', 'vehicle'];
+    public const USE_RELATIONS = ['customerAgreement', 'ownerAgreement', 'vehicle', 'replacesUse'];
 }

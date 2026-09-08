@@ -37,6 +37,11 @@ final class VehicleUseController
         return new VehicleUseResource($this->uses->transition($request->context(), $use, $request->expectedVersion(), VehicleUseAction::from($action), $request->only(['occurred_at', 'odometer', 'reason'])));
     }
 
+    public function replace(AgreementRequest $request, int $use): VehicleUseResource
+    {
+        return new VehicleUseResource($this->uses->replace($request->context(), $use, $request->expectedVersion(), $request->only(array_merge(OperationalFields::MUTABLE_USE, ['reason', 'return_odometer', 'handover_odometer']))));
+    }
+
     public function history(AgreementRequest $request, int $use): AnonymousResourceCollection
     {
         return VehicleUseHistoryResource::collection($this->uses->find($request->context(), $use)->history()->with('actor')->paginate($request->perPage()));

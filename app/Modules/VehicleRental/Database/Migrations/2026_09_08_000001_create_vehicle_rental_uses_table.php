@@ -20,13 +20,14 @@ return new class extends Migration
             $table->foreignId('owner_agreement_id')->nullable();
             $table->unsignedBigInteger('owner_agreement_version')->nullable();
             $table->foreignId('vehicle_id');
+            $table->foreignId('replaces_use_id')->nullable();
             $table->string('vehicle_label_snapshot');
             $table->string('status')->default(VehicleUseStatus::Planned->value);
             $table->unsignedBigInteger('row_version')->default(AgreementFields::INITIAL_VERSION);
             $table->dateTime('starts_at');
-            $table->dateTime('ends_at');
+            $table->dateTime('ends_at')->nullable();
             $table->string('starts_at_input');
-            $table->string('ends_at_input');
+            $table->string('ends_at_input')->nullable();
             $table->dateTime('handed_over_at')->nullable();
             $table->dateTime('returned_at')->nullable();
             $table->decimal('handover_odometer', AgreementFields::DECIMAL_PRECISION, AgreementFields::DECIMAL_SCALE)->nullable();
@@ -34,6 +35,8 @@ return new class extends Migration
             $table->text('notes')->nullable();
             $table->timestamps();
             $table->unique(['id', 'tenant_id'], 'vru_tenant_uk');
+            $table->unique('replaces_use_id', 'vru_replacement_uk');
+            $table->foreign(['replaces_use_id', 'tenant_id'], 'vru_replacement_fk')->references(['id', 'tenant_id'])->on('vehicle_rental_uses')->restrictOnDelete();
             $table->index(['tenant_id', 'vehicle_id', 'status', 'starts_at'], 'vru_timeline_ix');
             $table->index(['tenant_id', 'organization_unit_id', 'customer_agreement_id'], 'vru_customer_ix');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'vru_org_fk')->references(['id', 'tenant_id'])->on('organization_units')->restrictOnDelete();

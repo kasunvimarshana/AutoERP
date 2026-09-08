@@ -8,13 +8,14 @@ export const USE_ACTION_LABELS = { [VehicleUseAction.Handover]: 'Hand over vehic
 interface AgreementReference { id: number; reference: string; party_name: string; version: number }
 export interface VehicleUse {
     id: number; row_version: number; status: VehicleUseStatus;
+    replaces_use?: { id: number; vehicle_label: string } | null;
     customer_agreement: AgreementReference; owner_agreement: AgreementReference | null;
-    vehicle: { id: number; label: string }; starts_at: string; ends_at: string;
+    vehicle: { id: number; label: string }; starts_at: string; ends_at: string | null;
     handed_over_at: string | null; returned_at: string | null; handover_odometer: string | null; return_odometer: string | null; notes: string | null;
 }
 export interface VehicleUseHistory {
     version: number; action: string; reason: string | null; recorded_at: string; actor: { name: string };
-    vehicle_label: string; status: VehicleUseStatus; starts_at: string; ends_at: string;
+    vehicle_label: string; status: VehicleUseStatus; starts_at: string; ends_at: string | null;
     handed_over_at: string | null; returned_at: string | null; handover_odometer: string | null; return_odometer: string | null;
 }
 const MINUTES_PER_HOUR = 60;

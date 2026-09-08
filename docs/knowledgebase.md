@@ -1248,7 +1248,7 @@ HEAD before documentation change: d4aaa693706c2d3fe693244c8ea0f8d9e4ae326c
 
 ### 29.2 Active Runtime status
 
-At the original audit baseline there was **no active `app/Modules/VehicleRental` runtime module**. The 2026-09-07 fresh agreement foundation now registers a new module with separate customer/owner agreement APIs, UI, term snapshots, history and permissions. The 2026-09-08 fresh operational slice adds bounded vehicle-use planning, handover/return/cancellation and draft/finalized/reversed Running Charts with immutable correction history. Calculations and financial handoffs are not implemented. See [operations.md](vehicle-rental/operations.md) for exact states, API, ownership and limitations. See [the agreement implementation contract](vehicle-rental/agreements.md). The previous Rental runtime had been intentionally removed in earlier work, while historical financial vocabulary/data compatibility remains owned by the relevant financial modules where required.
+At the original audit baseline there was **no active `app/Modules/VehicleRental` runtime module**. The 2026-09-07 fresh agreement foundation now registers a new module with separate customer/owner agreement APIs, UI, term snapshots, history and permissions. The 2026-09-08 fresh operational slice adds bounded/open-ended vehicle-use planning, atomic replacement, handover/return/cancellation and draft/finalized/reversed Running Charts with immutable correction history. Calculations and financial handoffs are not implemented. See [operations.md](vehicle-rental/operations.md) for exact states, API, ownership and limitations. See [the agreement implementation contract](vehicle-rental/agreements.md). The previous Rental runtime had been intentionally removed in earlier work, while historical financial vocabulary/data compatibility remains owned by the relevant financial modules where required.
 
 That absence is significant: a fresh rebuild must not restore, cherry-pick, revive, or depend on the removed implementation.
 
@@ -1512,7 +1512,7 @@ If only one section is retained in working memory, retain this:
 8. **Keep the UI simple: Agreement -> Select Vehicle -> Running Chart -> financial outputs. Put integrity controls behind the workflow.**
 9. **Do not copy legacy security, mutation, raw-code, duplicate-workflow, or repair-after-error mechanisms.**
 10. **Do not invent partial-month, free-KM pooling, replacement charging, downtime, garage-mileage, deposit-priority, tax, withholding, or other unresolved policies.**
-11. **The fresh runtime covers agreements, bounded vehicle-use/custody and Running Chart evidence/history. Replacement, driver identity, commercial calculations, financial integration and release acceptance remain incomplete.**
+11. **The fresh runtime covers agreements, bounded/open-ended vehicle-use/custody, atomic replacement and Running Chart evidence/history. Replacement charging, driver identity, commercial calculations, financial integration and release acceptance remain incomplete.**
 12. **Correctness and auditability outrank compatibility with removed legacy code.**
 
 This knowledge base is the business/domain authority for future Vehicle Rental work until new authoritative TACGL/video/business evidence explicitly supersedes a rule recorded here.
