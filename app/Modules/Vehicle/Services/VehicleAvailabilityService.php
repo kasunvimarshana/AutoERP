@@ -20,6 +20,7 @@ final class VehicleAvailabilityService
         int $vehicleId,
         string $startsAt,
         ?string $endsAt,
+        ?VehicleAvailabilityBlockerInterface $selfBlocker = null,
     ): Vehicle {
         $vehicleQuery = Vehicle::query()->where('tenant_id', $tenantId);
         $organizationUnitId === null
@@ -34,13 +35,23 @@ final class VehicleAvailabilityService
             throw new InvalidArgumentException('The selected vehicle is not operationally active.');
         }
 
+        $this->assertUnblocked($tenantId, $organizationUnitId, $vehicleId, $startsAt, $endsAt, $selfBlocker);
+
+        return $vehicle;
+    }
+
+    // The caller must hold the vehicle lock in the transaction that persists its operational admission.
+    public function assertUnblocked(int $tenantId, ?int $organizationUnitId, int $vehicleId, string $startsAt, ?string $endsAt, ?VehicleAvailabilityBlockerInterface $selfBlocker = null): void
+    {
         foreach ($this->blockers as $blocker) {
+            if ($selfBlocker !== null && $blocker::class === $selfBlocker::class) {
+                continue;
+            }
             $reason = $blocker->blockingReason($tenantId, $organizationUnitId, $vehicleId, $startsAt, $endsAt);
             if ($reason !== null) {
                 throw new InvalidArgumentException($reason);
             }
         }
 
-        return $vehicle;
     }
 }

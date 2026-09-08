@@ -12,9 +12,9 @@
 
 **Canonical domain reference:** [knowledgebase.md](../knowledgebase.md)
 
-**Last evidence/reconciliation update:** 2026-09-08 (integration verification; source coverage unchanged)
+**Last evidence/reconciliation update:** 2026-09-08 (operational slice; audiovisual coverage incomplete)
 
-**Delivery status:** Fresh customer/owner agreement API and UI foundation, immutable term history, permissions, explicit Tenant opt-in, and Vehicle Service fixes implemented. Running Charts, assignments, calculations, financial handoffs and production acceptance remain outstanding.
+**Delivery status:** Fresh agreement and bounded vehicle-use/custody APIs/UI, Running Chart draft/finalize/reverse/correction history, permissions and reciprocal workshop admission are implemented. Financial calculations/handoffs, atomic replacements, driver identity and production acceptance remain outstanding.
 
 ---
 
@@ -70,6 +70,20 @@ Do not make one side depend on the amount or completion state of the other side.
 
 The detailed contract and rollout requirements are in [agreements.md](agreements.md). Checked foundation work does not imply that the complete-module requirements below are satisfied.
 
+## Operational delivery ledger — 2026-09-08
+
+- [x] Fresh tenant-safe vehicle-use/history and Running Chart/history migrations and models.
+- [x] Full-period customer/owner or proven company source coverage, frozen agreement revisions, bounded plans and actual custody.
+- [x] Vehicle-owned status/ownership coordination and reciprocal workshop admission through the shared availability contract.
+- [x] Running Chart physical observations, exact decimal distance, explicit minute units, unknown/zero distinction and original offset/second retention.
+- [x] Versioned draft/finalize/reverse/correction commands, immutable history, physical overlap and odometer continuity checks.
+- [x] Guided operational UI, independent chart permissions, readable history and stale request feedback.
+- [ ] Atomic replacements and open-ended plan entry; do not treat bounded plan/return as their completion.
+- [ ] HR/external-driver identity, effective successor agreement terms, commercial calculations and financial integration.
+- [ ] Real MySQL concurrency, production upgrade and authenticated browser/UAT acceptance.
+
+Detailed shipped behavior and relationship reasoning: [operations.md](operations.md). Older broad checklist items remain unchecked where they require more than this slice.
+
 ## Execution order and acceptance gates
 
 This is a backlog, not a claim that any runtime slice is complete. A checked documentation item does not satisfy implementation, database, API or browser acceptance.
@@ -91,7 +105,7 @@ This is a backlog, not a claim that any runtime slice is complete. A checked doc
 - [x] Independently reproduce knowledge-base E01–E16 transaction examples and the two documented invoice line reconciliations.
 - [x] Survey the full video durations with interval frames and inspect selected full-resolution anchors V01–V07.
 - [ ] Complete continuous video and narration review, including the long unchanged-screen discussion in `2.mp4`; interval frames are not complete audiovisual evidence.
-- [ ] Extract and inspect the password-protected nested backup. Free 7-Zip listed 86 entries, but extraction requires the source owner’s password; contents remain uninspected.
+- [ ] Extract and inspect the password-protected nested backup. Free 7-Zip listed 86 entries, but five exact source password-field values did not unlock it in the authorized recovery attempt; contents remain uninspected. No guessed password variants were used.
 - [ ] Obtain/inspect the dedicated AT Tours rental agreement and Running Chart dataset/application represented in the videos; do not equate archive `scfcon` company configuration with video aliases.
 - [ ] Inspect executable decision logic or gather demonstrated edge-case outputs where rules remain hidden. Do not execute an unknown legacy application against live business data.
 - [x] Establish free local PHP/Composer/SQLite verification. Vehicle and Vehicle Service suites pass (55 tests, 411 assertions); MySQL and complete Rental runtime verification remain open.

@@ -86,6 +86,6 @@ final class AgreementValidation
 
     private function visible(Builder $query, AgreementContext $context): Builder
     {
-        return $query->forTenant($context->tenantId)->where(fn (Builder $scope) => $scope->whereNull('organization_unit_id')->orWhere('organization_unit_id', $context->organizationUnitId));
+        return $query->where('tenant_id', $context->tenantId)->where(fn (Builder $scope) => $scope->whereNull('organization_unit_id')->orWhere('organization_unit_id', $context->organizationUnitId));
     }
 }

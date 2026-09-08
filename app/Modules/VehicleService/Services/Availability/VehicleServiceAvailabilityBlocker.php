@@ -38,7 +38,7 @@ final class VehicleServiceAvailabilityBlocker implements VehicleAvailabilityBloc
                 $query->whereNull('expected_delivery_date')
                     ->orWhereDate('expected_delivery_date', '>=', $startsOn);
             })
-            ->exists();
+            ->lockForUpdate()->first(['id']) !== null;
 
         return $blocked
             ? 'The selected vehicle is blocked by an active Vehicle Service job for the requested period.'

@@ -7,12 +7,14 @@ namespace Modules\VehicleService\Services;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
+use Modules\Vehicle\Models\Vehicle;
 use Modules\VehicleService\DTOs\VehicleServiceInspectionData;
 use Modules\VehicleService\DTOs\VehicleServiceJobData;
 use Modules\VehicleService\Enums\VehicleServiceCommissionType;
 use Modules\VehicleService\Enums\VehicleServiceJobStatus;
 use Modules\VehicleService\Models\VehicleServiceInspection;
 use Modules\VehicleService\Models\VehicleServiceJob;
+use Modules\VehicleService\Services\Availability\VehicleServiceAdmissionService;
 use Modules\VehicleService\Services\Concerns\AssertsVehicleServiceExpectedVersion;
 
 final class VehicleServiceJobService
@@ -29,6 +31,7 @@ final class VehicleServiceJobService
         private readonly VehicleServiceCommissionPolicyService $commissionPolicies,
         private readonly VehicleServiceStatusService $statuses,
         private readonly VehicleServiceInspectionService $inspections,
+        private readonly VehicleServiceAdmissionService $admission,
     ) {}
 
     public function create(VehicleServiceJobData $data): VehicleServiceJob
@@ -42,7 +45,7 @@ final class VehicleServiceJobService
             }
             $this->validateMileageFields($data);
 
-            $job = new VehicleServiceJob();
+            $job = new VehicleServiceJob;
             $job->forceFill($this->attributes($data, true, self::ZERO_AMOUNT))->save();
             $this->statuses->recordCreated($job, $data->createdBy);
             if ($data->customerComplaint !== null) {
@@ -60,7 +63,13 @@ final class VehicleServiceJobService
     public function update(VehicleServiceJob $job, VehicleServiceJobData $data, ?int $expectedVersion = null): VehicleServiceJob
     {
         return DB::transaction(function () use ($job, $data, $expectedVersion): VehicleServiceJob {
+            $snapshot = VehicleServiceJob::query()->findOrFail($job->getKey());
+            Vehicle::query()->where('tenant_id', $snapshot->tenant_id)
+                ->whereIn('id', array_unique([(int) $snapshot->vehicle_id, $data->vehicleId]))->orderBy('id')->lockForUpdate()->get();
             $job = VehicleServiceJob::query()->lockForUpdate()->findOrFail($job->getKey());
+            if ($job->status !== VehicleServiceJobStatus::Draft && (int) $job->vehicle_id !== $data->vehicleId) {
+                throw new InvalidArgumentException('Cancel the admitted workshop job before selecting a different physical vehicle.');
+            }
             $this->assertExpectedVersion($job, $expectedVersion);
             $this->validator->assertMutable($job);
 
@@ -77,6 +86,9 @@ final class VehicleServiceJobService
 
             $versionBefore = (int) $job->row_version;
             $job->forceFill($this->attributes($data, false, (string) $job->grand_total, $job))->save();
+            if (in_array($job->status, [VehicleServiceJobStatus::Inspected, VehicleServiceJobStatus::InProgress], true)) {
+                $this->admission->assertAdmissible($job);
+            }
             $job->refresh()->load('inspection');
             $complaintChanged = $this->syncCustomerComplaint($job, $data);
             if ($complaintChanged && (int) $job->row_version === $versionBefore) {

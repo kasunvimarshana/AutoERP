@@ -9,14 +9,14 @@ use LogicException;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\User\Models\UserModel;
 
-abstract class AgreementHistory extends TenantOwnedModel
+abstract class ImmutableRentalHistory extends TenantOwnedModel
 {
     public $timestamps = false;
 
     protected static function booted(): void
     {
-        static::updating(static fn () => throw new LogicException('Agreement history is append-only.'));
-        static::deleting(static fn () => throw new LogicException('Agreement history is append-only.'));
+        static::updating(static fn () => throw new LogicException('Rental history is append-only.'));
+        static::deleting(static fn () => throw new LogicException('Rental history is append-only.'));
     }
 
     public function actor(): BelongsTo

@@ -8,14 +8,17 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Modules\Vehicle\Models\Vehicle;
 use Modules\VehicleRental\Constants\AgreementFields;
 use Modules\VehicleRental\Data\AgreementContext;
 use Modules\VehicleRental\Enums\AgreementAction;
 use Modules\VehicleRental\Enums\AgreementKind;
 use Modules\VehicleRental\Enums\AgreementStatus;
+use Modules\VehicleRental\Enums\VehicleUseStatus;
 use Modules\VehicleRental\Models\Agreement;
 use Modules\VehicleRental\Models\CustomerAgreement;
 use Modules\VehicleRental\Models\OwnerAgreement;
+use Modules\VehicleRental\Models\VehicleUse;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 final class AgreementService
@@ -59,6 +62,11 @@ final class AgreementService
 
         return $this->atomic(function () use ($kind, $context, $id, $expectedVersion, $action, $input, $reason): Agreement {
             $this->validation->assertContext($context);
+            if ($kind === AgreementKind::Owner && $action === AgreementAction::Update) {
+                $snapshot = OwnerAgreement::query()->forContext($context->tenantId, $context->organizationUnitId)->findOrFail($id);
+                $vehicleIds = array_unique([(int) $snapshot->vehicle_id, (int) ($input['vehicle_id'] ?? $snapshot->vehicle_id)]);
+                Vehicle::query()->forTenant($context->tenantId, $context->organizationUnitId)->whereIn('id', $vehicleIds)->orderBy('id')->lockForUpdate()->get();
+            }
             $record = $this->model($kind)::query()->forContext($context->tenantId, $context->organizationUnitId)->lockForUpdate()->findOrFail($id);
             if ($record->row_version !== $expectedVersion) {
                 throw new ConflictHttpException('This agreement changed. Reload it before continuing.');
@@ -71,6 +79,11 @@ final class AgreementService
             } elseif ($action === AgreementAction::Close && $record->status === AgreementStatus::Active) {
                 if (trim($reason ?? '') === '' || mb_strlen($reason) > AgreementFields::NOTES_LENGTH) {
                     throw ValidationException::withMessages(['reason' => ['Provide a closure reason within the notes length limit.']]);
+                }
+                $foreignKey = $kind === AgreementKind::Customer ? 'customer_agreement_id' : 'owner_agreement_id';
+                if (VehicleUse::query()->forTenant($context->tenantId)->where($foreignKey, $record->id)
+                    ->whereIn('status', [VehicleUseStatus::Planned->value, VehicleUseStatus::InCustody->value])->lockForUpdate()->first(['id']) !== null) {
+                    throw ValidationException::withMessages(['status' => ['Return vehicles and cancel remaining plans before closing this agreement.']]);
                 }
                 $record->status = AgreementStatus::Closed;
                 $record->closed_at = now();

@@ -1,0 +1,43 @@
+import { useCallback, useState, type FormEvent } from 'react';
+import { requestLookup } from '@/shared/api/lookupRequest';
+import { endpoints } from '@/shared/api/endpoints';
+import { toApiError, type ApiError } from '@/shared/api/apiError';
+import { Button } from '@/shared/components/Button';
+import { Input } from '@/shared/components/Input';
+import { LookupSelect } from '@/shared/components/LookupSelect';
+import { ErrorAlert } from '@/shared/components/ErrorAlert';
+import type { NamedResource } from '@/shared/types/common';
+import type { LookupLoadParams } from '@/shared/types/lookup';
+import { AGREEMENT_API, type Agreement } from './agreements';
+import { planVehicleUse } from './vehicleUseApi';
+import { operationalTimeZone, timestampWithOffset } from './vehicleUse';
+const vehicles = (params: LookupLoadParams) => requestLookup<Record<string, unknown>>(`${endpoints.vehicles}/lookup/active`, params).then(result => ({ ...result, data: result.data.map(row => ({ id: Number(row.id), name: String(row.registration_number ?? row.vehicle_number) })) }));
+export function VehicleUseEditor({ agreement, onSaved, onCancel }: { agreement: Agreement; onSaved: () => void; onCancel: () => void }) {
+    const [vehicle, setVehicle] = useState<NamedResource | null>(null);
+    const [owner, setOwner] = useState<NamedResource | null>(null);
+    const [company, setCompany] = useState(false);
+    const [start, setStart] = useState(''); const [end, setEnd] = useState(''); const [notes, setNotes] = useState('');
+    const [error, setError] = useState<ApiError | null>(null); const [saving, setSaving] = useState(false);
+    const sources = useCallback((params: LookupLoadParams) => requestLookup<NamedResource>(`${AGREEMENT_API}/vehicles/${vehicle?.id}/sources`, params), [vehicle?.id]);
+    async function submit(event: FormEvent) {
+        event.preventDefault(); if (!vehicle || (!company && !owner)) return;
+        setSaving(true); setError(null);
+        try { await planVehicleUse(agreement, { vehicle_id: vehicle.id, owner_agreement_id: company ? null : owner!.id, starts_at: timestampWithOffset(start), ends_at: timestampWithOffset(end), notes: notes || null }); onSaved(); }
+        catch (failure) { setError(toApiError(failure)); } finally { setSaving(false); }
+    }
+    return <form onSubmit={submit} className="space-y-4 rounded-lg border p-4" aria-label="Assign vehicle">
+        <h3 className="font-semibold">Assign a vehicle to {agreement.reference}</h3>
+        <ErrorAlert error={error} inline />
+        <p className="text-sm text-slate-600">Times use {operationalTimeZone}. The planned end is the handover boundary for the next use, not a billing day-count rule.</p>
+        <fieldset disabled={saving} className="grid gap-4 sm:grid-cols-2">
+            <LookupSelect label="Vehicle" value={vehicle} onChange={value => { setVehicle(value); setOwner(null); }} search={vehicles} required error={error?.fields.vehicle_id?.[0]} />
+            <label className="flex items-center gap-2"><input type="checkbox" checked={company} onChange={event => { setCompany(event.target.checked); setOwner(null); }} />Company-owned vehicle</label>
+            {company && <p className="text-sm text-slate-600">Vehicle ownership records must cover the entire period. No owner payable is created for company supply.</p>}
+            {!company && vehicle && <LookupSelect label="Owner agreement" value={owner} onChange={setOwner} search={sources} required error={error?.fields.owner_agreement_id?.[0]} />}
+            <Input label="Planned handover" type="datetime-local" value={start} onChange={e => setStart(e.target.value)} required error={error?.fields.starts_at?.[0]} />
+            <Input label="Planned return" type="datetime-local" value={end} onChange={e => setEnd(e.target.value)} required error={error?.fields.ends_at?.[0]} />
+            <Input label="Assignment notes" value={notes} onChange={e => setNotes(e.target.value)} />
+        </fieldset>
+        <Button type="submit" loading={saving} disabled={!vehicle || (!company && !owner)}>Save assignment</Button> <Button variant="secondary" disabled={saving} onClick={onCancel}>Cancel</Button>
+    </form>;
+}

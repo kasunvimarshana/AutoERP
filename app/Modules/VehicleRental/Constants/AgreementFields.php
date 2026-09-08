@@ -14,6 +14,8 @@ final class AgreementFields
 
     public const DECIMAL_SCALE = 6;
 
+    public const DECIMAL_PRECISION = 20;
+
     public const ZERO = '0';
 
     public const DECIMAL_PATTERN = '/^(?:0|[1-9]\d{0,13})(?:\.\d{1,6})?$/D';

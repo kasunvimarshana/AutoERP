@@ -14,6 +14,7 @@ use Modules\VehicleService\Enums\VehicleServiceJobStatus;
 use Modules\VehicleService\Enums\VehicleServiceLineStatus;
 use Modules\VehicleService\Models\VehicleServiceJob;
 use Modules\VehicleService\Models\VehicleServiceStatusHistory;
+use Modules\VehicleService\Services\Availability\VehicleServiceAdmissionService;
 use Modules\VehicleService\Services\Concerns\AssertsVehicleServiceExpectedVersion;
 
 final class VehicleServiceStatusService
@@ -40,7 +41,7 @@ final class VehicleServiceStatusService
         'cancelled' => [],
     ];
 
-    public function __construct(private readonly VehicleStatusService $vehicleStatuses) {}
+    public function __construct(private readonly VehicleStatusService $vehicleStatuses, private readonly VehicleServiceAdmissionService $admission) {}
 
     public function change(
         VehicleServiceJob $job,
@@ -78,6 +79,9 @@ final class VehicleServiceStatusService
                 throw new InvalidArgumentException("Invalid service job status transition from {$old->value} to {$status->value}.");
             }
 
+            if (in_array($status, [VehicleServiceJobStatus::Inspected, VehicleServiceJobStatus::InProgress], true)) {
+                $this->admission->assertAdmissible($job);
+            }
             if ($status === VehicleServiceJobStatus::Inspected) {
                 $this->assertWorkforceReadyForInspection($job);
             }

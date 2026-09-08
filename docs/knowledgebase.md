@@ -2,7 +2,7 @@
 
 **Status:** Canonical working domain reference; evidence gaps remain; not a completed implementation or exhaustive audiovisual audit
 
-**Knowledge refresh date:** 2026-09-08 (implementation verification; source coverage unchanged)
+**Knowledge refresh date:** 2026-09-08 (fresh operational implementation; audiovisual coverage remains incomplete)
 
 **Primary business source of truth and conflict tie-breaker:** TACGL legacy application/data corpus
 
@@ -12,7 +12,7 @@
 
 **Initial architecture baseline:** `d4aaa693706c2d3fe693244c8ea0f8d9e4ae326c`
 
-**Latest implemented baseline reviewed:** `55d3aaff3e4fe7a4d48ee4a82a735810d2c2295f`, plus the [2026-09-08 integration corrections](changes/2026-09-08-rental-foundation-integration-verification.md). Full repository tests pass for the agreement foundation; this does not complete the remaining Rental workflows or audiovisual audit.
+**Latest implemented baseline reviewed:** `55166a8506303f7f40d149b31ab119682aa118b5`, plus the fresh [vehicle-use and Running Chart contract](vehicle-rental/operations.md). Operational capture is implemented; commercial integrations and complete audiovisual review remain outstanding.
 
 **TACGL source file:** `TACGL.zip`
 
@@ -152,7 +152,7 @@ Inspection performed in this refresh:
 - Extracted text from all 16 PDFs (63 pages). Fifteen are debtor outstanding age-analysis exports; `45827284.PDF` is a one-page artifact without extracted text. Inspected all five XLS inventories and column headers: they are debtor/transaction extracts, with 4, 4, 4, 340 and 8 rows including headers. These are not a complete contract/rate catalogue.
 - Visually surveyed frames at approximately 30-second intervals across all four videos and inspected selected native-resolution frames. This can locate workflows but cannot prove every short-lived action or validation.
 - No full audio transcription or continuous audiovisual review was completed in this refresh. Spoken-only rules, especially long discussion segments with unchanged screens, remain unverified. Earlier audit documents are secondary claims to cross-check, not substitutes for direct evidence.
-- The nested `DATABACKUP/!   CTACGLDATABACKUP202503271759.rar` remains uninspected. On 2026-09-07 the free 7-Zip 26.03 reader successfully listed 86 entries totaling 150,606,473 uncompressed bytes, then requested a password during extraction. No password was supplied and no password recovery was attempted. This supersedes the earlier libarchive solid-RAR reader limitation; directory visibility is not content inspection.
+- The nested `DATABACKUP/!   CTACGLDATABACKUP202503271759.rar` remains uninspected. On 2026-09-07 the free 7-Zip 26.03 reader successfully listed 86 entries totaling 150,606,473 uncompressed bytes, then requested a password during extraction. A subsequent authorized recovery attempt checked source configuration/strings and tested five distinct exact printable password-field values from the supplied DBF using free 7-Zip. None unlocked the backup; no guessed variants or brute-force search were used, and no credentials are published. This supersedes the earlier libarchive solid-RAR reader limitation; directory visibility is not content inspection.
 - Compiled executables/application files were not executed or decompiled. The mere presence of an executable does not establish its hidden validation or decision logic.
 
 Consequently, neither this refresh nor archive/file counts justify claiming exhaustive end-to-end business verification. Keep the remaining source work open in the TODO. An unchecked source area is unknown, not evidence that a capability or rule does not exist.
@@ -1248,7 +1248,7 @@ HEAD before documentation change: d4aaa693706c2d3fe693244c8ea0f8d9e4ae326c
 
 ### 29.2 Active Runtime status
 
-At the original audit baseline there was **no active `app/Modules/VehicleRental` runtime module**. The 2026-09-07 fresh agreement foundation now registers a new module with separate customer/owner agreement APIs, UI, term snapshots, history and permissions. It does not yet implement vehicle use, Running Charts, calculations or financial handoffs. See [the agreement implementation contract](vehicle-rental/agreements.md). The previous Rental runtime had been intentionally removed in earlier work, while historical financial vocabulary/data compatibility remains owned by the relevant financial modules where required.
+At the original audit baseline there was **no active `app/Modules/VehicleRental` runtime module**. The 2026-09-07 fresh agreement foundation now registers a new module with separate customer/owner agreement APIs, UI, term snapshots, history and permissions. The 2026-09-08 fresh operational slice adds bounded vehicle-use planning, handover/return/cancellation and draft/finalized/reversed Running Charts with immutable correction history. Calculations and financial handoffs are not implemented. See [operations.md](vehicle-rental/operations.md) for exact states, API, ownership and limitations. See [the agreement implementation contract](vehicle-rental/agreements.md). The previous Rental runtime had been intentionally removed in earlier work, while historical financial vocabulary/data compatibility remains owned by the relevant financial modules where required.
 
 That absence is significant: a fresh rebuild must not restore, cherry-pick, revive, or depend on the removed implementation.
 
@@ -1258,11 +1258,11 @@ The following paths were inspected at the stated baseline. These are current eng
 
 | Owner | Current path | Finding / required rebuild work |
 |---|---|---|
-| Module registration | `bootstrap/providers.php` | Vehicle, Vehicle Service and the fresh VehicleRental agreement provider are registered. Rental registration currently exposes agreement capture only |
+| Module registration | `bootstrap/providers.php` | Vehicle, Vehicle Service and the fresh VehicleRental agreement provider are registered. Rental registration exposes fresh agreements, vehicle use and Running Charts |
 | Vehicle | `app/Modules/Vehicle/Contracts/VehicleAvailabilityBlockerInterface.php` | Shared `vehicle.availability_blocker` tag and `blockingReason(tenant, organization, vehicle, startsAt, endsAt)` contract |
 | Vehicle | `app/Modules/Vehicle/Services/VehicleAvailabilityService.php` | Locks the vehicle, validates active status and asks tagged blockers. Call inside the transaction that persists use; a prior UI availability check is insufficient |
 | Vehicle Service | `app/Modules/VehicleService/Services/Availability/VehicleServiceAvailabilityBlocker.php` | Blocks Inspected/InProgress jobs using date overlap and expected delivery; not every maintenance record. The 2026-09-07 fix checks the physical vehicle across the tenant’s organization contexts and treats a null requested end as open-ended |
-| Vehicle Service | `app/Modules/VehicleService/Services/VehicleServiceStatusService.php` | Locks vehicle then its tenant-scoped jobs in ID order. The 2026-09-07 fix prevents release while another branch still has an InProgress job. Future Rental integration still needs reciprocal conflict checks |
+| Vehicle Service | `app/Modules/VehicleService/Services/VehicleServiceStatusService.php` | Locks vehicle then its tenant-scoped jobs in ID order. The 2026-09-07 fix prevents release while another branch still has an InProgress job. Fresh workshop admission and admitted-period changes now check the shared Rental publisher; real MySQL contention verification remains outstanding |
 | Vehicle | `app/Modules/Vehicle/Models/VehicleOwnership.php` | Owns physical/legal party history and ownership classification. This is not the Lessor commercial agreement or its rate/supply coverage |
 | Invoice | `app/Modules/Invoice/Enums/InvoiceType.php` and `Services/InvoiceStatusService.php`, `Services/InvoiceReversalService.php` | Rental is a retired source type with lifecycle/reversal restrictions. Do not remove guards simply to make a new route work; design new source lifecycle and restoration integration within Invoice |
 | Invoice | `app/Modules/Invoice/Services/InvoiceCreationService.php` | Owns invoice persistence, line calculation, balances, snapshots, tax and issuance. Rental must use the owner service, not insert financial tables itself |
@@ -1282,7 +1282,7 @@ Open engineering risks requiring focused tests before activation:
 
 On 2026-09-07 a free local PHP 8.3/Composer/SQLite environment was established and locked dependencies installed. Three new regression tests failed before the Vehicle Service fixes and passed afterward. The Vehicle and Vehicle Service suites passed: 55 tests, 411 assertions. This verifies the narrow owner-module fixes, not a fresh Rental runtime, MySQL locking, production migrations or browser acceptance. No schema relationships were added or removed: the existing vehicle-to-service-job relationship is now evaluated across its physical resource scope while remaining tenant-isolated.
 
-### 29.4 Why the agreement foundation is not a complete Rental runtime
+### 29.4 Why the operational slice is not a complete Rental runtime
 
 The combined TACGL + video audit now proves much more workflow/domain structure than a TACGL-only audit:
 
@@ -1512,7 +1512,7 @@ If only one section is retained in working memory, retain this:
 8. **Keep the UI simple: Agreement -> Select Vehicle -> Running Chart -> financial outputs. Put integrity controls behind the workflow.**
 9. **Do not copy legacy security, mutation, raw-code, duplicate-workflow, or repair-after-error mechanisms.**
 10. **Do not invent partial-month, free-KM pooling, replacement charging, downtime, garage-mileage, deposit-priority, tax, withholding, or other unresolved policies.**
-11. **The fresh runtime currently covers agreement capture/history only. Remaining Rental operations and financial integration must be built through their owning modules.**
+11. **The fresh runtime covers agreements, bounded vehicle-use/custody and Running Chart evidence/history. Replacement, driver identity, commercial calculations, financial integration and release acceptance remain incomplete.**
 12. **Correctness and auditability outrank compatibility with removed legacy code.**
 
 This knowledge base is the business/domain authority for future Vehicle Rental work until new authoritative TACGL/video/business evidence explicitly supersedes a rule recorded here.
