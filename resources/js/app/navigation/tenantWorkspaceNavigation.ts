@@ -1,3 +1,4 @@
+import { rentalNavigationItem } from './rentalNavigation';
 import { inventoryRoutePermissions } from '@/modules/inventory/inventoryPermissions';
 import { voucherViewPermissions } from '@/app/access/voucherRouteEntitlements';
 import { hrNavigationItem } from './hrNavigation';
@@ -47,6 +48,7 @@ export const tenantWorkspaceNavigationSections: NavigationSection[] = baseTenant
             items: [
                 ...section.items.map(inventoryNavigation),
                 hrNavigationItem,
+                rentalNavigationItem,
             ],
         };
     }

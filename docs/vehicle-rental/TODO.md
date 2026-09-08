@@ -14,7 +14,7 @@
 
 **Last evidence/reconciliation update:** 2026-09-07
 
-**Delivery status:** Documentation and verified Vehicle Service availability fixes delivered; fresh Vehicle Rental runtime and production verification remain outstanding.
+**Delivery status:** Fresh customer/owner agreement API and UI foundation, immutable term history, permissions, explicit Tenant opt-in, and Vehicle Service fixes implemented. Running Charts, assignments, calculations, financial handoffs and production acceptance remain outstanding.
 
 ---
 
@@ -56,6 +56,19 @@ Do not make one side depend on the amount or completion state of the other side.
 - Every change requires an append-only `docs/changes` record and regression verification appropriate to its owning modules.
 
 ---
+
+## Agreement foundation delivery ledger — 2026-09-07
+
+- [x] Fresh provider, separate customer/owner agreement models and four explicit migrations.
+- [x] Source-backed dates, basis, driver context and explicit nullable decimal term capture.
+- [x] Version-checked draft changes, activation/closure and immutable original revisions.
+- [x] Canonical identity snapshots, tenant-safe FKs and side-specific permissions.
+- [x] Agreement API/UI, readable history, guided selectors and inline conflict feedback.
+- [x] Explicit Tenant schema-4 opt-in without reviving old plan entries.
+- [x] Verify 70 backend tests (483 assertions), 43 frontend tests, typecheck, lint, formatting and build.
+- [ ] Complete effective successor versions and the remaining operational/commercial/release slices below.
+
+The detailed contract and rollout requirements are in [agreements.md](agreements.md). Checked foundation work does not imply that the complete-module requirements below are satisfied.
 
 ## Execution order and acceptance gates
 
@@ -144,7 +157,7 @@ These are **not optional guesses**. Implement only after business evidence/confi
 
 ## 3. Fresh Vehicle Rental module boundary
 
-- [ ] Create a new `VehicleRental` backend module only from the current clean branch.
+- [x] Create a new `VehicleRental` backend module only from the current clean branch (agreement foundation).
 - [ ] Do not copy files/classes/migrations/routes/tests from the removed Rental implementation.
 - [ ] Give the module only Rental-owned responsibilities:
   - agreements/rate versions;
@@ -173,7 +186,7 @@ These are **not optional guesses**. Implement only after business evidence/confi
 - [ ] **Invoice:** design the new source identity, creation/issuance and reversal/restoration contract alongside current retired-source guards. Do not remove `InvoiceType::Rental` restrictions merely to bypass an error.
 - [ ] **Invoice / Rental:** lock the source aggregate before `InvoiceSourceAllocationService`; prove independent commercial-side namespaces and rollback/retry semantics.
 - [ ] **Payment:** define an authorized Rental handoff using owner services. `StorePaymentRequest` currently rejects retired `RentalReceipt` and prohibits source fields; the UI must not forge those fields.
-- [ ] **Tenant:** add the fresh module entitlement/catalogue through Tenant's schema/version rules and verify both new and persisted plans; do not resurrect removed feature code by copying it.
+- [x] **Tenant:** add schema-4 fresh module opt-in; verify that persisted schema 1–3 entries cannot silently enable it.
 - [ ] **Invoice UI:** coordinate new-source lifecycle display/actions with backend policy; historical retired records remain explicitly distinguishable.
 - [ ] **Finance / Voucher:** verify posting profiles, tax context, voucher rendering and reversal lineage with the actual new source documents; enums alone do not prove integration.
 
@@ -807,7 +820,7 @@ Run real user workflows for:
 
 - [x] Maintain `docs/knowledgebase.md` as canonical domain knowledge.
 - [x] Maintain this TODO as the implementation backlog.
-- [ ] Add API/domain design documentation when code is introduced.
+- [x] Add [agreement API/domain design documentation](agreements.md).
 - [ ] Add source-to-rule traceability for confirmed formerly-unresolved policies.
 - [ ] Add operator/UAT workflow documentation after UI stabilizes.
 - [ ] Add Finance posting-profile/configuration documentation.
@@ -820,6 +833,8 @@ Run real user workflows for:
 The complete TODO is intentionally comprehensive, but implementation should proceed in small, verifiable owner-module batches.
 
 ## Release Slice A — source-backed operational foundation
+
+Agreement capture is implemented and verified separately in [agreements.md](agreements.md). This does not complete the whole operational slice or effective successor rate versions.
 
 Can proceed without inventing unresolved financial formulas:
 

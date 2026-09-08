@@ -1,8 +1,12 @@
+import { agreementPermissions, AgreementKind, agreementPath } from '@/modules/vehicle-rental/agreements';
+import { TENANT_MODULE_CODE } from './tenantModules';
 import { purchasePermissions } from '@/modules/purchase/purchasePermissions';
 import { vehicleServicePermissions } from '@/modules/vehicle-service/vehicleServicePermissions';
 import { operational, type EntitlementRule } from './routeEntitlementPolicy';
 
 export const commerceRouteEntitlements: readonly EntitlementRule[] = [
+    operational(agreementPath(AgreementKind.Customer), [TENANT_MODULE_CODE.VEHICLE_RENTAL], [agreementPermissions.customer.view]),
+    operational(agreementPath(AgreementKind.Owner), [TENANT_MODULE_CODE.VEHICLE_RENTAL], [agreementPermissions.owner.view]),
     operational('/purchase/fast-purchase', ['purchase'], [
         purchasePermissions.fastPurchasesView,
         purchasePermissions.fastPurchasesExecute,

@@ -1,3 +1,4 @@
+import { AgreementKind } from '@/modules/vehicle-rental/agreements';
 import { lazy } from "react";
 import { Route, RouterProvider, createBrowserRouter, createRoutesFromElements } from "react-router-dom";
 import { AppLayout } from "./layout/AppLayout";
@@ -88,6 +89,7 @@ const CustomerVehicleListPage = lazy(
 const CustomerVehicleFormPage = lazy(
     () => import("@/modules/customer/CustomerVehicleFormPage"),
 );
+const RentalAgreementsPage = lazy(() => import("@/modules/vehicle-rental/AgreementsPage"));
 const VehicleListPage = lazy(() => import("@/modules/vehicle/VehicleListPage"));
 const VehicleCreatePage = lazy(
     () => import("@/modules/vehicle/VehicleCreatePage"),
@@ -897,6 +899,8 @@ const appRouter = createBrowserRouter(
                             path="/hr/employees/:id"
                             element={<EmployeeDetailPage />}
                         />
+                        <Route path="/vehicle-rental/customer/agreements" element={<RentalAgreementsPage key={AgreementKind.Customer} kind={AgreementKind.Customer} />} />
+                        <Route path="/vehicle-rental/owner/agreements" element={<RentalAgreementsPage key={AgreementKind.Owner} kind={AgreementKind.Owner} />} />
                         <Route
                             path="/vehicle-service/jobs"
                             element={<VehicleServiceJobListPage />}

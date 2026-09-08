@@ -1246,7 +1246,7 @@ HEAD before documentation change: d4aaa693706c2d3fe693244c8ea0f8d9e4ae326c
 
 ### 29.2 Active Runtime status
 
-At that baseline there is **no active `app/Modules/VehicleRental` runtime module** in the authoritative branch. The previous Rental runtime had been intentionally removed in earlier work, while historical financial vocabulary/data compatibility remains owned by the relevant financial modules where required.
+At the original audit baseline there was **no active `app/Modules/VehicleRental` runtime module**. The 2026-09-07 fresh agreement foundation now registers a new module with separate customer/owner agreement APIs, UI, term snapshots, history and permissions. It does not yet implement vehicle use, Running Charts, calculations or financial handoffs. See [the agreement implementation contract](vehicle-rental/agreements.md). The previous Rental runtime had been intentionally removed in earlier work, while historical financial vocabulary/data compatibility remains owned by the relevant financial modules where required.
 
 That absence is significant: a fresh rebuild must not restore, cherry-pick, revive, or depend on the removed implementation.
 
@@ -1256,7 +1256,7 @@ The following paths were inspected at the stated baseline. These are current eng
 
 | Owner | Current path | Finding / required rebuild work |
 |---|---|---|
-| Module registration | `bootstrap/providers.php` | Vehicle and Vehicle Service are registered; no VehicleRental provider. A directory alone is not an active feature |
+| Module registration | `bootstrap/providers.php` | Vehicle, Vehicle Service and the fresh VehicleRental agreement provider are registered. Rental registration currently exposes agreement capture only |
 | Vehicle | `app/Modules/Vehicle/Contracts/VehicleAvailabilityBlockerInterface.php` | Shared `vehicle.availability_blocker` tag and `blockingReason(tenant, organization, vehicle, startsAt, endsAt)` contract |
 | Vehicle | `app/Modules/Vehicle/Services/VehicleAvailabilityService.php` | Locks the vehicle, validates active status and asks tagged blockers. Call inside the transaction that persists use; a prior UI availability check is insufficient |
 | Vehicle Service | `app/Modules/VehicleService/Services/Availability/VehicleServiceAvailabilityBlocker.php` | Blocks Inspected/InProgress jobs using date overlap and expected delivery; not every maintenance record. The 2026-09-07 fix checks the physical vehicle across the tenant’s organization contexts and treats a null requested end as open-ended |
@@ -1266,7 +1266,7 @@ The following paths were inspected at the stated baseline. These are current eng
 | Invoice | `app/Modules/Invoice/Services/InvoiceCreationService.php` | Owns invoice persistence, line calculation, balances, snapshots, tax and issuance. Rental must use the owner service, not insert financial tables itself |
 | Invoice | `app/Modules/Invoice/Services/InvoiceSourceAllocationService.php` | Requires the source-owning module to lock its aggregate before creation. Invoice allocation locks do not replace Rental source-consumption locking |
 | Payment | `app/Modules/Payment/Http/Requests/StorePaymentRequest.php` | Rejects retired `RentalReceipt`; prohibits client-supplied source identity/status. New Rental handoff needs an authorized owner-module contract, not forged public-request fields |
-| Tenant | `app/Modules/Tenant/Services/Plans/TenantPlanSchema.php` | `vehicle-rental` remains retired. Plan/entitlement activation must be implemented and tested in Tenant with release integration |
+| Tenant | `app/Modules/Tenant/Services/Plans/TenantPlanSchema.php` | Plan schema 4 supports an explicit fresh `vehicle-rental` opt-in. Persisted schema 1–3 Rental entries remain discarded; existing plans do not silently activate the new module |
 | UI | `resources/js/modules/invoice/pages/InvoiceDetailPage.tsx` | Rental appears in the retired-source set; frontend and backend lifecycle changes must be coordinated |
 | Finance | `app/Modules/Finance/Enums/FinancePostingProfileCode.php`, `FinanceAccountRoleCode.php` | Rental profile/role vocabulary exists. Enum presence does not prove a complete runnable posting/source flow |
 
@@ -1280,7 +1280,7 @@ Open engineering risks requiring focused tests before activation:
 
 On 2026-09-07 a free local PHP 8.3/Composer/SQLite environment was established and locked dependencies installed. Three new regression tests failed before the Vehicle Service fixes and passed afterward. The Vehicle and Vehicle Service suites passed: 55 tests, 411 assertions. This verifies the narrow owner-module fixes, not a fresh Rental runtime, MySQL locking, production migrations or browser acceptance. No schema relationships were added or removed: the existing vehicle-to-service-job relationship is now evaluated across its physical resource scope while remaining tenant-isolated.
 
-### 29.4 Why full runtime code is not generated from this document alone
+### 29.4 Why the agreement foundation is not a complete Rental runtime
 
 The combined TACGL + video audit now proves much more workflow/domain structure than a TACGL-only audit:
 
@@ -1510,7 +1510,7 @@ If only one section is retained in working memory, retain this:
 8. **Keep the UI simple: Agreement -> Select Vehicle -> Running Chart -> financial outputs. Put integrity controls behind the workflow.**
 9. **Do not copy legacy security, mutation, raw-code, duplicate-workflow, or repair-after-error mechanisms.**
 10. **Do not invent partial-month, free-KM pooling, replacement charging, downtime, garage-mileage, deposit-priority, tax, withholding, or other unresolved policies.**
-11. **The authoritative branch currently has no active Rental runtime; rebuild fresh and integrate through existing owner modules.**
+11. **The fresh runtime currently covers agreement capture/history only. Remaining Rental operations and financial integration must be built through their owning modules.**
 12. **Correctness and auditability outrank compatibility with removed legacy code.**
 
 This knowledge base is the business/domain authority for future Vehicle Rental work until new authoritative TACGL/video/business evidence explicitly supersedes a rule recorded here.
