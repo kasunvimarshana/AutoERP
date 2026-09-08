@@ -70,6 +70,8 @@ Vehicle Rental navigation exposes Customer Agreements and Owner Agreements. Form
 
 ## Verification and remaining work
 
-Verified locally: 70 backend tests across Rental, Vehicle, Vehicle Service and Tenant plan schema; 43 frontend tests across agreement review, route access and navigation; TypeScript; changed frontend lint; PHP formatting; production frontend build. See the append-only change record for final assertion counts and commands.
+Verified locally on 2026-09-08: the full backend suite (678 tests, 7,731 assertions), full frontend suite (77 files, 287 tests), TypeScript, changed frontend lint, PHP formatting and production build. See [integration verification](../changes/2026-09-08-rental-foundation-integration-verification.md) for reproduced defects, corrections and test limitations.
+
+The fresh migrations now use the repository-required `_table.php` suffix and history tables have composite tenant identity keys. If the preceding short-named migrations were already applied, inspect the deployment schema and migration journal before applying this baseline; do not blindly rerun renamed create migrations.
 
 Still outstanding: full source/audio review, protected backup contents, successor/effective rate versions, assignments/custody, source-coverage and overlap rules, Running Charts, independent calculations and consumption, financial handoffs, deposits/adjustments, reports, MySQL concurrency, production upgrade rehearsal and browser/UAT. No production database was accessed, and the new table names must be checked against the actual deployment schema before migration. This is a tested foundation, not a production-complete Rental system.

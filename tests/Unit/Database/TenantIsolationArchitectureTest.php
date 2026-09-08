@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit\Database;
 
 use FilesystemIterator;
+use Modules\Core\Models\Concerns\HasTenantScope;
 use PHPUnit\Framework\TestCase;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
@@ -27,6 +28,7 @@ final class TenantIsolationArchitectureTest extends TestCase
 
                 if (! isset($tables[$parent])) {
                     $violations[] = "{$table}.{$column}: references unknown table {$parent}";
+
                     continue;
                 }
 
@@ -93,7 +95,7 @@ final class TenantIsolationArchitectureTest extends TestCase
             }
 
             $source = (string) file_get_contents($file->getPathname());
-            if (preg_match("/protected \\$table = '([^']+)'/", $source, $tableMatch) !== 1) {
+            if (preg_match('/protected\s+\$table\s*=\s*["\']([^"\']+)["\']/', $source, $tableMatch) !== 1) {
                 continue;
             }
 
@@ -102,9 +104,10 @@ final class TenantIsolationArchitectureTest extends TestCase
                 continue;
             }
 
-            $isScoped = str_contains($source, 'extends TenantOwnedModel')
-                || str_contains($source, 'extends HrMasterModel')
-                || str_contains($source, 'use HasTenantScope;');
+            // Resolve inherited traits so abstract domain models remain covered.
+            $class = 'Modules\\'.str_replace('/', '\\', substr($path, strlen($root) + 1, -4));
+            $isScoped = class_exists($class)
+                && in_array(HasTenantScope::class, class_uses_recursive($class), true);
             if (! $isScoped) {
                 $violations[] = "{$table}: {$path} does not use the mandatory tenant scope";
             }
@@ -145,6 +148,7 @@ final class TenantIsolationArchitectureTest extends TestCase
 
             if (preg_match('/(?:abstract\s+|final\s+)?class\s+([A-Za-z0-9_]+)/', $source, $match) !== 1) {
                 $violations[] = "{$path}: request class could not be resolved";
+
                 continue;
             }
 
@@ -356,6 +360,7 @@ final class TenantIsolationArchitectureTest extends TestCase
             for ($offset = $braceStart; $offset < $length; $offset++) {
                 if ($source[$offset] === '{') {
                     $depth++;
+
                     continue;
                 }
                 if ($source[$offset] !== '}') {

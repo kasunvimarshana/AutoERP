@@ -2,7 +2,7 @@
 
 **Status:** Canonical working domain reference; evidence gaps remain; not a completed implementation or exhaustive audiovisual audit
 
-**Knowledge refresh date:** 2026-09-07
+**Knowledge refresh date:** 2026-09-08 (implementation verification; source coverage unchanged)
 
 **Primary business source of truth and conflict tie-breaker:** TACGL legacy application/data corpus
 
@@ -10,7 +10,9 @@
 
 **Authoritative engineering source:** `worktree-0.0.8`
 
-**Engineering HEAD audited before this documentation update:** `d4aaa693706c2d3fe693244c8ea0f8d9e4ae326c`
+**Initial architecture baseline:** `d4aaa693706c2d3fe693244c8ea0f8d9e4ae326c`
+
+**Latest implemented baseline reviewed:** `55d3aaff3e4fe7a4d48ee4a82a735810d2c2295f`, plus the [2026-09-08 integration corrections](changes/2026-09-08-rental-foundation-integration-verification.md). Full repository tests pass for the agreement foundation; this does not complete the remaining Rental workflows or audiovisual audit.
 
 **TACGL source file:** `TACGL.zip`
 

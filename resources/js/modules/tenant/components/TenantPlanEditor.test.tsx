@@ -5,7 +5,7 @@ import { TestRouter } from '@/test/TestRouter';
 import type { TenantPlan, TenantPlanRevision } from '../tenantTypes';
 import { TenantPlanEditor } from './TenantPlanEditor';
 
-const RETIRED_TENANT_MODULE_CODE = 'vehicle-rental';
+const RETIRED_TENANT_MODULE_CODE = TENANT_MODULE_CODE.VEHICLE_RENTAL;
 
 function createPlan(): TenantPlan {
     const revision: TenantPlanRevision = {
@@ -91,6 +91,19 @@ describe('TenantPlanEditor', () => {
         expect(payload.features.enabled_modules).toEqual([TENANT_MODULE_CODE.HR]);
     });
 
+    it('requires explicit selection before adding fresh Rental to a new plan', async () => {
+        const onSubmit = renderNewPlan();
+        expect(screen.getByLabelText('Vehicle rental')).not.toBeChecked();
+        fireEvent.change(screen.getByLabelText('Plan name'), { target: { value: 'Rental Plan' } });
+        fireEvent.change(screen.getByLabelText('Plan slug'), { target: { value: 'rental-plan' } });
+        fireEvent.click(screen.getByLabelText('Vehicle rental'));
+        fireEvent.change(screen.getByLabelText('Revision reason'), { target: { value: 'Enable the fresh Rental agreement module.' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Review new plan' }));
+        fireEvent.click(await screen.findByRole('button', { name: 'Create plan' }));
+        await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+        expect(onSubmit.mock.calls[0][0].features.enabled_modules).toEqual([TENANT_MODULE_CODE.VEHICLE_RENTAL]);
+    });
+
     it('omits a blank effective date instead of sending null', async () => {
         const onSubmit = renderNewPlan();
 
@@ -131,6 +144,7 @@ describe('TenantPlanEditor', () => {
             </TestRouter>,
         );
 
+        expect(screen.getByLabelText('Vehicle rental')).not.toBeChecked();
         fireEvent.change(screen.getByLabelText('Plan name'), { target: { value: 'Professional Plus' } });
         fireEvent.click(screen.getByRole('button', { name: 'Review plan changes' }));
         fireEvent.click(await screen.findByRole('button', { name: 'Save plan changes' }));

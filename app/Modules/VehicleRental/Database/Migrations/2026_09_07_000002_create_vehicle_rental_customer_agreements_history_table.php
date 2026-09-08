@@ -20,6 +20,7 @@ return new class extends Migration
             $table->text('reason')->nullable();
             $table->json('snapshot');
             $table->timestamp('recorded_at');
+            $table->unique(['id', 'tenant_id'], 'vrca_history_tenant_uk');
             $table->unique(['agreement_id', 'row_version'], 'vrca_history_version_uk');
             $table->foreign(['agreement_id', 'tenant_id'], 'vrca_history_agreement_fk')->references(['id', 'tenant_id'])->on('vehicle_rental_customer_agreements')->restrictOnDelete();
             $table->foreign(['actor_id', 'tenant_id'], 'vrca_history_actor_fk')->references(['id', 'tenant_id'])->on('users')->restrictOnDelete();

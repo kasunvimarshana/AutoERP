@@ -12,7 +12,7 @@
 
 **Canonical domain reference:** [knowledgebase.md](../knowledgebase.md)
 
-**Last evidence/reconciliation update:** 2026-09-07
+**Last evidence/reconciliation update:** 2026-09-08 (integration verification; source coverage unchanged)
 
 **Delivery status:** Fresh customer/owner agreement API and UI foundation, immutable term history, permissions, explicit Tenant opt-in, and Vehicle Service fixes implemented. Running Charts, assignments, calculations, financial handoffs and production acceptance remain outstanding.
 
@@ -65,7 +65,7 @@ Do not make one side depend on the amount or completion state of the other side.
 - [x] Canonical identity snapshots, tenant-safe FKs and side-specific permissions.
 - [x] Agreement API/UI, readable history, guided selectors and inline conflict feedback.
 - [x] Explicit Tenant schema-4 opt-in without reviving old plan entries.
-- [x] Verify 70 backend tests (483 assertions), 43 frontend tests, typecheck, lint, formatting and build.
+- [x] Verify the complete backend suite (678 tests, 7,731 assertions), complete frontend suite (287 tests), typecheck, lint, formatting and build; correct migration architecture and Tenant plan editor integration.
 - [ ] Complete effective successor versions and the remaining operational/commercial/release slices below.
 
 The detailed contract and rollout requirements are in [agreements.md](agreements.md). Checked foundation work does not imply that the complete-module requirements below are satisfied.
