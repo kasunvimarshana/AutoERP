@@ -12,7 +12,7 @@
 
 **Initial architecture baseline:** `d4aaa693706c2d3fe693244c8ea0f8d9e4ae326c`
 
-**Latest implemented baseline reviewed:** `baa436fc4c476eedd3ff8c61a48a485b48e2c8df`, plus the fresh [vehicle-use and Running Chart contract](vehicle-rental/operations.md). Operational capture is implemented; commercial integrations and complete audiovisual review remain outstanding.
+**Latest implemented baseline reviewed:** `0158725163ae31dd9a5e3e5450aaa9c4bc254ca2`, plus the fresh [vehicle-use and Running Chart contract](vehicle-rental/operations.md). Operational capture is implemented; commercial integrations and complete audiovisual review remain outstanding.
 
 **TACGL source file:** `TACGL.zip`
 
@@ -1529,3 +1529,11 @@ This knowledge base is the business/domain authority for future Vehicle Rental w
 ### Current local database verification limitation — 2026-09-09
 
 Free MariaDB 10.11.14 packages were extracted into an isolated scratch runtime and a disposable data directory initialized successfully. Starting the socket-only server failed with `UNIX Socket: Operation not permitted`. No MariaDB application tests or contention cases ran, and no production database was accessed. SQLite results must not be represented as evidence of InnoDB locking. The real-engine acceptance gate remains open.
+
+### Authenticated operational verification — 2026-09-09
+
+`AuthenticatedRentalJourneyTest` exercises real Auth login, tenant/organization resolution, subscription entitlement and permission enforcement without disabled middleware, mocked Rental authorization or injected request context. It covers independent customer/owner activation, owner-source lookup, planning, handover, chart finalization/reversal/correction, return, agreement closure and readable history. A second journey verifies company-source replacement, failed-source rollback, preserved predecessor identity and stale repeated exchange rejection. Negative cases cover unauthenticated access, missing permissions/features, chart-read versus finalization/reversal authority, foreign tenant IDs and client attempts to override trusted context. A separate branch-bound login isolates the same tenant’s agreements, and revoked branch membership prevents subsequent reads.
+
+These are application HTTP integration tests using SQLite, not browser/UAT or MySQL concurrency tests. Canonical party, vehicle, company-ownership and subscription records are test fixtures; these tests do not exercise those owner modules' provisioning UI. No new financial formula or policy is established, and no financial document is produced. Remaining commercial implementation and source gaps are unchanged.
+
+Verification for this update: six authenticated tests / 101 assertions and the complete PHP/SQLite suite / 709 tests / 8,034 assertions passed. PHP formatting and whitespace checks passed. Runtime and frontend files were unchanged.

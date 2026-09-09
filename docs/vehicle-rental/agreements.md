@@ -12,7 +12,7 @@ Draft → Active → Closed is the implementation's integrity workflow for recor
 
 | Record | Relationships and rationale |
 |---|---|
-| Customer agreement | Required Customer, organization and currency references. No Supplier or direct vehicle-use foreign key: the future customer-use aggregate will own physical assignment |
+| Customer agreement | Required Customer, organization and currency references. No Supplier or direct vehicle-use foreign key: the fresh customer-use aggregate owns physical assignment |
 | Owner agreement | Required Supplier, Vehicle, organization and currency references. The Supplier is the commercial payee; this does not replace Vehicle's legal ownership history |
 | Customer history | Required customer-agreement and actor references, unique agreement/revision pair, full original attribute snapshot |
 | Owner history | Required owner-agreement and actor references, unique agreement/revision pair, full original attribute snapshot |
@@ -51,7 +51,7 @@ Write payload fields: `reference`, `party_id`, `currency_id`, optional owner-onl
 
 Every mutation is a transaction. Existing records are locked and checked against the expected version before mutation. History insertion participates in the same transaction; failed writes do not create a revision. Stale versions and duplicate references return conflicts. History models reject updates/deletes, and agreement models reject edits to activated terms or deletion. Closed records cannot be reopened through the API.
 
-These controls have SQLite coverage. MySQL contention/lock-order verification remains required before production release; this feature does not yet participate in a physical vehicle reservation timeline.
+These controls have SQLite coverage, including the authenticated agreement-to-custody-to-chart-to-closure journey. Active agreements now participate in the fresh physical-use workflow described in [operations.md](operations.md); closure is blocked by outstanding planned or in-custody uses. MySQL contention/lock-order verification remains required before production release.
 
 ## Access and UI
 

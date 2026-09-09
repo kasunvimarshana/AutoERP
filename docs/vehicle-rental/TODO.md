@@ -6,7 +6,7 @@
 
 **Engineering authority:** latest `worktree-0.0.8`
 
-**Engineering baseline audited before this update:** `baa436fc4c476eedd3ff8c61a48a485b48e2c8df`
+**Engineering baseline audited before this update:** `0158725163ae31dd9a5e3e5450aaa9c4bc254ca2`
 
 **Old Rental implementation:** must not be restored, copied, revived, cherry-picked, or used as an implementation dependency
 
@@ -83,6 +83,17 @@ The detailed contract and rollout requirements are in [agreements.md](agreements
 - [ ] Real MySQL concurrency, production upgrade and authenticated browser/UAT acceptance. Free MariaDB 10.11.14 was initialized locally, but this environment refused its Unix socket; no real-engine tests ran.
 
 Detailed shipped behavior and relationship reasoning: [operations.md](operations.md). Older broad checklist items remain unchecked where they require more than this slice.
+
+## Authenticated operational acceptance — 2026-09-09
+
+- [x] Real Auth login and full middleware journey: customer/owner agreements → vehicle plan → handover → chart finalization → reversal/correction → return → closure and readable history.
+- [x] Authenticated company-owned replacement, missing-source rollback, predecessor lineage and stale-repeat rejection.
+- [x] Anonymous access, missing permissions, independent commercial-side permissions, chart-view versus finalize/reverse permissions and missing feature entitlement are rejected where required.
+- [x] Foreign tenant aggregate IDs remain inaccessible; submitted tenant/organization fields cannot override authenticated context.
+- [x] Branch-bound login session isolates agreements; client organization fields cannot override it; revoked branch membership denies subsequent access.
+- [ ] Browser interaction, real-engine contention and production migration acceptance.
+
+The reconciled checks below describe **current operational capture**, not financial computation. Capturing a driver/OT/night-out/deposit rate does not implement qualification, calculation, tax, settlement or deposit movements. Concurrency checks marked for commands cover version/transaction behavior on SQLite; real InnoDB contention remains a separate unchecked release gate. Driver identity and constrained-driver availability remain unfinished. No new business rule was inferred from test data.
 
 ## Execution order and acceptance gates
 
@@ -218,9 +229,9 @@ These are **not optional guesses**. Implement only after business evidence/confi
 
 ## 5. Physical Vehicle identity
 
-- [ ] Reuse Vehicle's canonical physical Vehicle ID.
+- [x] Reuse Vehicle's canonical physical Vehicle ID.
 - [ ] Ensure normalized registration formatting cannot create duplicate physical Vehicle identities.
-- [ ] Never create duplicate Vehicle rows to represent customer, owner, branch, or agreement context.
+- [x] Never create duplicate Vehicle rows to represent customer, owner, branch, or agreement context.
 - [ ] Keep ownership/source history outside the display registration value.
 - [ ] Verify Rental references always remain within tenant/organization boundaries.
 
@@ -228,46 +239,46 @@ These are **not optional guesses**. Implement only after business evidence/confi
 
 Implement source-backed fields/semantics without turning every legacy field into modern configuration.
 
-- [ ] Customer/Lessee reference.
-- [ ] Agreement number/reference.
+- [x] Customer/Lessee reference.
+- [x] Agreement number/reference.
 - [ ] Agreement/executing/start/end dates.
-- [ ] Draft/Active/Closed lifecycle consistent with project conventions.
-- [ ] Monthly/Daily basis.
-- [ ] With Driver / self-drive context.
-- [ ] Included/max-KM context.
-- [ ] Excess-KM rate component.
-- [ ] Non-AC / Front-AC / Dual-AC rate components where applicable.
-- [ ] Driver salary/recovery component where applicable.
-- [ ] Normal/double/triple OT components where applicable.
-- [ ] Night-out component where applicable.
+- [x] Draft/Active/Closed lifecycle consistent with project conventions.
+- [x] Monthly/Daily basis.
+- [x] With Driver / self-drive context.
+- [x] Included/max-KM context.
+- [x] Excess-KM rate component.
+- [x] Non-AC / Front-AC / Dual-AC rate components where applicable.
+- [x] Driver salary/recovery component where applicable.
+- [x] Normal/double/triple OT components where applicable.
+- [x] Night-out component where applicable.
 - [ ] Supported other/parking/recovery components only where evidence/policy exists.
-- [ ] Security-deposit fact/requirement only through explicit policy/value.
+- [x] Security-deposit fact/requirement only through explicit policy/value.
 - [ ] Tax context references, never hardcoded percentages/accounts.
 - [ ] Effective rate/version records.
 - [ ] Freeze consumed historical agreement/rate versions.
 - [ ] Successor-version flow for future rate changes.
-- [ ] Agreement closure that does not mutate already-consumed history.
-- [ ] Expected-version/concurrency check on mutable aggregate actions.
+- [x] Agreement closure that does not mutate already-consumed history.
+- [x] Expected-version/concurrency check on mutable aggregate actions.
 
 ## 7. Owner / Lessor Agreement aggregate
 
-- [ ] Lessor/Supplier reference.
-- [ ] Agreement number/reference.
-- [ ] Vehicle/source coverage context.
+- [x] Lessor/Supplier reference.
+- [x] Agreement number/reference.
+- [x] Vehicle/source coverage context.
 - [ ] Agreement/executing/start/end dates.
-- [ ] Draft/Active/Closed lifecycle.
-- [ ] Monthly/Daily basis.
-- [ ] With Driver context where applicable.
-- [ ] Included/max-KM context.
-- [ ] Owner excess-KM payable rate.
-- [ ] Non-AC / Front-AC / Dual-AC owner rate components where applicable.
-- [ ] Driver salary/OT/night-out reimbursement components where applicable.
+- [x] Draft/Active/Closed lifecycle.
+- [x] Monthly/Daily basis.
+- [x] With Driver context where applicable.
+- [x] Included/max-KM context.
+- [x] Owner excess-KM payable rate.
+- [x] Non-AC / Front-AC / Dual-AC owner rate components where applicable.
+- [x] Driver salary/OT/night-out reimbursement components where applicable.
 - [ ] Supported owner credits/deductions.
 - [ ] Tax/withholding references only through confirmed Tax/Finance policy.
 - [ ] Effective rate/version records.
 - [ ] Freeze consumed historical versions.
 - [ ] Successor-version flow.
-- [ ] Closure/concurrency rules.
+- [x] Closure/concurrency rules.
 
 ## 8. Agreement component/rate model
 
@@ -286,47 +297,47 @@ Implement source-backed fields/semantics without turning every legacy field into
 
 Backend must be able to prove historical supply/use even though the UI stays simple.
 
-- [ ] Represent owner-supply coverage for externally sourced vehicles.
-- [ ] Represent customer-use/custody coverage.
-- [ ] Link customer use to the valid owner source when externally supplied.
-- [ ] Support company-owned vehicle use without manufacturing owner-source/payable data.
-- [ ] Store planned/effective start/end facts.
-- [ ] Store actual handover/return timestamps where operationally relevant.
-- [ ] Preserve row/version/history identity.
-- [ ] Prevent physically impossible overlapping active customer use.
+- [x] Represent owner-supply coverage for externally sourced vehicles.
+- [x] Represent customer-use/custody coverage.
+- [x] Link customer use to the valid owner source when externally supplied.
+- [x] Support company-owned vehicle use without manufacturing owner-source/payable data.
+- [x] Store planned/effective start/end facts.
+- [x] Store actual handover/return timestamps where operationally relevant.
+- [x] Preserve row/version/history identity.
+- [x] Prevent physically impossible overlapping active customer use.
 - [ ] Prevent invalid owner-source coverage gaps.
-- [ ] Validate tenant/organization/vehicle identity consistently.
+- [x] Validate tenant/organization/vehicle identity consistently.
 
 ## 10. Simple agreement-first UI
 
 The normal operator should not manage technical relationship records directly.
 
-- [ ] Active Customer Agreement provides `Select vehicle` / `Assign vehicle` action.
+- [x] Active Customer Agreement provides `Select vehicle` / `Assign vehicle` action.
 - [ ] Active Owner Agreement provides source-vehicle association where externally supplied.
 - [ ] Context pre-fills the agreement/side; do not ask the operator to re-select technical side values.
-- [ ] Use searchable human-readable Vehicle selectors.
+- [x] Use searchable human-readable Vehicle selectors.
 - [ ] Filter unavailable/conflicting vehicles before save where possible.
-- [ ] Backend remains authoritative and revalidates on save.
-- [ ] Keep a compact assignment/history view for handover, return, replacement, cancellation, and audit.
-- [ ] Do not require a separate universal allocation wizard for normal flow.
+- [x] Backend remains authoritative and revalidates on save.
+- [x] Keep a compact assignment/history view for handover, return, replacement, cancellation, and audit.
+- [x] Do not require a separate universal allocation wizard for normal flow.
 
 ## 11. Handover and return
 
-- [ ] Record actual handover timestamp/odometer/custody evidence where required.
-- [ ] Record return timestamp/odometer/evidence.
+- [x] Record actual handover timestamp/odometer/custody evidence where required.
+- [x] Record return timestamp/odometer/evidence.
 - [ ] Revalidate vehicle/driver availability at operational transition time.
-- [ ] Keep planning period policy separate from actual operational timestamps.
+- [x] Keep planning period policy separate from actual operational timestamps.
 - [ ] Do not use handover timestamp as a hidden pricing formula unless the agreement policy explicitly proves it.
 
 ## 12. Replacement
 
-- [ ] Record original assignment/vehicle.
-- [ ] Record replacement vehicle and effective timestamp/period.
-- [ ] Preserve replacement lineage instead of rewriting the original assignment.
-- [ ] Revalidate replacement Vehicle availability/source coverage.
-- [ ] Prevent cross-tenant/cross-organization replacement lineage.
-- [ ] Use deterministic lock order where multiple Vehicle rows/resources are mutated.
-- [ ] Ensure Running Charts identify the actual physical vehicle used.
+- [x] Record original assignment/vehicle.
+- [x] Record replacement vehicle and effective timestamp/period.
+- [x] Preserve replacement lineage instead of rewriting the original assignment.
+- [x] Revalidate replacement Vehicle availability/source coverage.
+- [x] Prevent cross-tenant/cross-organization replacement lineage.
+- [x] Use deterministic lock order where multiple Vehicle rows/resources are mutated.
+- [x] Ensure Running Charts identify the actual physical vehicle used.
 - [ ] Keep replacement charging blocked/configuration-driven until VR-U04 is resolved.
 
 ---
@@ -335,31 +346,31 @@ The normal operator should not manage technical relationship records directly.
 
 ## 13. Running Chart aggregate
 
-- [ ] Draft creation/editing.
-- [ ] Customer/agreement/use context.
-- [ ] Vehicle identity.
-- [ ] Owner/source context where applicable.
+- [x] Draft creation/editing.
+- [x] Customer/agreement/use context.
+- [x] Vehicle identity.
+- [x] Owner/source context where applicable.
 - [ ] Driver identity where applicable.
-- [ ] Operational date/period.
-- [ ] Start/end timestamps where present.
-- [ ] Start/end odometer.
-- [ ] Total/commercial/garage-distance facts as separate fields, not one ambiguous number.
-- [ ] AC mode/context.
-- [ ] Normal/double/triple OT facts.
-- [ ] Night-out fact.
-- [ ] Remarks/other supported evidence.
-- [ ] Original/replacement lineage where applicable.
-- [ ] Minimal `Draft -> Finalized -> Reversed/Corrected` lifecycle unless business confirms more stages.
-- [ ] Expected-version/concurrency validation.
+- [x] Operational date/period.
+- [x] Start/end timestamps where present.
+- [x] Start/end odometer.
+- [x] Total/commercial/garage-distance facts as separate fields, not one ambiguous number.
+- [x] AC mode/context.
+- [x] Normal/double/triple OT facts.
+- [x] Night-out fact.
+- [x] Remarks/other supported evidence.
+- [x] Original/replacement lineage where applicable.
+- [x] Minimal `Draft -> Finalized -> Reversed/Corrected` lifecycle unless business confirms more stages.
+- [x] Expected-version/concurrency validation.
 
 ## 14. Running Chart physical integrity
 
-- [ ] End odometer cannot be lower than start odometer without governed correction.
-- [ ] Prevent overlapping physical usage for the same Vehicle.
+- [x] End odometer cannot be lower than start odometer without governed correction.
+- [x] Prevent overlapping physical usage for the same Vehicle.
 - [ ] Prevent conflicting Driver usage when Driver is assigned.
 - [ ] Validate usage falls within valid customer-use/source coverage.
-- [ ] Finalization freezes evidence.
-- [ ] Corrections create reversal/replacement lineage; never edit finalized truth in place.
+- [x] Finalization freezes evidence.
+- [x] Corrections create reversal/replacement lineage; never edit finalized truth in place.
 - [ ] Advance shared Vehicle odometer only through the Vehicle owner contract and only when evidence is newer/valid.
 - [ ] Do not automatically bill garage mileage until VR-U06 is resolved.
 
@@ -537,11 +548,11 @@ Implement only once deposit policies needed by the chosen release slice are conf
 ## 29. Shared availability contract
 
 - [ ] Define/reuse one shared Vehicle availability policy/contract.
-- [ ] Vehicle Rental publishes planned/active custody/use blockers.
-- [ ] Vehicle Service publishes workshop/maintenance/breakdown/off-road blockers.
+- [x] Vehicle Rental publishes planned/active custody/use blockers.
+- [x] Vehicle Service publishes workshop/maintenance/breakdown/off-road blockers.
 - [ ] Vehicle selection filters using the shared policy.
-- [ ] Backend always revalidates availability in the transaction.
-- [ ] Avoid direct table coupling between Rental and Vehicle Service.
+- [x] Backend always revalidates availability in the transaction.
+- [x] Avoid direct table coupling between Rental and Vehicle Service.
 - [ ] Preserve reason/source metadata so the UI can explain why a Vehicle is unavailable.
 - [ ] Do not convert unavailability into automatic financial downtime deduction until VR-U05 is resolved.
 
@@ -554,10 +565,10 @@ Implement only once deposit policies needed by the chosen release slice are conf
 Define semantic permissions aligned to real tasks, for example:
 
 - [ ] Vehicle Rental view.
-- [ ] Customer Agreement view/manage.
-- [ ] Owner Agreement view/manage.
-- [ ] Vehicle assignment/custody view/manage.
-- [ ] Running Chart view/manage/finalize/reverse.
+- [x] Customer Agreement view/manage.
+- [x] Owner Agreement view/manage.
+- [x] Vehicle assignment/custody view/manage.
+- [x] Running Chart view/manage/finalize/reverse.
 - [ ] Customer calculation/billing create.
 - [ ] Owner calculation/settlement create.
 - [ ] Rental adjustments/deposit manage where enabled.
@@ -567,9 +578,9 @@ Do not reproduce numeric legacy user levels.
 
 ## 31. Auditability
 
-- [ ] Record creator/updater/action actor for mutable workflow records.
-- [ ] Keep state-transition history for important aggregates.
-- [ ] Store reversal/correction reason and lineage.
+- [x] Record creator/updater/action actor for mutable workflow records.
+- [x] Keep state-transition history for important aggregates.
+- [x] Store reversal/correction reason and lineage.
 - [ ] Store agreement/rate/source snapshot references on calculations.
 - [ ] Make source-to-Invoice/Payable/Payment/GL traceability available to authorized users.
 - [ ] Never log secrets or sensitive document contents unnecessarily.
@@ -581,13 +592,13 @@ Do not reproduce numeric legacy user levels.
 ## 32. API design
 
 - [ ] REST resources/actions follow current AutoERP conventions.
-- [ ] Human-readable validation errors.
+- [x] Human-readable validation errors.
 - [ ] Explicit transition endpoints/actions for Activate/Close/Finalize/Reverse/Handover/Return/Replace where appropriate.
-- [ ] Expected-version required on concurrency-sensitive updates.
-- [ ] Tenant/organization scope enforced server-side.
-- [ ] Reject client-supplied owner-module state that the server can resolve authoritatively.
+- [x] Expected-version required on concurrency-sensitive updates.
+- [x] Tenant/organization scope enforced server-side.
+- [x] Reject client-supplied owner-module state that the server can resolve authoritatively.
 - [ ] Idempotency protection on downstream financial creation.
-- [ ] Pagination/filter/search for agreement, Running Chart, and history lists.
+- [ ] Pagination/filter/search for agreement, Running Chart, and history lists. Registers support search/filter; histories currently support pagination only.
 - [ ] Avoid exposing internal raw GL/account mapping as ordinary Rental API fields.
 
 ---
@@ -702,13 +713,13 @@ Select/derive Owner Agreement + Period
 - [ ] Customer and owner agreement independence.
 - [ ] Effective agreement/rate version selection.
 - [ ] Historical versions immutable after consumption.
-- [ ] Company-owned Vehicle skips external owner payable path.
-- [ ] External Vehicle requires valid owner/source coverage.
-- [ ] Vehicle overlap rejection.
+- [ ] Company-owned Vehicle skips external owner payable path. Operational use accepts proven company ownership without an Owner Agreement; financial handoff is not implemented.
+- [x] External Vehicle requires valid owner/source coverage.
+- [x] Vehicle overlap rejection.
 - [ ] Driver overlap rejection where applicable.
-- [ ] Replacement lineage/integrity.
-- [ ] Running Chart odometer/time integrity.
-- [ ] Finalized Running Chart immutability/reversal.
+- [x] Replacement lineage/integrity.
+- [x] Running Chart odometer/time integrity.
+- [x] Finalized Running Chart immutability/reversal.
 - [ ] Customer same-side duplicate consumption rejected.
 - [ ] Owner same-side duplicate consumption rejected.
 - [ ] Customer consumption does not block owner consumption.
