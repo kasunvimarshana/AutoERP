@@ -9,7 +9,9 @@ use Illuminate\Support\Str;
 use Modules\VehicleRental\Data\AgreementContext;
 use Modules\VehicleRental\Enums\AgreementAction;
 use Modules\VehicleRental\Enums\AgreementKind;
+use Modules\VehicleRental\Enums\VehicleUseAction;
 use Modules\VehicleRental\Services\AgreementService;
+use Modules\VehicleRental\Services\VehicleUseService;
 use Tests\Support\CurrencyFixture;
 use Tests\Support\OrganizationUnitFixture;
 use Tests\Support\TenantUserFixture;
@@ -42,6 +44,17 @@ trait BuildsRentalFixture
             $o = $agreements->change(AgreementKind::Owner, $context, $o->id, $o->row_version, AgreementAction::Activate);
             $input = ['vehicle_id' => $owner['vehicle_id'], 'owner_agreement_id' => $o->id, 'starts_at' => '2026-09-07T09:00:00+05:30', 'ends_at' => '2026-09-08T09:00:00+05:30'];
             $work($context, $c, $o, $input);
+        });
+    }
+
+    private function custodyFixture(callable $work): void
+    {
+        $this->activeFixture(function ($context, $customer, $owner, $input) use ($work): void {
+            $s = app(VehicleUseService::class);
+            $use = $s->plan($context, $customer->id, $customer->row_version, $input);
+            $use = $s->transition($context, $use->id, $use->row_version, VehicleUseAction::Handover, ['occurred_at' => $input['starts_at'], 'odometer' => '100', 'reason' => 'Collected']);
+            $facts = ['reference' => 'CHART-A', 'starts_at' => '2026-09-07T09:00:15+05:30', 'ends_at' => '2026-09-07T17:00:30+05:30', 'start_odometer' => '100', 'end_odometer' => '150.25', 'garage_km' => '0', 'normal_ot_minutes' => 90];
+            $work($context, $use, $facts);
         });
     }
 }

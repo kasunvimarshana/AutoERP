@@ -10,13 +10,20 @@ use Modules\VehicleRental\Constants\RunningChartFields;
 use Modules\VehicleRental\Enums\RunningChartAction;
 use Modules\VehicleRental\Http\Requests\AgreementRequest;
 use Modules\VehicleRental\Http\Resources\RunningChartHistoryResource;
+use Modules\VehicleRental\Http\Resources\RunningChartRegisterResource;
 use Modules\VehicleRental\Http\Resources\RunningChartResource;
+use Modules\VehicleRental\Services\RunningChartRegisterService;
 use Modules\VehicleRental\Services\RunningChartService;
 use Symfony\Component\HttpFoundation\Response;
 
 final class RunningChartController
 {
     public function __construct(private readonly RunningChartService $charts) {}
+
+    public function register(AgreementRequest $request, RunningChartRegisterService $register): AnonymousResourceCollection
+    {
+        return RunningChartRegisterResource::collection($register->list($request->context(), $request->only(['search', 'chart_status', 'from', 'until']), $request->perPage()));
+    }
 
     public function index(AgreementRequest $request, int $use): AnonymousResourceCollection
     {

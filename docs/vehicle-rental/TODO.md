@@ -677,7 +677,7 @@ Select/derive Owner Agreement + Period
 - [ ] Vehicle utilization/usage by period.
 - [ ] Customer Agreement/use history.
 - [ ] Owner/source Vehicle history.
-- [ ] Running Chart register/detail.
+- [x] Running Chart register/detail: scoped read-only API/UI, state/reference/party/vehicle/period filters, original quantities, correction/replacement context and history (2026-09-09).
 - [ ] Driver usage where applicable.
 - [ ] Original/replacement Vehicle lineage.
 - [ ] Vehicle availability/conflict history where useful.

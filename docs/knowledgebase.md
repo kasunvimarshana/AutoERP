@@ -974,7 +974,13 @@ Where a driver is a constrained physical resource, overlapping assignments/use m
 - replacement/original lineage must be preserved;
 - exact timestamps belong to operational evidence even where planning coverage is date-based.
 
-### 23.8 Duplicate consumption
+### 23.8 Register query semantics (implemented 2026-09-09)
+
+The Running Chart register is a read-only view of recorded evidence across vehicle uses in the selected tenant and organization. It requires chart-view permission. Search can match chart reference, vehicle label, agreement reference or party snapshot; optional state and explicit-offset period filters narrow the result. An interval matches when the chart ends after the filter start and starts before the filter end. Exact touching endpoints do not overlap. These are integrity-derived retrieval semantics, not billing rules.
+
+A matching chart displays its full original period and measurements; quantities are never clipped or prorated to the search interval. Blank measurements remain unknown. Draft, finalized and reversed records remain distinguishable. Agreement/party labels, correction and physical replacement references are readable; agreement prices are not exposed through register context. Customer/owner financial eligibility, totals and report export are not inferred by this register.
+
+### 23.9 Duplicate consumption
 
 A source Running Chart/usage scope cannot be consumed twice by the same customer calculation side or same owner calculation side.
 

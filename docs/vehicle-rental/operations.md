@@ -77,3 +77,11 @@ SQLite regression coverage verifies command behavior and rollback, not InnoDB co
 ## Fresh-baseline migration boundary
 
 The repository's mandatory migration architecture permits explicit fresh table creation only. Replacement provenance and nullable planned ends are therefore integrated into the original fresh `vehicle_rental_uses` creation migration. This is not an automatic upgrade for an already migrated database. No production schema was inspected or changed. If the earlier operational commit was applied, compare the actual schema and migration journal and prepare a deployment-specific, evidence-preserving upgrade before using this revision. Do not drop operational tables or erase history to satisfy the fresh baseline.
+
+## Running Chart register — 2026-09-09
+
+**Vehicle Rental → Running Chart Register** opens `/vehicle-rental/running-charts`. The UI and `GET /api/v1/vehicle-rental/running-charts` require `vehicle-rental.running-charts.view` with the existing tenant, organization and feature gates. All relationship context comes from the chart's existing use/agreement links; no duplicate identities or schema relationships are added.
+
+Optional filters are `search`, `chart_status`, `from` and `until`; timestamps require explicit offsets and the UI preserves seconds. Period filtering selects overlapping charts without changing recorded quantities. Results are paginated and ordered by usage start then chart ID descending. Search predicates remain grouped inside tenant/organization scope. States are enum-validated; invalid dates, reversed/empty intervals and unauthorized access fail explicitly. Failed filter requests hide previous results rather than presenting them as a matching report.
+
+Review expands recorded distances, OT minute counts, night-outs, AC mode, driver observation and notes. History loads only when requested. Context includes customer/owner names and references, company supply, correction predecessor and replacement vehicle. Rates are not returned through the contextual agreement objects. This is Rental-owned evidence browsing; cross-module financial reporting, aggregation, export and financial eligibility remain with their future owning workflows.

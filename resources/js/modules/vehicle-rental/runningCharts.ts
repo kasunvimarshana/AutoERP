@@ -13,3 +13,14 @@ export interface ChartFacts {
 }
 export interface RunningChart extends ChartFacts { id: number; row_version: number; status: RunningChartStatus; total_km: string | null; corrects_chart: { id: number; reference: string } | null }
 export interface ChartHistory { version: number; action: string; reason: string | null; actor: { name: string }; recorded_at: string; facts: ChartFacts }
+
+export const CHART_REGISTER_PATH = '/vehicle-rental/running-charts';
+export interface ChartRegisterRow extends RunningChart {
+    vehicle_use: { id: number; vehicle_label: string; version: number };
+    customer_agreement: { reference: string; party_name: string };
+    owner_agreement: { reference: string; party_name: string } | null;
+    replaces_vehicle: string | null;
+}
+export interface ChartRegisterFilters { search?: string; chart_status?: RunningChartStatus; from?: string; until?: string }
+
+export const AC_LABELS = { [AirConditioningMode.NonAc]: 'Non-AC', [AirConditioningMode.Front]: 'Front AC', [AirConditioningMode.Dual]: 'Dual AC' };
