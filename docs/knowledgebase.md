@@ -12,7 +12,7 @@
 
 **Initial architecture baseline:** `d4aaa693706c2d3fe693244c8ea0f8d9e4ae326c`
 
-**Latest implemented baseline reviewed:** `0158725163ae31dd9a5e3e5450aaa9c4bc254ca2`, plus the fresh [vehicle-use and Running Chart contract](vehicle-rental/operations.md). Operational capture is implemented; commercial integrations and complete audiovisual review remain outstanding.
+**Latest implemented baseline reviewed:** `5095cdda9b9b9b6589dc582869a1352f51be4156`, plus the fresh [vehicle-use and Running Chart contract](vehicle-rental/operations.md). Operational capture is implemented; commercial integrations and complete audiovisual review remain outstanding.
 
 **TACGL source file:** `TACGL.zip`
 
@@ -1537,3 +1537,9 @@ Free MariaDB 10.11.14 packages were extracted into an isolated scratch runtime a
 These are application HTTP integration tests using SQLite, not browser/UAT or MySQL concurrency tests. Canonical party, vehicle, company-ownership and subscription records are test fixtures; these tests do not exercise those owner modules' provisioning UI. No new financial formula or policy is established, and no financial document is produced. Remaining commercial implementation and source gaps are unchanged.
 
 Verification for this update: six authenticated tests / 101 assertions and the complete PHP/SQLite suite / 709 tests / 8,034 assertions passed. PHP formatting and whitespace checks passed. Runtime and frontend files were unchanged.
+
+### TACGL report-expression evidence — 2026-09-09
+
+The [report-expression audit](vehicle-rental/report-expression-audit.md) statically traversed all 109 unencrypted FoxPro report/memo pairs and extracted 3,996 non-deleted records containing expression text. Targeted review of Rental keywords and arithmetic found report-specific invoice unit display expressions, purchase/material report rounding, an ambiguous date-range heading and a hired-vehicle service-report heading. R01–R06 provide physical record references, interpretation limits and source hashes.
+
+These are presentation expressions, not proof of the upstream charge-eligibility or source-selection algorithm. In particular, two-decimal rounding in purchase/material reports does not resolve VR-U11 for Rental, and displayed amounts divided by quantity cannot resolve E02 by inventing a replacement rate. Report captions and numeric form options do not establish modern Rental state enums or availability rules. No monthly proration, included-KM pooling, replacement charging or driver/deposit policy was confirmed by this targeted inspection. Executable behavior, protected backup contents and full video narration remain incompletely reviewed.

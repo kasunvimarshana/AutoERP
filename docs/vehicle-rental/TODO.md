@@ -6,7 +6,7 @@
 
 **Engineering authority:** latest `worktree-0.0.8`
 
-**Engineering baseline audited before this update:** `0158725163ae31dd9a5e3e5450aaa9c4bc254ca2`
+**Engineering baseline audited before this update:** `5095cdda9b9b9b6589dc582869a1352f51be4156`
 
 **Old Rental implementation:** must not be restored, copied, revived, cherry-picked, or used as an implementation dependency
 
@@ -114,6 +114,7 @@ This is a backlog, not a claim that any runtime slice is complete. A checked doc
 - [x] Compare all 452 inner files across `TACGL.rar`, `TACGL.zip`, `TACGL(9).zip`; identical content confirmed.
 - [x] Verify hashes/durations of the four supplied videos and matching instruction files.
 - [x] Independently reproduce knowledge-base E01–E16 transaction examples and the two documented invoice line reconciliations.
+- [x] Statically extract expression text from all 109 unencrypted FoxPro report/memo pairs and inspect Rental-keyword/arithmetic matches. [R01–R06](report-expression-audit.md) document findings and limits; financial policy gates remain open.
 - [x] Survey the full video durations with interval frames and inspect selected full-resolution anchors V01–V07.
 - [ ] Complete continuous video and narration review, including the long unchanged-screen discussion in `2.mp4`; interval frames are not complete audiovisual evidence.
 - [ ] Extract and inspect the password-protected nested backup. Free 7-Zip listed 86 entries, but five exact source password-field values did not unlock it in the authorized recovery attempt; contents remain uninspected. No guessed password variants were used.
