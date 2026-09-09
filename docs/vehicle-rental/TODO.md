@@ -70,13 +70,13 @@ Do not make one side depend on the amount or completion state of the other side.
 
 The detailed contract and rollout requirements are in [agreements.md](agreements.md). Checked foundation work does not imply that the complete-module requirements below are satisfied.
 
-## Operational delivery ledger — 2026-09-08
+## Operational delivery ledger — 2026-09-08 (integrity verified 2026-09-09)
 
 - [x] Fresh tenant-safe vehicle-use/history and Running Chart/history migrations and models.
 - [x] Full-period customer/owner or proven company source coverage, frozen agreement revisions, bounded plans and actual custody.
 - [x] Vehicle-owned status/ownership coordination and reciprocal workshop admission through the shared availability contract.
 - [x] Running Chart physical observations, exact decimal distance, explicit minute units, unknown/zero distinction and original offset/second retention.
-- [x] Versioned draft/finalize/reverse/correction commands, immutable history, physical overlap and odometer continuity checks.
+- [x] Versioned draft/finalize/reverse/correction commands, immutable history, physical overlap and odometer continuity checks, including partial observations and backfilled charts.
 - [x] Guided operational UI, independent chart permissions, readable history and stale request feedback.
 - [x] Atomic physical replacement with predecessor lineage, failed-source rollback and open-ended plan/source coverage. Replacement charging remains gated by VR-U04.
 - [ ] HR/external-driver identity, effective successor agreement terms, commercial calculations and financial integration.

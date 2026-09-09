@@ -146,7 +146,7 @@ final class VehicleUseService
                     throw new ConflictHttpException('Return conflicts with another vehicle-use period. Review or cancel conflicting plans first.');
                 }
                 $charts = RunningChart::query()->forTenant($context->tenantId)->where('vehicle_use_id', $record->id)->where('status', RunningChartStatus::Finalized->value);
-                if ((clone $charts)->where('ends_at', '>', OperationalTime::database($at))->lockForUpdate()->first(['id']) !== null || (($data['odometer'] ?? null) !== null && (clone $charts)->where('end_odometer', '>', $data['odometer'])->lockForUpdate()->first(['id']) !== null)) {
+                if ((clone $charts)->where('ends_at', '>', OperationalTime::database($at))->lockForUpdate()->first(['id']) !== null || (($data['odometer'] ?? null) !== null && (clone $charts)->where(fn ($q) => $q->where('end_odometer', '>', $data['odometer'])->orWhere('start_odometer', '>', $data['odometer']))->lockForUpdate()->first(['id']) !== null)) {
                     throw new ConflictHttpException('Return contradicts finalized usage. Review the Running Charts first.');
                 }
                 if ($vehicle->status === VehicleStatus::Rented) {

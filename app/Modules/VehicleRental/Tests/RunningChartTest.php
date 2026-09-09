@@ -137,4 +137,62 @@ final class RunningChartTest extends TestCase
         $this->expectException(AuthorizationException::class);
         $authorization->assertChart($context, RunningChartAction::Finalize, true);
     }
+
+    public function test_known_end_cannot_precede_handover_when_start_is_unknown(): void
+    {
+        $this->custodyFixture(function ($context, $use, $facts): void {
+            $service = app(RunningChartService::class);
+            $chart = $service->create($context, $use->id, $use->row_version, array_replace($facts, ['start_odometer' => null, 'end_odometer' => '99']));
+            $this->expectException(ValidationException::class);
+            $service->change($context, $chart->id, $chart->row_version, RunningChartAction::Finalize);
+        });
+    }
+
+    public function test_partial_adjacent_charts_cannot_hide_a_decreasing_reading(): void
+    {
+        $this->custodyFixture(function ($context, $use, $facts): void {
+            $service = app(RunningChartService::class);
+            $first = $service->create($context, $use->id, $use->row_version, array_replace($facts, ['start_odometer' => '150', 'end_odometer' => null]));
+            $service->change($context, $first->id, $first->row_version, RunningChartAction::Finalize);
+            $next = $service->create($context, $use->id, $use->row_version, array_replace($facts, ['reference' => 'AFTER-PARTIAL', 'starts_at' => $facts['ends_at'], 'ends_at' => '2026-09-07T18:00:00+05:30', 'start_odometer' => null, 'end_odometer' => '140']));
+            $this->expectException(ValidationException::class);
+            $service->change($context, $next->id, $next->row_version, RunningChartAction::Finalize);
+        });
+    }
+
+    public function test_backfilled_partial_chart_cannot_exceed_a_later_known_end(): void
+    {
+        $this->custodyFixture(function ($context, $use, $facts): void {
+            $service = app(RunningChartService::class);
+            $later = $service->create($context, $use->id, $use->row_version, array_replace($facts, ['starts_at' => $facts['ends_at'], 'ends_at' => '2026-09-07T18:00:00+05:30', 'start_odometer' => null, 'end_odometer' => '180']));
+            $service->change($context, $later->id, $later->row_version, RunningChartAction::Finalize);
+            $earlier = $service->create($context, $use->id, $use->row_version, array_replace($facts, ['reference' => 'BEFORE-PARTIAL', 'start_odometer' => '190', 'end_odometer' => null]));
+            $this->expectException(ValidationException::class);
+            $service->change($context, $earlier->id, $earlier->row_version, RunningChartAction::Finalize);
+        });
+    }
+
+    public function test_return_cannot_ignore_a_finalized_start_without_an_end_reading(): void
+    {
+        $this->custodyFixture(function ($context, $use, $facts): void {
+            $service = app(RunningChartService::class);
+            $chart = $service->create($context, $use->id, $use->row_version, array_replace($facts, ['start_odometer' => '150', 'end_odometer' => null]));
+            $service->change($context, $chart->id, $chart->row_version, RunningChartAction::Finalize);
+            $this->expectException(ConflictHttpException::class);
+            app(VehicleUseService::class)->transition($context, $use->id, $use->row_version, VehicleUseAction::ReturnVehicle, ['occurred_at' => '2026-09-07T18:00:00+05:30', 'odometer' => '140', 'reason' => 'Contradicting reading']);
+        });
+    }
+
+    public function test_valid_partial_observations_stay_unknown_after_finalization(): void
+    {
+        $this->custodyFixture(function ($context, $use, $facts): void {
+            $service = app(RunningChartService::class);
+            $chart = $service->create($context, $use->id, $use->row_version, array_replace($facts, ['start_odometer' => null, 'end_odometer' => '150']));
+            $chart = $service->change($context, $chart->id, $chart->row_version, RunningChartAction::Finalize);
+            self::assertNull($chart->start_odometer);
+            self::assertNull($chart->totalKm());
+            self::assertSame('150.000000', $chart->end_odometer);
+            self::assertNull($chart->history()->get()->last()->snapshot['start_odometer']);
+        });
+    }
 }

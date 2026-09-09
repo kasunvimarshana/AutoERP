@@ -83,9 +83,14 @@ final class RunningChartService
                 if ((clone $timeline)->where('starts_at', '<', $chart->ends_at)->where('ends_at', '>', $chart->starts_at)->lockForUpdate()->first(['id']) !== null) {
                     throw new ConflictHttpException('Finalized usage already covers this vehicle period.');
                 }
-                $before = (clone $timeline)->where('ends_at', '<=', $chart->starts_at)->whereNotNull('end_odometer')->orderByDesc('ends_at')->lockForUpdate()->first();
-                $after = (clone $timeline)->where('starts_at', '>=', $chart->ends_at)->whereNotNull('start_odometer')->orderBy('starts_at')->lockForUpdate()->first();
-                foreach ([[$chart->start_odometer, $use->handover_odometer], [$chart->start_odometer, $before?->end_odometer], [$use->return_odometer, $chart->end_odometer], [$after?->start_odometer, $chart->end_odometer]] as [$later, $earlier]) {
+                $before = (clone $timeline)->where('ends_at', '<=', $chart->starts_at)->where(fn ($q) => $q->whereNotNull('end_odometer')->orWhereNotNull('start_odometer'))->orderByDesc('ends_at')->lockForUpdate()->first();
+                $after = (clone $timeline)->where('starts_at', '>=', $chart->ends_at)->where(fn ($q) => $q->whereNotNull('start_odometer')->orWhereNotNull('end_odometer'))->orderBy('starts_at')->lockForUpdate()->first();
+                // Use the earliest/latest known observations without filling missing measurements.
+                $firstKnown = $chart->start_odometer ?? $chart->end_odometer;
+                $lastKnown = $chart->end_odometer ?? $chart->start_odometer;
+                $previousKnown = $before?->end_odometer ?? $before?->start_odometer;
+                $followingKnown = $after?->start_odometer ?? $after?->end_odometer;
+                foreach ([[$firstKnown, $use->handover_odometer], [$firstKnown, $previousKnown], [$use->return_odometer, $lastKnown], [$followingKnown, $lastKnown]] as [$later, $earlier]) {
                     if ($later !== null && $earlier !== null && bccomp($later, $earlier, AgreementFields::DECIMAL_SCALE) < 0) {
                         throw ValidationException::withMessages(['odometer' => ['Readings conflict with custody or adjacent finalized usage. Review the evidence.']]);
                     }

@@ -967,6 +967,8 @@ Where a driver is a constrained physical resource, overlapping assignments/use m
 ### 23.7 Running Chart continuity
 
 - end odometer must not be lower than start odometer without an explicit correction model;
+- a missing start/end reading cannot hide a contradiction: compare the earliest/latest known chart observation with known custody and adjacent finalized observations. Do not populate the missing measurement or derive total KM from an incomplete pair;
+- an actual return reading cannot be below any known finalized chart reading, including a start reading whose end is unknown;
 - overlapping physical usage for the same vehicle is invalid;
 - finalized evidence is immutable;
 - replacement/original lineage must be preserved;
