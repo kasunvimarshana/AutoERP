@@ -32,7 +32,7 @@ final class VehicleUseService
 {
     public function __construct(private readonly RentalAuthorization $authorization, private readonly AgreementValidation $validation,
         private readonly VehicleAvailabilityService $availability, private readonly VehicleUseAvailabilityBlocker $rentalBlocker,
-        private readonly CompanyVehicleCoverageService $companyCoverage) {}
+        private readonly CompanyVehicleCoverageService $companyCoverage, private readonly OdometerContinuity $odometerContinuity) {}
 
     public function list(AgreementContext $context, int $customerAgreement, int $perPage): LengthAwarePaginator
     {
@@ -130,6 +130,7 @@ final class VehicleUseService
                 if ($owner === null && ! $this->companyCoverage->covers($context->tenantId, (int) $record->vehicle_id, OperationalTime::database($at), $record->ends_at?->format(OperationalFields::DATABASE_TIMESTAMP_FORMAT))) {
                     throw ValidationException::withMessages(['owner_agreement_id' => ['Company ownership no longer covers this use. Review the source before handover.']]);
                 }
+                $this->odometerContinuity->assertReading($context->tenantId, (int) $record->vehicle_id, OperationalTime::database($at), $data['odometer'] ?? null);
                 app(VehicleStatusService::class)->changeTo($vehicle, VehicleStatus::Rented, $context->actorId, OperationalFields::HANDOVER_STATUS_REASON.$customer->reference);
                 $record->status = VehicleUseStatus::InCustody;
                 $record->handed_over_at = OperationalTime::database($at);
@@ -149,6 +150,7 @@ final class VehicleUseService
                 if ((clone $charts)->where('ends_at', '>', OperationalTime::database($at))->lockForUpdate()->first(['id']) !== null || (($data['odometer'] ?? null) !== null && (clone $charts)->where(fn ($q) => $q->where('end_odometer', '>', $data['odometer'])->orWhere('start_odometer', '>', $data['odometer']))->lockForUpdate()->first(['id']) !== null)) {
                     throw new ConflictHttpException('Return contradicts finalized usage. Review the Running Charts first.');
                 }
+                $this->odometerContinuity->assertReading($context->tenantId, (int) $record->vehicle_id, OperationalTime::database($at), $data['odometer'] ?? null);
                 if ($vehicle->status === VehicleStatus::Rented) {
                     app(VehicleStatusService::class)->changeTo($vehicle, VehicleStatus::Active, $context->actorId, OperationalFields::RETURN_STATUS_REASON.$customer->reference);
                 }

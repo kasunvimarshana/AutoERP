@@ -2,7 +2,7 @@
 
 **Status:** Canonical working domain reference; evidence gaps remain; not a completed implementation or exhaustive audiovisual audit
 
-**Knowledge refresh date:** 2026-09-08 (fresh operational implementation; audiovisual coverage remains incomplete)
+**Knowledge refresh date:** 2026-09-09 (operational continuity verification; audiovisual coverage remains incomplete)
 
 **Primary business source of truth and conflict tie-breaker:** TACGL legacy application/data corpus
 
@@ -12,7 +12,7 @@
 
 **Initial architecture baseline:** `d4aaa693706c2d3fe693244c8ea0f8d9e4ae326c`
 
-**Latest implemented baseline reviewed:** `55166a8506303f7f40d149b31ab119682aa118b5`, plus the fresh [vehicle-use and Running Chart contract](vehicle-rental/operations.md). Operational capture is implemented; commercial integrations and complete audiovisual review remain outstanding.
+**Latest implemented baseline reviewed:** `baa436fc4c476eedd3ff8c61a48a485b48e2c8df`, plus the fresh [vehicle-use and Running Chart contract](vehicle-rental/operations.md). Operational capture is implemented; commercial integrations and complete audiovisual review remain outstanding.
 
 **TACGL source file:** `TACGL.zip`
 
@@ -969,6 +969,7 @@ Where a driver is a constrained physical resource, overlapping assignments/use m
 - end odometer must not be lower than start odometer without an explicit correction model;
 - a missing start/end reading cannot hide a contradiction: compare the earliest/latest known chart observation with known custody and adjacent finalized observations. Do not populate the missing measurement or derive total KM from an incomplete pair;
 - an actual return reading cannot be below any known finalized chart reading, including a start reading whose end is unknown;
+- custody and finalized-chart observations share the physical vehicle timeline across uses and organizations within the tenant. A known reading cannot be below an earlier known reading or above a later one; observations at the same instant must agree. Check both directions when recording backdated evidence. A missing handover/return reading must not hide a previous use’s known observation. This is integrity-derived monotonicity, not a TACGL odometer-reset policy. No reset/correction workflow or Vehicle-master update is implied;
 - overlapping physical usage for the same vehicle is invalid;
 - finalized evidence is immutable;
 - replacement/original lineage must be preserved;
@@ -1524,3 +1525,7 @@ If only one section is retained in working memory, retain this:
 12. **Correctness and auditability outrank compatibility with removed legacy code.**
 
 This knowledge base is the business/domain authority for future Vehicle Rental work until new authoritative TACGL/video/business evidence explicitly supersedes a rule recorded here.
+
+### Current local database verification limitation — 2026-09-09
+
+Free MariaDB 10.11.14 packages were extracted into an isolated scratch runtime and a disposable data directory initialized successfully. Starting the socket-only server failed with `UNIX Socket: Operation not permitted`. No MariaDB application tests or contention cases ran, and no production database was accessed. SQLite results must not be represented as evidence of InnoDB locking. The real-engine acceptance gate remains open.

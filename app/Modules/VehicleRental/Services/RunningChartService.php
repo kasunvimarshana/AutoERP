@@ -22,7 +22,7 @@ use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 final class RunningChartService
 {
-    public function __construct(private readonly RentalAuthorization $authorization, private readonly AgreementValidation $contextValidation, private readonly RunningChartValidation $validation) {}
+    public function __construct(private readonly RentalAuthorization $authorization, private readonly AgreementValidation $contextValidation, private readonly RunningChartValidation $validation, private readonly OdometerContinuity $odometerContinuity) {}
 
     public function list(AgreementContext $context, int $useId, int $perPage): LengthAwarePaginator
     {
@@ -83,18 +83,8 @@ final class RunningChartService
                 if ((clone $timeline)->where('starts_at', '<', $chart->ends_at)->where('ends_at', '>', $chart->starts_at)->lockForUpdate()->first(['id']) !== null) {
                     throw new ConflictHttpException('Finalized usage already covers this vehicle period.');
                 }
-                $before = (clone $timeline)->where('ends_at', '<=', $chart->starts_at)->where(fn ($q) => $q->whereNotNull('end_odometer')->orWhereNotNull('start_odometer'))->orderByDesc('ends_at')->lockForUpdate()->first();
-                $after = (clone $timeline)->where('starts_at', '>=', $chart->ends_at)->where(fn ($q) => $q->whereNotNull('start_odometer')->orWhereNotNull('end_odometer'))->orderBy('starts_at')->lockForUpdate()->first();
-                // Use the earliest/latest known observations without filling missing measurements.
-                $firstKnown = $chart->start_odometer ?? $chart->end_odometer;
-                $lastKnown = $chart->end_odometer ?? $chart->start_odometer;
-                $previousKnown = $before?->end_odometer ?? $before?->start_odometer;
-                $followingKnown = $after?->start_odometer ?? $after?->end_odometer;
-                foreach ([[$firstKnown, $use->handover_odometer], [$firstKnown, $previousKnown], [$use->return_odometer, $lastKnown], [$followingKnown, $lastKnown]] as [$later, $earlier]) {
-                    if ($later !== null && $earlier !== null && bccomp($later, $earlier, AgreementFields::DECIMAL_SCALE) < 0) {
-                        throw ValidationException::withMessages(['odometer' => ['Readings conflict with custody or adjacent finalized usage. Review the evidence.']]);
-                    }
-                }
+                $this->odometerContinuity->assertReading($context->tenantId, (int) $use->vehicle_id, $chart->starts_at->format(OperationalFields::DATABASE_TIMESTAMP_FORMAT), $chart->start_odometer);
+                $this->odometerContinuity->assertReading($context->tenantId, (int) $use->vehicle_id, $chart->ends_at->format(OperationalFields::DATABASE_TIMESTAMP_FORMAT), $chart->end_odometer);
                 $chart->vehicle_use_version = $use->row_version;
                 $chart->status = RunningChartStatus::Finalized;
                 $chart->finalized_at = now();

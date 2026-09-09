@@ -6,13 +6,13 @@
 
 **Engineering authority:** latest `worktree-0.0.8`
 
-**Engineering baseline audited before this update:** `d4aaa693706c2d3fe693244c8ea0f8d9e4ae326c`
+**Engineering baseline audited before this update:** `baa436fc4c476eedd3ff8c61a48a485b48e2c8df`
 
 **Old Rental implementation:** must not be restored, copied, revived, cherry-picked, or used as an implementation dependency
 
 **Canonical domain reference:** [knowledgebase.md](../knowledgebase.md)
 
-**Last evidence/reconciliation update:** 2026-09-08 (operational slice; audiovisual coverage incomplete)
+**Last evidence/reconciliation update:** 2026-09-09 (operational continuity; audiovisual coverage incomplete)
 
 **Delivery status:** Fresh agreement and bounded/open-ended vehicle-use/custody and atomic replacement APIs/UI, Running Chart draft/finalize/reverse/correction history, permissions and reciprocal workshop admission are implemented. Financial calculations/handoffs, replacement charging, driver identity and production acceptance remain outstanding.
 
@@ -76,11 +76,11 @@ The detailed contract and rollout requirements are in [agreements.md](agreements
 - [x] Full-period customer/owner or proven company source coverage, frozen agreement revisions, bounded plans and actual custody.
 - [x] Vehicle-owned status/ownership coordination and reciprocal workshop admission through the shared availability contract.
 - [x] Running Chart physical observations, exact decimal distance, explicit minute units, unknown/zero distinction and original offset/second retention.
-- [x] Versioned draft/finalize/reverse/correction commands, immutable history, physical overlap and odometer continuity checks, including partial observations and backfilled charts.
+- [x] Versioned draft/finalize/reverse/correction commands, immutable history, physical overlap and odometer continuity checks, including partial observations, backfilled charts and known custody readings across physical-vehicle uses.
 - [x] Guided operational UI, independent chart permissions, readable history and stale request feedback.
 - [x] Atomic physical replacement with predecessor lineage, failed-source rollback and open-ended plan/source coverage. Replacement charging remains gated by VR-U04.
 - [ ] HR/external-driver identity, effective successor agreement terms, commercial calculations and financial integration.
-- [ ] Real MySQL concurrency, production upgrade and authenticated browser/UAT acceptance.
+- [ ] Real MySQL concurrency, production upgrade and authenticated browser/UAT acceptance. Free MariaDB 10.11.14 was initialized locally, but this environment refused its Unix socket; no real-engine tests ran.
 
 Detailed shipped behavior and relationship reasoning: [operations.md](operations.md). Older broad checklist items remain unchecked where they require more than this slice.
 
