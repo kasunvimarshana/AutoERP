@@ -25,6 +25,7 @@ export function AgreementEditor({ kind, record, onSaved, onCancel }: { kind: Agr
     const [vehicle, setVehicle] = useState<NamedResource | null>(record?.vehicle ? { id: record.vehicle.id, name: record.vehicle.registration_number ?? record.vehicle.vehicle_number } : null);
     const [reference, setReference] = useState(record?.reference ?? '');
     const [agreedOn, setAgreedOn] = useState(record?.agreed_on ?? '');
+    const [executingOn, setExecutingOn] = useState(record?.executing_on ?? '');
     const [startsOn, setStartsOn] = useState(record?.starts_on ?? '');
     const [endsOn, setEndsOn] = useState(record?.ends_on ?? '');
     const [basis, setBasis] = useState<RentalBasis | ''>(record?.basis ?? '');
@@ -40,7 +41,7 @@ export function AgreementEditor({ kind, record, onSaved, onCancel }: { kind: Agr
         setSaving(true); setError(null);
         try {
             await saveAgreement(kind, { reference, party_id: party.id, currency_id: currency.id,
-                ...(kind === AgreementKind.Owner ? { vehicle_id: vehicle!.id } : {}), agreed_on: agreedOn, starts_on: startsOn,
+                ...(kind === AgreementKind.Owner ? { vehicle_id: vehicle!.id } : {}), agreed_on: agreedOn, executing_on: executingOn || null, starts_on: startsOn,
                 ends_on: endsOn || null, basis, driver_mode: driver, terms, notes: notes || null, expected_version: record?.row_version }, record?.id);
             onSaved();
         } catch (failure) { setError(toApiError(failure)); } finally { setSaving(false); }
@@ -54,6 +55,7 @@ export function AgreementEditor({ kind, record, onSaved, onCancel }: { kind: Agr
             {kind === AgreementKind.Owner && <LookupSelect label="Vehicle" value={vehicle} onChange={setVehicle} search={vehicles} required error={fieldError('vehicle_id')} />}
             <LookupSelect label="Currency" value={currency} onChange={setCurrency} search={currencies} required error={fieldError('currency_id')} />
             <Input label="Agreement date" type="date" value={agreedOn} onChange={e => setAgreedOn(e.target.value)} required error={fieldError('agreed_on')} />
+            <Input label="Agreement executing date" type="date" value={executingOn} onChange={e => setExecutingOn(e.target.value)} error={fieldError('executing_on')} hint="Record the date stated in the agreement; leave blank if unknown." />
             <Input label="Start date" type="date" value={startsOn} onChange={e => setStartsOn(e.target.value)} required error={fieldError('starts_on')} />
             <Input label="End date" type="date" value={endsOn} onChange={e => setEndsOn(e.target.value)} error={fieldError('ends_on')} hint="Leave blank if no end date has been agreed." />
             <Select label="Rental basis" options={basisOptions} value={basis} onChange={e => setBasis(e.target.value as RentalBasis)} required error={fieldError('basis')} />

@@ -24,6 +24,7 @@ return new class extends Migration
             $table->foreignId('currency_id')->constrained('currencies')->restrictOnDelete();
             $table->string('currency_code_snapshot');
             $table->date('agreed_on');
+            $table->date('executing_on')->nullable();
             $table->date('starts_on');
             $table->date('ends_on')->nullable();
             $table->string('basis');

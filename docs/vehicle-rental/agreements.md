@@ -25,7 +25,7 @@ Party code/name, currency code and owner-vehicle labels are captured from canoni
 
 ## Captured data and validation
 
-Required: agreement reference, party selection, currency selection, agreement date, start date, Daily/Monthly basis, and self-drive/with-driver context. Owner agreements also require a vehicle selection. End date is nullable and must not precede start date. Blank reference and invalid dates such as 31 September are rejected.
+Required: agreement reference, party selection, currency selection, agreement date, start date, Daily/Monthly basis, and self-drive/with-driver context. Owner agreements also require a vehicle selection. Executing date (`executing_on`) is an independent nullable recorded date, with no automatic default or activation/billing effect. End date is nullable and must not precede start date. Blank reference and invalid dates such as 31 September are rejected.
 
 `terms` is a flat, strictly allowlisted object. Supported keys are `base_rate`, `included_km`, `excess_km_rate`, `non_ac_rate`, `front_ac_rate`, `dual_ac_rate`, `driver_rate`, `normal_ot_rate`, `double_ot_rate`, `triple_ot_rate`, `night_out_rate`, and `deposit_requirement`. A small fixed object keeps one recorded set of terms together; it is not an arbitrary JSON policy engine or a dynamic formula language.
 
@@ -75,3 +75,9 @@ Verified locally on 2026-09-08: the full backend suite (678 tests, 7,731 asserti
 The fresh migrations now use the repository-required `_table.php` suffix and history tables have composite tenant identity keys. If the preceding short-named migrations were already applied, inspect the deployment schema and migration journal before applying this baseline; do not blindly rerun renamed create migrations.
 
 Still outstanding: full source/audio review, protected backup contents, successor/effective rate versions, assignments/custody, source-coverage and overlap rules, Running Charts, independent calculations and consumption, financial handoffs, deposits/adjustments, reports, MySQL concurrency, production upgrade rehearsal and browser/UAT. No production database was accessed, and the new table names must be checked against the actual deployment schema before migration. This is a tested foundation, not a production-complete Rental system.
+
+## Executing-date capture — 2026-09-10
+
+The customer agreement at `1.mp4` 03:15 and owner payable agreement context at 16:45 distinguish executing date from agreement/start/end dates. Capture it in both fresh aggregates, show it in review/history and validate calendar syntax. No cross-date ordering or mandatory-value rule is added without evidence. Draft edits and clearing the field preserve prior snapshots; activation freezes the recorded value. A pre-field history snapshot remains unknown rather than being backfilled from another date.
+
+The repository's fresh-only migration convention places the nullable column explicitly in each original agreement creation migration. This supports fresh installation, not automatic upgrade of an already migrated database. If previous fresh commits were installed, inspect the actual schema/migration journal and prepare a deployment-specific nullable-column upgrade without backfilling guessed dates or dropping records. No production database was inspected or modified here. Relationships and module ownership are unchanged.

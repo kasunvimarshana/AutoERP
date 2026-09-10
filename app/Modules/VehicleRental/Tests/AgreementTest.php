@@ -7,6 +7,7 @@ namespace Modules\VehicleRental\Tests;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Modules\Core\Tenancy\TenantFeature;
@@ -18,6 +19,8 @@ use Modules\VehicleRental\Enums\AgreementAction;
 use Modules\VehicleRental\Enums\AgreementKind;
 use Modules\VehicleRental\Enums\AgreementStatus;
 use Modules\VehicleRental\Http\Requests\AgreementRequest;
+use Modules\VehicleRental\Http\Resources\AgreementHistoryResource;
+use Modules\VehicleRental\Http\Resources\AgreementResource;
 use Modules\VehicleRental\Services\AgreementService;
 use Modules\VehicleRental\Services\RentalAuthorization;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
@@ -51,6 +54,54 @@ final class AgreementTest extends TestCase
             self::assertSame($owner['vehicle_id'], (int) $lessor->vehicle->getKey());
             self::assertSame(1, $lessee->history()->count());
             self::assertSame(1, $lessor->history()->count());
+        });
+    }
+
+    public function test_executing_date_is_independent_optional_and_preserved_in_both_agreement_histories(): void
+    {
+        [$context, $customer, $owner] = $this->fixture();
+        $this->withTenantExecutionContext($context->tenantId, function () use ($context, $customer, $owner): void {
+            $service = app(AgreementService::class);
+            foreach ([AgreementKind::Customer, AgreementKind::Owner] as $kind) {
+                $input = $kind === AgreementKind::Customer ? $customer : $owner;
+                $record = $service->create($kind, $context, $input);
+                self::assertNull((new AgreementResource($record))->toArray(new Request)['executing_on']);
+                $updated = $service->change($kind, $context, $record->id, $record->row_version, AgreementAction::Update, array_replace($input, ['executing_on' => '2026-09-03']));
+                $resource = (new AgreementResource($updated))->toArray(new Request);
+                self::assertSame('2026-09-03', $resource['executing_on']);
+                self::assertSame($input['agreed_on'], $resource['agreed_on']);
+                self::assertSame($input['starts_on'], $resource['starts_on']);
+                $cleared = $service->change($kind, $context, $updated->id, $updated->row_version, AgreementAction::Update, array_replace($input, ['executing_on' => null]));
+                self::assertNull($cleared->executing_on);
+                $history = $cleared->history()->with('actor')->get();
+                self::assertNull((new AgreementHistoryResource($history[0]))->toArray(new Request)['executing_on']);
+                self::assertSame('2026-09-03', (new AgreementHistoryResource($history[1]))->toArray(new Request)['executing_on']);
+                $active = $service->change($kind, $context, $cleared->id, $cleared->row_version, AgreementAction::Activate);
+                try {
+                    $service->change($kind, $context, $active->id, $active->row_version, AgreementAction::Update, array_replace($input, ['executing_on' => '2026-09-04']));
+                    self::fail('Active executing dates must remain immutable.');
+                } catch (ValidationException) {
+                    self::assertNull($active->refresh()->executing_on);
+                }
+            }
+        });
+    }
+
+    public function test_invalid_executing_dates_fail_for_both_sides_before_writes(): void
+    {
+        [$context, $customer, $owner] = $this->fixture();
+        $this->withTenantExecutionContext($context->tenantId, function () use ($context, $customer, $owner): void {
+            foreach ([AgreementKind::Customer, AgreementKind::Owner] as $kind) {
+                $input = $kind === AgreementKind::Customer ? $customer : $owner;
+                try {
+                    app(AgreementService::class)->create($kind, $context, array_replace($input, ['executing_on' => '2026-09-31']));
+                    self::fail('Invalid calendar date accepted.');
+                } catch (ValidationException $error) {
+                    self::assertArrayHasKey('executing_on', $error->errors());
+                    $this->assertDatabaseCount('vehicle_rental_customer_agreements', 0);
+                    $this->assertDatabaseCount('vehicle_rental_owner_agreements', 0);
+                }
+            }
         });
     }
 

@@ -21,10 +21,10 @@ export type TermKey = keyof typeof TERM_LABELS;
 export interface Agreement {
     id: number; reference: string; row_version: number; status: AgreementStatus; basis: RentalBasis; driver_mode: DriverMode;
     party: NamedResource; currency: NamedResource; vehicle?: { id: number; vehicle_number: string; registration_number: string | null };
-    agreed_on: string; starts_on: string; ends_on: string | null; terms: Record<TermKey, string | null>; notes: string | null;
+    agreed_on: string; executing_on: string | null; starts_on: string; ends_on: string | null; terms: Record<TermKey, string | null>; notes: string | null;
 }
 export interface AgreementPayload {
-    reference: string; party_id: number; currency_id: number; vehicle_id?: number; agreed_on: string; starts_on: string; ends_on: string | null;
+    reference: string; party_id: number; currency_id: number; vehicle_id?: number; agreed_on: string; executing_on: string | null; starts_on: string; ends_on: string | null;
     basis: RentalBasis | ''; driver_mode: DriverMode | ''; terms: Partial<Record<TermKey, string | null>>; notes: string | null; expected_version?: number;
 }
 export const agreementPath = (kind: AgreementKind) => `/vehicle-rental/${kind}/agreements`;

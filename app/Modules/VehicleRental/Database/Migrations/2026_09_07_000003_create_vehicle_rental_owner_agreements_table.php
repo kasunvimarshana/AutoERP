@@ -27,6 +27,7 @@ return new class extends Migration
             $table->string('vehicle_number_snapshot');
             $table->string('vehicle_registration_snapshot')->nullable();
             $table->date('agreed_on');
+            $table->date('executing_on')->nullable();
             $table->date('starts_on');
             $table->date('ends_on')->nullable();
             $table->string('basis');

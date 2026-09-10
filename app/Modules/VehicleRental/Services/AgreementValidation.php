@@ -29,8 +29,9 @@ final class AgreementValidation
             'party_id' => ['required', 'integer', 'min:1'],
             'vehicle_id' => [$kind === AgreementKind::Owner ? 'required' : 'prohibited', 'integer', 'min:1'],
             'currency_id' => ['required', 'integer', 'min:1'],
-            'agreed_on' => ['required', 'date_format:Y-m-d'], 'starts_on' => ['required', 'date_format:Y-m-d'],
-            'ends_on' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:starts_on'],
+            'agreed_on' => ['required', 'date_format:'.AgreementFields::DATE_FORMAT], 'starts_on' => ['required', 'date_format:'.AgreementFields::DATE_FORMAT],
+            'executing_on' => ['nullable', 'date_format:'.AgreementFields::DATE_FORMAT],
+            'ends_on' => ['nullable', 'date_format:'.AgreementFields::DATE_FORMAT, 'after_or_equal:starts_on'],
             'basis' => ['required', Rule::enum(RentalBasis::class)], 'driver_mode' => ['required', Rule::enum(DriverMode::class)],
             'terms' => ['present', 'array:'.implode(',', AgreementFields::AMOUNTS)],
             'notes' => ['nullable', 'string', 'max:'.AgreementFields::NOTES_LENGTH],
@@ -70,6 +71,7 @@ final class AgreementValidation
         }
         $data[$kind === AgreementKind::Customer ? 'customer_id' : 'supplier_id'] = (int) $data['party_id'];
         unset($data['party_id']);
+        $data['executing_on'] = $data['executing_on'] ?? null;
         $data['ends_on'] = $data['ends_on'] ?? null;
         $data['notes'] = $data['notes'] ?? null;
 

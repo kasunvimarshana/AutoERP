@@ -208,7 +208,7 @@ These are **not optional guesses**. Implement only after business evidence/confi
 
 - [x] **Vehicle Service:** reproduce and fix missed cross-organization workshop blockers, open-ended requests missing future jobs, and premature release while another branch has an InProgress job. Three regression tests fail before and pass after the owner-module changes.
 - [ ] **Vehicle / Vehicle Service / Rental:** verify exact handover boundaries and simultaneous workshop/rental starts on MySQL with the new Rental publisher. Rental must not add direct workshop-table workarounds.
-- [ ] **Vehicle / Rental:** establish one deterministic vehicle-first lock order and persist use in the same transaction as availability validation.
+- [x] **Vehicle / Rental:** vehicle-first lock order and atomic use/availability validation are implemented. Real MySQL contention verification remains open above.
 - [ ] **Invoice:** design the new source identity, creation/issuance and reversal/restoration contract alongside current retired-source guards. Do not remove `InvoiceType::Rental` restrictions merely to bypass an error.
 - [ ] **Invoice / Rental:** lock the source aggregate before `InvoiceSourceAllocationService`; prove independent commercial-side namespaces and rollback/retry semantics.
 - [ ] **Payment:** define an authorized Rental handoff using owner services. `StorePaymentRequest` currently rejects retired `RentalReceipt` and prohibits source fields; the UI must not forge those fields.
@@ -242,7 +242,7 @@ Implement source-backed fields/semantics without turning every legacy field into
 
 - [x] Customer/Lessee reference.
 - [x] Agreement number/reference.
-- [ ] Agreement/executing/start/end dates.
+- [x] Agreement/executing/start/end date capture, including independent nullable executing date and immutable history (2026-09-10). Executing-date billing/activation effects remain unproven.
 - [x] Draft/Active/Closed lifecycle consistent with project conventions.
 - [x] Monthly/Daily basis.
 - [x] With Driver / self-drive context.
@@ -266,7 +266,7 @@ Implement source-backed fields/semantics without turning every legacy field into
 - [x] Lessor/Supplier reference.
 - [x] Agreement number/reference.
 - [x] Vehicle/source coverage context.
-- [ ] Agreement/executing/start/end dates.
+- [x] Agreement/executing/start/end date capture, including independent nullable executing date and immutable history (2026-09-10). Executing-date billing/activation effects remain unproven.
 - [x] Draft/Active/Closed lifecycle.
 - [x] Monthly/Daily basis.
 - [x] With Driver context where applicable.

@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use LogicException;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\ReferenceData\Models\CurrencyModel;
+use Modules\VehicleRental\Constants\AgreementFields;
 use Modules\VehicleRental\Enums\AgreementStatus;
 use Modules\VehicleRental\Enums\DriverMode;
 use Modules\VehicleRental\Enums\RentalBasis;
@@ -17,7 +18,7 @@ abstract class Agreement extends TenantOwnedModel
 {
     protected function casts(): array
     {
-        return array_merge(parent::casts(), ['tenant_id' => 'integer', 'organization_unit_id' => 'integer', 'row_version' => 'integer', 'terms' => 'array', 'status' => AgreementStatus::class, 'basis' => RentalBasis::class, 'driver_mode' => DriverMode::class, 'agreed_on' => 'date:Y-m-d', 'starts_on' => 'date:Y-m-d', 'ends_on' => 'date:Y-m-d', 'activated_at' => 'immutable_datetime', 'closed_at' => 'immutable_datetime']);
+        return array_merge(parent::casts(), ['tenant_id' => 'integer', 'organization_unit_id' => 'integer', 'row_version' => 'integer', 'terms' => 'array', 'status' => AgreementStatus::class, 'basis' => RentalBasis::class, 'driver_mode' => DriverMode::class, 'executing_on' => 'date:'.AgreementFields::DATE_FORMAT, 'agreed_on' => 'date:'.AgreementFields::DATE_FORMAT, 'starts_on' => 'date:'.AgreementFields::DATE_FORMAT, 'ends_on' => 'date:'.AgreementFields::DATE_FORMAT, 'activated_at' => 'immutable_datetime', 'closed_at' => 'immutable_datetime']);
     }
 
     public function scopeForContext(Builder $query, int $tenantId, int $organizationUnitId): Builder

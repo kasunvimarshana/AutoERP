@@ -12,7 +12,7 @@
 
 **Initial architecture baseline:** `d4aaa693706c2d3fe693244c8ea0f8d9e4ae326c`
 
-**Latest implemented baseline reviewed:** `d7a05c285800f4008cfca65913b1e80e8f88c76f`, plus the fresh [vehicle-use and Running Chart contract](vehicle-rental/operations.md). Operational capture is implemented; commercial integrations and complete audiovisual review remain outstanding.
+**Latest implemented baseline reviewed:** `b7111adcba2fb253fafa60d3279b39578cf742b1`, plus the fresh [vehicle-use and Running Chart contract](vehicle-rental/operations.md). Operational capture is implemented; commercial integrations and complete audiovisual review remain outstanding.
 
 **TACGL source file:** `TACGL.zip`
 
@@ -362,6 +362,11 @@ Vehicle master ownership remains in the Vehicle module. Rental stores only Renta
 ## 9. Customer / Lessee Agreement
 
 ### 9.1 Explicit video evidence
+
+**Executing date verification, 2026-09-10:** `1.mp4` at **03:15** visibly labels Agreement Date, Agreement Executing Date, Agreement Starting Date and Agreement Ending Date separately. The owner-side Payment Payable Voucher at **16:45** also shows Agreement Executing Date separately from its agreement, start/end and payable dates. These observations prove distinct captured facts; equal executing/start dates in an example do not prove that they are always equal.
+
+Fresh customer and owner agreements now capture nullable `executing_on` independently of `agreed_on`, `starts_on`, `ends_on` and the system activation timestamp. The backend validates a real calendar date; draft edits are version-checked and recorded in immutable history. Unknown stays null and the UI has no date default. Once activated, it follows the existing immutable-agreement rule. No mandatory-date requirement, ordering relative to agreement/start dates, automatic activation, charge eligibility or billing-calendar effect is inferred from the label. Any such effect remains unproven until supported by further business evidence.
+
 
 The Customer/Lessee Agreement workflow exposes concepts including:
 

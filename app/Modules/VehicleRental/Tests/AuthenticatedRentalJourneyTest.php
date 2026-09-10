@@ -38,7 +38,9 @@ final class AuthenticatedRentalJourneyTest extends TestCase
     public function test_authenticated_owner_supply_chart_correction_return_and_closure_journey(): void
     {
         [$context, $customerInput, $ownerInput] = $this->loginFixture();
+        $customerInput['executing_on'] = '2026-09-03';
         $customer = $this->activate('customer', $customerInput);
+        self::assertSame('2026-09-03', $customer['executing_on']);
         $owner = $this->activate('owner', $ownerInput);
         $customerPath = self::ROOT.'/customer/agreements/'.$customer['id'];
         $this->getJson(self::ROOT.'/vehicles/'.$ownerInput['vehicle_id'].'/sources')->assertOk()->assertJsonPath('data.0.id', $owner['id']);

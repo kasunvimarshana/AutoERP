@@ -24,6 +24,7 @@ final class AgreementHistoryResource extends JsonResource
             'currency_code' => $snapshot['currency_code_snapshot'],
             'status' => $snapshot['status'],
             'agreed_on' => $snapshot['agreed_on'],
+            'executing_on' => $snapshot['executing_on'] ?? null,
             'starts_on' => $snapshot['starts_on'],
             'ends_on' => $snapshot['ends_on'],
             'basis' => $snapshot['basis'],

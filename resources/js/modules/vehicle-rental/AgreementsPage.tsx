@@ -63,6 +63,7 @@ export default function AgreementsPage({ kind }: { kind: AgreementKind }) {
         {selected && <section className="mt-5 space-y-4 rounded-xl border border-slate-200 bg-white p-5" aria-label="Agreement review">
             <h2 className="text-xl font-semibold">{selected.reference} · {selected.party.name}</h2>
             <p>{selected.currency.code} · {selected.driver_mode === DriverMode.SelfDrive ? 'Self-drive' : 'With driver'}{selected.vehicle ? ` · ${selected.vehicle.registration_number ?? selected.vehicle.vehicle_number}` : ''}</p>
+            <p>Agreement date: {selected.agreed_on} · Executing date: {selected.executing_on ?? 'Not recorded'}</p>
             <dl className="grid gap-3 sm:grid-cols-2">{(Object.keys(TERM_LABELS) as TermKey[]).map(key => <div key={key}><dt className="text-sm text-slate-500">{TERM_LABELS[key]}</dt><dd>{selected.terms[key] ?? 'Not specified'}</dd></div>)}</dl>
             {selected.notes && <p>{selected.notes}</p>}
             {kind === AgreementKind.Customer && canViewUse && <Button variant="secondary" onClick={() => setShowVehicles(value => !value)}>{showVehicles ? 'Hide vehicles' : 'View assigned vehicles'}</Button>}

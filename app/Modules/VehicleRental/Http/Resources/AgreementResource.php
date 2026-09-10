@@ -17,7 +17,7 @@ final class AgreementResource extends JsonResource
             'party' => ['id' => $this->party->getKey(), 'name' => $this->party_name_snapshot, 'code' => $this->party_code_snapshot],
             'currency' => ['id' => $this->currency->getKey(), 'code' => $this->currency_code_snapshot, 'name' => $this->currency->name],
             'vehicle' => $this->when($this->resource instanceof OwnerAgreement, fn () => ['id' => $this->vehicle->getKey(), 'registration_number' => $this->vehicle_registration_snapshot, 'vehicle_number' => $this->vehicle_number_snapshot]),
-            'agreed_on' => $this->agreed_on->toDateString(), 'starts_on' => $this->starts_on->toDateString(), 'ends_on' => $this->ends_on?->toDateString(),
+            'agreed_on' => $this->agreed_on->toDateString(), 'executing_on' => $this->executing_on?->toDateString(), 'starts_on' => $this->starts_on->toDateString(), 'ends_on' => $this->ends_on?->toDateString(),
             'terms' => $this->terms, 'notes' => $this->notes, 'activated_at' => $this->activated_at?->toIso8601String(), 'closed_at' => $this->closed_at?->toIso8601String()];
     }
 }

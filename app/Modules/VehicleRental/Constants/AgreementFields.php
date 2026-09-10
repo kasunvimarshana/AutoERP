@@ -6,6 +6,8 @@ namespace Modules\VehicleRental\Constants;
 
 final class AgreementFields
 {
+    public const DATE_FORMAT = 'Y-m-d';
+
     public const INITIAL_VERSION = 1;
 
     public const REFERENCE_LENGTH = 100;
@@ -22,7 +24,7 @@ final class AgreementFields
 
     public const AMOUNTS = ['base_rate', 'included_km', 'excess_km_rate', 'non_ac_rate', 'front_ac_rate', 'dual_ac_rate', 'driver_rate', 'normal_ot_rate', 'double_ot_rate', 'triple_ot_rate', 'night_out_rate', 'deposit_requirement'];
 
-    public const MUTABLE = ['reference', 'party_id', 'vehicle_id', 'agreed_on', 'starts_on', 'ends_on', 'basis', 'driver_mode', 'currency_id', 'terms', 'notes'];
+    public const MUTABLE = ['reference', 'party_id', 'vehicle_id', 'agreed_on', 'executing_on', 'starts_on', 'ends_on', 'basis', 'driver_mode', 'currency_id', 'terms', 'notes'];
 
     private function __construct() {}
 }
