@@ -686,7 +686,8 @@ Select/derive Owner Agreement + Period
 
 ## 39. Operational reports
 
-- [ ] Vehicle utilization/usage by period.
+- [x] Vehicle Use register: scoped read-only API/UI, vehicle/agreement/party search, state and planned-period overlap, actual custody and expandable history (2026-09-10).
+- [ ] Vehicle utilization/usage by actual period, with proven aggregation semantics.
 - [ ] Customer Agreement/use history.
 - [ ] Owner/source Vehicle history.
 - [x] Running Chart register/detail: scoped read-only API/UI, state/reference/party/vehicle/period filters, original quantities, correction/replacement context and history (2026-09-09).

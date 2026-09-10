@@ -34,3 +34,6 @@ export function localTimestampValue(value: string): string {
     const date = new Date(value); const pad = (part: number) => String(part).padStart(TIME_PART_WIDTH, '0');
     return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
 }
+
+export const USE_REGISTER_PATH = '/vehicle-rental/vehicle-uses';
+export interface VehicleUseRegisterFilters { search?: string; use_status?: VehicleUseStatus; from?: string; until?: string }

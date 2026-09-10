@@ -15,12 +15,18 @@ use Modules\VehicleRental\Http\Resources\VehicleUseHistoryResource;
 use Modules\VehicleRental\Http\Resources\VehicleUseResource;
 use Modules\VehicleRental\Models\OwnerAgreement;
 use Modules\VehicleRental\Services\RentalAuthorization;
+use Modules\VehicleRental\Services\VehicleUseRegisterService;
 use Modules\VehicleRental\Services\VehicleUseService;
 use Symfony\Component\HttpFoundation\Response;
 
 final class VehicleUseController
 {
     public function __construct(private readonly VehicleUseService $uses, private readonly RentalAuthorization $authorization) {}
+
+    public function register(AgreementRequest $request, VehicleUseRegisterService $register): AnonymousResourceCollection
+    {
+        return VehicleUseResource::collection($register->list($request->context(), $request->only(['search', 'use_status', 'from', 'until']), $request->perPage()));
+    }
 
     public function index(AgreementRequest $request, int $agreement): AnonymousResourceCollection
     {

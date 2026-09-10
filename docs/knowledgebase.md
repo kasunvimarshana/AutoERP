@@ -12,7 +12,7 @@
 
 **Initial architecture baseline:** `d4aaa693706c2d3fe693244c8ea0f8d9e4ae326c`
 
-**Latest implemented baseline reviewed:** `5095cdda9b9b9b6589dc582869a1352f51be4156`, plus the fresh [vehicle-use and Running Chart contract](vehicle-rental/operations.md). Operational capture is implemented; commercial integrations and complete audiovisual review remain outstanding.
+**Latest implemented baseline reviewed:** `d7a05c285800f4008cfca65913b1e80e8f88c76f`, plus the fresh [vehicle-use and Running Chart contract](vehicle-rental/operations.md). Operational capture is implemented; commercial integrations and complete audiovisual review remain outstanding.
 
 **TACGL source file:** `TACGL.zip`
 
@@ -976,6 +976,10 @@ Where a driver is a constrained physical resource, overlapping assignments/use m
 - exact timestamps belong to operational evidence even where planning coverage is date-based.
 
 ### 23.8 Register query semantics (implemented 2026-09-09)
+
+The Vehicle Use register provides read-only assignment and custody history across agreements in the selected tenant and organization. Existing use-view permission is required independently of agreement-management permission. Search matches vehicle labels and customer/owner reference/name snapshots. Enum state and explicit-offset **planned-period** filters are optional. Planned intervals use half-open overlap; a null planned end is unbounded. Exact touching endpoints are excluded. Search predicates cannot broaden tenant or organization scope.
+
+Display original planned dates separately from actual handover/return. Show readable customer/owner references, company supply, replacement predecessor and expandable immutable custody history. Unknown odometers remain unknown, including when only one observation is recorded. The register does not compute distance, charges or utilization. An overdue use can fall outside a planned-period search despite still being in custody; the shared availability contract remains authoritative for availability. These are implementation-derived retrieval semantics over the source-backed operational model, not new TACGL commercial rules. No schema relationship or cross-module ownership changes are needed. See [the register contract](vehicle-rental/operations.md#vehicle-use-register--2026-09-10).
 
 The Running Chart register is a read-only view of recorded evidence across vehicle uses in the selected tenant and organization. It requires chart-view permission. Search can match chart reference, vehicle label, agreement reference or party snapshot; optional state and explicit-offset period filters narrow the result. An interval matches when the chart ends after the filter start and starts before the filter end. Exact touching endpoints do not overlap. These are integrity-derived retrieval semantics, not billing rules.
 

@@ -64,6 +64,7 @@ final class AuthenticatedRentalJourneyTest extends TestCase
         $this->postJson(self::ROOT.'/owner/agreements/'.$owner['id'].'/close', ['expected_version' => $owner['row_version'], 'reason' => 'Supply complete'])->assertOk()->assertJsonPath('data.status', 'closed');
         $this->getJson($chartPath.'/history')->assertOk()->assertJsonCount(3, 'data')->assertJsonPath('data.0.actor.name', 'Test User');
         $this->getJson($usePath.'/history')->assertOk()->assertJsonCount(3, 'data');
+        $this->getJson(self::ROOT.'/vehicle-uses?use_status=returned')->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.customer_agreement.reference', $customerInput['reference']);
         $this->assertDatabaseHas('vehicle_rental_running_charts', ['id' => $chart['id'], 'end_odometer' => '150.25', 'status' => 'reversed']);
         $this->assertDatabaseHas('vehicles', ['id' => $ownerInput['vehicle_id'], 'tenant_id' => $context->tenantId, 'status' => 'active']);
     }
@@ -71,15 +72,27 @@ final class AuthenticatedRentalJourneyTest extends TestCase
     public function test_authentication_permissions_and_feature_gates_prevent_writes(): void
     {
         $this->getJson(self::ROOT.'/running-charts')->assertUnauthorized();
+        $this->getJson(self::ROOT.'/vehicle-uses')->assertUnauthorized();
         [, $input] = $this->loginFixture(permissions: []);
+        $this->getJson(self::ROOT.'/vehicle-uses')->assertForbidden();
         $this->getJson(self::ROOT.'/customer/agreements')->assertForbidden();
         $this->postJson(self::ROOT.'/customer/agreements', $input)->assertForbidden();
         $this->assertDatabaseCount('vehicle_rental_customer_agreements', 0);
 
         [, $input] = $this->loginFixture(modules: []);
+        $this->getJson(self::ROOT.'/vehicle-uses')->assertForbidden();
         $this->postJson(self::ROOT.'/customer/agreements', $input)->assertForbidden();
         $this->getJson(self::ROOT.'/running-charts')->assertForbidden();
         $this->assertDatabaseCount('vehicle_rental_customer_agreements', 0);
+    }
+
+    public function test_use_view_alone_allows_register_but_not_agreements_or_writes(): void
+    {
+        [, $input] = $this->loginFixture(permissions: [RentalAuthorization::USE_VIEW]);
+        $this->getJson(self::ROOT.'/vehicle-uses')->assertOk()->assertJsonCount(0, 'data');
+        $this->getJson(self::ROOT.'/vehicle-uses?use_status=invented')->assertUnprocessable()->assertJsonValidationErrors('use_status');
+        $this->getJson(self::ROOT.'/customer/agreements')->assertForbidden();
+        $this->postJson(self::ROOT.'/customer/agreements', $input)->assertForbidden();
     }
 
     public function test_foreign_ids_and_payload_context_cannot_change_the_authenticated_scope(): void
@@ -102,6 +115,7 @@ final class AuthenticatedRentalJourneyTest extends TestCase
         $this->getJson(self::ROOT.'/customer/agreements')->assertForbidden();
         $this->postJson(self::ROOT.'/owner/agreements', $owner)->assertForbidden();
         $this->getJson(self::ROOT.'/running-charts')->assertOk()->assertJsonCount(0, 'data');
+        $this->getJson(self::ROOT.'/vehicle-uses')->assertForbidden();
         $unknownChartId = 999999;
         foreach (['finalize', 'reverse'] as $action) {
             $this->postJson(self::ROOT.'/running-charts/'.$unknownChartId.'/'.$action, ['expected_version' => 1, 'reason' => 'Unauthorized'])->assertForbidden();

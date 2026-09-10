@@ -54,6 +54,7 @@ All routes use the existing authenticated tenant/organization/feature middleware
 
 | Method and relative path | Concurrency/permission |
 |---|---|
+| GET `vehicle-uses` | Use view; paginated register with search, state and planned-period overlap filters |
 | GET/POST `customer/agreements/{agreement}/vehicles` | Use view/manage; POST requires customer agreement `expected_version` |
 | GET `vehicles/{vehicle}/sources` | Use view; scoped active owner reference/name/date lookup, no owner rates |
 | POST `vehicle-uses/{use}/{handover\|return\|cancel}` | Use manage; current use `expected_version`, reason and applicable actual observations |
@@ -87,3 +88,13 @@ Optional filters are `search`, `chart_status`, `from` and `until`; timestamps re
 Review expands recorded distances, OT minute counts, night-outs, AC mode, driver observation and notes. History loads only when requested. Context includes customer/owner names and references, company supply, correction predecessor and replacement vehicle. Rates are not returned through the contextual agreement objects. This is Rental-owned evidence browsing; cross-module financial reporting, aggregation, export and financial eligibility remain with their future owning workflows.
 
 The shared Rental `OdometerContinuity` service checks known timestamped observations under the existing Vehicle lock using current locking reads. It neither fills missing values nor alters history. No new relationship, replicated Vehicle identity, financial rule or Vehicle-master write is introduced. MariaDB 10.11.14 initialization succeeded locally, but its socket was refused by the environment; real-engine execution and contention verification remain open.
+
+## Vehicle Use register — 2026-09-10
+
+**Vehicle Rental → Vehicle Use Register** opens `/vehicle-rental/vehicle-uses`. `GET /api/v1/vehicle-rental/vehicle-uses` and its UI require the existing use-view permission and tenant/organization/feature context. Agreement management permission is not implied. The read model uses the existing VehicleUse resource; it exposes agreement/party references and snapshots, not agreement rates.
+
+Optional `search` matches vehicle labels or customer/owner agreement references and party-name snapshots. `use_status` uses the VehicleUse status enum. Optional `from`/`until` require explicit numeric-offset timestamps and filter the **original planned interval**, not actual custody. An assignment matches when its planned start is before `until` and its planned end is after `from`; a null planned end is unbounded. Exact touching endpoints do not overlap. Both bounds together must form a nonempty increasing interval. Search OR predicates and open-end OR predicates remain inside trusted tenant/organization scope. Results are ordered by planned start then ID descending and paginated.
+
+The UI displays the complete original plan, actual handover/return, human-readable customer/owner or company supply and the predecessor vehicle for a replacement. Expand a row to review known/unknown odometers, notes and immutable history. Missing readings remain unknown; explicit zero stays zero. Failed searches hide stale rows. A planned-period search may exclude an overdue vehicle still in custody, so this register is not an availability or utilization calculation. Use status and actual custody remain visibly distinct from the planned period. No charges, physical distance totals, utilization percentages or financial eligibility are inferred.
+
+Relationship review: no new tables, foreign keys, inverse links or duplicated identities. Rental owns this read model; the existing use-to-agreement and directed replacement links already carry its context. Vehicle and financial owners retain their current responsibilities.

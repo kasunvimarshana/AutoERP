@@ -34,6 +34,7 @@ Route::prefix('api/v1/vehicle-rental')->middleware([
     Route::post('vehicle-uses/{use}/{action}', [VehicleUseController::class, 'transition'])->whereNumber('use')->whereIn('action', [VehicleUseAction::Handover->value, VehicleUseAction::ReturnVehicle->value, VehicleUseAction::Cancel->value]);
     Route::get('vehicle-uses/{use}/running-charts', [RunningChartController::class, 'index'])->whereNumber('use');
     Route::post('vehicle-uses/{use}/running-charts', [RunningChartController::class, 'store'])->whereNumber('use');
+    Route::get('vehicle-uses', [VehicleUseController::class, 'register']);
     Route::get('running-charts', [RunningChartController::class, 'register']);
     Route::put('running-charts/{chart}', [RunningChartController::class, 'update'])->whereNumber('chart');
     Route::get('running-charts/{chart}/history', [RunningChartController::class, 'history'])->whereNumber('chart');

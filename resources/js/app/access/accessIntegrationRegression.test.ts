@@ -1,3 +1,5 @@
+import { USE_PERMISSION, USE_REGISTER_PATH } from '@/modules/vehicle-rental/vehicleUse';
+import { TENANT_MODULE_CODE } from './tenantModules';
 import { describe, expect, it } from 'vitest';
 import { inventoryPermissions } from '@/modules/inventory/inventoryPermissions';
 import { financePermissions } from '@/modules/finance/financePermissions';
@@ -25,6 +27,17 @@ function visibleItemLabels(permissions: string[], enabledModules: string[]): str
 }
 
 describe('tenant access integration regressions', () => {
+    it('exposes Vehicle Use independently while retaining feature and route permission gates', () => {
+        const labels = visibleItemLabels([USE_PERMISSION.view], [TENANT_MODULE_CODE.VEHICLE_RENTAL]);
+        expect(labels).toContain('Vehicle Rental');
+        expect(labels).toContain('Vehicle Use Register');
+        expect(labels).not.toContain('Customer Agreements');
+        expect(visibleItemLabels([], [TENANT_MODULE_CODE.VEHICLE_RENTAL])).not.toContain('Vehicle Use Register');
+        expect(visibleItemLabels([USE_PERMISSION.view], [])).not.toContain('Vehicle Use Register');
+        expect(resolveTenantRouteEntitlement(USE_REGISTER_PATH)?.permissions).toEqual([USE_PERMISSION.view]);
+        expect(resolveTenantRouteEntitlement(USE_REGISTER_PATH)?.requiresOrganizationUnit).toBe(true);
+    });
+
     it('does not expose Inventory without an Inventory permission', () => {
         expect(visibleItemLabels([], ['inventory'])).not.toContain('Inventory');
         expect(visibleItemLabels([inventoryPermissions.stockView], ['inventory'])).toContain('Inventory');
