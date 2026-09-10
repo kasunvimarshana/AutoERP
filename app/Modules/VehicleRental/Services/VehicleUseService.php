@@ -56,11 +56,7 @@ final class VehicleUseService
         $this->validation->assertContext($context);
         $data = Validator::make($input, ['vehicle_id' => ['required', 'integer', 'min:1'], 'owner_agreement_id' => ['nullable', 'integer', 'min:1'],
             'starts_at' => ['required', 'string'], 'ends_at' => ['present', 'nullable', 'string'], 'notes' => ['nullable', 'string', 'max:'.AgreementFields::NOTES_LENGTH]])->validate();
-        $start = OperationalTime::parse($data['starts_at'], 'starts_at');
-        $end = $data['ends_at'] === null ? null : OperationalTime::parse($data['ends_at'], 'ends_at');
-        if ($end !== null && $end <= $start) {
-            throw ValidationException::withMessages(['ends_at' => ['End must be later than start.']]);
-        }
+        [$start, $end] = OperationalTime::plannedPeriod($data['starts_at'], $data['ends_at']);
 
         return DB::transaction(function () use ($context, $customerAgreement, $expectedAgreementVersion, $data, $start, $end, $replaces): VehicleUse {
             $vehicle = $this->lockVehicle($context, (int) $data['vehicle_id']);

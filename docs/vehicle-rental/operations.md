@@ -56,7 +56,7 @@ All routes use the existing authenticated tenant/organization/feature middleware
 |---|---|
 | GET `vehicle-uses` | Use view; paginated register with search, state and planned-period overlap filters |
 | GET/POST `customer/agreements/{agreement}/vehicles` | Use view/manage; POST requires customer agreement `expected_version` |
-| GET `vehicles/{vehicle}/sources` | Use view; scoped active owner reference/name/date lookup, no owner rates |
+| GET `vehicles/{vehicle}/sources` | Use view; required `starts_at` and present nullable `ends_at`; full-period scoped active owner lookup, no rates |
 | POST `vehicle-uses/{use}/{handover\|return\|cancel}` | Use manage; current use `expected_version`, reason and applicable actual observations |
 | POST `vehicle-uses/{use}/replace` | Use manage; old use version, actual exchange time, new vehicle/source, reason and optional separate odometers |
 | GET `vehicle-uses/{use}/history` | Use view; paginated readable history |
@@ -98,3 +98,9 @@ Optional `search` matches vehicle labels or customer/owner agreement references 
 The UI displays the complete original plan, actual handover/return, human-readable customer/owner or company supply and the predecessor vehicle for a replacement. Expand a row to review known/unknown odometers, notes and immutable history. Missing readings remain unknown; explicit zero stays zero. Failed searches hide stale rows. A planned-period search may exclude an overdue vehicle still in custody, so this register is not an availability or utilization calculation. Use status and actual custody remain visibly distinct from the planned period. No charges, physical distance totals, utilization percentages or financial eligibility are inferred.
 
 Relationship review: no new tables, foreign keys, inverse links or duplicated identities. Rental owns this read model; the existing use-to-agreement and directed replacement links already carry its context. Vehicle and financial owners retain their current responsibilities.
+
+## Period-aware owner source selection — 2026-09-10
+
+`GET vehicles/{vehicle}/sources` now requires `starts_at` and a present nullable `ends_at`. Both known timestamps require explicit numeric offsets and a nonempty increasing period. For an open-ended HTTP query send `ends_at=`; request normalization maps the explicit empty value to null. The UI sends the currently entered period and resets the selected owner agreement whenever either date or the vehicle changes.
+
+Only active source agreements for the selected physical vehicle and current tenant/organization are returned. Their start must cover the local input start date; a finite end must cover the last included second before the planned return. Null source ends are unbounded; a null planned end requires an unbounded source. This mirrors existing plan coverage, not a new financial calendar rule. Search remains grouped within scope and results retain normal pagination. Source selection does not inspect financial rates or certify availability, and the final command still validates source, agreement version and shared physical availability under locks. No schema, relationship or module boundary changes.

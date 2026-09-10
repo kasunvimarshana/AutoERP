@@ -7,21 +7,19 @@ namespace Modules\VehicleRental\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Modules\VehicleRental\Constants\OperationalFields;
-use Modules\VehicleRental\Enums\AgreementStatus;
 use Modules\VehicleRental\Enums\VehicleUseAction;
 use Modules\VehicleRental\Http\Requests\AgreementRequest;
 use Modules\VehicleRental\Http\Resources\OwnerSourceResource;
 use Modules\VehicleRental\Http\Resources\VehicleUseHistoryResource;
 use Modules\VehicleRental\Http\Resources\VehicleUseResource;
-use Modules\VehicleRental\Models\OwnerAgreement;
-use Modules\VehicleRental\Services\RentalAuthorization;
+use Modules\VehicleRental\Services\OwnerSourceService;
 use Modules\VehicleRental\Services\VehicleUseRegisterService;
 use Modules\VehicleRental\Services\VehicleUseService;
 use Symfony\Component\HttpFoundation\Response;
 
 final class VehicleUseController
 {
-    public function __construct(private readonly VehicleUseService $uses, private readonly RentalAuthorization $authorization) {}
+    public function __construct(private readonly VehicleUseService $uses) {}
 
     public function register(AgreementRequest $request, VehicleUseRegisterService $register): AnonymousResourceCollection
     {
@@ -53,14 +51,8 @@ final class VehicleUseController
         return VehicleUseHistoryResource::collection($this->uses->find($request->context(), $use)->history()->with('actor')->paginate($request->perPage()));
     }
 
-    public function sources(AgreementRequest $request, int $vehicle): AnonymousResourceCollection
+    public function sources(AgreementRequest $request, int $vehicle, OwnerSourceService $sources): AnonymousResourceCollection
     {
-        $context = $request->context();
-        $this->authorization->assertUse($context, false);
-
-        return OwnerSourceResource::collection(OwnerAgreement::query()->forContext($context->tenantId, $context->organizationUnitId)
-            ->where('vehicle_id', $vehicle)->where('status', AgreementStatus::Active->value)
-            ->when($request->validated('search'), fn ($q, $search) => $q->where(fn ($terms) => $terms->where('reference', 'like', '%'.$search.'%')->orWhere('party_name_snapshot', 'like', '%'.$search.'%')))
-            ->orderBy('reference')->paginate($request->perPage()));
+        return OwnerSourceResource::collection($sources->list($request->context(), $vehicle, $request->only(['search', 'starts_at', 'ends_at']), $request->perPage()));
     }
 }

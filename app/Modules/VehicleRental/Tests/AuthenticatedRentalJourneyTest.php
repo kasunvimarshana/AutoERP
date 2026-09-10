@@ -43,7 +43,7 @@ final class AuthenticatedRentalJourneyTest extends TestCase
         self::assertSame('2026-09-03', $customer['executing_on']);
         $owner = $this->activate('owner', $ownerInput);
         $customerPath = self::ROOT.'/customer/agreements/'.$customer['id'];
-        $this->getJson(self::ROOT.'/vehicles/'.$ownerInput['vehicle_id'].'/sources')->assertOk()->assertJsonPath('data.0.id', $owner['id']);
+        $this->getJson(self::ROOT.'/vehicles/'.$ownerInput['vehicle_id'].'/sources?'.http_build_query(['starts_at' => '2026-09-07T09:00:00+05:30', 'ends_at' => '']))->assertOk()->assertJsonPath('data.0.id', $owner['id']);
         $plan = ['vehicle_id' => $ownerInput['vehicle_id'], 'owner_agreement_id' => $owner['id'],
             'starts_at' => '2026-09-07T09:00:00+05:30', 'ends_at' => '2026-09-08T09:00:00+05:30', 'expected_version' => $customer['row_version']];
         $use = $this->postJson($customerPath.'/vehicles', $plan)->assertCreated()->assertJsonPath('data.owner_agreement.reference', $owner['reference'])->json('data');

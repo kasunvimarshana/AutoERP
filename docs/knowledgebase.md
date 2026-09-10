@@ -12,7 +12,7 @@
 
 **Initial architecture baseline:** `d4aaa693706c2d3fe693244c8ea0f8d9e4ae326c`
 
-**Latest implemented baseline reviewed:** `b7111adcba2fb253fafa60d3279b39578cf742b1`, plus the fresh [vehicle-use and Running Chart contract](vehicle-rental/operations.md). Operational capture is implemented; commercial integrations and complete audiovisual review remain outstanding.
+**Latest implemented baseline reviewed:** `8b227aa3c7e618015ebfa00cc93c083047b374fb`, plus the fresh [vehicle-use and Running Chart contract](vehicle-rental/operations.md). Operational capture is implemented; commercial integrations and complete audiovisual review remain outstanding.
 
 **TACGL source file:** `TACGL.zip`
 
@@ -982,6 +982,8 @@ Where a driver is a constrained physical resource, overlapping assignments/use m
 
 ### 23.8 Register query semantics (implemented 2026-09-09)
 
+The assignment/replacement owner-source selector requires the planned period and lists only active owner agreements covering the selected vehicle and the complete period in the current organization. It applies the same established coverage semantics as plan validation: start date at or before planned start, and an open end or an end date covering the last included second. An open-ended hire requires an open-ended source. The operator changes the period before choosing a source; changing either date clears the selection. A lookup result is advisory, not a reservation: save and handover still recheck the existing transactional coverage/availability rules. Customer/owner prices are not returned by this selector.
+
 The Vehicle Use register provides read-only assignment and custody history across agreements in the selected tenant and organization. Existing use-view permission is required independently of agreement-management permission. Search matches vehicle labels and customer/owner reference/name snapshots. Enum state and explicit-offset **planned-period** filters are optional. Planned intervals use half-open overlap; a null planned end is unbounded. Exact touching endpoints are excluded. Search predicates cannot broaden tenant or organization scope.
 
 Display original planned dates separately from actual handover/return. Show readable customer/owner references, company supply, replacement predecessor and expandable immutable custody history. Unknown odometers remain unknown, including when only one observation is recorded. The register does not compute distance, charges or utilization. An overdue use can fall outside a planned-period search despite still being in custody; the shared availability contract remains authoritative for availability. These are implementation-derived retrieval semantics over the source-backed operational model, not new TACGL commercial rules. No schema relationship or cross-module ownership changes are needed. See [the register contract](vehicle-rental/operations.md#vehicle-use-register--2026-09-10).
@@ -1560,3 +1562,7 @@ A free local `whisper.cpp` v1.9.2 build (source commit `306c88f4d1286aec1bf96e54
 Explicit Sinhala transcription produced repeated character sequences. Automatic-language mode selected English but produced excessive word repetition. The same runtime/model correctly transcribed its bundled English reference sample, establishing that a basic inference control worked; that does not establish recognition quality for these recordings. No generated sentence was promoted to business evidence. This attempt does not complete continuous narration review and does not close any financial-policy gate. The full-model audio and reference checks were completed after an earlier interrupted attempt; the interrupted attempt itself supplies no review evidence.
 
 Reliable narration evidence, such as a verified Sinhala/English transcript tied to video timestamps or demonstrated expected outputs for the unresolved policies, remains necessary before claiming the complete commercial workflow. Existing visual/transaction evidence and its limits remain as documented. Do not convert machine repetition, source-screen coincidences or an incomplete transcript into a rate, proration, allowance, tax or deposit rule.
+
+### Backup evidence recheck — 2026-09-10
+
+An additional filename-limited search of supplied/extracted text, Markdown, INI, CFG, BAT and PRG files for password/archive-key command clues found no matching file. This did not produce a new password candidate or inspect encrypted contents. The previous five exact recorded candidates remain unsuccessful; no secrets were published and no guessed variants or brute force were used. Implementation continued independently with the source-coverage selector.

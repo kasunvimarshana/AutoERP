@@ -6,13 +6,13 @@
 
 **Engineering authority:** latest `worktree-0.0.8`
 
-**Engineering baseline audited before this update:** `5095cdda9b9b9b6589dc582869a1352f51be4156`
+**Engineering baseline audited before this update:** `8b227aa3c7e618015ebfa00cc93c083047b374fb`
 
 **Old Rental implementation:** must not be restored, copied, revived, cherry-picked, or used as an implementation dependency
 
 **Canonical domain reference:** [knowledgebase.md](../knowledgebase.md)
 
-**Last evidence/reconciliation update:** 2026-09-09 (operational continuity; audiovisual coverage incomplete)
+**Last evidence/reconciliation update:** 2026-09-10 (registers, agreement dates and source coverage; audiovisual coverage incomplete)
 
 **Delivery status:** Fresh agreement and bounded/open-ended vehicle-use/custody and atomic replacement APIs/UI, Running Chart draft/finalize/reverse/correction history, permissions and reciprocal workshop admission are implemented. Financial calculations/handoffs, replacement charging, driver identity and production acceptance remain outstanding.
 
@@ -317,6 +317,7 @@ The normal operator should not manage technical relationship records directly.
 - [ ] Active Owner Agreement provides source-vehicle association where externally supplied.
 - [ ] Context pre-fills the agreement/side; do not ask the operator to re-select technical side values.
 - [x] Use searchable human-readable Vehicle selectors.
+- [x] Filter owner-agreement choices by complete planned-period coverage; clear the selection when dates change.
 - [ ] Filter unavailable/conflicting vehicles before save where possible.
 - [x] Backend remains authoritative and revalidates on save.
 - [x] Keep a compact assignment/history view for handover, return, replacement, cancellation, and audit.
