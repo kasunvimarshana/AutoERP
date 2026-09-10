@@ -116,7 +116,7 @@ This is a backlog, not a claim that any runtime slice is complete. A checked doc
 - [x] Independently reproduce knowledge-base E01–E16 transaction examples and the two documented invoice line reconciliations.
 - [x] Statically extract expression text from all 109 unencrypted FoxPro report/memo pairs and inspect Rental-keyword/arithmetic matches. [R01–R06](report-expression-audit.md) document findings and limits; financial policy gates remain open.
 - [x] Survey the full video durations with interval frames and inspect selected full-resolution anchors V01–V07.
-- [ ] Complete continuous video and narration review, including the long unchanged-screen discussion in `2.mp4`; interval frames are not complete audiovisual evidence.
+- [ ] Complete continuous video and narration review, including the long unchanged-screen discussion in `2.mp4`; interval frames are not complete audiovisual evidence. A completed free large-v3-turbo sample attempt on 2026-09-10 remained unreliable despite a successful English reference control; no policy was accepted from it.
 - [ ] Extract and inspect the password-protected nested backup. Free 7-Zip listed 86 entries, but five exact source password-field values did not unlock it in the authorized recovery attempt; contents remain uninspected. No guessed password variants were used.
 - [ ] Obtain/inspect the dedicated AT Tours rental agreement and Running Chart dataset/application represented in the videos; do not equate archive `scfcon` company configuration with video aliases.
 - [ ] Inspect executable decision logic or gather demonstrated edge-case outputs where rules remain hidden. Do not execute an unknown legacy application against live business data.
