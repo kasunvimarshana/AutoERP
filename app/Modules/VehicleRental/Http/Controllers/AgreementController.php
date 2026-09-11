@@ -13,6 +13,7 @@ use Modules\VehicleRental\Http\Requests\AgreementRequest;
 use Modules\VehicleRental\Http\Resources\AgreementHistoryResource;
 use Modules\VehicleRental\Http\Resources\AgreementResource;
 use Modules\VehicleRental\Services\AgreementService;
+use Modules\VehicleRental\Services\BaseRentPreview;
 use Symfony\Component\HttpFoundation\Response;
 
 final class AgreementController
@@ -47,5 +48,10 @@ final class AgreementController
     public function history(AgreementRequest $request, string $kind, int $agreement): AnonymousResourceCollection
     {
         return AgreementHistoryResource::collection($this->agreements->find(AgreementKind::from($kind), $request->context(), $agreement)->history()->with('actor')->paginate($request->perPage()));
+    }
+
+    public function previewBaseRent(AgreementRequest $request, string $kind, int $agreement, BaseRentPreview $preview): JsonResponse
+    {
+        return response()->json(['data' => $preview->calculate(AgreementKind::from($kind), $request->context(), $agreement, $request->only(['policy', 'expected_version', 'from', 'until']))]);
     }
 }

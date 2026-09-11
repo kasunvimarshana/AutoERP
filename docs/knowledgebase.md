@@ -12,7 +12,7 @@
 
 **Initial architecture baseline:** `d4aaa693706c2d3fe693244c8ea0f8d9e4ae326c`
 
-**Latest implemented baseline reviewed:** `bfe1f058c9861a21dee0ee148ea231e4aa104d9e`, plus the fresh [vehicle-use and Running Chart contract](vehicle-rental/operations.md). Operational capture is implemented; commercial integrations and complete audiovisual review remain outstanding. The [commercial research](vehicle-rental/commercial-research.md) distinguishes external evidence, implementation contracts and the shared Tax corrections.
+**Latest implemented baseline reviewed:** `41dbdef2dc69c67ffbf5ba323b48b726566f3843`, plus the fresh [vehicle-use and Running Chart contract](vehicle-rental/operations.md). Operational capture and [base-rent estimation](vehicle-rental/base-rent.md) are implemented; commercial integrations and complete audiovisual review remain outstanding. The [commercial research](vehicle-rental/commercial-research.md) distinguishes external evidence, implementation contracts and the shared Tax corrections.
 
 **TACGL source file:** `TACGL.zip`
 
@@ -1594,3 +1594,15 @@ Verification: four regression cases failed before the correction. After correcti
 ### 35.3 Completion boundary
 
 Operational capture and the Tax correction are implemented. Rental charge snapshots, agreement policy selection/effectivity, same-side commercial consumption, customer Invoice/owner Payable handoffs, deposit disposition, driver identity and complete production acceptance are still outstanding. Research narrows these requirements; it does not deliver them. The TODO retains actual missing work, and the full-video/password limitations above remain unchanged.
+
+## 36. Actual-calendar base-rent estimation — 2026-09-11
+
+The user has authorized independent, defensible decisions where additional evidence cannot be supplied. A fresh read-only calculation now implements the named `actual_calendar_days_v1` policy for both Customer and Owner Agreements. This is a new estimation policy, not a statement that TACGL historically used it or that every contract adopts it. Its [complete API and calculation contract](vehicle-rental/base-rent.md) accompanies the implementation.
+
+Select inclusive civil dates fully covered by the agreement. Daily basis multiplies the recorded daily base rate by the day count. Monthly basis uses cycles anchored to the agreement start date and each cycle's actual number of days. Each anniversary is calculated from the original anchor: January 31 becomes February 28/29 and then March 31. The executing date, physical custody period and other agreement side never override these inputs. A missing rate is an error; an explicitly recorded zero is valid.
+
+For exact allocation within a monthly cycle, define cumulative amount at day offset `k` as the six-decimal truncation of `base_rate × k / cycle_days`. A partial segment is the difference between its ending and starting cumulative amounts. This makes adjacent partial periods sum to the full-cycle rate without losing rounding residuals. Sum the resulting segments exactly. The response includes every denominator, period and amount, the policy name and source agreement revision. This allocation convention is an engineering decision for estimates; statutory rounding remains Tax-owned.
+
+Agreement review now offers a collapsed **Estimate base rent** form and breakdown. Its authenticated endpoint requires the matching agreement view permission, trusted tenant/organization context, an explicit policy and current expected version. Calculation is read-only and supports recorded Draft, Active or Closed terms. Dates must be strict and correctly ordered. A named ten-year interactive resource guard bounds work and response size without limiting contract duration. A result identifies the agreement revision read; it cannot authorize a later financial write without renewed validation.
+
+The calculation includes base rent only. Mileage, driver/OT/AC/night-out charges, replacement/downtime adjustments, deposits, tax, source consumption and Invoice/Payable creation are separate requirements. No existing agreement or historical financial document is amended by a preview. No schema or relationship change was necessary: Rental owns the calculation and Core owns exact decimal arithmetic.

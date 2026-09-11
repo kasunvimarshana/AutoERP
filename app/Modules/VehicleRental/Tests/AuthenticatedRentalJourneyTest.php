@@ -13,6 +13,7 @@ use Modules\User\Constants\UserOrganizationUnitStatus;
 use Modules\Vehicle\Enums\VehicleOwnershipType;
 use Modules\Vehicle\Enums\VehicleOwnerType;
 use Modules\VehicleRental\Data\AgreementContext;
+use Modules\VehicleRental\Enums\BaseRentPolicy;
 use Modules\VehicleRental\Services\RentalAuthorization;
 use Tests\Support\ActiveTenantSubscriptionFixture;
 use Tests\Support\OrganizationUnitFixture;
@@ -28,6 +29,27 @@ final class AuthenticatedRentalJourneyTest extends TestCase
     private const ROOT = '/api/v1/vehicle-rental';
 
     private const FIXTURE_PASSWORD = 'secret-password';
+
+    public function test_authenticated_base_rent_preview_enforces_scope_policy_and_revision_without_writes(): void
+    {
+        $this->postJson(self::ROOT.'/customer/agreements/1/base-rent-preview', [])->assertUnauthorized();
+        [, $customerInput, $ownerInput] = $this->loginFixture();
+        $customerInput['terms']['base_rate'] = '3000';
+        $customer = $this->activate('customer', $customerInput);
+        $url = self::ROOT.'/customer/agreements/'.$customer['id'].'/base-rent-preview';
+        $input = ['policy' => BaseRentPolicy::ActualCalendarDays->value, 'expected_version' => $customer['row_version'], 'from' => '2026-09-07', 'until' => '2026-10-06'];
+        $this->postJson($url, $input)->assertOk()->assertJsonPath('data.base_rent', '3000.000000')->assertJsonPath('data.segments.0.denominator_days', 30);
+        $this->postJson($url, array_replace($input, ['policy' => 'unverified']))->assertUnprocessable();
+        $this->postJson($url, array_replace($input, ['expected_version' => 1]))->assertConflict();
+        $owner = $this->activate('owner', $ownerInput);
+        $this->postJson(self::ROOT.'/owner/agreements/'.$owner['id'].'/base-rent-preview', $input)->assertUnprocessable();
+        $this->assertDatabaseCount('invoices', 0);
+        $this->assertDatabaseCount('vehicle_rental_customer_agreements_history', 2);
+        $this->loginFixture(permissions: [RentalAuthorization::OWNER_VIEW]);
+        $this->postJson($url, $input)->assertForbidden();
+        $this->loginFixture();
+        $this->postJson($url, $input)->assertNotFound();
+    }
 
     protected function setUp(): void
     {

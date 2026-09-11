@@ -1,4 +1,5 @@
 import { VehicleUsePanel } from './VehicleUsePanel';
+import { BaseRentPreviewPanel } from './BaseRentPreviewPanel';
 import { USE_PERMISSION } from './vehicleUse';
 import { AgreementHistoryPanel } from './AgreementHistoryPanel';
 import { listAgreements, transitionAgreement } from './agreementApi';
@@ -66,6 +67,7 @@ export default function AgreementsPage({ kind }: { kind: AgreementKind }) {
             <p>Agreement date: {selected.agreed_on} · Executing date: {selected.executing_on ?? 'Not recorded'}</p>
             <dl className="grid gap-3 sm:grid-cols-2">{(Object.keys(TERM_LABELS) as TermKey[]).map(key => <div key={key}><dt className="text-sm text-slate-500">{TERM_LABELS[key]}</dt><dd>{selected.terms[key] ?? 'Not specified'}</dd></div>)}</dl>
             {selected.notes && <p>{selected.notes}</p>}
+            <BaseRentPreviewPanel key={`${kind}-${selected.id}-${selected.row_version}`} kind={kind} agreement={selected} />
             {kind === AgreementKind.Customer && canViewUse && <Button variant="secondary" onClick={() => setShowVehicles(value => !value)}>{showVehicles ? 'Hide vehicles' : 'View assigned vehicles'}</Button>}
             {kind === AgreementKind.Customer && canViewUse && showVehicles && <VehicleUsePanel key={selected.id} agreement={selected} canManage={canManageUse} />}
             <Button variant="secondary" onClick={() => setShowHistory(value => !value)}>{showHistory ? 'Hide history' : 'View history'}</Button>

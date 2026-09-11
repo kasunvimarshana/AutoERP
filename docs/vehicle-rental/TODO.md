@@ -6,7 +6,7 @@
 
 **Engineering authority:** latest `worktree-0.0.8`
 
-**Engineering baseline audited before this update:** `bfe1f058c9861a21dee0ee148ea231e4aa104d9e`
+**Engineering baseline audited before this update:** `41dbdef2dc69c67ffbf5ba323b48b726566f3843`
 
 **Old Rental implementation:** must not be restored, copied, revived, cherry-picked, or used as an implementation dependency
 
@@ -64,6 +64,18 @@ Do not make one side depend on the amount or completion state of the other side.
 - [x] Reproduce and fix malformed-line omission, duplicate source-line identity, inclusive header overcharge and missing header withholding reduction in the owning Tax module.
 - [x] Verify mixed line/header tax and adjustment ordering; full backend 726 tests / 8,161 assertions; frontend 303 tests; typecheck/build.
 - [ ] Implement the commercial policies, snapshots, financial handoffs and release cases specified by the research. A research decision is not runtime delivery.
+
+## Base-rent estimation delivery ledger — 2026-09-11
+
+- [x] Implement a named actual-calendar estimation policy with independent customer/owner agreement rates and source revision.
+- [x] Daily inclusive civil days and actual anniversary-cycle monthly proration, including short-month anchor recovery.
+- [x] Cumulative exact-decimal allocation so adjacent partial periods reconcile to the full cycle.
+- [x] Authenticated, tenant/organization/permission-scoped preview endpoint; stale-version, coverage, policy and missing-rate validation.
+- [x] Agreement review form with explicit scope, period breakdown, error handling and stale-result cancellation.
+- [x] Unit/integration/API and frontend tests for arithmetic, boundaries, independence, authorization and no financial writes.
+- [ ] Persist commercially adopted policy versions and governed calculation/source-consumption snapshots; estimation does not replace billing or financial handoffs.
+
+See [base-rent.md](base-rent.md). The later checklist entries for posted commercial calculations remain open because a read-only estimate does not complete them.
 
 ## Agreement foundation delivery ledger — 2026-09-07
 

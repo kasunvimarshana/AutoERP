@@ -24,6 +24,7 @@ Route::prefix('api/v1/vehicle-rental')->middleware([
         Route::get('{agreement}', [AgreementController::class, 'show'])->whereNumber('agreement');
         Route::put('{agreement}', [AgreementController::class, 'update'])->whereNumber('agreement');
         Route::get('{agreement}/history', [AgreementController::class, 'history'])->whereNumber('agreement');
+        Route::post('{agreement}/base-rent-preview', [AgreementController::class, 'previewBaseRent'])->whereNumber('agreement');
         Route::post('{agreement}/{action}', [AgreementController::class, 'transition'])->whereNumber('agreement')->whereIn('action', [AgreementAction::Activate->value, AgreementAction::Close->value]);
     });
     Route::get('customer/agreements/{agreement}/vehicles', [VehicleUseController::class, 'index'])->whereNumber('agreement');
