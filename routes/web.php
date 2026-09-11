@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use Modules\Invoice\Http\Controllers\InvoiceController;
+use Modules\Purchase\Http\Controllers\PurchaseOrderController;
 
 Route::get('/', function () {
     return view('welcome');
@@ -28,6 +29,13 @@ Route::get('/signed/invoices/{invoice}/print/{tenant}', [InvoiceController::clas
 
 Route::get('/signed/invoices/{invoice}/pdf/{tenant}', [InvoiceController::class, 'publicPdf'])
     ->name('invoices.public.pdf')
+    ->middleware('signed');
+Route::get('/shared/invoices/{invoice}/pdf/{tenant}', [InvoiceController::class, 'publicSharedPdf'])
+    ->name('invoices.public.shared-pdf')
+    ->middleware('signed');
+
+Route::get('/shared/purchase-orders/{order}/pdf/{tenant}', [PurchaseOrderController::class, 'publicSharedPdf'])
+    ->name('purchase-orders.public.shared-pdf')
     ->middleware('signed');
 
 Route::get('/{any}', function () {

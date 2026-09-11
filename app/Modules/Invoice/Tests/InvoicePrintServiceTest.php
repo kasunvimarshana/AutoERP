@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Invoice\Tests;
 
+use Dompdf\Dompdf;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -133,6 +134,48 @@ final class InvoicePrintServiceTest extends TestCase
             'organization_unit' => $otherOrganizationUnitId,
         ]);
         $this->get($wrongScopeUrl)->assertNotFound();
+    }
+    public function test_pdf_mode_fits_the_invoice_within_one_a4_page(): void
+    {
+        [$tenantId, $organizationUnitId] = $this->scope();
+        $customerId = $this->customer($tenantId, $organizationUnitId, 'A4 Width Customer');
+        $invoice = $this->printedInvoice($tenantId, $organizationUnitId, $customerId);
+        $invoice = $this->invoice($tenantId, (int) $invoice->getKey());
+        $html = view('invoice.print', app(InvoicePrintService::class)->viewData($invoice, mode: 'pdf'))->render();
+
+        $this->assertStringContainsString('class="pdf-output"', $html);
+
+        $dompdf = new Dompdf;
+        $dompdf->loadHtml($html);
+        $dompdf->setPaper(InvoicePrintService::PDF_PAPER_SIZE, InvoicePrintService::PDF_ORIENTATION);
+        $dompdf->render();
+
+        $this->assertSame(1, $dompdf->getCanvas()->get_page_count());
+    }
+
+
+    public function test_whatsapp_shared_invoice_pdf_expires_and_respects_current_lifecycle(): void
+    {
+        [$tenantId, $organizationUnitId] = $this->scope();
+        $customerId = $this->customer($tenantId, $organizationUnitId, 'WhatsApp Share Customer');
+        $invoice = $this->printedInvoice($tenantId, $organizationUnitId, $customerId);
+        DB::table('invoices')->where('id', $invoice->getKey())->update(['status' => 'posted']);
+
+        $parameters = [
+            'invoice' => (int) $invoice->getKey(),
+            'tenant' => $tenantId,
+            'organization_unit' => $organizationUnitId,
+        ];
+        $validUrl = URL::temporarySignedRoute('invoices.public.shared-pdf', now()->addMinutes(5), $parameters);
+        $response = $this->get($validUrl)->assertOk();
+        $response->assertHeader('Content-Type', 'application/pdf');
+        $this->assertStringStartsWith('%PDF', $response->getContent());
+
+        DB::table('invoices')->where('id', $invoice->getKey())->update(['status' => 'cancelled']);
+        $this->get($validUrl)->assertNotFound();
+
+        $expiredUrl = URL::temporarySignedRoute('invoices.public.shared-pdf', now()->subMinute(), $parameters);
+        $this->get($expiredUrl)->assertForbidden();
     }
 
     private function printedInvoice(int $tenantId, int $organizationUnitId, int $customerId): Invoice

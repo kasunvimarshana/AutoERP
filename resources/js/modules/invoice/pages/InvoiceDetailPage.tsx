@@ -7,6 +7,7 @@ import {
     getInvoiceAdjustments,
     getInvoiceBalance,
     getInvoiceSignedPrintLink,
+    getInvoiceWhatsAppShare,
     getInvoiceSources,
     postInvoice,
     reverseInvoice,
@@ -19,6 +20,7 @@ import { ContentHeader } from '@/shared/components/ContentHeader';
 import { Button, LinkButton } from '@/shared/components/Button';
 import { ReversalDialog, type ReversalFacts } from '@/shared/components/ReversalDialog';
 import { openSameOriginUrl } from '@/shared/utils/safeNavigation';
+import { closePendingWhatsAppWindow, navigateToWhatsApp, openPendingWhatsAppWindow } from '@/shared/utils/whatsAppNavigation';
 import { Tabs, type TabItem } from '@/shared/components/Tabs';
 import { Panel } from '@/shared/components/Panel';
 import { DetailGrid } from '@/shared/components/DetailGrid';
@@ -56,6 +58,7 @@ export default function InvoiceDetailPage() {
     const [action, setAction] = useState<InvoiceAction | null>(null);
     const [actionError, setActionError] = useState<ApiError | null>(null);
     const [reversalOpen, setReversalOpen] = useState(false);
+    const [sharingWhatsApp, setSharingWhatsApp] = useState(false);
     const tabState = useOnDemandTab<Tab>('summary');
     const tabs: TabItem<Tab>[] = [
         summaryTab,
@@ -96,6 +99,7 @@ export default function InvoiceDetailPage() {
         && isServiceInvoice
         && settlementStatuses.includes(value.status as typeof settlementStatuses[number])
         && isPositiveDecimal(value.balance_due ?? '0');
+    const canShareViaWhatsApp = value.direction === 'outbound' && value.party_type === 'customer' && ['posted', 'partially_paid', 'paid'].includes(value.status ?? '');
     const printUrl = `/invoices/${id}/print`;
 
     const runAction = async (nextAction: Exclude<InvoiceAction, 'reverse'>) => {
@@ -138,6 +142,23 @@ export default function InvoiceDetailPage() {
             setActionError(toApiError(error));
         } finally {
             setAction(null);
+        }
+    };
+
+    const shareViaWhatsApp = async () => {
+        const pendingWindow = openPendingWhatsAppWindow();
+        setSharingWhatsApp(true);
+        setActionError(null);
+        try {
+            const share = await getInvoiceWhatsAppShare(id);
+            if (!navigateToWhatsApp(share.whatsapp_url, pendingWindow)) {
+                throw new Error('The server returned an invalid WhatsApp link.');
+            }
+        } catch (error: unknown) {
+            closePendingWhatsAppWindow(pendingWindow);
+            setActionError(toApiError(error));
+        } finally {
+            setSharingWhatsApp(false);
         }
     };
 
@@ -197,6 +218,16 @@ export default function InvoiceDetailPage() {
 
                             window.open(`/invoices/${id}/pdf`, '_blank');
                         }}>Download PDF</Button>
+                        {canShareViaWhatsApp ? (
+                            <Button
+                                variant="secondary"
+                                loading={sharingWhatsApp}
+                                loadingLabel="Opening WhatsApp..."
+                                onClick={() => void shareViaWhatsApp()}
+                            >
+                                Share via WhatsApp
+                            </Button>
+                        ) : null}
                     </div>
                 )}
             />

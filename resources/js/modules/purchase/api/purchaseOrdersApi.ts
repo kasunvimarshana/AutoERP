@@ -13,6 +13,16 @@ import type {
     PurchaseOrderPayload,
     PurchaseSupplierContext,
 } from '../purchaseTypes';
+export interface WhatsAppDocumentShare {
+    recipient: {
+        name: string;
+        phone: string;
+    };
+    document_url: string;
+    whatsapp_url: string;
+    expires_at: string;
+}
+
 
 export async function listPurchaseOrders(params: ListParams, signal?: AbortSignal) {
     const response = await apiClient.get<ApiCollection<PurchaseOrder>>(`${endpoints.purchase}/orders`, { params, signal });
@@ -53,6 +63,13 @@ export async function downloadPurchaseOrderPdf(id: number, purchaseOrderNumber?:
     link.click();
     link.remove();
     window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
+}
+
+export async function getPurchaseOrderWhatsAppShare(id: number) {
+    const response = await apiClient.post<ApiResource<WhatsAppDocumentShare>>(
+        `${endpoints.purchase}/orders/${id}/whatsapp-share`,
+    );
+    return response.data.data;
 }
 
 export async function getPurchaseOrderCreateContext(signal?: AbortSignal) {

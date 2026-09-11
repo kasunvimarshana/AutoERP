@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { approvePurchaseOrder, cancelPurchaseOrder, closePurchaseOrder, deletePurchaseOrder, downloadPurchaseOrderPdf, getPurchaseOrder, submitPurchaseOrder } from '../purchaseApi';
+import { getPurchaseOrderWhatsAppShare } from '../purchaseApi';
 import { useAuth } from '@/modules/auth/AuthProvider';
 import { useApi } from '@/shared/hooks/useApi';
 import { ContentHeader } from '@/shared/components/ContentHeader';
@@ -15,6 +16,7 @@ import { useConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { formatDate } from '@/shared/utils/formatDate';
 import { readableRelation } from '@/shared/utils/object';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
+import { closePendingWhatsAppWindow, navigateToWhatsApp, openPendingWhatsAppWindow } from '@/shared/utils/whatsAppNavigation';
 import { PurchaseOrderActions } from '../components/PurchaseOrderActions';
 import { PurchaseOrderStatusBadge } from '../components/PurchaseOrderStatusBadge';
 import { PurchaseOrderTabs } from '../components/PurchaseOrderTabs';
@@ -29,6 +31,7 @@ export default function PurchaseOrderDetailPage() {
     const result = useApi((signal) => getPurchaseOrder(id, signal), [id]);
     const [busy, setBusy] = useState(false);
     const [downloadingPdf, setDownloadingPdf] = useState(false);
+    const [sharingWhatsApp, setSharingWhatsApp] = useState(false);
     const [actionError, setActionError] = useState<ApiError | null>(null);
 
     const run = async (action: 'submit' | 'approve' | 'cancel' | 'close' | 'delete') => {
@@ -71,10 +74,29 @@ export default function PurchaseOrderDetailPage() {
         }
     };
 
+    const shareViaWhatsApp = async () => {
+        if (!result.data) return;
+        const pendingWindow = openPendingWhatsAppWindow();
+        setSharingWhatsApp(true);
+        setActionError(null);
+        try {
+            const share = await getPurchaseOrderWhatsAppShare(result.data.id);
+            if (!navigateToWhatsApp(share.whatsapp_url, pendingWindow)) {
+                throw new Error('The server returned an invalid WhatsApp link.');
+            }
+        } catch (error) {
+            closePendingWhatsAppWindow(pendingWindow);
+            setActionError(toApiError(error));
+        } finally {
+            setSharingWhatsApp(false);
+        }
+    };
+
     if (result.loading) return <LoadingState />;
     if (!result.data) return <ErrorAlert error={result.error} />;
     const order = result.data;
     const capabilities = purchaseOrderCapabilities(order);
+    const canShareViaWhatsApp = ['approved', 'closed'].includes(order.workflow_status ?? order.status ?? '');
     const summary = (
         <DetailGrid items={[
             { label: 'Workflow', value: <PurchaseOrderStatusBadge status={order.workflow_status ?? order.status} /> },
@@ -113,6 +135,8 @@ export default function PurchaseOrderDetailPage() {
                         busy={busy}
                         downloadingPdf={downloadingPdf}
                         onDownloadPdf={downloadPdf}
+                        sharingWhatsApp={sharingWhatsApp}
+                        onShareWhatsApp={canShareViaWhatsApp ? shareViaWhatsApp : undefined}
                         canUpdate={hasPurchasePermission(auth, purchasePermissions.ordersUpdate)}
                         onSubmit={hasPurchasePermission(auth, purchasePermissions.ordersSubmit) ? () => run('submit') : undefined}
                         onApprove={hasPurchasePermission(auth, purchasePermissions.ordersApprove) ? () => run('approve') : undefined}

@@ -12,7 +12,9 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use InvalidArgumentException;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Http\Requests\InvoiceActionRequest;
@@ -27,6 +29,7 @@ use Modules\Invoice\Services\InvoiceBalanceService;
 use Modules\Invoice\Services\InvoicePrintService;
 use Modules\Invoice\Services\InvoiceReversalService;
 use Modules\Invoice\Services\InvoiceStatusService;
+use Modules\Invoice\Services\InvoiceWhatsAppShareService;
 use Modules\Invoice\Services\ManualInvoiceService;
 
 final class InvoiceController
@@ -253,6 +256,29 @@ final class InvoiceController
         return response()->json(['data' => ['print_url' => $printUrl, 'pdf_url' => $pdfUrl]]);
     }
 
+    public function whatsappShare(
+        Request $request,
+        int $invoice,
+        InvoiceWhatsAppShareService $shares,
+    ): JsonResponse {
+        $model = $this->prints->findScoped(
+            $invoice,
+            $this->currentTenantId($request),
+            $this->currentOrganizationUnitId($request),
+        );
+        if ($model === null) {
+            abort(404);
+        }
+
+        try {
+            return response()->json(['data' => $shares->create($model)]);
+        } catch (InvalidArgumentException $exception) {
+            throw ValidationException::withMessages([
+                'whatsapp' => [$exception->getMessage()],
+            ]);
+        }
+    }
+
     public function publicPrint(Request $request, int $invoice, int $tenant, TenantExecutionContextInterface $executionContext): View|Response
     {
         $organizationUnitId = $this->signedOrganizationUnitId($request);
@@ -282,6 +308,25 @@ final class InvoiceController
             fn (): ?Invoice => $this->prints->findScoped($invoice, $tenant, $organizationUnitId),
         );
         if ($model === null) {
+            return $this->notFound($invoice);
+        }
+
+        return $this->pdfResponse($model);
+    }
+
+    public function publicSharedPdf(
+        Request $request,
+        int $invoice,
+        int $tenant,
+        TenantExecutionContextInterface $executionContext,
+        InvoiceWhatsAppShareService $shares,
+    ): Response {
+        $organizationUnitId = $this->signedOrganizationUnitId($request);
+        $model = $executionContext->runForTenant(
+            $tenant,
+            fn (): ?Invoice => $this->prints->findScoped($invoice, $tenant, $organizationUnitId),
+        );
+        if ($model === null || ! $shares->isShareable($model)) {
             return $this->notFound($invoice);
         }
 

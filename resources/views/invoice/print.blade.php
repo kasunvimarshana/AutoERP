@@ -81,6 +81,8 @@
         .muted { color: #444; font-size: 10px; }
         .footer-fields { margin-top: 14px; }
         .footer-fields td { border: 1px solid #222; min-height: 9mm; padding: 6px 8px; vertical-align: top; }
+        .pdf-output { background: #fff; }
+        .pdf-output .sheet { width: auto; min-height: 0; margin: 0; padding: 0; }
         @media print {
             body { background: #fff; }
             .controls { display: none !important; }
@@ -88,7 +90,7 @@
         }
     </style>
 </head>
-<body>
+<body class="{{ ($mode ?? 'print') === 'pdf' ? 'pdf-output' : '' }}">
 @php
     $isPdf = ($mode ?? 'print') === 'pdf';
     $amounts = $document['amounts'];

@@ -3,12 +3,14 @@ import { Button, LinkButton } from '@/shared/components/Button';
 import type { PurchaseOrder } from '../purchaseApi';
 import { purchaseOrderCapabilities } from '../purchaseCapabilities';
 
-export function PurchaseOrderActions({ order, busy, downloadingPdf, canUpdate = true, onDownloadPdf, onSubmit, onApprove, onCancel, onClose, onDelete }: {
+export function PurchaseOrderActions({ order, busy, downloadingPdf, sharingWhatsApp, canUpdate = true, onDownloadPdf, onShareWhatsApp, onSubmit, onApprove, onCancel, onClose, onDelete }: {
     order: PurchaseOrder;
     busy?: boolean;
     downloadingPdf?: boolean;
+    sharingWhatsApp?: boolean;
     canUpdate?: boolean;
     onDownloadPdf?: () => void;
+    onShareWhatsApp?: () => void;
     onSubmit?: () => void;
     onApprove?: () => void;
     onCancel?: () => void;
@@ -22,6 +24,7 @@ export function PurchaseOrderActions({ order, busy, downloadingPdf, canUpdate = 
     return (
         <div className="flex flex-wrap justify-end gap-2">
             {onDownloadPdf && <Button type="button" variant="secondary" loading={downloadingPdf} loadingLabel="Preparing PDF..." onClick={onDownloadPdf}>Download PDF</Button>}
+            {onShareWhatsApp && <Button type="button" variant="secondary" loading={sharingWhatsApp} loadingLabel="Opening WhatsApp..." onClick={onShareWhatsApp}>Share via WhatsApp</Button>}
             {canEdit && canUpdate && <LinkButton to={`/purchase/orders/${order.id}/edit`} variant="secondary">Edit</LinkButton>}
             {canSubmit && onSubmit && <Button type="button" variant="secondary" loading={busy} onClick={onSubmit}>Submit</Button>}
             {canApprove && onApprove && <Button type="button" loading={busy} onClick={onApprove}>Approve</Button>}

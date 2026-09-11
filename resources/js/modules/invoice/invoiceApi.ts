@@ -19,6 +19,16 @@ export type {
 export interface InvoiceReversalPayload extends ReversalFacts {
     expected_version: number;
 }
+export interface WhatsAppDocumentShare {
+    recipient: {
+        name: string;
+        phone: string;
+    };
+    document_url: string;
+    whatsapp_url: string;
+    expires_at: string;
+}
+
 
 export async function listInvoices(params: ListParams, signal?: AbortSignal) {
     const response = await apiClient.get<ApiCollection<Invoice>>(endpoints.invoices, { params, signal });
@@ -71,6 +81,14 @@ export async function getInvoiceAdjustments(id: number, signal?: AbortSignal) {
     const response = await apiClient.get<ApiResource<InvoiceAdjustment[]>>(`${endpoints.invoices}/${id}/adjustments`, { signal });
     return response.data.data;
 }
+
+export async function getInvoiceWhatsAppShare(id: number) {
+    const response = await apiClient.post<ApiResource<WhatsAppDocumentShare>>(
+        `${endpoints.invoices}/${id}/whatsapp-share`,
+    );
+    return response.data.data;
+}
+
 
 export async function getInvoiceSignedPrintLink(id: number, signal?: AbortSignal) {
     const response = await apiClient.post<ApiResource<{ print_url: string; pdf_url: string }>>(

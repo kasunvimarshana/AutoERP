@@ -79,6 +79,44 @@ final class PurchaseOrderApiTest extends TestCase
             ->assertNotFound();
     }
 
+    public function test_approved_purchase_order_can_open_whatsapp_with_a_signed_pdf_link(): void
+    {
+        $context = $this->context('POSHARE');
+        DB::table('suppliers')->where('id', $context['supplier_id'])->update(['mobile' => '0771234567']);
+        $order = $this->withAuth($context)
+            ->postJson('/api/v1/purchase/orders', $this->payload($context))
+            ->assertCreated()
+            ->json('data');
+
+        $submitted = $this->withAuth($context)
+            ->patchJson('/api/v1/purchase/orders/'.$order['id'].'/submit', $this->actionPayload($context, 'purchase_orders', (int) $order['id']))
+            ->assertOk()
+            ->json('data');
+        self::assertSame('pending_approval', $submitted['status']);
+
+        $this->withAuth($context)
+            ->patchJson('/api/v1/purchase/orders/'.$order['id'].'/approve', $this->actionPayload($context, 'purchase_orders', (int) $order['id']))
+            ->assertOk()
+            ->assertJsonPath('data.status', 'approved');
+
+        $share = $this->withAuth($context)
+            ->postJson('/api/v1/purchase/orders/'.$order['id'].'/whatsapp-share')
+            ->assertOk()
+            ->assertJsonPath('data.recipient.phone', '94771234567')
+            ->json('data');
+
+        self::assertStringStartsWith('https://wa.me/94771234567?text=', $share['whatsapp_url']);
+        self::assertStringContainsString('/shared/purchase-orders/', $share['document_url']);
+        self::assertNotEmpty($share['expires_at']);
+
+        $pdf = $this->get($share['document_url'])->assertOk();
+        $pdf->assertHeader('Content-Type', 'application/pdf');
+        self::assertStringStartsWith('%PDF-', $pdf->getContent());
+
+        DB::table('purchase_orders')->where('id', $order['id'])->update(['status' => 'cancelled']);
+        $this->get($share['document_url'])->assertNotFound();
+    }
+
     public function test_create_purchase_order_with_header_adjustments_is_decimal_safe(): void
     {
         $context = $this->context();
