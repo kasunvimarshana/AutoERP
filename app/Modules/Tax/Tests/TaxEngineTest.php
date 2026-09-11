@@ -40,11 +40,121 @@ use Modules\Tax\Services\TaxPostingContextService;
 use Modules\Tax\Services\TaxReportService;
 use Modules\Tax\Services\TaxReturnAllocationService;
 use Modules\Tax\Services\TaxSnapshotService;
+use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\Support\OrganizationUnitFixture;
 use Tests\TestCase;
 
 final class TaxEngineTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_calculation_rejects_malformed_lines_instead_of_silently_omitting_them(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Every calculation line must be TaxCalculationLineData.');
+
+        app(TaxCalculationService::class)->calculate(new TaxCalculationData(
+            tenantId: 1,
+            documentType: 'manual',
+            documentDate: '2026-09-10',
+            lines: [
+                new TaxCalculationLineData(lineNumber: 7, taxableAmount: '200.000000'),
+                ['lineNumber' => 1, 'taxableAmount' => '100.000000'],
+            ],
+        ));
+    }
+
+    public function test_calculation_rejects_duplicate_line_numbers_before_determining_tax(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Calculation line numbers must be unique.');
+
+        app(TaxCalculationService::class)->calculate(new TaxCalculationData(
+            tenantId: 1,
+            documentType: 'manual',
+            documentDate: '2026-09-10',
+            lines: [
+                new TaxCalculationLineData(lineNumber: 7, taxableAmount: '100.000000'),
+                new TaxCalculationLineData(lineNumber: 7, taxableAmount: '200.000000'),
+            ],
+        ));
+    }
+
+    /** @return iterable<string, array{string, bool, string, string}> */
+    public static function headerTaxMethods(): iterable
+    {
+        // Synthetic arithmetic fixtures, not jurisdictional tax rates.
+        yield 'inclusive stays within gross' => ['inclusive', false, '100.000000', '9.090910'];
+        yield 'withholding reduces payment' => ['percentage', true, '90.000000', '10.000000'];
+        yield 'exclusive increases payment' => ['exclusive', false, '110.000000', '10.000000'];
+        yield 'fixed increases payment' => ['fixed', false, '110.000000', '10.000000'];
+        yield 'compound increases payment' => ['compound', false, '110.000000', '10.000000'];
+    }
+
+    public function test_mixed_header_taxes_preserve_line_tax_and_adjustment_order(): void
+    {
+        $tenantId = $this->createTenant();
+        $inclusive = $this->createTax($tenantId, 'HDR-INCLUSIVE', 'CUSTOM', 'inclusive', '10.000000');
+        $withholding = $this->createTax($tenantId, 'HDR-WHT', 'CUSTOM', 'percentage', '5.000000', isWithholding: true);
+        $group = $this->withTenantExecutionContext($tenantId, fn () => app(TaxMasterDataService::class)->saveGroup([
+            'tenant_id' => $tenantId,
+            'code' => 'MIXED-HEADER',
+            'name' => 'Mixed header arithmetic fixture',
+            'active' => true,
+        ], [
+            ['tax_id' => $inclusive->getKey(), 'sequence' => 1, 'active' => true],
+            ['tax_id' => $withholding->getKey(), 'sequence' => 2, 'active' => true],
+        ]));
+
+        $result = $this->withTenantExecutionContext($tenantId, fn () => app(TaxCalculationService::class)->calculate(new TaxCalculationData(
+            tenantId: $tenantId,
+            documentType: 'manual',
+            documentDate: '2026-09-10',
+            lines: [new TaxCalculationLineData(
+                lineNumber: 7,
+                taxableAmount: '100.000000',
+                applicableTaxes: [new ApplicableTaxData(1, 'LINE', 'Line fixture', 'CUSTOM', 'exclusive', '7.000000', 1)],
+            )],
+            headerTaxGroupId: (int) $group->getKey(),
+            headerDiscountBeforeTax: '10.000000',
+            headerChargeBeforeTax: '20.000000',
+            headerDiscountAfterTax: '4.000000',
+            headerChargeAfterTax: '1.000000',
+        )));
+
+        $this->assertSame('110.000000', $result->taxableAmount);
+        $this->assertSame('7.000000', $result->lineTaxAmount);
+        $this->assertSame('15.500000', $result->headerTaxAmount);
+        $this->assertSame('5.500000', $result->withholdingAmount);
+        $this->assertSame('104.500000', $result->headerTaxes[1]->totalAfterTax);
+        $this->assertSame('108.500000', $result->totalAmount);
+    }
+
+    #[DataProvider('headerTaxMethods')]
+    public function test_header_tax_changes_total_by_its_payment_effect(
+        string $method,
+        bool $isWithholding,
+        string $expectedTotal,
+        string $expectedTax,
+    ): void {
+        $tenantId = $this->createTenant();
+        $tax = $this->createTax($tenantId, 'HDR-METHOD', 'CUSTOM', $method, '10.000000', isWithholding: $isWithholding);
+        $group = $this->createGroup($tenantId, 'HDR-METHOD-GROUP', $tax);
+
+        $result = $this->withTenantExecutionContext($tenantId, fn () => app(TaxCalculationService::class)->calculate(new TaxCalculationData(
+            tenantId: $tenantId,
+            documentType: 'manual',
+            documentDate: '2026-09-10',
+            lines: [new TaxCalculationLineData(lineNumber: 7, taxableAmount: '100.000000')],
+            headerTaxGroupId: (int) $group->getKey(),
+        )));
+
+        $this->assertSame($expectedTotal, $result->totalAmount);
+        $this->assertSame($expectedTax, $result->headerTaxAmount);
+        $this->assertSame($isWithholding ? $expectedTax : '0.000000', $result->withholdingAmount);
+        $this->assertSame($expectedTotal, $result->headerTaxes[0]->totalAfterTax);
+        $this->assertSame(7, $result->lineResults[0]->lineNumber);
+    }
 
     public function test_tax_creation_rates_groups_and_validation_guardrails(): void
     {
@@ -734,7 +844,7 @@ final class TaxEngineTest extends TestCase
 
     private function createOrganizationUnit(int $tenantId, string $code): int
     {
-        return (int) \Tests\Support\OrganizationUnitFixture::create([
+        return (int) OrganizationUnitFixture::create([
             'tenant_id' => $tenantId,
             'name' => $code,
             'code' => $code,

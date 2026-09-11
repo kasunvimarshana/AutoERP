@@ -6,13 +6,13 @@
 
 **Engineering authority:** latest `worktree-0.0.8`
 
-**Engineering baseline audited before this update:** `8b227aa3c7e618015ebfa00cc93c083047b374fb`
+**Engineering baseline audited before this update:** `bfe1f058c9861a21dee0ee148ea231e4aa104d9e`
 
 **Old Rental implementation:** must not be restored, copied, revived, cherry-picked, or used as an implementation dependency
 
 **Canonical domain reference:** [knowledgebase.md](../knowledgebase.md)
 
-**Last evidence/reconciliation update:** 2026-09-10 (registers, agreement dates and source coverage; audiovisual coverage incomplete)
+**Last evidence/reconciliation update:** 2026-09-11 (external commercial/tax research and Tax integrity fixes; audiovisual coverage incomplete)
 
 **Delivery status:** Fresh agreement and bounded/open-ended vehicle-use/custody and atomic replacement APIs/UI, Running Chart draft/finalize/reverse/correction history, permissions and reciprocal workshop admission are implemented. Financial calculations/handoffs, replacement charging, driver identity and production acceptance remain outstanding.
 
@@ -46,7 +46,7 @@ Do not make one side depend on the amount or completion state of the other side.
 
 ### Hard engineering constraints
 
-- Never invent a financially material rule that TACGL/videos do not prove.
+- Use TACGL/videos first; where incomplete, the user authorizes defensible primary-source research. Preserve source, scope, effective date and applicability. Never silently turn another operator's contract choice into a TACGL default.
 - Never restore the removed Vehicle Rental implementation.
 - Do not duplicate Customer, Supplier, Vehicle, HR, Invoice, Payment, Tax, Finance, Reporting, or Vehicle Service responsibilities.
 - Keep one source of truth for each business fact.
@@ -56,6 +56,14 @@ Do not make one side depend on the amount or completion state of the other side.
 - Every change requires an append-only `docs/changes` record and regression verification appropriate to its owning modules.
 
 ---
+
+## Commercial research and Tax integrity delivery ledger — 2026-09-11
+
+- [x] Record scoped operator, billing, database and Sri Lankan tax primary sources in [commercial-research.md](commercial-research.md).
+- [x] Distinguish agreement-selectable policy from statutory applicability and engineering invariants.
+- [x] Reproduce and fix malformed-line omission, duplicate source-line identity, inclusive header overcharge and missing header withholding reduction in the owning Tax module.
+- [x] Verify mixed line/header tax and adjustment ordering; full backend 726 tests / 8,161 assertions; frontend 303 tests; typecheck/build.
+- [ ] Implement the commercial policies, snapshots, financial handoffs and release cases specified by the research. A research decision is not runtime delivery.
 
 ## Agreement foundation delivery ledger — 2026-09-07
 
@@ -549,7 +557,7 @@ Implement only once deposit policies needed by the chosen release slice are conf
 
 ## 29. Shared availability contract
 
-- [ ] Define/reuse one shared Vehicle availability policy/contract.
+- [x] Reuse Vehicle-owned availability through registered Rental and Vehicle Service blockers.
 - [x] Vehicle Rental publishes planned/active custody/use blockers.
 - [x] Vehicle Service publishes workshop/maintenance/breakdown/off-road blockers.
 - [ ] Vehicle selection filters using the shared policy.
@@ -595,7 +603,7 @@ Do not reproduce numeric legacy user levels.
 
 - [ ] REST resources/actions follow current AutoERP conventions.
 - [x] Human-readable validation errors.
-- [ ] Explicit transition endpoints/actions for Activate/Close/Finalize/Reverse/Handover/Return/Replace where appropriate.
+- [x] Explicit operational transition endpoints for Activate/Close/Finalize/Reverse/Handover/Return/Replace.
 - [x] Expected-version required on concurrency-sensitive updates.
 - [x] Tenant/organization scope enforced server-side.
 - [x] Reject client-supplied owner-module state that the server can resolve authoritatively.
@@ -866,7 +874,7 @@ Agreement capture is implemented and verified separately in [agreements.md](agre
 
 Can proceed without inventing unresolved financial formulas:
 
-- [ ] fresh module/provider/permissions/routes;
+- [x] fresh operational module/provider/permissions/routes; financial permissions remain in the commercial slices;
 - [ ] Customer and Owner Agreement persistence/versioning;
 - [ ] simple agreement-first Vehicle selection;
 - [ ] effective source/use relationship and overlap integrity;

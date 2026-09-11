@@ -2,7 +2,7 @@
 
 **Status:** Canonical working domain reference; evidence gaps remain; not a completed implementation or exhaustive audiovisual audit
 
-**Knowledge refresh date:** 2026-09-09 (operational continuity verification; audiovisual coverage remains incomplete)
+**Knowledge refresh date:** 2026-09-11 (external commercial/tax research and Tax arithmetic verification; audiovisual coverage remains incomplete)
 
 **Primary business source of truth and conflict tie-breaker:** TACGL legacy application/data corpus
 
@@ -12,7 +12,7 @@
 
 **Initial architecture baseline:** `d4aaa693706c2d3fe693244c8ea0f8d9e4ae326c`
 
-**Latest implemented baseline reviewed:** `8b227aa3c7e618015ebfa00cc93c083047b374fb`, plus the fresh [vehicle-use and Running Chart contract](vehicle-rental/operations.md). Operational capture is implemented; commercial integrations and complete audiovisual review remain outstanding.
+**Latest implemented baseline reviewed:** `bfe1f058c9861a21dee0ee148ea231e4aa104d9e`, plus the fresh [vehicle-use and Running Chart contract](vehicle-rental/operations.md). Operational capture is implemented; commercial integrations and complete audiovisual review remain outstanding. The [commercial research](vehicle-rental/commercial-research.md) distinguishes external evidence, implementation contracts and the shared Tax corrections.
 
 **TACGL source file:** `TACGL.zip`
 
@@ -42,7 +42,7 @@ It organizes the currently documented evidence-supported model of:
 
 This document is **not** a screen-for-screen, table-for-table, code-prefix-for-code-prefix, or GL-account-for-GL-account copy of TACGL. TACGL is authoritative for the business meaning demonstrated by its data and behavior. Historical design defects are evidence to correct, not defects to preserve.
 
-The core engineering rule is: **understand first, verify second, change third**. Where TACGL and the videos do not uniquely establish a financially material rule, the rule remains unresolved and implementation must fail closed or wait for business confirmation rather than inventing a default.
+The core engineering rule is: **understand first, verify second, change third**. The user has authorized external primary-source research where project evidence is incomplete. Defensible external rules must retain their jurisdiction, effective date, applicability and evidence class. A commercial example does not establish TACGL's contractual choice. Where neither project evidence nor applicable external authority determines an outcome, preserve the uncertainty and require an explicit supported policy instead of inventing a default.
 
 ---
 
@@ -76,6 +76,8 @@ The latest `worktree-0.0.8` branch is authoritative for current AutoERP architec
 Business evidence does not justify putting responsibility in the wrong module. Rental may orchestrate Rental workflows, but it must not duplicate Customer, Supplier, Vehicle, HR, Invoice, Payment, Tax, Finance, Reporting, or Vehicle Service ownership.
 
 ### 2.4 Evidence classes used throughout this document
+
+The 2026-09-10 external review adds **legal requirement**, **external commercial example** and **engineering derivation** as distinct classes. These do not supersede observed project facts. See Section 35 and [commercial-research.md](vehicle-rental/commercial-research.md) for source URLs and limitations. Existing E/V identifiers continue to identify project evidence only.
 
 - **Explicit — TACGL:** directly represented by structured TACGL data, report artifacts, or accounting lineage.
 - **Explicit — Video:** directly visible in a supplied video screen, field, report, or workflow.
@@ -1115,7 +1117,7 @@ These items are intentionally **not solved by guessing**.
 | VR-U09 | Deposit application/forfeiture/refund priority | Unresolved | Append-only movements; no automatic priority without confirmed rule |
 | VR-U10 | Tax applicability by each Rental component | Partially observed | Tax owner module + explicit configuration required |
 | VR-U11 | Tax rounding convention | Unresolved | Use Tax owner module policy; Rental must not define its own |
-| VR-U12 | Withholding applicability on owner settlement | Unresolved | Configure through Tax/Finance only when business confirms |
+| VR-U12 | Withholding applicability on owner settlement | Conditional statutory basis researched; taxpayer applicability and runtime aggregation incomplete | Tax/Payment own effective-dated classification, residency, exemptions and aggregate-payment assessment; a business preference cannot override applicable law. See Section 35 |
 | VR-U13 | Exact AC-rate selection hierarchy/default behavior | Partially observed | Record explicit selected/contextual AC mode; do not infer hidden fallback |
 | VR-U14 | Exact normal/double/triple OT thresholds | Partially observed | Rates/components visible; threshold policy requires confirmation unless explicitly stored in agreement |
 | VR-U15 | Night-out qualification rule | Partially observed | Do not infer time threshold; use explicit evidence/policy |
@@ -1320,7 +1322,7 @@ The combined TACGL + video audit now proves much more workflow/domain structure 
 - cheque/bank reconciliation/reporting;
 - Vehicle Service availability boundary.
 
-However, several financially material formulas remain unresolved (Section 26). Implementing those formulas now would violate the explicit no-guessing rule.
+Several financially material formulas remain unresolved for particular agreements (Section 26). External research now supports explicit policy design (Section 35), but a vendor's formula cannot silently become a TACGL default. Implement only the policy actually established for the agreement and preserve its provenance.
 
 Therefore the correct engineering posture is:
 
@@ -1566,3 +1568,29 @@ Reliable narration evidence, such as a verified Sinhala/English transcript tied 
 ### Backup evidence recheck — 2026-09-10
 
 An additional filename-limited search of supplied/extracted text, Markdown, INI, CFG, BAT and PRG files for password/archive-key command clues found no matching file. This did not produce a new password candidate or inspect encrypted contents. The previous five exact recorded candidates remain unsuccessful; no secrets were published and no guessed variants or brute force were used. Implementation continued independently with the source-coverage selector.
+
+## 35. External commercial research and financial integrity — 2026-09-11
+
+The [primary-source research register](vehicle-rental/commercial-research.md) records CR01–CR15, accessed 2026-09-10. It separates researched legal conditions, other operators' contract examples and engineering conclusions. This expanded evidence route is authorized; earlier wording requiring TACGL alone to resolve every gap must not prevent legitimate research. It still does not authorize arbitrary rates or retrospective reinterpretation of project transactions.
+
+### 35.1 Decisions established by the research
+
+**Commercial policies are agreement-specific.** Malkey's chauffeur terms describe cumulative consecutive-calendar-day mileage; Europcar's mileage FAQ and Enterprise's US long-term offering describe different limits. This supports explicit pool/period policy and a distinct unlimited state, not a universal allowance. No reviewed source establishes TACGL's replacement-day price, downtime percentage or automatic deposit priority. [Malkey terms](https://www.malkey.lk/rates/with-driver-rates/), [Europcar mileage](https://www.europcar.com/en-us/faq?question=is-there-mileage-limit-for-my-rental), [Enterprise long-term rental](https://www.enterprise.com/en/car-rental/long-term.html).
+
+**Proration requires a declared unit and denominator.** Preserve commercial cycle, physical custody and invoice period separately. A proportional formula is meaningful only after contract evidence identifies the eligible quantity and matching denominator. Replacements require customer and owner policy evaluation independently. Credits need original-charge lineage and downstream correction; a period change does not itself authorize a refund. Subscription billing supplies an external design example, not Rental entitlement. [Stripe proration documentation](https://docs.stripe.com/billing/subscriptions/prorations).
+
+**Tax policy is conditional law plus taxpayer context.** Do not infer a blanket exemption from a With Driver flag or public-transport terminology. Do not apply financial-services rates to ordinary vehicle hire. Refundable security needs a different classification from consideration for a supply. Current legislation takes precedence over stale summary text. [VAT consolidation, sections 5(8), 25C and First Schedule](https://www.ird.gov.lk/en/publications/Value%20Added%20Tax_Acts/VAT_Act_No_14%5BE%5D_2002_%28Consolidation_2025%29.pdf), [2026 VAT amendment](https://www.ird.gov.lk/en/publications/Value%20Added%20Tax_Acts/VAT_Act_No_14-2026_E.PDF).
+
+**Withholding cannot be inferred from one invoice amount.** Resident rent assessment uses a monthly payment aggregate under the reviewed provisions; residency, classification, exceptions and effective dates remain necessary. Tax/Payment must assess the relevant party/period across contributing payments and retain already-withheld amounts. Do not reset the aggregate by vehicle, agreement or branch, or duplicate withholding at invoice and payment stages. [IRD 2025/26 chart](https://www.ird.gov.lk/en/publications/SitePages/tax_chart_2526.aspx?menuid=1404), [Inland Revenue consolidation](https://www.ird.gov.lk/en/publications/Acts_Income%20Tax_2017/IRA_Cons_Act_-_2025_Changes.pdf), [2026 Inland Revenue amendment](https://www.ird.gov.lk/en/publications/Acts_Income%20Tax_2017/IR_Act_No_11-2026_E.pdf).
+
+### 35.2 Runtime corrections verified
+
+The shared Tax calculator now rejects malformed lines and duplicate line numbers before determining tax. This protects complete financial totals and the existing line-number-to-source-snapshot mapping. Valid line numbers need not be contiguous.
+
+Header tax changes the payable total by its calculated payment effect. Inclusive tax remains inside gross; withholding reduces payment. Previously inclusive header tax was added twice and header withholding was canceled out by addition/subtraction. Tax component summaries and snapshots remain available independently. Mixed header taxes, line taxes and before/after-tax adjustments preserve their calculation order. No rate, statutory threshold or account mapping was introduced; no posted history was changed.
+
+Verification: four regression cases failed before the correction. After correction, the full PHP/SQLite suite passed **726 tests / 8,161 assertions**; frontend **82 files / 303 tests**, TypeScript and build passed. These results do not establish real MySQL contention, production upgrade or browser/UAT acceptance.
+
+### 35.3 Completion boundary
+
+Operational capture and the Tax correction are implemented. Rental charge snapshots, agreement policy selection/effectivity, same-side commercial consumption, customer Invoice/owner Payable handoffs, deposit disposition, driver identity and complete production acceptance are still outstanding. Research narrows these requirements; it does not deliver them. The TODO retains actual missing work, and the full-video/password limitations above remain unchanged.
