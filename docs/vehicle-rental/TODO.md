@@ -6,7 +6,7 @@
 
 **Engineering authority:** latest `worktree-0.0.8`
 
-**Engineering baseline audited before this update:** `41dbdef2dc69c67ffbf5ba323b48b726566f3843`
+**Engineering baseline audited before this update:** `7ceb7966d3cf81a43a08ba8177a0327407b897ea`
 
 **Old Rental implementation:** must not be restored, copied, revived, cherry-picked, or used as an implementation dependency
 
@@ -17,6 +17,10 @@
 **Delivery status:** Fresh agreement and bounded/open-ended vehicle-use/custody and atomic replacement APIs/UI, Running Chart draft/finalize/reverse/correction history, permissions and reciprocal workshop admission are implemented. Financial calculations/handoffs, replacement charging, driver identity and production acceptance remain outstanding.
 
 ---
+
+## Latest financial-owner correction — 2026-09-11
+
+- [x] Fix default Invoice source-allocation precision and cumulative residual reconciliation, including released allocations, without rewriting history or overriding explicit owner-supplied amounts. See knowledge base section 37.
 
 ## 0. Purpose and implementation rule
 

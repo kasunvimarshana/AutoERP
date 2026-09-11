@@ -12,7 +12,7 @@
 
 **Initial architecture baseline:** `d4aaa693706c2d3fe693244c8ea0f8d9e4ae326c`
 
-**Latest implemented baseline reviewed:** `41dbdef2dc69c67ffbf5ba323b48b726566f3843`, plus the fresh [vehicle-use and Running Chart contract](vehicle-rental/operations.md). Operational capture and [base-rent estimation](vehicle-rental/base-rent.md) are implemented; commercial integrations and complete audiovisual review remain outstanding. The [commercial research](vehicle-rental/commercial-research.md) distinguishes external evidence, implementation contracts and the shared Tax corrections.
+**Latest implemented baseline reviewed:** `7ceb7966d3cf81a43a08ba8177a0327407b897ea`, plus the fresh [vehicle-use and Running Chart contract](vehicle-rental/operations.md). Operational capture and [base-rent estimation](vehicle-rental/base-rent.md) are implemented; commercial integrations and complete audiovisual review remain outstanding. The [commercial research](vehicle-rental/commercial-research.md) distinguishes external evidence, implementation contracts and the shared Tax corrections.
 
 **TACGL source file:** `TACGL.zip`
 
@@ -1606,3 +1606,14 @@ For exact allocation within a monthly cycle, define cumulative amount at day off
 Agreement review now offers a collapsed **Estimate base rent** form and breakdown. Its authenticated endpoint requires the matching agreement view permission, trusted tenant/organization context, an explicit policy and current expected version. Calculation is read-only and supports recorded Draft, Active or Closed terms. Dates must be strict and correctly ordered. A named ten-year interactive resource guard bounds work and response size without limiting contract duration. A result identifies the agreement revision read; it cannot authorize a later financial write without renewed validation.
 
 The calculation includes base rent only. Mileage, driver/OT/AC/night-out charges, replacement/downtime adjustments, deposits, tax, source consumption and Invoice/Payable creation are separate requirements. No existing agreement or historical financial document is amended by a preview. No schema or relationship change was necessary: Rental owns the calculation and Core owns exact decimal arithmetic.
+
+
+## 37. Proportional Invoice source allocation integrity — 2026-09-11
+
+The financial-owner review identified a reproducible defect in `InvoiceSourceAllocationService`: dividing a selected quantity by its source quantity before multiplying by the source amount could lose precision even for an exact allocation (`3 × 1 / 3` became `0.999999`). Independently truncating successive allocations could also leave a monetary residual after all source quantity was consumed.
+
+For an omitted explicit allocation amount, Invoice now calculates the cumulative proportional amount for the persisted surviving quantity plus the newly selected quantity, then subtracts the persisted surviving allocated amount. Multiply at the sum of the two persisted decimal scales before dividing and quantizing once to the six-decimal storage scale. For a source amount of one and quantity three, successive unit allocations are `0.333333`, `0.333333` and `0.333334`. A fractional source quantity must not erase the smallest representable amount.
+
+Use surviving monetary allocations as well as quantities: a cancelled, void or reversed invoice contributes neither. This lets a replacement allocation reconcile after a release even when surviving allocations contain a rounding residual. Historical source rows remain unchanged. Never trust the caller's previously-invoiced quantity; read the scoped allocation history. Source owners still must lock the source aggregate and preserve its original quantity and valuation before calling Invoice creation. This change does not establish real-engine concurrency verification.
+
+An explicitly supplied allocation amount remains the source owner's decision under existing validation. Where earlier nonproportional allocations make the default cumulative adjustment negative, reject the default and require an explicit reviewed amount. Do not silently clamp it to zero, rewrite history or create a negative invoice line. This is Invoice-owned monetary allocation, not a new Rental rate, tax rule or usage-entitlement policy. No schema or relationship changes are needed.
