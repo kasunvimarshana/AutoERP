@@ -46,6 +46,7 @@ const initialItem: ItemPayload = {
     sales_tax_group_id: null,
     sku: null,
     barcode: null,
+    reorder_level: null,
     description: null,
     is_stockable: true,
     is_combo: false,

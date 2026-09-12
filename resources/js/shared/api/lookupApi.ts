@@ -31,6 +31,8 @@ export interface ItemLookupResource extends NamedResource {
     resolved_service_unit_price?: string | null;
     resolved_purchase_unit_price?: string | null;
     available_stock_quantity?: string | null;
+    reserved_stock_quantity?: string | null;
+    reorder_level?: string | null;
     batch?: (NamedResource & { batch_number?: string; lot_number?: string; expiry_date?: string | null }) | null;
     batch_price_revision_id?: number | null;
     price_source?: string | null;

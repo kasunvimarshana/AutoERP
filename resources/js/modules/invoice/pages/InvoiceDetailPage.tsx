@@ -151,6 +151,12 @@ export default function InvoiceDetailPage() {
         setActionError(null);
         try {
             const share = await getInvoiceWhatsAppShare(id);
+            if (share.recipient.verification_status !== 'verified'
+                && !window.confirm('This customer WhatsApp number has not been manually verified. Continue sharing anyway?')) {
+                closePendingWhatsAppWindow(pendingWindow);
+                return;
+            }
+
             if (!navigateToWhatsApp(share.whatsapp_url, pendingWindow)) {
                 throw new Error('The server returned an invalid WhatsApp link.');
             }

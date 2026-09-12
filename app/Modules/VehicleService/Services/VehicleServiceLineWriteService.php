@@ -26,14 +26,16 @@ final class VehicleServiceLineWriteService
         private readonly VehicleServiceLineValidator $lineValidator,
         private readonly VehicleServiceLineRuleService $rules,
         private readonly VehicleServiceLineCalculationService $calculations,
+        private readonly VehicleServiceInventoryIntegrationService $inventory,
     ) {}
 
     public function create(
         VehicleServiceJob $job,
         VehicleServiceLineData $data,
         ?int $expectedVersion = null,
+        ?int $actorId = null,
     ): VehicleServiceJobLine {
-        return DB::transaction(function () use ($job, $data, $expectedVersion): VehicleServiceJobLine {
+        return DB::transaction(function () use ($job, $data, $expectedVersion, $actorId): VehicleServiceJobLine {
             $job = VehicleServiceJob::query()->lockForUpdate()->findOrFail($job->getKey());
             $this->assertExpectedVersion($job, $expectedVersion);
             $this->jobValidator->assertMutable($job);
@@ -42,6 +44,7 @@ final class VehicleServiceLineWriteService
             if ($data->lineSourceType === VehicleServiceLineSourceType::ComboParent && $data->expandCombo) {
                 $this->expandCombo($job, $line);
             }
+            $this->inventory->reserveLineTree($job, $line, $actorId);
             $this->calculations->recalculateJob($job);
 
             return $line->refresh()->load(['item', 'variant', 'uom', 'batch', 'children.item', 'children.uom']);
@@ -53,8 +56,9 @@ final class VehicleServiceLineWriteService
         VehicleServiceJobLine $line,
         VehicleServiceLineData $data,
         ?int $expectedVersion = null,
+        ?int $actorId = null,
     ): VehicleServiceJobLine {
-        return DB::transaction(function () use ($job, $line, $data, $expectedVersion): VehicleServiceJobLine {
+        return DB::transaction(function () use ($job, $line, $data, $expectedVersion, $actorId): VehicleServiceJobLine {
             $job = VehicleServiceJob::query()->lockForUpdate()->findOrFail($job->getKey());
             $line = $job->lines()->with('job')->findOrFail($line->getKey());
             $this->assertExpectedVersion($job, $expectedVersion);
@@ -62,6 +66,7 @@ final class VehicleServiceLineWriteService
             $this->jobValidator->assertMutable($job);
             $this->rules->assertCanUpdate($line, $data);
 
+            $this->inventory->releaseLineTree($job, $line, $actorId);
             $originalQuantity = (string) $line->quantity;
             $item = $this->lineValidator->validate($job, $data);
             $attributes = $this->calculations->attributes($data, $item);
@@ -75,15 +80,16 @@ final class VehicleServiceLineWriteService
             $line->save();
             $this->rescaleComboChildren($line, $originalQuantity, (string) $line->quantity);
             $this->calculations->recalculateAssignments($line);
+            $this->inventory->reserveLineTree($job, $line->refresh(), $actorId);
             $this->calculations->recalculateJob($job);
 
             return $line->refresh()->load(['item', 'variant', 'uom', 'batch', 'children.item', 'children.uom']);
         });
     }
 
-    public function delete(VehicleServiceJob $job, VehicleServiceJobLine $line, ?int $expectedVersion = null): void
+    public function delete(VehicleServiceJob $job, VehicleServiceJobLine $line, ?int $expectedVersion = null, ?int $actorId = null): void
     {
-        DB::transaction(function () use ($job, $line, $expectedVersion): void {
+        DB::transaction(function () use ($job, $line, $expectedVersion, $actorId): void {
             $job = VehicleServiceJob::query()->lockForUpdate()->findOrFail($job->getKey());
             $line = $job->lines()->with('job')->findOrFail($line->getKey());
             $this->assertExpectedVersion($job, $expectedVersion);
@@ -91,6 +97,7 @@ final class VehicleServiceLineWriteService
             $this->jobValidator->assertMutable($job);
             $this->rules->assertCanDelete($line);
 
+            $this->inventory->releaseLineTree($job, $line, $actorId);
             $line->delete();
             $this->renumber($job);
             $this->calculations->recalculateJob($job);

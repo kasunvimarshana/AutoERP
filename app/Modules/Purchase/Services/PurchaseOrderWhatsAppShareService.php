@@ -10,6 +10,7 @@ use Modules\Core\Services\WhatsAppShareLinkService;
 use Modules\Purchase\Enums\PurchaseOrderStatus;
 use Modules\Purchase\Models\PurchaseOrder;
 use Modules\Supplier\Models\Supplier;
+use Modules\Supplier\Services\SupplierWhatsAppVerificationService;
 
 final class PurchaseOrderWhatsAppShareService
 {
@@ -19,13 +20,16 @@ final class PurchaseOrderWhatsAppShareService
         PurchaseOrderStatus::Closed,
     ];
 
-    public function __construct(private readonly WhatsAppShareLinkService $links) {}
+    public function __construct(
+        private readonly WhatsAppShareLinkService $links,
+        private readonly SupplierWhatsAppVerificationService $verifications,
+    ) {}
 
-    /** @return array{recipient:array{name:string, phone:string}, document_url:string, whatsapp_url:string, expires_at:string} */
+    /** @return array{recipient:array{name:string, phone:string, verification_status:string}, document_url:string, whatsapp_url:string, expires_at:string} */
     public function create(PurchaseOrder $order): array
     {
         $this->assertShareable($order);
-        [$recipientName, $recipientPhone] = $this->recipient($order);
+        [$recipientName, $recipientPhone, $verificationStatus] = $this->recipient($order);
         $expiresAt = now()->addMinutes($this->linkTtlMinutes());
         $documentUrl = URL::temporarySignedRoute(
             'purchase-orders.public.shared-pdf',
@@ -40,7 +44,11 @@ final class PurchaseOrderWhatsAppShareService
         $share = $this->links->create($recipientPhone, $message);
 
         return [
-            'recipient' => ['name' => $recipientName, 'phone' => $share['phone']],
+            'recipient' => [
+                'name' => $recipientName,
+                'phone' => $share['phone'],
+                'verification_status' => $verificationStatus,
+            ],
             'document_url' => $documentUrl,
             'whatsapp_url' => $share['whatsapp_url'],
             'expires_at' => $expiresAt->toISOString(),
@@ -63,16 +71,10 @@ final class PurchaseOrderWhatsAppShareService
         }
     }
 
-    /** @return array{string, string} */
+    /** @return array{string, string, string} */
     private function recipient(PurchaseOrder $order): array
     {
         $supplier = Supplier::query()
-            ->with(['contacts' => static fn ($query) => $query
-                ->where('is_active', true)
-                ->whereNotNull('mobile')
-                ->where('mobile', '<>', '')
-                ->orderByDesc('is_primary')
-                ->orderBy('contact_name')])
             ->where('tenant_id', $order->tenant_id)
             ->whereKey($order->supplier_id)
             ->first();
@@ -80,15 +82,13 @@ final class PurchaseOrderWhatsAppShareService
             throw new InvalidArgumentException('The supplier for this purchase order is no longer available.');
         }
 
-        $contact = $supplier->contacts->first();
-        $phone = trim((string) ($contact?->mobile ?? $supplier->mobile));
-        if ($phone === '') {
+        $verification = $this->verifications->state($supplier);
+        $recipient = $verification['recipient'] ?? null;
+        if (! is_array($recipient)) {
             throw new InvalidArgumentException('The supplier does not have an active WhatsApp number.');
         }
 
-        $name = trim((string) ($contact?->contact_name ?? $supplier->display_name ?? $supplier->name));
-
-        return [$name === '' ? 'Supplier' : $name, $phone];
+        return [(string) $recipient['name'], (string) $recipient['phone'], (string) $verification['status']];
     }
 
     /** @return array<string, int> */

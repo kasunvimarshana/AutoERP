@@ -81,6 +81,12 @@ export default function PurchaseOrderDetailPage() {
         setActionError(null);
         try {
             const share = await getPurchaseOrderWhatsAppShare(result.data.id);
+            if (share.recipient.verification_status !== 'verified'
+                && !window.confirm('This supplier WhatsApp number has not been manually verified. Continue sharing anyway?')) {
+                closePendingWhatsAppWindow(pendingWindow);
+                return;
+            }
+
             if (!navigateToWhatsApp(share.whatsapp_url, pendingWindow)) {
                 throw new Error('The server returned an invalid WhatsApp link.');
             }

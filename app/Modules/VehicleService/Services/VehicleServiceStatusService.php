@@ -50,6 +50,7 @@ final class VehicleServiceStatusService
         private readonly VehicleServiceLineRuleService $lineRules,
         private readonly VehicleServiceJobCancellationService $cancellations,
         private readonly VehicleServiceBillingProtection $billing,
+        private readonly VehicleServiceInventoryIntegrationService $inventory,
     ) {}
 
     public function change(
@@ -85,6 +86,7 @@ final class VehicleServiceStatusService
                     throw new InvalidArgumentException('An expected job version is required for cancellation.');
                 }
                 $this->cancellations->reverse($job, $changedBy, $reason);
+                $this->inventory->releaseJobReservations($job, $changedBy);
             }
             if ($old === $status) {
                 return $job;
@@ -99,6 +101,7 @@ final class VehicleServiceStatusService
 
             if ($status === VehicleServiceJobStatus::InProgress) {
                 $this->assertVehicleCanEnterService($vehicle);
+                $this->inventory->issueReservedOnStart($job, $changedBy);
             }
 
             if ($status === VehicleServiceJobStatus::Completed) {

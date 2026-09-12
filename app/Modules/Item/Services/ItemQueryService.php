@@ -137,15 +137,15 @@ final class ItemQueryService
         /** @var Collection<int, Item> $items */
         $items = $paginator->getCollection();
         $tenantId = $items->first()?->tenant_id;
-        $availableStockByItemId = $tenantId === null
+        $stockByItemId = $tenantId === null
             ? []
-            : $this->availableStockByItemIds(
+            : $this->stockSummaryByItemIds(
                 $items->modelKeys(),
                 (int) $tenantId,
                 $organizationUnitId,
             );
 
-        $items->each(function (Item $item) use ($organizationUnitId, $availableStockByItemId): void {
+        $items->each(function (Item $item) use ($organizationUnitId, $stockByItemId): void {
             $resolvedServicePrice = $this->prices->resolvePrice(
                 item: $item,
                 context: ItemPriceResolutionService::CONTEXT_SERVICE,
@@ -162,7 +162,13 @@ final class ItemQueryService
             $item->setAttribute(
                 'available_stock_quantity',
                 $item->is_stockable
-                    ? ($availableStockByItemId[(int) $item->getKey()] ?? '0.000000')
+                    ? ($stockByItemId[(int) $item->getKey()]['available'] ?? '0.000000')
+                    : null,
+            );
+            $item->setAttribute(
+                'reserved_stock_quantity',
+                $item->is_stockable
+                    ? ($stockByItemId[(int) $item->getKey()]['reserved'] ?? '0.000000')
                     : null,
             );
         });
@@ -175,13 +181,24 @@ final class ItemQueryService
      */
     public function availableStockByItemIds(array $itemIds, int $tenantId, ?int $organizationUnitId): array
     {
+        return array_map(
+            static fn (array $stock): string => $stock['available'],
+            $this->stockSummaryByItemIds($itemIds, $tenantId, $organizationUnitId),
+        );
+    }
+
+    /** @param list<int> $itemIds
+     * @return array<int, array{available: string, reserved: string}>
+     */
+    public function stockSummaryByItemIds(array $itemIds, int $tenantId, ?int $organizationUnitId): array
+    {
         $itemIds = array_values(array_unique(array_map('intval', $itemIds)));
         if ($itemIds === []) {
             return [];
         }
 
         $query = DB::table('inventory_stock_balances')
-            ->selectRaw('item_id, SUM(quantity_available) as available_stock_quantity')
+            ->selectRaw('item_id, SUM(quantity_available) as available_stock_quantity, SUM(quantity_reserved) as reserved_stock_quantity')
             ->where('tenant_id', $tenantId)
             ->whereIn('item_id', $itemIds)
             ->groupBy('item_id');
@@ -196,8 +213,11 @@ final class ItemQueryService
         }
 
         return $query
-            ->pluck('available_stock_quantity', 'item_id')
-            ->mapWithKeys(fn ($quantity, $itemId): array => [(int) $itemId => $this->math->normalize((string) $quantity)])
+            ->get()
+            ->mapWithKeys(fn ($row): array => [(int) $row->item_id => [
+                'available' => $this->math->normalize((string) $row->available_stock_quantity),
+                'reserved' => $this->math->normalize((string) $row->reserved_stock_quantity),
+            ]])
             ->all();
     }
 

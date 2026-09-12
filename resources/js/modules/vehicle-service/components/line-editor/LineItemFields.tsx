@@ -208,11 +208,11 @@ function ItemOption({ option, active }: { option: ItemLookupResource; active: bo
                 {option.batch ? (
                     <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
                         <span className="font-medium text-sky-700">Batch {option.batch.batch_number ?? option.batch.code}{option.batch.lot_number ? ` / Lot ${option.batch.lot_number}` : ''}</span>
-                        <span className="text-slate-500">{stockNotice(option)}</span>
+                        <span className={stockNoticeClass(option)}>{stockNotice(option)}</span>
                         <span className="font-semibold text-emerald-700">Service price: {option.resolved_service_unit_price ?? '0.000000'}</span>
                     </div>
                 ) : (
-                    <div className="mt-1 text-xs text-slate-500">{stockNotice(option)}</div>
+                    <div className={`mt-1 text-xs ${stockNoticeClass(option)}`}>{stockNotice(option)}</div>
                 )}
             </div>
             <span className={`shrink-0 rounded-full px-2 py-1 text-xs font-semibold ${
@@ -232,9 +232,24 @@ function stockNotice(option: ItemLookupResource): string {
     }
 
     const quantity = option.available_stock_quantity ?? '0.000000';
+    const reserved = option.reserved_stock_quantity ?? '0.000000';
     const unit = option.base_uom?.code ?? option.base_uom?.name ?? 'units';
 
-    return `Available stock: ${quantity} ${unit}`.trim();
+    const reservedNotice = Number(reserved) > 0 ? ` | Reserved: ${reserved} ${unit}` : '';
+    return `Available: ${quantity} ${unit}${reservedNotice}`.trim();
+}
+
+function stockNoticeClass(option: ItemLookupResource): string {
+    if (!option.is_stockable) return 'text-slate-500';
+
+    const available = Number(option.available_stock_quantity ?? 0);
+    const reorderLevel = option.reorder_level == null ? null : Number(option.reorder_level);
+    if (available <= 0) return 'font-semibold text-rose-700';
+    if (reorderLevel !== null && available <= reorderLevel) {
+        return 'font-semibold text-amber-700';
+    }
+
+    return 'text-emerald-700';
 }
 
 function dedupeLineOptions<T extends ItemLookupResource>(options: T[]): T[] {

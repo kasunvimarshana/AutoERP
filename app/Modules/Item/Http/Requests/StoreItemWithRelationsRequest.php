@@ -41,6 +41,7 @@ final class StoreItemWithRelationsRequest extends TenantScopedRequest
             'item.barcode' => ['nullable', 'string', 'max:120'],
             'item.description' => ['nullable', 'string'],
             'item.is_stockable' => ['nullable', 'boolean'],
+            'item.reorder_level' => ['nullable', 'decimal:0,6', 'min:0'],
             'item.is_combo' => ['nullable', 'boolean'],
             'item.is_tax_exempt' => ['nullable', 'boolean'],
             'item.is_active' => ['nullable', 'boolean'],

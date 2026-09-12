@@ -2,6 +2,7 @@ import { apiClient } from '@/shared/api/apiClient';
 import { endpoints } from '@/shared/api/endpoints';
 import type { ReversalFacts } from '@/shared/components/ReversalDialog';
 import type { ApiCollection, ApiResource, ListParams } from '@/shared/types/api';
+import type { WhatsAppVerificationStatus } from '@/shared/types/whatsAppVerification';
 import type {
     Invoice,
     InvoiceAdjustment,
@@ -23,6 +24,7 @@ export interface WhatsAppDocumentShare {
     recipient: {
         name: string;
         phone: string;
+        verification_status: WhatsAppVerificationStatus;
     };
     document_url: string;
     whatsapp_url: string;

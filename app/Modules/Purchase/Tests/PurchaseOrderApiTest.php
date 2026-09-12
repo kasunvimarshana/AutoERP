@@ -103,6 +103,7 @@ final class PurchaseOrderApiTest extends TestCase
             ->postJson('/api/v1/purchase/orders/'.$order['id'].'/whatsapp-share')
             ->assertOk()
             ->assertJsonPath('data.recipient.phone', '94771234567')
+            ->assertJsonPath('data.recipient.verification_status', 'unverified')
             ->json('data');
 
         self::assertStringStartsWith('https://wa.me/94771234567?text=', $share['whatsapp_url']);

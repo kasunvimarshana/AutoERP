@@ -12,6 +12,7 @@ use Modules\Audit\Contracts\AuditRecorderInterface;
 use Modules\Audit\Data\AuditEventData;
 use Modules\Core\Services\WhatsAppShareLinkService;
 use Modules\Customer\Models\Customer;
+use Modules\Customer\Services\CustomerWhatsAppVerificationService;
 use Modules\Invoice\Enums\InvoiceDirection;
 use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Models\Invoice;
@@ -27,14 +28,15 @@ final class InvoiceWhatsAppShareService
 
     public function __construct(
         private readonly WhatsAppShareLinkService $links,
+        private readonly CustomerWhatsAppVerificationService $verifications,
         private readonly AuditRecorderInterface $audit,
     ) {}
 
-    /** @return array{recipient:array{name:string, phone:string}, document_url:string, whatsapp_url:string, expires_at:string} */
+    /** @return array{recipient:array{name:string, phone:string, verification_status:string}, document_url:string, whatsapp_url:string, expires_at:string} */
     public function create(Invoice $invoice): array
     {
         $this->assertShareable($invoice);
-        [$recipientName, $recipientPhone] = $this->recipient($invoice);
+        [$recipientName, $recipientPhone, $verificationStatus, $recipientSource] = $this->recipient($invoice);
         $expiresAt = now()->addMinutes($this->linkTtlMinutes());
         $documentUrl = URL::temporarySignedRoute(
             'invoices.public.shared-pdf',
@@ -58,7 +60,8 @@ final class InvoiceWhatsAppShareService
             metadata: [
                 'tenant_id' => (int) $invoice->tenant_id,
                 'organization_unit_id' => $invoice->organization_unit_id,
-                'recipient_source' => 'customer_mobile',
+                'recipient_source' => $recipientSource,
+                'recipient_verification_status' => $verificationStatus,
                 'link_expires_at' => $expiresAt->toISOString(),
             ],
             tags: ['invoice', 'whatsapp_share'],
@@ -66,7 +69,11 @@ final class InvoiceWhatsAppShareService
         ));
 
         return [
-            'recipient' => ['name' => $recipientName, 'phone' => $share['phone']],
+            'recipient' => [
+                'name' => $recipientName,
+                'phone' => $share['phone'],
+                'verification_status' => $verificationStatus,
+            ],
             'document_url' => $documentUrl,
             'whatsapp_url' => $share['whatsapp_url'],
             'expires_at' => $expiresAt->toISOString(),
@@ -96,16 +103,10 @@ final class InvoiceWhatsAppShareService
         }
     }
 
-    /** @return array{string, string} */
+    /** @return array{string, string, string, string} */
     private function recipient(Invoice $invoice): array
     {
         $customer = Customer::query()
-            ->with(['contacts' => static fn ($query) => $query
-                ->where('is_active', true)
-                ->whereNotNull('mobile')
-                ->where('mobile', '<>', '')
-                ->orderByDesc('is_primary')
-                ->orderBy('contact_name')])
             ->where('tenant_id', $invoice->tenant_id)
             ->whereKey($invoice->party_id)
             ->first();
@@ -113,15 +114,18 @@ final class InvoiceWhatsAppShareService
             throw new InvalidArgumentException('The customer for this invoice is no longer available.');
         }
 
-        $contact = $customer->contacts->first();
-        $phone = trim((string) ($contact?->mobile ?? $customer->mobile));
-        if ($phone === '') {
+        $verification = $this->verifications->state($customer);
+        $recipient = $verification['recipient'] ?? null;
+        if (! is_array($recipient)) {
             throw new InvalidArgumentException('The customer does not have an active WhatsApp number.');
         }
 
-        $name = trim((string) ($contact?->contact_name ?? $customer->display_name ?? $customer->name ?? $invoice->party_name_snapshot));
-
-        return [$name === '' ? 'Customer' : $name, $phone];
+        return [
+            (string) $recipient['name'],
+            (string) $recipient['phone'],
+            (string) $verification['status'],
+            (string) $recipient['source'],
+        ];
     }
 
     /** @return array<string, int> */

@@ -24,6 +24,7 @@ use Modules\Supplier\Services\SupplierCreationService;
 use Modules\Supplier\Services\SupplierQueryService;
 use Modules\Supplier\Services\SupplierStatusService;
 use Modules\Supplier\Services\SupplierUpdateService;
+use Modules\Supplier\Services\SupplierWhatsAppVerificationService;
 
 final class SupplierController
 {
@@ -35,6 +36,7 @@ final class SupplierController
         private readonly SupplierAuthorizationService $authorization,
         private readonly SupplierBlockerService $blockers,
         private readonly InvoiceBalanceProviderInterface $invoiceBalances,
+        private readonly SupplierWhatsAppVerificationService $whatsappVerifications,
     ) {}
 
     public function index(ListSupplierRequest $request): AnonymousResourceCollection
@@ -48,6 +50,7 @@ final class SupplierController
             $request->perPage(),
         );
         $this->attachTotalDue($suppliers, $request->tenantId(), $request->organizationUnitId());
+        $this->whatsappVerifications->attachListSummaries($suppliers->getCollection());
 
         return SupplierSummaryResource::collection($suppliers);
     }

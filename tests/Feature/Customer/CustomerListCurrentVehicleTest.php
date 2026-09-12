@@ -30,6 +30,7 @@ final class CustomerListCurrentVehicleTest extends TestCase
         [$tenantId, $organizationUnitId] = $this->scope();
         $this->authenticate($tenantId);
         $customerId = $this->customer($tenantId, $organizationUnitId, 'CUS-VEHICLE');
+        DB::table('customers')->where('id', $customerId)->update(['mobile' => '0771234567']);
         $customerWithoutVehiclesId = $this->customer($tenantId, $organizationUnitId, 'CUS-EMPTY');
         [$makeId, $modelId] = $this->vehicleIdentity($tenantId, $organizationUnitId);
 
@@ -69,6 +70,8 @@ final class CustomerListCurrentVehicleTest extends TestCase
         ]))->assertOk();
 
         $customers = collect($response->json('data'))->keyBy('id');
+        $this->assertSame('94771234567', $customers->get($customerId)['whatsapp_contact']['phone']);
+        $this->assertSame('unverified', $customers->get($customerId)['whatsapp_contact']['status']);
         $this->assertSame([[
             'id' => $currentVehicleId,
             'registration_number' => 'WP-CAB-1234',

@@ -37,6 +37,7 @@ final readonly class CreateItemData
         public ?int $purchaseTaxGroupId = null,
         public ?int $salesTaxGroupId = null,
         public bool $isStockable = false,
+        public ?string $reorderLevel = null,
         public ?bool $isCombo = null,
         public bool $isTaxExempt = false,
         public bool $isActive = true,

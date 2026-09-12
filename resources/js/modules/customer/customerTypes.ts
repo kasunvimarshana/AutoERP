@@ -1,4 +1,5 @@
 import type { NamedResource } from '@/shared/types/common';
+import type { WhatsAppVerificationRecipient, WhatsAppVerificationStatus } from '@/shared/types/whatsAppVerification';
 
 export const customerTypes = ['individual', 'company', 'government', 'internal', 'foreign', 'retail', 'wholesale', 'corporate', 'other'] as const;
 export const customerStatuses = ['pending_approval', 'active', 'inactive', 'on_hold', 'blacklisted'] as const;
@@ -22,6 +23,7 @@ export interface CustomerSummary extends NamedResource {
     email?: string | null;
     phone?: string | null;
     mobile?: string | null;
+    whatsapp_contact?: (WhatsAppVerificationRecipient & { status: WhatsAppVerificationStatus }) | null;
     default_currency?: NamedResource | null;
     categories?: CustomerCategory[];
     credit_allowed: boolean;

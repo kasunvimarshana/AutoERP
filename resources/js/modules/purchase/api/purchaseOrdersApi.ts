@@ -3,6 +3,7 @@ import { endpoints } from '@/shared/api/endpoints';
 import type { ApiCollection, ApiResource, ListParams } from '@/shared/types/api';
 import type { NamedResource } from '@/shared/types/common';
 import type { LookupLoadParams, LookupResult } from '@/shared/types/lookup';
+import type { WhatsAppVerificationStatus } from '@/shared/types/whatsAppVerification';
 import type {
     PurchaseAdjustmentCatalogueEntry,
     PurchaseActionPayload,
@@ -17,6 +18,7 @@ export interface WhatsAppDocumentShare {
     recipient: {
         name: string;
         phone: string;
+        verification_status: WhatsAppVerificationStatus;
     };
     document_url: string;
     whatsapp_url: string;

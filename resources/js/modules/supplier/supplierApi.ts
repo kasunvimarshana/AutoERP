@@ -5,6 +5,7 @@ import type { ApiCollection, ApiResource, ListParams } from '@/shared/types/api'
 import type { NamedResource } from '@/shared/types/common';
 import type { LookupLoadParams, LookupResult } from '@/shared/types/lookup';
 import type { PartyVehiclePayload } from '@/shared/types/partyVehicle';
+import type { WhatsAppVerificationChallenge, WhatsAppVerificationState } from '@/shared/types/whatsAppVerification';
 import { clearVehicleOwnershipCurrent, createVehicleOwnership, endVehicleOwnership, getVehicleOwnership, listVehicleOwnerships, setVehicleOwnershipCurrent, updateVehicleOwnership } from '@/modules/vehicle/vehicleOwnershipApi';
 import type {
     Supplier,
@@ -138,3 +139,14 @@ export const updateSupplierVehicle = updateVehicleOwnership;
 export const setSupplierVehicleCurrent = setVehicleOwnershipCurrent;
 export const clearSupplierVehicleCurrent = clearVehicleOwnershipCurrent;
 export const endSupplierVehicle = endVehicleOwnership;
+
+const supplierWhatsAppVerificationPath = (supplierId: number) => `${endpoints.suppliers}/${supplierId}/whatsapp-verification`;
+
+export const getSupplierWhatsAppVerification = (supplierId: number, signal?: AbortSignal) =>
+    apiClient.get<ApiResource<WhatsAppVerificationState>>(supplierWhatsAppVerificationPath(supplierId), { signal }).then((response) => response.data.data);
+export const startSupplierWhatsAppVerification = (supplierId: number, idempotencyKey: string) =>
+    apiClient.post<ApiResource<WhatsAppVerificationChallenge>>(`${supplierWhatsAppVerificationPath(supplierId)}/challenges`, { idempotency_key: idempotencyKey })
+        .then((response) => response.data.data);
+export const confirmSupplierWhatsAppVerification = (supplierId: number, code: string) =>
+    apiClient.post<ApiResource<WhatsAppVerificationState>>(`${supplierWhatsAppVerificationPath(supplierId)}/confirmations`, { code, ownership_confirmed: true })
+        .then((response) => response.data.data);

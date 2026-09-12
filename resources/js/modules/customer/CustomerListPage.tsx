@@ -11,6 +11,7 @@ import { Modal } from '@/shared/components/Modal';
 import { Pagination } from '@/shared/components/Pagination';
 import { Select } from '@/shared/components/Select';
 import { StatusBadge } from '@/shared/components/StatusBadge';
+import { WhatsAppContactCell } from '@/shared/components/WhatsAppContactCell';
 import { useApi } from '@/shared/hooks/useApi';
 import { useDebounce } from '@/shared/hooks/useDebounce';
 import { changeCustomerStatus, listCustomers, setCustomerActive } from './customerApi';
@@ -39,7 +40,7 @@ export default function CustomerListPage() {
 
     const columns: DataColumn<CustomerSummary>[] = [
         { key: 'customer', header: 'Customer', render: (row) => <Link className="font-semibold text-sky-700 hover:underline" to={`/customers/${row.id}`}>{row.name}<span className="block text-xs font-normal text-slate-500">{row.code} / {row.customer_number}</span></Link> },
-        { key: 'contact', header: 'Contact', render: (row) => row.email ?? row.phone ?? '-' },
+        { key: 'contact', header: 'Contact', render: (row) => <WhatsAppContactCell contact={row.whatsapp_contact} email={row.email} phone={row.phone} /> },
         { key: 'vehicles', header: 'Current Vehicles', render: (row) => row.current_vehicles?.some((vehicle) => vehicle.registration_number) ? <div className="flex flex-wrap gap-1">{row.current_vehicles.filter((vehicle) => vehicle.registration_number).map((vehicle) => <Link key={vehicle.id} className="rounded bg-slate-100 px-2 py-1 text-xs font-semibold text-sky-700 hover:bg-sky-50" to={`/vehicles/${vehicle.id}`}>{vehicle.registration_number}</Link>)}</div> : '-' },
         { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.status} /> },
         { key: 'actions', header: '', className: 'text-right', render: (row) => canUpdate ? <div className="flex justify-end gap-3"><Link className="font-semibold text-slate-600 hover:text-sky-700" to={`/customers/${row.id}/edit`}>Edit</Link><button type="button" className="font-semibold text-amber-700" onClick={() => void toggle(row)}>{row.status === 'active' ? 'Deactivate' : 'Activate'}</button><button type="button" className="font-semibold text-sky-700" onClick={() => { setStatusCustomer(row); setNextStatus(row.status === 'active' ? 'on_hold' : 'active'); setReason(''); }}>Change status</button></div> : null },

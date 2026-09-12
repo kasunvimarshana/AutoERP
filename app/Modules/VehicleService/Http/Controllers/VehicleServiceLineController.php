@@ -52,7 +52,7 @@ final class VehicleServiceLineController extends VehicleServiceController
         VehicleServiceAssignableLineService $assignableLines,
     ): JsonResponse {
         $jobModel = $this->job($request, $job);
-        $line = $service->create($jobModel, $request->toData(), $request->expectedVersion());
+        $line = $service->create($jobModel, $request->toData(), $request->expectedVersion(), $request->currentUserId());
 
         return $this->mutationResponse($request, $jobModel, $line, $assignableLines, 201);
     }
@@ -70,6 +70,7 @@ final class VehicleServiceLineController extends VehicleServiceController
             $this->line($jobModel, $line),
             $request->toData(),
             $request->expectedVersion(),
+            $request->currentUserId(),
         );
 
         return $this->mutationResponse($request, $jobModel, $updatedLine, $assignableLines);
@@ -83,7 +84,7 @@ final class VehicleServiceLineController extends VehicleServiceController
         VehicleServiceAssignableLineService $assignableLines,
     ): JsonResponse {
         $jobModel = $this->job($request, $job);
-        $service->delete($jobModel, $this->line($jobModel, $line), $request->expectedVersion());
+        $service->delete($jobModel, $this->line($jobModel, $line), $request->expectedVersion(), $request->currentUserId());
 
         return $this->mutationResponse($request, $jobModel, null, $assignableLines);
     }

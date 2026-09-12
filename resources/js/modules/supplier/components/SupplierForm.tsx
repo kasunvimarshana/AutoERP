@@ -32,7 +32,7 @@ export function SupplierForm({ value, onChange, currency, onCurrencyChange, erro
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                 <Input label="Email" type="email" value={value.email ?? ''} onChange={(event) => set('email', event.target.value || null)} error={fieldError(error, 'email') ?? fieldError(error, 'supplier.email')} />
                 <Input label="Phone" value={value.phone ?? ''} onChange={(event) => set('phone', event.target.value || null)} />
-                <Input label="Mobile" value={value.mobile ?? ''} onChange={(event) => set('mobile', event.target.value || null)} />
+                <Input label="WhatsApp Number" value={value.mobile ?? ''} onChange={(event) => set('mobile', event.target.value || null)} />
                 <Input label="Website" type="url" value={value.website ?? ''} onChange={(event) => set('website', event.target.value || null)} />
                 <SupplierCurrencySelect value={currency} onChange={(next) => { onCurrencyChange(next); set('default_currency_id', next ? Number(next.id) : null); }} error={fieldError(error, 'default_currency_id') ?? fieldError(error, 'supplier.default_currency_id')} />
                 <Input label="Reference credit limit" value={value.credit_limit ?? '0.000000'} onChange={(event) => set('credit_limit', event.target.value)} error={fieldError(error, 'credit_limit') ?? fieldError(error, 'supplier.credit_limit')} />

@@ -64,6 +64,7 @@ export function ItemForm({
                         item_type: itemType,
                         is_combo: nextIsCombo,
                         is_stockable: nextNonInventory ? false : true,
+                        reorder_level: nextNonInventory ? null : value.reorder_level,
                         tracking_type: nextNonInventory ? 'none' : value.tracking_type,
                         costing_method: nextNonInventory ? 'none' : value.costing_method,
                     });
@@ -85,6 +86,17 @@ export function ItemForm({
                     </div>
                 ) : (
                     <ItemUomSelect label="Base UOM" value={baseUom} onChange={(next) => { onBaseUomChange(next); set('base_uom_id', next ? Number(next.id) : null); }} error={fieldError(error, 'base_uom_id') ?? fieldError(error, 'item.base_uom_id')} />
+                )}
+                {value.is_stockable && (
+                    <Input
+                        label="Reorder level"
+                        type="number"
+                        min="0"
+                        step="0.000001"
+                        value={value.reorder_level ?? ''}
+                        onChange={(event) => set('reorder_level', event.target.value || null)}
+                        error={fieldError(error, 'reorder_level') ?? fieldError(error, 'item.reorder_level')}
+                    />
                 )}
             </div>
             <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -123,7 +135,17 @@ export function ItemForm({
                 <Textarea label="Description" value={value.description ?? ''} onChange={(event) => set('description', event.target.value || null)} />
             </div>
             <div className="mt-4 flex flex-wrap gap-6 text-sm text-slate-700">
-                <label><input className="mr-2" type="checkbox" checked={value.is_stockable} disabled={nonInventoryType} onChange={(event) => set('is_stockable', event.target.checked)} />Stockable</label>
+                <label><input
+                    className="mr-2"
+                    type="checkbox"
+                    checked={value.is_stockable}
+                    disabled={nonInventoryType}
+                    onChange={(event) => onChange({
+                        ...value,
+                        is_stockable: event.target.checked,
+                        reorder_level: event.target.checked ? value.reorder_level : null,
+                    })}
+                />Stockable</label>
                 <span className="text-slate-500">{comboType ? 'Bundle composition item' : 'Single item'}</span>
                 <label><input className="mr-2" type="checkbox" checked={value.is_tax_exempt} onChange={(event) => set('is_tax_exempt', event.target.checked)} />Tax exempt</label>
                 <label><input className="mr-2" type="checkbox" checked={value.is_active} onChange={(event) => set('is_active', event.target.checked)} />Active</label>

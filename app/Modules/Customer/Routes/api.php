@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Route;
 use Modules\Customer\Http\Controllers\CustomerCategoryController;
 use Modules\Customer\Http\Controllers\CustomerController;
 use Modules\Customer\Http\Controllers\CustomerRelationController;
+use Modules\Customer\Http\Controllers\CustomerWhatsAppVerificationController;
 use Modules\Customer\Services\CustomerAuthorizationService;
 
 $middleware = [
@@ -44,6 +45,20 @@ Route::prefix('api/v1')->middleware($middleware)->name('api.v1.')->group(functio
         ->name('customers.status');
 
     Route::prefix('customers/{customer}')->name('customers.')->group(function () use ($requires): void {
+        Route::get('whatsapp-verification', [CustomerWhatsAppVerificationController::class, 'show'])
+            ->whereNumber('customer')
+            ->middleware($requires(CustomerAuthorizationService::VIEW))
+            ->name('whatsapp-verification.show');
+        Route::post('whatsapp-verification/challenges', [CustomerWhatsAppVerificationController::class, 'start'])
+            ->whereNumber('customer')
+            ->middleware($requires(CustomerAuthorizationService::UPDATE))
+            ->middleware('throttle:'.max(1, (int) config('whatsapp-verification.rate_limit_per_minute', 10)).',1')
+            ->name('whatsapp-verification.challenges.store');
+        Route::post('whatsapp-verification/confirmations', [CustomerWhatsAppVerificationController::class, 'confirm'])
+            ->whereNumber('customer')
+            ->middleware($requires(CustomerAuthorizationService::UPDATE))
+            ->middleware('throttle:'.max(1, (int) config('whatsapp-verification.rate_limit_per_minute', 10)).',1')
+            ->name('whatsapp-verification.confirmations.store');
         Route::get('contacts', [CustomerRelationController::class, 'contacts'])
             ->whereNumber('customer')
             ->middleware($requires(CustomerAuthorizationService::VIEW))

@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
+import { hasPermission } from '@/modules/auth/accessControl';
+import { useAuth } from '@/modules/auth/AuthProvider';
 import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
 import { lookupApi, type VehicleLookupResource } from '@/shared/api/lookupApi';
 import { Button } from '@/shared/components/Button';
@@ -8,8 +10,9 @@ import { Input } from '@/shared/components/Input';
 import { Modal } from '@/shared/components/Modal';
 import { Panel } from '@/shared/components/Panel';
 import { Select } from '@/shared/components/Select';
+import { WhatsAppVerificationPanel } from '@/shared/components/WhatsAppVerificationPanel';
 import { customerTypes, type CustomerPayload } from '@/modules/customer/customerTypes';
-import { createCustomer } from '@/modules/customer/customerApi';
+import { confirmCustomerWhatsAppVerification, createCustomer, getCustomerWhatsAppVerification, startCustomerWhatsAppVerification } from '@/modules/customer/customerApi';
 import {
     DEFAULT_CUSTOMER_STATUS,
     defaultCustomerPayload,
@@ -49,6 +52,8 @@ export function VehicleServiceQuickVehicleModal({
     onClose: () => void;
     onCreated: (vehicle: VehicleLookupResource, customer: NamedResource) => void;
 }) {
+    const auth = useAuth();
+    const canVerifyCustomer = hasPermission(auth, 'customers.update');
     const [customerMode, setCustomerMode] = useState<CustomerMode>('existing');
     const [existingCustomer, setExistingCustomer] = useState<NamedResource | null>(null);
     const [customerPayload, setCustomerPayload] = useState<CustomerPayload>(defaultCustomerPayload());
@@ -60,6 +65,8 @@ export function VehicleServiceQuickVehicleModal({
     const [loadingVehicleDefaults, setLoadingVehicleDefaults] = useState(false);
     const [loadingCustomerDefaults, setLoadingCustomerDefaults] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
+    const [verifyAfterSave, setVerifyAfterSave] = useState(false);
+    const [createdForVerification, setCreatedForVerification] = useState<{ vehicle: VehicleLookupResource; customer: NamedResource } | null>(null);
 
     const customerSearch = useMemo(() => lookupApi.customers, []);
 
@@ -110,6 +117,41 @@ export function VehicleServiceQuickVehicleModal({
 
     if (!open) return null;
 
+    const finishCreatedFlow = () => {
+        if (!createdForVerification) return;
+        onCreated(createdForVerification.vehicle, createdForVerification.customer);
+        setCreatedForVerification(null);
+        onClose();
+    };
+
+    if (createdForVerification) {
+        const customerId = Number(createdForVerification.customer.id);
+
+        return (
+            <Modal
+                open={open}
+                title="Verify customer WhatsApp"
+                onClose={finishCreatedFlow}
+                closeOnBackdrop={false}
+            >
+                <p className="text-sm text-slate-600">
+                    Customer and vehicle were saved. Complete verification now, or continue to the job and verify later.
+                </p>
+                <WhatsAppVerificationPanel
+                    subjectId={customerId}
+                    subjectLabel="Customer"
+                    canManage={canVerifyCustomer}
+                    load={(signal) => getCustomerWhatsAppVerification(customerId, signal)}
+                    start={(key) => startCustomerWhatsAppVerification(customerId, key)}
+                    confirm={(code) => confirmCustomerWhatsAppVerification(customerId, code)}
+                />
+                <div className="mt-5 flex justify-end">
+                    <Button type="button" onClick={finishCreatedFlow}>Continue to job</Button>
+                </div>
+            </Modal>
+        );
+    }
+
     return (
         <Modal
             open={open}
@@ -157,10 +199,17 @@ export function VehicleServiceQuickVehicleModal({
                             }],
                         });
 
+                        const createdVehicle = vehicleLookupResource(vehicle, customer);
                         setCustomerPayload(defaultCustomerPayload());
                         setExistingCustomer(null);
                         setCustomerMode('existing');
-                        onCreated(vehicleLookupResource(vehicle, customer), customer);
+
+                        if (verifyAfterSave && customerMode === 'new' && Boolean(customerPayload.mobile?.trim())) {
+                            setCreatedForVerification({ vehicle: createdVehicle, customer });
+                            return;
+                        }
+
+                        onCreated(createdVehicle, customer);
                         onClose();
                     } catch (requestError) {
                         setError(toApiError(requestError));
@@ -282,6 +331,18 @@ export function VehicleServiceQuickVehicleModal({
                                 onChange={(event) => setCustomerPayload((current) => ({ ...current, mobile: event.target.value || null }))}
                                 error={customerError(error, 'mobile', 'customer.mobile')}
                             />
+                            {canVerifyCustomer ? (
+                                <label className="flex items-start gap-2 text-sm text-slate-700 md:col-span-2">
+                                    <input
+                                        className="mt-1"
+                                        type="checkbox"
+                                        checked={verifyAfterSave}
+                                        disabled={!customerPayload.mobile?.trim()}
+                                        onChange={(event) => setVerifyAfterSave(event.target.checked)}
+                                    />
+                                    <span>Verify WhatsApp after saving<span className="block text-xs text-slate-500">Customer and vehicle will be saved first. You can skip verification and continue the job.</span></span>
+                                </label>
+                            ) : null}
                             <Input
                                 label="Phone"
                                 value={customerPayload.phone ?? ''}

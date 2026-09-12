@@ -131,6 +131,8 @@ export interface VehicleServiceJobLine {
     inventory_movement_id?: number | null;
     inventory_movement?: { id: number; status: string; reversed_at: string | null } | null;
     available_stock_quantity?: string | null;
+    reserved_stock_quantity?: string | null;
+    reorder_level?: string | null;
     stock_on_hand?: string;
     stock_available?: string;
     issue_eligible?: boolean;
@@ -297,6 +299,7 @@ export interface VehicleServiceLinePayload {
     is_billable?: boolean;
     expand_combo?: boolean;
 }
+
 
 export interface VehicleServiceInvoicePreview {
     subtotal: string;

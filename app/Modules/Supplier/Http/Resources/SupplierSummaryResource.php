@@ -26,6 +26,10 @@ final class SupplierSummaryResource extends JsonResource
             'email' => $this->email,
             'phone' => $this->phone,
             'mobile' => $this->mobile,
+            'whatsapp_contact' => $this->when(
+                array_key_exists('whatsapp_contact', $this->resource->getAttributes()),
+                fn () => $this->resource->getAttribute('whatsapp_contact'),
+            ),
             'default_currency' => $this->relationLoaded('defaultCurrency')
                 ? $this->namedResource($this->defaultCurrency, true)
                 : null,

@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { hasPermission } from '@/modules/auth/accessControl';
+import { useAuth } from '@/modules/auth/AuthProvider';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
@@ -10,6 +12,10 @@ import { Panel } from '@/shared/components/Panel';
 import { TabPanel, Tabs } from '@/shared/components/Tabs';
 import { useUnsavedChanges } from '@/shared/hooks/useUnsavedChanges';
 import type { NamedResource } from '@/shared/types/common';
+import { notifyError } from '@/shared/notifications/appToast';
+import { closePendingWhatsAppWindow, navigateToWhatsApp, openPendingWhatsAppWindow } from '@/shared/utils/whatsAppNavigation';
+import { selectWhatsAppVerificationPhone } from '@/shared/utils/whatsAppVerificationTarget';
+import { startCustomerWhatsAppVerification } from './customerApi';
 import { createCustomer, createCustomerWithRelations } from './customerApi';
 import { defaultCustomerPayload, loadCustomerCreationDefaults } from './customerCreateDefaults';
 import type { CustomerPayload, CustomerWithRelationsPayload } from './customerTypes';
@@ -34,6 +40,8 @@ const tabs = [
 const relatedTabs = tabs.filter((tab) => tab.id !== 'basic') as { id: RelatedTab; label: string }[];
 
 export default function CustomerCreatePage() {
+    const auth = useAuth();
+    const canVerifyWhatsApp = hasPermission(auth, 'customers.update');
     const navigate = useNavigate();
     const [customer, setCustomer] = useState<CustomerPayload>(defaultCustomerPayload);
     const [initialCustomer, setInitialCustomer] = useState<CustomerPayload | null>(null);
@@ -43,12 +51,15 @@ export default function CustomerCreatePage() {
     const [activeTab, setActiveTab] = useState<Tab>('basic');
     const [draft, setDraft] = useState<CustomerOneShotDraft>(emptyCustomerOneShotDraft);
     const [submitting, setSubmitting] = useState(false);
+    const [verifyAfterSave, setVerifyAfterSave] = useState(false);
     const [loadingDefaults, setLoadingDefaults] = useState(true);
     const [error, setError] = useState<ApiError | null>(null);
     const dirty = initialCustomer !== null && (JSON.stringify(customer) !== JSON.stringify(initialCustomer)
         || JSON.stringify(draft) !== JSON.stringify(emptyCustomerOneShotDraft)
         || (currency?.id ?? null) !== initialCurrencyId);
     const confirmDiscard = useUnsavedChanges(dirty && !submitting);
+    const verificationPhone = selectWhatsAppVerificationPhone(customer.mobile, includeRelated ? draft.contacts : []);
+    const shouldVerifyAfterSave = verifyAfterSave && canVerifyWhatsApp && verificationPhone !== null;
 
     useEffect(() => {
         const controller = new AbortController();
@@ -77,13 +88,31 @@ export default function CustomerCreatePage() {
 
     async function save() {
         setSubmitting(true);
+        const pendingWindow = shouldVerifyAfterSave ? openPendingWhatsAppWindow() : null;
         setError(null);
         try {
             const saved = includeRelated
                 ? await createCustomerWithRelations(toPayload(customer, draft))
                 : await createCustomer(customer);
+
+            if (shouldVerifyAfterSave) {
+                try {
+                    const challenge = await startCustomerWhatsAppVerification(saved.id, crypto.randomUUID());
+                    if (!navigateToWhatsApp(challenge.whatsapp_url, pendingWindow)) {
+                        throw new Error('The server returned an invalid WhatsApp link.');
+                    }
+                    if (pendingWindow === null) {
+                        return;
+                    }
+                } catch (verificationError) {
+                    closePendingWhatsAppWindow(pendingWindow);
+                    notifyError(toApiError(verificationError), 'Customer created; verification not started');
+                }
+            }
+
             navigate(`/customers/${saved.id}`);
         } catch (requestError) {
+            closePendingWhatsAppWindow(pendingWindow);
             setError(toApiError(requestError));
             setSubmitting(false);
         }
@@ -143,9 +172,19 @@ export default function CustomerCreatePage() {
                 )}
 
                 <FormActions>
+                    <label className="mr-auto flex items-start gap-2 text-sm text-slate-700">
+                        <input
+                            className="mt-1"
+                            type="checkbox"
+                            checked={verifyAfterSave}
+                            disabled={!canVerifyWhatsApp || verificationPhone === null || submitting}
+                            onChange={(event) => setVerifyAfterSave(event.target.checked)}
+                        />
+                        <span>Verify WhatsApp after saving{verificationPhone ? <span className="block text-xs text-slate-500">Target: {verificationPhone}</span> : <span className="block text-xs text-amber-700">Add a WhatsApp number first.</span>}</span>
+                    </label>
                     <Button type="button" variant="secondary" onClick={() => confirmDiscard() && navigate(-1)}>Cancel</Button>
                     <Button type="submit" loading={submitting}>
-                        {includeRelated ? 'Create customer and related records' : 'Create customer'}
+                        {shouldVerifyAfterSave ? 'Create & verify WhatsApp' : (includeRelated ? 'Create customer and related records' : 'Create customer')}
                     </Button>
                 </FormActions>
             </form>

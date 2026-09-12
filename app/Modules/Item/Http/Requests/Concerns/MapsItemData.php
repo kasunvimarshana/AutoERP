@@ -40,6 +40,7 @@ trait MapsItemData
             purchaseTaxGroupId: $this->nullableInt($item, 'purchase_tax_group_id'),
             salesTaxGroupId: $this->nullableInt($item, 'sales_tax_group_id'),
             isStockable: (bool) ($item['is_stockable'] ?? false),
+            reorderLevel: $this->nullableString($item, 'reorder_level'),
             isCombo: array_key_exists('is_combo', $item) ? (bool) $item['is_combo'] : null,
             isTaxExempt: (bool) ($item['is_tax_exempt'] ?? false),
             isActive: (bool) ($item['is_active'] ?? true),

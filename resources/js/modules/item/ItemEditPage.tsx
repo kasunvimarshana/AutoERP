@@ -82,6 +82,7 @@ export default function ItemEditPage() {
             .then(([item, audit]) => {
                 if (controller.signal.aborted) return;
                 setForm({
+                    reorder_level: item.reorder_level ?? null,
                     code: item.code,
                     name: item.name,
                     item_type: item.item_type,

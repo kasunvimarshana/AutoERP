@@ -88,6 +88,7 @@ final class SupplierApiTest extends TestCase
         $foreignCurrencyId = $this->createCurrency('USD');
         $supplierId = $this->createSupplier($context, [
             'default_currency_id' => $currencyId,
+            'mobile' => '0771234567',
         ]);
 
         $this->createSupplierInvoiceBalance($context, $supplierId, $currencyId, 'PINV-OPEN-1', '125.000000');
@@ -109,6 +110,8 @@ final class SupplierApiTest extends TestCase
             ->assertJsonPath('data.0.total_due.0.currency_code', 'LKR')
             ->assertJsonPath('data.0.total_due.1.amount', '10.000000')
             ->assertJsonPath('data.0.total_due.1.currency_code', 'USD')
+            ->assertJsonPath('data.0.whatsapp_contact.phone', '94771234567')
+            ->assertJsonPath('data.0.whatsapp_contact.status', 'unverified')
             ->assertJsonPath('data.0.default_currency.code', 'LKR');
     }
 

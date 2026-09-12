@@ -5,6 +5,7 @@ import { useAuth } from '@/modules/auth/AuthProvider';
 import { useTenantRouteAccess } from '@/modules/auth/useTenantRouteAccess';
 import { LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
+import { WhatsAppVerificationPanel } from '@/shared/components/WhatsAppVerificationPanel';
 import { EntityDetailLayout } from '@/shared/components/EntityDetailLayout';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
@@ -12,7 +13,7 @@ import { Panel } from '@/shared/components/Panel';
 import { Tabs } from '@/shared/components/Tabs';
 import { useApi } from '@/shared/hooks/useApi';
 import { useOnDemandTab } from '@/shared/hooks/useOnDemandTab';
-import { getCustomer } from './customerApi';
+import { confirmCustomerWhatsAppVerification, getCustomer, getCustomerWhatsAppVerification, startCustomerWhatsAppVerification } from './customerApi';
 import { customerPermissions } from './customerPermissions';
 import { CustomerSummaryCard } from './components/CustomerSummaryCard';
 
@@ -55,7 +56,17 @@ export default function CustomerDetailPage() {
             <Panel className="p-0">
                 <Tabs tabs={tabs} active={tab.activeTab} onChange={tab.openTab} />
                 <div className="p-5">
-                    {tab.activeTab === 'summary' && <CustomerSummaryCard customer={customer.data} />}
+                    {tab.activeTab === 'summary' && <>
+                        <CustomerSummaryCard customer={customer.data} />
+                        <WhatsAppVerificationPanel
+                            subjectId={customerId}
+                            subjectLabel="Customer"
+                            canManage={canManage}
+                            load={(signal) => getCustomerWhatsAppVerification(customerId, signal)}
+                            start={(key) => startCustomerWhatsAppVerification(customerId, key)}
+                            confirm={(code) => confirmCustomerWhatsAppVerification(customerId, code)}
+                        />
+                    </>}
                     <Suspense fallback={<LoadingState />}>
                         {tab.openedTabs.has('contacts') && <div hidden={tab.activeTab !== 'contacts'}><CustomerContactTab customerId={customerId} canManage={canManage} /></div>}
                         {tab.openedTabs.has('addresses') && <div hidden={tab.activeTab !== 'addresses'}><CustomerAddressTab customerId={customerId} canManage={canManage} /></div>}

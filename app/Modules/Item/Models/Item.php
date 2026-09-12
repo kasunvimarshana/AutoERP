@@ -40,6 +40,7 @@ final class Item extends TenantOwnedModel
             'tracking_type' => TrackingType::class,
             'costing_method' => CostingMethod::class,
             'is_stockable' => 'boolean',
+            'reorder_level' => 'decimal:6',
             'is_combo' => 'boolean',
             'is_tax_exempt' => 'boolean',
             'is_active' => 'boolean',

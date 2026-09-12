@@ -24,6 +24,7 @@ use Modules\Customer\Services\CustomerNumberService;
 use Modules\Customer\Services\CustomerQueryService;
 use Modules\Customer\Services\CustomerStatusService;
 use Modules\Customer\Services\CustomerUpdateService;
+use Modules\Customer\Services\CustomerWhatsAppVerificationService;
 use Modules\Vehicle\Contracts\CustomerVehicleProviderInterface;
 
 final class CustomerController
@@ -37,6 +38,7 @@ final class CustomerController
         private readonly CustomerAuthorizationService $authorization,
         private readonly CustomerBlockerService $blockers,
         private readonly CustomerVehicleProviderInterface $customerVehicles,
+        private readonly CustomerWhatsAppVerificationService $whatsappVerifications,
     ) {}
 
     public function index(ListCustomerRequest $request): AnonymousResourceCollection
@@ -61,6 +63,7 @@ final class CustomerController
             $request->perPage(),
         );
         $this->attachCurrentVehicles($customers, $request->tenantId(), $request->organizationUnitId());
+        $this->whatsappVerifications->attachListSummaries($customers->getCollection());
 
         return CustomerSummaryResource::collection($customers);
     }
