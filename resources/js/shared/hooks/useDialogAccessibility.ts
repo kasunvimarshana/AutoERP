@@ -29,7 +29,8 @@ export function useDialogAccessibility(
             containerRef.current?.querySelectorAll<HTMLElement>(focusableSelector) ?? [],
         ).filter((element) => !element.hidden && element.getAttribute('aria-hidden') !== 'true');
 
-        window.requestAnimationFrame(() => {
+        const initialFocusFrame = window.requestAnimationFrame(() => {
+            if (containerRef.current?.contains(document.activeElement)) return;
             const first = focusable()[0] ?? containerRef.current;
             first?.focus();
         });
@@ -62,6 +63,7 @@ export function useDialogAccessibility(
 
         window.addEventListener('keydown', onKeyDown);
         return () => {
+            window.cancelAnimationFrame(initialFocusFrame);
             window.removeEventListener('keydown', onKeyDown);
             document.body.style.overflow = previousOverflow;
             previouslyFocused?.focus();

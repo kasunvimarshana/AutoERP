@@ -9,6 +9,7 @@ use Modules\VehicleRental\Enums\AgreementKind;
 use Modules\VehicleRental\Enums\RunningChartAction;
 use Modules\VehicleRental\Enums\VehicleUseAction;
 use Modules\VehicleRental\Http\Controllers\AgreementController;
+use Modules\VehicleRental\Http\Controllers\BaseRentBillingController;
 use Modules\VehicleRental\Http\Controllers\RunningChartController;
 use Modules\VehicleRental\Http\Controllers\VehicleUseController;
 
@@ -24,6 +25,12 @@ Route::prefix('api/v1/vehicle-rental')->middleware([
         Route::get('{agreement}', [AgreementController::class, 'show'])->whereNumber('agreement');
         Route::put('{agreement}', [AgreementController::class, 'update'])->whereNumber('agreement');
         Route::get('{agreement}/history', [AgreementController::class, 'history'])->whereNumber('agreement');
+        Route::middleware('tenant.feature:'.TenantFeature::INVOICE)->group(function (): void {
+            Route::get('{agreement}/base-charges', [BaseRentBillingController::class, 'index'])->whereNumber('agreement');
+            Route::post('{agreement}/base-charges', [BaseRentBillingController::class, 'store'])->whereNumber('agreement');
+            Route::post('{agreement}/base-charges/{charge}/void', [BaseRentBillingController::class, 'void'])->whereNumber('agreement')->whereNumber('charge');
+            Route::post('{agreement}/base-charges/{charge}/reissue', [BaseRentBillingController::class, 'reissue'])->whereNumber('agreement')->whereNumber('charge');
+        });
         Route::post('{agreement}/base-rent-preview', [AgreementController::class, 'previewBaseRent'])->whereNumber('agreement');
         Route::post('{agreement}/{action}', [AgreementController::class, 'transition'])->whereNumber('agreement')->whereIn('action', [AgreementAction::Activate->value, AgreementAction::Close->value]);
     });

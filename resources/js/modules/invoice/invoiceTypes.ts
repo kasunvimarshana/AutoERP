@@ -1,3 +1,8 @@
+export enum InvoiceStatus {
+    Draft = 'draft', Approved = 'approved', Posted = 'posted', PartiallyPaid = 'partially_paid',
+    Paid = 'paid', Cancelled = 'cancelled', Void = 'void', Reversed = 'reversed',
+}
+
 export interface InvoicePartySnapshot extends Record<string, unknown> {
     id?: number | null;
     number?: string | null;

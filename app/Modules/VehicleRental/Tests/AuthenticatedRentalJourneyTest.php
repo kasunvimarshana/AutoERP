@@ -30,6 +30,28 @@ final class AuthenticatedRentalJourneyTest extends TestCase
 
     private const FIXTURE_PASSWORD = 'secret-password';
 
+    public function test_authenticated_base_billing_requires_its_permission_and_invoice_entitlement(): void
+    {
+        $this->postJson(self::ROOT.'/customer/agreements/1/base-charges', [])->assertUnauthorized();
+        [, $customerInput] = $this->loginFixture(modules: [TenantFeature::VEHICLE_RENTAL, TenantFeature::INVOICE]);
+        $customerInput['terms']['base_rate'] = '3000';
+        $customer = $this->activate('customer', $customerInput);
+        $url = self::ROOT.'/customer/agreements/'.$customer['id'].'/base-charges';
+        $input = ['policy' => BaseRentPolicy::ActualCalendarDays->value, 'expected_version' => $customer['row_version'],
+            'from' => '2026-09-07', 'until' => '2026-10-06', 'invoice_date' => '2026-09-12', 'exchange_rate' => '1'];
+        $this->postJson($url, $input)->assertCreated()->assertJsonPath('data.grand_total', '3000.000000');
+        $this->getJson($url)->assertOk()->assertJsonPath('data.0.invoices.0.status', 'draft')->assertJsonMissingPath('data.0.tenant_id');
+        $this->postJson($url, $input)->assertConflict();
+        $this->postJson($url, array_replace($input, ['expected_version' => 1]))->assertConflict();
+        $this->loginFixture(permissions: [RentalAuthorization::CUSTOMER_VIEW], modules: [TenantFeature::VEHICLE_RENTAL, TenantFeature::INVOICE]);
+        $this->postJson($url, $input)->assertForbidden();
+        $this->loginFixture(modules: [TenantFeature::VEHICLE_RENTAL, TenantFeature::INVOICE]);
+        $this->postJson($url, $input)->assertNotFound();
+        $this->loginFixture();
+        $this->postJson($url, $input)->assertForbidden();
+        $this->assertDatabaseCount('invoices', 1);
+    }
+
     public function test_authenticated_base_rent_preview_enforces_scope_policy_and_revision_without_writes(): void
     {
         $this->postJson(self::ROOT.'/customer/agreements/1/base-rent-preview', [])->assertUnauthorized();

@@ -14,24 +14,57 @@ final class FinancePostingFixture
     private const OPENING_EFFECTIVE_DATE = '1900-01-01';
 
     private const ASSET_TYPE = 'ASSET';
+
     private const LIABILITY_TYPE = 'LIABILITY';
+
     private const REVENUE_TYPE = 'REVENUE';
+
     private const EXPENSE_TYPE = 'EXPENSE';
 
     private const CASH_ACCOUNT = '1010';
+
     private const BANK_ACCOUNT = '1020';
+
     private const RECEIVABLE_ACCOUNT = '1100';
+
     private const INVENTORY_ACCOUNT = '1200';
+
     private const TAX_RECEIVABLE_ACCOUNT = '1300';
+
     private const SUPPLIER_ADVANCE_ACCOUNT = '1400';
+
     private const PAYABLE_ACCOUNT = '2100';
+
     private const GRNI_ACCOUNT = '2150';
+
     private const TAX_PAYABLE_ACCOUNT = '2200';
+
     private const CUSTOMER_ADVANCE_ACCOUNT = '2300';
+
     private const SALES_REVENUE_ACCOUNT = '4100';
+
     private const SERVICE_REVENUE_ACCOUNT = '4200';
+
     private const PURCHASE_EXPENSE_ACCOUNT = '5100';
+
     private const COST_OF_GOODS_SOLD_ACCOUNT = '5200';
+
+    public static function seedRentalInvoiceProfiles(int $tenantId, ?int $organizationUnitId = null): void
+    {
+        $accounts = self::accounts($tenantId, $organizationUnitId);
+        self::profile($tenantId, $organizationUnitId, FinancePostingProfileCode::CustomerRentalInvoice->value, [
+            FinanceAccountRoleCode::Receivable->value => $accounts[FinanceAccountRoleCode::Receivable->value],
+            FinanceAccountRoleCode::RentalRevenue->value => $accounts[FinanceAccountRoleCode::Revenue->value],
+            FinanceAccountRoleCode::TaxPayable->value => $accounts[FinanceAccountRoleCode::TaxPayable->value],
+            FinanceAccountRoleCode::WithholdingReceivable->value => $accounts[FinanceAccountRoleCode::WithholdingReceivable->value],
+        ]);
+        self::profile($tenantId, $organizationUnitId, FinancePostingProfileCode::SupplierRentalInvoice->value, [
+            FinanceAccountRoleCode::Payable->value => $accounts[FinanceAccountRoleCode::Payable->value],
+            FinanceAccountRoleCode::RentalExpense->value => $accounts[FinanceAccountRoleCode::Expense->value],
+            FinanceAccountRoleCode::TaxReceivable->value => $accounts[FinanceAccountRoleCode::TaxReceivable->value],
+            FinanceAccountRoleCode::WithholdingPayable->value => $accounts[FinanceAccountRoleCode::WithholdingPayable->value],
+        ]);
+    }
 
     public static function seedCustomerPaymentProfiles(int $tenantId, ?int $organizationUnitId = null): void
     {

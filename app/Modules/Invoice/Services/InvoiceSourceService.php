@@ -12,6 +12,20 @@ final class InvoiceSourceService
 {
     public function __construct(private readonly InvoiceSourceAllocationService $sourceAllocations) {}
 
+    /** @param list<int> $sourceIds @return array<int, list<array{id: int, number: string, status: string}>> */
+    public function documents(int $tenantId, int $organizationUnitId, string $sourceType, array $sourceIds): array
+    {
+        $documents = [];
+        foreach (InvoiceSource::query()->where('tenant_id', $tenantId)->where('organization_unit_id', $organizationUnitId)
+            ->where('source_type', $sourceType)->whereIn('source_id', $sourceIds)
+            ->whereHas('invoice', fn ($query) => $query->where('tenant_id', $tenantId)->where('organization_unit_id', $organizationUnitId))->with('invoice')->orderByDesc('id')->get() as $source) {
+            $invoice = $source->invoice;
+            $documents[(int) $source->source_id][] = ['id' => (int) $invoice->id, 'number' => $invoice->invoice_number, 'status' => $invoice->status->value];
+        }
+
+        return $documents;
+    }
+
     /**
      * @param  array<string, string>  $invoicedAmountBySource
      * @param  array<string, string>  $allocatedAdjustmentBySource

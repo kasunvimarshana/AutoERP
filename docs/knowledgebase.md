@@ -2,7 +2,7 @@
 
 **Status:** Canonical working domain reference; evidence gaps remain; not a completed implementation or exhaustive audiovisual audit
 
-**Knowledge refresh date:** 2026-09-11 (external commercial/tax research and Tax arithmetic verification; audiovisual coverage remains incomplete)
+**Knowledge refresh date:** 2026-09-12 (base-rent financial workflow and shared tax/posting reconciliation; audiovisual coverage remains incomplete)
 
 **Primary business source of truth and conflict tie-breaker:** TACGL legacy application/data corpus
 
@@ -12,7 +12,7 @@
 
 **Initial architecture baseline:** `d4aaa693706c2d3fe693244c8ea0f8d9e4ae326c`
 
-**Latest implemented baseline reviewed:** `7ceb7966d3cf81a43a08ba8177a0327407b897ea`, plus the fresh [vehicle-use and Running Chart contract](vehicle-rental/operations.md). Operational capture and [base-rent estimation](vehicle-rental/base-rent.md) are implemented; commercial integrations and complete audiovisual review remain outstanding. The [commercial research](vehicle-rental/commercial-research.md) distinguishes external evidence, implementation contracts and the shared Tax corrections.
+**Latest implemented baseline reviewed:** `562ac72116e9f4d68cf65a22be4d3a5a401f113e`, plus the fresh [vehicle-use and Running Chart contract](vehicle-rental/operations.md). Operational capture, [base-rent estimation](vehicle-rental/base-rent.md) and [base-rent billing](vehicle-rental/base-billing.md) are implemented. Usage-based commercial components and complete audiovisual review remain outstanding. The [commercial research](vehicle-rental/commercial-research.md) distinguishes external evidence, implementation contracts and the shared Tax corrections.
 
 **TACGL source file:** `TACGL.zip`
 
@@ -1617,3 +1617,16 @@ For an omitted explicit allocation amount, Invoice now calculates the cumulative
 Use surviving monetary allocations as well as quantities: a cancelled, void or reversed invoice contributes neither. This lets a replacement allocation reconcile after a release even when surviving allocations contain a rounding residual. Historical source rows remain unchanged. Never trust the caller's previously-invoiced quantity; read the scoped allocation history. Source owners still must lock the source aggregate and preserve its original quantity and valuation before calling Invoice creation. This change does not establish real-engine concurrency verification.
 
 An explicitly supplied allocation amount remains the source owner's decision under existing validation. Where earlier nonproportional allocations make the default cumulative adjustment negative, reject the default and require an explicit reviewed amount. Do not silently clamp it to zero, rewrite history or create a negative invoice line. This is Invoice-owned monetary allocation, not a new Rental rate, tax rule or usage-entitlement policy. No schema or relationship changes are needed.
+
+
+## 38. Base-rent charges and financial handoff — 2026-09-12
+
+The [base-billing contract](vehicle-rental/base-billing.md) now implements customer and owner base-rent charge records, draft creation, linked-document review, unchanged-charge reissue and audited void/correction. The explicit actual-calendar policy from section 36 supplies the base amount. It is a newly selected convention, not a retrospective TACGL claim. The agreement must be Active or Closed, covered dates and expected revision must match, and each side's billing permission is required. The command rejects overlapping non-voided periods while holding the agreement lock. The charge and invoice creation commit atomically.
+
+Each side has its own tenant-safe mandatory agreement reference. The calculation preserves the original revision, rate, policy, currency and period breakdown. Invoice owns the source link and indivisible consumption, avoiding a second mutable invoice pointer in Rental. Calculation history cannot be changed or deleted. Cancelled/reversed invoices can be reissued from the same unchanged charge. An incorrect charge is voided with its own revision, actor, reason and timestamp only after all linked invoices are released; a corrected charge can then use that period. A voided charge cannot be reissued.
+
+Invoice prepares taxes and posting through a shared factory also used by manual invoices. Inclusive tax is not added to gross again, and withholding is excluded from ordinary tax when deriving revenue/expense and the posting plan. Tax snapshots remain Tax-owned; percentages, legal exemptions and Finance account assignments are not supplied by Rental defaults. Customer base rent becomes a Sales/Outbound invoice, owner cost a Purchase/Inbound document. Both use existing Finance role/profile enums and the governed Invoice lifecycle. The historical retired Rental invoice type remains retired.
+
+The new UI records the chosen period and document dates, requires an explicit exchange rate and policy acceptance, links the created draft to Invoice review, and shows charge/document history with reissue and void controls. Backend rules remain authoritative. Zero base rent produces no invoice or consumed period; unknown rates still fail. Stored base amounts must fit the existing monetary precision. These are base-only documents: do not infer KM, driver/OT/AC/night-out, downtime, replacement surcharges, deposits or monthly aggregate withholding workflows from their existence.
+
+A full-suite failure also exposed a shared dialog focus race. The delayed initial-focus callback now preserves focus already inside the dialog, and cleanup cancels the pending callback. Two controlled regression tests fail against the prior hook and pass after the owner-level fix. No Rental-only workaround or unrelated relationship change is used.

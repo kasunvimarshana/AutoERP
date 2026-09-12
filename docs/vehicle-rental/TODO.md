@@ -6,7 +6,7 @@
 
 **Engineering authority:** latest `worktree-0.0.8`
 
-**Engineering baseline audited before this update:** `7ceb7966d3cf81a43a08ba8177a0327407b897ea`
+**Engineering baseline audited before this update:** `562ac72116e9f4d68cf65a22be4d3a5a401f113e`
 
 **Old Rental implementation:** must not be restored, copied, revived, cherry-picked, or used as an implementation dependency
 
@@ -14,9 +14,16 @@
 
 **Last evidence/reconciliation update:** 2026-09-11 (external commercial/tax research and Tax integrity fixes; audiovisual coverage incomplete)
 
-**Delivery status:** Fresh agreement and bounded/open-ended vehicle-use/custody and atomic replacement APIs/UI, Running Chart draft/finalize/reverse/correction history, permissions and reciprocal workshop admission are implemented. Financial calculations/handoffs, replacement charging, driver identity and production acceptance remain outstanding.
+**Delivery status:** Fresh agreement and bounded/open-ended vehicle-use/custody and atomic replacement APIs/UI, Running Chart draft/finalize/reverse/correction history, permissions and reciprocal workshop admission are implemented. Base-rent charges and Invoice/Finance handoff are implemented. Usage-based charges, deposits, replacement charging, driver identity and full production acceptance remain outstanding.
 
 ---
+
+## Latest base-billing delivery — 2026-09-12
+
+- [x] Independent customer/owner base charges with agreement-locked period overlap checks and version validation.
+- [x] Atomic Invoice draft handoff, scoped document history, unchanged-source reissue and audited void after invoice release.
+- [x] Shared Invoice tax preparation and balanced Finance plans; test both sides through posting/reversal.
+- [x] Billing UI and real-login permission/entitlement/tenant tests.
 
 ## Latest financial-owner correction — 2026-09-11
 
@@ -77,9 +84,10 @@ Do not make one side depend on the amount or completion state of the other side.
 - [x] Authenticated, tenant/organization/permission-scoped preview endpoint; stale-version, coverage, policy and missing-rate validation.
 - [x] Agreement review form with explicit scope, period breakdown, error handling and stale-result cancellation.
 - [x] Unit/integration/API and frontend tests for arithmetic, boundaries, independence, authorization and no financial writes.
-- [ ] Persist commercially adopted policy versions and governed calculation/source-consumption snapshots; estimation does not replace billing or financial handoffs.
+- [x] Persist the explicitly selected actual-calendar base-charge policy, original calculation and governed Invoice source consumption.
+- [ ] Extend commercial policy effectivity and consumption to the other components below.
 
-See [base-rent.md](base-rent.md). The later checklist entries for posted commercial calculations remain open because a read-only estimate does not complete them.
+See [base-rent.md](base-rent.md) and [base-billing.md](base-billing.md). Base-only billing now includes immutable calculations, customer/owner Invoice drafts, tax snapshots, posting plans, cancellation/reissue, and audited void/correction. Broader calculation entries below include additional components and are not closed by base-only billing.
 
 ## Agreement foundation delivery ledger — 2026-09-07
 

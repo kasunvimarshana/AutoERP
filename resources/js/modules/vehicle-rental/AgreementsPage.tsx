@@ -1,3 +1,5 @@
+import { BaseRentBillingPanel } from './BaseRentBillingPanel';
+import { BILLING_PERMISSION } from './baseRentBillingApi';
 import { VehicleUsePanel } from './VehicleUsePanel';
 import { BaseRentPreviewPanel } from './BaseRentPreviewPanel';
 import { USE_PERMISSION } from './vehicleUse';
@@ -18,6 +20,7 @@ import { AgreementAction, AgreementKind, AgreementStatus, DriverMode, RentalBasi
 
 export default function AgreementsPage({ kind }: { kind: AgreementKind }) {
     const auth = useAuth();
+    const canBill = hasPermission(auth, BILLING_PERMISSION[kind]);
     const canManage = hasPermission(auth, agreementPermissions[kind].manage);
     const canViewUse = hasPermission(auth, USE_PERMISSION.view);
     const canManageUse = hasPermission(auth, USE_PERMISSION.manage);
@@ -68,6 +71,7 @@ export default function AgreementsPage({ kind }: { kind: AgreementKind }) {
             <dl className="grid gap-3 sm:grid-cols-2">{(Object.keys(TERM_LABELS) as TermKey[]).map(key => <div key={key}><dt className="text-sm text-slate-500">{TERM_LABELS[key]}</dt><dd>{selected.terms[key] ?? 'Not specified'}</dd></div>)}</dl>
             {selected.notes && <p>{selected.notes}</p>}
             <BaseRentPreviewPanel key={`${kind}-${selected.id}-${selected.row_version}`} kind={kind} agreement={selected} />
+            {canBill && selected.status !== AgreementStatus.Draft && <BaseRentBillingPanel key={`billing-${kind}-${selected.id}-${selected.row_version}`} kind={kind} agreement={selected} />}
             {kind === AgreementKind.Customer && canViewUse && <Button variant="secondary" onClick={() => setShowVehicles(value => !value)}>{showVehicles ? 'Hide vehicles' : 'View assigned vehicles'}</Button>}
             {kind === AgreementKind.Customer && canViewUse && showVehicles && <VehicleUsePanel key={selected.id} agreement={selected} canManage={canManageUse} />}
             <Button variant="secondary" onClick={() => setShowHistory(value => !value)}>{showHistory ? 'Hide history' : 'View history'}</Button>

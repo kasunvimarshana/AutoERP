@@ -12,6 +12,10 @@ use Modules\VehicleRental\Enums\RunningChartAction;
 
 class RentalAuthorization
 {
+    public const CUSTOMER_BILL = 'vehicle-rental.customer-agreements.bill';
+
+    public const OWNER_BILL = 'vehicle-rental.owner-agreements.bill';
+
     public const CHART_VIEW = 'vehicle-rental.running-charts.view';
 
     public const CHART_MANAGE = 'vehicle-rental.running-charts.manage';
@@ -36,7 +40,7 @@ class RentalAuthorization
 
     public static function descriptions(): array
     {
-        return [self::CHART_VIEW => 'View Running Chart evidence.', self::CHART_MANAGE => 'Create and edit draft Running Charts.', self::CHART_FINALIZE => 'Finalize physical usage evidence.', self::CHART_REVERSE => 'Reverse finalized physical usage evidence.', self::USE_VIEW => 'View assigned vehicles and custody history.', self::USE_MANAGE => 'Plan, hand over, return and cancel vehicle use.', self::CUSTOMER_VIEW => 'View customer rental agreements.', self::CUSTOMER_MANAGE => 'Create, edit drafts, activate and close customer rental agreements.', self::OWNER_VIEW => 'View owner rental agreements.', self::OWNER_MANAGE => 'Create, edit drafts, activate and close owner rental agreements.'];
+        return [self::CUSTOMER_BILL => 'Create customer base-rent invoice drafts.', self::OWNER_BILL => 'Create owner base-rent payable drafts.', self::CHART_VIEW => 'View Running Chart evidence.', self::CHART_MANAGE => 'Create and edit draft Running Charts.', self::CHART_FINALIZE => 'Finalize physical usage evidence.', self::CHART_REVERSE => 'Reverse finalized physical usage evidence.', self::USE_VIEW => 'View assigned vehicles and custody history.', self::USE_MANAGE => 'Plan, hand over, return and cancel vehicle use.', self::CUSTOMER_VIEW => 'View customer rental agreements.', self::CUSTOMER_MANAGE => 'Create, edit drafts, activate and close customer rental agreements.', self::OWNER_VIEW => 'View owner rental agreements.', self::OWNER_MANAGE => 'Create, edit drafts, activate and close owner rental agreements.'];
     }
 
     public function assert(AgreementContext $context, AgreementKind $kind, bool $write): void
@@ -45,6 +49,14 @@ class RentalAuthorization
             AgreementKind::Customer => $write ? self::CUSTOMER_MANAGE : self::CUSTOMER_VIEW,
             AgreementKind::Owner => $write ? self::OWNER_MANAGE : self::OWNER_VIEW,
         };
+        if (! $this->access->can($context->actorId, $context->tenantId, $permission)) {
+            throw new AuthorizationException('This Rental action requires permission: '.$permission);
+        }
+    }
+
+    public function assertBilling(AgreementContext $context, AgreementKind $kind): void
+    {
+        $permission = $kind === AgreementKind::Customer ? self::CUSTOMER_BILL : self::OWNER_BILL;
         if (! $this->access->can($context->actorId, $context->tenantId, $permission)) {
             throw new AuthorizationException('This Rental action requires permission: '.$permission);
         }
