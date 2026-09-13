@@ -41,6 +41,7 @@ use Modules\Payment\Models\Payment;
 use Modules\Payment\Models\PaymentMethod;
 use Modules\Payment\Services\PaymentMethodService;
 use Modules\User\Models\UserModel;
+use Modules\VehicleService\DTOs\VehicleServiceEmployeeAssignmentBatchEntryData;
 use Modules\VehicleService\DTOs\VehicleServiceEmployeeAssignmentData;
 use Modules\VehicleService\DTOs\VehicleServiceInspectionData;
 use Modules\VehicleService\DTOs\VehicleServiceJobData;
@@ -445,12 +446,11 @@ final class VehicleServiceEngineTest extends TestCase
         $assignment = $this->assignEmployee(
             $job,
             $child,
-            new VehicleServiceEmployeeAssignmentData($alternateSupervisorEmployeeId),
+            new VehicleServiceEmployeeAssignmentData($context['supervisor_employee_id']),
         );
         $job = $this->refreshJob($job);
 
-        $this->assertNotSame($context['supervisor_employee_id'], $assignment->employee_id);
-        $this->assertSame($alternateSupervisorEmployeeId, $assignment->employee_id);
+        $this->assertSame($context['supervisor_employee_id'], $assignment->employee_id);
         $this->assertSame('supervisor', $assignment->role_type);
         $this->assertSame('60.000000', (string) $job->supervisor_commission_amount);
         $this->assertSame('60.000000', (string) $job->commission_cost_total);
@@ -460,15 +460,97 @@ final class VehicleServiceEngineTest extends TestCase
             $this->assignEmployee(
                 $job,
                 $child,
-                new VehicleServiceEmployeeAssignmentData($context['employee_id']),
+                new VehicleServiceEmployeeAssignmentData($alternateSupervisorEmployeeId),
             );
-            $this->fail('Expected a non-supervisor assignment to be rejected.');
+            $this->fail('Expected an alternate supervisor assignment to be rejected.');
         } catch (InvalidArgumentException $exception) {
             $this->assertSame(
-                'Only employees with the Supervisor designation can be assigned to this labour line.',
+                'This labour line must use the Job Card supervisor.',
                 $exception->getMessage(),
             );
         }
+    }
+
+    public function test_workforce_batch_assignment_is_atomic_and_bumps_job_version_once(): void
+    {
+        $context = $this->context();
+        $job = $this->createJob($context);
+        $firstLine = $this->line(
+            $job,
+            VehicleServiceLineSourceType::LabourItem,
+            $context['labour'],
+            '1.000000',
+            '100.000000',
+            description: 'First batch labour line',
+        );
+        $secondLine = $this->line(
+            $job,
+            VehicleServiceLineSourceType::ServiceItem,
+            $context['service'],
+            '1.000000',
+            '200.000000',
+            description: 'Second batch service line',
+        );
+        $beforeVersion = $this->currentJobVersion($job);
+
+        $created = $this->withTenantExecutionContext(
+            (int) $job->tenant_id,
+            fn () => app(VehicleServiceEmployeeAssignmentService::class)->createBatch(
+                $job,
+                [
+                    new VehicleServiceEmployeeAssignmentBatchEntryData(
+                        (int) $firstLine->getKey(),
+                        new VehicleServiceEmployeeAssignmentData($context['employee_id']),
+                    ),
+                    new VehicleServiceEmployeeAssignmentBatchEntryData(
+                        (int) $secondLine->getKey(),
+                        new VehicleServiceEmployeeAssignmentData($context['helper_employee_id']),
+                    ),
+                ],
+                $beforeVersion,
+            ),
+        );
+
+        $this->assertCount(2, $created);
+        $this->assertSame($beforeVersion + 1, $this->currentJobVersion($job));
+
+        $rollbackJob = $this->createJob($context);
+        $rollbackLine = $this->line(
+            $rollbackJob,
+            VehicleServiceLineSourceType::LabourItem,
+            $context['labour'],
+            '1.000000',
+            '100.000000',
+            description: 'Rollback batch labour line',
+        );
+
+        try {
+            $this->withTenantExecutionContext(
+                (int) $rollbackJob->tenant_id,
+                fn () => app(VehicleServiceEmployeeAssignmentService::class)->createBatch(
+                    $rollbackJob,
+                    [
+                        new VehicleServiceEmployeeAssignmentBatchEntryData(
+                            (int) $rollbackLine->getKey(),
+                            new VehicleServiceEmployeeAssignmentData($context['employee_id']),
+                        ),
+                        new VehicleServiceEmployeeAssignmentBatchEntryData(
+                            999999,
+                            new VehicleServiceEmployeeAssignmentData($context['helper_employee_id']),
+                        ),
+                    ],
+                    $this->currentJobVersion($rollbackJob),
+                ),
+            );
+            $this->fail('Expected an invalid batch line to reject the complete assignment batch.');
+        } catch (InvalidArgumentException $exception) {
+            $this->assertSame(
+                'One or more workforce lines do not belong to the service job.',
+                $exception->getMessage(),
+            );
+        }
+
+        $this->assertSame(0, $rollbackLine->employeeAssignments()->count());
     }
 
     public function test_inventory_reservation_prevents_overbooking_and_manual_recovery_can_issue_reserved_line(): void
@@ -503,6 +585,7 @@ final class VehicleServiceEngineTest extends TestCase
         $this->expectExceptionMessage('Inventory reservation quantity cannot exceed available stock.');
         $this->line($secondJob, VehicleServiceLineSourceType::InventoryItem, $context['stock'], '4.000000', '20.000000');
     }
+
     public function test_line_update_and_delete_keep_reservations_and_available_stock_consistent(): void
     {
         $context = $this->context();

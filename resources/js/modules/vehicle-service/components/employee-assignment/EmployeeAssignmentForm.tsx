@@ -28,22 +28,21 @@ export function EmployeeAssignmentForm({ value, lines, jobSupervisor, error, sav
         (params: LookupLoadParams) => lookupApi.availableNonSupervisorEmployees(params),
         [],
     );
-    const searchSupervisors = useCallback(
-        (params: LookupLoadParams) => lookupApi.availableSupervisors(params),
-        [],
-    );
     const set = <K extends keyof AssignmentFormValue>(
         key: K,
         next: AssignmentFormValue[K],
     ) => setDraft((current) => ({ ...current, [key]: next }));
     const selectedLine = lines.find((line) => line.id === draft.lineId);
+    const submissionEmployee = selectedLine?.uses_job_supervisor === true
+        ? jobSupervisor
+        : draft.employee;
 
     return (
         <form
             className="space-y-5"
             onSubmit={(event) => {
                 event.preventDefault();
-                if (!saving) onSave(draft);
+                if (!saving && submissionEmployee) onSave({ ...draft, employee: submissionEmployee });
             }}
         >
             <ErrorAlert error={error} />
@@ -73,25 +72,27 @@ export function EmployeeAssignmentForm({ value, lines, jobSupervisor, error, sav
                             ));
                         }}
                     />
-                    <GenericLookupSelect
-                        label="Employee"
-                        value={draft.employee}
-                        error={fieldError(error, 'employee_id')}
-                        onChange={(employee) => set('employee', employee)}
-                        search={selectedLine?.uses_job_supervisor === true
-                            ? searchSupervisors
-                            : searchNonSupervisors}
-                        placeholder={selectedLine?.uses_job_supervisor === true
-                            ? 'Search supervisors by code or name'
-                            : 'Search by code or name'}
-                        loadOnOpen
-                        formatLabel={(employee) =>
-                            [employee.code, employee.name].filter(Boolean).join(' - ')}
-                    />
-                    {selectedLine?.uses_job_supervisor === true && (
-                        <p className="text-sm text-slate-500 sm:col-span-2">
-                            Only active employees with the Supervisor designation can be selected for this line.
-                        </p>
+                    {selectedLine?.uses_job_supervisor === true ? (
+                        <div>
+                            <span className="mb-1 block text-sm font-medium text-slate-700">Employee</span>
+                            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                                {jobSupervisor
+                                    ? [jobSupervisor.code, jobSupervisor.name].filter(Boolean).join(' - ')
+                                    : 'No Job Card supervisor selected'}
+                            </div>
+                            <p className="mt-1 text-xs text-slate-500">This line always uses the Job Card supervisor.</p>
+                        </div>
+                    ) : (
+                        <GenericLookupSelect
+                            label="Employee"
+                            value={draft.employee}
+                            error={fieldError(error, 'employee_id')}
+                            onChange={(employee) => set('employee', employee)}
+                            search={searchNonSupervisors}
+                            placeholder="Search by code or name"
+                            loadOnOpen
+                            formatLabel={(employee) => [employee.code, employee.name].filter(Boolean).join(' - ')}
+                        />
                     )}
                     <DecimalInput
                         label="Assigned hours"
@@ -146,7 +147,7 @@ export function EmployeeAssignmentForm({ value, lines, jobSupervisor, error, sav
                 <Button
                     type="submit"
                     loading={saving}
-                    disabled={draft.lineId === null || !draft.employee}
+                    disabled={draft.lineId === null || !submissionEmployee}
                 >
                     Save assignment
                 </Button>

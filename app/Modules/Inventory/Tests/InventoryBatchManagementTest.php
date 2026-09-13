@@ -4,16 +4,20 @@ declare(strict_types=1);
 
 namespace Modules\Inventory\Tests;
 
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Modules\Inventory\DTOs\BatchPriceData;
+use Modules\Inventory\DTOs\ReservationData;
 use Modules\Inventory\DTOs\StockMovementData;
 use Modules\Inventory\Enums\InventoryDirection;
 use Modules\Inventory\Enums\InventoryMovementType;
+use Modules\Inventory\Http\Resources\SellableBatchOptionResource;
 use Modules\Inventory\Services\BatchPriceService;
 use Modules\Inventory\Services\BatchTrackingService;
 use Modules\Inventory\Services\SellableBatchLookupService;
 use Modules\Inventory\Services\StockMovementService;
+use Modules\Inventory\Services\StockReservationService;
 use Modules\Item\Enums\ItemPriceType;
 use Modules\Item\Enums\TrackingType;
 use Tests\Support\CurrencyFixture;
@@ -80,6 +84,15 @@ final class InventoryBatchManagementTest extends InventoryTestCase
 
         $this->receipt($tenantId, $warehouseId, $item, '2.000000', '5.000000', (int) $oldBatch->getKey());
         $this->receipt($tenantId, $warehouseId, $item, '3.000000', '7.000000', (int) $newBatch->getKey());
+        DB::table('items')->where('id', $item->getKey())->update(['reorder_level' => '4.000000']);
+        $this->withTenantExecutionContext($tenantId, fn () => app(StockReservationService::class)->reserve(new ReservationData(
+            tenantId: $tenantId,
+            reservationDate: '2026-06-07',
+            itemId: (int) $item->getKey(),
+            warehouseId: $warehouseId,
+            quantityReserved: '1.000000',
+            batchId: (int) $newBatch->getKey(),
+        )));
 
         $serviceOptions = app(SellableBatchLookupService::class);
         $initial = $this->withTenantExecutionContext($tenantId, fn () => $serviceOptions->paginate(
@@ -90,8 +103,14 @@ final class InventoryBatchManagementTest extends InventoryTestCase
             warehouseId: $warehouseId,
         ));
         $this->assertEqualsCanonicalizing([(int) $oldBatch->getKey(), (int) $newBatch->getKey()], $initial->getCollection()->modelKeys());
+        $newBatchOption = $initial->getCollection()->firstWhere('id', $newBatch->getKey());
         $this->assertSame('10.000000', $initial->getCollection()->firstWhere('id', $oldBatch->getKey())?->resolved_service_unit_price);
-        $this->assertSame('20.000000', $initial->getCollection()->firstWhere('id', $newBatch->getKey())?->resolved_service_unit_price);
+        $this->assertSame('20.000000', $newBatchOption?->resolved_service_unit_price);
+        $this->assertSame(2.0, (float) $newBatchOption?->available_stock_quantity);
+        $this->assertSame(1.0, (float) $newBatchOption?->reserved_stock_quantity);
+        $serializedOption = (new SellableBatchOptionResource($newBatchOption))->toArray(Request::create('/'));
+        $this->assertSame('1.000000', $serializedOption['reserved_stock_quantity']);
+        $this->assertSame('4.000000', $serializedOption['reorder_level']);
 
         $this->withTenantExecutionContext($tenantId, fn () => app(StockMovementService::class)->record(new StockMovementData(
             tenantId: $tenantId,
@@ -113,7 +132,7 @@ final class InventoryBatchManagementTest extends InventoryTestCase
         ));
 
         $this->assertSame([(int) $newBatch->getKey()], $result->getCollection()->modelKeys());
-        $this->assertSame(3.0, (float) $result->getCollection()->first()?->available_stock_quantity);
+        $this->assertSame(2.0, (float) $result->getCollection()->first()?->available_stock_quantity);
     }
 
     public function test_non_tracked_items_cannot_own_batches(): void

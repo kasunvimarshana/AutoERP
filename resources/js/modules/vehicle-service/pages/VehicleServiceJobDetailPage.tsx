@@ -79,12 +79,13 @@ export default function VehicleServiceJobDetailPage() {
     if (!job) return <ErrorAlert error={result.error} />;
     const expectedVersion = job.row_version ?? 0;
 
-    const canCancel = hasPermission(auth, vehicleServicePermissions.jobsTransition)
-        && (['draft', 'inspected', 'in_progress'].includes(job.status)
-            || (job.status === 'completed' && hasPermission(auth, vehicleServicePermissions.jobsCancelCompleted)));
+    const canCancel = hasPermission(auth, vehicleServicePermissions.jobsCancel)
+        && (['draft', 'inspected'].includes(job.status)
+            || (['in_progress', 'completed'].includes(job.status)
+                && hasPermission(auth, vehicleServicePermissions.jobsCancelAfterStart)));
     const needsBillingReversal = ['invoiced', 'partially_paid', 'paid'].includes(job.status)
-        && hasPermission(auth, vehicleServicePermissions.jobsTransition)
-        && hasPermission(auth, vehicleServicePermissions.jobsCancelCompleted);
+        && hasPermission(auth, vehicleServicePermissions.jobsCancel)
+        && hasPermission(auth, vehicleServicePermissions.jobsCancelAfterStart);
 
     const handleCancelled = async (cancelled: VehicleServiceJob) => {
         // Apply the committed status even if the following refresh fails. Never

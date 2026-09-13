@@ -23,6 +23,8 @@ final class VehicleServiceJobCancellationService
 {
     private const ZERO_AMOUNT = '0.000000';
 
+    private const STOCK_REVERSAL_REASON_PREFIX = 'Job cancellation: ';
+
     public function __construct(
         private readonly PermissionCheckerInterface $permissions,
         private readonly InventoryFacade $inventory,
@@ -98,7 +100,7 @@ final class VehicleServiceJobCancellationService
                 throw new InvalidArgumentException('The stock issue for '.$line->description.' is missing, already reversed, or does not belong to this job. Reconcile it before cancellation.');
             }
 
-            $this->inventory->reverse($movement, $actorId);
+            $this->inventory->reverseMovement($movement, $actorId, self::STOCK_REVERSAL_REASON_PREFIX.$reason);
             // Missing non-zero postings are an error, not a zero-cost issue.
             try {
                 $this->finance->reverseIssue($job, $movement, $actorId, $reason);
@@ -112,12 +114,12 @@ final class VehicleServiceJobCancellationService
 
     private function assertAuthorized(VehicleServiceJob $job, ?int $actorId): void
     {
-        if ($actorId === null || ! $this->permissions->allows($actorId, (int) $job->tenant_id, VehicleServicePermission::JOBS_TRANSITION)) {
+        if ($actorId === null || ! $this->permissions->allows($actorId, (int) $job->tenant_id, VehicleServicePermission::JOBS_CANCEL)) {
             throw new AuthorizationException('You do not have permission to cancel vehicle service jobs.');
         }
-        if ($job->status === VehicleServiceJobStatus::Completed
-            && ! $this->permissions->allows($actorId, (int) $job->tenant_id, VehicleServicePermission::JOBS_CANCEL_COMPLETED)) {
-            throw new AuthorizationException('Cancelling a completed job requires the completed-job cancellation permission.');
+        if (in_array($job->status, [VehicleServiceJobStatus::InProgress, VehicleServiceJobStatus::Completed], true)
+            && ! $this->permissions->allows($actorId, (int) $job->tenant_id, VehicleServicePermission::JOBS_CANCEL_AFTER_START)) {
+            throw new AuthorizationException('Cancelling an in-progress or completed job requires the after-start cancellation permission.');
         }
     }
 

@@ -47,10 +47,12 @@ Route::prefix('api/v1/vehicle-service')->middleware($middleware)->name('api.v1.v
         Route::put('jobs/{job}/inspection', [VehicleServiceJobController::class, 'updateInspection'])->whereNumber('job')->name('inspection.update');
     });
     Route::middleware($requires(VehicleServicePermission::JOBS_TRANSITION))->group(function (): void {
-        Route::get('jobs/{job}/cancellation-preview', [VehicleServiceJobController::class, 'cancellationPreview'])->whereNumber('job')->name('jobs.cancellation-preview');
         Route::patch('jobs/{job}/inspect', [VehicleServiceJobController::class, 'inspect'])->whereNumber('job')->name('jobs.inspect');
         Route::patch('jobs/{job}/start', [VehicleServiceJobController::class, 'start'])->whereNumber('job')->name('jobs.start');
         Route::patch('jobs/{job}/complete', [VehicleServiceJobController::class, 'complete'])->whereNumber('job')->name('jobs.complete');
+    });
+    Route::middleware($requires(VehicleServicePermission::JOBS_CANCEL))->group(function (): void {
+        Route::get('jobs/{job}/cancellation-preview', [VehicleServiceJobController::class, 'cancellationPreview'])->whereNumber('job')->name('jobs.cancellation-preview');
         Route::patch('jobs/{job}/cancel', [VehicleServiceJobController::class, 'cancel'])->whereNumber('job')->name('jobs.cancel');
     });
 
@@ -69,6 +71,7 @@ Route::prefix('api/v1/vehicle-service')->middleware($middleware)->name('api.v1.v
         Route::get('jobs/{job}/employee-assignable-lines', [VehicleServiceWorkforceController::class, 'assignableLines'])->whereNumber('job')->name('employee-assignable-lines');
     });
     Route::middleware($requires(VehicleServicePermission::WORKFORCE_MANAGE))->group(function (): void {
+        Route::post('jobs/{job}/employees/batch', [VehicleServiceWorkforceController::class, 'storeBatch'])->whereNumber('job')->name('employees.store-batch');
         Route::post('jobs/{job}/lines/{line}/employees', [VehicleServiceWorkforceController::class, 'store'])->whereNumber('job')->whereNumber('line')->name('employees.store');
         Route::put('jobs/{job}/lines/{line}/employees/{assignment}', [VehicleServiceWorkforceController::class, 'update'])->whereNumber('job')->whereNumber('line')->whereNumber('assignment')->name('employees.update');
         Route::delete('jobs/{job}/lines/{line}/employees/{assignment}', [VehicleServiceWorkforceController::class, 'destroy'])->whereNumber('job')->whereNumber('line')->whereNumber('assignment')->name('employees.destroy');

@@ -279,6 +279,12 @@ final class VehicleEngineTest extends TestCase
         $this->tenantGetJson($tenantId, "/api/v1/vehicles/lookup/active?tenant_id={$tenantId}&organization_unit_id={$organizationUnitId}")
             ->assertOk()
             ->assertJsonFragment(['vehicle_number' => 'VEH-API']);
+        $this->tenantGetJson($tenantId, "/api/v1/vehicles/lookup/service-available?tenant_id={$tenantId}&organization_unit_id={$organizationUnitId}&search=api%201234")
+            ->assertOk()
+            ->assertJsonFragment(['registration_number' => 'API-1234']);
+        $this->tenantGetJson($tenantId, "/api/v1/vehicles/lookup/service-available?tenant_id={$tenantId}&organization_unit_id={$organizationUnitId}&search=api1234")
+            ->assertOk()
+            ->assertJsonFragment(['registration_number' => 'API-1234']);
 
         $this->runInTenant($tenantId, fn () => $this->putJson("/api/v1/vehicles/{$id}", [
             'tenant_id' => $tenantId,

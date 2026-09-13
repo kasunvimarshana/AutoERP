@@ -144,7 +144,7 @@ trait TestsVehicleServiceBillingReversal
             $this->cancelJob($job, $actor);
             $this->fail('Invoice reversal permission must not grant completed-job cancellation.');
         } catch (AuthorizationException $exception) {
-            $this->assertStringContainsString('completed-job cancellation permission', $exception->getMessage());
+            $this->assertStringContainsString('after-start cancellation permission', $exception->getMessage());
         }
         $this->allowCancellationPermissions(true);
         $this->assertSame(VehicleServiceJobStatus::Cancelled, $this->cancelJob($job, $actor)->status);

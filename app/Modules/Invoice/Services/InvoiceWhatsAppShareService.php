@@ -29,6 +29,7 @@ final class InvoiceWhatsAppShareService
     public function __construct(
         private readonly WhatsAppShareLinkService $links,
         private readonly CustomerWhatsAppVerificationService $verifications,
+        private readonly InvoiceWhatsAppMessageBuilder $messages,
         private readonly AuditRecorderInterface $audit,
     ) {}
 
@@ -43,11 +44,12 @@ final class InvoiceWhatsAppShareService
             $expiresAt,
             $this->routeParameters($invoice),
         );
-        $message = strtr((string) config('document-sharing.whatsapp.invoice_message'), [
-            '{recipient_name}' => $recipientName,
-            '{document_number}' => trim((string) $invoice->invoice_number) ?: 'Invoice #'.$invoice->getKey(),
-            '{document_url}' => $documentUrl,
-        ]);
+        $message = $this->messages->build(
+            invoice: $invoice,
+            recipientName: $recipientName,
+            documentNumber: trim((string) $invoice->invoice_number) ?: 'Invoice #'.$invoice->getKey(),
+            documentUrl: $documentUrl,
+        );
         $share = $this->links->create($recipientPhone, $message);
 
         $this->audit->record(new AuditEventData(

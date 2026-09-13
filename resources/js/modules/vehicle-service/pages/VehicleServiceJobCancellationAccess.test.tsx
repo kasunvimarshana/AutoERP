@@ -24,7 +24,7 @@ function showJob() {
 describe('Vehicle Service cancellation access and billing guidance', () => {
     beforeEach(() => {
         fixture.job = { id: 4, job_number: 'VSJ-000004', status: 'completed', row_version: 5, invoice_links: [], payment_links: [] } as unknown as VehicleServiceJob;
-        fixture.permissions = [vehicleServicePermissions.jobsTransition, vehicleServicePermissions.jobsCancelCompleted];
+        fixture.permissions = [vehicleServicePermissions.jobsCancel, vehicleServicePermissions.jobsCancelAfterStart];
     });
 
     it.each(['invoiced', 'partially_paid', 'paid'] as const)('guides an authorized user through billing reversal for a %s job without offering direct cancellation', (status) => {
@@ -45,15 +45,25 @@ describe('Vehicle Service cancellation access and billing guidance', () => {
         expect(screen.queryByRole('button', { name: /restore|reopen/i })).not.toBeInTheDocument();
     });
 
-    it('offers completed-job cancellation only with the elevated permission', async () => {
+    it.each(['in_progress', 'completed'] as const)('offers %s-job cancellation only with the elevated permission', async (status) => {
+        fixture.job.status = status;
         showJob();
         await userEvent.setup().click(screen.getByText('More actions'));
         expect(screen.getByRole('button', { name: 'Cancel job' })).toBeVisible();
     });
 
-    it('does not offer completed-job cancellation to an ordinary transition user', () => {
-        fixture.permissions = [vehicleServicePermissions.jobsTransition];
+    it.each(['in_progress', 'completed'] as const)('does not offer %s-job cancellation with only the ordinary cancellation permission', (status) => {
+        fixture.job.status = status;
+        fixture.permissions = [vehicleServicePermissions.jobsCancel];
         showJob();
         expect(screen.queryByText('Cancel job')).not.toBeInTheDocument();
+    });
+
+    it.each(['draft', 'inspected'] as const)('offers %s-job cancellation with the ordinary cancellation permission', async (status) => {
+        fixture.job.status = status;
+        fixture.permissions = [vehicleServicePermissions.jobsCancel];
+        showJob();
+        await userEvent.setup().click(screen.getByText('More actions'));
+        expect(screen.getByRole('button', { name: 'Cancel job' })).toBeVisible();
     });
 });

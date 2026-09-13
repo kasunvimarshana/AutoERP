@@ -6,6 +6,7 @@ namespace Modules\Inventory\Services;
 
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
+use Modules\Core\Services\DecimalMath;
 use Modules\Inventory\Enums\BatchStatus;
 use Modules\Inventory\Models\InventoryBatch;
 use Modules\Item\Enums\ItemPriceType;
@@ -18,6 +19,7 @@ final class SellableBatchLookupService
     public function __construct(
         private readonly BatchPriceService $batchPrices,
         private readonly ItemPriceResolutionService $itemPrices,
+        private readonly DecimalMath $math,
     ) {}
 
     public function paginate(
@@ -53,6 +55,7 @@ final class SellableBatchLookupService
                 ->whereIn('tracking_type', [TrackingType::Batch->value, TrackingType::Lot->value]))
             ->with(['item.baseUom', 'variant'])
             ->withSum(['stockBalances as available_stock_quantity' => $balanceScope], 'quantity_available')
+            ->withSum(['stockBalances as reserved_stock_quantity' => $balanceScope], 'quantity_reserved')
             ->whereHas('stockBalances', function (Builder $balance) use ($balanceScope): void {
                 $balanceScope($balance);
                 $balance->where('quantity_available', '>', 0);
@@ -92,6 +95,14 @@ final class SellableBatchLookupService
                 )
                 : null;
 
+            $batch->setAttribute(
+                'available_stock_quantity',
+                $this->math->normalize((string) ($batch->getAttribute('available_stock_quantity') ?? '0')),
+            );
+            $batch->setAttribute(
+                'reserved_stock_quantity',
+                $this->math->normalize((string) ($batch->getAttribute('reserved_stock_quantity') ?? '0')),
+            );
             $batch->setAttribute('batch_price_revision_id', $batchPrice?->getKey());
             $batch->setAttribute('resolved_service_unit_price', $batchPrice?->amount ?? $fallback?->amount ?? '0.000000');
             $batch->setAttribute('price_source', $batchPrice === null ? ($fallback?->source ?? 'manual') : 'batch_price_revision');

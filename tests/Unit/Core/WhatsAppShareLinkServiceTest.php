@@ -28,14 +28,17 @@ final class WhatsAppShareLinkServiceTest extends TestCase
 
     public function test_it_builds_an_encoded_wa_me_message(): void
     {
+        $message = "Invoice INV-1\n\nView or download PDF:\nhttps://erp.example.test/shared/invoice?expires=123&signature=abc";
         $result = app(WhatsAppShareLinkService::class)->create(
             '0771234567',
-            "Invoice INV-1\nhttps://erp.example.test/shared/invoice",
+            $message,
         );
+        parse_str((string) parse_url($result['whatsapp_url'], PHP_URL_QUERY), $query);
 
         self::assertSame('94771234567', $result['phone']);
         self::assertStringStartsWith('https://wa.me/94771234567?text=', $result['whatsapp_url']);
-        self::assertStringContainsString('Invoice%20INV-1%0Ahttps%3A%2F%2Ferp.example.test', $result['whatsapp_url']);
+        self::assertStringContainsString('https%3A%2F%2Ferp.example.test%2Fshared%2Finvoice%3Fexpires%3D123%26signature%3Dabc', $result['whatsapp_url']);
+        self::assertSame($message, $query['text'] ?? null);
     }
 
     public function test_it_rejects_invalid_numbers(): void

@@ -70,6 +70,7 @@ trait TestsVehicleServiceCancellation
                 $this->assertSame($issue->quantity, $reverse->quantity);
                 $this->assertSame($issue->total_cost, $reverse->total_cost);
                 $this->assertSame($issue->warehouse_location_id, $reverse->warehouse_location_id);
+                $this->assertSame('Job cancellation: Items returned; Reversal of '.$issue->movement_number, $reverse->description);
                 $this->assertSame((int) $issue->id, (int) $cancelled->lines()->findOrFail($issue->source_line_id)->inventory_movement_id);
                 $journal = FinanceJournalEntry::query()->where('source_type', VehicleServiceFinanceSource::INVENTORY_ISSUE)->where('source_id', $issue->id)->whereNull('reversal_of_id')->sole();
                 $this->assertSame(JournalStatus::Reversed, $journal->status);
@@ -162,19 +163,38 @@ trait TestsVehicleServiceCancellation
         $this->cancelJob($job, $actor);
     }
 
-    public function test_cancellation_completed_job_requires_elevated_permission_even_with_stale_model(): void
+    public function test_draft_and_inspected_jobs_require_only_the_ordinary_cancellation_permission(): void
+    {
+        $context = $this->context();
+        $actor = $this->cancellationActor($context, false);
+
+        $draft = $this->createJob($context);
+        $this->assertSame(
+            VehicleServiceJobStatus::Cancelled,
+            $this->cancelJob($draft, $actor)->status,
+        );
+
+        $inspected = $this->createJob($context);
+        $this->changeStatus($inspected, VehicleServiceJobStatus::Inspected);
+        $this->assertSame(
+            VehicleServiceJobStatus::Cancelled,
+            $this->cancelJob($inspected, $actor)->status,
+        );
+    }
+
+    public function test_cancellation_after_start_requires_elevated_permission_even_with_stale_model(): void
     {
         $context = $this->context();
         $actor = $this->cancellationActor($context, false);
         $job = $this->createJob($context);
         $this->changeStatus($job, VehicleServiceJobStatus::InProgress);
-        $this->changeStatus($job, VehicleServiceJobStatus::Completed);
         try {
             $this->cancelJob($job, $actor);
             $this->fail('The current locked status must require elevated permission.');
         } catch (AuthorizationException $exception) {
-            $this->assertStringContainsString('completed-job cancellation permission', $exception->getMessage());
+            $this->assertStringContainsString('after-start cancellation permission', $exception->getMessage());
         }
+        $this->changeStatus($job, VehicleServiceJobStatus::Completed);
         $completedAt = $this->refreshJob($job)->completed_at;
         $this->allowCancellationPermissions(true);
         $cancelled = $this->cancelJob($job, $actor);
@@ -281,8 +301,8 @@ trait TestsVehicleServiceCancellation
     private function allowCancellationPermissions(bool $completed): void
     {
         $this->mock(PermissionCheckerInterface::class, function ($mock) use ($completed): void {
-            $mock->shouldReceive('allows')->andReturnUsing(fn (int $userId, int $tenantId, string $permission): bool => $permission === VehicleServicePermission::JOBS_TRANSITION
-                || ($completed && $permission === VehicleServicePermission::JOBS_CANCEL_COMPLETED));
+            $mock->shouldReceive('allows')->andReturnUsing(fn (int $userId, int $tenantId, string $permission): bool => $permission === VehicleServicePermission::JOBS_CANCEL
+                || ($completed && $permission === VehicleServicePermission::JOBS_CANCEL_AFTER_START));
         });
     }
 

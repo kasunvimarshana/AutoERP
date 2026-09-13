@@ -19,6 +19,7 @@ final class SellableBatchOptionResource extends JsonResource
             'item_type' => $this->item?->item_type instanceof \BackedEnum ? $this->item->item_type->value : (string) $this->item?->item_type,
             'tracking_type' => $this->item?->tracking_type instanceof \BackedEnum ? $this->item->tracking_type->value : (string) $this->item?->tracking_type,
             'is_stockable' => true,
+            'reorder_level' => $this->item?->reorder_level === null ? null : (string) $this->item->reorder_level,
             'item_variant_id' => $this->item_variant_id,
             'base_uom' => $this->item?->baseUom === null ? null : [
                 'id' => (int) $this->item->baseUom->getKey(),
@@ -37,6 +38,7 @@ final class SellableBatchOptionResource extends JsonResource
             'resolved_service_unit_price' => (string) $this->getAttribute('resolved_service_unit_price'),
             'resolved_purchase_unit_price' => '0.000000',
             'available_stock_quantity' => (string) $this->getAttribute('available_stock_quantity'),
+            'reserved_stock_quantity' => (string) ($this->getAttribute('reserved_stock_quantity') ?? '0.000000'),
             'price_source' => $this->getAttribute('price_source'),
         ];
     }

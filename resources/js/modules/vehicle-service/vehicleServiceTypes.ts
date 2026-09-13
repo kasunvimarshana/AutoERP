@@ -89,6 +89,14 @@ export interface VehicleServiceEmployeeAssignmentPayload {
     status?: 'assigned' | 'completed' | 'cancelled';
 }
 
+export interface VehicleServiceEmployeeAssignmentBatchPayload {
+    expected_version: number;
+    assignments: Array<{
+        line_id: number;
+        employee_id: number;
+    }>;
+}
+
 export interface VehicleServiceJobLine {
     id: number;
     parent_line_id?: number | null;

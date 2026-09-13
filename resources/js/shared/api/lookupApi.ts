@@ -70,22 +70,11 @@ export const lookupApi = {
         key: 'lookup:items:active',
         load: (params) => itemLookup(`${endpoints.items}/lookup`, params),
     }),
-    stockableItems: createQueryCachedLookupLoader<ItemLookupResource>({
-        key: 'lookup:items:stockable',
-        load: (params) => itemLookup(`${endpoints.items}/lookup/stockable`, params),
-    }),
-    untrackedStockableItems: createQueryCachedLookupLoader<ItemLookupResource>({
-        key: 'lookup:items:untracked-stockable',
-        load: (params) => itemLookup(`${endpoints.items}/lookup/untracked-stockable`, params),
-    }),
-    batchTrackedStockableItems: createQueryCachedLookupLoader<ItemLookupResource>({
-        key: 'lookup:items:batch-tracked-stockable',
-        load: (params) => itemLookup(`${endpoints.items}/lookup/batch-tracked-stockable`, params),
-    }),
-    serviceBatchItems: createQueryCachedLookupLoader<ItemLookupResource>({
-        key: 'lookup:inventory:service-batches',
-        load: (params) => itemLookup(`${endpoints.inventory}/batches/service-options`, params),
-    }),
+    // Stock quantities are live transactional data and must not be served from the lookup cache.
+    stockableItems: (params: LookupLoadParams) => itemLookup(`${endpoints.items}/lookup/stockable`, params),
+    untrackedStockableItems: (params: LookupLoadParams) => itemLookup(`${endpoints.items}/lookup/untracked-stockable`, params),
+    batchTrackedStockableItems: (params: LookupLoadParams) => itemLookup(`${endpoints.items}/lookup/batch-tracked-stockable`, params),
+    serviceBatchItems: (params: LookupLoadParams) => itemLookup(`${endpoints.inventory}/batches/service-options`, params),
     serviceItems: createQueryCachedLookupLoader<ItemLookupResource>({
         key: 'lookup:items:service',
         load: (params) => itemLookup(`${endpoints.items}/lookup/service`, params),
