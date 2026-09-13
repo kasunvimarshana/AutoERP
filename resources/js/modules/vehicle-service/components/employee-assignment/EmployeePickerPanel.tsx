@@ -10,12 +10,12 @@ import type { PaginationMeta } from '@/shared/types/pagination';
 const SEARCH_DEBOUNCE_MS = 300;
 const RESULTS_PER_PAGE = 20;
 
-export function EmployeePickerPanel({ lineLabel, selectedEmployee, excludeIds, onClose, onSelect }: {
+export function EmployeePickerPanel({ lineLabel, selectedEmployeeIds, excludeIds, onClose, onToggle }: {
     lineLabel: string;
-    selectedEmployee: NamedResource | null;
+    selectedEmployeeIds: number[];
     excludeIds: number[];
     onClose: () => void;
-    onSelect: (employee: NamedResource) => void;
+    onToggle: (employee: NamedResource) => void;
 }) {
     const [search, setSearch] = useState('');
     const debouncedSearch = useDebounce(search.trim(), SEARCH_DEBOUNCE_MS);
@@ -88,21 +88,21 @@ export function EmployeePickerPanel({ lineLabel, selectedEmployee, excludeIds, o
                 {!loading && error && <PickerMessage tone="error">{error}</PickerMessage>}
                 {!loading && !error && visibleEmployees.length === 0 && <PickerMessage>No matching available employees.</PickerMessage>}
                 {!loading && visibleEmployees.map((employee) => {
-                    const selected = Number(selectedEmployee?.id) === Number(employee.id);
+                    const selected = selectedEmployeeIds.includes(Number(employee.id));
                     return (
                         <button
                             key={employee.id}
                             type="button"
                             className={`flex w-full items-center gap-3 border-b border-slate-100 px-4 py-3 text-left transition ${selected ? 'bg-sky-50' : 'hover:bg-slate-50'}`}
                             aria-pressed={selected}
-                            onClick={() => onSelect(employee)}
+                            onClick={() => onToggle(employee)}
                         >
                             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sky-100 text-xs font-semibold text-sky-800">{initials(employee.name ?? employee.code ?? '')}</span>
                             <span className="min-w-0 flex-1">
                                 <strong className="block truncate text-sm font-medium text-slate-900">{employee.name}</strong>
                                 <span className="block truncate text-xs text-slate-500">{employee.code}</span>
                             </span>
-                            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-300 text-base font-semibold text-white" aria-hidden="true">+</span>
+                            <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-base font-semibold text-white ${selected ? 'bg-sky-600' : 'bg-slate-300'}`} aria-hidden="true">{selected ? '✓' : '+'}</span>
                         </button>
                     );
                 })}

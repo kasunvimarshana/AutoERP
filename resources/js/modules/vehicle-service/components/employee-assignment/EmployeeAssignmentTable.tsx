@@ -26,7 +26,7 @@ export function EmployeeAssignmentTable({
     jobSupervisor,
     assigning,
     pendingEmployees,
-    onPendingChange,
+    onPendingToggle,
     onAssignSelected,
     onEdit,
     onRemove,
@@ -35,8 +35,8 @@ export function EmployeeAssignmentTable({
     loading: boolean;
     jobSupervisor: NamedResource | null;
     assigning: boolean;
-    pendingEmployees: Record<number, NamedResource>;
-    onPendingChange: (lineId: number, employee: NamedResource) => void;
+    pendingEmployees: Record<number, NamedResource[]>;
+    onPendingToggle: (lineId: number, employee: NamedResource) => void;
     onAssignSelected: (assignments: PendingWorkforceAssignment[]) => void;
     onEdit: (row: AssignmentRow) => void;
     onRemove: (row: AssignmentRow) => void;
@@ -46,7 +46,11 @@ export function EmployeeAssignmentTable({
 
     if (loading) return <LoadingState />;
     if (lines.length === 0) {
-        return <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">No service or labour lines are available for workforce assignment.</div>;
+        return (
+            <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">
+                No service or labour lines are available for workforce assignment.
+            </div>
+        );
     }
 
     const selections = lines.flatMap((line): PendingWorkforceAssignment[] => {
@@ -54,67 +58,86 @@ export function EmployeeAssignmentTable({
         if (line.uses_job_supervisor === true && !alreadyAssigned && jobSupervisor) {
             return [{ line, employee: jobSupervisor }];
         }
-        const employee = pendingEmployees[line.id];
-        return employee ? [{ line, employee }] : [];
+
+        return (pendingEmployees[line.id] ?? []).map((employee) => ({ line, employee }));
     });
     const assignedIds = pickerLine?.employee_assignments?.map((assignment) => assignment.employee_id) ?? [];
+    const pickerSelections = pickerLine ? pendingEmployees[pickerLine.id] ?? [] : [];
 
     return (
         <div className={pickerLine ? 'grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]' : ''}>
             <div className="min-w-0 space-y-5">
-            <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                    <h3 className="font-semibold text-slate-900">Workforce assignments</h3>
-                    <p className="text-sm text-slate-500">Select employees, then save all pending assignments together.</p>
-                </div>
-                <Button type="button" loading={assigning} disabled={assigning || selections.length === 0} onClick={() => onAssignSelected(selections)}>
-                    Assign selected employees{selections.length > 0 ? ` (${selections.length})` : ''}
-                </Button>
-            </div>
-
-            {groupLines(lines).map((group) => (
-                <section key={group.key} className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-                    <header className="border-b border-slate-200 bg-slate-50 px-4 py-3 sm:px-5">
-                        <h3 className="font-semibold text-slate-900">{group.title}</h3>
-                        <p className="text-sm text-slate-500">{group.subtitle}</p>
-                    </header>
-                    <div className="divide-y divide-slate-200">
-                        {group.lines.map((line) => (
-                            <WorkforceLine
-                                key={line.id}
-                                line={line}
-                                jobSupervisor={jobSupervisor}
-                                selectedEmployee={line.uses_job_supervisor === true ? jobSupervisor : (pendingEmployees[line.id] ?? null)}
-                                assigning={assigning}
-                                onOpenPicker={() => setPickerLineId(line.id)}
-                                onEdit={onEdit}
-                                onRemove={onRemove}
-                            />
-                        ))}
+                <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <h3 className="font-semibold text-slate-900">Workforce assignments</h3>
+                        <p className="text-sm text-slate-500">Select one or more employees per line, then save all pending assignments together.</p>
                     </div>
-                </section>
-            ))}
+                    <Button
+                        type="button"
+                        loading={assigning}
+                        disabled={assigning || selections.length === 0}
+                        onClick={() => onAssignSelected(selections)}
+                    >
+                        Assign selected employees{selections.length > 0 ? ` (${selections.length})` : ''}
+                    </Button>
+                </div>
+
+                {groupLines(lines).map((group) => (
+                    <section key={group.key} className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+                        <header className="border-b border-slate-200 bg-slate-50 px-4 py-3 sm:px-5">
+                            <h3 className="font-semibold text-slate-900">{group.title}</h3>
+                            <p className="text-sm text-slate-500">{group.subtitle}</p>
+                        </header>
+                        <div className="divide-y divide-slate-200">
+                            {group.lines.map((line) => (
+                                <WorkforceLine
+                                    key={line.id}
+                                    line={line}
+                                    jobSupervisor={jobSupervisor}
+                                    selectedEmployees={line.uses_job_supervisor === true
+                                        ? (jobSupervisor ? [jobSupervisor] : [])
+                                        : (pendingEmployees[line.id] ?? [])}
+                                    assigning={assigning}
+                                    onOpenPicker={() => setPickerLineId(line.id)}
+                                    onPendingRemove={(employee) => onPendingToggle(line.id, employee)}
+                                    onEdit={onEdit}
+                                    onRemove={onRemove}
+                                />
+                            ))}
+                        </div>
+                    </section>
+                ))}
             </div>
 
             {pickerLine && (
                 <EmployeePickerPanel
                     lineLabel={pickerLine.description}
-                    selectedEmployee={pendingEmployees[pickerLine.id] ?? null}
+                    selectedEmployeeIds={pickerSelections.map((employee) => Number(employee.id))}
                     excludeIds={assignedIds}
                     onClose={() => setPickerLineId(null)}
-                    onSelect={(employee) => onPendingChange(pickerLine.id, employee)}
+                    onToggle={(employee) => onPendingToggle(pickerLine.id, employee)}
                 />
             )}
         </div>
     );
 }
 
-function WorkforceLine({ line, jobSupervisor, selectedEmployee, assigning, onOpenPicker, onEdit, onRemove }: {
+function WorkforceLine({
+    line,
+    jobSupervisor,
+    selectedEmployees,
+    assigning,
+    onOpenPicker,
+    onPendingRemove,
+    onEdit,
+    onRemove,
+}: {
     line: VehicleServiceJobLine;
     jobSupervisor: NamedResource | null;
-    selectedEmployee: NamedResource | null;
+    selectedEmployees: NamedResource[];
     assigning: boolean;
     onOpenPicker: () => void;
+    onPendingRemove: (employee: NamedResource) => void;
     onEdit: (row: AssignmentRow) => void;
     onRemove: (row: AssignmentRow) => void;
 }) {
@@ -127,23 +150,56 @@ function WorkforceLine({ line, jobSupervisor, selectedEmployee, assigning, onOpe
         <div className="p-4 sm:p-5">
             <div className="flex flex-wrap items-center gap-2">
                 <h4 className="font-semibold text-slate-900">{line.line_number}. {line.description}</h4>
-                {supervisorLine && <span className="rounded-full bg-sky-100 px-2 py-1 text-xs font-semibold text-sky-800">Supervisor</span>}
+                {supervisorLine && (
+                    <span className="rounded-full bg-sky-100 px-2 py-1 text-xs font-semibold text-sky-800">Supervisor</span>
+                )}
             </div>
             <p className="mt-1 text-sm text-slate-500">Commission pool: {commission?.commission_value ?? '0.000000'}</p>
 
             {!supervisorAssigned && (
                 <div className="mt-4">
-                    <span className="mb-1 block text-sm font-medium text-slate-700">Employee</span>
+                    <span className="mb-1 block text-sm font-medium text-slate-700">Employees</span>
                     {supervisorLine ? (
                         <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
                             {jobSupervisor ? formatNamedResource(jobSupervisor) : <span className="text-amber-700">Select a Job Card supervisor first.</span>}
                         </div>
                     ) : (
-                        <button type="button" disabled={assigning} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-left text-sm hover:border-sky-500 disabled:bg-slate-50" onClick={onOpenPicker}>
-                            {selectedEmployee ? formatNamedResource(selectedEmployee) : <span className="text-slate-400">Select employee</span>}
+                        <button
+                            type="button"
+                            disabled={assigning}
+                            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-left text-sm hover:border-sky-500 disabled:bg-slate-50"
+                            onClick={onOpenPicker}
+                        >
+                            {selectedEmployees.length > 0
+                                ? `${selectedEmployees.length} employee${selectedEmployees.length === 1 ? '' : 's'} selected`
+                                : <span className="text-slate-400">Select one or more employees</span>}
                         </button>
                     )}
-                    {selectedEmployee && <p className="mt-1 text-xs text-sky-700">Pending assignment</p>}
+
+                    {!supervisorLine && selectedEmployees.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-2" aria-label="Pending employees">
+                            {selectedEmployees.map((employee) => (
+                                <span key={employee.id} className="inline-flex items-center gap-2 rounded-full bg-sky-50 px-3 py-1 text-xs font-medium text-sky-800">
+                                    {formatNamedResource(employee)}
+                                    {!supervisorLine && (
+                                        <button
+                                            type="button"
+                                            className="font-bold text-sky-600 hover:text-rose-600"
+                                            aria-label={`Remove ${formatNamedResource(employee)}`}
+                                            onClick={() => onPendingRemove(employee)}
+                                        >
+                                            ×
+                                        </button>
+                                    )}
+                                </span>
+                            ))}
+                        </div>
+                    )}
+                    {selectedEmployees.length > 0 && (
+                        <p className="mt-2 text-xs text-sky-700">
+                            {selectedEmployees.length} pending assignment{selectedEmployees.length === 1 ? '' : 's'}. Commission will be recalculated when saved.
+                        </p>
+                    )}
                 </div>
             )}
 
@@ -204,5 +260,10 @@ function formatNamedResource(resource: NamedResource): string {
 }
 
 function Summary({ label, value }: { label: string; value: string }) {
-    return <div><span className="text-xs uppercase text-slate-500">{label}</span><strong className="block font-medium text-slate-900">{value}</strong></div>;
+    return (
+        <div>
+            <span className="text-xs uppercase text-slate-500">{label}</span>
+            <strong className="block font-medium text-slate-900">{value}</strong>
+        </div>
+    );
 }

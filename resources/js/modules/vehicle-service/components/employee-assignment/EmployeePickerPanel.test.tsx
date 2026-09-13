@@ -22,14 +22,14 @@ describe('EmployeePickerPanel', () => {
     });
 
     it('renders as an inline contacts panel and selects an available employee', async () => {
-        const onSelect = vi.fn();
+        const onToggle = vi.fn();
         render(
             <EmployeePickerPanel
                 lineLabel="Oil change labour"
-                selectedEmployee={null}
+                selectedEmployeeIds={[]}
                 excludeIds={[21]}
                 onClose={vi.fn()}
-                onSelect={onSelect}
+                onToggle={onToggle}
             />,
         );
 
@@ -40,17 +40,17 @@ describe('EmployeePickerPanel', () => {
         ));
         expect(screen.queryByText('First technician')).not.toBeInTheDocument();
         await userEvent.click(await screen.findByRole('button', { name: /Second technician/ }));
-        expect(onSelect).toHaveBeenCalledWith({ id: 22, code: 'EMP-22', name: 'Second technician' });
+        expect(onToggle).toHaveBeenCalledWith({ id: 22, code: 'EMP-22', name: 'Second technician' });
     });
 
     it('searches employees after the user enters a term', async () => {
         render(
             <EmployeePickerPanel
                 lineLabel="Oil change labour"
-                selectedEmployee={null}
+                selectedEmployeeIds={[]}
                 excludeIds={[]}
                 onClose={vi.fn()}
-                onSelect={vi.fn()}
+                onToggle={vi.fn()}
             />,
         );
 

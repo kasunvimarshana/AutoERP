@@ -1,0 +1,37 @@
+diff --git a/resources/js/modules/vehicle-service/components/employee-assignment/EmployeePickerPanel.test.tsx b/resources/js/modules/vehicle-service/components/employee-assignment/EmployeePickerPanel.test.tsx
+--- a/resources/js/modules/vehicle-service/components/employee-assignment/EmployeePickerPanel.test.tsx
++++ b/resources/js/modules/vehicle-service/components/employee-assignment/EmployeePickerPanel.test.tsx
+@@ -25 +25 @@
+-        const onSelect = vi.fn();
++        const onToggle = vi.fn();
+@@ -29 +29 @@
+-                selectedEmployee={null}
++                selectedEmployeeIds={[]}
+@@ -32 +32 @@
+-                onSelect={onSelect}
++                onToggle={onToggle}
+@@ -43 +43 @@
+-        expect(onSelect).toHaveBeenCalledWith({ id: 22, code: 'EMP-22', name: 'Second technician' });
++        expect(onToggle).toHaveBeenCalledWith({ id: 22, code: 'EMP-22', name: 'Second technician' });
+@@ -50 +50 @@
+-                selectedEmployee={null}
++                selectedEmployeeIds={[]}
+@@ -53 +53 @@
+-                onSelect={vi.fn()}
++                onToggle={vi.fn()}
+diff --git a/resources/js/modules/vehicle-service/components/VehicleServiceEmployeeAssignmentTab.test.tsx b/resources/js/modules/vehicle-service/components/VehicleServiceEmployeeAssignmentTab.test.tsx
+--- a/resources/js/modules/vehicle-service/components/VehicleServiceEmployeeAssignmentTab.test.tsx
++++ b/resources/js/modules/vehicle-service/components/VehicleServiceEmployeeAssignmentTab.test.tsx
+@@ -23,3 +23,4 @@
+-    EmployeePickerPanel: ({ onSelect }: { onSelect: (employee: NamedResource) => void }) => (
++    EmployeePickerPanel: ({ onToggle }: { onToggle: (employee: NamedResource) => void }) => (
+         <aside aria-label="Employee contacts">
+-            <button type="button" onClick={() => onSelect({ id: 22, code: 'EMP-22', name: 'Second technician' })}>Choose Second technician</button>
++            <button type="button" onClick={() => onToggle({ id: 22, code: 'EMP-22', name: 'Second technician' })}>Choose Second technician</button>
++            <button type="button" onClick={() => onToggle({ id: 23, code: 'EMP-23', name: 'Third technician' })}>Choose Third technician</button>
+@@ -153 +154 @@
+-            assignments: [{ line_id: 11, employee_id: 22 }],
++            lines: [{ line_id: 11, employee_ids: [22] }],
+@@ -189 +190 @@
+-        await waitFor(() => expect(apiMocks.createVehicleServiceEmployeeBatch).toHaveBeenCalledWith(7, expect.objectContaining({ assignments: [{ line_id: 11, employee_id: 31 }] })));
++        await waitFor(() => expect(apiMocks.createVehicleServiceEmployeeBatch).toHaveBeenCalledWith(7, expect.objectContaining({ lines: [{ line_id: 11, employee_ids: [31] }] })));

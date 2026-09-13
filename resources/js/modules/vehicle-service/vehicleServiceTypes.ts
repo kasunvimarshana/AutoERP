@@ -91,9 +91,9 @@ export interface VehicleServiceEmployeeAssignmentPayload {
 
 export interface VehicleServiceEmployeeAssignmentBatchPayload {
     expected_version: number;
-    assignments: Array<{
+    lines: Array<{
         line_id: number;
-        employee_id: number;
+        employee_ids: number[];
     }>;
 }
 

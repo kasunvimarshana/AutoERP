@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\VehicleService\Http\Requests;
 
+use Illuminate\Validation\Validator;
 use Modules\Core\Http\Requests\TenantScopedRequest;
 use Modules\VehicleService\DTOs\VehicleServiceEmployeeAssignmentBatchEntryData;
 use Modules\VehicleService\DTOs\VehicleServiceEmployeeAssignmentData;
@@ -21,21 +22,44 @@ final class StoreVehicleServiceEmployeeBatchRequest extends TenantScopedRequest
             'tenant_id' => ['required', 'integer', 'min:1'],
             'organization_unit_id' => ['nullable', 'integer', 'min:1'],
             'expected_version' => $this->expectedVersionRules(),
-            'assignments' => ['required', 'array', 'min:1', 'max:'.self::MAX_ASSIGNMENTS_PER_REQUEST],
-            'assignments.*.line_id' => ['required', 'integer', 'min:1', 'distinct'],
-            'assignments.*.employee_id' => ['required', 'integer', 'min:1'],
+            'lines' => ['required', 'array', 'min:1', 'max:'.self::MAX_ASSIGNMENTS_PER_REQUEST],
+            'lines.*.line_id' => ['required', 'integer', 'min:1', 'distinct'],
+            'lines.*.employee_ids' => ['required', 'array', 'min:1', 'max:'.self::MAX_ASSIGNMENTS_PER_REQUEST],
+            'lines.*.employee_ids.*' => ['required', 'integer', 'min:1', 'distinct'],
         ];
+    }
+
+    /** @return list<callable(Validator): void> */
+    public function after(): array
+    {
+        return [function (Validator $validator): void {
+            $count = collect($this->input('lines', []))
+                ->sum(static fn (mixed $line): int => is_array($line) && is_array($line['employee_ids'] ?? null)
+                    ? count($line['employee_ids'])
+                    : 0);
+
+            if ($count > self::MAX_ASSIGNMENTS_PER_REQUEST) {
+                $validator->errors()->add(
+                    'lines',
+                    'A workforce batch cannot contain more than '.self::MAX_ASSIGNMENTS_PER_REQUEST.' employee assignments.',
+                );
+            }
+        }];
     }
 
     /** @return list<VehicleServiceEmployeeAssignmentBatchEntryData> */
     public function toData(): array
     {
-        return array_map(
-            static fn (array $row): VehicleServiceEmployeeAssignmentBatchEntryData => new VehicleServiceEmployeeAssignmentBatchEntryData(
-                lineId: (int) $row['line_id'],
-                assignment: new VehicleServiceEmployeeAssignmentData(employeeId: (int) $row['employee_id']),
-            ),
-            $this->validated('assignments'),
-        );
+        $entries = [];
+        foreach ($this->validated('lines') as $line) {
+            foreach ($line['employee_ids'] as $employeeId) {
+                $entries[] = new VehicleServiceEmployeeAssignmentBatchEntryData(
+                    lineId: (int) $line['line_id'],
+                    assignment: new VehicleServiceEmployeeAssignmentData(employeeId: (int) $employeeId),
+                );
+            }
+        }
+
+        return $entries;
     }
 }

@@ -1,0 +1,21 @@
+diff --git a/resources/js/modules/vehicle-service/components/employee-assignment/EmployeePickerPanel.tsx b/resources/js/modules/vehicle-service/components/employee-assignment/EmployeePickerPanel.tsx
+--- a/resources/js/modules/vehicle-service/components/employee-assignment/EmployeePickerPanel.tsx
++++ b/resources/js/modules/vehicle-service/components/employee-assignment/EmployeePickerPanel.tsx
+@@ -13 +13 @@
+-export function EmployeePickerPanel({ lineLabel, selectedEmployee, excludeIds, onClose, onSelect }: {
++export function EmployeePickerPanel({ lineLabel, selectedEmployeeIds, excludeIds, onClose, onToggle }: {
+@@ -15 +15 @@
+-    selectedEmployee: NamedResource | null;
++    selectedEmployeeIds: number[];
+@@ -18 +18 @@
+-    onSelect: (employee: NamedResource) => void;
++    onToggle: (employee: NamedResource) => void;
+@@ -91 +91 @@
+-                    const selected = Number(selectedEmployee?.id) === Number(employee.id);
++                    const selected = selectedEmployeeIds.includes(Number(employee.id));
+@@ -98 +98 @@
+-                            onClick={() => onSelect(employee)}
++                            onClick={() => onToggle(employee)}
+@@ -105 +105 @@
+-                            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-300 text-base font-semibold text-white" aria-hidden="true">+</span>
++                            <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-base font-semibold text-white ${selected ? 'bg-sky-600' : 'bg-slate-300'}`} aria-hidden="true">{selected ? '✓' : '+'}</span>

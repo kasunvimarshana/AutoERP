@@ -47,7 +47,7 @@ export default function VehicleServiceEmployeeAssignmentTab({ jobId, expectedVer
     const wasActive = useRef(active);
     const [dialog, setDialog] = useState<AssignmentDialogState | null>(null);
     const [removeTarget, setRemoveTarget] = useState<AssignmentRow | null>(null);
-    const [pendingEmployees, setPendingEmployees] = useState<Record<number, NamedResource>>({});
+    const [pendingEmployees, setPendingEmployees] = useState<Record<number, NamedResource[]>>({});
     const [saving, setSaving] = useState(false);
     const [assigning, setAssigning] = useState(false);
     const [removing, setRemoving] = useState(false);
@@ -93,10 +93,7 @@ export default function VehicleServiceEmployeeAssignmentTab({ jobId, expectedVer
         try {
             await createVehicleServiceEmployeeBatch(jobId, {
                 expected_version: expectedVersion,
-                assignments: assignments.map(({ line, employee }) => ({
-                    line_id: line.id,
-                    employee_id: Number(employee.id),
-                })),
+                lines: groupAssignmentsByLine(assignments),
             });
             setPendingEmployees({});
             await synchronize();
@@ -149,7 +146,20 @@ export default function VehicleServiceEmployeeAssignmentTab({ jobId, expectedVer
                 jobSupervisor={workforce?.supervisor ?? null}
                 assigning={assigning}
                 pendingEmployees={pendingEmployees}
-                onPendingChange={(lineId, employee) => setPendingEmployees((current) => ({ ...current, [lineId]: employee }))}
+                onPendingToggle={(lineId, employee) => setPendingEmployees((current) => {
+                    const selected = current[lineId] ?? [];
+                    const alreadySelected = selected.some((candidate) => Number(candidate.id) === Number(employee.id));
+                    const next = alreadySelected
+                        ? selected.filter((candidate) => Number(candidate.id) !== Number(employee.id))
+                        : [...selected, employee];
+                    if (next.length === 0) {
+                        const { [lineId]: removed, ...remaining } = current;
+                        void removed;
+                        return remaining;
+                    }
+
+                    return { ...current, [lineId]: next };
+                })}
                 onAssignSelected={(assignments) => void assignSelected(assignments)}
                 onEdit={(row) => {
                     setError(null);
@@ -170,4 +180,21 @@ async function loadWorkforceSnapshot(jobId: number, signal?: AbortSignal): Promi
     ]);
     if (typeof job.row_version !== 'number') throw new Error(MISSING_JOB_VERSION_MESSAGE);
     return { lines, rowVersion: job.row_version, supervisor: job.supervisor ?? null };
+}
+
+function groupAssignmentsByLine(assignments: PendingWorkforceAssignment[]): Array<{
+    line_id: number;
+    employee_ids: number[];
+}> {
+    const grouped = new Map<number, number[]>();
+    for (const { line, employee } of assignments) {
+        const employeeIds = grouped.get(line.id) ?? [];
+        employeeIds.push(Number(employee.id));
+        grouped.set(line.id, employeeIds);
+    }
+
+    return [...grouped.entries()].map(([lineId, employeeIds]) => ({
+        line_id: lineId,
+        employee_ids: employeeIds,
+    }));
 }

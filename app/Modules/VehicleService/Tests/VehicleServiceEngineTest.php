@@ -483,14 +483,6 @@ final class VehicleServiceEngineTest extends TestCase
             '100.000000',
             description: 'First batch labour line',
         );
-        $secondLine = $this->line(
-            $job,
-            VehicleServiceLineSourceType::ServiceItem,
-            $context['service'],
-            '1.000000',
-            '200.000000',
-            description: 'Second batch service line',
-        );
         $beforeVersion = $this->currentJobVersion($job);
 
         $created = $this->withTenantExecutionContext(
@@ -500,11 +492,19 @@ final class VehicleServiceEngineTest extends TestCase
                 [
                     new VehicleServiceEmployeeAssignmentBatchEntryData(
                         (int) $firstLine->getKey(),
-                        new VehicleServiceEmployeeAssignmentData($context['employee_id']),
+                        new VehicleServiceEmployeeAssignmentData(
+                            $context['employee_id'],
+                            commissionType: VehicleServiceCommissionType::Fixed,
+                            commissionValue: '150.000000',
+                        ),
                     ),
                     new VehicleServiceEmployeeAssignmentBatchEntryData(
-                        (int) $secondLine->getKey(),
-                        new VehicleServiceEmployeeAssignmentData($context['helper_employee_id']),
+                        (int) $firstLine->getKey(),
+                        new VehicleServiceEmployeeAssignmentData(
+                            $context['helper_employee_id'],
+                            commissionType: VehicleServiceCommissionType::Fixed,
+                            commissionValue: '150.000000',
+                        ),
                     ),
                 ],
                 $beforeVersion,
@@ -512,6 +512,10 @@ final class VehicleServiceEngineTest extends TestCase
         );
 
         $this->assertCount(2, $created);
+        $this->assertSame(
+            ['75.000000', '75.000000'],
+            $created->pluck('commission_amount')->map(static fn ($amount): string => (string) $amount)->all(),
+        );
         $this->assertSame($beforeVersion + 1, $this->currentJobVersion($job));
 
         $rollbackJob = $this->createJob($context);

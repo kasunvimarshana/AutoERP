@@ -20,9 +20,10 @@ const apiMocks = vi.hoisted(() => ({
 vi.mock('../vehicleServiceApi', () => apiMocks);
 
 vi.mock('./employee-assignment/EmployeePickerPanel', () => ({
-    EmployeePickerPanel: ({ onSelect }: { onSelect: (employee: NamedResource) => void }) => (
+    EmployeePickerPanel: ({ onToggle }: { onToggle: (employee: NamedResource) => void }) => (
         <aside aria-label="Employee contacts">
-            <button type="button" onClick={() => onSelect({ id: 22, code: 'EMP-22', name: 'Second technician' })}>Choose Second technician</button>
+            <button type="button" onClick={() => onToggle({ id: 22, code: 'EMP-22', name: 'Second technician' })}>Choose Second technician</button>
+            <button type="button" onClick={() => onToggle({ id: 23, code: 'EMP-23', name: 'Third technician' })}>Choose Third technician</button>
         </aside>
     ),
 }));
@@ -118,7 +119,7 @@ function refreshedJob(rowVersion: number): VehicleServiceJob {
 
 async function chooseAndAssignEmployee() {
     const user = userEvent.setup();
-    await user.click(await screen.findByRole('button', { name: 'Select employee' }));
+    await user.click(await screen.findByRole('button', { name: 'Select one or more employees' }));
     await user.click(screen.getByRole('button', { name: 'Choose Second technician' }));
     await user.click(screen.getByRole('button', { name: 'Assign selected employees (1)' }));
 }
@@ -150,11 +151,30 @@ describe('VehicleServiceEmployeeAssignmentTab', () => {
 
         await waitFor(() => expect(apiMocks.createVehicleServiceEmployeeBatch).toHaveBeenCalledWith(7, {
             expected_version: 9,
-            assignments: [{ line_id: 11, employee_id: 22 }],
+            lines: [{ line_id: 11, employee_ids: [22] }],
         }));
         expect(screen.queryByRole('button', { name: 'Add' })).not.toBeInTheDocument();
         expect(onVersionChanged).toHaveBeenNthCalledWith(1, 9);
         await waitFor(() => expect(onVersionChanged).toHaveBeenLastCalledWith(10));
+    });
+
+    it('assigns multiple pending employees to the same labour line', async () => {
+        const user = userEvent.setup();
+        renderTab();
+
+        await user.click(await screen.findByRole('button', { name: 'Select one or more employees' }));
+        await user.click(screen.getByRole('button', { name: 'Choose Second technician' }));
+        await user.click(screen.getByRole('button', { name: 'Choose Third technician' }));
+
+        expect(screen.getByRole('button', { name: '2 employees selected' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Remove EMP-22 - Second technician' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Remove EMP-23 - Third technician' })).toBeInTheDocument();
+        await user.click(screen.getByRole('button', { name: 'Assign selected employees (2)' }));
+
+        await waitFor(() => expect(apiMocks.createVehicleServiceEmployeeBatch).toHaveBeenCalledWith(7, {
+            expected_version: 9,
+            lines: [{ line_id: 11, employee_ids: [22, 23] }],
+        }));
     });
 
     it('reloads stale data and preserves the pending choice for retry', async () => {
@@ -186,7 +206,7 @@ describe('VehicleServiceEmployeeAssignmentTab', () => {
         expect(screen.getByText('EMP-31 - Service Supervisor')).toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'EMP-31 - Service Supervisor' })).not.toBeInTheDocument();
         await userEvent.click(screen.getByRole('button', { name: 'Assign selected employees (1)' }));
-        await waitFor(() => expect(apiMocks.createVehicleServiceEmployeeBatch).toHaveBeenCalledWith(7, expect.objectContaining({ assignments: [{ line_id: 11, employee_id: 31 }] })));
+        await waitFor(() => expect(apiMocks.createVehicleServiceEmployeeBatch).toHaveBeenCalledWith(7, expect.objectContaining({ lines: [{ line_id: 11, employee_ids: [31] }] })));
     });
 
     it('blocks an automatic supervisor assignment when the Job Card has no supervisor', async () => {
