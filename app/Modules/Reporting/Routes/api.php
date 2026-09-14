@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
+use Modules\Reporting\Http\Controllers\DashboardController;
 use Modules\Reporting\Http\Controllers\EmployeeCommissionReportController;
 use Modules\Reporting\Http\Controllers\OperationalReportController;
 use Modules\Reporting\Http\Controllers\ReportController;
@@ -26,6 +27,7 @@ $exportFormats = ['html', 'csv', 'xlsx', 'pdf', 'print'];
 Route::prefix('api/v1/reports')->middleware($middleware)->name('api.v1.reports.')->group(function () use ($requires, $exportFormats): void {
     Route::middleware($requires(ReportingAuthorizationService::REPORTS_VIEW))->group(function (): void {
         Route::get('/', [ReportController::class, 'index'])->name('index');
+        Route::get('dashboard', DashboardController::class)->name('dashboard');
         Route::get('summary', [OperationalReportController::class, 'summary'])->name('summary');
         Route::get('purchase/detailed', [OperationalReportController::class, 'detailedPurchase'])->name('purchase.detailed');
         Route::get('purchase/grn-payables', [OperationalReportController::class, 'grnPayables'])->name('purchase.grn-payables');
