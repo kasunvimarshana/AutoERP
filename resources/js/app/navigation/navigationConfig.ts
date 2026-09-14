@@ -852,6 +852,28 @@ export const tenantNavigationSections: NavigationSection[] = [
                             permissions: [reportingPermissions.view],
                         },
                     },
+                    {
+                        id: "employee-commission-report",
+                        type: "link",
+                        label: "Employee Commission",
+                        to: "/reports/vehicle-service/employee-commissions",
+                        match: ["/reports/vehicle-service/employee-commissions"],
+                        access: {
+                            ...operationalAccess(["reporting"]),
+                            permissions: [reportingPermissions.view],
+                        },
+                    },
+                    {
+                        id: "vehicle-service-history-report",
+                        type: "link",
+                        label: "Vehicle Service History",
+                        to: "/reports/vehicle-service/service-history",
+                        match: ["/reports/vehicle-service/service-history"],
+                        access: {
+                            ...operationalAccess(["reporting"]),
+                            permissions: [reportingPermissions.view],
+                        },
+                    },
                 ],
             },
             {

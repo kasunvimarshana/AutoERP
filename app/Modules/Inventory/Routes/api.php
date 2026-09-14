@@ -139,6 +139,9 @@ Route::prefix('api/v1/inventory')->middleware($middleware)->name('api.v1.invento
     Route::post('batches', [BatchController::class, 'store'])
         ->middleware($requires(InventoryPermission::TRACKING_MANAGE))
         ->name('batches.store');
+    Route::post('batches/generate-number', [BatchController::class, 'generateNumber'])
+        ->middleware($requires(InventoryPermission::TRACKING_MANAGE))
+        ->name('batches.generate-number');
     Route::get('batch-prices', [BatchController::class, 'prices'])
         ->middleware($requires(InventoryPermission::TRACKING_VIEW))
         ->name('batch-prices.index');

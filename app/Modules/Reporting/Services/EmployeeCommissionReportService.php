@@ -520,6 +520,8 @@ final class EmployeeCommissionReportService
                 .'COUNT(DISTINCT commission_rows.job_id) as total_jobs, '
                 ."COALESCE(SUM(CASE WHEN commission_rows.commission_status <> 'cancelled' THEN commission_rows.assigned_hours ELSE 0 END), 0) as total_hours, "
                 ."COALESCE(SUM(CASE WHEN commission_rows.commission_status <> 'cancelled' THEN commission_rows.labour_amount ELSE 0 END), 0) as total_labour_value, "
+                ."COALESCE(SUM(CASE WHEN commission_rows.commission_status = 'earned' THEN commission_rows.commission_amount ELSE 0 END), 0) as earned_commission, "
+                ."COALESCE(SUM(CASE WHEN commission_rows.commission_status = 'pending' THEN commission_rows.commission_amount ELSE 0 END), 0) as pending_commission, "
                 ."COALESCE(SUM(CASE WHEN commission_rows.commission_status <> 'cancelled' THEN commission_rows.commission_amount ELSE 0 END), 0) as total_commission",
             )
             ->groupBy($key)
@@ -540,6 +542,8 @@ final class EmployeeCommissionReportService
                     'total_jobs' => (int) $row->total_jobs,
                     'total_hours' => $this->decimal($row->total_hours),
                     'total_labour_value' => $this->decimal($row->total_labour_value),
+                    'earned_commission' => $this->decimal($row->earned_commission),
+                    'pending_commission' => $this->decimal($row->pending_commission),
                     'total_commission' => $this->decimal($row->total_commission),
                 ];
             })

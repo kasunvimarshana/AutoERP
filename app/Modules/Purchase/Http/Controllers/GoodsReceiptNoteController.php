@@ -5,10 +5,13 @@ declare(strict_types=1);
 namespace Modules\Purchase\Http\Controllers;
 
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Modules\Inventory\Services\BatchNumberService;
 use Modules\Purchase\Constants\PurchaseAuditEvent;
 use Modules\Purchase\Enums\GoodsReceiptNoteStatus;
 use Modules\Purchase\Http\Controllers\Concerns\ScopesPurchaseRequests;
+use Modules\Purchase\Http\Requests\GenerateGoodsReceiptBatchNumberRequest;
 use Modules\Purchase\Http\Requests\ListPurchaseDocumentRequest;
 use Modules\Purchase\Http\Requests\PurchaseActionRequest;
 use Modules\Purchase\Http\Requests\StoreGoodsReceiptNoteRequest;
@@ -69,6 +72,17 @@ final class GoodsReceiptNoteController
         $this->presentation->prepareGoodsReceipts($goodsReceipts->getCollection());
 
         return GoodsReceiptNoteResource::collection($goodsReceipts);
+    }
+
+    public function generateBatchNumber(
+        GenerateGoodsReceiptBatchNumberRequest $request,
+        BatchNumberService $numbers,
+    ): JsonResponse {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PurchaseAuthorizationService::GOODS_RECEIPTS_CREATE);
+
+        return response()->json([
+            'data' => ['batch_number' => $numbers->next($request->tenantId())],
+        ]);
     }
 
     public function store(StoreGoodsReceiptNoteRequest $request, GoodsReceiptNoteService $service): GoodsReceiptNoteResource

@@ -8,6 +8,7 @@ use Modules\Reporting\Http\Controllers\OperationalReportController;
 use Modules\Reporting\Http\Controllers\ReportController;
 use Modules\Reporting\Http\Controllers\TechnicianWorkReportController;
 use Modules\Reporting\Http\Controllers\VehicleRentalReportController;
+use Modules\Reporting\Http\Controllers\VehicleServiceHistoryReportController;
 use Modules\Reporting\Services\ReportingAuthorizationService;
 
 $middleware = [
@@ -33,6 +34,8 @@ Route::prefix('api/v1/reports')->middleware($middleware)->name('api.v1.reports.'
         Route::get('vehicle-service/technician-work', [TechnicianWorkReportController::class, 'index'])->name('vehicle-service.technician-work');
         Route::get('vehicle-service/employee-commissions', [EmployeeCommissionReportController::class, 'index'])
             ->name('vehicle-service.employee-commissions');
+        Route::get('vehicle-service/service-history', [VehicleServiceHistoryReportController::class, 'index'])
+            ->name('vehicle-service.service-history');
 
         Route::middleware('tenant.feature:vehicle-rental')->group(function (): void {
             Route::get('vehicle-rental/running-chart', [VehicleRentalReportController::class, 'runningChart'])->name('vehicle-rental.running-chart');
@@ -65,6 +68,9 @@ Route::prefix('api/v1/reports')->middleware($middleware)->name('api.v1.reports.'
         Route::get('vehicle-service/employee-commissions/export/{format}', [EmployeeCommissionReportController::class, 'export'])
             ->whereIn('format', $exportFormats)
             ->name('vehicle-service.employee-commissions.export');
+        Route::get('vehicle-service/service-history/export/{format}', [VehicleServiceHistoryReportController::class, 'export'])
+            ->whereIn('format', $exportFormats)
+            ->name('vehicle-service.service-history.export');
 
         Route::middleware('tenant.feature:vehicle-rental')->group(function () use ($exportFormats): void {
             Route::get('vehicle-rental/running-chart/export/{format}', [VehicleRentalReportController::class, 'exportRunningChart'])

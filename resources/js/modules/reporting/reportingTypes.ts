@@ -49,3 +49,9 @@ export type {
     GrnPayablesSummary,
     GrnPayablesSupplierRow,
 } from './grnPayablesReportTypes';
+export type {
+    VehicleServiceHistoryLine,
+    VehicleServiceHistoryParams,
+    VehicleServiceHistoryResult,
+    VehicleServiceHistoryRow,
+} from './vehicleServiceHistoryTypes';

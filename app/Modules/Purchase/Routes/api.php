@@ -58,6 +58,7 @@ Route::prefix('api/v1/purchase')->middleware($middleware)->name('api.v1.purchase
     Route::get('orders/{order}/invoiceable-lines', [PurchaseEligibilityController::class, 'invoiceableOrderLines'])->whereNumber('order')->middleware($requires(PurchaseAuthorizationService::SUPPLIER_INVOICES_VIEW))->name('orders.invoiceable-lines');
 
     Route::get('goods-receipts', [GoodsReceiptNoteController::class, 'index'])->middleware($requires(PurchaseAuthorizationService::GOODS_RECEIPTS_VIEW))->name('goods-receipts.index');
+    Route::post('goods-receipts/batch-number', [GoodsReceiptNoteController::class, 'generateBatchNumber'])->middleware($requires(PurchaseAuthorizationService::GOODS_RECEIPTS_CREATE))->name('goods-receipts.batch-number');
     Route::post('goods-receipts', [GoodsReceiptNoteController::class, 'store'])->middleware($requires(PurchaseAuthorizationService::GOODS_RECEIPTS_CREATE))->name('goods-receipts.store');
     Route::get('goods-receipts/{grn}', [GoodsReceiptNoteController::class, 'show'])->whereNumber('grn')->middleware($requires(PurchaseAuthorizationService::GOODS_RECEIPTS_VIEW))->name('goods-receipts.show');
     Route::patch('goods-receipts/{grn}/post', [GoodsReceiptNoteController::class, 'post'])->whereNumber('grn')->middleware($requires(PurchaseAuthorizationService::GOODS_RECEIPTS_POST))->name('goods-receipts.post');

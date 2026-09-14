@@ -6,6 +6,7 @@ namespace Modules\Inventory\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Modules\Inventory\Http\Requests\GenerateInventoryBatchNumberRequest;
 use Modules\Inventory\Http\Requests\InventoryLookupRequest;
 use Modules\Inventory\Http\Requests\StoreBatchPriceRequest;
 use Modules\Inventory\Http\Requests\StoreInventoryBatchRequest;
@@ -14,12 +15,22 @@ use Modules\Inventory\Http\Resources\InventoryBatchPriceResource;
 use Modules\Inventory\Http\Resources\InventoryBatchResource;
 use Modules\Inventory\Http\Resources\SellableBatchOptionResource;
 use Modules\Inventory\Models\InventoryBatchPriceRevision;
+use Modules\Inventory\Services\BatchNumberService;
 use Modules\Inventory\Services\BatchPriceService;
 use Modules\Inventory\Services\BatchTrackingService;
 use Modules\Inventory\Services\SellableBatchLookupService;
 
 final class BatchController extends InventoryQueryController
 {
+    public function generateNumber(
+        GenerateInventoryBatchNumberRequest $request,
+        BatchNumberService $numbers,
+    ): JsonResponse {
+        return response()->json([
+            'data' => ['batch_number' => $numbers->next($request->tenantId())],
+        ]);
+    }
+
     public function serviceOptions(
         InventoryLookupRequest $request,
         SellableBatchLookupService $service,

@@ -17,12 +17,21 @@ import type {
 } from '../reportingTypes';
 
 const reportKey = 'vehicle-service/employee-commissions';
+const today = new Date();
+const currentMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+const localDate = (date: Date) => [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, '0'),
+    String(date.getDate()).padStart(2, '0'),
+].join('-');
 const initialFilters: EmployeeCommissionReportParams = {
     page: 1,
     per_page: 25,
     group_by: 'employee',
     sort: 'job_date',
     direction: 'desc',
+    date_from: localDate(currentMonthStart),
+    date_to: localDate(today),
 };
 
 export default function EmployeeCommissionReportScreen() {
@@ -76,7 +85,7 @@ export default function EmployeeCommissionReportScreen() {
         <>
             <ContentHeader
                 title="Employee Commission Report"
-                description="Commission results with independent Payment lifecycle filters."
+                description="Review commission earned by HR employees assigned to Vehicle Service labour."
                 actions={<LinkButton to="/reports" variant="secondary">All reports</LinkButton>}
             />
             <ErrorAlert error={error} title="Could not load employee commission report" />
@@ -93,7 +102,7 @@ export default function EmployeeCommissionReportScreen() {
                 {result && <EmployeeCommissionSummary result={result} />}
                 <div className="flex items-center justify-between gap-3">
                     <span className="text-sm text-slate-500">
-                        {loading ? 'Refreshing...' : `${result?.meta?.total ?? 0} commission entries`}
+                        {loading ? 'Refreshing...' : `${result?.summary.total_employees ?? 0} employees · ${result?.meta?.total ?? 0} commission entries`}
                     </span>
                     <ExportActions reportKey={reportKey} params={exportParams} />
                 </div>

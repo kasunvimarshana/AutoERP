@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type ReactNode } from 'react';
+import { useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/shared/components/Button';
 import { LookupSelect } from '@/shared/components/LookupSelect';
@@ -10,11 +10,12 @@ import { LoadingState } from '@/shared/components/LoadingState';
 import { Panel } from '@/shared/components/Panel';
 import { Select } from '@/shared/components/Select';
 import { StatusBadge } from '@/shared/components/StatusBadge';
-import { fieldError, type ApiError } from '@/shared/api/apiError';
+import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
 import { compactObject, humanize } from '@/shared/utils/object';
 import {
     createCostAdjustment,
     createInventoryBatch,
+    generateInventoryBatchNumber,
     listBatches,
     listSerials,
     listStateChanges,
@@ -133,7 +134,39 @@ export function TrackingTab({
     const [item, setItem] = useState<ItemLookupResource | null>(null);
     const [form, setForm] = useState({ batch_number: '', lot_number: '', manufacture_date: '', expiry_date: '' });
     const [busy, setBusy] = useState(false);
+    const [generatingBatchNumber, setGeneratingBatchNumber] = useState(false);
     const [actionError, setActionError] = useState<ApiError | null>(null);
+    const batchNumberRequest = useRef(0);
+
+    const changeItem = (next: ItemLookupResource | null) => {
+        const request = ++batchNumberRequest.current;
+        setItem(next);
+        setForm((current) => ({ ...current, batch_number: '' }));
+        setActionError(null);
+
+        if (!next) {
+            setGeneratingBatchNumber(false);
+            return;
+        }
+
+        setGeneratingBatchNumber(true);
+        void generateInventoryBatchNumber()
+            .then(({ batch_number }) => {
+                if (batchNumberRequest.current === request) {
+                    setForm((current) => ({ ...current, batch_number }));
+                }
+            })
+            .catch((requestError) => {
+                if (batchNumberRequest.current === request) {
+                    setActionError(toApiError(requestError));
+                }
+            })
+            .finally(() => {
+                if (batchNumberRequest.current === request) {
+                    setGeneratingBatchNumber(false);
+                }
+            });
+    };
 
     const submit = async (event: FormEvent) => {
         if (!item) return;
@@ -157,13 +190,14 @@ export function TrackingTab({
                 <form className="space-y-4" onSubmit={submit}>
                     <p className="text-sm text-slate-600">Register a tracking reference before stock entry, or create it while receiving a purchase.</p>
                     <div className="grid gap-4 md:grid-cols-3">
-                        <LookupSelect<ItemLookupResource> label="Tracked item" value={item} onChange={setItem} search={lookupApi.batchTrackedStockableItems} placeholder="Search batch-tracked items..." error={fieldError(actionError, 'item_id')} required />
-                        <Input label="Batch / tracking number" value={form.batch_number} onChange={(event) => setForm({ ...form, batch_number: event.target.value })} error={fieldError(actionError, 'batch_number')} required />
+                        <LookupSelect<ItemLookupResource> label="Tracked item" value={item} onChange={changeItem} search={lookupApi.batchTrackedStockableItems} placeholder="Search batch-tracked items..." error={fieldError(actionError, 'item_id')} required />
+                        <Input label="Batch / tracking number" value={form.batch_number} disabled={generatingBatchNumber} onChange={(event) => setForm({ ...form, batch_number: event.target.value })} error={fieldError(actionError, 'batch_number')} required />
                         <Input label="Supplier lot number" value={form.lot_number} onChange={(event) => setForm({ ...form, lot_number: event.target.value })} error={fieldError(actionError, 'lot_number')} />
                         <Input label="Manufacture date" type="date" value={form.manufacture_date} onChange={(event) => setForm({ ...form, manufacture_date: event.target.value })} error={fieldError(actionError, 'manufacture_date')} />
                         <Input label="Expiry date" type="date" value={form.expiry_date} onChange={(event) => setForm({ ...form, expiry_date: event.target.value })} error={fieldError(actionError, 'expiry_date')} />
                     </div>
-                    <Button type="submit" loading={busy} disabled={!item || !form.batch_number.trim()}>Create batch</Button>
+                    <p className="text-xs text-slate-500">Generated automatically after selecting an item. You can edit it before creating the batch.</p>
+                    <Button type="submit" loading={busy} disabled={!item || generatingBatchNumber || !form.batch_number.trim()}>Create batch</Button>
                 </form>
             </WorkflowPanel>}
             <div className="grid gap-5 xl:grid-cols-2">

@@ -7,6 +7,7 @@ import { compactObject, readableRelation } from '@/shared/utils/object';
 import type {
     AllocationPayload,
     AdjustmentPayload,
+    BatchNumberResult,
     CostAdjustmentPayload,
     InventoryAvailability,
     InventoryBatchPayload,
@@ -125,6 +126,9 @@ export const listBatches = (params: ListParams, signal?: AbortSignal) =>
 
 export const createInventoryBatch = (payload: InventoryBatchPayload) =>
     apiClient.post<ApiResource<InventoryRecord>>(`${endpoints.inventory}/batches`, payload).then((response) => response.data.data);
+
+export const generateInventoryBatchNumber = () =>
+    apiClient.post<ApiResource<BatchNumberResult>>(`${endpoints.inventory}/batches/generate-number`, {}).then((response) => response.data.data);
 
 export const listBatchPrices = (params: ListParams, signal?: AbortSignal) =>
     apiClient.get<ApiCollection<InventoryBatchPrice>>(`${endpoints.inventory}/batch-prices`, { params, signal }).then((response) => response.data);

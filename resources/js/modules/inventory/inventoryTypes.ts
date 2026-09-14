@@ -55,6 +55,10 @@ export interface InventoryBatchPayload {
     expiry_date?: string;
 }
 
+export interface BatchNumberResult {
+    batch_number: string;
+}
+
 export interface InventoryBatchPricePayload {
     batch_id: number;
     price_type: 'sales' | 'service';

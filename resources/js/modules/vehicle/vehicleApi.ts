@@ -69,7 +69,10 @@ export const changeVehicleStatus = (id: number, status: string, reason?: string)
 export function searchVehicles(params: LookupLoadParams, kind = 'active'): Promise<LookupResult<VehicleSummary>> {
     const loader = createQueryCachedLookupLoader<VehicleSummary>({
         key: `lookup:vehicles:${kind}`,
-        load: (lookupParams) => requestLookup<VehicleSummary>(`${endpoints.vehicles}/lookup/${kind}`, lookupParams),
+        load: (lookupParams) => requestLookup<VehicleSummary>(
+            kind === 'all' ? `${endpoints.vehicles}/lookup` : `${endpoints.vehicles}/lookup/${kind}`,
+            lookupParams,
+        ),
     });
 
     return loader(params);

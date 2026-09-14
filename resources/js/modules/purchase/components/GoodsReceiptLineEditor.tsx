@@ -1,4 +1,5 @@
 import { useCallback, useState, type ReactNode } from 'react';
+import { toApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
 import { DecimalInput } from '@/shared/components/DecimalInput';
@@ -10,7 +11,7 @@ import type { LookupLoadParams } from '@/shared/types/lookup';
 import { searchInventoryBatches } from '@/modules/inventory/inventoryApi';
 import { MoneyDisplay } from '@/shared/components/MoneyDisplay';
 import { compareDecimalStrings, isPositiveDecimal, multiplyDecimal, sumDecimals } from '@/shared/utils/decimal';
-import type { PurchaseOrderLine } from '../purchaseApi';
+import { generateGoodsReceiptBatchNumber, type PurchaseOrderLine } from '../purchaseApi';
 
 export interface EditableGoodsReceiptLine {
     source: PurchaseOrderLine;
@@ -96,6 +97,8 @@ function GoodsReceiptLineForm({ line, errorFor, onSave, onCancel }: {
     onCancel: () => void;
 }) {
     const [draft, setDraft] = useState(line);
+    const [generatingBatchNumber, setGeneratingBatchNumber] = useState(false);
+    const [batchNumberError, setBatchNumberError] = useState<string | null>(null);
     const batchIssue = batchAllocationIssue(draft);
     const set = <K extends keyof EditableGoodsReceiptLine>(key: K, value: EditableGoodsReceiptLine[K]) => {
         setDraft((current) => {
@@ -110,6 +113,30 @@ function GoodsReceiptLineForm({ line, errorFor, onSave, onCancel }: {
 
             return next;
         });
+    };
+    const appendBatchAllocation = (batchNumber: string) => {
+        setDraft((current) => ({
+            ...current,
+            batch_allocations: [
+                ...current.batch_allocations,
+                emptyBatchAllocation(current.accepted_quantity, current.batch_allocations.length, batchNumber),
+            ],
+        }));
+    };
+    const addBatch = async () => {
+        if (generatingBatchNumber) return;
+        setGeneratingBatchNumber(true);
+        setBatchNumberError(null);
+
+        try {
+            const { batch_number } = await generateGoodsReceiptBatchNumber();
+            appendBatchAllocation(batch_number);
+        } catch (requestError) {
+            appendBatchAllocation('');
+            setBatchNumberError(toApiError(requestError).message + ' Enter the batch number manually.');
+        } finally {
+            setGeneratingBatchNumber(false);
+        }
     };
 
     return (
@@ -143,8 +170,9 @@ function GoodsReceiptLineForm({ line, errorFor, onSave, onCancel }: {
                         <h3 className="font-semibold text-slate-900">Batch / lot allocation</h3>
                         <p className="text-sm text-slate-600">Allocate the full accepted quantity across one or more batches.</p>
                     </div>
-                    <Button type="button" variant="secondary" onClick={() => set('batch_allocations', [...draft.batch_allocations, emptyBatchAllocation(draft.accepted_quantity, draft.batch_allocations.length)])}>Add batch</Button>
+                    <Button type="button" variant="secondary" loading={generatingBatchNumber} onClick={() => void addBatch()}>Add batch</Button>
                 </div>
+                {batchNumberError && <p role="alert" className="text-sm font-medium text-amber-700">{batchNumberError}</p>}
                 {batchIssue && <p className="text-sm font-medium text-rose-700">{batchIssue}</p>}
                 {draft.batch_allocations.map((allocation, index) => <BatchAllocationFields
                     key={index}
@@ -187,10 +215,10 @@ function BatchAllocationFields({ itemId, itemVariantId, value, errorFor, onChang
     </div>;
 }
 
-function emptyBatchAllocation(acceptedQuantity: string, existingCount: number): EditableGoodsReceiptBatchAllocation {
+function emptyBatchAllocation(acceptedQuantity: string, existingCount: number, batchNumber = ''): EditableGoodsReceiptBatchAllocation {
     return {
         batch: null,
-        batch_number: '',
+        batch_number: batchNumber,
         lot_number: '',
         manufacture_date: '',
         expiry_date: '',
