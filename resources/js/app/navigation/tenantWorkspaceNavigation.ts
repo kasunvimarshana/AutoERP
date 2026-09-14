@@ -4,7 +4,6 @@ import { hrNavigationItem } from './hrNavigation';
 import { tenantNavigationSections as baseTenantNavigationSections } from './navigationConfig';
 import type { NavigationItem, NavigationSection } from './navigationTypes';
 import { uomNavigationItem } from './uomNavigation';
-import { vehicleRentalNavigationItem } from './vehicleRentalNavigation';
 
 const MASTER_DATA_SECTION_ID = 'master-data';
 const OPERATIONS_SECTION_ID = 'operations';
@@ -20,7 +19,10 @@ function inventoryNavigation(item: NavigationItem): NavigationItem {
         access: { ...item.access, permissions: inventoryRoutePermissions },
         children: item.children.map((child) => ({
             ...child,
-            access: { ...child.access, permissions: inventoryRoutePermissions },
+            access: {
+                ...child.access,
+                permissions: child.access?.permissions ?? inventoryRoutePermissions,
+            },
         })),
     };
 }
@@ -47,7 +49,6 @@ export const tenantWorkspaceNavigationSections: NavigationSection[] = baseTenant
             ...section,
             items: [
                 ...section.items.map(inventoryNavigation),
-                vehicleRentalNavigationItem,
                 hrNavigationItem,
             ],
         };
