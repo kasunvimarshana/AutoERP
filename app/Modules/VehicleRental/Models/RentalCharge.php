@@ -9,7 +9,7 @@ use LogicException;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\VehicleRental\Constants\AgreementFields;
 
-abstract class BaseCharge extends TenantOwnedModel
+abstract class RentalCharge extends TenantOwnedModel
 {
     protected function casts(): array
     {

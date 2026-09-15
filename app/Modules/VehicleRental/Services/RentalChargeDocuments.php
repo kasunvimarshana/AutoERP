@@ -1,0 +1,106 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Modules\VehicleRental\Services;
+
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
+use Modules\Finance\Enums\FinanceAccountRoleCode;
+use Modules\Finance\Enums\FinancePostingProfileCode;
+use Modules\Invoice\DTOs\CreateInvoiceData;
+use Modules\Invoice\DTOs\InvoiceLineData;
+use Modules\Invoice\DTOs\InvoiceSourceData;
+use Modules\Invoice\DTOs\InvoiceSourceLineData;
+use Modules\Invoice\Enums\InvoiceDirection;
+use Modules\Invoice\Enums\InvoiceLineType;
+use Modules\Invoice\Enums\InvoicePartyType;
+use Modules\Invoice\Enums\InvoiceStatus;
+use Modules\Invoice\Enums\InvoiceType;
+use Modules\Invoice\Models\Invoice;
+use Modules\Invoice\Services\InvoiceCreationService;
+use Modules\Invoice\Services\InvoiceSourceService;
+use Modules\Invoice\Services\TaxedSourceInvoiceFactory;
+use Modules\VehicleRental\Constants\AgreementFields;
+use Modules\VehicleRental\Data\AgreementContext;
+use Modules\VehicleRental\Enums\AgreementKind;
+use Modules\VehicleRental\Enums\AgreementStatus;
+use Modules\VehicleRental\Models\Agreement;
+use Modules\VehicleRental\Models\RentalCharge;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
+
+final class RentalChargeDocuments
+{
+    private const WHOLE_CHARGE = '1.000000';
+
+    private const FIRST_LINE = 1;
+
+    public function __construct(private readonly TaxedSourceInvoiceFactory $factory, private readonly InvoiceCreationService $invoices, private readonly InvoiceSourceService $sources) {}
+
+    public function issue(AgreementKind $kind, AgreementContext $context, Agreement $agreement, RentalCharge $charge, string $sourceType, string $description, array $data): Invoice
+    {
+        $customer = $kind === AgreementKind::Customer;
+        $source = new CreateInvoiceData(tenantId: $context->tenantId, organizationUnitId: $context->organizationUnitId,
+            invoiceType: $customer ? InvoiceType::Sales : InvoiceType::Purchase, direction: $customer ? InvoiceDirection::Outbound : InvoiceDirection::Inbound,
+            invoiceDate: $data['invoice_date'], dueDate: $data['due_date'] ?? null, currencyId: $agreement->currency_id, exchangeRate: $data['exchange_rate'],
+            partyType: $customer ? InvoicePartyType::Customer->value : InvoicePartyType::Supplier->value,
+            partyId: $customer ? $agreement->customer_id : $agreement->supplier_id, createdBy: $context->actorId,
+            supplyPeriodStart: $charge->period_from, supplyPeriodEnd: $charge->period_until,
+            lines: [new InvoiceLineData(lineNumber: self::FIRST_LINE, description: $description, quantity: self::WHOLE_CHARGE,
+                unitPrice: $charge->amount, lineType: InvoiceLineType::Service, sourceLineType: $sourceType, sourceLineId: $charge->id)],
+            sources: [new InvoiceSourceData(tenantId: $context->tenantId, organizationUnitId: $context->organizationUnitId, sourceType: $sourceType, sourceId: $charge->id,
+                sourceDocumentNumber: $agreement->reference, sourceDocumentDate: $charge->period_from, sourceSubtotal: $charge->amount, sourceGrandTotal: $charge->amount)],
+            sourceLines: [new InvoiceSourceLineData(tenantId: $context->tenantId, organizationUnitId: $context->organizationUnitId, sourceType: $sourceType, sourceId: $charge->id,
+                sourceLineType: $sourceType, sourceLineId: $charge->id, sourceQuantity: self::WHOLE_CHARGE, invoicedQuantity: self::WHOLE_CHARGE,
+                sourceUnitPrice: $charge->amount, sourceLineTotal: $charge->amount, invoicedLineTotal: $charge->amount)]);
+
+        return $this->invoices->create($this->factory->prepare($source,
+            $customer ? FinancePostingProfileCode::CustomerRentalInvoice : FinancePostingProfileCode::SupplierRentalInvoice,
+            $customer ? FinanceAccountRoleCode::RentalRevenue : FinanceAccountRoleCode::RentalExpense));
+    }
+
+    public function documentInput(array $input): array
+    {
+        return Validator::make($input, ['expected_version' => ['required', 'integer', 'min:'.AgreementFields::INITIAL_VERSION],
+            'invoice_date' => ['required', 'date_format:'.AgreementFields::DATE_FORMAT],
+            'due_date' => ['nullable', 'date_format:'.AgreementFields::DATE_FORMAT, 'after_or_equal:invoice_date'],
+            'exchange_rate' => ['required', 'string', 'regex:'.AgreementFields::DECIMAL_PATTERN, 'numeric', 'gt:0']])->validate();
+    }
+
+    public function assertAgreement(Agreement $agreement, int $version): void
+    {
+        if ($agreement->row_version !== $version) {
+            throw new ConflictHttpException('This agreement changed. Reload before billing.');
+        }
+        if ($agreement->status === AgreementStatus::Draft) {
+            throw ValidationException::withMessages(['agreement' => ['Activate the agreement before billing.']]);
+        }
+    }
+
+    public function voidInput(array $input): array
+    {
+        $data = Validator::make($input, ['expected_version' => ['required', 'integer', 'min:'.AgreementFields::INITIAL_VERSION],
+            'expected_charge_version' => ['required', 'integer', 'min:'.AgreementFields::INITIAL_VERSION],
+            'reason' => ['required', 'string', 'max:'.AgreementFields::NOTES_LENGTH]])->validate();
+        if (trim($data['reason']) === '') {
+            throw ValidationException::withMessages(['reason' => ['Provide the reason for voiding this charge.']]);
+        }
+
+        return $data;
+    }
+
+    // Caller holds the source mutex and charge row lock for the entire transaction.
+    public function void(RentalCharge $charge, string $sourceType, AgreementContext $context, array $data): void
+    {
+        if ($charge->row_version !== (int) $data['expected_charge_version'] || $charge->voided_at !== null) {
+            throw new ConflictHttpException('This charge changed. Reload before continuing.');
+        }
+        $documents = $this->sources->documents($context->tenantId, $context->organizationUnitId, $sourceType, [$charge->id]);
+        foreach ($documents[$charge->id] ?? [] as $document) {
+            if (! in_array($document['status'], [InvoiceStatus::Cancelled->value, InvoiceStatus::Void->value, InvoiceStatus::Reversed->value], true)) {
+                throw new ConflictHttpException('Cancel or reverse every live invoice before voiding its Rental charge.');
+            }
+        }
+        $charge->forceFill(['voided_at' => now(), 'voided_by' => $context->actorId, 'void_reason' => trim($data['reason']), 'row_version' => $charge->row_version + 1])->save();
+    }
+}

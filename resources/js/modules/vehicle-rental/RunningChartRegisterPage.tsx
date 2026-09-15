@@ -8,6 +8,7 @@ import type { PaginationMeta } from '@/shared/types/pagination';
 import { listChartRegister } from './runningChartApi';
 import { AC_LABELS, CHART_LABELS, COUNT_LABELS, DISTANCE_LABELS, RunningChartStatus, type ChartRegisterFilters, type ChartRegisterRow } from './runningCharts';
 import { operationalTimeZone, OPERATIONAL_TIME_STEP_SECONDS, timestampWithOffset } from './vehicleUse';
+import { UsageChargePanel } from './UsageChargePanel';
 import { RunningChartHistoryPanel } from './RunningChartHistoryPanel';
 
 export default function RunningChartRegisterPage() {
@@ -57,7 +58,7 @@ export default function RunningChartRegisterPage() {
                     <p>Air conditioning: {row.ac_mode === null ? 'Not recorded' : AC_LABELS[row.ac_mode]}</p>
                     <p>Driver observation: {row.driver_observation ?? 'Not recorded'}</p><p>Notes: {row.notes ?? 'Not recorded'}</p>
                     <Button variant="secondary" onClick={() => setHistory(history === row.id ? null : row.id)}>Chart history</Button>
-                    {history === row.id && <RunningChartHistoryPanel key={row.id} id={row.id} />}
+                    {history === row.id && <RunningChartHistoryPanel key={row.id} id={row.id} />}<UsageChargePanel chart={row} hasOwner={row.owner_agreement !== null} />
                 </div>}
             </article>)}
             <Pagination meta={meta} onPageChange={next => { setLoading(true); setSelected(null); setHistory(null); setPage(next); }} />

@@ -4,6 +4,7 @@ import { ApiError } from '@/shared/api/apiError';
 import RunningChartRegisterPage from './RunningChartRegisterPage';
 import { listChartRegister } from './runningChartApi';
 import { RunningChartStatus, type ChartRegisterRow } from './runningCharts';
+vi.mock('@/modules/auth/AuthProvider', () => ({ useAuth: () => ({ permissions: [] }) }));
 vi.mock('./runningChartApi', () => ({ listChartRegister: vi.fn(), chartHistory: vi.fn() }));
 const row: ChartRegisterRow = {
     id: 9, row_version: 2, reference: 'CHART-A', status: RunningChartStatus.Finalized,

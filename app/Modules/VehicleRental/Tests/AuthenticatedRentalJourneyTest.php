@@ -73,6 +73,47 @@ final class AuthenticatedRentalJourneyTest extends TestCase
         $this->postJson($url, $input)->assertNotFound();
     }
 
+    public function test_authenticated_chart_component_billing_rechecks_scope_permission_and_evidence(): void
+    {
+        $this->postJson(self::ROOT.'/running-charts/1/customer/charges', [])->assertUnauthorized();
+        [, $customerInput, $ownerInput] = $this->loginFixture(modules: [TenantFeature::VEHICLE_RENTAL, TenantFeature::INVOICE]);
+        $customerInput['terms']['normal_ot_rate'] = '500';
+        $ownerInput['terms']['normal_ot_rate'] = '250';
+        $customer = $this->activate('customer', $customerInput);
+        $owner = $this->activate('owner', $ownerInput);
+        $use = $this->postJson(self::ROOT.'/customer/agreements/'.$customer['id'].'/vehicles', [
+            'expected_version' => $customer['row_version'], 'vehicle_id' => $ownerInput['vehicle_id'], 'owner_agreement_id' => $owner['id'],
+            'starts_at' => '2026-09-07T09:00:00+05:30', 'ends_at' => '2026-09-08T09:00:00+05:30',
+        ])->assertCreated()->json('data');
+        $use = $this->postJson(self::ROOT.'/vehicle-uses/'.$use['id'].'/handover', ['expected_version' => $use['row_version'],
+            'occurred_at' => '2026-09-07T09:00:00+05:30', 'reason' => 'Collected'])->assertOk()->json('data');
+        $chart = $this->postJson(self::ROOT.'/vehicle-uses/'.$use['id'].'/running-charts', ['expected_version' => $use['row_version'],
+            'reference' => 'AUTH-OT', 'starts_at' => '2026-09-07T09:00:00+05:30', 'ends_at' => '2026-09-07T18:00:00+05:30', 'normal_ot_minutes' => 90,
+        ])->assertCreated()->json('data');
+        $path = self::ROOT.'/running-charts/'.$chart['id'];
+        $input = ['expected_version' => $customer['row_version'], 'expected_chart_version' => $chart['row_version'], 'invoice_date' => '2026-09-10',
+            'exchange_rate' => '1', 'component' => 'normal_ot', 'policy' => 'recorded_minutes_and_nights_v1'];
+        $this->postJson($path.'/customer/charges', $input)->assertConflict();
+        $chart = $this->postJson($path.'/finalize', ['expected_version' => $chart['row_version']])->assertOk()->json('data');
+        $input['expected_chart_version'] = $chart['row_version'];
+        $this->postJson($path.'/customer/charges', array_replace($input, ['policy' => 'guess']))->assertUnprocessable();
+        $this->postJson($path.'/customer/charges', $input)->assertCreated()->assertJsonPath('data.grand_total', '750.000000');
+        $this->postJson($path.'/customer/charges', $input)->assertConflict();
+        $this->postJson($path.'/owner/charges', array_replace($input, ['expected_version' => $owner['row_version']]))->assertCreated()->assertJsonPath('data.grand_total', '375.000000');
+        $list = $this->getJson($path.'/customer/charges')->assertOk()->assertJsonPath('agreement.reference', $customer['reference'])
+            ->assertJsonPath('charges.data.0.invoices.0.status', 'draft')->assertJsonMissingPath('charges.data.0.tenant_id')->json();
+        $charge = $list['charges']['data'][0];
+        $this->postJson($path.'/customer/charges/'.$charge['id'].'/void', $input + ['expected_charge_version' => $charge['row_version'], 'reason' => 'Invalid while live'])->assertConflict();
+        $this->postJson($path.'/reverse', ['expected_version' => $chart['row_version'], 'reason' => 'Consumed'])->assertConflict();
+        $this->loginFixture(permissions: [RentalAuthorization::CHART_VIEW, RentalAuthorization::CUSTOMER_VIEW], modules: [TenantFeature::VEHICLE_RENTAL, TenantFeature::INVOICE]);
+        $this->getJson($path.'/customer/charges')->assertForbidden();
+        $this->loginFixture(modules: [TenantFeature::VEHICLE_RENTAL, TenantFeature::INVOICE]);
+        $this->postJson($path.'/customer/charges', $input)->assertNotFound();
+        $this->loginFixture();
+        $this->postJson($path.'/customer/charges', $input)->assertForbidden();
+        $this->assertDatabaseCount('invoices', 2);
+    }
+
     protected function setUp(): void
     {
         parent::setUp();

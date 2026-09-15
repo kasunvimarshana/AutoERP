@@ -6,7 +6,7 @@
 
 **Engineering authority:** latest `worktree-0.0.8`
 
-**Engineering baseline audited before this update:** `562ac72116e9f4d68cf65a22be4d3a5a401f113e`
+**Engineering baseline audited before this update:** `d9695b897f2be2707b6334bdb17dffba3679f2be`
 
 **Old Rental implementation:** must not be restored, copied, revived, cherry-picked, or used as an implementation dependency
 
@@ -14,9 +14,20 @@
 
 **Last evidence/reconciliation update:** 2026-09-11 (external commercial/tax research and Tax integrity fixes; audiovisual coverage incomplete)
 
-**Delivery status:** Fresh agreement and bounded/open-ended vehicle-use/custody and atomic replacement APIs/UI, Running Chart draft/finalize/reverse/correction history, permissions and reciprocal workshop admission are implemented. Base-rent charges and Invoice/Finance handoff are implemented. Usage-based charges, deposits, replacement charging, driver identity and full production acceptance remain outstanding.
+**Delivery status:** Fresh agreement and bounded/open-ended vehicle-use/custody and atomic replacement APIs/UI, Running Chart draft/finalize/reverse/correction history, permissions and reciprocal workshop admission are implemented. Base-rent charges and Invoice/Finance handoff are implemented. Recorded OT/night-out charge workflows are implemented. Mileage and other commercial charges, deposits, replacement charging, driver identity and full production acceptance remain outstanding.
 
 ---
+
+## Recorded OT/night-out billing delivery — 2026-09-12
+
+- [x] Price finalized integer minutes and nights against the assigned agreement revision independently on each side.
+- [x] Show server quotes; preserve exact units/rates/calculation and distinguish unknown, zero and overflow.
+- [x] Persist immutable chart/component charges with duplicate-consumption prevention and atomic Invoice handoff.
+- [x] Support release, unchanged reissue, audited void and replacement; prevent chart reversal while either side retains a charge.
+- [x] Integrate guided customer/owner charge controls into both chart entry points, with authenticated API and frontend tests.
+- [x] Exercise both sides through Invoice approval, Finance posting, reversal and reissue.
+
+See [usage-billing.md](usage-billing.md). Sections 16–20 describe the broader commercial engine; the four delivered usage components do not close their mileage, driver-base, deduction or settlement requirements.
 
 ## Latest base-billing delivery — 2026-09-12
 

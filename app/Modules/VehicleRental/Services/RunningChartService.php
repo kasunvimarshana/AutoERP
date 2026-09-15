@@ -16,6 +16,8 @@ use Modules\VehicleRental\Data\AgreementContext;
 use Modules\VehicleRental\Enums\RunningChartAction;
 use Modules\VehicleRental\Enums\RunningChartStatus;
 use Modules\VehicleRental\Enums\VehicleUseStatus;
+use Modules\VehicleRental\Models\CustomerUsageCharge;
+use Modules\VehicleRental\Models\OwnerUsageCharge;
 use Modules\VehicleRental\Models\RunningChart;
 use Modules\VehicleRental\Models\VehicleUse;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
@@ -92,6 +94,11 @@ final class RunningChartService
                 Validator::make(['reason' => $reason], ['reason' => ['required', 'string', 'max:'.AgreementFields::NOTES_LENGTH]])->validate();
                 if (trim($reason ?? '') === '') {
                     throw ValidationException::withMessages(['reason' => ['Explain the reversal.']]);
+                }
+                foreach ([CustomerUsageCharge::class, OwnerUsageCharge::class] as $charges) {
+                    if ($charges::query()->forTenant($context->tenantId)->where('running_chart_id', $chart->id)->whereNull('voided_at')->lockForUpdate()->exists()) {
+                        throw new ConflictHttpException('Release the invoices and void all customer and owner usage charges before reversing this chart.');
+                    }
                 }
                 $chart->status = RunningChartStatus::Reversed;
                 $chart->reversed_at = now();

@@ -2,7 +2,7 @@
 
 **Status:** Canonical working domain reference; evidence gaps remain; not a completed implementation or exhaustive audiovisual audit
 
-**Knowledge refresh date:** 2026-09-12 (base-rent financial workflow and shared tax/posting reconciliation; audiovisual coverage remains incomplete)
+**Knowledge refresh date:** 2026-09-12 (base-rent and recorded OT/night-out billing; audiovisual coverage remains incomplete)
 
 **Primary business source of truth and conflict tie-breaker:** TACGL legacy application/data corpus
 
@@ -12,7 +12,7 @@
 
 **Initial architecture baseline:** `d4aaa693706c2d3fe693244c8ea0f8d9e4ae326c`
 
-**Latest implemented baseline reviewed:** `562ac72116e9f4d68cf65a22be4d3a5a401f113e`, plus the fresh [vehicle-use and Running Chart contract](vehicle-rental/operations.md). Operational capture, [base-rent estimation](vehicle-rental/base-rent.md) and [base-rent billing](vehicle-rental/base-billing.md) are implemented. Usage-based commercial components and complete audiovisual review remain outstanding. The [commercial research](vehicle-rental/commercial-research.md) distinguishes external evidence, implementation contracts and the shared Tax corrections.
+**Latest implemented baseline reviewed:** `d9695b897f2be2707b6334bdb17dffba3679f2be`, plus the fresh [vehicle-use and Running Chart contract](vehicle-rental/operations.md). Operational capture, [base-rent estimation](vehicle-rental/base-rent.md) and [base-rent billing](vehicle-rental/base-billing.md) are implemented. Recorded OT/night-out billing is implemented in this update. Mileage and other commercial components and complete audiovisual review remain outstanding. The [commercial research](vehicle-rental/commercial-research.md) distinguishes external evidence, implementation contracts and the shared Tax corrections.
 
 **TACGL source file:** `TACGL.zip`
 
@@ -1630,3 +1630,14 @@ Invoice prepares taxes and posting through a shared factory also used by manual 
 The new UI records the chosen period and document dates, requires an explicit exchange rate and policy acceptance, links the created draft to Invoice review, and shows charge/document history with reissue and void controls. Backend rules remain authoritative. Zero base rent produces no invoice or consumed period; unknown rates still fail. Stored base amounts must fit the existing monetary precision. These are base-only documents: do not infer KM, driver/OT/AC/night-out, downtime, replacement surcharges, deposits or monthly aggregate withholding workflows from their existence.
 
 A full-suite failure also exposed a shared dialog focus race. The delayed initial-focus callback now preserves focus already inside the dialog, and cleanup cancels the pending callback. Two controlled regression tests fail against the prior hook and pass after the owner-level fix. No Rental-only workaround or unrelated relationship change is used.
+
+
+## 39. Recorded OT and night-out charges — 2026-09-12
+
+The [usage-billing contract](vehicle-rental/usage-billing.md) implements independent customer/owner pricing and Invoice handoff for finalized chart normal/double/triple OT minutes and night-out counts. Use the exact agreement revision assigned to the vehicle use. The explicitly selected `recorded_minutes_and_nights_v1` policy prices each OT category as integer minutes × that category's agreed hourly rate ÷ 60, and nights as count × agreed per-night rate. Multiply before dividing and truncate once to the existing six-decimal money scale. Never apply an additional double/triple multiplier or infer eligibility from chart duration. E06/E07 justify typed units and reject a universal dotted-text parser; they do not prove a statutory threshold or universal night-out entitlement.
+
+The operator sees a server-generated quantity/rate/amount quote before acceptance. Unknown quantities or rates remain unknown. Zero previews remain zero and produce no invoice or source consumption. Commands recompute under locks, reject overflow/stale state and ignore client amounts. Each positive charge preserves component, policy, original chart/agreement revisions, quantity, rate, denominator, currency and amount. Invoice consumes one indivisible assessment; the physical quantities are retained in its readable description and Rental calculation, avoiding a second fractional-hour rounding loss. Document supply dates use the original chart start offset consistently for both ends; no commercial distance is apportioned by date.
+
+The physical vehicle mutex precedes agreement/chart/charge locks. Only one non-voided charge per chart/component/side is permitted. Invoice cancellation/reversal permits unchanged-charge reissue; void additionally records expected charge revision, reason, actor and timestamp and requires all invoices released. Voiding preserves history and permits a replacement charge. Chart reversal now rejects any non-voided charge on either side, even after invoice cancellation, until the assessment itself is voided. Customer consumption never consumes owner entitlement. Missing owner supply cannot be billed as an owner payable.
+
+Two explicit tenant-safe usage-charge tables preserve mandatory agreement/chart ownership without nullable polymorphic agreement relationships or inverse Invoice pointers. Shared `RentalCharge` immutability and `RentalChargeDocuments` handoff/void logic serve both base and usage charges. Canonical Invoice/Tax/Finance modules own their existing responsibilities. Authenticated APIs, guided register/vehicle-chart UI, real-login negative cases and both-side Finance posting/reversal tests cover this workflow. This entry does not close mileage allowances, AC/driver-base charges, deposits, replacement/downtime commercial policy, monthly withholding aggregation or production/UAT gates.

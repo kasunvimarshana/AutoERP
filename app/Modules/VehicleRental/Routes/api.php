@@ -11,6 +11,7 @@ use Modules\VehicleRental\Enums\VehicleUseAction;
 use Modules\VehicleRental\Http\Controllers\AgreementController;
 use Modules\VehicleRental\Http\Controllers\BaseRentBillingController;
 use Modules\VehicleRental\Http\Controllers\RunningChartController;
+use Modules\VehicleRental\Http\Controllers\UsageChargeBillingController;
 use Modules\VehicleRental\Http\Controllers\VehicleUseController;
 
 Route::prefix('api/v1/vehicle-rental')->middleware([
@@ -43,6 +44,12 @@ Route::prefix('api/v1/vehicle-rental')->middleware([
     Route::get('vehicle-uses/{use}/running-charts', [RunningChartController::class, 'index'])->whereNumber('use');
     Route::post('vehicle-uses/{use}/running-charts', [RunningChartController::class, 'store'])->whereNumber('use');
     Route::get('vehicle-uses', [VehicleUseController::class, 'register']);
+    Route::prefix('running-charts/{chart}/{kind}/charges')->whereNumber('chart')->whereIn('kind', array_column(AgreementKind::cases(), 'value'))->middleware('tenant.feature:'.TenantFeature::INVOICE)->group(function (): void {
+        Route::get('/', [UsageChargeBillingController::class, 'index']);
+        Route::post('/', [UsageChargeBillingController::class, 'store']);
+        Route::post('{charge}/reissue', [UsageChargeBillingController::class, 'reissue'])->whereNumber('charge');
+        Route::post('{charge}/void', [UsageChargeBillingController::class, 'void'])->whereNumber('charge');
+    });
     Route::get('running-charts', [RunningChartController::class, 'register']);
     Route::put('running-charts/{chart}', [RunningChartController::class, 'update'])->whereNumber('chart');
     Route::get('running-charts/{chart}/history', [RunningChartController::class, 'history'])->whereNumber('chart');
