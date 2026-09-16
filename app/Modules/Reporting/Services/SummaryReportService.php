@@ -72,20 +72,6 @@ final class SummaryReportService
             $dateFrom,
             $dateTo,
         );
-        $profitAndLoss = $this->statements->profitAndLoss(
-            $tenantId,
-            $organizationUnitId,
-            $dateFrom,
-            $dateTo,
-        );
-        $costOfSales = $this->sumStatementRows(
-            $profitAndLoss['rows'],
-            self::COST_OF_GOODS_SOLD_CATEGORY,
-        );
-        $otherExpenses = $this->math->sub(
-            (string) $profitAndLoss['total_expenses'],
-            $costOfSales,
-        );
         $branding = $this->branding->resolve($tenantId, $organizationUnitId);
 
         return [
@@ -122,13 +108,7 @@ final class SummaryReportService
                     PaymentDirection::Outbound,
                 ),
             ],
-            'performance' => [
-                'total_income' => (string) $profitAndLoss['total_revenue'],
-                'cost_of_sales' => $costOfSales,
-                'other_expenses' => $otherExpenses,
-                'total_expenses' => (string) $profitAndLoss['total_expenses'],
-                'net_profit' => (string) $profitAndLoss['net_profit'],
-            ],
+            'performance' => $this->performance($tenantId, $organizationUnitId, $dateFrom, $dateTo),
             'capabilities' => [
                 'sales_returns' => [
                     'available' => true,
@@ -144,6 +124,40 @@ final class SummaryReportService
                     'message' => 'Payroll is not available because no payroll transaction or payroll accounting category exists yet.',
                 ],
             ],
+        ];
+    }
+
+    /**
+     * Return the canonical ledger-backed profitability metrics shared by reports and dashboards.
+     *
+     * @return array{total_income:string,cost_of_sales:string,gross_profit:string,other_expenses:string,total_expenses:string,net_profit:string}
+     */
+    public function performance(
+        int $tenantId,
+        ?int $organizationUnitId,
+        string $dateFrom,
+        string $dateTo,
+    ): array {
+        $profitAndLoss = $this->statements->profitAndLoss(
+            $tenantId,
+            $organizationUnitId,
+            $dateFrom,
+            $dateTo,
+        );
+        $totalIncome = (string) $profitAndLoss['total_revenue'];
+        $costOfSales = $this->sumStatementRows(
+            $profitAndLoss['rows'],
+            self::COST_OF_GOODS_SOLD_CATEGORY,
+        );
+        $totalExpenses = (string) $profitAndLoss['total_expenses'];
+
+        return [
+            'total_income' => $totalIncome,
+            'cost_of_sales' => $costOfSales,
+            'gross_profit' => $this->math->sub($totalIncome, $costOfSales),
+            'other_expenses' => $this->math->sub($totalExpenses, $costOfSales),
+            'total_expenses' => $totalExpenses,
+            'net_profit' => (string) $profitAndLoss['net_profit'],
         ];
     }
 

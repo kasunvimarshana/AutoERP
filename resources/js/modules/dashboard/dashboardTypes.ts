@@ -35,6 +35,29 @@ export interface DashboardSummary {
         receivables: DashboardMetricBucket[];
         payables: DashboardMetricBucket[];
     };
+    profitability: {
+        total_income: string;
+        cost_of_sales: string;
+        gross_profit: string;
+        other_expenses: string;
+        total_expenses: string;
+        net_profit: string;
+    };
+    employee_performance: Array<{
+        employee: {
+            id: number;
+            code: string;
+            name: string;
+        };
+        completed_jobs: number;
+        total_jobs: number;
+        total_hours: string;
+        labour_value: string;
+        earned_commission: string;
+        pending_commission: string;
+        cancelled_commission: string;
+        total_commission: string;
+    }>;
     actions: Array<{
         key: string;
         label: string;

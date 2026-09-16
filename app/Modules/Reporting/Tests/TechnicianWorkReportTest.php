@@ -23,6 +23,7 @@ use Modules\Payment\Enums\PaymentDirection;
 use Modules\Payment\Enums\PaymentDocumentStatus;
 use Modules\Payment\Enums\PaymentPostingStatus;
 use Modules\Payment\Enums\PaymentType;
+use Modules\Reporting\Services\EmployeeCommissionReportService;
 use Modules\Reporting\Services\ReportingAuthorizationService;
 use Modules\User\Constants\UserGuard;
 use Modules\User\Constants\UserSystemRole;
@@ -41,6 +42,8 @@ use Modules\VehicleService\Services\VehicleServiceLineService;
 use Modules\VehicleService\Services\VehicleServiceStatusService;
 use Spatie\LaravelPdf\Facades\Pdf;
 use Spatie\LaravelPdf\PdfBuilder;
+use Tests\Support\OrganizationUnitFixture;
+use Tests\Support\TenantUserFixture;
 use Tests\TestCase;
 
 final class TechnicianWorkReportTest extends TestCase
@@ -210,6 +213,31 @@ final class TechnicianWorkReportTest extends TestCase
             'commission_base' => '200.000000',
             'commission_amount' => '25.000000',
         ]);
+
+        $dashboardPerformance = app(EmployeeCommissionReportService::class)->dashboardPerformance([
+            'tenant_id' => $context['tenant_id'],
+            'organization_unit_id' => $context['organization_unit_id'],
+            'date_from' => '2026-06-01',
+            'date_to' => '2026-06-30',
+        ], 2);
+
+        $this->assertCount(2, $dashboardPerformance);
+        $this->assertSame('EMP-COM', $dashboardPerformance[0]['employee']['code']);
+        $this->assertSame('100.000000', $dashboardPerformance[0]['labour_value']);
+        $this->assertSame('30.000000', $dashboardPerformance[0]['total_commission']);
+
+        $this->reportGetJson($context, '/api/v1/reports/dashboard?'.http_build_query([
+            'tenant_id' => $context['tenant_id'],
+            'organization_unit_id' => $context['organization_unit_id'],
+            'date_from' => '2026-06-01',
+            'date_to' => '2026-06-30',
+        ]))
+            ->assertOk()
+            ->assertJsonPath('data.employee_performance.0.employee.code', 'EMP-COM')
+            ->assertJsonPath('data.employee_performance.0.labour_value', '100.000000')
+            ->assertJsonPath('data.profitability.total_income', '0.000000')
+            ->assertJsonPath('data.profitability.gross_profit', '0.000000')
+            ->assertJsonPath('data.profitability.net_profit', '0.000000');
 
         $this->reportGetJson($context, '/api/v1/reports/vehicle-service/employee-commissions?'.http_build_query([
             ...$this->scope($context),
@@ -670,8 +698,7 @@ final class TechnicianWorkReportTest extends TestCase
         PaymentDocumentStatus $paymentDocumentStatus = PaymentDocumentStatus::Approved,
         PaymentPostingStatus $paymentPostingStatus = PaymentPostingStatus::Posted,
         PaymentAllocationState $paymentAllocationStatus = PaymentAllocationState::FullyAllocated,
-    ): void
-    {
+    ): void {
         $now = now();
         $invoiceId = (int) DB::table('invoices')->insertGetId([
             'tenant_id' => $context['tenant_id'],
@@ -772,7 +799,7 @@ final class TechnicianWorkReportTest extends TestCase
 
     private function organizationUnit(int $tenantId, string $code): int
     {
-        return (int) \Tests\Support\OrganizationUnitFixture::create([
+        return (int) OrganizationUnitFixture::create([
             'tenant_id' => $tenantId,
             'name' => 'Org '.$code,
             'code' => $code,
@@ -903,7 +930,7 @@ final class TechnicianWorkReportTest extends TestCase
         $organizationUnitId = (int) $context['organization_unit_id'];
         $guard = UserGuard::TENANT_API;
         $now = now();
-        $userId = (int) \Tests\Support\TenantUserFixture::create([
+        $userId = (int) TenantUserFixture::create([
             'tenant_id' => $tenantId,
             'first_name' => 'Reporting',
             'last_name' => 'Administrator',

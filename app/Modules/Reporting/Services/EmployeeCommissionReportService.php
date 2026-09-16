@@ -47,6 +47,58 @@ final class EmployeeCommissionReportService
     }
 
     /**
+     * Build the compact employee ranking used by the Business Overview dashboard.
+     *
+     * @param  array<string, mixed>  $params
+     * @return list<array<string, mixed>>
+     */
+    public function dashboardPerformance(array $params, int $limit = 5): array
+    {
+        $groups = array_values(array_filter(
+            $this->groups(
+                $this->query([
+                    ...$params,
+                    'group_by' => 'employee',
+                    'include_cancelled' => true,
+                ]),
+                'employee',
+            ),
+            static fn (array $group): bool => $group['resource'] !== null,
+        ));
+
+        usort($groups, function (array $left, array $right): int {
+            $labourComparison = $this->math->compare(
+                (string) $right['total_labour_value'],
+                (string) $left['total_labour_value'],
+            );
+            if ($labourComparison !== 0) {
+                return $labourComparison;
+            }
+
+            $commissionComparison = $this->math->compare(
+                (string) $right['total_commission'],
+                (string) $left['total_commission'],
+            );
+
+            return $commissionComparison !== 0
+                ? $commissionComparison
+                : strcmp((string) $left['label'], (string) $right['label']);
+        });
+
+        return array_slice(array_map(static fn (array $group): array => [
+            'employee' => $group['resource'],
+            'completed_jobs' => $group['completed_jobs'],
+            'total_jobs' => $group['total_jobs'],
+            'total_hours' => $group['total_hours'],
+            'labour_value' => $group['total_labour_value'],
+            'earned_commission' => $group['earned_commission'],
+            'pending_commission' => $group['pending_commission'],
+            'cancelled_commission' => $group['cancelled_commission'],
+            'total_commission' => $group['total_commission'],
+        ], $groups), 0, min(20, max(1, $limit)));
+    }
+
+    /**
      * @param  array<string, mixed>  $params
      * @return Collection<int, array<string, mixed>>
      */
@@ -517,11 +569,14 @@ final class EmployeeCommissionReportService
             ->select([])
             ->selectRaw(
                 "{$key} as group_key, MAX({$label}) as group_label, "
+                .'MAX(commission_rows.employee_code) as group_code, '
                 .'COUNT(DISTINCT commission_rows.job_id) as total_jobs, '
+                ."COUNT(DISTINCT CASE WHEN commission_rows.commission_status = 'earned' THEN commission_rows.job_id END) as completed_jobs, "
                 ."COALESCE(SUM(CASE WHEN commission_rows.commission_status <> 'cancelled' THEN commission_rows.assigned_hours ELSE 0 END), 0) as total_hours, "
                 ."COALESCE(SUM(CASE WHEN commission_rows.commission_status <> 'cancelled' THEN commission_rows.labour_amount ELSE 0 END), 0) as total_labour_value, "
                 ."COALESCE(SUM(CASE WHEN commission_rows.commission_status = 'earned' THEN commission_rows.commission_amount ELSE 0 END), 0) as earned_commission, "
                 ."COALESCE(SUM(CASE WHEN commission_rows.commission_status = 'pending' THEN commission_rows.commission_amount ELSE 0 END), 0) as pending_commission, "
+                ."COALESCE(SUM(CASE WHEN commission_rows.commission_status = 'cancelled' THEN commission_rows.commission_amount ELSE 0 END), 0) as cancelled_commission, "
                 ."COALESCE(SUM(CASE WHEN commission_rows.commission_status <> 'cancelled' THEN commission_rows.commission_amount ELSE 0 END), 0) as total_commission",
             )
             ->groupBy($key)
@@ -538,12 +593,18 @@ final class EmployeeCommissionReportService
                     'label' => $label,
                     'resource' => $resourceType === 'source' || $key === 'unassigned'
                         ? null
-                        : ['id' => (int) $row->group_key, 'code' => '', 'name' => $label],
+                        : [
+                            'id' => (int) $row->group_key,
+                            'code' => $resourceType === 'employee' ? (string) ($row->group_code ?? '') : '',
+                            'name' => $label,
+                        ],
+                    'completed_jobs' => (int) $row->completed_jobs,
                     'total_jobs' => (int) $row->total_jobs,
                     'total_hours' => $this->decimal($row->total_hours),
                     'total_labour_value' => $this->decimal($row->total_labour_value),
                     'earned_commission' => $this->decimal($row->earned_commission),
                     'pending_commission' => $this->decimal($row->pending_commission),
+                    'cancelled_commission' => $this->decimal($row->cancelled_commission),
                     'total_commission' => $this->decimal($row->total_commission),
                 ];
             })

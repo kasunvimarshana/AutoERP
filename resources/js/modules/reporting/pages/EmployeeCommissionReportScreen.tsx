@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
@@ -24,7 +25,7 @@ const localDate = (date: Date) => [
     String(date.getMonth() + 1).padStart(2, '0'),
     String(date.getDate()).padStart(2, '0'),
 ].join('-');
-const initialFilters: EmployeeCommissionReportParams = {
+const defaultFilters: EmployeeCommissionReportParams = {
     page: 1,
     per_page: 25,
     group_by: 'employee',
@@ -35,8 +36,10 @@ const initialFilters: EmployeeCommissionReportParams = {
 };
 
 export default function EmployeeCommissionReportScreen() {
-    const [filters, setFilters] = useState(initialFilters);
-    const [draft, setDraft] = useState(initialFilters);
+    const [searchParams] = useSearchParams();
+    const initialFilters = useMemo(() => reportInitialFilters(searchParams), [searchParams]);
+    const [filters, setFilters] = useState(() => initialFilters);
+    const [draft, setDraft] = useState(() => initialFilters);
     const [result, setResult] = useState<EmployeeCommissionReportResult | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
@@ -130,4 +133,21 @@ function cleanParams(params: EmployeeCommissionReportParams): EmployeeCommission
     return Object.fromEntries(
         Object.entries(params).filter(([, value]) => value !== '' && value !== null && value !== undefined),
     ) as EmployeeCommissionReportParams;
+}
+
+function reportInitialFilters(searchParams: URLSearchParams): EmployeeCommissionReportParams {
+    const dateFrom = searchParams.get('date_from');
+    const dateTo = searchParams.get('date_to');
+    const search = searchParams.get('search')?.trim();
+
+    return {
+        ...defaultFilters,
+        date_from: isDateInput(dateFrom) ? dateFrom : defaultFilters.date_from,
+        date_to: isDateInput(dateTo) ? dateTo : defaultFilters.date_to,
+        search: search || undefined,
+    };
+}
+
+function isDateInput(value: string | null): value is string {
+    return value !== null && /^\d{4}-\d{2}-\d{2}$/.test(value);
 }

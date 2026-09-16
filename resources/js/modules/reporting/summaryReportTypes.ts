@@ -62,6 +62,7 @@ export interface SummaryReportResult {
     performance: {
         total_income: string;
         cost_of_sales: string;
+        gross_profit: string;
         other_expenses: string;
         total_expenses: string;
         net_profit: string;

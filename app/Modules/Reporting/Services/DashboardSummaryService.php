@@ -33,9 +33,13 @@ final class DashboardSummaryService
 
     private const EXPIRING_BATCH_DAYS = 30;
 
+    private const EMPLOYEE_RANKING_LIMIT = 5;
+
     public function __construct(
         private readonly DecimalMath $math,
         private readonly ReportBrandingResolver $branding,
+        private readonly SummaryReportService $summaryReports,
+        private readonly EmployeeCommissionReportService $commissions,
     ) {}
 
     /** @return array<string, mixed> */
@@ -68,6 +72,18 @@ final class DashboardSummaryService
                 'receivables' => $receivables['buckets'],
                 'payables' => $payables['buckets'],
             ],
+            'profitability' => $this->summaryReports->performance(
+                $tenantId,
+                $organizationUnitId,
+                $dateFrom,
+                $dateTo,
+            ),
+            'employee_performance' => $this->commissions->dashboardPerformance([
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $organizationUnitId,
+                'date_from' => $dateFrom,
+                'date_to' => $dateTo,
+            ], self::EMPLOYEE_RANKING_LIMIT),
             'actions' => $this->actions(
                 $receivables['overdue_count'],
                 $payables['overdue_count'],

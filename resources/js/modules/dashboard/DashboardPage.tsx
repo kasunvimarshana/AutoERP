@@ -17,7 +17,9 @@ import type { DashboardDateRange } from './dashboardTypes';
 import {
     AgingChart,
     CashFlowChart,
+    EmployeePerformance,
     InventoryHealth,
+    ProfitabilityOverview,
     RevenueTrendChart,
     ServiceStatusChart,
 } from './DashboardVisuals';
@@ -102,6 +104,16 @@ export default function DashboardPage() {
                     <section className="grid gap-5 lg:grid-cols-2">
                         <AgingChart title="Receivable aging" rows={data.aging.receivables} currency={currency} url="/invoices" />
                         <AgingChart title="Payable aging" rows={data.aging.payables} currency={currency} url="/reports/purchase/grn-payables" />
+                    </section>
+
+                    <section className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
+                        <ProfitabilityOverview profitability={data.profitability} currency={currency} />
+                        <EmployeePerformance
+                            rows={data.employee_performance}
+                            currency={currency}
+                            dateFrom={data.period.date_from}
+                            dateTo={data.period.date_to}
+                        />
                     </section>
 
                     <ActionRequired actions={data.actions} />
