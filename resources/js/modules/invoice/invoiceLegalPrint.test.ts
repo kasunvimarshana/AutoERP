@@ -28,7 +28,6 @@ describe('invoice legal print foundation', () => {
             'Telephone No:',
             'Date of Delivery / Supply:',
             'Place of Supply:',
-            'Total Amount in words:',
             'Mode of Payment:',
         ]) {
             expect(invoicePrint).toContain(label);
@@ -38,7 +37,7 @@ describe('invoice legal print foundation', () => {
         expect(invoicePrint).toContain("{{ $label }}'s Name:");
         expect(invoicePrint).toContain('@php($party = $document[$key])');
         expect(invoicePrint).toContain("$document['number_label']");
-        expect(invoicePrint).toContain("$document['amount_in_words']");
+        expect(invoicePrint).not.toContain('Total Amount in words:');
         expect(invoicePrint).toContain("$document['place_of_supply']");
     });
 

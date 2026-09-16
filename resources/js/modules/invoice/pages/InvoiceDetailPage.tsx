@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { useLocation, useParams, useSearchParams } from 'react-router-dom';
 import {
     approveInvoice,
     cancelInvoice,
@@ -46,7 +46,9 @@ const retiredSourceInvoiceTypes = new Set(['rental', 'vehicle_finance']);
 
 export default function InvoiceDetailPage() {
     const id = Number(useParams().id);
+    const location = useLocation();
     const auth = useAuth();
+    const [searchParams] = useSearchParams();
     const canViewBalance = hasInvoicePermission(auth, invoicePermissions.balanceView);
     const canViewSources = hasInvoicePermission(auth, invoicePermissions.sourcesView);
     const canApprove = hasInvoicePermission(auth, invoicePermissions.approve);
@@ -54,7 +56,6 @@ export default function InvoiceDetailPage() {
     const canReverse = hasInvoicePermission(auth, invoicePermissions.reverse);
     const canCancel = hasInvoicePermission(auth, invoicePermissions.cancel);
     const canCreateVehicleServicePayment = hasPermission(auth, vehicleServicePermissions.paymentsCreate);
-    const [searchParams] = useSearchParams();
     const [action, setAction] = useState<InvoiceAction | null>(null);
     const [actionError, setActionError] = useState<ApiError | null>(null);
     const [reversalOpen, setReversalOpen] = useState(false);
@@ -88,7 +89,7 @@ export default function InvoiceDetailPage() {
     if (invoice.loading) return <LoadingState />;
     if (!invoice.data) return <ErrorAlert error={invoice.error} />;
     const value = invoice.data;
-    const fromPurchase = searchParams.get('from') === 'purchase';
+    const fromPurchase = location.pathname.startsWith('/purchase/invoices/');
     const vehicleServiceSource = (value.sources ?? []).find((source) => source.source_type === 'vehicle_service_job');
     const vehicleServiceJobId = vehicleServiceSource?.source_id ?? Number(searchParams.get('job_id'));
     const hasVehicleServiceJobContext = Number.isInteger(vehicleServiceJobId) && vehicleServiceJobId > 0;

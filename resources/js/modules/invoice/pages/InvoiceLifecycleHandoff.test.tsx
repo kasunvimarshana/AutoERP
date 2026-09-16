@@ -41,6 +41,14 @@ describe('invoice lifecycle handoff', () => {
         expect(detail).toContain('to={`/vehicle-service/jobs/${vehicleServiceJobId}/payment`}');
     });
 
+    it('derives supplier invoice context from the Purchase-owned route', () => {
+        const detail = sourceFile('resources/js/modules/invoice/pages/InvoiceDetailPage.tsx');
+
+        expect(detail).toContain("location.pathname.startsWith('/purchase/invoices/')");
+        expect(detail).toContain('to="/purchase/invoices"');
+        expect(detail).not.toContain("searchParams.get('from') === 'purchase'");
+    });
+
     it('keeps invoices from retired source modules read-only', () => {
         const detail = sourceFile('resources/js/modules/invoice/pages/InvoiceDetailPage.tsx');
 

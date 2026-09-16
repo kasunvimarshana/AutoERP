@@ -5,11 +5,17 @@ declare(strict_types=1);
 namespace Modules\Invoice\Services;
 
 use BackedEnum;
+use DateTimeImmutable;
 use DateTimeInterface;
+use DateTimeZone;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Modules\Configuration\Contracts\ConfigurationResolverInterface;
+use Modules\Core\Contracts\TenantExecutionContextInterface;
+use Modules\Invoice\Data\InvoicePrintContext;
 use Modules\Invoice\Enums\InvoiceDirection;
 use Modules\Invoice\Enums\InvoiceDocumentKind;
+use Modules\Invoice\Enums\InvoicePrintLayout;
 use Modules\Invoice\Enums\InvoiceType;
 use Modules\Invoice\Models\Invoice;
 use Modules\Invoice\Models\InvoiceDocumentSnapshot;
@@ -19,17 +25,19 @@ final class InvoicePrintService
 {
     private const DEFAULT_TAX_LABEL = 'Tax';
 
+    private const TIMEZONE_CONFIGURATION_KEY = 'localization.timezone';
+
     public const SIGNED_URL_TTL_MINUTES = 15;
-
-    public const PDF_PAPER_SIZE = 'A4';
-
-    public const PDF_ORIENTATION = 'portrait';
 
     private const MONEY_SCALE = 2;
 
     private const QUANTITY_SCALE = 3;
 
-    public function __construct(private readonly InvoiceAmountInWordsFormatter $amountInWords) {}
+    public function __construct(
+        private readonly InvoiceAmountInWordsFormatter $amountInWords,
+        private readonly ConfigurationResolverInterface $configuration,
+        private readonly TenantExecutionContextInterface $executionContext,
+    ) {}
 
     /** @return Builder<Invoice> */
     public function scopedQuery(int $tenantId, ?int $organizationUnitId): Builder
@@ -54,8 +62,12 @@ final class InvoicePrintService
     }
 
     /** @return array<string, mixed> */
-    public function viewData(Invoice $invoice, ?string $pdfUrl = null, string $mode = 'print'): array
-    {
+    public function viewData(
+        Invoice $invoice,
+        ?string $pdfUrl = null,
+        string $mode = 'print',
+        ?InvoicePrintContext $printContext = null,
+    ): array {
         $invoice->loadMissing([
             'tenant',
             'organizationUnit',
@@ -75,10 +87,18 @@ final class InvoicePrintService
             ? $this->snapshotParty($snapshot, 'buyer')
             : $this->purchaser($invoice);
         $taxLabel = $this->taxLabel($invoice->lines);
+        $layout = $this->layout($invoice);
 
         return [
             'mode' => $mode,
             'pdf_url' => $pdfUrl,
+            'print_layout' => [
+                'value' => $layout->value,
+                'css_class' => $layout->cssClass(),
+                'paper_size' => $layout->paperSize(),
+                'orientation' => $layout->orientation(),
+            ],
+            'print_context' => $this->printContext($invoice, $printContext),
             'document' => [
                 'title' => $kind->title(),
                 'number_label' => $kind->numberLabel(),
@@ -108,6 +128,16 @@ final class InvoicePrintService
                 'amounts' => $this->amounts($invoice, $currency, $taxLabel),
             ],
         ];
+    }
+
+    public function layout(Invoice $invoice): InvoicePrintLayout
+    {
+        $value = $this->configurationValue(
+            $invoice,
+            InvoicePrintLayout::CONFIGURATION_KEY,
+        );
+
+        return InvoicePrintLayout::from((string) $value);
     }
 
     public function filename(Invoice $invoice): string
@@ -402,5 +432,36 @@ final class InvoicePrintService
         $value = trim((string) $value);
 
         return $value === '' ? null : $value;
+    }
+
+    /** @return array{printed_at:string,printed_by:string,copy_type:?string}|null */
+    private function printContext(Invoice $invoice, ?InvoicePrintContext $context): ?array
+    {
+        if ($context === null) {
+            return null;
+        }
+
+        $timezone = (string) $this->configurationValue($invoice, self::TIMEZONE_CONFIGURATION_KEY);
+        $printedAt = DateTimeImmutable::createFromInterface($context->printedAt)
+            ->setTimezone(new DateTimeZone($timezone));
+
+        return [
+            'printed_at' => $printedAt->format('d M Y h:i A'),
+            'printed_by' => $context->printedBy,
+            'copy_type' => $context->copyType?->label(),
+        ];
+    }
+
+    private function configurationValue(Invoice $invoice, string $key): mixed
+    {
+        $tenantId = (int) $invoice->tenant_id;
+        $organizationUnitId = $invoice->organization_unit_id === null
+            ? null
+            : (int) $invoice->organization_unit_id;
+
+        return $this->executionContext->runForTenant(
+            $tenantId,
+            fn (): mixed => $this->configuration->value($key, $tenantId, $organizationUnitId),
+        );
     }
 }

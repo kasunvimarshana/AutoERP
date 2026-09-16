@@ -118,6 +118,24 @@ final class PurchaseOrderApiTest extends TestCase
         $this->get($share['document_url'])->assertNotFound();
     }
 
+    public function test_approved_unreceived_purchase_order_hides_supplier_invoice_capability(): void
+    {
+        $context = $this->context('POUNRECEIVED');
+        $order = $this->createApprovedHttpOrder($context, '10.000000');
+
+        $this->withAuth($context)
+            ->getJson('/api/v1/purchase/orders/'.$order['id'])
+            ->assertOk()
+            ->assertJsonPath('data.status', 'approved')
+            ->assertJsonPath('data.receipt_status', 'not_received')
+            ->assertJsonPath('data.capabilities.can_invoice', false)
+            ->assertJsonPath('data.capabilities.details.can_invoice.code', 'not_received')
+            ->assertJsonPath(
+                'data.capabilities.details.can_invoice.reason',
+                'Purchase order must have received quantity before supplier invoicing.',
+            );
+    }
+
     public function test_create_purchase_order_with_header_adjustments_is_decimal_safe(): void
     {
         $context = $this->context();
@@ -317,6 +335,7 @@ final class PurchaseOrderApiTest extends TestCase
             ->assertJsonPath('data.invoice_status', 'partially_invoiced')
             ->assertJsonPath('data.return_status', 'partially_returned')
             ->assertJsonPath('data.capabilities.can_receive', true)
+            ->assertJsonPath('data.capabilities.can_invoice', true)
             ->assertJsonPath('data.capabilities.details.can_receive.allowed', true)
             ->assertJsonPath('data.capabilities.details.can_close.code', 'remaining_receivable')
             ->assertJsonMissingPath('data.capabilities.can_return')

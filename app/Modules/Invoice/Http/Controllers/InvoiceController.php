@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Invoice\Http\Controllers;
 
+use DateTimeImmutable;
 use Dompdf\Dompdf;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -16,6 +17,8 @@ use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 use InvalidArgumentException;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
+use Modules\Invoice\Data\InvoicePrintContext;
+use Modules\Invoice\Enums\InvoiceCopyType;
 use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Http\Requests\InvoiceActionRequest;
 use Modules\Invoice\Http\Requests\ListInvoiceRequest;
@@ -26,6 +29,7 @@ use Modules\Invoice\Http\Resources\InvoiceSourceLineResource;
 use Modules\Invoice\Http\Resources\InvoiceSourceResource;
 use Modules\Invoice\Models\Invoice;
 use Modules\Invoice\Services\InvoiceBalanceService;
+use Modules\Invoice\Services\InvoicePrintIssuanceService;
 use Modules\Invoice\Services\InvoicePrintService;
 use Modules\Invoice\Services\InvoiceReversalService;
 use Modules\Invoice\Services\InvoiceStatusService;
@@ -34,7 +38,10 @@ use Modules\Invoice\Services\ManualInvoiceService;
 
 final class InvoiceController
 {
-    public function __construct(private readonly InvoicePrintService $prints) {}
+    public function __construct(
+        private readonly InvoicePrintService $prints,
+        private readonly InvoicePrintIssuanceService $printIssuance,
+    ) {}
 
     public function index(
         ListInvoiceRequest $request,
@@ -210,9 +217,12 @@ final class InvoiceController
             return $this->notFound($invoice);
         }
 
+        $context = $this->printIssuance->issue($model);
+
         return view('invoice.print', $this->prints->viewData(
             $model,
-            $this->scopedPdfUrl($request, $model),
+            $this->signedPdfUrl($model, $context),
+            printContext: $context,
         ));
     }
 
@@ -228,7 +238,7 @@ final class InvoiceController
             return $this->notFound($invoice);
         }
 
-        return $this->pdfResponse($model);
+        return $this->pdfResponse($model, $this->printIssuance->issue($model));
     }
 
     public function signedPrintLink(Request $request, int $invoice): JsonResponse
@@ -241,7 +251,8 @@ final class InvoiceController
             abort(404);
         }
 
-        $routeParameters = $this->publicRouteParameters($model);
+        $context = $this->printIssuance->issue($model);
+        $routeParameters = $this->publicRouteParameters($model, $context);
         $printUrl = URL::temporarySignedRoute(
             'invoices.public.print',
             now()->addMinutes(InvoicePrintService::SIGNED_URL_TTL_MINUTES),
@@ -290,13 +301,12 @@ final class InvoiceController
             return $this->notFound($invoice);
         }
 
+        $context = $this->signedPrintContext($request);
+
         return view('invoice.print', $this->prints->viewData(
             $model,
-            URL::temporarySignedRoute(
-                'invoices.public.pdf',
-                now()->addMinutes(InvoicePrintService::SIGNED_URL_TTL_MINUTES),
-                $this->publicRouteParameters($model),
-            ),
+            $this->signedPdfUrl($model, $context),
+            printContext: $context,
         ));
     }
 
@@ -311,7 +321,7 @@ final class InvoiceController
             return $this->notFound($invoice);
         }
 
-        return $this->pdfResponse($model);
+        return $this->pdfResponse($model, $this->signedPrintContext($request));
     }
 
     public function publicSharedPdf(
@@ -333,12 +343,17 @@ final class InvoiceController
         return $this->pdfResponse($model);
     }
 
-    private function pdfResponse(Invoice $invoice): Response
+    private function pdfResponse(Invoice $invoice, ?InvoicePrintContext $context = null): Response
     {
-        $html = view('invoice.print', $this->prints->viewData($invoice, mode: 'pdf'))->render();
+        $html = view('invoice.print', $this->prints->viewData(
+            $invoice,
+            mode: 'pdf',
+            printContext: $context,
+        ))->render();
+        $layout = $this->prints->layout($invoice);
         $dompdf = new Dompdf;
         $dompdf->loadHtml($html);
-        $dompdf->setPaper(InvoicePrintService::PDF_PAPER_SIZE, InvoicePrintService::PDF_ORIENTATION);
+        $dompdf->setPaper($layout->paperSize(), $layout->orientation());
         $dompdf->render();
 
         return response($dompdf->output(), 200)
@@ -346,19 +361,24 @@ final class InvoiceController
             ->header('Content-Disposition', 'inline; filename="'.$this->prints->filename($invoice).'"');
     }
 
-    private function scopedPdfUrl(Request $request, Invoice $invoice): string
+    private function signedPdfUrl(Invoice $invoice, ?InvoicePrintContext $context): string
     {
-        $route = $request->routeIs('invoice.print') ? 'invoice.pdf' : 'invoices.pdf';
-
-        return route($route, ['invoice' => (int) $invoice->getKey()]);
+        return URL::temporarySignedRoute(
+            'invoices.public.pdf',
+            now()->addMinutes(InvoicePrintService::SIGNED_URL_TTL_MINUTES),
+            $this->publicRouteParameters($invoice, $context),
+        );
     }
 
-    /** @return array<string, int> */
-    private function publicRouteParameters(Invoice $invoice): array
-    {
+    /** @return array<string, int|string> */
+    private function publicRouteParameters(
+        Invoice $invoice,
+        ?InvoicePrintContext $context = null,
+    ): array {
         $parameters = [
             'invoice' => (int) $invoice->getKey(),
             'tenant' => (int) $invoice->tenant_id,
+            ...$this->printContextParameters($context),
         ];
 
         if ($invoice->organization_unit_id !== null) {
@@ -366,6 +386,46 @@ final class InvoiceController
         }
 
         return $parameters;
+    }
+
+    /** @return array<string, string> */
+    private function printContextParameters(?InvoicePrintContext $context): array
+    {
+        if ($context === null) {
+            return [];
+        }
+
+        $parameters = [
+            'printed_at' => $context->printedAt->format(DATE_ATOM),
+            'printed_by' => $context->printedBy,
+        ];
+
+        if ($context->copyType !== null) {
+            $parameters['copy_type'] = $context->copyType->value;
+        }
+
+        return $parameters;
+    }
+
+    private function signedPrintContext(Request $request): ?InvoicePrintContext
+    {
+        if (! $request->hasValidSignature()) {
+            return null;
+        }
+
+        $printedAt = trim((string) $request->query('printed_at', ''));
+        $printedBy = trim((string) $request->query('printed_by', ''));
+        $copyTypeValue = trim((string) $request->query('copy_type', ''));
+        $copyType = $copyTypeValue === '' ? null : InvoiceCopyType::tryFrom($copyTypeValue);
+        if ($printedAt === '' || $printedBy === '' || ($copyTypeValue !== '' && $copyType === null)) {
+            return null;
+        }
+
+        try {
+            return new InvoicePrintContext(new DateTimeImmutable($printedAt), $printedBy, $copyType);
+        } catch (\Exception) {
+            return null;
+        }
     }
 
     private function currentTenantId(Request $request): int

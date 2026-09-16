@@ -287,6 +287,23 @@ describe('navigation access and matching', () => {
         expect(match?.item.id).toBe('service-invoices');
     });
 
+    it('keeps Purchase-owned invoice and payment details in the Purchase module', () => {
+        const invoice = findNavigationMatch('/purchase/invoices/42', '', tenantWorkspaceNavigationSections);
+        const payment = findNavigationMatch('/purchase/payments/84', '', tenantWorkspaceNavigationSections);
+
+        expect(invoice?.parent?.id).toBe('purchase');
+        expect(invoice?.item.id).toBe('supplier-invoices');
+        expect(payment?.parent?.id).toBe('purchase');
+        expect(payment?.item.id).toBe('supplier-payments');
+    });
+
+    it('keeps canonical invoice details in the Vehicle Service invoice context', () => {
+        const match = findNavigationMatch('/invoices/42', '?from=vehicle-service&job_id=7', tenantWorkspaceNavigationSections);
+
+        expect(match?.parent?.id).toBe('vehicle-service');
+        expect(match?.item.id).toBe('service-invoices');
+    });
+
     it('shows Service Job list and creation links without Vehicle Rental in the sidebar', () => {
         const items = tenantWorkspaceNavigationSections.flatMap((section) => section.items);
         const vehicleService = items.find((item) => item.id === 'vehicle-service');

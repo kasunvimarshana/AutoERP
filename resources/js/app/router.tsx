@@ -692,6 +692,10 @@ const appRouter = createBrowserRouter(
                             element={<PurchaseInvoiceCreatePage />}
                         />
                         <Route
+                            path="/purchase/invoices/:id"
+                            element={<InvoiceDetailPage />}
+                        />
+                        <Route
                             path="/purchase/payments"
                             element={<PurchasePaymentWorkspacePage />}
                         />
@@ -702,6 +706,10 @@ const appRouter = createBrowserRouter(
                         <Route
                             path="/purchase/payments/prepare"
                             element={<PurchasePaymentPreparePage />}
+                        />
+                        <Route
+                            path="/purchase/payments/:id"
+                            element={<PaymentDetailPage />}
                         />
                         <Route
                             path="/purchase/debit-notes"

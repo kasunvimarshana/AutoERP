@@ -18,6 +18,7 @@ import {
     type OrganizationUnitSummary,
 } from '../organizationUnitApi';
 import { organizationUnitPermissions } from '../organizationUnitPermissions';
+import { OrganizationUnitDocumentSettingsPanel } from './OrganizationUnitDocumentSettingsPanel';
 import { OrganizationUnitLegalProfilePanel } from './OrganizationUnitLegalProfilePanel';
 
 export function OrganizationUnitDetailDrawer({
@@ -97,6 +98,8 @@ export function OrganizationUnitDetailDrawer({
                     unit={unit}
                     canManage={canUpdate && unit.lifecycle_status !== 'retired'}
                 />
+
+                <OrganizationUnitDocumentSettingsPanel unit={unit} />
 
                 {canUpdate && unit.lifecycle_status !== 'retired' && (
                     <Panel>

@@ -4,6 +4,7 @@ export interface InventoryRelation extends Record<string, unknown> {
     id: number;
     name?: string;
     code?: string;
+    symbol?: string;
 }
 
 export interface StockBalance extends Record<string, unknown> {
@@ -24,6 +25,16 @@ export interface StockBalance extends Record<string, unknown> {
     quantity_expired?: string;
     quantity_scrapped?: string;
     total_value?: string;
+    reorder_level?: string | null;
+    stock_level: InventoryStockLevel;
+}
+
+export type InventoryStockLevel = 'in_stock' | 'low_stock' | 'out_of_stock';
+
+export interface StockBalanceSummary {
+    in_stock: number;
+    low_stock: number;
+    out_of_stock: number;
 }
 
 export interface InventoryAvailability extends Record<string, unknown> {

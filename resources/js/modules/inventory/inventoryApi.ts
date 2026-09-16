@@ -17,6 +17,7 @@ import type {
     OpeningStockImportPreview,
     ReservationPayload,
     StockBalance,
+    StockBalanceSummary,
     StockCountPayload,
     TransferPayload,
 } from './inventoryTypes';
@@ -34,8 +35,10 @@ export type {
     TransferPayload,
 } from './inventoryTypes';
 
+export type StockBalanceCollection = ApiCollection<StockBalance> & { summary: StockBalanceSummary };
+
 export const listStockBalances = (params: ListParams, signal?: AbortSignal) =>
-    apiClient.get<ApiCollection<StockBalance>>(`${endpoints.inventory}/stock-balances`, { params, signal }).then((response) => response.data);
+    apiClient.get<StockBalanceCollection>(`${endpoints.inventory}/stock-balances`, { params, signal }).then((response) => response.data);
 
 export const getAvailability = (params: ListParams, signal?: AbortSignal) =>
     apiClient.get<ApiResource<InventoryAvailability>>(`${endpoints.inventory}/availability`, { params, signal }).then((response) => response.data.data);
