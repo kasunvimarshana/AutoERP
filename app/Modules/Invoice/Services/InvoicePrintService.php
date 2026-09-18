@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Modules\Configuration\Contracts\ConfigurationResolverInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
+use Modules\Invoice\Contracts\InvoicePaymentMethodProviderInterface;
 use Modules\Invoice\Data\InvoicePrintContext;
 use Modules\Invoice\Enums\InvoiceDirection;
 use Modules\Invoice\Enums\InvoiceDocumentKind;
@@ -37,6 +38,7 @@ final class InvoicePrintService
         private readonly InvoiceAmountInWordsFormatter $amountInWords,
         private readonly ConfigurationResolverInterface $configuration,
         private readonly TenantExecutionContextInterface $executionContext,
+        private readonly InvoicePaymentMethodProviderInterface $paymentMethods,
     ) {}
 
     /** @return Builder<Invoice> */
@@ -88,6 +90,7 @@ final class InvoicePrintService
             : $this->purchaser($invoice);
         $taxLabel = $this->taxLabel($invoice->lines);
         $layout = $this->layout($invoice);
+        $usesFocusedPrint = $this->usesFocusedPrint($invoice);
 
         return [
             'mode' => $mode,
@@ -97,6 +100,7 @@ final class InvoicePrintService
                 'css_class' => $layout->cssClass(),
                 'paper_size' => $layout->paperSize(),
                 'orientation' => $layout->orientation(),
+                'is_compact' => $layout->isCompact(),
             ],
             'print_context' => $this->printContext($invoice, $printContext),
             'document' => [
@@ -120,12 +124,14 @@ final class InvoicePrintService
                 'supply_period_end' => $snapshot instanceof InvoiceDocumentSnapshot ? $this->dateString($snapshot->supply_period_end) : null,
                 'place_of_supply' => $snapshot instanceof InvoiceDocumentSnapshot ? $this->nullableString($snapshot->place_of_supply) : null,
                 'payment_mode' => $snapshot instanceof InvoiceDocumentSnapshot ? $this->nullableString($snapshot->payment_mode) : null,
+                'resolved_payment_mode' => $this->resolvedPaymentMode($invoice, $snapshot),
                 'payment_terms' => $snapshot instanceof InvoiceDocumentSnapshot ? $this->nullableString($snapshot->payment_terms) : null,
                 'amount_in_words' => $this->amountInWords->format($invoice->grand_total, $currency['code']),
                 'notes' => $this->nullableString($invoice->notes),
                 'warnings' => [],
+                'uses_focused_print' => $usesFocusedPrint,
                 'lines' => $this->lines($invoice->lines, $currency),
-                'amounts' => $this->amounts($invoice, $currency, $taxLabel),
+                'amounts' => $this->amounts($invoice, $currency, $taxLabel, $usesFocusedPrint),
             ],
         ];
     }
@@ -137,7 +143,13 @@ final class InvoicePrintService
             InvoicePrintLayout::CONFIGURATION_KEY,
         );
 
-        return InvoicePrintLayout::from((string) $value);
+        $configuredLayout = InvoicePrintLayout::from((string) $value);
+
+        if ($configuredLayout === InvoicePrintLayout::CompactA5 && $this->usesFocusedPrint($invoice)) {
+            return InvoicePrintLayout::CompactA5Portrait;
+        }
+
+        return $configuredLayout;
     }
 
     public function filename(Invoice $invoice): string
@@ -159,6 +171,7 @@ final class InvoicePrintService
                 'line_number' => (int) $line->line_number,
                 'reference' => $this->lineReference($line),
                 'item' => $this->lineItemLabel($line),
+                'display_name' => $this->lineDisplayName($line),
                 'description' => (string) $line->description,
                 'quantity' => [
                     'raw' => (string) $line->quantity,
@@ -176,7 +189,7 @@ final class InvoicePrintService
     }
 
     /** @return array<string, array{label:string, raw:string, display:string}> */
-    private function amounts(Invoice $invoice, array $currency, string $taxLabel): array
+    private function amounts(Invoice $invoice, array $currency, string $taxLabel, bool $usesFocusedPrint): array
     {
         return [
             'subtotal' => $this->labeledMoney('Total Value of Supply', $invoice->subtotal, $currency),
@@ -186,9 +199,41 @@ final class InvoicePrintService
             'adjustment_total' => $this->labeledMoney('Other adjustments', $invoice->adjustment_total, $currency),
             'grand_total' => $this->labeledMoney('Total Amount including '.$taxLabel, $invoice->grand_total, $currency),
             'paid_total' => $this->labeledMoney('Paid', $invoice->paid_total, $currency),
-            'credit_total' => $this->labeledMoney('Credits', $invoice->credit_total, $currency),
+            'credit_total' => $this->labeledMoney($usesFocusedPrint ? 'Credit' : 'Credits', $invoice->credit_total, $currency),
             'balance_due' => $this->labeledMoney('Balance due', $invoice->balance_due, $currency),
         ];
+    }
+
+    private function resolvedPaymentMode(Invoice $invoice, mixed $snapshot): ?string
+    {
+        $methodNames = $this->paymentMethods->namesForInvoice(
+            (int) $invoice->getKey(),
+            (int) $invoice->tenant_id,
+            $invoice->organization_unit_id === null ? null : (int) $invoice->organization_unit_id,
+        );
+        if ($methodNames !== []) {
+            return implode(', ', $methodNames);
+        }
+
+        $snapshotMode = $snapshot instanceof InvoiceDocumentSnapshot
+            ? $this->nullableString($snapshot->payment_mode)
+            : null;
+        if ($snapshotMode !== null) {
+            return $snapshotMode;
+        }
+
+        return $this->usesFocusedPrint($invoice)
+            && bccomp((string) $invoice->balance_due, '0', 6) > 0
+                ? 'Credit'
+                : null;
+    }
+
+    private function usesFocusedPrint(Invoice $invoice): bool
+    {
+        return in_array($this->enumValue($invoice->invoice_type), [
+            InvoiceType::Service->value,
+            InvoiceType::Purchase->value,
+        ], true);
     }
 
     /** @param Collection<int, InvoiceLine> $lines */
@@ -363,6 +408,14 @@ final class InvoicePrintService
         $code = $this->nullableString($line->item_code_snapshot);
 
         return $name !== null && $code !== null ? $code.' - '.$name : $name ?? $code;
+    }
+
+    private function lineDisplayName(InvoiceLine $line): string
+    {
+        return $this->nullableString($line->item_name_snapshot)
+            ?? $this->nullableString($line->description)
+            ?? $this->nullableString($line->item_code_snapshot)
+            ?? 'Item '.(int) $line->line_number;
     }
 
     private function lineReference(InvoiceLine $line): string

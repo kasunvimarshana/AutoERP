@@ -6,12 +6,13 @@
     <title>{{ $document['invoice_number'] }} - {{ $document['title'] }}</title>
     @php
         $isPdf = ($mode ?? 'print') === 'pdf';
-        $isCompact = ($print_layout['value'] ?? 'standard_a4') === 'compact_a5';
+        $isCompact = (bool) ($print_layout['is_compact'] ?? false);
+        $usesFocusedPrint = (bool) ($document['uses_focused_print'] ?? false);
         $amounts = $document['amounts'];
         $lines = $document['lines'] ?? [];
         $minimumPrintableLineRows = $isCompact ? 1 : 5;
         $blankLineRows = max(0, $minimumPrintableLineRows - count($lines));
-        $summaryColumnSpan = $isCompact ? 5 : 4;
+        $summaryColumnSpan = $usesFocusedPrint ? 3 : ($isCompact ? 5 : 4);
         $zeroMoney = static fn (array $amount): bool => bccomp((string) ($amount['raw'] ?? '0.000000'), '0', 6) === 0;
         $settlementRowsVisible = ! $zeroMoney($amounts['paid_total'])
             || ! $zeroMoney($amounts['credit_total'])
@@ -109,6 +110,9 @@
         .layout-a5 { font-family: Arial, Helvetica, sans-serif; font-size: 8px; line-height: 1.15; }
         .layout-a5 .controls { width: 210mm; }
         .layout-a5 .sheet { width: 210mm; min-height: 148mm; padding: 6mm; }
+        .layout-a5-portrait .controls,
+        .layout-a5-portrait .sheet { width: 148mm; }
+        .layout-a5-portrait .sheet { min-height: 210mm; }
         .layout-a5 .field-table { margin-bottom: 3px; }
         .layout-a5 .field-table td { padding: 3px 5px; }
         .layout-a5 .field-table .gap { width: 6px; }
@@ -260,57 +264,69 @@
     <table class="invoice-lines">
         <thead>
         <tr>
-            <th style="width: 13%;">Reference</th>
-            <th>Description of Goods or Services</th>
+            @if ($usesFocusedPrint)
+                <th>Item Name</th>
+            @else
+                <th style="width: 13%;">Reference</th>
+                <th>Description of Goods or Services</th>
+            @endif
             <th style="width: 12%;">Quantity</th>
             <th style="width: 14%;">Unit Price</th>
-            @if ($isCompact)<th style="width: 12%;">Discount</th>@endif
+            @if ($isCompact && ! $usesFocusedPrint)<th style="width: 12%;">Discount</th>@endif
             <th style="width: 17%;">Amount</th>
         </tr>
         </thead>
         <tbody>
         @foreach ($lines as $line)
             <tr>
-                <td>{{ $line['reference'] }}</td>
-                <td>
-                    {{ $line['description'] }}
-                    @if (! empty($line['item']))<div class="muted">{{ $line['item'] }}</div>@endif
-                </td>
+                @if ($usesFocusedPrint)
+                    <td>{{ $line['display_name'] }}</td>
+                @else
+                    <td>{{ $line['reference'] }}</td>
+                    <td>
+                        {{ $line['description'] }}
+                        @if (! empty($line['item']))<div class="muted">{{ $line['item'] }}</div>@endif
+                    </td>
+                @endif
                 <td class="number">
                     {{ $line['quantity']['display'] }}
                     @if (! empty($line['uom'])) {{ $line['uom'] }} @endif
                 </td>
                 <td class="number">{{ $line['unit_price']['display'] }}</td>
-                @if ($isCompact)<td class="number">{{ $line['discount_amount']['display'] }}</td>@endif
+                @if ($isCompact && ! $usesFocusedPrint)<td class="number">{{ $line['discount_amount']['display'] }}</td>@endif
                 <td class="number">{{ $line['line_total']['display'] }}</td>
             </tr>
         @endforeach
         @for ($row = 0; $row < $blankLineRows; $row++)
-            <tr><td>&nbsp;</td><td></td><td></td><td></td>@if ($isCompact)<td></td>@endif<td></td></tr>
+            <tr><td>&nbsp;</td>@unless ($usesFocusedPrint)<td></td>@endunless<td></td><td></td>@if ($isCompact && ! $usesFocusedPrint)<td></td>@endif<td></td></tr>
         @endfor
 
-        <tr>
-            <td colspan="{{ $summaryColumnSpan }}" class="summary-label">{{ $amounts['subtotal']['label'] }}:</td>
-            <td class="number">{{ $amounts['subtotal']['display'] }}</td>
-        </tr>
-        @foreach (['discount_total', 'charge_total', 'adjustment_total'] as $amountKey)
-            @if (! $zeroMoney($amounts[$amountKey]))
-                <tr>
-                    <td colspan="{{ $summaryColumnSpan }}" class="summary-label">{{ $amounts[$amountKey]['label'] }}:</td>
-                    <td class="number">{{ $amounts[$amountKey]['display'] }}</td>
-                </tr>
-            @endif
-        @endforeach
-        <tr>
-            <td colspan="{{ $summaryColumnSpan }}" class="summary-label">{{ $amounts['tax_total']['label'] }}:</td>
-            <td class="number">{{ $amounts['tax_total']['display'] }}</td>
-        </tr>
+        @unless ($usesFocusedPrint)
+            <tr>
+                <td colspan="{{ $summaryColumnSpan }}" class="summary-label">{{ $amounts['subtotal']['label'] }}:</td>
+                <td class="number">{{ $amounts['subtotal']['display'] }}</td>
+            </tr>
+            @foreach (['discount_total', 'charge_total', 'adjustment_total'] as $amountKey)
+                @if (! $zeroMoney($amounts[$amountKey]))
+                    <tr>
+                        <td colspan="{{ $summaryColumnSpan }}" class="summary-label">{{ $amounts[$amountKey]['label'] }}:</td>
+                        <td class="number">{{ $amounts[$amountKey]['display'] }}</td>
+                    </tr>
+                @endif
+            @endforeach
+            <tr>
+                <td colspan="{{ $summaryColumnSpan }}" class="summary-label">{{ $amounts['tax_total']['label'] }}:</td>
+                <td class="number">{{ $amounts['tax_total']['display'] }}</td>
+            </tr>
+        @endunless
         <tr>
             <td colspan="{{ $summaryColumnSpan }}" class="summary-label">{{ $amounts['grand_total']['label'] }}:</td>
             <td class="number">{{ $amounts['grand_total']['display'] }}</td>
         </tr>
-        @if ($settlementRowsVisible)
-            <tr><td colspan="{{ $summaryColumnSpan }}" class="summary-label">{{ $amounts['paid_total']['label'] }}:</td><td class="number">{{ $amounts['paid_total']['display'] }}</td></tr>
+        @if ($settlementRowsVisible || $usesFocusedPrint)
+            @if (! $zeroMoney($amounts['paid_total']))
+                <tr><td colspan="{{ $summaryColumnSpan }}" class="summary-label">{{ $amounts['paid_total']['label'] }}:</td><td class="number">{{ $amounts['paid_total']['display'] }}</td></tr>
+            @endif
             <tr><td colspan="{{ $summaryColumnSpan }}" class="summary-label">{{ $amounts['credit_total']['label'] }}:</td><td class="number">{{ $amounts['credit_total']['display'] }}</td></tr>
             <tr><td colspan="{{ $summaryColumnSpan }}" class="summary-label">{{ $amounts['balance_due']['label'] }}:</td><td class="number">{{ $amounts['balance_due']['display'] }}</td></tr>
         @endif
@@ -320,7 +336,7 @@
     <table class="footer-fields">
         <tr>
             <td>
-                <span class="label">Mode of Payment:</span> {{ $document['payment_mode'] ?? '' }}
+                <span class="label">Mode of Payment:</span> {{ $document['resolved_payment_mode'] ?? '' }}
                 @if (! empty($document['payment_terms']))
                     <div class="muted">Terms: {{ $document['payment_terms'] }}</div>
                 @endif

@@ -6,12 +6,15 @@ namespace Modules\Payment\Providers;
 
 use Illuminate\Support\ServiceProvider;
 use Modules\Core\Contracts\PermissionDefinitionRegistryInterface;
+use Modules\Invoice\Contracts\InvoicePaymentMethodProviderInterface;
 use Modules\Payment\Constants\PaymentPermission;
+use Modules\Payment\Services\InvoicePaymentMethodProvider;
 
 final class PaymentServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        $this->app->singleton(InvoicePaymentMethodProviderInterface::class, InvoicePaymentMethodProvider::class);
     }
 
     public function boot(): void
