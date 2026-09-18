@@ -4,6 +4,10 @@ export function openPendingWhatsAppWindow(): Window | null {
     return window.open('', '_blank');
 }
 
+export function confirmPendingWhatsAppShare(pendingWindow: Window | null, message: string): boolean {
+    return (pendingWindow ?? window).confirm(message);
+}
+
 export function navigateToWhatsApp(value: string, pendingWindow: Window | null): boolean {
     const url = resolveWhatsAppUrl(value);
     if (!url) {

@@ -16,7 +16,7 @@ import { useConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { formatDate } from '@/shared/utils/formatDate';
 import { readableRelation } from '@/shared/utils/object';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
-import { closePendingWhatsAppWindow, navigateToWhatsApp, openPendingWhatsAppWindow } from '@/shared/utils/whatsAppNavigation';
+import { closePendingWhatsAppWindow, confirmPendingWhatsAppShare, navigateToWhatsApp, openPendingWhatsAppWindow } from '@/shared/utils/whatsAppNavigation';
 import { PurchaseOrderActions } from '../components/PurchaseOrderActions';
 import { PurchaseOrderStatusBadge } from '../components/PurchaseOrderStatusBadge';
 import { PurchaseOrderTabs } from '../components/PurchaseOrderTabs';
@@ -82,7 +82,7 @@ export default function PurchaseOrderDetailPage() {
         try {
             const share = await getPurchaseOrderWhatsAppShare(result.data.id);
             if (share.recipient.verification_status !== 'verified'
-                && !window.confirm('This supplier WhatsApp number has not been manually verified. Continue sharing anyway?')) {
+                && !confirmPendingWhatsAppShare(pendingWindow, 'This supplier WhatsApp number has not been manually verified. Continue sharing anyway?')) {
                 closePendingWhatsAppWindow(pendingWindow);
                 return;
             }

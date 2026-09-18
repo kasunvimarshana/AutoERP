@@ -20,7 +20,7 @@ import { ContentHeader } from '@/shared/components/ContentHeader';
 import { Button, LinkButton } from '@/shared/components/Button';
 import { ReversalDialog, type ReversalFacts } from '@/shared/components/ReversalDialog';
 import { openSameOriginUrl } from '@/shared/utils/safeNavigation';
-import { closePendingWhatsAppWindow, navigateToWhatsApp, openPendingWhatsAppWindow } from '@/shared/utils/whatsAppNavigation';
+import { closePendingWhatsAppWindow, confirmPendingWhatsAppShare, navigateToWhatsApp, openPendingWhatsAppWindow } from '@/shared/utils/whatsAppNavigation';
 import { Tabs, type TabItem } from '@/shared/components/Tabs';
 import { Panel } from '@/shared/components/Panel';
 import { DetailGrid } from '@/shared/components/DetailGrid';
@@ -153,7 +153,7 @@ export default function InvoiceDetailPage() {
         try {
             const share = await getInvoiceWhatsAppShare(id);
             if (share.recipient.verification_status !== 'verified'
-                && !window.confirm('This customer WhatsApp number has not been manually verified. Continue sharing anyway?')) {
+                && !confirmPendingWhatsAppShare(pendingWindow, 'This customer WhatsApp number has not been manually verified. Continue sharing anyway?')) {
                 closePendingWhatsAppWindow(pendingWindow);
                 return;
             }
