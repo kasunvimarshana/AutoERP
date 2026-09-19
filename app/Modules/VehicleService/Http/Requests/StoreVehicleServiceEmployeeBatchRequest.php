@@ -25,7 +25,7 @@ final class StoreVehicleServiceEmployeeBatchRequest extends TenantScopedRequest
             'lines' => ['required', 'array', 'min:1', 'max:'.self::MAX_ASSIGNMENTS_PER_REQUEST],
             'lines.*.line_id' => ['required', 'integer', 'min:1', 'distinct'],
             'lines.*.employee_ids' => ['required', 'array', 'min:1', 'max:'.self::MAX_ASSIGNMENTS_PER_REQUEST],
-            'lines.*.employee_ids.*' => ['required', 'integer', 'min:1', 'distinct'],
+            'lines.*.employee_ids.*' => ['required', 'integer', 'min:1'],
         ];
     }
 
@@ -43,6 +43,28 @@ final class StoreVehicleServiceEmployeeBatchRequest extends TenantScopedRequest
                     'lines',
                     'A workforce batch cannot contain more than '.self::MAX_ASSIGNMENTS_PER_REQUEST.' employee assignments.',
                 );
+            }
+
+            foreach ((array) $this->input('lines', []) as $lineIndex => $line) {
+                if (! is_array($line) || ! is_array($line['employee_ids'] ?? null)) {
+                    continue;
+                }
+
+                $seenEmployeeIds = [];
+                foreach ($line['employee_ids'] as $employeeIndex => $employeeId) {
+                    if (! is_numeric($employeeId)) {
+                        continue;
+                    }
+
+                    $employeeId = (int) $employeeId;
+                    if (isset($seenEmployeeIds[$employeeId])) {
+                        $validator->errors()->add(
+                            "lines.{$lineIndex}.employee_ids.{$employeeIndex}",
+                            'An employee can only be selected once per workforce line.',
+                        );
+                    }
+                    $seenEmployeeIds[$employeeId] = true;
+                }
             }
         }];
     }

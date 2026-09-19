@@ -131,7 +131,7 @@
         .layout-a5 .muted { font-size: 7px; }
         .layout-a5 .footer-fields { margin-top: 4px; }
         .layout-a5 .footer-fields td { min-height: 5mm; padding: 3px 5px; }
-        .layout-a5 .signature-table { margin-top: 5px; }
+        .layout-a5 .signature-table { margin-top: 16px; }
         .layout-a5 .signature-table td { padding-top: 7px; }
         .pdf-output.layout-a5 .sheet { width: auto; min-height: 0; margin: 0; padding: 0; }
         @media print {
@@ -157,7 +157,7 @@
         <table class="compact-header">
             <tr>
                 <td class="compact-company">
-                    <div class="compact-company-name">{{ $document['supplier']['name'] }}</div>
+                    <div class="compact-company-name">{{ $document['capitalizes_company_header'] ? mb_strtoupper($document['supplier']['name']) : $document['supplier']['name'] }}</div>
                     @if (! empty($document['supplier']['address']))<div>{{ $document['supplier']['address'] }}</div>@endif
                     <div>
                         @if (! empty($document['supplier']['phone']))Tel: {{ $document['supplier']['phone'] }}@endif
@@ -290,7 +290,6 @@
                 @endif
                 <td class="number">
                     {{ $line['quantity']['display'] }}
-                    @if (! empty($line['uom'])) {{ $line['uom'] }} @endif
                 </td>
                 <td class="number">{{ $line['unit_price']['display'] }}</td>
                 @if ($isCompact && ! $usesFocusedPrint)<td class="number">{{ $line['discount_amount']['display'] }}</td>@endif
@@ -301,6 +300,14 @@
             <tr><td>&nbsp;</td>@unless ($usesFocusedPrint)<td></td>@endunless<td></td><td></td>@if ($isCompact && ! $usesFocusedPrint)<td></td>@endif<td></td></tr>
         @endfor
 
+        @if ($document['shows_service_discount_breakdown'])
+            @foreach (['line_discount_total', 'bill_discount_total'] as $amountKey)
+                <tr>
+                    <td colspan="{{ $summaryColumnSpan }}" class="summary-label">{{ $amounts[$amountKey]['label'] }}:</td>
+                    <td class="number">@unless ($zeroMoney($amounts[$amountKey]))-@endunless{{ $amounts[$amountKey]['display'] }}</td>
+                </tr>
+            @endforeach
+        @endif
         @unless ($usesFocusedPrint)
             <tr>
                 <td colspan="{{ $summaryColumnSpan }}" class="summary-label">{{ $amounts['subtotal']['label'] }}:</td>
@@ -327,7 +334,6 @@
             @if (! $zeroMoney($amounts['paid_total']))
                 <tr><td colspan="{{ $summaryColumnSpan }}" class="summary-label">{{ $amounts['paid_total']['label'] }}:</td><td class="number">{{ $amounts['paid_total']['display'] }}</td></tr>
             @endif
-            <tr><td colspan="{{ $summaryColumnSpan }}" class="summary-label">{{ $amounts['credit_total']['label'] }}:</td><td class="number">{{ $amounts['credit_total']['display'] }}</td></tr>
             <tr><td colspan="{{ $summaryColumnSpan }}" class="summary-label">{{ $amounts['balance_due']['label'] }}:</td><td class="number">{{ $amounts['balance_due']['display'] }}</td></tr>
         @endif
         </tbody>

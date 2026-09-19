@@ -471,6 +471,86 @@ final class VehicleServiceEngineTest extends TestCase
         }
     }
 
+    public function test_workforce_batch_allows_same_employee_on_different_lines_but_not_twice_on_one_line(): void
+    {
+        $this->withoutMiddleware();
+        $context = $this->context();
+        $this->actingAsTenantUser($context['tenant_id']);
+        $combo = $this->item($context['tenant_id'], 'COMBO-WORKFORCE', ItemType::Combo, false, $context['uom_id']);
+        $otherLabour = $this->item($context['tenant_id'], 'LABOUR-WORKFORCE', ItemType::Labour, false, $context['uom_id']);
+        DB::table('item_bundles')->insert([
+            [
+                'tenant_id' => $context['tenant_id'],
+                'parent_item_id' => $combo->getKey(),
+                'child_item_id' => $context['labour']->getKey(),
+                'quantity' => '1.000000',
+                'uom_id' => $context['uom_id'],
+                'line_type' => 'labour',
+                'unit_cost' => '50.000000',
+                'uses_job_supervisor' => false,
+                'is_required' => true,
+                'sort_order' => 1,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'tenant_id' => $context['tenant_id'],
+                'parent_item_id' => $combo->getKey(),
+                'child_item_id' => $otherLabour->getKey(),
+                'quantity' => '1.000000',
+                'uom_id' => $context['uom_id'],
+                'line_type' => 'labour',
+                'unit_cost' => '50.000000',
+                'uses_job_supervisor' => false,
+                'is_required' => true,
+                'sort_order' => 2,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ]);
+        $job = $this->createJob($context);
+        $parent = $this->line($job, VehicleServiceLineSourceType::ComboParent, $combo, '1.000000', '100.000000');
+        [$firstLine, $secondLine] = $this->withTenantExecutionContext(
+            (int) $context['tenant_id'],
+            fn (): array => $parent->children()->orderBy('line_number')->get()->all(),
+        );
+        $url = "/api/v1/vehicle-service/jobs/{$job->getKey()}/employees/batch";
+
+        $this->tenantPostJson($context['tenant_id'], $url, [
+            'tenant_id' => $context['tenant_id'],
+            'expected_version' => $this->currentJobVersion($job),
+            'lines' => [
+                ['line_id' => $firstLine->getKey(), 'employee_ids' => [$context['employee_id']]],
+                ['line_id' => $secondLine->getKey(), 'employee_ids' => [$context['employee_id']]],
+            ],
+        ])->assertCreated();
+
+        $this->assertSame(1, $this->withTenantExecutionContext(
+            (int) $context['tenant_id'],
+            fn (): int => $firstLine->employeeAssignments()->count(),
+        ));
+        $this->assertSame(1, $this->withTenantExecutionContext(
+            (int) $context['tenant_id'],
+            fn (): int => $secondLine->employeeAssignments()->count(),
+        ));
+
+        $this->tenantPostJson($context['tenant_id'], $url, [
+            'tenant_id' => $context['tenant_id'],
+            'expected_version' => $this->currentJobVersion($job),
+            'lines' => [
+                ['line_id' => $firstLine->getKey(), 'employee_ids' => [
+                    $context['helper_employee_id'],
+                    $context['helper_employee_id'],
+                ]],
+            ],
+        ])->assertUnprocessable()->assertJsonValidationErrors('lines.0.employee_ids.1');
+
+        $this->assertSame(1, $this->withTenantExecutionContext(
+            (int) $context['tenant_id'],
+            fn (): int => $firstLine->employeeAssignments()->count(),
+        ));
+    }
+
     public function test_workforce_batch_assignment_is_atomic_and_bumps_job_version_once(): void
     {
         $context = $this->context();

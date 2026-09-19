@@ -212,7 +212,9 @@ final class InvoicePrintServiceTest extends TestCase
         $this->assertStringNotContainsString('Total Value of Supply', $html);
         $this->assertStringNotContainsString('VAT Amount', $html);
         $this->assertStringContainsString('Total Amount including VAT', $html);
-        $this->assertStringContainsString('Credit:', $html);
+        $this->assertStringContainsString('Line discount:', $html);
+        $this->assertStringContainsString('Bill discount:', $html);
+        $this->assertStringNotContainsString('Credit:', $html);
         $this->assertStringContainsString('Balance due:', $html);
         $this->assertStringContainsString('Printed: 16 Sep 2026 10:42 AM | By: Kasun Perera | Original', $html);
         $this->assertStringNotContainsString('DUPLICATE', $html);
@@ -225,6 +227,73 @@ final class InvoicePrintServiceTest extends TestCase
 
         $this->assertSame(InvoicePrintLayout::CompactA5Portrait, $layout);
         $this->assertSame('portrait', $layout->orientation());
+        $this->assertSame(1, $dompdf->getCanvas()->get_page_count());
+    }
+
+    public function test_service_invoice_print_shows_discounts_and_two_decimal_quantity_with_uppercase_header_only(): void
+    {
+        [$tenantId, $organizationUnitId] = $this->scope();
+        $customerId = $this->customer($tenantId, $organizationUnitId, 'Discount Print Customer');
+        $invoice = $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): Invoice => app(InvoiceCreationService::class)->create(new CreateInvoiceData(
+                tenantId: $tenantId,
+                invoiceType: InvoiceType::Service,
+                direction: InvoiceDirection::Outbound,
+                invoiceDate: '2026-09-19',
+                organizationUnitId: $organizationUnitId,
+                partyType: InvoicePartyType::Customer->value,
+                partyId: $customerId,
+                lines: [new InvoiceLineData(
+                    lineNumber: 1,
+                    description: 'Wash',
+                    quantity: '1.000000',
+                    unitPrice: '100.000000',
+                    discountAmount: '10.000000',
+                )],
+                adjustments: [new InvoiceAdjustmentData(
+                    name: 'Service bill discount',
+                    adjustmentType: AdjustmentType::Discount,
+                    effect: AdjustmentEffect::Decrease,
+                    amount: '5.000000',
+                )],
+            )),
+        );
+        DB::table('invoice_lines')->where('invoice_id', $invoice->getKey())->update(['uom_code_snapshot' => 'HOUR']);
+        DB::table('invoice_document_snapshots')->where('invoice_id', $invoice->getKey())->update([
+            'seller_legal_name' => 'PIC Auto Lanka (PVT) LTD',
+        ]);
+        $invoice = $this->invoice($tenantId, (int) $invoice->getKey());
+
+        $configuration = $this->createMock(ConfigurationResolverInterface::class);
+        $configuration->method('value')->willReturnCallback(
+            static fn (string $key): string => $key === InvoicePrintLayout::CONFIGURATION_KEY
+                ? InvoicePrintLayout::CompactA5->value
+                : 'Asia/Colombo',
+        );
+        $this->app->instance(ConfigurationResolverInterface::class, $configuration);
+
+        $prints = app(InvoicePrintService::class);
+        $data = $prints->viewData($invoice, mode: 'pdf');
+        $html = view('invoice.print', $data)->render();
+
+        $this->assertSame('10.000000', $data['document']['amounts']['line_discount_total']['raw']);
+        $this->assertSame('5.000000', $data['document']['amounts']['bill_discount_total']['raw']);
+        $this->assertSame('85.000000', $data['document']['amounts']['grand_total']['raw']);
+        $this->assertSame('1.00', $data['document']['lines'][0]['quantity']['display']);
+        $this->assertStringContainsString('PIC AUTO LANKA (PVT) LTD</div>', $html);
+        $this->assertStringContainsString("Supplier's Name:</span> PIC Auto Lanka (PVT) LTD", $html);
+        $this->assertStringContainsString('Line discount:', $html);
+        $this->assertStringContainsString('Bill discount:', $html);
+        $this->assertStringNotContainsString('HOUR', $html);
+        $this->assertStringNotContainsString('Credit:', $html);
+
+        $dompdf = new Dompdf;
+        $dompdf->loadHtml($html);
+        $layout = $prints->layout($invoice);
+        $dompdf->setPaper($layout->paperSize(), $layout->orientation());
+        $dompdf->render();
+
         $this->assertSame(1, $dompdf->getCanvas()->get_page_count());
     }
 
@@ -267,7 +336,7 @@ final class InvoicePrintServiceTest extends TestCase
         $this->assertStringContainsString('Brake Pad', $html);
         $this->assertStringNotContainsString('BP-001 - Brake Pad', $html);
         $this->assertStringNotContainsString('Internal purchase description', $html);
-        $this->assertStringContainsString('Credit:', $html);
+        $this->assertStringNotContainsString('Credit:', $html);
         $this->assertStringContainsString('Balance due:', $html);
     }
 

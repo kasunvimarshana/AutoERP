@@ -12,13 +12,17 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Modules\Configuration\Contracts\ConfigurationResolverInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
+use Modules\Core\Services\DecimalMath;
 use Modules\Invoice\Contracts\InvoicePaymentMethodProviderInterface;
 use Modules\Invoice\Data\InvoicePrintContext;
+use Modules\Invoice\Enums\AdjustmentEffect;
+use Modules\Invoice\Enums\AdjustmentType;
 use Modules\Invoice\Enums\InvoiceDirection;
 use Modules\Invoice\Enums\InvoiceDocumentKind;
 use Modules\Invoice\Enums\InvoicePrintLayout;
 use Modules\Invoice\Enums\InvoiceType;
 use Modules\Invoice\Models\Invoice;
+use Modules\Invoice\Models\InvoiceAdjustment;
 use Modules\Invoice\Models\InvoiceDocumentSnapshot;
 use Modules\Invoice\Models\InvoiceLine;
 
@@ -32,10 +36,13 @@ final class InvoicePrintService
 
     private const MONEY_SCALE = 2;
 
-    private const QUANTITY_SCALE = 3;
+    private const QUANTITY_SCALE = 2;
+
+    private const ZERO_AMOUNT = '0.000000';
 
     public function __construct(
         private readonly InvoiceAmountInWordsFormatter $amountInWords,
+        private readonly DecimalMath $math,
         private readonly ConfigurationResolverInterface $configuration,
         private readonly TenantExecutionContextInterface $executionContext,
         private readonly InvoicePaymentMethodProviderInterface $paymentMethods,
@@ -49,6 +56,7 @@ final class InvoicePrintService
                 'tenant',
                 'organizationUnit',
                 'documentSnapshot',
+                'adjustments',
                 'lines' => static fn ($query) => $query->orderBy('line_number'),
             ])
             ->where('tenant_id', $tenantId);
@@ -70,12 +78,13 @@ final class InvoicePrintService
         string $mode = 'print',
         ?InvoicePrintContext $printContext = null,
     ): array {
-        $invoice->loadMissing([
+        $this->executionContext->runForTenant((int) $invoice->tenant_id, static fn () => $invoice->loadMissing([
             'tenant',
             'organizationUnit',
             'documentSnapshot',
+            'adjustments',
             'lines' => static fn ($query) => $query->orderBy('line_number'),
-        ]);
+        ]));
 
         $currency = $this->currency($invoice);
         $snapshot = $invoice->documentSnapshot;
@@ -130,6 +139,8 @@ final class InvoicePrintService
                 'notes' => $this->nullableString($invoice->notes),
                 'warnings' => [],
                 'uses_focused_print' => $usesFocusedPrint,
+                'capitalizes_company_header' => $this->isOutbound($invoice),
+                'shows_service_discount_breakdown' => $this->enumValue($invoice->invoice_type) === InvoiceType::Service->value,
                 'lines' => $this->lines($invoice->lines, $currency),
                 'amounts' => $this->amounts($invoice, $currency, $taxLabel, $usesFocusedPrint),
             ],
@@ -191,8 +202,22 @@ final class InvoicePrintService
     /** @return array<string, array{label:string, raw:string, display:string}> */
     private function amounts(Invoice $invoice, array $currency, string $taxLabel, bool $usesFocusedPrint): array
     {
+        $lineDiscountTotal = $invoice->lines->reduce(
+            fn (string $total, InvoiceLine $line): string => $this->math->add($total, (string) $line->discount_amount),
+            self::ZERO_AMOUNT,
+        );
+        $billDiscountTotal = $invoice->adjustments
+            ->filter(static fn (InvoiceAdjustment $adjustment): bool => $adjustment->adjustment_type === AdjustmentType::Discount
+                && $adjustment->effect === AdjustmentEffect::Decrease)
+            ->reduce(
+                fn (string $total, InvoiceAdjustment $adjustment): string => $this->math->add($total, (string) $adjustment->amount),
+                self::ZERO_AMOUNT,
+            );
+
         return [
             'subtotal' => $this->labeledMoney('Total Value of Supply', $invoice->subtotal, $currency),
+            'line_discount_total' => $this->labeledMoney('Line discount', $lineDiscountTotal, $currency),
+            'bill_discount_total' => $this->labeledMoney('Bill discount', $billDiscountTotal, $currency),
             'discount_total' => $this->labeledMoney('Discounts', $invoice->discount_total, $currency),
             'tax_total' => $this->labeledMoney($taxLabel.' Amount', $invoice->tax_total, $currency),
             'charge_total' => $this->labeledMoney('Charges', $invoice->charge_total, $currency),
