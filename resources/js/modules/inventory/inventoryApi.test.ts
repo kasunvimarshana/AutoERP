@@ -21,6 +21,7 @@ describe('inventory API lookup adapters', () => {
                 data: [{
                     id: 5,
                     batch_number: 'BATCH-1',
+                    lot_number: 'SUPPLIER-LOT-9',
                     item: { id: 1, name: 'Oil Filter' },
                     variant: { id: 2, name: 'Premium' },
                 }],
@@ -44,7 +45,7 @@ describe('inventory API lookup adapters', () => {
             },
             signal,
         });
-        expect(result.data).toEqual([{ id: 5, code: 'BATCH-1', name: 'Oil Filter / Premium' }]);
+        expect(result.data).toEqual([{ id: 5, code: 'BATCH-1', name: 'Oil Filter / Premium / Lot SUPPLIER-LOT-9' }]);
     });
 
     it('searches available serials with stock location filters', async () => {

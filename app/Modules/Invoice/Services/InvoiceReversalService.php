@@ -18,6 +18,8 @@ use Modules\Tax\Services\TaxDocumentIntegrationService;
 
 final class InvoiceReversalService
 {
+    private const TRANSACTION_ATTEMPTS = 3;
+
     public function __construct(
         private readonly DecimalMath $math,
         private readonly InvoicePostingPlanService $postingPlans,
@@ -84,10 +86,11 @@ final class InvoiceReversalService
                 InvoiceFinanceSource::REVERSAL_LINE_TYPE,
             );
             $this->postingPlans->reverse($invoice, $reversalDate, $actorId, $reason);
-            $this->sourceRestoration->restore($invoice, InvoiceStatus::Reversed);
-
             $invoice->forceFill(['status' => InvoiceStatus::Reversed->value])->save();
             $this->balances->reverse($invoice);
+            // Source owners reconcile against the final document state within
+            // this transaction; a handler failure still rolls everything back.
+            $this->sourceRestoration->restore($invoice, InvoiceStatus::Reversed, $actorId, $reason);
 
             return $invoice->refresh()->load([
                 'lines',
@@ -98,7 +101,7 @@ final class InvoiceReversalService
                 'balance',
                 'postingPlan',
             ]);
-        });
+        }, self::TRANSACTION_ATTEMPTS);
     }
 
     private function assertUnsettled(InvoiceBalance $balance): void

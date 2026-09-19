@@ -63,6 +63,11 @@ final class Supplier extends TenantOwnedModel
         return $this->hasMany(SupplierContact::class, 'supplier_id');
     }
 
+    public function whatsappVerifications(): HasMany
+    {
+        return $this->hasMany(SupplierWhatsAppVerification::class, 'supplier_id');
+    }
+
     public function addresses(): HasMany
     {
         return $this->hasMany(SupplierAddress::class, 'supplier_id');

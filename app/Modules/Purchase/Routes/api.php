@@ -45,6 +45,8 @@ Route::prefix('api/v1/purchase')->middleware($middleware)->name('api.v1.purchase
     Route::get('orders', [PurchaseOrderController::class, 'index'])->middleware($requires(PurchaseAuthorizationService::ORDERS_VIEW))->name('orders.index');
     Route::post('orders', [PurchaseOrderController::class, 'store'])->middleware($requires(PurchaseAuthorizationService::ORDERS_CREATE))->name('orders.store');
     Route::get('orders/{order}', [PurchaseOrderController::class, 'show'])->whereNumber('order')->middleware($requires(PurchaseAuthorizationService::ORDERS_VIEW))->name('orders.show');
+    Route::get('orders/{order}/pdf', [PurchaseOrderController::class, 'pdf'])->whereNumber('order')->middleware($requires(PurchaseAuthorizationService::ORDERS_VIEW))->name('orders.pdf');
+    Route::post('orders/{order}/whatsapp-share', [PurchaseOrderController::class, 'whatsappShare'])->whereNumber('order')->middleware($requires(PurchaseAuthorizationService::ORDERS_VIEW))->name('orders.whatsapp-share');
     Route::put('orders/{order}', [PurchaseOrderController::class, 'update'])->whereNumber('order')->middleware($requires(PurchaseAuthorizationService::ORDERS_UPDATE))->name('orders.update');
     Route::delete('orders/{order}', [PurchaseOrderController::class, 'destroy'])->whereNumber('order')->middleware($requires(PurchaseAuthorizationService::ORDERS_DELETE))->name('orders.destroy');
     Route::patch('orders/{order}/submit', [PurchaseOrderController::class, 'submit'])->whereNumber('order')->middleware($requires(PurchaseAuthorizationService::ORDERS_SUBMIT))->name('orders.submit');
@@ -56,6 +58,7 @@ Route::prefix('api/v1/purchase')->middleware($middleware)->name('api.v1.purchase
     Route::get('orders/{order}/invoiceable-lines', [PurchaseEligibilityController::class, 'invoiceableOrderLines'])->whereNumber('order')->middleware($requires(PurchaseAuthorizationService::SUPPLIER_INVOICES_VIEW))->name('orders.invoiceable-lines');
 
     Route::get('goods-receipts', [GoodsReceiptNoteController::class, 'index'])->middleware($requires(PurchaseAuthorizationService::GOODS_RECEIPTS_VIEW))->name('goods-receipts.index');
+    Route::post('goods-receipts/batch-number', [GoodsReceiptNoteController::class, 'generateBatchNumber'])->middleware($requires(PurchaseAuthorizationService::GOODS_RECEIPTS_CREATE))->name('goods-receipts.batch-number');
     Route::post('goods-receipts', [GoodsReceiptNoteController::class, 'store'])->middleware($requires(PurchaseAuthorizationService::GOODS_RECEIPTS_CREATE))->name('goods-receipts.store');
     Route::get('goods-receipts/{grn}', [GoodsReceiptNoteController::class, 'show'])->whereNumber('grn')->middleware($requires(PurchaseAuthorizationService::GOODS_RECEIPTS_VIEW))->name('goods-receipts.show');
     Route::patch('goods-receipts/{grn}/post', [GoodsReceiptNoteController::class, 'post'])->whereNumber('grn')->middleware($requires(PurchaseAuthorizationService::GOODS_RECEIPTS_POST))->name('goods-receipts.post');

@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Modules\Inventory\Http\Controllers;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Modules\Inventory\DTOs\StockBalanceData;
+use Modules\Inventory\Enums\InventoryStockLevel;
 use Modules\Inventory\Http\Requests\InventoryLookupRequest;
 use Modules\Inventory\Http\Resources\InventoryBatchResource;
 use Modules\Inventory\Http\Resources\InventorySerialNumberResource;
@@ -32,7 +34,48 @@ final class StockController extends InventoryQueryController
             'batch_id',
         ]);
 
-        return StockBalanceResource::collection($query->orderBy('item_id')->paginate($request->perPage()));
+        if ($request->filled('search')) {
+            $search = '%'.trim((string) $request->input('search')).'%';
+            $query->whereHas('item', static fn (Builder $itemQuery): Builder => $itemQuery
+                ->where('name', 'like', $search)
+                ->orWhere('code', 'like', $search)
+                ->orWhere('sku', 'like', $search));
+        }
+
+        $summaryQuery = clone $query;
+        $summary = [
+            InventoryStockLevel::IN_STOCK->value => $this->stockLevelQuery(clone $summaryQuery, InventoryStockLevel::IN_STOCK)->count(),
+            InventoryStockLevel::LOW_STOCK->value => $this->stockLevelQuery(clone $summaryQuery, InventoryStockLevel::LOW_STOCK)->count(),
+            InventoryStockLevel::OUT_OF_STOCK->value => $this->stockLevelQuery(clone $summaryQuery, InventoryStockLevel::OUT_OF_STOCK)->count(),
+        ];
+
+        if ($request->filled('stock_level')) {
+            $this->stockLevelQuery($query, InventoryStockLevel::from((string) $request->input('stock_level')));
+        }
+
+        return StockBalanceResource::collection(
+            $query->orderBy('quantity_available')->orderBy('item_id')->paginate($request->perPage()),
+        )->additional(['summary' => $summary]);
+    }
+
+    private function stockLevelQuery(Builder $query, InventoryStockLevel $stockLevel): Builder
+    {
+        if ($stockLevel === InventoryStockLevel::OUT_OF_STOCK) {
+            return $query->where('quantity_available', '<=', 0);
+        }
+
+        $query->where('quantity_available', '>', 0);
+
+        if ($stockLevel === InventoryStockLevel::LOW_STOCK) {
+            return $query->whereHas('item', static fn (Builder $itemQuery): Builder => $itemQuery
+                ->whereNotNull('reorder_level')
+                ->whereColumn('inventory_stock_balances.quantity_available', '<=', 'items.reorder_level'));
+        }
+
+        return $query->whereHas('item', static fn (Builder $itemQuery): Builder => $itemQuery
+            ->where(static fn (Builder $reorderQuery): Builder => $reorderQuery
+                ->whereNull('reorder_level')
+                ->orWhereColumn('inventory_stock_balances.quantity_available', '>', 'items.reorder_level')));
     }
 
     public function availability(InventoryLookupRequest $request, InventoryAvailabilityService $service): JsonResponse
@@ -75,7 +118,10 @@ final class StockController extends InventoryQueryController
         $query = $this->scope(InventoryBatch::query(), $request)->with(['item', 'variant']);
         $this->filters($query, $request, ['item_id', 'item_variant_id', 'status']);
         if ($request->filled('search')) {
-            $query->where('batch_number', 'like', '%'.trim((string) $request->input('search')).'%');
+            $search = '%'.trim((string) $request->input('search')).'%';
+            $query->where(static fn (Builder $searchQuery): Builder => $searchQuery
+                ->where('batch_number', 'like', $search)
+                ->orWhere('lot_number', 'like', $search));
         }
 
         return InventoryBatchResource::collection($query->orderBy('batch_number')->paginate($request->perPage()));

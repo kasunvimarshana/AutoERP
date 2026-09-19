@@ -6,44 +6,58 @@ namespace Modules\Customer\Services;
 
 use Modules\Customer\Models\Customer;
 use Modules\Sequence\Repositories\SequenceRepositoryInterface;
-use Modules\Sequence\Services\Contracts\SequenceDomainServiceInterface;
 use Modules\Sequence\Services\Sequences\GenerateSequenceNumberService;
 use RuntimeException;
 
 final class CustomerNumberService
 {
-    private const DOCUMENT_TYPE = 'customer';
+    private const NUMBER_DOCUMENT_TYPE = 'customer';
+
+    private const CODE_DOCUMENT_TYPE = 'customer_code';
+
     private const PERIOD_TYPE = 'infinite';
+
     private const PREFIX = 'CUS-';
+
     private const PADDING = 6;
+
     private const MAX_GENERATION_ATTEMPTS = 3;
 
     public function __construct(
         private readonly GenerateSequenceNumberService $sequences,
         private readonly SequenceRepositoryInterface $sequenceRepository,
-        private readonly SequenceDomainServiceInterface $sequenceDomain,
     ) {}
 
     public function next(int $tenantId): string
     {
+        return $this->nextUnique($tenantId, self::NUMBER_DOCUMENT_TYPE, 'customer_number');
+    }
+
+    public function nextCode(int $tenantId): string
+    {
+        return $this->nextUnique($tenantId, self::CODE_DOCUMENT_TYPE, 'code');
+    }
+
+    private function nextUnique(int $tenantId, string $documentType, string $column): string
+    {
         for ($attempt = 0; $attempt < self::MAX_GENERATION_ATTEMPTS; $attempt++) {
-            $candidate = $this->generate($tenantId);
-            if (! $this->exists($tenantId, $candidate)) {
+            $candidate = $this->generate($tenantId, $documentType);
+            if (! $this->exists($tenantId, $column, $candidate)) {
                 return $candidate;
             }
 
-            $this->advanceSequencePastExistingNumbers($tenantId);
+            $this->advanceSequencePastExistingReferences($tenantId, $documentType, $column);
         }
 
-        throw new RuntimeException('Unable to generate a unique customer number.');
+        throw new RuntimeException('Unable to generate a unique customer reference.');
     }
 
-    private function generate(int $tenantId): string
+    private function generate(int $tenantId, string $documentType): string
     {
         $result = $this->sequences->execute([
             'tenant_id' => $tenantId,
             'organization_unit_id' => null,
-            'document_type' => self::DOCUMENT_TYPE,
+            'document_type' => $documentType,
             'period_type' => self::PERIOD_TYPE,
             'prefix' => self::PREFIX,
             'padding' => self::PADDING,
@@ -56,21 +70,24 @@ final class CustomerNumberService
         return (string) $result->valueOrFail()['generated_number'];
     }
 
-    private function exists(int $tenantId, string $customerNumber): bool
+    private function exists(int $tenantId, string $column, string $candidate): bool
     {
         return Customer::query()
             ->withTrashed()
             ->where('tenant_id', $tenantId)
-            ->where('customer_number', $customerNumber)
+            ->where($column, $candidate)
             ->exists();
     }
 
-    private function advanceSequencePastExistingNumbers(int $tenantId): void
-    {
+    private function advanceSequencePastExistingReferences(
+        int $tenantId,
+        string $documentType,
+        string $column,
+    ): void {
         $sequence = $this->sequenceRepository->findByScopeForUpdate(
             $tenantId,
             null,
-            self::DOCUMENT_TYPE,
+            $documentType,
             null,
         );
 
@@ -79,7 +96,7 @@ final class CustomerNumberService
         }
 
         $currentNextNumber = (int) $sequence->get('next_number', 1);
-        $highestExistingNumber = $this->highestExistingNumber($tenantId);
+        $highestExistingNumber = $this->highestExistingNumber($tenantId, $column);
         $nextAvailableNumber = max($currentNextNumber, $highestExistingNumber + 1);
 
         if ($nextAvailableNumber === $currentNextNumber) {
@@ -97,18 +114,18 @@ final class CustomerNumberService
         }
     }
 
-    private function highestExistingNumber(int $tenantId): int
+    private function highestExistingNumber(int $tenantId, string $column): int
     {
         $prefix = self::PREFIX;
-        $customerNumbers = Customer::query()
+        $references = Customer::query()
             ->withTrashed()
             ->where('tenant_id', $tenantId)
-            ->where('customer_number', 'like', $prefix.'%')
-            ->pluck('customer_number');
+            ->where($column, 'like', $prefix.'%')
+            ->pluck($column);
 
         $highest = 0;
-        foreach ($customerNumbers as $customerNumber) {
-            $suffix = substr((string) $customerNumber, strlen($prefix));
+        foreach ($references as $reference) {
+            $suffix = substr((string) $reference, strlen($prefix));
             if ($suffix === '' || ! ctype_digit($suffix)) {
                 continue;
             }

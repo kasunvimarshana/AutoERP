@@ -12,7 +12,7 @@ describe('Vehicle Service job-line state', () => {
         expect(flattenVehicleServiceLines([parent])[1].unit_price).toBe('125.000000');
     });
 
-    it('recalculates local job totals from active billable lines only', () => {
+    it('applies authoritative job totals returned by the line mutation', () => {
         const billableParent = line({
             id: 1,
             quantity: '2.000000',
@@ -40,7 +40,18 @@ describe('Vehicle Service job-line state', () => {
             billableParent,
             nonBillableChild,
             cancelledBillableLine,
-        ], 4);
+        ], 4, {
+            subtotal: '1000.000000',
+            line_discount_total: '50.000000',
+            job_discount_base: '950.000000',
+            job_discount_amount: '0.000000',
+            discount_total: '50.000000',
+            tax_total: '100.000000',
+            charge_total: '25.000000',
+            grand_total: '1075.000000',
+            commission_cost_total: '0.000000',
+            net_after_commission: '1075.000000',
+        });
 
         expect(updated.row_version).toBe(4);
         expect(updated.subtotal).toBe('1000.000000');

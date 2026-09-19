@@ -6,11 +6,14 @@ namespace Modules\Reporting\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
+use Modules\Core\Http\Requests\TenantScopedRequest;
+use Modules\Reporting\Http\Requests\GrnPayablesReportRequest;
 use Modules\Reporting\Http\Requests\OperationalReportRequest;
 use Modules\Reporting\Http\Requests\SummaryReportRequest;
 use Modules\Reporting\Services\DetailedPurchaseReportService;
 use Modules\Reporting\Services\DetailedVehicleServiceReportService;
 use Modules\Reporting\Services\EmployeeIncentiveReportService;
+use Modules\Reporting\Services\GrnPayablesReportService;
 use Modules\Reporting\Services\ReportExport;
 use Modules\Reporting\Services\ReportingAuthorizationService;
 use Modules\Reporting\Services\SummaryReportService;
@@ -19,6 +22,7 @@ final class OperationalReportController
 {
     public function __construct(
         private readonly DetailedPurchaseReportService $purchase,
+        private readonly GrnPayablesReportService $grnPayables,
         private readonly DetailedVehicleServiceReportService $vehicleService,
         private readonly EmployeeIncentiveReportService $incentives,
         private readonly SummaryReportService $summary,
@@ -61,6 +65,28 @@ final class OperationalReportController
             $format,
             $this->purchase->definition(),
             $this->purchase->exportRows($input)->all(),
+            $request->tenantId(),
+            $request->organizationUnitId(),
+            $input,
+        );
+    }
+
+    public function grnPayables(GrnPayablesReportRequest $request): JsonResponse
+    {
+        $this->assertView($request);
+
+        return response()->json($this->grnPayables->run($this->grnPayablesInput($request)));
+    }
+
+    public function exportGrnPayables(GrnPayablesReportRequest $request, string $format): Response
+    {
+        $this->assertExport($request);
+        $input = $this->grnPayablesInput($request);
+
+        return $this->export->export(
+            $format,
+            $this->grnPayables->definition(),
+            $this->grnPayables->exportRows($input)->all(),
             $request->tenantId(),
             $request->organizationUnitId(),
             $input,
@@ -123,7 +149,17 @@ final class OperationalReportController
         ];
     }
 
-    private function assertView(OperationalReportRequest $request): void
+    /** @return array<string, mixed> */
+    private function grnPayablesInput(GrnPayablesReportRequest $request): array
+    {
+        return [
+            ...$request->validated(),
+            'tenant_id' => $request->tenantId(),
+            'organization_unit_id' => $request->organizationUnitId(),
+        ];
+    }
+
+    private function assertView(TenantScopedRequest $request): void
     {
         $this->authorization->assert(
             $request->currentUserId(),
@@ -132,7 +168,7 @@ final class OperationalReportController
         );
     }
 
-    private function assertExport(OperationalReportRequest $request): void
+    private function assertExport(TenantScopedRequest $request): void
     {
         $this->authorization->assert(
             $request->currentUserId(),

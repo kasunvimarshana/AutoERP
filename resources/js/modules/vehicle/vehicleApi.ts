@@ -51,6 +51,10 @@ export const createVehicleWithRelations = (payload: VehicleWithRelationsPayload)
         hasDocumentFiles(payload.documents) ? vehicleWithRelationsFormData(payload) : payload
     ).then((response) => response.data.data);
 
+export const generateVehicleCode = (signal?: AbortSignal) =>
+    apiClient.post<ApiResource<{ code: string }>>(`${endpoints.vehicles}/code-reservations`, undefined, { signal })
+        .then((response) => response.data.data.code);
+
 export const updateVehicle = (id: number, payload: Partial<VehiclePayload>) =>
     apiClient.put<ApiResource<Vehicle>>(`${endpoints.vehicles}/${id}`, payload).then((response) => response.data.data);
 
@@ -65,7 +69,10 @@ export const changeVehicleStatus = (id: number, status: string, reason?: string)
 export function searchVehicles(params: LookupLoadParams, kind = 'active'): Promise<LookupResult<VehicleSummary>> {
     const loader = createQueryCachedLookupLoader<VehicleSummary>({
         key: `lookup:vehicles:${kind}`,
-        load: (lookupParams) => requestLookup<VehicleSummary>(`${endpoints.vehicles}/lookup/${kind}`, lookupParams),
+        load: (lookupParams) => requestLookup<VehicleSummary>(
+            kind === 'all' ? `${endpoints.vehicles}/lookup` : `${endpoints.vehicles}/lookup/${kind}`,
+            lookupParams,
+        ),
     });
 
     return loader(params);

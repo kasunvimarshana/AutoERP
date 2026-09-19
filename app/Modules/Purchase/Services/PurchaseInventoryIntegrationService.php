@@ -14,6 +14,7 @@ use Modules\Item\Enums\ItemType;
 use Modules\Item\Models\Item;
 use Modules\Purchase\Models\GoodsReceiptNote;
 use Modules\Purchase\Models\GoodsReceiptNoteLine;
+use Modules\Purchase\Models\GoodsReceiptNoteLineBatchAllocation;
 use Modules\Purchase\Models\PurchaseReturn;
 use Modules\Purchase\Models\PurchaseReturnLine;
 
@@ -83,6 +84,48 @@ final class PurchaseInventoryIntegrationService
             description: 'Purchase return '.$return->return_number,
             uomId: $line->uom_id,
         ), $postedBy);
+    }
+
+    public function receiptBatchAllocation(
+        GoodsReceiptNote $grn,
+        GoodsReceiptNoteLine $line,
+        GoodsReceiptNoteLineBatchAllocation $allocation,
+        ?int $postedBy = null,
+    ): InventoryMovement {
+        $unitCost = $this->costs->unitCostForReceiptLine($grn, $line);
+
+        return $this->inventory->receive(new StockMovementData(
+            tenantId: (int) $grn->tenant_id,
+            movementDate: $grn->received_date->toDateString(),
+            movementType: InventoryMovementType::Receipt,
+            direction: InventoryDirection::In,
+            itemId: (int) $line->item_id,
+            warehouseId: (int) $grn->warehouse_id,
+            quantity: (string) $allocation->quantity,
+            organizationUnitId: $grn->organization_unit_id,
+            itemVariantId: $line->item_variant_id,
+            warehouseLocationId: $grn->warehouse_location_id,
+            batchId: (int) $allocation->batch_id,
+            unitCost: $unitCost,
+            sourceType: 'goods_receipt_note',
+            sourceId: (int) $grn->getKey(),
+            sourceLineType: 'goods_receipt_note_line_batch_allocation',
+            sourceLineId: (int) $allocation->getKey(),
+            description: 'GRN '.$grn->grn_number,
+            uomId: $line->uom_id ?? $line->base_uom_id,
+        ), $postedBy);
+    }
+
+    public function reverseReceiptBatchAllocation(
+        GoodsReceiptNoteLineBatchAllocation $allocation,
+        ?int $reversedBy = null,
+    ): void {
+        $allocation->loadMissing('inventoryMovement');
+        if (! $allocation->inventoryMovement instanceof InventoryMovement) {
+            throw new \InvalidArgumentException('Posted batch allocation inventory movement was not found.');
+        }
+
+        $this->inventory->reverse($allocation->inventoryMovement, $reversedBy);
     }
 
     public function reverseReceipt(GoodsReceiptNote $grn, GoodsReceiptNoteLine $line, ?int $postedBy = null): ?InventoryMovement

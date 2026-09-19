@@ -5,26 +5,48 @@ declare(strict_types=1);
 namespace Modules\Invoice\Services;
 
 use BackedEnum;
+use DateTimeImmutable;
 use DateTimeInterface;
+use DateTimeZone;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Modules\Configuration\Contracts\ConfigurationResolverInterface;
+use Modules\Core\Contracts\TenantExecutionContextInterface;
+use Modules\Core\Services\DecimalMath;
+use Modules\Invoice\Contracts\InvoicePaymentMethodProviderInterface;
+use Modules\Invoice\Data\InvoicePrintContext;
+use Modules\Invoice\Enums\AdjustmentEffect;
+use Modules\Invoice\Enums\AdjustmentType;
 use Modules\Invoice\Enums\InvoiceDirection;
 use Modules\Invoice\Enums\InvoiceDocumentKind;
+use Modules\Invoice\Enums\InvoicePrintLayout;
 use Modules\Invoice\Enums\InvoiceType;
 use Modules\Invoice\Models\Invoice;
+use Modules\Invoice\Models\InvoiceAdjustment;
 use Modules\Invoice\Models\InvoiceDocumentSnapshot;
 use Modules\Invoice\Models\InvoiceLine;
 
 final class InvoicePrintService
 {
     private const DEFAULT_TAX_LABEL = 'Tax';
-    public const SIGNED_URL_TTL_MINUTES = 15;
-    public const PDF_PAPER_SIZE = 'A4';
-    public const PDF_ORIENTATION = 'portrait';
-    private const MONEY_SCALE = 2;
-    private const QUANTITY_SCALE = 3;
 
-    public function __construct(private readonly InvoiceAmountInWordsFormatter $amountInWords) {}
+    private const TIMEZONE_CONFIGURATION_KEY = 'localization.timezone';
+
+    public const SIGNED_URL_TTL_MINUTES = 15;
+
+    private const MONEY_SCALE = 2;
+
+    private const QUANTITY_SCALE = 2;
+
+    private const ZERO_AMOUNT = '0.000000';
+
+    public function __construct(
+        private readonly InvoiceAmountInWordsFormatter $amountInWords,
+        private readonly DecimalMath $math,
+        private readonly ConfigurationResolverInterface $configuration,
+        private readonly TenantExecutionContextInterface $executionContext,
+        private readonly InvoicePaymentMethodProviderInterface $paymentMethods,
+    ) {}
 
     /** @return Builder<Invoice> */
     public function scopedQuery(int $tenantId, ?int $organizationUnitId): Builder
@@ -34,6 +56,7 @@ final class InvoicePrintService
                 'tenant',
                 'organizationUnit',
                 'documentSnapshot',
+                'adjustments',
                 'lines' => static fn ($query) => $query->orderBy('line_number'),
             ])
             ->where('tenant_id', $tenantId);
@@ -49,14 +72,19 @@ final class InvoicePrintService
     }
 
     /** @return array<string, mixed> */
-    public function viewData(Invoice $invoice, ?string $pdfUrl = null, string $mode = 'print'): array
-    {
-        $invoice->loadMissing([
+    public function viewData(
+        Invoice $invoice,
+        ?string $pdfUrl = null,
+        string $mode = 'print',
+        ?InvoicePrintContext $printContext = null,
+    ): array {
+        $this->executionContext->runForTenant((int) $invoice->tenant_id, static fn () => $invoice->loadMissing([
             'tenant',
             'organizationUnit',
             'documentSnapshot',
+            'adjustments',
             'lines' => static fn ($query) => $query->orderBy('line_number'),
-        ]);
+        ]));
 
         $currency = $this->currency($invoice);
         $snapshot = $invoice->documentSnapshot;
@@ -70,10 +98,20 @@ final class InvoicePrintService
             ? $this->snapshotParty($snapshot, 'buyer')
             : $this->purchaser($invoice);
         $taxLabel = $this->taxLabel($invoice->lines);
+        $layout = $this->layout($invoice);
+        $usesFocusedPrint = $this->usesFocusedPrint($invoice);
 
         return [
             'mode' => $mode,
             'pdf_url' => $pdfUrl,
+            'print_layout' => [
+                'value' => $layout->value,
+                'css_class' => $layout->cssClass(),
+                'paper_size' => $layout->paperSize(),
+                'orientation' => $layout->orientation(),
+                'is_compact' => $layout->isCompact(),
+            ],
+            'print_context' => $this->printContext($invoice, $printContext),
             'document' => [
                 'title' => $kind->title(),
                 'number_label' => $kind->numberLabel(),
@@ -87,19 +125,42 @@ final class InvoicePrintService
                 'currency' => $currency,
                 'supplier' => $supplier,
                 'purchaser' => $purchaser,
+                'purchaser_reference_fields' => $snapshot instanceof InvoiceDocumentSnapshot
+                    ? ($snapshot->purchaser_reference_fields ?? [])
+                    : [],
                 'supply_date' => $snapshot instanceof InvoiceDocumentSnapshot ? $this->dateString($snapshot->supply_date) : null,
                 'supply_period_start' => $snapshot instanceof InvoiceDocumentSnapshot ? $this->dateString($snapshot->supply_period_start) : null,
                 'supply_period_end' => $snapshot instanceof InvoiceDocumentSnapshot ? $this->dateString($snapshot->supply_period_end) : null,
                 'place_of_supply' => $snapshot instanceof InvoiceDocumentSnapshot ? $this->nullableString($snapshot->place_of_supply) : null,
                 'payment_mode' => $snapshot instanceof InvoiceDocumentSnapshot ? $this->nullableString($snapshot->payment_mode) : null,
+                'resolved_payment_mode' => $this->resolvedPaymentMode($invoice, $snapshot),
                 'payment_terms' => $snapshot instanceof InvoiceDocumentSnapshot ? $this->nullableString($snapshot->payment_terms) : null,
                 'amount_in_words' => $this->amountInWords->format($invoice->grand_total, $currency['code']),
                 'notes' => $this->nullableString($invoice->notes),
                 'warnings' => [],
+                'uses_focused_print' => $usesFocusedPrint,
+                'capitalizes_company_header' => $this->isOutbound($invoice),
+                'shows_service_discount_breakdown' => $this->enumValue($invoice->invoice_type) === InvoiceType::Service->value,
                 'lines' => $this->lines($invoice->lines, $currency),
-                'amounts' => $this->amounts($invoice, $currency, $taxLabel),
+                'amounts' => $this->amounts($invoice, $currency, $taxLabel, $usesFocusedPrint),
             ],
         ];
+    }
+
+    public function layout(Invoice $invoice): InvoicePrintLayout
+    {
+        $value = $this->configurationValue(
+            $invoice,
+            InvoicePrintLayout::CONFIGURATION_KEY,
+        );
+
+        $configuredLayout = InvoicePrintLayout::from((string) $value);
+
+        if ($configuredLayout === InvoicePrintLayout::CompactA5 && $this->usesFocusedPrint($invoice)) {
+            return InvoicePrintLayout::CompactA5Portrait;
+        }
+
+        return $configuredLayout;
     }
 
     public function filename(Invoice $invoice): string
@@ -121,6 +182,7 @@ final class InvoicePrintService
                 'line_number' => (int) $line->line_number,
                 'reference' => $this->lineReference($line),
                 'item' => $this->lineItemLabel($line),
+                'display_name' => $this->lineDisplayName($line),
                 'description' => (string) $line->description,
                 'quantity' => [
                     'raw' => (string) $line->quantity,
@@ -138,19 +200,65 @@ final class InvoicePrintService
     }
 
     /** @return array<string, array{label:string, raw:string, display:string}> */
-    private function amounts(Invoice $invoice, array $currency, string $taxLabel): array
+    private function amounts(Invoice $invoice, array $currency, string $taxLabel, bool $usesFocusedPrint): array
     {
+        $lineDiscountTotal = $invoice->lines->reduce(
+            fn (string $total, InvoiceLine $line): string => $this->math->add($total, (string) $line->discount_amount),
+            self::ZERO_AMOUNT,
+        );
+        $billDiscountTotal = $invoice->adjustments
+            ->filter(static fn (InvoiceAdjustment $adjustment): bool => $adjustment->adjustment_type === AdjustmentType::Discount
+                && $adjustment->effect === AdjustmentEffect::Decrease)
+            ->reduce(
+                fn (string $total, InvoiceAdjustment $adjustment): string => $this->math->add($total, (string) $adjustment->amount),
+                self::ZERO_AMOUNT,
+            );
+
         return [
             'subtotal' => $this->labeledMoney('Total Value of Supply', $invoice->subtotal, $currency),
+            'line_discount_total' => $this->labeledMoney('Line discount', $lineDiscountTotal, $currency),
+            'bill_discount_total' => $this->labeledMoney('Bill discount', $billDiscountTotal, $currency),
             'discount_total' => $this->labeledMoney('Discounts', $invoice->discount_total, $currency),
             'tax_total' => $this->labeledMoney($taxLabel.' Amount', $invoice->tax_total, $currency),
             'charge_total' => $this->labeledMoney('Charges', $invoice->charge_total, $currency),
             'adjustment_total' => $this->labeledMoney('Other adjustments', $invoice->adjustment_total, $currency),
             'grand_total' => $this->labeledMoney('Total Amount including '.$taxLabel, $invoice->grand_total, $currency),
             'paid_total' => $this->labeledMoney('Paid', $invoice->paid_total, $currency),
-            'credit_total' => $this->labeledMoney('Credits', $invoice->credit_total, $currency),
+            'credit_total' => $this->labeledMoney($usesFocusedPrint ? 'Credit' : 'Credits', $invoice->credit_total, $currency),
             'balance_due' => $this->labeledMoney('Balance due', $invoice->balance_due, $currency),
         ];
+    }
+
+    private function resolvedPaymentMode(Invoice $invoice, mixed $snapshot): ?string
+    {
+        $methodNames = $this->paymentMethods->namesForInvoice(
+            (int) $invoice->getKey(),
+            (int) $invoice->tenant_id,
+            $invoice->organization_unit_id === null ? null : (int) $invoice->organization_unit_id,
+        );
+        if ($methodNames !== []) {
+            return implode(', ', $methodNames);
+        }
+
+        $snapshotMode = $snapshot instanceof InvoiceDocumentSnapshot
+            ? $this->nullableString($snapshot->payment_mode)
+            : null;
+        if ($snapshotMode !== null) {
+            return $snapshotMode;
+        }
+
+        return $this->usesFocusedPrint($invoice)
+            && bccomp((string) $invoice->balance_due, '0', 6) > 0
+                ? 'Credit'
+                : null;
+    }
+
+    private function usesFocusedPrint(Invoice $invoice): bool
+    {
+        return in_array($this->enumValue($invoice->invoice_type), [
+            InvoiceType::Service->value,
+            InvoiceType::Purchase->value,
+        ], true);
     }
 
     /** @param Collection<int, InvoiceLine> $lines */
@@ -327,6 +435,14 @@ final class InvoicePrintService
         return $name !== null && $code !== null ? $code.' - '.$name : $name ?? $code;
     }
 
+    private function lineDisplayName(InvoiceLine $line): string
+    {
+        return $this->nullableString($line->item_name_snapshot)
+            ?? $this->nullableString($line->description)
+            ?? $this->nullableString($line->item_code_snapshot)
+            ?? 'Item '.(int) $line->line_number;
+    }
+
     private function lineReference(InvoiceLine $line): string
     {
         return $this->nullableString($line->item_code_snapshot)
@@ -394,5 +510,36 @@ final class InvoicePrintService
         $value = trim((string) $value);
 
         return $value === '' ? null : $value;
+    }
+
+    /** @return array{printed_at:string,printed_by:string,copy_type:?string}|null */
+    private function printContext(Invoice $invoice, ?InvoicePrintContext $context): ?array
+    {
+        if ($context === null) {
+            return null;
+        }
+
+        $timezone = (string) $this->configurationValue($invoice, self::TIMEZONE_CONFIGURATION_KEY);
+        $printedAt = DateTimeImmutable::createFromInterface($context->printedAt)
+            ->setTimezone(new DateTimeZone($timezone));
+
+        return [
+            'printed_at' => $printedAt->format('d M Y h:i A'),
+            'printed_by' => $context->printedBy,
+            'copy_type' => $context->copyType?->label(),
+        ];
+    }
+
+    private function configurationValue(Invoice $invoice, string $key): mixed
+    {
+        $tenantId = (int) $invoice->tenant_id;
+        $organizationUnitId = $invoice->organization_unit_id === null
+            ? null
+            : (int) $invoice->organization_unit_id;
+
+        return $this->executionContext->runForTenant(
+            $tenantId,
+            fn (): mixed => $this->configuration->value($key, $tenantId, $organizationUnitId),
+        );
     }
 }

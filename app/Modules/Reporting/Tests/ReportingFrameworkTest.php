@@ -37,6 +37,7 @@ final class ReportingFrameworkTest extends TestCase
             'inventory.stock-movement',
             'purchase.orders',
             'purchase.grns',
+            'purchase/grn-payables',
             'purchase.returns',
             'masters.supplier',
             'masters.customer',

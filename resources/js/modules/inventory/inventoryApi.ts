@@ -7,12 +7,17 @@ import { compactObject, readableRelation } from '@/shared/utils/object';
 import type {
     AllocationPayload,
     AdjustmentPayload,
+    BatchNumberResult,
     CostAdjustmentPayload,
     InventoryAvailability,
+    InventoryBatchPayload,
+    InventoryBatchPricePayload,
+    InventoryBatchPrice,
     InventoryRecord,
     OpeningStockImportPreview,
     ReservationPayload,
     StockBalance,
+    StockBalanceSummary,
     StockCountPayload,
     TransferPayload,
 } from './inventoryTypes';
@@ -30,8 +35,10 @@ export type {
     TransferPayload,
 } from './inventoryTypes';
 
+export type StockBalanceCollection = ApiCollection<StockBalance> & { summary: StockBalanceSummary };
+
 export const listStockBalances = (params: ListParams, signal?: AbortSignal) =>
-    apiClient.get<ApiCollection<StockBalance>>(`${endpoints.inventory}/stock-balances`, { params, signal }).then((response) => response.data);
+    apiClient.get<StockBalanceCollection>(`${endpoints.inventory}/stock-balances`, { params, signal }).then((response) => response.data);
 
 export const getAvailability = (params: ListParams, signal?: AbortSignal) =>
     apiClient.get<ApiResource<InventoryAvailability>>(`${endpoints.inventory}/availability`, { params, signal }).then((response) => response.data.data);
@@ -120,6 +127,21 @@ export const postStockCount = (id: number) =>
 export const listBatches = (params: ListParams, signal?: AbortSignal) =>
     apiClient.get<ApiCollection<InventoryRecord>>(`${endpoints.inventory}/batches`, { params, signal }).then((response) => response.data);
 
+export const createInventoryBatch = (payload: InventoryBatchPayload) =>
+    apiClient.post<ApiResource<InventoryRecord>>(`${endpoints.inventory}/batches`, payload).then((response) => response.data.data);
+
+export const generateInventoryBatchNumber = () =>
+    apiClient.post<ApiResource<BatchNumberResult>>(`${endpoints.inventory}/batches/generate-number`, {}).then((response) => response.data.data);
+
+export const listBatchPrices = (params: ListParams, signal?: AbortSignal) =>
+    apiClient.get<ApiCollection<InventoryBatchPrice>>(`${endpoints.inventory}/batch-prices`, { params, signal }).then((response) => response.data);
+
+export const createBatchPrice = (payload: InventoryBatchPricePayload) =>
+    apiClient.post<ApiResource<InventoryBatchPrice>>(`${endpoints.inventory}/batch-prices`, payload).then((response) => response.data.data);
+
+export const supersedeBatchPrice = (id: number, payload: InventoryBatchPricePayload) =>
+    apiClient.post<ApiResource<InventoryBatchPrice>>(`${endpoints.inventory}/batch-prices/${id}/supersede`, payload).then((response) => response.data.data);
+
 export const listSerials = (params: ListParams, signal?: AbortSignal) =>
     apiClient.get<ApiCollection<InventoryRecord>>(`${endpoints.inventory}/serials`, { params, signal }).then((response) => response.data);
 
@@ -181,7 +203,10 @@ function toNamedResource(row: InventoryRecord, primaryKey: string, fallbackKey?:
     const code = String(row[primaryKey] ?? (fallbackKey ? row[fallbackKey] : '') ?? '');
     const item = readableRelation(row.item);
     const variant = readableRelation(row.variant);
-    const context = [item, variant].filter((value) => value !== '-').join(' / ');
+    const lot = primaryKey === 'batch_number' && typeof row.lot_number === 'string' && row.lot_number.trim()
+        ? `Lot ${row.lot_number.trim()}`
+        : null;
+    const context = [item, variant, lot].filter((value) => value !== '-' && value !== null).join(' / ');
 
     return {
         id: Number(row.id),

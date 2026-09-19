@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { useLocation, useParams, useSearchParams } from 'react-router-dom';
 import {
     approveInvoice,
     cancelInvoice,
@@ -7,6 +7,7 @@ import {
     getInvoiceAdjustments,
     getInvoiceBalance,
     getInvoiceSignedPrintLink,
+    getInvoiceWhatsAppShare,
     getInvoiceSources,
     postInvoice,
     reverseInvoice,
@@ -19,6 +20,7 @@ import { ContentHeader } from '@/shared/components/ContentHeader';
 import { Button, LinkButton } from '@/shared/components/Button';
 import { ReversalDialog, type ReversalFacts } from '@/shared/components/ReversalDialog';
 import { openSameOriginUrl } from '@/shared/utils/safeNavigation';
+import { closePendingWhatsAppWindow, confirmPendingWhatsAppShare, navigateToWhatsApp, openPendingWhatsAppWindow } from '@/shared/utils/whatsAppNavigation';
 import { Tabs, type TabItem } from '@/shared/components/Tabs';
 import { Panel } from '@/shared/components/Panel';
 import { DetailGrid } from '@/shared/components/DetailGrid';
@@ -44,7 +46,9 @@ const retiredSourceInvoiceTypes = new Set(['rental', 'vehicle_finance']);
 
 export default function InvoiceDetailPage() {
     const id = Number(useParams().id);
+    const location = useLocation();
     const auth = useAuth();
+    const [searchParams] = useSearchParams();
     const canViewBalance = hasInvoicePermission(auth, invoicePermissions.balanceView);
     const canViewSources = hasInvoicePermission(auth, invoicePermissions.sourcesView);
     const canApprove = hasInvoicePermission(auth, invoicePermissions.approve);
@@ -52,10 +56,10 @@ export default function InvoiceDetailPage() {
     const canReverse = hasInvoicePermission(auth, invoicePermissions.reverse);
     const canCancel = hasInvoicePermission(auth, invoicePermissions.cancel);
     const canCreateVehicleServicePayment = hasPermission(auth, vehicleServicePermissions.paymentsCreate);
-    const [searchParams] = useSearchParams();
     const [action, setAction] = useState<InvoiceAction | null>(null);
     const [actionError, setActionError] = useState<ApiError | null>(null);
     const [reversalOpen, setReversalOpen] = useState(false);
+    const [sharingWhatsApp, setSharingWhatsApp] = useState(false);
     const tabState = useOnDemandTab<Tab>('summary');
     const tabs: TabItem<Tab>[] = [
         summaryTab,
@@ -85,7 +89,7 @@ export default function InvoiceDetailPage() {
     if (invoice.loading) return <LoadingState />;
     if (!invoice.data) return <ErrorAlert error={invoice.error} />;
     const value = invoice.data;
-    const fromPurchase = searchParams.get('from') === 'purchase';
+    const fromPurchase = location.pathname.startsWith('/purchase/invoices/');
     const vehicleServiceSource = (value.sources ?? []).find((source) => source.source_type === 'vehicle_service_job');
     const vehicleServiceJobId = vehicleServiceSource?.source_id ?? Number(searchParams.get('job_id'));
     const hasVehicleServiceJobContext = Number.isInteger(vehicleServiceJobId) && vehicleServiceJobId > 0;
@@ -96,6 +100,7 @@ export default function InvoiceDetailPage() {
         && isServiceInvoice
         && settlementStatuses.includes(value.status as typeof settlementStatuses[number])
         && isPositiveDecimal(value.balance_due ?? '0');
+    const canShareViaWhatsApp = value.direction === 'outbound' && value.party_type === 'customer' && ['posted', 'partially_paid', 'paid'].includes(value.status ?? '');
     const printUrl = `/invoices/${id}/print`;
 
     const runAction = async (nextAction: Exclude<InvoiceAction, 'reverse'>) => {
@@ -138,6 +143,29 @@ export default function InvoiceDetailPage() {
             setActionError(toApiError(error));
         } finally {
             setAction(null);
+        }
+    };
+
+    const shareViaWhatsApp = async () => {
+        const pendingWindow = openPendingWhatsAppWindow();
+        setSharingWhatsApp(true);
+        setActionError(null);
+        try {
+            const share = await getInvoiceWhatsAppShare(id);
+            if (share.recipient.verification_status !== 'verified'
+                && !confirmPendingWhatsAppShare(pendingWindow, 'This customer WhatsApp number has not been manually verified. Continue sharing anyway?')) {
+                closePendingWhatsAppWindow(pendingWindow);
+                return;
+            }
+
+            if (!navigateToWhatsApp(share.whatsapp_url, pendingWindow)) {
+                throw new Error('The server returned an invalid WhatsApp link.');
+            }
+        } catch (error: unknown) {
+            closePendingWhatsAppWindow(pendingWindow);
+            setActionError(toApiError(error));
+        } finally {
+            setSharingWhatsApp(false);
         }
     };
 
@@ -197,6 +225,16 @@ export default function InvoiceDetailPage() {
 
                             window.open(`/invoices/${id}/pdf`, '_blank');
                         }}>Download PDF</Button>
+                        {canShareViaWhatsApp ? (
+                            <Button
+                                variant="secondary"
+                                loading={sharingWhatsApp}
+                                loadingLabel="Opening WhatsApp..."
+                                onClick={() => void shareViaWhatsApp()}
+                            >
+                                Share via WhatsApp
+                            </Button>
+                        ) : null}
                     </div>
                 )}
             />

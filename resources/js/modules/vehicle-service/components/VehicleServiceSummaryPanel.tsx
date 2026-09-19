@@ -5,7 +5,9 @@ import { readableRelation } from '@/shared/utils/object';
 import type { VehicleServiceJob } from '../vehicleServiceTypes';
 import { VehicleServiceStatusBadge } from './VehicleServiceStatusBadge';
 
-export function VehicleServiceSummaryPanel({ job }: { job: VehicleServiceJob }) {
+export function VehicleServiceSummaryPanel({ job }: {
+    job: VehicleServiceJob;
+}) {
     const currentCustomerOwner = job.vehicle?.current_ownerships?.find((ownership) => ownership.owner_type === 'customer')?.owner ?? job.customer;
 
     return (
@@ -24,7 +26,9 @@ export function VehicleServiceSummaryPanel({ job }: { job: VehicleServiceJob }) 
                 { label: 'Manual job card', value: job.manual_job_card ?? '-' },
                 { label: 'Type', value: job.type_label ?? job.type.replaceAll('_', ' ') },
                 { label: 'Subtotal', value: <MoneyDisplay value={job.subtotal} /> },
-                { label: 'Discount', value: <MoneyDisplay value={job.discount_total} /> },
+                { label: 'Line discounts', value: <MoneyDisplay value={job.line_discount_total} /> },
+                { label: 'Whole-job discount', value: <MoneyDisplay value={job.job_discount_amount} /> },
+                { label: 'Total discounts', value: <MoneyDisplay value={job.discount_total} /> },
                 { label: 'Tax', value: <MoneyDisplay value={job.tax_total} /> },
                 { label: 'Charges', value: <MoneyDisplay value={job.charge_total} /> },
                 { label: 'Grand total', value: <MoneyDisplay value={job.grand_total} /> },

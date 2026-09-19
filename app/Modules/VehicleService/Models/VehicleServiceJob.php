@@ -47,6 +47,9 @@ final class VehicleServiceJob extends TenantOwnedModel
             'odometer_reading' => 'decimal:6',
             'next_service_mileage' => 'decimal:6',
             'subtotal' => 'decimal:6',
+            'line_discount_total' => 'decimal:6',
+            'job_discount_base' => 'decimal:6',
+            'job_discount_amount' => 'decimal:6',
             'discount_total' => 'decimal:6',
             'tax_total' => 'decimal:6',
             'charge_total' => 'decimal:6',
@@ -110,6 +113,18 @@ final class VehicleServiceJob extends TenantOwnedModel
     public function invoiceLinks(): HasMany
     {
         return $this->hasMany(VehicleServiceInvoiceLink::class, 'vehicle_service_job_id');
+    }
+
+    public function discountRevisions(): HasMany
+    {
+        return $this->hasMany(VehicleServiceJobDiscount::class, 'vehicle_service_job_id')
+            ->orderByDesc('revision');
+    }
+
+    public function currentDiscountRevision(): HasOne
+    {
+        return $this->hasOne(VehicleServiceJobDiscount::class, 'vehicle_service_job_id')
+            ->ofMany('revision', 'max');
     }
 
     public function paymentLinks(): HasMany

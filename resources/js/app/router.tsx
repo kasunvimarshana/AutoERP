@@ -314,11 +314,17 @@ const ReportPage = lazy(() => import("@/modules/reporting/pages/ReportPage"));
 const SummaryReportPage = lazy(
     () => import("@/modules/reporting/pages/SummaryReportPage"),
 );
+const GrnPayablesReportPage = lazy(
+    () => import("@/modules/reporting/pages/GrnPayablesReportPage"),
+);
 const TechnicianWorkReportPage = lazy(
     () => import("@/modules/reporting/pages/TechnicianWorkReportPage"),
 );
 const EmployeeCommissionReportPage = lazy(
     () => import("@/modules/reporting/pages/EmployeeCommissionReportPage"),
+);
+const VehicleServiceHistoryReportPage = lazy(
+    () => import("@/modules/reporting/pages/VehicleServiceHistoryReportPage"),
 );
 const OperationalReportPage = lazy(
     () => import("@/modules/reporting/pages/OperationalReportPage"),
@@ -686,6 +692,10 @@ const appRouter = createBrowserRouter(
                             element={<PurchaseInvoiceCreatePage />}
                         />
                         <Route
+                            path="/purchase/invoices/:id"
+                            element={<InvoiceDetailPage />}
+                        />
+                        <Route
                             path="/purchase/payments"
                             element={<PurchasePaymentWorkspacePage />}
                         />
@@ -696,6 +706,10 @@ const appRouter = createBrowserRouter(
                         <Route
                             path="/purchase/payments/prepare"
                             element={<PurchasePaymentPreparePage />}
+                        />
+                        <Route
+                            path="/purchase/payments/:id"
+                            element={<PaymentDetailPage />}
                         />
                         <Route
                             path="/purchase/debit-notes"
@@ -859,6 +873,10 @@ const appRouter = createBrowserRouter(
                                 />}
                         />
                         <Route
+                            path="/reports/purchase/grn-payables"
+                            element={<GrnPayablesReportPage />}
+                        />
+                        <Route
                             path="/reports/vehicle-service/detailed"
                             element={<OperationalReportPage
                                     reportKey="vehicle-service/detailed"
@@ -879,6 +897,10 @@ const appRouter = createBrowserRouter(
                         <Route
                             path="/reports/vehicle-service/employee-commissions"
                             element={<EmployeeCommissionReportPage />}
+                        />
+                        <Route
+                            path="/reports/vehicle-service/service-history"
+                            element={<VehicleServiceHistoryReportPage />}
                         />
                         <Route
                             path="/reports/:key"

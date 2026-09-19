@@ -104,6 +104,19 @@ export interface ConfigurationEntry {
     updated_at: string;
 }
 
+export interface ResolvedConfiguration {
+    key: string;
+    label: string;
+    owner: string;
+    value_type: ConfigurationValueType;
+    value: unknown;
+    display_value: string | null;
+    sensitive: boolean;
+    source_scope: ConfigurationScope | 'default';
+    uses_default: boolean;
+    row_version: number | null;
+}
+
 export interface ConfigurationEntryPage {
     data: ConfigurationEntry[];
     meta: PaginationMeta;

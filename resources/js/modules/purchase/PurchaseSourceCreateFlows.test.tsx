@@ -13,6 +13,7 @@ const purchaseApiMocks = vi.hoisted(() => ({
     createGoodsReceipt: vi.fn(),
     createPurchaseInvoice: vi.fn(),
     createPurchaseReturn: vi.fn(),
+    generateGoodsReceiptBatchNumber: vi.fn(),
     getGoodsReceipt: vi.fn(),
     getInvoiceableGoodsReceiptLines: vi.fn(),
     getInvoiceablePurchaseOrderLines: vi.fn(),
@@ -75,6 +76,7 @@ describe('Purchase source create flows', () => {
         purchaseApiMocks.getReceivablePurchaseOrderLines.mockResolvedValue([purchaseOrderLine(401), purchaseOrderLine(401)]);
         purchaseApiMocks.getReturnableGoodsReceiptLines.mockResolvedValue([returnableLine(601), returnableLine(601)]);
         purchaseApiMocks.createPurchaseReturn.mockResolvedValue({ id: 901 });
+        purchaseApiMocks.generateGoodsReceiptBatchNumber.mockResolvedValue({ batch_number: 'BAT-20260913-000001' });
     });
     it('loads an invoice query GRN once in StrictMode and deduplicates source lines', async () => {
         renderInvoice('/purchase/invoices/create?goods_receipt_id=77&tab=details', true);
@@ -151,14 +153,58 @@ describe('Purchase source create flows', () => {
         expect(screen.getByTestId('po-eligibility')).toHaveTextContent('receivable');
         expect(await screen.findByText('PO-31 - Supplier A')).toBeInTheDocument();
         await waitFor(() => expect(screen.getAllByText('Widget')).toHaveLength(2));
-        expect(screen.getByText('Accepted amount')).toBeInTheDocument();
+        expect(screen.getAllByText('Accepted amount').length).toBeGreaterThan(0);
         fireEvent.click(screen.getByRole('button', { name: 'Receive All Remaining' }));
-        expect(await screen.findByText('$50.00')).toBeInTheDocument();
+        expect((await screen.findAllByText(/50\.00/)).length).toBeGreaterThan(0);
         expect(screen.getByTestId('location-search')).toHaveTextContent('tab=source');
         expect(screen.getByTestId('location-search')).not.toHaveTextContent('purchase_order_id');
         fireEvent.click(screen.getByRole('button', { name: 'Clear PO' }));
+        fireEvent.click(await screen.findByRole('button', { name: 'Change purchase order' }));
         await waitFor(() => expect(screen.queryByText('PO-31 - Supplier A')).not.toBeInTheDocument());
         expect(purchaseApiMocks.getPurchaseOrder).toHaveBeenCalledTimes(1);
+    });
+    it('shows batch allocation controls and blocks an incomplete tracked receipt', async () => {
+        const line = purchaseOrderLine(401);
+        line.item = { ...line.item!, tracking_type: 'batch' };
+        purchaseApiMocks.getReceivablePurchaseOrderLines.mockResolvedValueOnce([line]);
+
+        renderGoodsReceipt('/purchase/goods-receipts/create?purchase_order_id=31');
+        await waitFor(() => expect(screen.getAllByText('Widget')).toHaveLength(2));
+        fireEvent.click(screen.getByRole('button', { name: 'Receive All Remaining' }));
+
+        expect(await screen.findByText(/need a complete allocation/i)).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Create GRN' })).toBeDisabled();
+
+        fireEvent.click(screen.getAllByRole('button', { name: 'Edit line' })[0]);
+        expect(await screen.findByText('Batch / lot allocation')).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Add batch' }));
+        expect(await screen.findByLabelText('Existing batch')).toBeInTheDocument();
+        expect(screen.getByLabelText('Allocated quantity')).toHaveValue('5.000000');
+        expect(screen.getByLabelText('New batch / tracking number')).toHaveValue('BAT-20260913-000001');
+        expect(screen.getByRole('button', { name: 'Save line' })).toBeEnabled();
+
+        fireEvent.change(screen.getByLabelText('New batch / tracking number'), { target: { value: 'SUPPLIER-BATCH-001' } });
+        expect(screen.getByLabelText('New batch / tracking number')).toHaveValue('SUPPLIER-BATCH-001');
+        expect(screen.getByRole('button', { name: 'Save line' })).toBeEnabled();
+    });
+    it('keeps the GRN batch allocation editable when automatic number generation fails', async () => {
+        const line = purchaseOrderLine(401);
+        line.item = { ...line.item!, tracking_type: 'batch' };
+        purchaseApiMocks.getReceivablePurchaseOrderLines.mockResolvedValueOnce([line]);
+        purchaseApiMocks.generateGoodsReceiptBatchNumber.mockRejectedValueOnce(new Error('Number service unavailable.'));
+
+        renderGoodsReceipt('/purchase/goods-receipts/create?purchase_order_id=31');
+        await waitFor(() => expect(screen.getAllByText('Widget')).toHaveLength(2));
+        fireEvent.click(screen.getByRole('button', { name: 'Receive All Remaining' }));
+        fireEvent.click(screen.getAllByRole('button', { name: 'Edit line' })[0]);
+        fireEvent.click(await screen.findByRole('button', { name: 'Add batch' }));
+
+        expect(await screen.findByRole('alert')).toHaveTextContent('Enter the batch number manually.');
+        const batchNumber = screen.getByLabelText('New batch / tracking number');
+        expect(batchNumber).toHaveValue('');
+        fireEvent.change(batchNumber, { target: { value: 'MANUAL-BATCH-001' } });
+        expect(batchNumber).toHaveValue('MANUAL-BATCH-001');
+        expect(screen.getByRole('button', { name: 'Save line' })).toBeEnabled();
     });
     it('ignores stale GRN PO line responses after the source changes', async () => {
         const order31 = deferred<PurchaseOrder>();

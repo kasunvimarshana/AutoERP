@@ -9,8 +9,8 @@ use Modules\Core\Services\DecimalMath;
 use Modules\Vehicle\Data\CreateVehicleOwnershipData;
 use Modules\Vehicle\DTOs\CreateVehicleData;
 use Modules\Vehicle\Models\Vehicle;
-use Modules\Vehicle\Validators\VehicleValidationService;
 use Modules\Vehicle\Services\Ownership\VehicleOwnershipCommandService;
+use Modules\Vehicle\Validators\VehicleValidationService;
 use Throwable;
 
 final class VehicleCreationService
@@ -27,16 +27,17 @@ final class VehicleCreationService
 
     public function create(CreateVehicleData $data): Vehicle
     {
-        $this->validator->validateCreate($data);
+        $code = $data->code ?? $this->numbers->nextCode($data->tenantId);
+        $this->validator->validateCreate($data, $code);
         $storedDocumentPaths = [];
 
         try {
-            return DB::transaction(function () use ($data, &$storedDocumentPaths): Vehicle {
+            return DB::transaction(function () use ($data, $code, &$storedDocumentPaths): Vehicle {
                 $vehicle = Vehicle::query()->create([
                     'tenant_id' => $data->tenantId,
                     'organization_unit_id' => $data->organizationUnitId,
                     'vehicle_number' => $data->vehicleNumber ?? $this->numbers->next($data->tenantId),
-                    'code' => $data->code,
+                    'code' => $code,
                     'vehicle_make_id' => $data->vehicleMakeId,
                     'vehicle_model_id' => $data->vehicleModelId,
                     'vehicle_type_id' => $data->vehicleTypeId,

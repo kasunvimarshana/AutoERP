@@ -13,7 +13,6 @@ use Modules\OrganizationUnit\Models\OrganizationUnitModel;
 use Modules\Vehicle\DTOs\CreateVehicleData;
 use Modules\Vehicle\DTOs\UpdateVehicleData;
 use Modules\Vehicle\DTOs\VehicleModelData;
-use Modules\Vehicle\Enums\VehicleOwnershipType;
 use Modules\Vehicle\Models\Vehicle;
 use Modules\Vehicle\Models\VehicleCategory;
 use Modules\Vehicle\Models\VehicleMake;
@@ -24,12 +23,12 @@ final class VehicleValidationService
 {
     public function __construct(private readonly DecimalMath $math) {}
 
-    public function validateCreate(CreateVehicleData $data): void
+    public function validateCreate(CreateVehicleData $data, string $resolvedCode): void
     {
         if ($data->vehicleNumber !== null) {
             $this->assertNumberUnique($data->tenantId, $data->vehicleNumber);
         }
-        $this->assertUniqueNullable('code', $data->tenantId, $data->code, 'Vehicle code already exists for this tenant.');
+        $this->assertUniqueNullable('code', $data->tenantId, $resolvedCode, 'Vehicle code already exists for this tenant.');
         $this->assertUniqueNullable('registration_number', $data->tenantId, $data->registrationNumber, 'Vehicle registration number already exists for this tenant.');
         $this->assertUniqueNullable('chassis_number', $data->tenantId, $data->chassisNumber, 'Vehicle chassis number already exists for this tenant.');
         $this->assertUniqueNullable('engine_number', $data->tenantId, $data->engineNumber, 'Vehicle engine number already exists for this tenant.');
@@ -206,7 +205,7 @@ final class VehicleValidationService
     }
 
     /**
-     * @param class-string $modelClass
+     * @param  class-string  $modelClass
      */
     private function missingTenantReference(
         string $table,
@@ -219,6 +218,6 @@ final class VehicleValidationService
             throw new InvalidArgumentException($message);
         }
 
-        throw (new ModelNotFoundException())->setModel($modelClass, [$id]);
+        throw (new ModelNotFoundException)->setModel($modelClass, [$id]);
     }
 }

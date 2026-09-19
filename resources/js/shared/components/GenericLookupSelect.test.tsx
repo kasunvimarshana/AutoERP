@@ -93,7 +93,7 @@ describe('GenericLookupSelect', () => {
         }));
 
         render(
-            <GenericLookupSelect
+            <GenericLookupSelect<NamedResource>
                 label="Source"
                 value={null}
                 onChange={() => undefined}
@@ -110,6 +110,28 @@ describe('GenericLookupSelect', () => {
         await userEvent.type(screen.getByRole('combobox', { name: 'Source' }), 'AB');
 
         expect(await screen.findByRole('button', { name: 'Create AB' })).toBeInTheDocument();
+    });
+
+    it('does not show a required-selection error when an untouched empty lookup loses focus', async () => {
+        render(
+            <GenericLookupSelect<NamedResource>
+                label="Source"
+                value={null}
+                onChange={() => undefined}
+                search={async () => ({ data: [], links: {}, meta: undefined })}
+                formatLabel={(item) => item.name}
+                required
+            />,
+        );
+
+        const input = screen.getByRole('combobox', { name: 'Source' });
+        fireEvent.focus(input);
+        fireEvent.blur(input);
+        expect(screen.queryByText('Select a valid source from the list.')).not.toBeInTheDocument();
+
+        await userEvent.type(input, 'Unknown source');
+        fireEvent.blur(input);
+        expect(screen.getByText('Select a valid source from the list.')).toBeInTheDocument();
     });
 });
 

@@ -14,7 +14,7 @@ final class PurchaseOrderLineResource extends PurchaseResource
             'id' => (int) $this->getKey(),
             'line_number' => (int) $this->line_number,
             'item_id' => $this->item_id,
-            'item' => $this->whenLoaded('item', fn () => $this->summary($this->item, ['code', 'name', 'sku'])),
+            'item' => $this->whenLoaded('item', fn () => $this->summary($this->item, ['code', 'name', 'sku', 'tracking_type'])),
             'item_variant_id' => $this->item_variant_id,
             'item_variant' => $this->whenLoaded('variant', fn () => $this->summary($this->variant, ['code', 'name', 'sku'])),
             'description' => $this->description,

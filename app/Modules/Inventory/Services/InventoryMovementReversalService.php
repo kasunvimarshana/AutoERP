@@ -22,15 +22,17 @@ use Modules\Item\Models\ItemBaseUomRevision;
 
 final class InventoryMovementReversalService
 {
+    private const REVERSAL_DESCRIPTION_PREFIX = 'Reversal of ';
+
     public function __construct(
         private readonly DecimalMath $math,
         private readonly InventoryMovementRecorder $recorder,
         private readonly InventoryMovementPoster $poster,
     ) {}
 
-    public function reverse(InventoryMovement $movement, ?int $reversedBy = null): InventoryMovement
+    public function reverse(InventoryMovement $movement, ?int $reversedBy = null, ?string $reason = null): InventoryMovement
     {
-        return DB::transaction(function () use ($movement, $reversedBy): InventoryMovement {
+        return DB::transaction(function () use ($movement, $reversedBy, $reason): InventoryMovement {
             $movement = InventoryMovement::query()->lockForUpdate()->findOrFail($movement->getKey());
             if ($movement->status !== InventoryStatus::Posted) {
                 throw new InvalidArgumentException('Only posted inventory movements can be reversed.');
@@ -61,7 +63,7 @@ final class InventoryMovementReversalService
                 unitCost: $reversalUnitCost,
                 sourceType: 'inventory_movement',
                 sourceId: (int) $movement->getKey(),
-                description: 'Reversal of '.$movement->movement_number,
+                description: $this->reversalDescription($movement, $reason),
                 fromState: $movement->to_state,
                 toState: InventoryStockState::Reversed,
             ));
@@ -77,6 +79,14 @@ final class InventoryMovementReversalService
 
             return $reversal->refresh();
         });
+    }
+
+    private function reversalDescription(InventoryMovement $movement, ?string $reason): string
+    {
+        $reason = trim((string) $reason);
+        $reversalReference = self::REVERSAL_DESCRIPTION_PREFIX.$movement->movement_number;
+
+        return $reason === '' ? $reversalReference : $reason.'; '.$reversalReference;
     }
 
     /**

@@ -30,6 +30,10 @@ export function useDialogAccessibility(
         ).filter((element) => !element.hidden && element.getAttribute('aria-hidden') !== 'true');
 
         window.requestAnimationFrame(() => {
+            const activeElement = document.activeElement;
+            if (activeElement instanceof HTMLElement && containerRef.current?.contains(activeElement)) {
+                return;
+            }
             const first = focusable()[0] ?? containerRef.current;
             first?.focus();
         });

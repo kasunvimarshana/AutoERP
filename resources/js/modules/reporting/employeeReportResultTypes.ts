@@ -78,6 +78,8 @@ export interface EmployeeCommissionGroup {
     total_jobs: number;
     total_hours: string;
     total_labour_value: string;
+    earned_commission: string;
+    pending_commission: string;
     total_commission: string;
 }
 

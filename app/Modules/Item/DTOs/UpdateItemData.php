@@ -31,6 +31,7 @@ final readonly class UpdateItemData
         public ?int $purchaseTaxGroupId = null,
         public ?int $salesTaxGroupId = null,
         public ?bool $isStockable = null,
+        public ?string $reorderLevel = null,
         public ?bool $isCombo = null,
         public ?bool $isTaxExempt = null,
         public ?bool $isActive = null,

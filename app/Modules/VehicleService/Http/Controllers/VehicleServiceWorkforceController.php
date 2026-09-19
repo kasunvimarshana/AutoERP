@@ -7,6 +7,7 @@ namespace Modules\VehicleService\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Modules\VehicleService\Http\Requests\ListVehicleServiceJobRequest;
+use Modules\VehicleService\Http\Requests\StoreVehicleServiceEmployeeBatchRequest;
 use Modules\VehicleService\Http\Requests\StoreVehicleServiceEmployeeRequest;
 use Modules\VehicleService\Http\Requests\VehicleServiceActionRequest;
 use Modules\VehicleService\Http\Resources\VehicleServiceEmployeeAssignmentResource;
@@ -42,6 +43,18 @@ final class VehicleServiceWorkforceController extends VehicleServiceController
             $request->toData(),
             $request->expectedVersion(),
         )))->response()->setStatusCode(201);
+    }
+
+    public function storeBatch(
+        StoreVehicleServiceEmployeeBatchRequest $request,
+        int $job,
+        VehicleServiceEmployeeAssignmentService $service,
+    ): JsonResponse {
+        $jobModel = $this->job($request, $job);
+
+        return VehicleServiceEmployeeAssignmentResource::collection(
+            $service->createBatch($jobModel, $request->toData(), $request->expectedVersion()),
+        )->response()->setStatusCode(201);
     }
 
     public function update(

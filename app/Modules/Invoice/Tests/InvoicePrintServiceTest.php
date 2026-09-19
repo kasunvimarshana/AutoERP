@@ -4,24 +4,34 @@ declare(strict_types=1);
 
 namespace Modules\Invoice\Tests;
 
+use DateTimeImmutable;
+use Dompdf\Dompdf;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
+use Modules\Configuration\Contracts\ConfigurationResolverInterface;
+use Modules\Core\DTOs\DataRecord;
 use Modules\Invoice\Constants\InvoiceTaxMetadata;
+use Modules\Invoice\Contracts\InvoicePaymentMethodProviderInterface;
+use Modules\Invoice\Data\InvoicePrintContext;
 use Modules\Invoice\DTOs\CreateInvoiceData;
 use Modules\Invoice\DTOs\InvoiceAdjustmentData;
 use Modules\Invoice\DTOs\InvoiceLineData;
 use Modules\Invoice\Enums\AdjustmentEffect;
 use Modules\Invoice\Enums\AdjustmentType;
+use Modules\Invoice\Enums\InvoiceCopyType;
 use Modules\Invoice\Enums\InvoiceDirection;
 use Modules\Invoice\Enums\InvoicePartyType;
+use Modules\Invoice\Enums\InvoicePrintLayout;
 use Modules\Invoice\Enums\InvoiceType;
 use Modules\Invoice\Http\Controllers\InvoiceController;
 use Modules\Invoice\Models\Invoice;
 use Modules\Invoice\Services\InvoiceCreationService;
+use Modules\Invoice\Services\InvoicePrintIssuanceService;
 use Modules\Invoice\Services\InvoicePrintService;
+use Modules\User\Contracts\AuthenticatedUserProviderInterface;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Tests\Support\OrganizationUnitFixture;
 use Tests\TestCase;
@@ -55,6 +65,7 @@ final class InvoicePrintServiceTest extends TestCase
         $this->assertSame('5.000000', $data['document']['amounts']['discount_total']['raw']);
         $this->assertSame('95.000000', $data['document']['amounts']['grand_total']['raw']);
         $this->assertSame($originalName, $data['document']['purchaser']['name']);
+        $this->assertSame([], $data['document']['purchaser_reference_fields']);
         $this->assertStringContainsString('Tax Invoice', $html);
         $this->assertStringContainsString('Tax Invoice No.', $html);
         $this->assertStringContainsString('Total Value of Supply', $html);
@@ -67,6 +78,7 @@ final class InvoicePrintServiceTest extends TestCase
         $this->assertStringNotContainsString('Total Value of Supply @ 18%', $html);
         $this->assertStringNotContainsString('SAMPLE', $html);
         $this->assertStringNotContainsString('EOG', $html);
+        $this->assertStringNotContainsString('Job No:</span>', $html);
     }
 
     public function test_signed_print_link_is_issued_only_for_the_current_organization_scope(): void
@@ -133,13 +145,299 @@ final class InvoicePrintServiceTest extends TestCase
         $this->get($wrongScopeUrl)->assertNotFound();
     }
 
-    private function printedInvoice(int $tenantId, int $organizationUnitId, int $customerId): Invoice
+    public function test_pdf_mode_fits_the_invoice_within_one_a4_page(): void
     {
+        [$tenantId, $organizationUnitId] = $this->scope();
+        $customerId = $this->customer($tenantId, $organizationUnitId, 'A4 Width Customer');
+        $invoice = $this->printedInvoice($tenantId, $organizationUnitId, $customerId);
+        $invoice = $this->invoice($tenantId, (int) $invoice->getKey());
+        $html = view('invoice.print', app(InvoicePrintService::class)->viewData($invoice, mode: 'pdf'))->render();
+
+        $this->assertStringContainsString('pdf-output', $html);
+
+        $dompdf = new Dompdf;
+        $dompdf->loadHtml($html);
+        $layout = app(InvoicePrintService::class)->layout($invoice);
+        $dompdf->setPaper($layout->paperSize(), $layout->orientation());
+        $dompdf->render();
+
+        $this->assertSame(1, $dompdf->getCanvas()->get_page_count());
+    }
+
+    public function test_service_invoice_a5_layout_is_focused_portrait_and_fits_one_page(): void
+    {
+        [$tenantId, $organizationUnitId] = $this->scope();
+        $customerId = $this->customer($tenantId, $organizationUnitId, 'A5 Compact Customer');
+        $invoice = $this->printedInvoice($tenantId, $organizationUnitId, $customerId, InvoiceType::Service);
+        DB::table('invoice_balances')
+            ->where('invoice_id', $invoice->getKey())
+            ->update([
+                'paid_amount' => '100.000000',
+                'remaining_amount' => '0.000000',
+                'status' => 'paid',
+                'updated_at' => now(),
+            ]);
+        DB::table('invoices')
+            ->where('id', $invoice->getKey())
+            ->update([
+                'paid_total' => '100.000000',
+                'balance_due' => '0.000000',
+                'status' => 'paid',
+                'updated_at' => now(),
+            ]);
+        $invoice = $this->invoice($tenantId, (int) $invoice->getKey());
+        $configuration = $this->createMock(ConfigurationResolverInterface::class);
+        $configuration->method('value')->willReturnCallback(
+            static fn (string $key): string => $key === InvoicePrintLayout::CONFIGURATION_KEY
+                ? InvoicePrintLayout::CompactA5->value
+                : 'Asia/Colombo',
+        );
+        $this->app->instance(ConfigurationResolverInterface::class, $configuration);
+        $prints = app(InvoicePrintService::class);
+        $context = new InvoicePrintContext(
+            new DateTimeImmutable('2026-09-16T05:12:00+00:00'),
+            'Kasun Perera',
+            InvoiceCopyType::Original,
+        );
+        $html = view('invoice.print', $prints->viewData(
+            $invoice,
+            mode: 'pdf',
+            printContext: $context,
+        ))->render();
+
+        $this->assertStringContainsString('layout-a5-portrait', $html);
+        $this->assertStringContainsString('Item Name', $html);
+        $this->assertStringNotContainsString('>Reference<', $html);
+        $this->assertStringNotContainsString('Description of Goods or Services', $html);
+        $this->assertStringNotContainsString('Total Value of Supply', $html);
+        $this->assertStringNotContainsString('VAT Amount', $html);
+        $this->assertStringContainsString('Total Amount including VAT', $html);
+        $this->assertStringContainsString('Line discount:', $html);
+        $this->assertStringContainsString('Bill discount:', $html);
+        $this->assertStringNotContainsString('Credit:', $html);
+        $this->assertStringContainsString('Balance due:', $html);
+        $this->assertStringContainsString('Printed: 16 Sep 2026 10:42 AM | By: Kasun Perera | Original', $html);
+        $this->assertStringNotContainsString('DUPLICATE', $html);
+
+        $layout = $prints->layout($invoice);
+        $dompdf = new Dompdf;
+        $dompdf->loadHtml($html);
+        $dompdf->setPaper($layout->paperSize(), $layout->orientation());
+        $dompdf->render();
+
+        $this->assertSame(InvoicePrintLayout::CompactA5Portrait, $layout);
+        $this->assertSame('portrait', $layout->orientation());
+        $this->assertSame(1, $dompdf->getCanvas()->get_page_count());
+    }
+
+    public function test_service_invoice_print_shows_discounts_and_two_decimal_quantity_with_uppercase_header_only(): void
+    {
+        [$tenantId, $organizationUnitId] = $this->scope();
+        $customerId = $this->customer($tenantId, $organizationUnitId, 'Discount Print Customer');
+        $invoice = $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): Invoice => app(InvoiceCreationService::class)->create(new CreateInvoiceData(
+                tenantId: $tenantId,
+                invoiceType: InvoiceType::Service,
+                direction: InvoiceDirection::Outbound,
+                invoiceDate: '2026-09-19',
+                organizationUnitId: $organizationUnitId,
+                partyType: InvoicePartyType::Customer->value,
+                partyId: $customerId,
+                lines: [new InvoiceLineData(
+                    lineNumber: 1,
+                    description: 'Wash',
+                    quantity: '1.000000',
+                    unitPrice: '100.000000',
+                    discountAmount: '10.000000',
+                )],
+                adjustments: [new InvoiceAdjustmentData(
+                    name: 'Service bill discount',
+                    adjustmentType: AdjustmentType::Discount,
+                    effect: AdjustmentEffect::Decrease,
+                    amount: '5.000000',
+                )],
+            )),
+        );
+        DB::table('invoice_lines')->where('invoice_id', $invoice->getKey())->update(['uom_code_snapshot' => 'HOUR']);
+        DB::table('invoice_document_snapshots')->where('invoice_id', $invoice->getKey())->update([
+            'seller_legal_name' => 'PIC Auto Lanka (PVT) LTD',
+        ]);
+        $invoice = $this->invoice($tenantId, (int) $invoice->getKey());
+
+        $configuration = $this->createMock(ConfigurationResolverInterface::class);
+        $configuration->method('value')->willReturnCallback(
+            static fn (string $key): string => $key === InvoicePrintLayout::CONFIGURATION_KEY
+                ? InvoicePrintLayout::CompactA5->value
+                : 'Asia/Colombo',
+        );
+        $this->app->instance(ConfigurationResolverInterface::class, $configuration);
+
+        $prints = app(InvoicePrintService::class);
+        $data = $prints->viewData($invoice, mode: 'pdf');
+        $html = view('invoice.print', $data)->render();
+
+        $this->assertSame('10.000000', $data['document']['amounts']['line_discount_total']['raw']);
+        $this->assertSame('5.000000', $data['document']['amounts']['bill_discount_total']['raw']);
+        $this->assertSame('85.000000', $data['document']['amounts']['grand_total']['raw']);
+        $this->assertSame('1.00', $data['document']['lines'][0]['quantity']['display']);
+        $this->assertStringContainsString('PIC AUTO LANKA (PVT) LTD</div>', $html);
+        $this->assertStringContainsString("Supplier's Name:</span> PIC Auto Lanka (PVT) LTD", $html);
+        $this->assertStringContainsString('Line discount:', $html);
+        $this->assertStringContainsString('Bill discount:', $html);
+        $this->assertStringNotContainsString('HOUR', $html);
+        $this->assertStringNotContainsString('Credit:', $html);
+
+        $dompdf = new Dompdf;
+        $dompdf->loadHtml($html);
+        $layout = $prints->layout($invoice);
+        $dompdf->setPaper($layout->paperSize(), $layout->orientation());
+        $dompdf->render();
+
+        $this->assertSame(1, $dompdf->getCanvas()->get_page_count());
+    }
+
+    public function test_purchase_invoice_uses_focused_portrait_layout_and_realized_payment_method(): void
+    {
+        [$tenantId, $organizationUnitId] = $this->scope();
+        $customerId = $this->customer($tenantId, $organizationUnitId, 'Supplier Invoice Party');
+        $invoice = $this->printedInvoice($tenantId, $organizationUnitId, $customerId, InvoiceType::Purchase);
+        DB::table('invoice_lines')->where('invoice_id', $invoice->getKey())->update([
+            'item_code_snapshot' => 'BP-001',
+            'item_name_snapshot' => 'Brake Pad',
+            'description' => 'Internal purchase description',
+        ]);
+        $invoice = $this->invoice($tenantId, (int) $invoice->getKey());
+
+        $configuration = $this->createMock(ConfigurationResolverInterface::class);
+        $configuration->method('value')->willReturnCallback(
+            static fn (string $key): string => $key === InvoicePrintLayout::CONFIGURATION_KEY
+                ? InvoicePrintLayout::CompactA5->value
+                : 'Asia/Colombo',
+        );
+        $this->app->instance(ConfigurationResolverInterface::class, $configuration);
+
+        $paymentMethods = $this->createMock(InvoicePaymentMethodProviderInterface::class);
+        $paymentMethods->expects($this->once())
+            ->method('namesForInvoice')
+            ->with((int) $invoice->getKey(), $tenantId, $organizationUnitId)
+            ->willReturn(['Cash']);
+        $this->app->instance(InvoicePaymentMethodProviderInterface::class, $paymentMethods);
+
+        $prints = app(InvoicePrintService::class);
+        $data = $prints->viewData($invoice, mode: 'pdf');
+        $html = view('invoice.print', $data)->render();
+
+        $this->assertSame(InvoicePrintLayout::CompactA5Portrait, $prints->layout($invoice));
+        $this->assertSame('Cash', $data['document']['resolved_payment_mode']);
+        $this->assertSame('Brake Pad', $data['document']['lines'][0]['display_name']);
+        $this->assertStringContainsString('Mode of Payment:</span> Cash', $html);
+        $this->assertStringContainsString('Item Name', $html);
+        $this->assertStringContainsString('Brake Pad', $html);
+        $this->assertStringNotContainsString('BP-001 - Brake Pad', $html);
+        $this->assertStringNotContainsString('Internal purchase description', $html);
+        $this->assertStringNotContainsString('Credit:', $html);
+        $this->assertStringContainsString('Balance due:', $html);
+    }
+
+    public function test_service_invoice_copy_labels_start_only_after_payment(): void
+    {
+        [$tenantId, $organizationUnitId] = $this->scope();
+        $customerId = $this->customer($tenantId, $organizationUnitId, 'Copy State Customer');
+        $invoice = $this->printedInvoice($tenantId, $organizationUnitId, $customerId, InvoiceType::Service);
+        $users = $this->createMock(AuthenticatedUserProviderInterface::class);
+        $users->method('requireCurrentUserRecord')->willReturn(new DataRecord([
+            'first_name' => 'Kasun',
+            'last_name' => 'Perera',
+            'username' => 'kasun',
+            'email' => 'kasun@example.test',
+        ]));
+        $this->app->instance(AuthenticatedUserProviderInterface::class, $users);
+        $issuance = app(InvoicePrintIssuanceService::class);
+
+        $beforePayment = $issuance->issue($invoice);
+        $this->assertNotNull($beforePayment);
+        $this->assertNull($beforePayment->copyType);
+        $this->assertNull($invoice->fresh()->original_printed_at);
+        $beforePaymentHtml = view('invoice.print', app(InvoicePrintService::class)->viewData(
+            $invoice,
+            mode: 'pdf',
+            printContext: $beforePayment,
+        ))->render();
+        $this->assertStringContainsString('By: Kasun Perera', $beforePaymentHtml);
+        $this->assertStringNotContainsString('| Original', $beforePaymentHtml);
+        $this->assertStringNotContainsString('| Duplicate', $beforePaymentHtml);
+
+        DB::table('invoice_balances')
+            ->where('invoice_id', $invoice->getKey())
+            ->update([
+                'paid_amount' => '100.000000',
+                'remaining_amount' => '0.000000',
+                'status' => 'paid',
+                'updated_at' => now(),
+            ]);
+
+        $originalResponse = $this->withTenantExecutionContext(
+            $tenantId,
+            fn () => app(InvoiceController::class)->signedPrintLink(
+                $this->requestWithScope($tenantId, $organizationUnitId),
+                (int) $invoice->getKey(),
+            ),
+        );
+        $originalUrl = $originalResponse->getData(true)['data']['print_url'];
+        parse_str((string) parse_url($originalUrl, PHP_URL_QUERY), $originalQuery);
+
+        $duplicateResponse = $this->withTenantExecutionContext(
+            $tenantId,
+            fn () => app(InvoiceController::class)->signedPrintLink(
+                $this->requestWithScope($tenantId, $organizationUnitId),
+                (int) $invoice->getKey(),
+            ),
+        );
+        $duplicateUrl = $duplicateResponse->getData(true)['data']['print_url'];
+        parse_str((string) parse_url($duplicateUrl, PHP_URL_QUERY), $duplicateQuery);
+
+        $this->assertSame(InvoiceCopyType::Original->value, $originalQuery['copy_type'] ?? null);
+        $this->assertSame(InvoiceCopyType::Duplicate->value, $duplicateQuery['copy_type'] ?? null);
+        $this->assertSame('Kasun Perera', $originalQuery['printed_by'] ?? null);
+        $this->assertNotNull($invoice->fresh()->original_printed_at);
+    }
+
+    public function test_whatsapp_shared_invoice_pdf_expires_and_respects_current_lifecycle(): void
+    {
+        [$tenantId, $organizationUnitId] = $this->scope();
+        $customerId = $this->customer($tenantId, $organizationUnitId, 'WhatsApp Share Customer');
+        $invoice = $this->printedInvoice($tenantId, $organizationUnitId, $customerId);
+        DB::table('invoices')->where('id', $invoice->getKey())->update(['status' => 'posted']);
+
+        $parameters = [
+            'invoice' => (int) $invoice->getKey(),
+            'tenant' => $tenantId,
+            'organization_unit' => $organizationUnitId,
+        ];
+        $validUrl = URL::temporarySignedRoute('invoices.public.shared-pdf', now()->addMinutes(5), $parameters);
+        $response = $this->get($validUrl)->assertOk();
+        $response->assertHeader('Content-Type', 'application/pdf');
+        $this->assertStringStartsWith('%PDF', $response->getContent());
+
+        DB::table('invoices')->where('id', $invoice->getKey())->update(['status' => 'cancelled']);
+        $this->get($validUrl)->assertNotFound();
+
+        $expiredUrl = URL::temporarySignedRoute('invoices.public.shared-pdf', now()->subMinute(), $parameters);
+        $this->get($expiredUrl)->assertForbidden();
+    }
+
+    private function printedInvoice(
+        int $tenantId,
+        int $organizationUnitId,
+        int $customerId,
+        InvoiceType $invoiceType = InvoiceType::Manual,
+    ): Invoice {
         return $this->withTenantExecutionContext(
             $tenantId,
             fn (): Invoice => app(InvoiceCreationService::class)->create(new CreateInvoiceData(
                 tenantId: $tenantId,
-                invoiceType: InvoiceType::Manual,
+                invoiceType: $invoiceType,
                 direction: InvoiceDirection::Outbound,
                 invoiceDate: '2026-07-07',
                 organizationUnitId: $organizationUnitId,

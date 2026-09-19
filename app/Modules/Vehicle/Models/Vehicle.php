@@ -29,6 +29,11 @@ final class Vehicle extends TenantOwnedModel
         'vin_number',
     ];
 
+    private const NORMALIZED_REGISTRATION_SEARCH_SQL =
+        "LOWER(REPLACE(REPLACE(vehicles.registration_number, '-', ''), ' ', ''))";
+
+    private const REGISTRATION_SEARCH_SEPARATOR_PATTERN = '/[\s-]+/u';
+
     protected $table = 'vehicles';
 
     protected $guarded = ['id'];
@@ -117,15 +122,25 @@ final class Vehicle extends TenantOwnedModel
     public function scopeMatchingSearch(Builder $query, ?string $search): Builder
     {
         $value = trim((string) $search);
+        $normalizedRegistration = self::normalizeRegistrationSearch($value);
         if ($value === '') {
             return $query;
         }
 
-        return $query->where(function (Builder $scope) use ($value): void {
+        return $query->where(function (Builder $scope) use ($normalizedRegistration, $value): void {
             foreach (self::SEARCHABLE_COLUMNS as $column) {
                 $scope->orWhere($column, 'like', "%{$value}%");
             }
+
+            if ($normalizedRegistration !== '') {
+                $scope->orWhereRaw(self::NORMALIZED_REGISTRATION_SEARCH_SQL.' LIKE ?', ["%{$normalizedRegistration}%"]);
+            }
         });
+    }
+
+    private static function normalizeRegistrationSearch(string $value): string
+    {
+        return mb_strtolower(preg_replace(self::REGISTRATION_SEARCH_SEPARATOR_PATTERN, '', $value) ?? '');
     }
 
     public function scopeForTenant(Builder $query, int $tenantId, ?int $organizationUnitId = null): Builder

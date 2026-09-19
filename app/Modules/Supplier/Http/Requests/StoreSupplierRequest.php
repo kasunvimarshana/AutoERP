@@ -33,7 +33,7 @@ final class StoreSupplierRequest extends TenantScopedRequest
             $key('tenant_id') => $prefix === '' ? ['required', 'integer', 'min:1'] : ['prohibited'],
             $key('organization_unit_id') => $prefix === '' ? ['nullable', 'integer', 'min:1'] : ['prohibited'],
             $key('supplier_number') => ['nullable', 'string', 'max:80'],
-            $key('code') => ['required', 'string', 'max:80'],
+            $key('code') => ['nullable', 'string', 'max:80'],
             $key('name') => ['required', 'string', 'max:255'],
             $key('supplier_type') => ['required', Rule::enum(SupplierType::class)],
             $key('status') => ['nullable', Rule::enum(SupplierStatus::class)],

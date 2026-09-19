@@ -38,4 +38,20 @@ export type {
     SummaryPaymentMethod,
     SummaryPaymentMetrics,
     SummaryReportResult,
+    SalesSettlementBreakdown,
+    SalesSettlementMetric,
 } from './summaryReportTypes';
+export type {
+    GrnExposureStatus,
+    GrnInvoiceProgress,
+    GrnPayablesReportParams,
+    GrnPayablesReportResult,
+    GrnPayablesSummary,
+    GrnPayablesSupplierRow,
+} from './grnPayablesReportTypes';
+export type {
+    VehicleServiceHistoryLine,
+    VehicleServiceHistoryParams,
+    VehicleServiceHistoryResult,
+    VehicleServiceHistoryRow,
+} from './vehicleServiceHistoryTypes';

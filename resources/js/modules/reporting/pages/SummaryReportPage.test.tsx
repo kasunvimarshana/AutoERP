@@ -30,6 +30,14 @@ describe('SummaryReportPage', () => {
                     grand_total: '1050',
                 },
             },
+            sales_settlement: {
+                cash: { amount: '376270', document_count: 40 },
+                card: { amount: '349125.71', document_count: 41 },
+                credit: { amount: '127857.60', document_count: 3 },
+                other_paid: { amount: '0', document_count: 0 },
+                credits_applied: '0',
+                source_note: 'Cash and card show active receipt allocations to these sales.',
+            },
             payments: {
                 received: {
                     amount: '725395.71',
@@ -52,6 +60,7 @@ describe('SummaryReportPage', () => {
             performance: {
                 total_income: '853253.31',
                 cost_of_sales: '305432.71',
+                gross_profit: '547820.60',
                 other_expenses: '0',
                 total_expenses: '305432.71',
                 net_profit: '547820.60',
@@ -77,8 +86,12 @@ describe('SummaryReportPage', () => {
         );
 
         expect(await screen.findByRole('heading', { name: 'Summary Reports' })).toBeInTheDocument();
-        expect(screen.getByText(/547,820\.60/)).toBeInTheDocument();
+        expect(screen.getAllByText(/547,820\.60/)).toHaveLength(2);
         expect(screen.getByRole('heading', { name: 'Sales' })).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: 'Cash' })).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: 'Card' })).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: 'On credit' })).toBeInTheDocument();
+        expect(screen.getAllByText(/376,270\.00/)).toHaveLength(2);
         expect(screen.getByRole('heading', { name: 'Payments received' })).toBeInTheDocument();
         expect(screen.getByRole('heading', { name: 'Not connected yet' })).toBeInTheDocument();
 

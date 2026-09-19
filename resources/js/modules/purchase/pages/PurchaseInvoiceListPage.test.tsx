@@ -33,7 +33,7 @@ describe('PurchaseInvoiceListPage', () => {
         expect(screen.getByRole('heading', { name: 'Supplier Invoices' })).toBeInTheDocument();
         expect(screen.getByTestId('invoice-view')).toHaveTextContent('supplier');
         expect(screen.getByRole('link', { name: 'Create supplier invoice' })).toHaveAttribute('href', '/purchase/invoices/create');
-        expect(screen.getByRole('link', { name: 'Open supplier invoice' })).toHaveAttribute('href', '/invoices/42?from=purchase');
+        expect(screen.getByRole('link', { name: 'Open supplier invoice' })).toHaveAttribute('href', '/purchase/invoices/42');
         expect(screen.queryByText('/invoices?view=supplier')).not.toBeInTheDocument();
     });
     it('hides supplier invoice creation without permission', () => {

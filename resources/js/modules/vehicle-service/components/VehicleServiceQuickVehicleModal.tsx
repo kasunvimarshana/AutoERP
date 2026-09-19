@@ -1,4 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { hasPermission } from '@/modules/auth/accessControl';
+import { useAuth } from '@/modules/auth/AuthProvider';
 import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
 import { lookupApi, type VehicleLookupResource } from '@/shared/api/lookupApi';
 import { Button } from '@/shared/components/Button';
@@ -8,18 +10,26 @@ import { Input } from '@/shared/components/Input';
 import { Modal } from '@/shared/components/Modal';
 import { Panel } from '@/shared/components/Panel';
 import { Select } from '@/shared/components/Select';
+import { WhatsAppVerificationPanel } from '@/shared/components/WhatsAppVerificationPanel';
 import { customerTypes, type CustomerPayload } from '@/modules/customer/customerTypes';
-import { createCustomer } from '@/modules/customer/customerApi';
+import { confirmCustomerWhatsAppVerification, createCustomer, getCustomerWhatsAppVerification, startCustomerWhatsAppVerification } from '@/modules/customer/customerApi';
+import {
+    DEFAULT_CUSTOMER_STATUS,
+    defaultCustomerPayload,
+    loadCustomerCreationDefaults,
+} from '@/modules/customer/customerCreateDefaults';
 import type { NamedResource } from '@/shared/types/common';
 import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { createVehicleWithRelations } from '@/modules/vehicle/vehicleApi';
-import { VehicleCategorySelect } from '@/modules/vehicle/components/VehicleCategorySelect';
+import {
+    defaultVehiclePayload,
+    loadVehicleCreationDefaults,
+} from '@/modules/vehicle/vehicleCreateDefaults';
 import { VehicleMakeSelect } from '@/modules/vehicle/components/VehicleMakeSelect';
 import { VehicleModelSelect } from '@/modules/vehicle/components/VehicleModelSelect';
 import { VehicleTypeSelect } from '@/modules/vehicle/components/VehicleTypeSelect';
 import type {
     Vehicle,
-    VehicleCategory,
     VehicleMake,
     VehicleModel,
     VehicleOwnershipType,
@@ -29,12 +39,6 @@ import type {
 
 type CustomerMode = 'existing' | 'new';
 
-const DEFAULT_CUSTOMER_STATUS = 'active';
-const DEFAULT_CUSTOMER_TYPE = 'individual';
-const DEFAULT_VEHICLE_STATUS = 'active';
-const DEFAULT_DECIMAL_VALUE = '0.000000';
-const DEFAULT_ODOMETER_READING = DEFAULT_DECIMAL_VALUE;
-const DEFAULT_ODOMETER_UNIT = 'km';
 const DEFAULT_CUSTOMER_OWNERSHIP_TYPE: VehicleOwnershipType = 'customer_owned';
 
 export function VehicleServiceQuickVehicleModal({
@@ -48,6 +52,8 @@ export function VehicleServiceQuickVehicleModal({
     onClose: () => void;
     onCreated: (vehicle: VehicleLookupResource, customer: NamedResource) => void;
 }) {
+    const auth = useAuth();
+    const canVerifyCustomer = hasPermission(auth, 'customers.update');
     const [customerMode, setCustomerMode] = useState<CustomerMode>('existing');
     const [existingCustomer, setExistingCustomer] = useState<NamedResource | null>(null);
     const [customerPayload, setCustomerPayload] = useState<CustomerPayload>(defaultCustomerPayload());
@@ -55,13 +61,96 @@ export function VehicleServiceQuickVehicleModal({
     const [make, setMake] = useState<VehicleMake | null>(null);
     const [model, setModel] = useState<VehicleModel | null>(null);
     const [type, setType] = useState<VehicleType | null>(null);
-    const [category, setCategory] = useState<VehicleCategory | null>(null);
     const [saving, setSaving] = useState(false);
+    const [loadingVehicleDefaults, setLoadingVehicleDefaults] = useState(false);
+    const [loadingCustomerDefaults, setLoadingCustomerDefaults] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
+    const [verifyAfterSave, setVerifyAfterSave] = useState(false);
+    const [createdForVerification, setCreatedForVerification] = useState<{ vehicle: VehicleLookupResource; customer: NamedResource } | null>(null);
 
     const customerSearch = useMemo(() => lookupApi.customers, []);
 
+    useEffect(() => {
+        if (!open) return;
+
+        const controller = new AbortController();
+        setLoadingVehicleDefaults(true);
+        setVehiclePayload(defaultVehiclePayload(initialVehicleNumber));
+        setMake(null);
+        setModel(null);
+        setType(null);
+        void loadVehicleCreationDefaults(controller.signal)
+            .then(({ code }) => {
+                setVehiclePayload((current) => ({ ...current, code }));
+                setError(null);
+            })
+            .catch((requestError) => {
+                if (!controller.signal.aborted) setError(toApiError(requestError));
+            })
+            .finally(() => {
+                if (!controller.signal.aborted) setLoadingVehicleDefaults(false);
+            });
+
+        return () => controller.abort();
+    }, [initialVehicleNumber, open]);
+
+    async function selectNewCustomer() {
+        setCustomerMode('new');
+        if (customerPayload.code !== '' && customerPayload.default_currency_id !== null) return;
+
+        setLoadingCustomerDefaults(true);
+        setError(null);
+        const controller = new AbortController();
+        try {
+            const { code, currency } = await loadCustomerCreationDefaults(controller.signal);
+            setCustomerPayload((current) => ({
+                ...current,
+                code: current.code || code,
+                default_currency_id: current.default_currency_id ?? Number(currency.id),
+            }));
+        } catch (requestError) {
+            setError(toApiError(requestError));
+        } finally {
+            setLoadingCustomerDefaults(false);
+        }
+    }
+
     if (!open) return null;
+
+    const finishCreatedFlow = () => {
+        if (!createdForVerification) return;
+        onCreated(createdForVerification.vehicle, createdForVerification.customer);
+        setCreatedForVerification(null);
+        onClose();
+    };
+
+    if (createdForVerification) {
+        const customerId = Number(createdForVerification.customer.id);
+
+        return (
+            <Modal
+                open={open}
+                title="Verify customer WhatsApp"
+                onClose={finishCreatedFlow}
+                closeOnBackdrop={false}
+            >
+                <p className="text-sm text-slate-600">
+                    Customer and vehicle were saved. Complete verification now, or continue to the job and verify later.
+                </p>
+                <WhatsAppVerificationPanel
+                    subjectId={customerId}
+                    subjectLabel="Customer"
+                    canManage={canVerifyCustomer}
+                    load={(signal) => getCustomerWhatsAppVerification(customerId, signal)}
+                    start={(key) => startCustomerWhatsAppVerification(customerId, key)}
+                    confirm={(code) => confirmCustomerWhatsAppVerification(customerId, code)}
+                />
+                <div className="mt-5 flex justify-end">
+                    <Button type="button" onClick={finishCreatedFlow}>Continue to job</Button>
+                </div>
+            </Modal>
+        );
+    }
 
     return (
         <Modal
@@ -75,7 +164,7 @@ export function VehicleServiceQuickVehicleModal({
                 className="space-y-5"
                 onSubmit={async (event) => {
                     event.preventDefault();
-                    if (saving) return;
+                    if (saving || loadingCustomerDefaults || loadingVehicleDefaults) return;
                     setSaving(true);
                     setError(null);
 
@@ -98,7 +187,6 @@ export function VehicleServiceQuickVehicleModal({
                                 vehicle_make_id: make?.id ?? null,
                                 vehicle_model_id: model?.id ?? null,
                                 vehicle_type_id: type?.id ?? null,
-                                vehicle_category_id: category?.id ?? null,
                             },
                             documents: [],
                             attributes: [],
@@ -111,7 +199,17 @@ export function VehicleServiceQuickVehicleModal({
                             }],
                         });
 
-                        onCreated(vehicleLookupResource(vehicle, customer), customer);
+                        const createdVehicle = vehicleLookupResource(vehicle, customer);
+                        setCustomerPayload(defaultCustomerPayload());
+                        setExistingCustomer(null);
+                        setCustomerMode('existing');
+
+                        if (verifyAfterSave && customerMode === 'new' && Boolean(customerPayload.mobile?.trim())) {
+                            setCreatedForVerification({ vehicle: createdVehicle, customer });
+                            return;
+                        }
+
+                        onCreated(createdVehicle, customer);
                         onClose();
                     } catch (requestError) {
                         setError(toApiError(requestError));
@@ -125,13 +223,6 @@ export function VehicleServiceQuickVehicleModal({
                 <Panel title="Vehicle details">
                     <div className="grid gap-4 md:grid-cols-2">
                         <Input
-                            label="Vehicle Number"
-                            value={vehiclePayload.vehicle_number ?? ''}
-                            onChange={(event) => setVehiclePayload((current) => ({ ...current, vehicle_number: event.target.value }))}
-                            error={vehicleError(error, 'vehicle_number')}
-                            required
-                        />
-                        <Input
                             label="Registration Number"
                             value={vehiclePayload.registration_number ?? ''}
                             onChange={(event) => setVehiclePayload((current) => ({ ...current, registration_number: event.target.value }))}
@@ -144,10 +235,14 @@ export function VehicleServiceQuickVehicleModal({
                             error={vehicleError(error, 'code')}
                         />
                         <Input
-                            label="Odometer"
-                            value={vehiclePayload.odometer_reading ?? DEFAULT_ODOMETER_READING}
-                            onChange={(event) => setVehiclePayload((current) => ({ ...current, odometer_reading: event.target.value }))}
-                            error={vehicleError(error, 'odometer_reading')}
+                            label="Manufacture Year"
+                            type="number"
+                            value={vehiclePayload.manufacture_year ?? ''}
+                            onChange={(event) => setVehiclePayload((current) => ({
+                                ...current,
+                                manufacture_year: event.target.value === '' ? null : Number(event.target.value),
+                            }))}
+                            error={vehicleError(error, 'manufacture_year')}
                         />
                         <VehicleMakeSelect
                             value={make}
@@ -165,7 +260,6 @@ export function VehicleServiceQuickVehicleModal({
                             error={vehicleError(error, 'vehicle_model_id')}
                         />
                         <VehicleTypeSelect value={type} onChange={setType} error={vehicleError(error, 'vehicle_type_id')} />
-                        <VehicleCategorySelect value={category} onChange={setCategory} error={vehicleError(error, 'vehicle_category_id')} />
                     </div>
                 </Panel>
 
@@ -181,7 +275,8 @@ export function VehicleServiceQuickVehicleModal({
                         <Button
                             type="button"
                             variant={customerMode === 'new' ? 'primary' : 'secondary'}
-                            onClick={() => setCustomerMode('new')}
+                            onClick={() => void selectNewCustomer()}
+                            loading={loadingCustomerDefaults}
                         >
                             New customer
                         </Button>
@@ -231,11 +326,23 @@ export function VehicleServiceQuickVehicleModal({
                                 </div>
                             </div>
                             <Input
-                                label="Mobile"
+                                label="WhatsApp Number"
                                 value={customerPayload.mobile ?? ''}
                                 onChange={(event) => setCustomerPayload((current) => ({ ...current, mobile: event.target.value || null }))}
                                 error={customerError(error, 'mobile', 'customer.mobile')}
                             />
+                            {canVerifyCustomer ? (
+                                <label className="flex items-start gap-2 text-sm text-slate-700 md:col-span-2">
+                                    <input
+                                        className="mt-1"
+                                        type="checkbox"
+                                        checked={verifyAfterSave}
+                                        disabled={!customerPayload.mobile?.trim()}
+                                        onChange={(event) => setVerifyAfterSave(event.target.checked)}
+                                    />
+                                    <span>Verify WhatsApp after saving<span className="block text-xs text-slate-500">Customer and vehicle will be saved first. You can skip verification and continue the job.</span></span>
+                                </label>
+                            ) : null}
                             <Input
                                 label="Phone"
                                 value={customerPayload.phone ?? ''}
@@ -257,36 +364,11 @@ export function VehicleServiceQuickVehicleModal({
 
                 <div className="flex justify-end gap-2">
                     <Button type="button" variant="secondary" onClick={onClose} disabled={saving}>Cancel</Button>
-                    <Button type="submit" loading={saving}>Save vehicle and continue</Button>
+                    <Button type="submit" loading={saving} disabled={loadingCustomerDefaults || loadingVehicleDefaults}>Save vehicle and continue</Button>
                 </div>
             </form>
         </Modal>
     );
-}
-
-function defaultCustomerPayload(): CustomerPayload {
-    return {
-        customer_number: null,
-        code: '',
-        name: '',
-        customer_type: DEFAULT_CUSTOMER_TYPE,
-        status: DEFAULT_CUSTOMER_STATUS,
-        default_currency_id: null,
-        is_tax_exempt: false,
-        marketing_consent: false,
-        preferred_communication_channel: null,
-    };
-}
-
-function defaultVehiclePayload(vehicleNumber: string): VehiclePayload {
-    return {
-        vehicle_number: vehicleNumber,
-        code: '',
-        registration_number: '',
-        odometer_reading: DEFAULT_ODOMETER_READING,
-        odometer_unit: DEFAULT_ODOMETER_UNIT,
-        status: DEFAULT_VEHICLE_STATUS,
-    };
 }
 
 function customerSummary(customer: { id: number; code: string; name: string }): NamedResource {

@@ -88,6 +88,7 @@ describe('EmployeeCommissionReportPage', () => {
                 supervisor_commission: '50.000000',
                 earned_commission: '50.000000',
                 pending_commission: '0.000000',
+                cancelled_commission: '0.000000',
                 total_commission: '50.000000',
                 average_commission_per_job: '50.000000',
                 average_commission_per_employee: '50.000000',
@@ -125,8 +126,9 @@ describe('EmployeeCommissionReportPage', () => {
         expect(await screen.findByRole('heading', { name: 'Employee Commission Report' })).toBeInTheDocument();
         expect(screen.getAllByText('Nimal Supervisor').length).toBeGreaterThan(0);
         expect(screen.getAllByText(/50/).length).toBeGreaterThan(0);
-        expect(screen.getByText('Supervisor commission')).toBeInTheDocument();
+        expect(screen.getByText('Earned commission')).toBeInTheDocument();
         expect(screen.getByTestId('export-actions')).toHaveTextContent('vehicle-service/employee-commissions');
+        await user.click(screen.getByRole('button', { name: 'More filters' }));
         await user.selectOptions(screen.getByLabelText('Commission source'), 'supervisor');
         await user.click(screen.getByRole('button', { name: 'Apply filters' }));
         await waitFor(() => {
@@ -135,5 +137,25 @@ describe('EmployeeCommissionReportPage', () => {
                 expect.any(AbortSignal),
             );
         });
+    });
+
+    it('loads dashboard drill-down date and employee search context from the URL', async () => {
+        render(
+            <TestRouter initialEntries={['/reports/vehicle-service/employee-commissions?date_from=2026-09-01&date_to=2026-09-30&search=EMP-007']}>
+                <EmployeeCommissionReportPage />
+            </TestRouter>,
+        );
+
+        await waitFor(() => {
+            expect(apiMocks.runEmployeeCommissionReport).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    date_from: '2026-09-01',
+                    date_to: '2026-09-30',
+                    search: 'EMP-007',
+                }),
+                expect.any(AbortSignal),
+            );
+        });
+        expect(screen.getByLabelText('Search')).toHaveValue('EMP-007');
     });
 });

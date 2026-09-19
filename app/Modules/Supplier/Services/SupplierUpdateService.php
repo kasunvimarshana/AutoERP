@@ -83,6 +83,10 @@ final class SupplierUpdateService
                 }
             }
 
+            if (in_array('name', $data->provided, true)) {
+                $attributes['legal_name'] = $data->name;
+            }
+
             $supplier->fill($attributes);
             $supplier->setAttribute('row_version', ((int) $supplier->row_version) + 1);
             $supplier->save();
