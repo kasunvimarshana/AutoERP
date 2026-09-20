@@ -7,7 +7,8 @@ import type { BillingDocumentInput, CreatedRentalInvoice } from './baseRentBilli
 export enum UsageChargeComponent { NormalOvertime = 'normal_ot', DoubleOvertime = 'double_ot', TripleOvertime = 'triple_ot', NightOut = 'night_out' }
 export enum UsageChargePolicy { RecordedMinutesAndNights = 'recorded_minutes_and_nights_v1' }
 export const USAGE_COMPONENT_LABELS = { [UsageChargeComponent.NormalOvertime]: 'Normal OT', [UsageChargeComponent.DoubleOvertime]: 'Double OT', [UsageChargeComponent.TripleOvertime]: 'Triple OT', [UsageChargeComponent.NightOut]: 'Night-outs' } as const;
-export interface UsageCharge { id: number; row_version: number; component: UsageChargeComponent; amount: string; voided_at: string | null; void_reason: string | null; calculation: { description: string; currency: string }; invoices: { id: number; number: string; status: string }[] }
+export const MILEAGE_COMPONENT = 'excess_distance';
+export interface UsageCharge { id: number; row_version: number; component: UsageChargeComponent | typeof MILEAGE_COMPONENT; amount: string; voided_at: string | null; void_reason: string | null; calculation: { description: string; currency: string }; invoices: { id: number; number: string; status: string }[] }
 export interface UsageComponentQuote { component: UsageChargeComponent; label: string; quantity: number | null; rate: string | null; denominator: number; amount: string | null; error: string | null }
 export interface UsageChargePage { currency: string; components: UsageComponentQuote[]; agreement: { reference: string; version: number }; charges: { data: UsageCharge[]; current_page: number; last_page: number } }
 const path = (kind: AgreementKind, chart: RunningChart) => `${CHART_API}/${chart.id}/${kind}/charges`;

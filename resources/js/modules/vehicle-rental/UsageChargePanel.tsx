@@ -8,6 +8,7 @@ import { Input } from '@/shared/components/Input';
 import { Select } from '@/shared/components/Select';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
+import { MileageAssessmentPanel } from './MileageAssessmentPanel';
 import { AgreementKind } from './agreements';
 import { BILLING_PERMISSION, type CreatedRentalInvoice } from './baseRentBillingApi';
 import { RunningChartStatus, type RunningChart } from './runningCharts';
@@ -26,6 +27,7 @@ export function UsageChargePanel({ chart, hasOwner }: { chart: RunningChart; has
     </section>;
 }
 export function UsageChargeForm({ kind, chart }: { kind: AgreementKind; chart: RunningChart }) {
+    const [mileage, setMileage] = useState(false);
     const [result, setResult] = useState<UsageChargePage | null>(null);
     const [component, setComponent] = useState<UsageChargeComponent | ''>('');
     const [selected, setSelected] = useState<UsageCharge | null>(null);
@@ -39,7 +41,7 @@ export function UsageChargeForm({ kind, chart }: { kind: AgreementKind; chart: R
         loadUsageCharges(kind, chart, page, controller.signal).then(value => { if (!controller.signal.aborted) { setResult(value); setError(null); } }).catch(failure => { if (!controller.signal.aborted) { setResult(null); setError(toApiError(failure)); } });
         return () => controller.abort();
     }, [kind, chart, page, revision]);
-    function choose(charge: UsageCharge, next: ChargeAction) { setSelected(charge); setAction(next); setAccepted(false); setReason(''); setCreated(null); }
+    function choose(charge: UsageCharge, next: ChargeAction) { setMileage(false); setSelected(charge); setAction(next); setAccepted(false); setReason(''); setCreated(null); }
     async function submit(event: FormEvent) {
         event.preventDefault(); if (inFlight.current || !result || !accepted) return;
         inFlight.current = true; setBusy(true); setError(null); setCreated(null);
@@ -57,7 +59,9 @@ export function UsageChargeForm({ kind, chart }: { kind: AgreementKind; chart: R
         <p>{result?.agreement.reference} · {kind === AgreementKind.Customer ? 'Customer invoice' : 'Owner payable'} · {chart.reference}</p>
         <p className="text-sm">Bill a recorded OT or night-out component using this side’s assigned agreement. OT uses minutes × the category’s hourly rate ÷ 60, without another multiplier. Night-outs use count × agreed rate. Blank values cannot be billed. Review and post the draft in Invoice.</p>
         <ErrorAlert error={error} inline />
-        {result && chart.status === RunningChartStatus.Finalized && <form aria-label="Bill chart component" onSubmit={submit} className="space-y-3">
+        {chart.status === RunningChartStatus.Finalized && <Button variant="secondary" disabled={busy} onClick={() => { setMileage(!mileage); setSelected(null); setAction(ChargeAction.Create); setAccepted(false); }}>{mileage ? 'OT and night-outs' : 'Assess mileage'}</Button>}
+        {mileage && <MileageAssessmentPanel kind={kind} chart={chart} onSaved={() => setRevision(value => value + 1)} />}
+        {!mileage && result && chart.status === RunningChartStatus.Finalized && <form aria-label="Bill chart component" onSubmit={submit} className="space-y-3">
             {selected ? <p>{action === ChargeAction.Void ? 'Void' : 'Reissue'}: {selected.calculation.description} <Button type="button" variant="secondary" disabled={busy} onClick={() => { setSelected(null); setAction(ChargeAction.Create); setAccepted(false); }}>Cancel selection</Button></p> : <Select label="Component" required value={component} options={Object.entries(USAGE_COMPONENT_LABELS).map(([value, label]) => ({ value, label }))} onChange={e => { setComponent(e.target.value as UsageChargeComponent | ''); setAccepted(false); }} />}
             {!selected && quote && <p role="status">{quote.quantity ?? 'Not recorded'} {component === UsageChargeComponent.NightOut ? 'nights' : 'minutes'} · rate {quote.rate ?? 'Not recorded'} {component === UsageChargeComponent.NightOut ? 'per night' : 'per hour'} · {result.currency} {quote.amount ?? 'Cannot calculate'}{quote.error && ` · ${quote.error}`}</p>}
             {action === ChargeAction.Void ? <Input label="Void reason" required value={reason} disabled={busy} onChange={e => setReason(e.target.value)} /> : <>
@@ -71,7 +75,7 @@ export function UsageChargeForm({ kind, chart }: { kind: AgreementKind; chart: R
         {created && <p role="status">Created <Link to={`/invoices/${created.id}`} className="underline">{created.invoice_number}</Link> · {created.grand_total}</p>}
         {result?.charges.data.map(charge => <article key={charge.id} className="space-y-2 border-t pt-2"><p>{charge.calculation.description} · {charge.calculation.currency} {charge.amount}</p>
             {charge.invoices.map(invoice => <p key={invoice.id}><Link to={`/invoices/${invoice.id}`} className="underline">{invoice.number}</Link> · {invoice.status}</p>)}
-            {charge.voided_at ? <p>Voided: {charge.void_reason}</p> : chart.status === RunningChartStatus.Finalized && charge.invoices.length > 0 && charge.invoices.every(invoice => RELEASED.has(invoice.status)) && <div className="flex gap-2"><Button variant="secondary" disabled={busy} onClick={() => choose(charge, ChargeAction.Reissue)}>Reissue charge</Button><Button variant="secondary" disabled={busy} onClick={() => choose(charge, ChargeAction.Void)}>Void charge</Button></div>}
+            {charge.voided_at ? <p>Voided: {charge.void_reason}</p> : chart.status === RunningChartStatus.Finalized && charge.invoices.every(invoice => RELEASED.has(invoice.status)) && <div className="flex gap-2">{charge.invoices.length > 0 && <Button variant="secondary" disabled={busy} onClick={() => choose(charge, ChargeAction.Reissue)}>Reissue charge</Button>}<Button variant="secondary" disabled={busy} onClick={() => choose(charge, ChargeAction.Void)}>Void charge</Button></div>}
         </article>)}
         {result && result.charges.last_page > 1 && <div className="flex gap-2"><Button disabled={busy || page === 1} onClick={() => setPage(page - 1)}>Previous</Button><span>Page {page} of {result.charges.last_page}</span><Button disabled={busy || page === result.charges.last_page} onClick={() => setPage(page + 1)}>Next</Button></div>}
         <Button variant="secondary" disabled={busy} onClick={() => { setResult(null); setSelected(null); setAction(ChargeAction.Create); setAccepted(false); setRevision(value => value + 1); }}>Reload charges</Button>

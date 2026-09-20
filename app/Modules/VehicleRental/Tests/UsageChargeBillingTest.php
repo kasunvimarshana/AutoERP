@@ -14,6 +14,8 @@ use Modules\Invoice\Services\InvoiceStatusService;
 use Modules\Tax\Services\TaxMasterDataService;
 use Modules\VehicleRental\Enums\AgreementAction;
 use Modules\VehicleRental\Enums\AgreementKind;
+use Modules\VehicleRental\Enums\MileagePolicy;
+use Modules\VehicleRental\Enums\RentalBasis;
 use Modules\VehicleRental\Enums\RunningChartAction;
 use Modules\VehicleRental\Enums\UsageChargeComponent;
 use Modules\VehicleRental\Enums\UsageChargePolicy;
@@ -21,6 +23,7 @@ use Modules\VehicleRental\Enums\VehicleUseAction;
 use Modules\VehicleRental\Models\CustomerUsageCharge;
 use Modules\VehicleRental\Models\OwnerUsageCharge;
 use Modules\VehicleRental\Services\AgreementService;
+use Modules\VehicleRental\Services\MileageAllowance;
 use Modules\VehicleRental\Services\RentalAuthorization;
 use Modules\VehicleRental\Services\RunningChartService;
 use Modules\VehicleRental\Services\UsageChargeBilling;
@@ -98,6 +101,125 @@ final class UsageChargeBillingTest extends TestCase
                 $this->assertDatabaseCount('vehicle_rental_customer_usage_charges', 0);
             }
         }, ['normal_ot_minutes' => 2147483647], ['normal_ot_rate' => '99999999999999.999999']);
+    }
+
+    public function test_mileage_pool_is_shared_across_charts_and_zero_assessments_are_preserved(): void
+    {
+        $this->billable(function ($ctx, $c, $o, $chart): void {
+            $service = app(UsageChargeBilling::class);
+            $quote = $service->previewMileage(AgreementKind::Customer, $ctx, $chart->id);
+            $this->assertSame('100.000000', $quote['allowance']);
+            $this->assertSame('0.000000', $quote['amount']);
+            $first = $service->assessMileage(AgreementKind::Customer, $ctx, $chart->id, $this->mileageInput($c, $chart, $quote));
+            $this->assertNull($first['invoice']);
+            $this->assertDatabaseCount('invoices', 0);
+            $next = $this->nextMileageChart($ctx, $chart, '90');
+            $quote = $service->previewMileage(AgreementKind::Customer, $ctx, $next->id);
+            $this->assertSame('60.000000', $quote['included_applied']);
+            $this->assertSame('30.000000', $quote['excess_km']);
+            $this->assertSame('2700.000000', $quote['amount']);
+            $second = $service->assessMileage(AgreementKind::Customer, $ctx, $next->id, $this->mileageInput($c, $next, $quote));
+            $this->assertSame('2700.000000', $second['invoice']->grand_total);
+            $this->assertSame('2026-09-08', $second['invoice']->documentSnapshot->supply_period_start->toDateString());
+            $this->assertSame('2026-09-08', $second['invoice']->documentSnapshot->supply_period_end->toDateString());
+            $this->assertDatabaseCount('vehicle_rental_customer_usage_charges', 2);
+            $this->expectException(ConflictHttpException::class);
+            $service->assessMileage(AgreementKind::Customer, $ctx, $chart->id, $this->mileageInput($c, $chart, $quote));
+        }, ['starts_at' => '2026-09-07T09:00:00+00:00', 'ends_at' => '2026-09-07T17:00:00+00:00', 'commercial_km' => '40'], ['included_km' => '100', 'excess_km_rate' => '90']);
+    }
+
+    public function test_mileage_corrections_unwind_dependencies_and_preserve_both_sides(): void
+    {
+        $this->billable(function ($ctx, $c, $o, $chart): void {
+            $service = app(UsageChargeBilling::class);
+            $quote = $service->previewMileage(AgreementKind::Customer, $ctx, $chart->id);
+            $first = $service->assessMileage(AgreementKind::Customer, $ctx, $chart->id, $this->mileageInput($c, $chart, $quote));
+            $next = $this->nextMileageChart($ctx, $chart, '90');
+            $quote = $service->previewMileage(AgreementKind::Customer, $ctx, $next->id);
+            $second = $service->assessMileage(AgreementKind::Customer, $ctx, $next->id, $this->mileageInput($c, $next, $quote));
+            $command = $this->input($c, $chart) + ['expected_charge_version' => 1, 'reason' => 'Correction'];
+            try {
+                $service->void(AgreementKind::Customer, $ctx, $chart->id, $first['assessment']['id'], $command);
+                $this->fail('Voided an assessment with surviving dependents.');
+            } catch (ConflictHttpException) {
+                $this->assertNull(CustomerUsageCharge::query()->findOrFail($first['assessment']['id'])->voided_at);
+            }
+            $invoice = $second['invoice'];
+            app(InvoiceStatusService::class)->transitionIfVersion($invoice, InvoiceStatus::Cancelled, $invoice->row_version, $ctx->actorId, 'Correct mileage');
+            $service->void(AgreementKind::Customer, $ctx, $next->id, $second['assessment']['id'], $command + ['expected_chart_version' => $next->row_version]);
+            $service->void(AgreementKind::Customer, $ctx, $chart->id, $first['assessment']['id'], $command);
+            $quote = $service->previewMileage(AgreementKind::Customer, $ctx, $next->id);
+            $this->assertSame('0.000000', $quote['amount']);
+            $owner = $service->previewMileage(AgreementKind::Owner, $ctx, $chart->id);
+            $this->assertSame('0', $owner['prior_distance']);
+            $this->assertDatabaseCount('vehicle_rental_customer_usage_charges', 2);
+        }, ['starts_at' => '2026-09-07T09:00:00+00:00', 'ends_at' => '2026-09-07T17:00:00+00:00', 'commercial_km' => '40'], ['included_km' => '100', 'excess_km_rate' => '90']);
+    }
+
+    public function test_mileage_quote_revision_and_cumulative_rounding_prevent_stale_or_lost_amounts(): void
+    {
+        $this->billable(function ($ctx, $c, $o, $chart): void {
+            $service = app(UsageChargeBilling::class);
+            $next = $this->nextMileageChart($ctx, $chart, '0.000001');
+            $old = $service->previewMileage(AgreementKind::Customer, $ctx, $next->id);
+            $firstQuote = $service->previewMileage(AgreementKind::Customer, $ctx, $chart->id);
+            $first = $service->assessMileage(AgreementKind::Customer, $ctx, $chart->id, $this->mileageInput($c, $chart, $firstQuote));
+            $this->assertNull($first['invoice']);
+            try {
+                $service->assessMileage(AgreementKind::Customer, $ctx, $next->id, $this->mileageInput($c, $next, $old));
+                $this->fail('Stale allowance quote accepted.');
+            } catch (ConflictHttpException) {
+                $this->assertDatabaseCount('vehicle_rental_customer_usage_charges', 1);
+            }
+            $quote = $service->previewMileage(AgreementKind::Customer, $ctx, $next->id);
+            $this->assertSame('0.000001', $quote['amount']);
+            $second = $service->assessMileage(AgreementKind::Customer, $ctx, $next->id, $this->mileageInput($c, $next, $quote));
+            $this->assertSame('0.000001', $second['invoice']->grand_total);
+        }, ['starts_at' => '2026-09-07T09:00:00+00:00', 'ends_at' => '2026-09-07T17:00:00+00:00', 'commercial_km' => '0.000001'], ['included_km' => '0', 'excess_km_rate' => '0.500001']);
+    }
+
+    public function test_mileage_calendar_cycles_partial_months_and_unsplittable_evidence(): void
+    {
+        $this->billable(function ($ctx, $c, $o, $chart): void {
+            $calculator = app(MileageAllowance::class);
+            $terms = ['included_km' => '2800', 'excess_km_rate' => '90'];
+            $c->starts_on = '2026-01-31';
+            $c->ends_on = '2026-02-13';
+            $chart->starts_at = '2026-02-01 09:00:00';
+            $chart->ends_at = '2026-02-01 17:00:00';
+            $quote = $calculator->quote(AgreementKind::Customer, $ctx, $c, $chart, $terms);
+            $this->assertSame(28, $quote['cycle_days']);
+            $this->assertSame(14, $quote['covered_days']);
+            $this->assertSame('1400.000000', $quote['allowance']);
+            $c->ends_on = null;
+            $chart->starts_at = '2026-03-01 09:00:00';
+            $chart->ends_at = '2026-03-01 17:00:00';
+            $quote = $calculator->quote(AgreementKind::Customer, $ctx, $c, $chart, $terms);
+            $this->assertSame('2026-02-28', $quote['cycle_from']);
+            $this->assertSame('2026-03-30', $quote['cycle_until']);
+            $this->assertSame(31, $quote['cycle_days']);
+            $c->basis = RentalBasis::Daily;
+            $quote = $calculator->quote(AgreementKind::Customer, $ctx, $c, $chart, $terms);
+            $this->assertSame('2026-03-01', $quote['cycle_from']);
+            $this->assertSame('2026-03-01', $quote['cycle_until']);
+            $chart->ends_at = '2026-03-02 01:00:00';
+            $this->expectException(ValidationException::class);
+            $calculator->quote(AgreementKind::Customer, $ctx, $c, $chart, $terms);
+        }, ['commercial_km' => '40']);
+    }
+
+    private function mileageInput($agreement, $chart, array $quote): array
+    {
+        return array_replace($this->input($agreement, $chart), ['policy' => MileagePolicy::CommercialCalendarCycles->value, 'expected_pool_head' => $quote['pool_head'], 'expected_timezone' => $quote['timezone']]);
+    }
+
+    private function nextMileageChart($context, $chart, string $distance)
+    {
+        $use = $chart->vehicleUse;
+        $service = app(RunningChartService::class);
+        $next = $service->create($context, $use->id, $use->row_version, ['reference' => 'MILEAGE-NEXT', 'starts_at' => '2026-09-08T09:00:00+00:00', 'ends_at' => '2026-09-08T17:00:00+00:00', 'commercial_km' => $distance]);
+
+        return $service->change($context, $next->id, $next->row_version, RunningChartAction::Finalize);
     }
 
     private function billable(callable $work, array $facts = [], array $terms = []): void

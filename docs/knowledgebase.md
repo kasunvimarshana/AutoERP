@@ -2,7 +2,7 @@
 
 **Status:** Canonical working domain reference; evidence gaps remain; not a completed implementation or exhaustive audiovisual audit
 
-**Knowledge refresh date:** 2026-09-12 (base-rent and recorded OT/night-out billing; audiovisual coverage remains incomplete)
+**Knowledge refresh date:** 2026-09-15 (commercial mileage allowance assessment; audiovisual coverage remains incomplete)
 
 **Primary business source of truth and conflict tie-breaker:** TACGL legacy application/data corpus
 
@@ -12,7 +12,7 @@
 
 **Initial architecture baseline:** `d4aaa693706c2d3fe693244c8ea0f8d9e4ae326c`
 
-**Latest implemented baseline reviewed:** `d9695b897f2be2707b6334bdb17dffba3679f2be`, plus the fresh [vehicle-use and Running Chart contract](vehicle-rental/operations.md). Operational capture, [base-rent estimation](vehicle-rental/base-rent.md) and [base-rent billing](vehicle-rental/base-billing.md) are implemented. Recorded OT/night-out billing is implemented in this update. Mileage and other commercial components and complete audiovisual review remain outstanding. The [commercial research](vehicle-rental/commercial-research.md) distinguishes external evidence, implementation contracts and the shared Tax corrections.
+**Latest implemented baseline reviewed:** `9ce214406c91499ae3be658166866bd762c04a83`, plus the fresh [vehicle-use and Running Chart contract](vehicle-rental/operations.md). Operational capture, [base-rent estimation](vehicle-rental/base-rent.md) and [base-rent billing](vehicle-rental/base-billing.md) are implemented. Recorded OT/night-out and explicit-policy commercial mileage assessment are implemented. Other commercial components and complete audiovisual review remain outstanding. The [commercial research](vehicle-rental/commercial-research.md) distinguishes external evidence, implementation contracts and the shared Tax corrections.
 
 **TACGL source file:** `TACGL.zip`
 
@@ -1108,7 +1108,7 @@ These items are intentionally **not solved by guessing**.
 |---|---|---|---|
 | VR-U01 | Partial-month monthly-rental proration formula | Unresolved | Do not invent divisor/calendar rule; require explicit policy/configuration before production calculation |
 | VR-U02 | Exact Monthly basis day-count convention | Unresolved | No hardcoded 30/31/actual-days assumption |
-| VR-U03 | Included/free-KM pooling/reset across days/months/replacements | Unresolved | Do not pool/reset automatically without policy |
+| VR-U03 | Included/free-KM pooling/reset across days/months/replacements | Historical TACGL convention unproven; explicit implementation policy delivered | Section 40 defines the selected calendar-cycle pool, replacement sharing and correction rules; do not represent it as a universal tariff |
 | VR-U04 | Replacement-day charging and split between original/replacement vehicle | Unresolved | Preserve lineage; block automatic commercial treatment until configured |
 | VR-U05 | Downtime/off-road deduction formula | Unresolved | Availability may block use; financial deduction needs explicit policy |
 | VR-U06 | Garage mileage billability/payability | Unresolved | Record evidence separately; do not assume customer/owner treatment |
@@ -1641,3 +1641,16 @@ The operator sees a server-generated quantity/rate/amount quote before acceptanc
 The physical vehicle mutex precedes agreement/chart/charge locks. Only one non-voided charge per chart/component/side is permitted. Invoice cancellation/reversal permits unchanged-charge reissue; void additionally records expected charge revision, reason, actor and timestamp and requires all invoices released. Voiding preserves history and permits a replacement charge. Chart reversal now rejects any non-voided charge on either side, even after invoice cancellation, until the assessment itself is voided. Customer consumption never consumes owner entitlement. Missing owner supply cannot be billed as an owner payable.
 
 Two explicit tenant-safe usage-charge tables preserve mandatory agreement/chart ownership without nullable polymorphic agreement relationships or inverse Invoice pointers. Shared `RentalCharge` immutability and `RentalChargeDocuments` handoff/void logic serve both base and usage charges. Canonical Invoice/Tax/Finance modules own their existing responsibilities. Authenticated APIs, guided register/vehicle-chart UI, real-login negative cases and both-side Finance posting/reversal tests cover this workflow. This entry does not close mileage allowances, AC/driver-base charges, deposits, replacement/downtime commercial policy, monthly withholding aggregation or production/UAT gates.
+
+
+## 40. Commercial mileage pools and assessments — 2026-09-15
+
+The [mileage-billing contract](vehicle-rental/mileage-billing.md) implements the explicitly accepted `commercial_calendar_cycles_v1` convention. Daily agreements receive an allowance per civil day; monthly agreements per original-start anniversary cycle. An explicitly shortened final contract cycle prorates included KM by actual covered/full-cycle days. No carry-forward is applied between cycles. Customer original/replacement charts share the same agreement pool; owner agreement pools remain independent. This is an implementation decision supported by the existing model and user-authorized research, not proof of TACGL's historical convention. External rental examples differ; none supplies AutoERP's numeric defaults.
+
+Use finalized recorded commercial KM and explicit included-KM/excess-rate terms from the assigned agreement revision. Never substitute total odometer distance or automatically classify garage mileage. Unknown is not zero. The initial resolved workspace timezone is displayed and frozen by the first assessment for that agreement, even if later voided. A chart must fit within one covered cycle; no guessed distribution of distance across boundaries is permitted. Original-anchor arithmetic preserves short-month anniversary recovery.
+
+Compute cumulative excess at the agreed rate, quantize once to six decimals, and subtract surviving previous assessment amounts. Preserve prior totals, pool head, applied included distance, excess KM, rate, currency, policy, timezone and source revisions. Known zero-cost assessments persist without an Invoice so allowance cannot be reused. Positive assessments create canonical Invoice drafts atomically; the Invoice supply dates describe actual chart coverage, not a future full allowance cycle. Quote acceptance checks chart/agreement revisions, pool head and timezone under source locks.
+
+An Invoice cancellation does not release the allowance assessment. Reissue preserves it. Voiding requires released invoices and no later surviving mileage assessment in that same cycle. Reverse-order correction prevents an early free-KM release from leaving later excess charges overstated. Retain void history and require both sides' assessments released before physical chart reversal. Zero assessments require no nonexistent financial release, but cannot create zero-value invoices. Existing side-specific usage-charge tables and two explicit cycle indexes support this workflow without new inverse relationships or cached allowance balances.
+
+The API and chart UI provide pricing review, explicit policy acceptance, zero-cost completion, stale-quote recovery and existing charge corrections. The supplied protected backup still has no verified password; it did not block this policy-backed implementation. Whole-distance hire, other commercial tariffs, deposits and broader production acceptance are not established by this mileage workflow.

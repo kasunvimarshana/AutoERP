@@ -15,6 +15,7 @@ use Modules\Vehicle\Models\Vehicle;
 use Modules\VehicleRental\Constants\AgreementFields;
 use Modules\VehicleRental\Data\AgreementContext;
 use Modules\VehicleRental\Enums\AgreementKind;
+use Modules\VehicleRental\Enums\MileagePolicy;
 use Modules\VehicleRental\Enums\RunningChartStatus;
 use Modules\VehicleRental\Enums\UsageChargeComponent;
 use Modules\VehicleRental\Enums\UsageChargePolicy;
@@ -29,7 +30,50 @@ use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 final class UsageChargeBilling
 {
     public function __construct(private readonly RunningChartService $charts, private readonly AgreementService $agreements,
-        private readonly RentalAuthorization $authorization, private readonly RentalChargeDocuments $documents, private readonly InvoiceSourceService $sources) {}
+        private readonly RentalAuthorization $authorization, private readonly RentalChargeDocuments $documents, private readonly InvoiceSourceService $sources, private readonly MileageAllowance $mileage) {}
+
+    public function previewMileage(AgreementKind $kind, AgreementContext $context, int $chartId): array
+    {
+        [$chart, $agreement] = $this->scope($kind, $context, $chartId);
+        $versionField = $kind->value.'_agreement_version';
+        $revision = $agreement->history()->where('row_version', $chart->vehicleUse->$versionField)->sole();
+
+        return $this->mileage->quote($kind, $context, $agreement, $chart, $revision->snapshot['terms'])
+            + ['agreement' => ['reference' => $agreement->reference, 'version' => $agreement->row_version]];
+    }
+
+    public function assessMileage(AgreementKind $kind, AgreementContext $context, int $chartId, array $input): array
+    {
+        $data = $this->documents->documentInput($input) + Validator::make($input, [
+            'policy' => ['required', Rule::enum(MileagePolicy::class)],
+            'expected_pool_head' => ['required', 'integer', 'min:'.MileagePolicy::EMPTY_POOL_REVISION],
+            'expected_timezone' => ['required', 'string'],
+        ])->validate();
+
+        return $this->locked($kind, $context, $chartId, $input, function (Agreement $agreement, RunningChart $chart) use ($kind, $context, $data): array {
+            $class = $this->chargeClass($kind);
+            if ($class::query()->forContext($context->tenantId, $context->organizationUnitId)->where('running_chart_id', $chart->id)
+                ->where('component', MileagePolicy::COMPONENT)->whereNull('voided_at')->lockForUpdate()->first(['id']) !== null) {
+                throw new ConflictHttpException('Mileage for this chart is already assessed on this side. Review its recorded assessment.');
+            }
+            $versionField = $kind->value.'_agreement_version';
+            $revision = $agreement->history()->where('row_version', $chart->vehicleUse->$versionField)->sole();
+            $calculation = $this->mileage->quote($kind, $context, $agreement, $chart, $revision->snapshot['terms']);
+            if ($calculation['pool_head'] !== (int) $data['expected_pool_head'] || $calculation['timezone'] !== $data['expected_timezone']) {
+                throw new ConflictHttpException('This mileage allowance changed. Review a new quote before assessing.');
+            }
+            $calculation += ['agreement' => ['id' => $agreement->id, 'reference' => $agreement->reference, 'version' => $revision->row_version, 'kind' => $kind->value],
+                'chart' => ['id' => $chart->id, 'reference' => $chart->reference, 'version' => $chart->row_version, 'starts_at' => $chart->starts_at_input, 'ends_at' => $chart->ends_at_input],
+                'description' => 'Excess distance · '.$chart->reference.' · '.$calculation['excess_km'].' km at '.$calculation['rate'].'/km'];
+            $charge = new $class;
+            $charge->forceFill(['tenant_id' => $context->tenantId, 'organization_unit_id' => $context->organizationUnitId, 'agreement_id' => $agreement->id,
+                'running_chart_id' => $chart->id, 'row_version' => AgreementFields::INITIAL_VERSION, 'component' => MileagePolicy::COMPONENT, 'period_from' => $calculation['cycle_from'], 'period_until' => $calculation['cycle_until'],
+                'amount' => $calculation['amount'], 'calculation' => $calculation, 'actor_id' => $context->actorId])->save();
+            $invoice = bccomp($charge->amount, AgreementFields::ZERO, AgreementFields::DECIMAL_SCALE) > 0 ? $this->issue($kind, $context, $agreement, $charge, $data) : null;
+
+            return ['assessment' => ['id' => $charge->id, 'row_version' => $charge->row_version, 'calculation' => $calculation], 'invoice' => $invoice];
+        });
+    }
 
     public function create(AgreementKind $kind, AgreementContext $context, int $chartId, array $input): Invoice
     {
@@ -92,7 +136,9 @@ final class UsageChargeBilling
     {
         $data = $this->documents->voidInput($input);
         $this->locked($kind, $context, $chartId, $input, function (Agreement $agreement, RunningChart $chart) use ($kind, $context, $chargeId, $data): void {
-            $this->documents->void($this->findCharge($kind, $context, $chart, $chargeId), UsageChargeSource::forKind($kind)->value, $context, $data);
+            $charge = $this->findCharge($kind, $context, $chart, $chargeId);
+            $this->mileage->assertReversible($kind, $context, $charge);
+            $this->documents->void($charge, UsageChargeSource::forKind($kind)->value, $context, $data);
         });
     }
 
@@ -179,6 +225,10 @@ final class UsageChargeBilling
 
     private function issue(AgreementKind $kind, AgreementContext $context, Agreement $agreement, RentalCharge $charge, array $data): Invoice
     {
+        if (bccomp($charge->amount, AgreementFields::ZERO, AgreementFields::DECIMAL_SCALE) === 0) {
+            throw ValidationException::withMessages(['amount' => ['This zero-cost mileage assessment needs no invoice.']]);
+        }
+
         return $this->documents->issue($kind, $context, $agreement, $charge, UsageChargeSource::forKind($kind)->value, $charge->calculation['description'], $data);
     }
 

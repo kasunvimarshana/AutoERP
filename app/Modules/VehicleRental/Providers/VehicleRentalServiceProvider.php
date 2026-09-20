@@ -22,7 +22,10 @@ final class VehicleRentalServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->app->make(PermissionDefinitionRegistryInterface::class)->register(TenantFeature::VEHICLE_RENTAL, RentalAuthorization::descriptions());
-        $this->loadMigrationsFrom(__DIR__.'/../Database/Migrations');
+        $this->loadMigrationsFrom([
+            __DIR__.'/../Database/Migrations',
+            __DIR__.'/../Database/UpgradeMigrations',
+        ]);
         $this->loadRoutesFrom(__DIR__.'/../Routes/api.php');
     }
 }

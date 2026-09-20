@@ -14,6 +14,7 @@ use Modules\Vehicle\Enums\VehicleOwnershipType;
 use Modules\Vehicle\Enums\VehicleOwnerType;
 use Modules\VehicleRental\Data\AgreementContext;
 use Modules\VehicleRental\Enums\BaseRentPolicy;
+use Modules\VehicleRental\Enums\MileagePolicy;
 use Modules\VehicleRental\Services\RentalAuthorization;
 use Tests\Support\ActiveTenantSubscriptionFixture;
 use Tests\Support\OrganizationUnitFixture;
@@ -78,6 +79,7 @@ final class AuthenticatedRentalJourneyTest extends TestCase
         $this->postJson(self::ROOT.'/running-charts/1/customer/charges', [])->assertUnauthorized();
         [, $customerInput, $ownerInput] = $this->loginFixture(modules: [TenantFeature::VEHICLE_RENTAL, TenantFeature::INVOICE]);
         $customerInput['terms']['normal_ot_rate'] = '500';
+        $customerInput['terms']['included_km'] = '100';
         $ownerInput['terms']['normal_ot_rate'] = '250';
         $customer = $this->activate('customer', $customerInput);
         $owner = $this->activate('owner', $ownerInput);
@@ -88,7 +90,7 @@ final class AuthenticatedRentalJourneyTest extends TestCase
         $use = $this->postJson(self::ROOT.'/vehicle-uses/'.$use['id'].'/handover', ['expected_version' => $use['row_version'],
             'occurred_at' => '2026-09-07T09:00:00+05:30', 'reason' => 'Collected'])->assertOk()->json('data');
         $chart = $this->postJson(self::ROOT.'/vehicle-uses/'.$use['id'].'/running-charts', ['expected_version' => $use['row_version'],
-            'reference' => 'AUTH-OT', 'starts_at' => '2026-09-07T09:00:00+05:30', 'ends_at' => '2026-09-07T18:00:00+05:30', 'normal_ot_minutes' => 90,
+            'reference' => 'AUTH-OT', 'starts_at' => '2026-09-07T09:00:00+05:30', 'ends_at' => '2026-09-07T18:00:00+05:30', 'normal_ot_minutes' => 90, 'commercial_km' => '40',
         ])->assertCreated()->json('data');
         $path = self::ROOT.'/running-charts/'.$chart['id'];
         $input = ['expected_version' => $customer['row_version'], 'expected_chart_version' => $chart['row_version'], 'invoice_date' => '2026-09-10',
@@ -105,13 +107,22 @@ final class AuthenticatedRentalJourneyTest extends TestCase
         $charge = $list['charges']['data'][0];
         $this->postJson($path.'/customer/charges/'.$charge['id'].'/void', $input + ['expected_charge_version' => $charge['row_version'], 'reason' => 'Invalid while live'])->assertConflict();
         $this->postJson($path.'/reverse', ['expected_version' => $chart['row_version'], 'reason' => 'Consumed'])->assertConflict();
+        $quote = $this->getJson($path.'/customer/charges/mileage')->assertOk()->assertJsonPath('amount', '0.000000')->json();
+        $mileageInput = array_replace($input, ['policy' => MileagePolicy::CommercialCalendarCycles->value,
+            'expected_pool_head' => $quote['pool_head'], 'expected_timezone' => $quote['timezone']]);
+        $assessment = $this->postJson($path.'/customer/charges/mileage', $mileageInput)->assertCreated()->assertJsonPath('invoice', null)->json('assessment');
+        $this->postJson($path.'/customer/charges/mileage', $mileageInput)->assertConflict();
+        $this->postJson($path.'/customer/charges/'.$assessment['id'].'/void', $input + ['expected_charge_version' => $assessment['row_version'], 'reason' => 'Correction'])->assertNoContent();
+        $quote = $this->getJson($path.'/owner/charges/mileage')->assertOk()->assertJsonPath('amount', '2400.000000')->json();
+        $this->postJson($path.'/owner/charges/mileage', array_replace($mileageInput, ['expected_version' => $owner['row_version'],
+            'expected_pool_head' => $quote['pool_head'], 'expected_timezone' => $quote['timezone']]))->assertCreated()->assertJsonPath('invoice.grand_total', '2400.000000');
         $this->loginFixture(permissions: [RentalAuthorization::CHART_VIEW, RentalAuthorization::CUSTOMER_VIEW], modules: [TenantFeature::VEHICLE_RENTAL, TenantFeature::INVOICE]);
         $this->getJson($path.'/customer/charges')->assertForbidden();
         $this->loginFixture(modules: [TenantFeature::VEHICLE_RENTAL, TenantFeature::INVOICE]);
         $this->postJson($path.'/customer/charges', $input)->assertNotFound();
         $this->loginFixture();
         $this->postJson($path.'/customer/charges', $input)->assertForbidden();
-        $this->assertDatabaseCount('invoices', 2);
+        $this->assertDatabaseCount('invoices', 3);
     }
 
     protected function setUp(): void

@@ -46,6 +46,8 @@ Route::prefix('api/v1/vehicle-rental')->middleware([
     Route::get('vehicle-uses', [VehicleUseController::class, 'register']);
     Route::prefix('running-charts/{chart}/{kind}/charges')->whereNumber('chart')->whereIn('kind', array_column(AgreementKind::cases(), 'value'))->middleware('tenant.feature:'.TenantFeature::INVOICE)->group(function (): void {
         Route::get('/', [UsageChargeBillingController::class, 'index']);
+        Route::get('mileage', [UsageChargeBillingController::class, 'previewMileage']);
+        Route::post('mileage', [UsageChargeBillingController::class, 'assessMileage']);
         Route::post('/', [UsageChargeBillingController::class, 'store']);
         Route::post('{charge}/reissue', [UsageChargeBillingController::class, 'reissue'])->whereNumber('charge');
         Route::post('{charge}/void', [UsageChargeBillingController::class, 'void'])->whereNumber('charge');

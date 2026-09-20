@@ -6,7 +6,7 @@
 
 **Engineering authority:** latest `worktree-0.0.8`
 
-**Engineering baseline audited before this update:** `d9695b897f2be2707b6334bdb17dffba3679f2be`
+**Engineering baseline audited before this update:** `9ce214406c91499ae3be658166866bd762c04a83`
 
 **Old Rental implementation:** must not be restored, copied, revived, cherry-picked, or used as an implementation dependency
 
@@ -14,9 +14,19 @@
 
 **Last evidence/reconciliation update:** 2026-09-11 (external commercial/tax research and Tax integrity fixes; audiovisual coverage incomplete)
 
-**Delivery status:** Fresh agreement and bounded/open-ended vehicle-use/custody and atomic replacement APIs/UI, Running Chart draft/finalize/reverse/correction history, permissions and reciprocal workshop admission are implemented. Base-rent charges and Invoice/Finance handoff are implemented. Recorded OT/night-out charge workflows are implemented. Mileage and other commercial charges, deposits, replacement charging, driver identity and full production acceptance remain outstanding.
+**Delivery status:** Fresh agreement and bounded/open-ended vehicle-use/custody and atomic replacement APIs/UI, Running Chart draft/finalize/reverse/correction history, permissions and reciprocal workshop admission are implemented. Base-rent charges and Invoice/Finance handoff are implemented. Recorded OT/night-out charge workflows are implemented. Explicit-policy commercial mileage assessment is implemented. Other commercial tariffs, deposits, replacement surcharges, driver identity and full production acceptance remain outstanding.
 
 ---
+
+## Commercial mileage delivery — 2026-09-15
+
+- [x] Explicit daily/monthly agreement-cycle allowances, actual-days final-cycle proration and timezone snapshots.
+- [x] Shared customer allowance across charts/replacement vehicles, independent owner pools and no cross-cycle carry-forward.
+- [x] Exact cumulative pricing, zero-cost consumption, stale-quote checks and immutable financial/source history.
+- [x] Reverse-order correction guards and existing Invoice/Tax/Finance handoff.
+- [x] Guided quote/assessment UI, authenticated API, arithmetic/boundary/correction tests and cycle indexes.
+
+See [mileage-billing.md](mileage-billing.md). Whole-distance hire and other tariffs are separate from this explicit excess-KM convention.
 
 ## Recorded OT/night-out billing delivery — 2026-09-12
 
@@ -187,7 +197,7 @@ These are **not optional guesses**. Implement only after business evidence/confi
 
 - [ ] **VR-U01:** Confirm partial-month monthly-rental proration formula.
 - [ ] **VR-U02:** Confirm monthly day-count convention if proration exists.
-- [ ] **VR-U03:** Confirm included/free-KM pooling/reset policy across days, months, and replacements.
+- [x] **VR-U03:** Implement the explicitly selected calendar-cycle allowance/reset and replacement-sharing policy in section 40. Historical TACGL convention remains unproven; do not apply this policy silently to a different tariff.
 - [ ] **VR-U04:** Confirm replacement-day/period charging rule.
 - [ ] **VR-U05:** Confirm downtime/off-road financial deduction rule.
 - [ ] **VR-U06:** Confirm garage-mileage customer/owner treatment.

@@ -45,7 +45,7 @@ final class RentalChargeDocuments
             invoiceDate: $data['invoice_date'], dueDate: $data['due_date'] ?? null, currencyId: $agreement->currency_id, exchangeRate: $data['exchange_rate'],
             partyType: $customer ? InvoicePartyType::Customer->value : InvoicePartyType::Supplier->value,
             partyId: $customer ? $agreement->customer_id : $agreement->supplier_id, createdBy: $context->actorId,
-            supplyPeriodStart: $charge->period_from, supplyPeriodEnd: $charge->period_until,
+            supplyPeriodStart: $charge->calculation['supply_from'] ?? $charge->period_from, supplyPeriodEnd: $charge->calculation['supply_until'] ?? $charge->period_until,
             lines: [new InvoiceLineData(lineNumber: self::FIRST_LINE, description: $description, quantity: self::WHOLE_CHARGE,
                 unitPrice: $charge->amount, lineType: InvoiceLineType::Service, sourceLineType: $sourceType, sourceLineId: $charge->id)],
             sources: [new InvoiceSourceData(tenantId: $context->tenantId, organizationUnitId: $context->organizationUnitId, sourceType: $sourceType, sourceId: $charge->id,

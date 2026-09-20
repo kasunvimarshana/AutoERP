@@ -15,6 +15,18 @@ final class UsageChargeBillingController
 {
     public function __construct(private readonly UsageChargeBilling $billing) {}
 
+    public function previewMileage(AgreementRequest $request, int $chart, string $kind): JsonResponse
+    {
+        return response()->json($this->billing->previewMileage(AgreementKind::from($kind), $request->context(), $chart));
+    }
+
+    public function assessMileage(AgreementRequest $request, int $chart, string $kind): JsonResponse
+    {
+        $result = $this->billing->assessMileage(AgreementKind::from($kind), $request->context(), $chart, $request->all());
+
+        return response()->json(['assessment' => $result['assessment'], 'invoice' => $result['invoice'] === null ? null : new InvoiceResource($result['invoice'])], Response::HTTP_CREATED);
+    }
+
     public function store(AgreementRequest $request, int $chart, string $kind): JsonResponse
     {
         return (new InvoiceResource($this->billing->create(AgreementKind::from($kind), $request->context(), $chart, $request->all())))
