@@ -10,6 +10,7 @@ use Modules\VehicleRental\Enums\RunningChartAction;
 use Modules\VehicleRental\Enums\VehicleUseAction;
 use Modules\VehicleRental\Http\Controllers\AgreementController;
 use Modules\VehicleRental\Http\Controllers\BaseRentBillingController;
+use Modules\VehicleRental\Http\Controllers\DepositReceiptController;
 use Modules\VehicleRental\Http\Controllers\RunningChartController;
 use Modules\VehicleRental\Http\Controllers\UsageChargeBillingController;
 use Modules\VehicleRental\Http\Controllers\VehicleUseController;
@@ -34,6 +35,10 @@ Route::prefix('api/v1/vehicle-rental')->middleware([
         });
         Route::post('{agreement}/base-rent-preview', [AgreementController::class, 'previewBaseRent'])->whereNumber('agreement');
         Route::post('{agreement}/{action}', [AgreementController::class, 'transition'])->whereNumber('agreement')->whereIn('action', [AgreementAction::Activate->value, AgreementAction::Close->value]);
+    });
+    Route::prefix('customer/agreements/{agreement}/deposits')->whereNumber('agreement')->middleware('tenant.feature:'.TenantFeature::PAYMENT)->group(function (): void {
+        Route::get('/', [DepositReceiptController::class, 'index']);
+        Route::post('/', [DepositReceiptController::class, 'store']);
     });
     Route::get('customer/agreements/{agreement}/vehicles', [VehicleUseController::class, 'index'])->whereNumber('agreement');
     Route::post('customer/agreements/{agreement}/vehicles', [VehicleUseController::class, 'store'])->whereNumber('agreement');

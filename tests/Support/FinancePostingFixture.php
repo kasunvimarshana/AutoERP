@@ -41,6 +41,8 @@ final class FinancePostingFixture
 
     private const CUSTOMER_ADVANCE_ACCOUNT = '2300';
 
+    private const CUSTOMER_DEPOSIT_ACCOUNT = '2310';
+
     private const SALES_REVENUE_ACCOUNT = '4100';
 
     private const SERVICE_REVENUE_ACCOUNT = '4200';
@@ -63,6 +65,19 @@ final class FinancePostingFixture
             FinanceAccountRoleCode::RentalExpense->value => $accounts[FinanceAccountRoleCode::Expense->value],
             FinanceAccountRoleCode::TaxReceivable->value => $accounts[FinanceAccountRoleCode::TaxReceivable->value],
             FinanceAccountRoleCode::WithholdingPayable->value => $accounts[FinanceAccountRoleCode::WithholdingPayable->value],
+        ]);
+    }
+
+    public static function seedRentalDepositProfile(int $tenantId, ?int $organizationUnitId = null): void
+    {
+        $accounts = self::accounts($tenantId, $organizationUnitId);
+        $liability = self::accountType($tenantId, self::LIABILITY_TYPE, 'credit', 'balance_sheet');
+        $deposit = self::account($tenantId, $organizationUnitId, $liability, self::CUSTOMER_DEPOSIT_ACCOUNT, 'Customer Security Deposits', 'credit');
+        self::profile($tenantId, $organizationUnitId, FinancePostingProfileCode::RentalDeposit->value, [
+            FinanceAccountRoleCode::Cash->value => $accounts[FinanceAccountRoleCode::Cash->value],
+            FinanceAccountRoleCode::Bank->value => $accounts[FinanceAccountRoleCode::Bank->value],
+            FinanceAccountRoleCode::Receivable->value => $accounts[FinanceAccountRoleCode::Receivable->value],
+            FinanceAccountRoleCode::CustomerDeposit->value => $deposit,
         ]);
     }
 

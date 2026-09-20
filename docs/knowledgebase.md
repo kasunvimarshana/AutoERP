@@ -2,7 +2,7 @@
 
 **Status:** Canonical working domain reference; evidence gaps remain; not a completed implementation or exhaustive audiovisual audit
 
-**Knowledge refresh date:** 2026-09-15 (commercial mileage allowance assessment; audiovisual coverage remains incomplete)
+**Knowledge refresh date:** 2026-09-20 (customer security-deposit receipts and Payment disposition; audiovisual coverage remains incomplete)
 
 **Primary business source of truth and conflict tie-breaker:** TACGL legacy application/data corpus
 
@@ -12,7 +12,7 @@
 
 **Initial architecture baseline:** `d4aaa693706c2d3fe693244c8ea0f8d9e4ae326c`
 
-**Latest implemented baseline reviewed:** `9ce214406c91499ae3be658166866bd762c04a83`, plus the fresh [vehicle-use and Running Chart contract](vehicle-rental/operations.md). Operational capture, [base-rent estimation](vehicle-rental/base-rent.md) and [base-rent billing](vehicle-rental/base-billing.md) are implemented. Recorded OT/night-out and explicit-policy commercial mileage assessment are implemented. Other commercial components and complete audiovisual review remain outstanding. The [commercial research](vehicle-rental/commercial-research.md) distinguishes external evidence, implementation contracts and the shared Tax corrections.
+**Latest implemented baseline reviewed:** `f0ec8e6fff0eee82351367b06673ec604f7865dc`, plus the fresh [vehicle-use and Running Chart contract](vehicle-rental/operations.md). Operational capture, [base-rent estimation](vehicle-rental/base-rent.md) and [base-rent billing](vehicle-rental/base-billing.md) are implemented. Recorded OT/night-out, explicit-policy commercial mileage assessment and customer security-deposit receipt/disposition workflows are implemented. Other commercial components and complete audiovisual review remain outstanding. The [commercial research](vehicle-rental/commercial-research.md) distinguishes external evidence, implementation contracts and the shared Tax corrections.
 
 **TACGL source file:** `TACGL.zip`
 
@@ -1654,3 +1654,16 @@ Compute cumulative excess at the agreed rate, quantize once to six decimals, and
 An Invoice cancellation does not release the allowance assessment. Reissue preserves it. Voiding requires released invoices and no later surviving mileage assessment in that same cycle. Reverse-order correction prevents an early free-KM release from leaving later excess charges overstated. Retain void history and require both sides' assessments released before physical chart reversal. Zero assessments require no nonexistent financial release, but cannot create zero-value invoices. Existing side-specific usage-charge tables and two explicit cycle indexes support this workflow without new inverse relationships or cached allowance balances.
 
 The API and chart UI provide pricing review, explicit policy acceptance, zero-cost completion, stale-quote recovery and existing charge corrections. The supplied protected backup still has no verified password; it did not block this policy-backed implementation. Whole-distance hire, other commercial tariffs, deposits and broader production acceptance are not established by this mileage workflow.
+
+
+## 41. Customer security-deposit receipts and disposition
+
+The fresh customer agreement's positive, explicit deposit requirement now drives controlled partial Payment receipts. Null and zero cannot initiate collection; active terms must already be frozen. Rental derives party/currency/source and snapshots the agreement revision. Separate Payment permissions, entitlement, idempotency and validations apply. No additional deposit balance table or inverse relationship is introduced.
+
+Collection capacity includes all surviving receipts, including drafts, less active refunds. Application to an invoice does not release collection capacity. Version-check and lock the agreement, create/replay Payment atomically, then reject excess and roll back all new effects. An exact retry at the limit returns the same receipt. Drafts are not posted cash; void/reversal preserves history and releases capacity.
+
+Payment owns approval, posting, explicit invoice allocation, refund and reversal. Finance uses its configured customer-deposit liability and cash/bank/receivable roles. Refundable receipt is not rental revenue and does not itself generate an Invoice or sales tax. A deduction requires a justified underlying invoice and explicit allocation; return/closure does not imply forfeiture, refund or application priority. Refund reversal can restore excess security after recollection; preserve accounting truth, display the difference and block further receipts. Closed agreements retain disposition/history access but cannot initiate new collection.
+
+The full self-contained workflow, evidence, permissions, concurrency boundaries, relationships and correction cases are in [Customer security deposits](vehicle-rental/deposits.md). These are documented implementation decisions supported by current module contracts and primary-source distinctions about refundable security, not unverified historical TACGL defaults. The API/UI tests execute receipt → Finance posting → invoice application → partial refund → refund reversal → receipt reversal with authentic authorization and synthetic configured ledger mappings.
+
+The newly supplied TACGL(10).zip is byte-identical to TACGL(9).zip (SHA-256 `79c240494943437978754169c3360bb7c6e35d911ef8263c4b2d6b6246384d77`). Its file inventory adds no password candidate or new business evidence. The 2026-09-17 instruction copies preserve the same ownership, concurrency, explicit migration and audit-history requirements.

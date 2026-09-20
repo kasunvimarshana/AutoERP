@@ -14,7 +14,7 @@
 
 **Last evidence/reconciliation update:** 2026-09-11 (external commercial/tax research and Tax integrity fixes; audiovisual coverage incomplete)
 
-**Delivery status:** Fresh agreement and bounded/open-ended vehicle-use/custody and atomic replacement APIs/UI, Running Chart draft/finalize/reverse/correction history, permissions and reciprocal workshop admission are implemented. Base-rent charges and Invoice/Finance handoff are implemented. Recorded OT/night-out charge workflows are implemented. Explicit-policy commercial mileage assessment is implemented. Other commercial tariffs, deposits, replacement surcharges, driver identity and full production acceptance remain outstanding.
+**Delivery status:** Fresh agreement and bounded/open-ended vehicle-use/custody and atomic replacement APIs/UI, Running Chart draft/finalize/reverse/correction history, permissions and reciprocal workshop admission are implemented. Base-rent charges and Invoice/Finance handoff are implemented. Recorded OT/night-out charge workflows are implemented. Explicit-policy commercial mileage assessment is implemented. Customer security-deposit receipts and Payment disposition are implemented. Other commercial tariffs, replacement surcharges, driver identity and full production acceptance remain outstanding.
 
 ---
 
@@ -202,8 +202,8 @@ These are **not optional guesses**. Implement only after business evidence/confi
 - [ ] **VR-U05:** Confirm downtime/off-road financial deduction rule.
 - [ ] **VR-U06:** Confirm garage-mileage customer/owner treatment.
 - [ ] **VR-U07:** Confirm accident/insurance-excess responsibility rules.
-- [ ] **VR-U08:** Confirm security-deposit requirement/default policy.
-- [ ] **VR-U09:** Confirm deposit application/refund/forfeiture priority.
+- [x] **VR-U08:** Implement explicit positive customer-agreement security requirement with no inferred default; see `deposits.md`.
+- [x] **VR-U09:** Implement explicit authorized Payment allocation/refund and correction; no automatic priority or unsupported forfeiture. See `deposits.md`.
 - [ ] **VR-U10:** Confirm tax applicability by Rental component through Tax configuration.
 - [ ] **VR-U11:** Confirm/consume Tax-owner rounding policy; Rental must not invent one.
 - [ ] **VR-U12:** Confirm withholding applicability to owner settlements.
@@ -557,16 +557,16 @@ The normal operator should not manage technical relationship records directly.
 
 ## 25. Security deposit capability
 
-Implement only once deposit policies needed by the chosen release slice are confirmed.
+Implemented through current Payment ownership; see [deposit contract](deposits.md).
 
-- [ ] Store explicit agreement deposit requirement/fact.
-- [ ] Model append-only deposit movements rather than one mutable balance field as the sole history.
-- [ ] Link receipts through Payment identities; support multiple partial receipts.
-- [ ] Support application/refund/forfeiture only through confirmed policy/actions.
-- [ ] Recalculate balance from authoritative movements.
-- [ ] Guard each movement with tenant/party/agreement/payment identity validation.
-- [ ] Expose received/applied/refunded/forfeited/remaining amounts clearly.
-- [ ] Add reversal lineage rather than deleting movement history.
+- [x] Store explicit immutable agreement deposit requirement; distinguish null and zero.
+- [x] Preserve Payment receipt, allocation, refund, reversal and lifecycle history instead of a second Rental balance ledger.
+- [x] Link scoped receipts to the fresh agreement identity; allow partial receipts with capacity and idempotency checks.
+- [x] Apply/refund through authorized Payment actions; no automatic forfeiture or deduction without an underlying justified Invoice.
+- [x] Use Payment-owned authoritative balance projections and source receipts for collection capacity.
+- [x] Guard source, tenant, organization, party, currency and agreement revision; keep Payment movement version checks.
+- [x] Expose original/applied/refunded/unapplied amounts and document/posting status with human-readable payment links.
+- [x] Retain correction lineage; test refund reversal before original receipt reversal, and void/replacement.
 
 ---
 

@@ -8,6 +8,10 @@ use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Modules\Core\Tenancy\TenantFeature;
+use Modules\Invoice\Enums\InvoiceStatus;
+use Modules\Invoice\Models\Invoice;
+use Modules\Invoice\Services\InvoiceStatusService;
+use Modules\Payment\Constants\PaymentPermission;
 use Modules\User\Constants\UserGuard;
 use Modules\User\Constants\UserOrganizationUnitStatus;
 use Modules\Vehicle\Enums\VehicleOwnershipType;
@@ -17,6 +21,7 @@ use Modules\VehicleRental\Enums\BaseRentPolicy;
 use Modules\VehicleRental\Enums\MileagePolicy;
 use Modules\VehicleRental\Services\RentalAuthorization;
 use Tests\Support\ActiveTenantSubscriptionFixture;
+use Tests\Support\FinancePostingFixture;
 use Tests\Support\OrganizationUnitFixture;
 use Tests\Support\TenantAuthenticationFixture;
 use Tests\TestCase;
@@ -123,6 +128,103 @@ final class AuthenticatedRentalJourneyTest extends TestCase
         $this->loginFixture();
         $this->postJson($path.'/customer/charges', $input)->assertForbidden();
         $this->assertDatabaseCount('invoices', 3);
+    }
+
+    public function test_deposit_receipt_idempotency_limits_posting_and_refund_through_real_apis(): void
+    {
+        $permissions = array_keys(RentalAuthorization::descriptions() + PaymentPermission::descriptions());
+        [$context, $input] = $this->loginFixture($permissions, [TenantFeature::VEHICLE_RENTAL, TenantFeature::PAYMENT, TenantFeature::INVOICE]);
+        $input['terms']['deposit_requirement'] = '1000';
+        $input['terms']['base_rate'] = '300';
+        $agreement = $this->activate('customer', $input);
+        $method = DB::table('payment_methods')->insertGetId(['tenant_id' => $context->tenantId, 'scope_key' => 'tenant:'.$context->tenantId,
+            'code' => 'DEPOSIT-CASH', 'name' => 'Deposit cash', 'method_type' => 'cash', 'direction_allowed' => 'both', 'is_active' => true]);
+        FinancePostingFixture::seedRentalDepositProfile($context->tenantId, $context->organizationUnitId);
+        FinancePostingFixture::seedRentalInvoiceProfiles($context->tenantId, $context->organizationUnitId);
+        $url = self::ROOT.'/customer/agreements/'.$agreement['id'].'/deposits';
+        $payload = ['expected_version' => $agreement['row_version'], 'payment_date' => '2026-09-09', 'exchange_rate' => '1',
+            'lines' => [['payment_method_id' => $method, 'amount' => '1000']]];
+        $this->postJson($url, $payload)->assertUnprocessable();
+        $this->withHeader('Idempotency-Key', 'deposit-a');
+        $payment = $this->postJson($url, $payload)->assertCreated()->assertJsonPath('data.total_amount', '1000.000000')
+            ->assertJsonPath('data.party.id', $input['party_id'])->assertJsonPath('data.currency.id', $input['currency_id'])->json('data');
+        $this->postJson($url, $payload)->assertCreated()->assertJsonPath('data.id', $payment['id']);
+        $this->getJson($url)->assertOk()->assertJsonPath('data.remaining_to_receive', '0.000000')->assertJsonCount(1, 'data.payments');
+        $this->withHeader('Idempotency-Key', 'deposit-b')->postJson($url, $payload)->assertConflict();
+        $this->postJson($url, $payload + ['party_id' => $input['party_id']])->assertUnprocessable();
+        $this->postJson($url, array_replace($payload, ['expected_version' => 1]))->assertConflict();
+        $this->assertDatabaseCount('payments', 1);
+        $this->assertDatabaseCount('idempotency_records', 1);
+        $path = '/api/v1/payments/'.$payment['id'];
+        foreach (['submit-approval', 'approve', 'post'] as $action) {
+            $payment = $this->postJson($path.'/'.$action, ['expected_version' => $payment['row_version']])->assertOk()->json('data');
+        }
+        $this->assertSame('posted', $payment['posting_status']);
+        $this->assertDatabaseCount('finance_journal_entries', 1);
+        $invoice = $this->postJson(self::ROOT.'/customer/agreements/'.$agreement['id'].'/base-charges', [
+            'policy' => BaseRentPolicy::ActualCalendarDays->value, 'expected_version' => $agreement['row_version'],
+            'from' => '2026-09-07', 'until' => '2026-10-06', 'invoice_date' => '2026-09-09', 'exchange_rate' => '1',
+        ])->assertCreated()->json('data');
+        $this->withTenantExecutionContext($context->tenantId, function () use ($invoice, $context): void {
+            $row = Invoice::query()->findOrFail($invoice['id']);
+            $statuses = app(InvoiceStatusService::class);
+            $row = $statuses->transitionIfVersion($row, InvoiceStatus::Approved, $row->row_version, $context->actorId);
+            $statuses->transitionIfVersion($row, InvoiceStatus::Posted, $row->row_version, $context->actorId);
+        });
+        $payment = $this->postJson($path.'/allocations', ['expected_version' => $payment['row_version'],
+            'allocations' => [['invoice_id' => $invoice['id'], 'allocated_amount' => '300', 'allocation_date' => '2026-09-09', 'allocation_method' => 'specific_invoice']],
+        ])->assertOk()->assertJsonPath('data.allocated_amount', '300.000000')->json('data');
+        $this->getJson($url)->assertOk()->assertJsonPath('data.remaining_to_receive', '0.000000');
+        $refund = ['expected_version' => $payment['row_version'], 'refund_date' => '2026-09-09', 'amount' => '400', 'reason' => 'Return surplus security'];
+        $refundId = $this->postJson($path.'/refunds', $refund)->assertCreated()->json('data.refund_payment_id');
+        $this->getJson($url)->assertOk()->assertJsonPath('data.remaining_to_receive', '400.000000')
+            ->assertJsonPath('data.payments.0.refunded_amount', '400.000000')->assertJsonPath('data.payments.0.unapplied_amount', '300.000000');
+        $this->postJson($path.'/refunds', $refund)->assertStatus(422);
+        $this->assertDatabaseCount('finance_journal_entries', 4);
+        $this->assertDatabaseCount('invoices', 1);
+        $payment = $this->getJson($path)->assertOk()->json('data');
+        $this->postJson($path.'/reverse', ['expected_version' => $payment['row_version'], 'reversal_date' => '2026-09-09', 'reason' => 'Cannot reverse active refund'])->assertUnprocessable();
+        $refundPayment = $this->getJson('/api/v1/payments/'.$refundId)->assertOk()->json('data');
+        $this->postJson('/api/v1/payments/'.$refundId.'/reverse', ['expected_version' => $refundPayment['row_version'], 'reversal_date' => '2026-09-09', 'reason' => 'Refund correction'])->assertOk();
+        $this->getJson($url)->assertOk()->assertJsonPath('data.remaining_to_receive', '0.000000')->assertJsonPath('data.payments.0.refunded_amount', '0.000000');
+        $payment = $this->getJson($path)->assertOk()->json('data');
+        $this->postJson($path.'/reverse', ['expected_version' => $payment['row_version'], 'reversal_date' => '2026-09-09', 'reason' => 'Receipt correction'])->assertOk();
+        $this->getJson($url)->assertOk()->assertJsonPath('data.remaining_to_receive', '1000.000000')->assertJsonPath('data.payments.0.document_status', 'reversed');
+        $this->loginFixture(modules: [TenantFeature::VEHICLE_RENTAL, TenantFeature::PAYMENT]);
+        $this->getJson($url)->assertForbidden();
+        $this->loginFixture($permissions, [TenantFeature::VEHICLE_RENTAL, TenantFeature::PAYMENT]);
+        $this->getJson($url)->assertNotFound();
+        $this->loginFixture($permissions);
+        $this->getJson($url)->assertForbidden();
+    }
+
+    public function test_deposit_requires_active_positive_terms_and_void_releases_collection_capacity(): void
+    {
+        [$context, $input] = $this->loginFixture(array_keys(RentalAuthorization::descriptions() + PaymentPermission::descriptions()), [TenantFeature::VEHICLE_RENTAL, TenantFeature::PAYMENT]);
+        $method = DB::table('payment_methods')->insertGetId(['tenant_id' => $context->tenantId, 'scope_key' => 'tenant:'.$context->tenantId,
+            'code' => 'CASH', 'name' => 'Cash', 'method_type' => 'cash', 'direction_allowed' => 'both', 'is_active' => true]);
+        foreach ([null, '0', '1000'] as $index => $requirement) {
+            $input['reference'] = 'DEPOSIT-'.$index;
+            $input['terms']['deposit_requirement'] = $requirement;
+            $draft = $this->postJson(self::ROOT.'/customer/agreements', $input)->assertCreated()->json('data');
+            $url = self::ROOT.'/customer/agreements/'.$draft['id'].'/deposits';
+            $payload = ['expected_version' => $draft['row_version'], 'payment_date' => '2026-09-09', 'exchange_rate' => '1',
+                'lines' => [['payment_method_id' => $method, 'amount' => '600']]];
+            $this->withHeader('Idempotency-Key', 'deposit-'.$index)->postJson($url, $payload)->assertUnprocessable();
+            $active = $this->postJson(self::ROOT.'/customer/agreements/'.$draft['id'].'/activate', ['expected_version' => $draft['row_version']])->assertOk()->json('data');
+            $payload['expected_version'] = $active['row_version'];
+            if ($requirement !== '1000') {
+                $this->postJson($url, $payload)->assertUnprocessable();
+
+                continue;
+            }
+            $payment = $this->postJson($url, $payload)->assertCreated()->json('data');
+            $this->withHeader('Idempotency-Key', 'excess')->postJson($url, $payload)->assertConflict();
+            $this->postJson('/api/v1/payments/'.$payment['id'].'/void', ['expected_version' => $payment['row_version'], 'reason' => 'Receipt entered in error'])->assertOk();
+            $this->getJson($url)->assertOk()->assertJsonPath('data.remaining_to_receive', '1000.000000');
+            $this->postJson($url, $payload)->assertCreated();
+            $this->getJson($url)->assertOk()->assertJsonPath('data.remaining_to_receive', '400.000000')->assertJsonCount(2, 'data.payments');
+        }
     }
 
     protected function setUp(): void
@@ -290,7 +392,7 @@ final class AuthenticatedRentalJourneyTest extends TestCase
     private function grant(AgreementContext $context, array $permissions): void
     {
         foreach ($permissions as $name) {
-            $permission = DB::table('permissions')->insertGetId(['tenant_id' => $context->tenantId, 'name' => $name, 'guard_name' => UserGuard::TENANT_API, 'module' => 'VehicleRental', 'description' => RentalAuthorization::descriptions()[$name], 'row_version' => 1, 'created_at' => now(), 'updated_at' => now()]);
+            $permission = DB::table('permissions')->insertGetId(['tenant_id' => $context->tenantId, 'name' => $name, 'guard_name' => UserGuard::TENANT_API, 'module' => 'VehicleRental', 'description' => (RentalAuthorization::descriptions() + PaymentPermission::descriptions())[$name], 'row_version' => 1, 'created_at' => now(), 'updated_at' => now()]);
             DB::table('user_permissions')->insert(['tenant_id' => $context->tenantId, 'user_id' => $context->actorId, 'permission_id' => $permission, 'row_version' => 1, 'created_at' => now(), 'updated_at' => now()]);
         }
     }

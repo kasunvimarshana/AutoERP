@@ -1,3 +1,5 @@
+import { DepositPanel } from './DepositPanel';
+import { DEPOSIT_PERMISSION } from './depositApi';
 import { BaseRentBillingPanel } from './BaseRentBillingPanel';
 import { BILLING_PERMISSION } from './baseRentBillingApi';
 import { VehicleUsePanel } from './VehicleUsePanel';
@@ -36,6 +38,7 @@ export default function AgreementsPage({ kind }: { kind: AgreementKind }) {
     const [reason, setReason] = useState('');
     const [saving, setSaving] = useState(false);
     const [showVehicles, setShowVehicles] = useState(false);
+    const [showDeposits, setShowDeposits] = useState(false);
     const [showHistory, setShowHistory] = useState(false);
     useEffect(() => {
         const controller = new AbortController();
@@ -54,13 +57,13 @@ export default function AgreementsPage({ kind }: { kind: AgreementKind }) {
         finally { setSaving(false); }
     }
     return <div>
-        <ContentHeader title={kind === AgreementKind.Customer ? 'Customer Rental Agreements' : 'Owner Rental Agreements'} description="Record agreed terms and preserve their history. Assign vehicles from active customer agreements and preserve custody history. Billing is not yet enabled."
+        <ContentHeader title={kind === AgreementKind.Customer ? 'Customer Rental Agreements' : 'Owner Rental Agreements'} description="Record agreed terms and preserve their history. Assign vehicles from active customer agreements and preserve custody history. Review charges and customer deposits from each agreement."
             actions={<><Button variant="secondary" onClick={reload} disabled={saving || editing !== null}>Reload</Button>{canManage && <Button onClick={() => { setEditing('new'); setSelected(null); }} disabled={saving || editing !== null}>New agreement</Button>}</>} />
         <ErrorAlert error={error} inline />
         {editing !== null && <AgreementEditor key={editing === 'new' ? 'new' : editing.id} kind={kind} record={editing === 'new' ? undefined : editing} onSaved={reload} onCancel={() => setEditing(null)} />}
         {loading ? <p role="status">Loading agreements…</p> : <div className="mt-5 overflow-x-auto rounded-xl border border-slate-200 bg-white">
             <table className="w-full text-left text-sm"><caption className="sr-only">Rental agreements</caption><thead><tr>{['Reference', 'Party', 'Period', 'Basis', 'Status', 'Details'].map(label => <th className="p-3" key={label}>{label}</th>)}</tr></thead>
-                <tbody>{rows.map(row => <tr key={row.id} className="border-t border-slate-100"><td className="p-3">{row.reference}</td><td className="p-3">{row.party.name}</td><td className="p-3">{row.starts_on} – {row.ends_on ?? 'Open-ended'}</td><td className="p-3">{row.basis === RentalBasis.Daily ? 'Daily' : 'Monthly'}</td><td className="p-3 capitalize">{row.status}</td><td className="p-3"><Button variant="secondary" disabled={saving || editing !== null} onClick={() => { setSelected(row); setAction(null); setReason(''); setShowHistory(false); setShowVehicles(false); }}>Review {row.reference}</Button></td></tr>)}</tbody>
+                <tbody>{rows.map(row => <tr key={row.id} className="border-t border-slate-100"><td className="p-3">{row.reference}</td><td className="p-3">{row.party.name}</td><td className="p-3">{row.starts_on} – {row.ends_on ?? 'Open-ended'}</td><td className="p-3">{row.basis === RentalBasis.Daily ? 'Daily' : 'Monthly'}</td><td className="p-3 capitalize">{row.status}</td><td className="p-3"><Button variant="secondary" disabled={saving || editing !== null} onClick={() => { setSelected(row); setAction(null); setReason(''); setShowHistory(false); setShowVehicles(false); setShowDeposits(false); }}>Review {row.reference}</Button></td></tr>)}</tbody>
             </table>{rows.length === 0 && <p className="p-5 text-slate-500">No agreements have been recorded.</p>}
         </div>}
         <Pagination meta={meta} onPageChange={value => { setLoading(true); setPage(value); setSelected(null); }} />
@@ -72,6 +75,8 @@ export default function AgreementsPage({ kind }: { kind: AgreementKind }) {
             {selected.notes && <p>{selected.notes}</p>}
             <BaseRentPreviewPanel key={`${kind}-${selected.id}-${selected.row_version}`} kind={kind} agreement={selected} />
             {canBill && selected.status !== AgreementStatus.Draft && <BaseRentBillingPanel key={`billing-${kind}-${selected.id}-${selected.row_version}`} kind={kind} agreement={selected} />}
+            {kind === AgreementKind.Customer && hasPermission(auth, DEPOSIT_PERMISSION.view) && <Button variant="secondary" onClick={() => setShowDeposits(value => !value)}>{showDeposits ? 'Hide deposits' : 'View deposits'}</Button>}
+            {kind === AgreementKind.Customer && hasPermission(auth, DEPOSIT_PERMISSION.view) && showDeposits && <DepositPanel key={selected.id} agreement={selected} canCreate={hasPermission(auth, DEPOSIT_PERMISSION.create)} />}
             {kind === AgreementKind.Customer && canViewUse && <Button variant="secondary" onClick={() => setShowVehicles(value => !value)}>{showVehicles ? 'Hide vehicles' : 'View assigned vehicles'}</Button>}
             {kind === AgreementKind.Customer && canViewUse && showVehicles && <VehicleUsePanel key={selected.id} agreement={selected} canManage={canManageUse} />}
             <Button variant="secondary" onClick={() => setShowHistory(value => !value)}>{showHistory ? 'Hide history' : 'View history'}</Button>
