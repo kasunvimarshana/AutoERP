@@ -30,7 +30,7 @@ export interface PurchaseOrderLine {
     id?: number;
     line_number?: number;
     item_id?: number | null;
-    item?: NamedResource | null;
+    item?: (NamedResource & { tracking_type?: string }) | null;
     item_variant_id?: number | null;
     item_variant?: NamedResource | null;
     description?: string | null;
@@ -317,6 +317,18 @@ export interface GoodsReceiptLine {
     line_subtotal?: string;
     line_total?: string;
     status?: string;
+    batch_allocations?: GoodsReceiptBatchAllocation[];
+}
+
+export interface GoodsReceiptBatchAllocation {
+    id?: number;
+    batch?: (NamedResource & { batch_number?: string; lot_number?: string }) | null;
+    batch_id?: number;
+    batch_number?: string;
+    lot_number?: string;
+    manufacture_date?: string;
+    expiry_date?: string;
+    quantity: string;
 }
 
 export interface GoodsReceipt {
@@ -369,6 +381,14 @@ export interface GoodsReceiptPayload {
         uom_id?: number;
         ordered_uom_id?: number;
         ordered_quantity?: string;
+        batch_allocations?: Array<{
+            batch_id?: number;
+            batch_number?: string;
+            lot_number?: string;
+            manufacture_date?: string;
+            expiry_date?: string;
+            quantity: string;
+        }>;
     }>;
 }
 

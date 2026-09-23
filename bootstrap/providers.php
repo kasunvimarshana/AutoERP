@@ -6,10 +6,11 @@ use Modules\Auth\Providers\AuthServiceProvider;
 use Modules\Configuration\Providers\ConfigurationServiceProvider;
 use Modules\Core\Providers\CoreServiceProvider;
 use Modules\Customer\Providers\CustomerServiceProvider;
+use Modules\Expense\Providers\ExpenseServiceProvider;
 use Modules\Finance\Providers\FinanceServiceProvider;
 use Modules\Hr\Providers\HrServiceProvider;
-use Modules\Inventory\Providers\InventoryServiceProvider;
 use Modules\Idempotency\Providers\IdempotencyServiceProvider;
+use Modules\Inventory\Providers\InventoryServiceProvider;
 use Modules\Invoice\Providers\InvoiceServiceProvider;
 use Modules\Item\Providers\ItemServiceProvider;
 use Modules\OrganizationUnit\Providers\OrganizationUnitServiceProvider;
@@ -45,6 +46,7 @@ return [
     InvoiceServiceProvider::class,
     PaymentServiceProvider::class,
     FinanceServiceProvider::class,
+    ExpenseServiceProvider::class,
     VoucherServiceProvider::class,
     ReportingServiceProvider::class,
     HrServiceProvider::class,

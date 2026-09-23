@@ -42,7 +42,7 @@ final class VehicleServiceJobService
             }
             $this->validateMileageFields($data);
 
-            $job = new VehicleServiceJob();
+            $job = new VehicleServiceJob;
             $job->forceFill($this->attributes($data, true, self::ZERO_AMOUNT))->save();
             $this->statuses->recordCreated($job, $data->createdBy);
             if ($data->customerComplaint !== null) {
@@ -140,6 +140,9 @@ final class VehicleServiceJobService
                 'job_number' => $data->jobNumber ?? $this->numbers->next($data->tenantId),
                 'status' => VehicleServiceJobStatus::Draft->value,
                 'subtotal' => self::ZERO_AMOUNT,
+                'line_discount_total' => self::ZERO_AMOUNT,
+                'job_discount_base' => self::ZERO_AMOUNT,
+                'job_discount_amount' => self::ZERO_AMOUNT,
                 'discount_total' => self::ZERO_AMOUNT,
                 'tax_total' => self::ZERO_AMOUNT,
                 'charge_total' => self::ZERO_AMOUNT,
@@ -255,6 +258,7 @@ final class VehicleServiceJobService
     {
         return [
             'customer', 'billToCustomer', 'vehicle.make', 'vehicle.model', 'vehicle.currentOwnerships', 'supervisor', 'inspection.inspector',
+            'currentDiscountRevision.changedBy',
             'invoiceLinks.invoice.balance', 'paymentLinks.payment.lines.paymentMethod', 'paymentLinks.payment.allocations', 'paymentLinks.invoice',
         ];
     }

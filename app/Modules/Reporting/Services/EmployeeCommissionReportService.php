@@ -10,6 +10,8 @@ use Illuminate\Support\Facades\DB;
 use Modules\Core\Services\DecimalMath;
 use Modules\Reporting\DTOs\ReportColumn;
 use Modules\Reporting\DTOs\ReportDefinition;
+use Modules\VehicleService\Enums\VehicleServiceLineSourceType;
+use Modules\VehicleService\Enums\VehicleServiceLineStatus;
 use Modules\VehicleService\Models\VehicleServiceLineEmployee;
 
 final class EmployeeCommissionReportService
@@ -42,6 +44,58 @@ final class EmployeeCommissionReportService
         $response['groups'] = $metrics['groups'];
 
         return $response;
+    }
+
+    /**
+     * Build the compact employee ranking used by the Business Overview dashboard.
+     *
+     * @param  array<string, mixed>  $params
+     * @return list<array<string, mixed>>
+     */
+    public function dashboardPerformance(array $params, int $limit = 5): array
+    {
+        $groups = array_values(array_filter(
+            $this->groups(
+                $this->query([
+                    ...$params,
+                    'group_by' => 'employee',
+                    'include_cancelled' => true,
+                ]),
+                'employee',
+            ),
+            static fn (array $group): bool => $group['resource'] !== null,
+        ));
+
+        usort($groups, function (array $left, array $right): int {
+            $labourComparison = $this->math->compare(
+                (string) $right['total_labour_value'],
+                (string) $left['total_labour_value'],
+            );
+            if ($labourComparison !== 0) {
+                return $labourComparison;
+            }
+
+            $commissionComparison = $this->math->compare(
+                (string) $right['total_commission'],
+                (string) $left['total_commission'],
+            );
+
+            return $commissionComparison !== 0
+                ? $commissionComparison
+                : strcmp((string) $left['label'], (string) $right['label']);
+        });
+
+        return array_slice(array_map(static fn (array $group): array => [
+            'employee' => $group['resource'],
+            'completed_jobs' => $group['completed_jobs'],
+            'total_jobs' => $group['total_jobs'],
+            'total_hours' => $group['total_hours'],
+            'labour_value' => $group['total_labour_value'],
+            'earned_commission' => $group['earned_commission'],
+            'pending_commission' => $group['pending_commission'],
+            'cancelled_commission' => $group['cancelled_commission'],
+            'total_commission' => $group['total_commission'],
+        ], $groups), 0, min(20, max(1, $limit)));
     }
 
     /**
@@ -108,7 +162,7 @@ final class EmployeeCommissionReportService
         $organizationUnitId = $params['organization_unit_id'] ?? null;
         $includeCancelled = filter_var($params['include_cancelled'] ?? false, FILTER_VALIDATE_BOOL);
 
-        $commissionRows = $this->technicianRows($tenantId, $organizationUnitId, $includeCancelled)
+        $commissionRows = $this->assignmentRows($tenantId, $organizationUnitId, $includeCancelled)
             ->unionAll($this->supervisorRows($tenantId, $organizationUnitId, $includeCancelled));
         $query = DB::query()
             ->fromSub($commissionRows, 'commission_rows')
@@ -140,7 +194,7 @@ final class EmployeeCommissionReportService
         return $query;
     }
 
-    private function technicianRows(int $tenantId, mixed $organizationUnitId, bool $includeCancelled): Builder
+    private function assignmentRows(int $tenantId, mixed $organizationUnitId, bool $includeCancelled): Builder
     {
         $query = DB::table('vehicle_service_line_employees as assignments')
             ->join('vehicle_service_jobs as jobs', 'jobs.id', '=', 'assignments.vehicle_service_job_id')
@@ -171,7 +225,8 @@ final class EmployeeCommissionReportService
         }
 
         return $query->selectRaw(
-            "'technician' as commission_source, assignments.id as source_id, assignments.employee_id, jobs.id as job_id, lines.id as line_id, "
+            "CASE WHEN lines.line_source_type = ? AND lines.uses_job_supervisor = ? THEN 'supervisor' ELSE 'technician' END as commission_source, "
+            ."'assignment' as source_origin, assignments.id as source_id, assignments.employee_id, jobs.id as job_id, lines.id as line_id, "
             .'employees.employee_number as employee_code, employees.display_name as employee_name, '
             .'departments.id as department_id, departments.code as department_code, departments.name as department_name, '
             .'designations.id as designation_id, designations.code as designation_code, designations.name as designation_name, '
@@ -186,6 +241,7 @@ final class EmployeeCommissionReportService
             ."WHEN assignments.completed_at IS NOT NULL OR assignments.status = 'completed' OR jobs.completed_at IS NOT NULL "
             ."OR jobs.status IN ('completed', 'invoiced', 'partially_paid', 'paid') THEN 'earned' ELSE 'pending' END as commission_status, "
             .'COALESCE(assignments.completed_at, jobs.completed_at) as completed_at',
+            [VehicleServiceLineSourceType::ComboChild->value, true],
         );
     }
 
@@ -204,6 +260,22 @@ final class EmployeeCommissionReportService
             ->where(function (Builder $commission): void {
                 $commission->where('jobs.supervisor_commission_type', '<>', 'none')
                     ->orWhere('jobs.supervisor_commission_amount', '>', 0);
+            })
+            ->whereNotExists(function (Builder $comboSupervisorLines) use ($tenantId, $organizationUnitId): void {
+                $comboSupervisorLines
+                    ->selectRaw('1')
+                    ->from('vehicle_service_job_lines as combo_supervisor_lines')
+                    ->whereColumn('combo_supervisor_lines.vehicle_service_job_id', 'jobs.id')
+                    ->where('combo_supervisor_lines.tenant_id', $tenantId)
+                    ->where('combo_supervisor_lines.line_source_type', VehicleServiceLineSourceType::ComboChild->value)
+                    ->where('combo_supervisor_lines.uses_job_supervisor', true)
+                    ->where('combo_supervisor_lines.status', '<>', VehicleServiceLineStatus::Cancelled->value);
+
+                $this->organizationScope(
+                    $comboSupervisorLines,
+                    'combo_supervisor_lines.organization_unit_id',
+                    $organizationUnitId,
+                );
             });
 
         $this->organizationScope($query, 'jobs.organization_unit_id', $organizationUnitId);
@@ -212,7 +284,7 @@ final class EmployeeCommissionReportService
         }
 
         return $query->selectRaw(
-            "'supervisor' as commission_source, jobs.id as source_id, jobs.supervisor_employee_id as employee_id, jobs.id as job_id, 0 as line_id, "
+            "'supervisor' as commission_source, 'job' as source_origin, jobs.id as source_id, jobs.supervisor_employee_id as employee_id, jobs.id as job_id, 0 as line_id, "
             .'employees.employee_number as employee_code, employees.display_name as employee_name, '
             .'departments.id as department_id, departments.code as department_code, departments.name as department_name, '
             .'designations.id as designation_id, designations.code as designation_code, designations.name as designation_name, '
@@ -497,9 +569,14 @@ final class EmployeeCommissionReportService
             ->select([])
             ->selectRaw(
                 "{$key} as group_key, MAX({$label}) as group_label, "
+                .'MAX(commission_rows.employee_code) as group_code, '
                 .'COUNT(DISTINCT commission_rows.job_id) as total_jobs, '
+                ."COUNT(DISTINCT CASE WHEN commission_rows.commission_status = 'earned' THEN commission_rows.job_id END) as completed_jobs, "
                 ."COALESCE(SUM(CASE WHEN commission_rows.commission_status <> 'cancelled' THEN commission_rows.assigned_hours ELSE 0 END), 0) as total_hours, "
                 ."COALESCE(SUM(CASE WHEN commission_rows.commission_status <> 'cancelled' THEN commission_rows.labour_amount ELSE 0 END), 0) as total_labour_value, "
+                ."COALESCE(SUM(CASE WHEN commission_rows.commission_status = 'earned' THEN commission_rows.commission_amount ELSE 0 END), 0) as earned_commission, "
+                ."COALESCE(SUM(CASE WHEN commission_rows.commission_status = 'pending' THEN commission_rows.commission_amount ELSE 0 END), 0) as pending_commission, "
+                ."COALESCE(SUM(CASE WHEN commission_rows.commission_status = 'cancelled' THEN commission_rows.commission_amount ELSE 0 END), 0) as cancelled_commission, "
                 ."COALESCE(SUM(CASE WHEN commission_rows.commission_status <> 'cancelled' THEN commission_rows.commission_amount ELSE 0 END), 0) as total_commission",
             )
             ->groupBy($key)
@@ -516,10 +593,18 @@ final class EmployeeCommissionReportService
                     'label' => $label,
                     'resource' => $resourceType === 'source' || $key === 'unassigned'
                         ? null
-                        : ['id' => (int) $row->group_key, 'code' => '', 'name' => $label],
+                        : [
+                            'id' => (int) $row->group_key,
+                            'code' => $resourceType === 'employee' ? (string) ($row->group_code ?? '') : '',
+                            'name' => $label,
+                        ],
+                    'completed_jobs' => (int) $row->completed_jobs,
                     'total_jobs' => (int) $row->total_jobs,
                     'total_hours' => $this->decimal($row->total_hours),
                     'total_labour_value' => $this->decimal($row->total_labour_value),
+                    'earned_commission' => $this->decimal($row->earned_commission),
+                    'pending_commission' => $this->decimal($row->pending_commission),
+                    'cancelled_commission' => $this->decimal($row->cancelled_commission),
                     'total_commission' => $this->decimal($row->total_commission),
                 ];
             })
@@ -535,7 +620,9 @@ final class EmployeeCommissionReportService
         $group = $this->groupResource($row, $groupBy);
 
         return [
-            'id' => (string) $row->commission_source.'-'.(string) $row->source_id,
+            'id' => $row->commission_source === 'supervisor' && $row->source_origin === 'assignment'
+                ? 'supervisor-assignment-'.(string) $row->source_id
+                : (string) $row->commission_source.'-'.(string) $row->source_id,
             'commission_source' => (string) $row->commission_source,
             'employee' => $this->employeeResource($row),
             'employee_code' => (string) ($row->employee_code ?? ''),

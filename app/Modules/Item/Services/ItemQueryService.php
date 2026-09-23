@@ -6,13 +6,14 @@ namespace Modules\Item\Services;
 
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
+use Modules\Item\Enums\TrackingType;
 use Modules\Item\Models\Item;
 
 final class ItemQueryService
@@ -40,6 +41,8 @@ final class ItemQueryService
         $criteria['is_active'] = true;
         match ($kind) {
             'stockable' => $criteria['is_stockable'] = true,
+            'untracked-stockable' => [$criteria['is_stockable'] = true, $criteria['tracking_type'] = TrackingType::None->value],
+            'batch-tracked-stockable' => [$criteria['is_stockable'] = true, $criteria['tracking_types'] = [TrackingType::Batch->value, TrackingType::Lot->value]],
             'service', 'labour', 'combo', 'package' => $criteria['item_type'] = $kind,
             default => null,
         };
@@ -60,7 +63,7 @@ final class ItemQueryService
         }
 
         $this->assertItemIsNotOwnedByAnotherScope($id, $tenantId, $organizationUnitId);
-        throw (new ModelNotFoundException())->setModel(Item::class, [$id]);
+        throw (new ModelNotFoundException)->setModel(Item::class, [$id]);
     }
 
     public function item(int $id, int $tenantId, ?int $organizationUnitId): Item
@@ -72,7 +75,7 @@ final class ItemQueryService
         }
 
         $this->assertItemIsNotOwnedByAnotherScope($id, $tenantId, $organizationUnitId);
-        throw (new ModelNotFoundException())->setModel(Item::class, [$id]);
+        throw (new ModelNotFoundException)->setModel(Item::class, [$id]);
     }
 
     public function delete(Item $item): void
@@ -106,10 +109,13 @@ final class ItemQueryService
             });
         }
 
-        foreach (['item_type', 'is_stockable', 'is_active'] as $filter) {
+        foreach (['item_type', 'tracking_type', 'is_stockable', 'is_active'] as $filter) {
             if (array_key_exists($filter, $criteria) && $criteria[$filter] !== null && $criteria[$filter] !== '') {
                 $query->where($filter, $criteria[$filter]);
             }
+        }
+        if (! empty($criteria['tracking_types'])) {
+            $query->whereIn('tracking_type', $criteria['tracking_types']);
         }
         if (! empty($criteria['category_id'])) {
             $query->where('item_category_id', (int) $criteria['category_id']);
@@ -131,11 +137,15 @@ final class ItemQueryService
         /** @var Collection<int, Item> $items */
         $items = $paginator->getCollection();
         $tenantId = $items->first()?->tenant_id;
-        $availableStockByItemId = $tenantId === null
+        $stockByItemId = $tenantId === null
             ? []
-            : $this->availableStockByItemId($items, (int) $tenantId, $organizationUnitId);
+            : $this->stockSummaryByItemIds(
+                $items->modelKeys(),
+                (int) $tenantId,
+                $organizationUnitId,
+            );
 
-        $items->each(function (Item $item) use ($organizationUnitId, $availableStockByItemId): void {
+        $items->each(function (Item $item) use ($organizationUnitId, $stockByItemId): void {
             $resolvedServicePrice = $this->prices->resolvePrice(
                 item: $item,
                 context: ItemPriceResolutionService::CONTEXT_SERVICE,
@@ -152,7 +162,13 @@ final class ItemQueryService
             $item->setAttribute(
                 'available_stock_quantity',
                 $item->is_stockable
-                    ? ($availableStockByItemId[(int) $item->getKey()] ?? '0.000000')
+                    ? ($stockByItemId[(int) $item->getKey()]['available'] ?? '0.000000')
+                    : null,
+            );
+            $item->setAttribute(
+                'reserved_stock_quantity',
+                $item->is_stockable
+                    ? ($stockByItemId[(int) $item->getKey()]['reserved'] ?? '0.000000')
                     : null,
             );
         });
@@ -160,19 +176,29 @@ final class ItemQueryService
         return $paginator->setCollection($items);
     }
 
-    /**
-     * @param  Collection<int, Item>  $items
+    /** @param list<int> $itemIds
      * @return array<int, string>
      */
-    private function availableStockByItemId(Collection $items, int $tenantId, ?int $organizationUnitId): array
+    public function availableStockByItemIds(array $itemIds, int $tenantId, ?int $organizationUnitId): array
     {
-        $itemIds = $items->pluck('id')->map(static fn ($id): int => (int) $id)->all();
+        return array_map(
+            static fn (array $stock): string => $stock['available'],
+            $this->stockSummaryByItemIds($itemIds, $tenantId, $organizationUnitId),
+        );
+    }
+
+    /** @param list<int> $itemIds
+     * @return array<int, array{available: string, reserved: string}>
+     */
+    public function stockSummaryByItemIds(array $itemIds, int $tenantId, ?int $organizationUnitId): array
+    {
+        $itemIds = array_values(array_unique(array_map('intval', $itemIds)));
         if ($itemIds === []) {
             return [];
         }
 
         $query = DB::table('inventory_stock_balances')
-            ->selectRaw('item_id, SUM(quantity_available) as available_stock_quantity')
+            ->selectRaw('item_id, SUM(quantity_available) as available_stock_quantity, SUM(quantity_reserved) as reserved_stock_quantity')
             ->where('tenant_id', $tenantId)
             ->whereIn('item_id', $itemIds)
             ->groupBy('item_id');
@@ -187,8 +213,11 @@ final class ItemQueryService
         }
 
         return $query
-            ->pluck('available_stock_quantity', 'item_id')
-            ->mapWithKeys(fn ($quantity, $itemId): array => [(int) $itemId => $this->math->normalize((string) $quantity)])
+            ->get()
+            ->mapWithKeys(fn ($row): array => [(int) $row->item_id => [
+                'available' => $this->math->normalize((string) $row->available_stock_quantity),
+                'reserved' => $this->math->normalize((string) $row->reserved_stock_quantity),
+            ]])
             ->all();
     }
 

@@ -11,9 +11,11 @@ import { auditPermissions } from "@/modules/audit/auditPermissions";
 import { referenceDataPermissions } from "@/modules/reference-data/referenceDataPermissions";
 import { tenantPermissions } from "@/modules/tenant/tenantPermissions";
 import { financePermissions } from "@/modules/finance/financePermissions";
+import { expensePermissions } from "@/modules/expense/expensePermissions";
 import { paymentPermissions } from "@/modules/payment/paymentPermissions";
 import { purchasePermissions } from "@/modules/purchase/purchasePermissions";
 import { reportingPermissions } from "@/modules/reporting/reportingPermissions";
+import { inventoryPermissions } from "@/modules/inventory/inventoryPermissions";
 import { warehousePermissions } from "@/modules/warehouse/warehousePermissions";
 const tenantAccess = (
     modules: NonNullable<
@@ -461,6 +463,46 @@ export const tenantNavigationSections: NavigationSection[] = [
                         match: ["/inventory"],
                         access: operationalAccess(["inventory"]),
                     },
+                    {
+                        id: "inventory-adjustments",
+                        type: "link",
+                        label: "Adjustments",
+                        to: "/inventory?tab=adjustments",
+                        match: ["/inventory"],
+                        access: {
+                            ...operationalAccess(["inventory"]),
+                            permissions: [
+                                inventoryPermissions.adjustmentsView,
+                                inventoryPermissions.adjustmentsManage,
+                                inventoryPermissions.adjustmentsPost,
+                            ],
+                        },
+                    },
+                    {
+                        id: "inventory-batch-serial",
+                        type: "link",
+                        label: "Batch / Serial",
+                        to: "/inventory?tab=tracking",
+                        match: ["/inventory"],
+                        access: {
+                            ...operationalAccess(["inventory"]),
+                            permissions: [
+                                inventoryPermissions.trackingView,
+                                inventoryPermissions.trackingManage,
+                            ],
+                        },
+                    },
+                    {
+                        id: "inventory-stock-movements",
+                        type: "link",
+                        label: "Stock Movements",
+                        to: "/reports/inventory.stock-movement",
+                        match: ["/reports/inventory.stock-movement"],
+                        access: {
+                            ...operationalAccess(["inventory", "reporting"]),
+                            permissions: [reportingPermissions.view],
+                        },
+                    },
                 ],
             },
             {
@@ -586,9 +628,17 @@ export const tenantNavigationSections: NavigationSection[] = [
                     {
                         id: "service-jobs",
                         type: "link",
-                        label: "Service Jobs",
+                        label: "Service Job List",
                         to: "/vehicle-service/jobs",
                         match: ["/vehicle-service/jobs"],
+                        access: operationalAccess(["vehicle-service"]),
+                    },
+                    {
+                        id: "create-service-job",
+                        type: "link",
+                        label: "Create Service Job",
+                        to: "/vehicle-service/jobs/create",
+                        match: ["/vehicle-service/jobs/create"],
                         access: operationalAccess(["vehicle-service"]),
                     },
                     {
@@ -625,6 +675,49 @@ export const tenantNavigationSections: NavigationSection[] = [
         id: "finance",
         label: "Finance",
         items: [
+            {
+                id: "expense-workspace",
+                type: "module",
+                label: "Expenses",
+                icon: "payment",
+                access: operationalAccess(["finance"]),
+                children: [
+                    {
+                        id: "expenses",
+                        type: "link",
+                        label: "All Expenses",
+                        to: "/expenses",
+                        match: ["/expenses"],
+                        exclude: ["/expenses/create", "/expenses/types"],
+                        access: {
+                            ...operationalAccess(["finance"]),
+                            permissions: [expensePermissions.view],
+                        },
+                    },
+                    {
+                        id: "add-expense",
+                        type: "link",
+                        label: "Add Expense",
+                        to: "/expenses/create",
+                        match: ["/expenses/create"],
+                        access: {
+                            ...operationalAccess(["finance"]),
+                            permissions: [expensePermissions.create],
+                        },
+                    },
+                    {
+                        id: "expense-types",
+                        type: "link",
+                        label: "Expense Types",
+                        to: "/expenses/types",
+                        match: ["/expenses/types"],
+                        access: {
+                            ...operationalAccess(["finance"]),
+                            permissions: [expensePermissions.typesView],
+                        },
+                    },
+                ],
+            },
             {
                 id: "finance-workspace",
                 type: "module",
@@ -831,11 +924,55 @@ export const tenantNavigationSections: NavigationSection[] = [
                         },
                     },
                     {
+                        id: "expense-report",
+                        type: "link",
+                        label: "Expense Report",
+                        to: "/reports/expenses",
+                        match: ["/reports/expenses"],
+                        access: {
+                            ...operationalAccess(["reporting"]),
+                            permissions: [reportingPermissions.view],
+                        },
+                    },
+                    {
                         id: "all-reports",
                         type: "link",
                         label: "All Reports",
                         to: "/reports",
                         match: ["/reports"],
+                        access: {
+                            ...operationalAccess(["reporting"]),
+                            permissions: [reportingPermissions.view],
+                        },
+                    },
+                    {
+                        id: "grn-payables-report",
+                        type: "link",
+                        label: "GRN Payables",
+                        to: "/reports/purchase/grn-payables",
+                        match: ["/reports/purchase/grn-payables"],
+                        access: {
+                            ...operationalAccess(["reporting"]),
+                            permissions: [reportingPermissions.view],
+                        },
+                    },
+                    {
+                        id: "employee-commission-report",
+                        type: "link",
+                        label: "Employee Commission",
+                        to: "/reports/vehicle-service/employee-commissions",
+                        match: ["/reports/vehicle-service/employee-commissions"],
+                        access: {
+                            ...operationalAccess(["reporting"]),
+                            permissions: [reportingPermissions.view],
+                        },
+                    },
+                    {
+                        id: "vehicle-service-history-report",
+                        type: "link",
+                        label: "Vehicle Service History",
+                        to: "/reports/vehicle-service/service-history",
+                        match: ["/reports/vehicle-service/service-history"],
                         access: {
                             ...operationalAccess(["reporting"]),
                             permissions: [reportingPermissions.view],

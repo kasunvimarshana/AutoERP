@@ -38,6 +38,7 @@ final class PurchaseDocumentCapabilityService
         $remainingInvoiceable = $this->sumRemaining($order->lines, fn (PurchaseOrderLine $line): string => $this->balances->remainingInvoiceableForPurchaseOrderLine($line));
 
         $approved = $status === PurchaseOrderStatus::Approved->value;
+        $hasReceived = $this->positive($received);
         $hasReceivedOrInvoiced = $this->positive($received) || $this->positive($invoiced);
 
         $closeBlocker = $approved ? $this->blockers->purchaseOrderCloseBlocker($order) : null;
@@ -47,7 +48,15 @@ final class PurchaseDocumentCapabilityService
             'can_submit' => $this->result($status === PurchaseOrderStatus::Draft->value, 'not_draft', 'Only draft purchase orders can be submitted.'),
             'can_approve' => $this->result($status === PurchaseOrderStatus::PendingApproval->value, 'not_pending_approval', 'Only submitted purchase orders can be approved.'),
             'can_receive' => $this->result($approved && $this->positive($remainingReceivable), $approved ? 'fully_received' : 'not_approved', $approved ? 'Purchase order has no remaining receivable quantity.' : 'Only approved purchase orders can be received.'),
-            'can_invoice' => $this->result($approved && $this->positive($remainingInvoiceable), $approved ? 'fully_invoiced' : 'not_approved', $approved ? 'Purchase order has no remaining invoiceable quantity.' : 'Only approved purchase orders can be invoiced.'),
+            'can_invoice' => $this->result(
+                $approved && $hasReceived && $this->positive($remainingInvoiceable),
+                ! $approved ? 'not_approved' : (! $hasReceived ? 'not_received' : 'fully_invoiced'),
+                ! $approved
+                    ? 'Only approved purchase orders can be invoiced.'
+                    : (! $hasReceived
+                        ? 'Purchase order must have received quantity before supplier invoicing.'
+                        : 'Purchase order has no remaining invoiceable quantity.'),
+            ),
             'can_close' => $this->result($approved && $closeBlocker === null, $closeBlocker['code'] ?? 'not_approved', $closeBlocker['reason'] ?? 'Only approved purchase orders can be closed.'),
             'can_force_close' => $this->result(false, 'unsupported_workflow', 'Force close is not supported.'),
             'can_cancel' => $this->result(in_array($status, [PurchaseOrderStatus::Draft->value, PurchaseOrderStatus::PendingApproval->value, PurchaseOrderStatus::Approved->value], true) && ! $hasReceivedOrInvoiced, $hasReceivedOrInvoiced ? 'has_activity' : 'invalid_lifecycle', $hasReceivedOrInvoiced ? 'Purchase orders with received or invoiced quantities cannot be cancelled.' : 'Purchase order cannot be cancelled in its current lifecycle state.'),

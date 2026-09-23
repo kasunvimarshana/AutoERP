@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { expensePermissions } from '@/modules/expense/expensePermissions';
 import { itemPermissions } from '@/modules/item/itemPermissions';
 import { financePermissions } from '@/modules/finance/financePermissions';
 import { inventoryPermissions } from '@/modules/inventory/inventoryPermissions';
@@ -6,6 +7,7 @@ import { invoicePermissions } from '@/modules/invoice/invoicePermissions';
 import { purchasePermissions } from '@/modules/purchase/purchasePermissions';
 import { reportingPermissions } from '@/modules/reporting/reportingPermissions';
 import { tenantNavigationSections } from './navigationConfig';
+import { tenantWorkspaceNavigationSections } from './tenantWorkspaceNavigation';
 import {
     filterNavigation,
     findNavigationMatch,
@@ -172,6 +174,35 @@ describe('navigation access and matching', () => {
         ]);
     });
 
+    it('shows Expenses as a focused top-level workspace with permission-owned actions', () => {
+        const sections = filterNavigation(tenantNavigationSections, {
+            tenantId: 10,
+            isPlatformOperator: false,
+            organizationUnitId: 20,
+            roles: [],
+            permissions: [
+                expensePermissions.view,
+                expensePermissions.create,
+                expensePermissions.typesView,
+            ],
+            permissionsLoaded: true,
+            enabledModules: ['finance'],
+            enabledModulesLoaded: true,
+        });
+        const expenseModule = sections
+            .flatMap((section) => section.items)
+            .find((item) => item.id === 'expense-workspace');
+
+        expect(expenseModule?.type).toBe('module');
+        expect(expenseModule?.type === 'module' ? expenseModule.children.map((child) => child.label) : []).toEqual([
+            'All Expenses',
+            'Add Expense',
+            'Expense Types',
+        ]);
+        expect(findNavigationMatch('/expenses/types', '', tenantNavigationSections)?.parent?.id).toBe('expense-workspace');
+        expect(findNavigationMatch('/expenses/types', '', tenantNavigationSections)?.item.id).toBe('expense-types');
+    });
+
     it('shows Summary Reports under the reporting workspace', () => {
         const sections = filterNavigation(tenantNavigationSections, {
             tenantId: 10,
@@ -190,9 +221,14 @@ describe('navigation access and matching', () => {
         expect(reports?.type).toBe('module');
         expect(reports?.type === 'module' ? reports.children.map((child) => child.label) : []).toEqual([
             'Summary Reports',
+            'Expense Report',
             'All Reports',
+            'GRN Payables',
+            'Employee Commission',
+            'Vehicle Service History',
         ]);
         expect(findNavigationMatch('/reports/summary', '', tenantNavigationSections)?.item.id).toBe('summary-reports');
+        expect(findNavigationMatch('/reports/expenses', '', tenantNavigationSections)?.item.id).toBe('expense-report');
     });
 
     it('requires an Inventory permission before showing Inventory navigation', () => {
@@ -227,6 +263,38 @@ describe('navigation access and matching', () => {
         expect(findNavigationMatch('/inventory', '', tenantNavigationSections)?.parent?.id).toBe('inventory');
     });
 
+    it('shows permission-owned Inventory shortcuts and matches their destinations', () => {
+        const sections = filterNavigation(tenantWorkspaceNavigationSections, {
+            tenantId: 10,
+            isPlatformOperator: false,
+            organizationUnitId: 20,
+            roles: [],
+            permissions: [
+                inventoryPermissions.stockView,
+                inventoryPermissions.adjustmentsView,
+                inventoryPermissions.trackingView,
+                reportingPermissions.view,
+            ],
+            permissionsLoaded: true,
+            enabledModules: ['inventory', 'reporting'],
+            enabledModulesLoaded: true,
+        });
+        const inventoryModule = sections
+            .flatMap((section) => section.items)
+            .find((item) => item.id === 'inventory');
+
+        expect(inventoryModule?.type).toBe('module');
+        expect(inventoryModule?.type === 'module' ? inventoryModule.children.map((child) => child.label) : []).toEqual([
+            'Inventory',
+            'Adjustments',
+            'Batch / Serial',
+            'Stock Movements',
+        ]);
+        expect(findNavigationMatch('/inventory', '?tab=adjustments', tenantWorkspaceNavigationSections)?.item.id).toBe('inventory-adjustments');
+        expect(findNavigationMatch('/inventory', '?tab=tracking', tenantWorkspaceNavigationSections)?.item.id).toBe('inventory-batch-serial');
+        expect(findNavigationMatch('/reports/inventory.stock-movement', '', tenantWorkspaceNavigationSections)?.item.id).toBe('inventory-stock-movements');
+    });
+
     it('preserves navigation-specific module constraints for shared route paths', () => {
         const sections = filterNavigation(tenantNavigationSections, {
             tenantId: 10,
@@ -249,6 +317,38 @@ describe('navigation access and matching', () => {
 
         expect(match?.parent?.id).toBe('vehicle-service');
         expect(match?.item.id).toBe('service-invoices');
+    });
+
+    it('keeps Purchase-owned invoice and payment details in the Purchase module', () => {
+        const invoice = findNavigationMatch('/purchase/invoices/42', '', tenantWorkspaceNavigationSections);
+        const payment = findNavigationMatch('/purchase/payments/84', '', tenantWorkspaceNavigationSections);
+
+        expect(invoice?.parent?.id).toBe('purchase');
+        expect(invoice?.item.id).toBe('supplier-invoices');
+        expect(payment?.parent?.id).toBe('purchase');
+        expect(payment?.item.id).toBe('supplier-payments');
+    });
+
+    it('keeps canonical invoice details in the Vehicle Service invoice context', () => {
+        const match = findNavigationMatch('/invoices/42', '?from=vehicle-service&job_id=7', tenantWorkspaceNavigationSections);
+
+        expect(match?.parent?.id).toBe('vehicle-service');
+        expect(match?.item.id).toBe('service-invoices');
+    });
+
+    it('shows Service Job list and creation links without Vehicle Rental in the sidebar', () => {
+        const items = tenantWorkspaceNavigationSections.flatMap((section) => section.items);
+        const vehicleService = items.find((item) => item.id === 'vehicle-service');
+
+        expect(vehicleService?.type).toBe('module');
+        expect(vehicleService?.type === 'module' ? vehicleService.children.map((child) => child.label) : []).toEqual([
+            'Service Job List',
+            'Create Service Job',
+            'Service Invoices',
+            'Customer Receipts',
+        ]);
+        expect(items.some((item) => item.id === 'vehicle-rental')).toBe(false);
+        expect(findNavigationMatch('/vehicle-service/jobs/create', '', tenantWorkspaceNavigationSections)?.item.id).toBe('create-service-job');
     });
 
     it('keeps the primary business hierarchy without brittle duplicate snapshots', () => {

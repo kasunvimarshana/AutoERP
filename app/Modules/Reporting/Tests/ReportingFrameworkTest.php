@@ -33,10 +33,12 @@ final class ReportingFrameworkTest extends TestCase
         $reports = array_keys($this->app->make(ReportDefinitionRegistry::class)->all());
 
         foreach ([
+            'expenses',
             'inventory.stock-balance',
             'inventory.stock-movement',
             'purchase.orders',
             'purchase.grns',
+            'purchase/grn-payables',
             'purchase.returns',
             'masters.supplier',
             'masters.customer',

@@ -2,11 +2,10 @@ import { useState } from 'react';
 import type { ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
-import { VehicleServiceInventoryLocationFields } from '../VehicleServiceInventoryLocationFields';
 import { LineAdvancedFields } from './LineAdvancedFields';
 import { LineBasicFields } from './LineBasicFields';
 import { LinePricingFields } from './LinePricingFields';
-import { isInventoryLineItem, LineItemFields } from './LineItemFields';
+import { LineItemFields } from './LineItemFields';
 import { LineSummary } from './LineSummary';
 import {
     calculateLinePreview,
@@ -15,19 +14,15 @@ import {
 
 export function VehicleServiceLineForm({
     value,
-    mode,
     error,
     saving,
-    canIssueInventory,
     onSave,
     onCancel,
 }: {
     value: VehicleServiceLineFormValue;
-    mode: 'create' | 'edit';
     error: ApiError | null;
     saving: boolean;
-    canIssueInventory: boolean;
-    onSave: (value: VehicleServiceLineFormValue, issueStock: boolean) => void;
+    onSave: (value: VehicleServiceLineFormValue) => void;
     onCancel: () => void;
 }) {
     const [draft, setDraft] = useState(value);
@@ -36,21 +31,13 @@ export function VehicleServiceLineForm({
         next: VehicleServiceLineFormValue[K],
     ) => setDraft((current) => ({ ...current, [key]: next }));
     const preview = calculateLinePreview(draft);
-    const showIssueControls = canIssueInventory
-        && mode === 'create'
-        && draft.item !== null
-        && draft.source === 'inventory_item'
-        && isInventoryLineItem(draft.item);
-    const canIssueOnCreate = showIssueControls
-        && draft.issueWarehouse !== null
-        && draft.issueLocation !== null;
 
     return (
         <form
             className="space-y-5"
             onSubmit={(event) => {
                 event.preventDefault();
-                if (!saving) onSave(draft, false);
+                if (!saving) onSave(draft);
             }}
         >
             <ErrorAlert error={error} />
@@ -62,20 +49,11 @@ export function VehicleServiceLineForm({
                     </p>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    <LineItemFields value={draft} error={error} onChange={setDraft} />
-                    {showIssueControls && (
-                        <div className="sm:col-span-2 lg:col-span-3">
-                            <VehicleServiceInventoryLocationFields
-                                value={{ warehouse: draft.issueWarehouse, location: draft.issueLocation }}
-                                onChange={({ warehouse, location }) => setDraft((current) => ({
-                                    ...current,
-                                    issueWarehouse: warehouse,
-                                    issueLocation: location,
-                                }))}
-                                disabled={saving}
-                            />
-                        </div>
-                    )}
+                    <LineItemFields
+                        value={draft}
+                        error={error}
+                        onChange={setDraft}
+                    />
                     <LineBasicFields value={draft} error={error} set={set} />
                     <LinePricingFields value={draft} total={preview.total} error={error} set={set} />
                 </div>
@@ -91,19 +69,7 @@ export function VehicleServiceLineForm({
 
             <div className="flex flex-wrap justify-end gap-2">
                 <Button type="button" variant="secondary" disabled={saving} onClick={onCancel}>Cancel</Button>
-                <Button type="submit" loading={saving}>
-                    {mode === 'edit' ? 'Save line' : 'Add line'}
-                </Button>
-                {showIssueControls && (
-                    <Button
-                        type="button"
-                        loading={saving}
-                        disabled={!canIssueOnCreate}
-                        onClick={() => onSave(draft, true)}
-                    >
-                        Add & issue stock
-                    </Button>
-                )}
+                <Button type="submit" loading={saving}>Save line</Button>
             </div>
         </form>
     );

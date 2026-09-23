@@ -21,11 +21,12 @@ export function LineSummary({ preview }: { preview: LinePreview }) {
     );
 }
 
-export function SummaryValue({ label, value }: { label: string; value: string }) {
+export function SummaryValue({ label, value }: { label: string; value: ReactNode }) {
     return (
         <div>
             <span className="text-xs uppercase text-slate-500">{label}</span>
-            <strong className="block tabular-nums text-slate-900">{value}</strong>
+            <div className="font-semibold tabular-nums text-slate-900">{value}</div>
         </div>
     );
 }
+import type { ReactNode } from 'react';

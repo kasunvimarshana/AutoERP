@@ -20,7 +20,7 @@ final readonly class CreateCustomerData
      */
     public function __construct(
         public int $tenantId,
-        public string $code,
+        public ?string $code,
         public string $name,
         public CustomerType $customerType,
         public ?int $organizationUnitId = null,

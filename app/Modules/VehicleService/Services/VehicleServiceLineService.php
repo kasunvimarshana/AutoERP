@@ -20,9 +20,10 @@ final class VehicleServiceLineService
         VehicleServiceJob $job,
         VehicleServiceLineData $data,
         ?int $expectedVersion = null,
+        ?int $actorId = null,
     ): VehicleServiceJobLine
     {
-        return $this->writes->create($job, $data, $expectedVersion);
+        return $this->writes->create($job, $data, $expectedVersion, $actorId);
     }
 
     public function update(
@@ -30,13 +31,14 @@ final class VehicleServiceLineService
         VehicleServiceJobLine $line,
         VehicleServiceLineData $data,
         ?int $expectedVersion = null,
+        ?int $actorId = null,
     ): VehicleServiceJobLine {
-        return $this->writes->update($job, $line, $data, $expectedVersion);
+        return $this->writes->update($job, $line, $data, $expectedVersion, $actorId);
     }
 
-    public function delete(VehicleServiceJob $job, VehicleServiceJobLine $line, ?int $expectedVersion = null): void
+    public function delete(VehicleServiceJob $job, VehicleServiceJobLine $line, ?int $expectedVersion = null, ?int $actorId = null): void
     {
-        $this->writes->delete($job, $line, $expectedVersion);
+        $this->writes->delete($job, $line, $expectedVersion, $actorId);
     }
 
     public function recalculateJob(VehicleServiceJob $job): VehicleServiceJob

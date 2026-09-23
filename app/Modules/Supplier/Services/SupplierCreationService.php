@@ -29,16 +29,17 @@ final class SupplierCreationService
 
     public function create(CreateSupplierData $data): Supplier
     {
-        $this->validator->validateCreate($data);
+        $code = $data->code ?? $this->numbers->nextCode($data->tenantId);
+        $this->validator->validateCreate($data, $code);
 
-        return DB::transaction(function () use ($data): Supplier {
+        return DB::transaction(function () use ($data, $code): Supplier {
             $supplier = Supplier::query()->create([
                 'tenant_id' => $data->tenantId,
                 'organization_unit_id' => $data->organizationUnitId,
                 'supplier_number' => $data->supplierNumber ?? $this->numbers->next($data->tenantId),
-                'code' => $data->code,
+                'code' => $code,
                 'name' => $data->name,
-                'legal_name' => $data->legalName,
+                'legal_name' => $data->name,
                 'display_name' => $data->displayName,
                 'supplier_type' => $data->supplierType,
                 'status' => $data->status,

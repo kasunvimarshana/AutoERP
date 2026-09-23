@@ -6,7 +6,9 @@ namespace Modules\VehicleService\Services;
 
 use Illuminate\Support\Facades\DB;
 use Modules\Core\Services\DecimalMath;
+use Modules\Invoice\DTOs\InvoiceAdjustmentData;
 use Modules\Invoice\DTOs\InvoiceLineData;
+use Modules\Invoice\Enums\AdjustmentEffect;
 use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Models\Invoice;
 use Modules\Invoice\Services\InvoiceCreationService;
@@ -75,7 +77,7 @@ final class VehicleServiceInvoiceCreator
                     static fn (InvoiceLineData $line): string => (string) $line->lineTotal,
                     $data->lines,
                 )),
-                'allocated_adjustment_total' => '0.000000',
+                'allocated_adjustment_total' => $this->allocatedAdjustmentTotal($data->adjustments),
                 'invoice_total' => (string) $invoice->grand_total,
                 'status' => 'active',
             ]);
@@ -103,5 +105,17 @@ final class VehicleServiceInvoiceCreator
                 'balance',
             ]);
         });
+    }
+
+    /** @param list<InvoiceAdjustmentData> $adjustments */
+    private function allocatedAdjustmentTotal(array $adjustments): string
+    {
+        return array_reduce(
+            $adjustments,
+            fn (string $total, InvoiceAdjustmentData $adjustment): string => $adjustment->effect === AdjustmentEffect::Decrease
+                ? $this->math->add($total, $adjustment->amount)
+                : $this->math->sub($total, $adjustment->amount),
+            '0.000000',
+        );
     }
 }

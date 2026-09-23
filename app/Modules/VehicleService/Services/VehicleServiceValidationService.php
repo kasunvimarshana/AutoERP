@@ -12,8 +12,8 @@ use Modules\Hr\Models\HrEmployee;
 use Modules\Item\Enums\ItemType;
 use Modules\Vehicle\Enums\VehicleStatus;
 use Modules\Vehicle\Models\Vehicle;
-use Modules\VehicleService\Enums\VehicleServiceLineSourceType;
 use Modules\VehicleService\Enums\VehicleServiceDesignationCode;
+use Modules\VehicleService\Enums\VehicleServiceLineSourceType;
 use Modules\VehicleService\Models\VehicleServiceJob;
 use Modules\VehicleService\Models\VehicleServiceJobLine;
 
@@ -82,8 +82,14 @@ final class VehicleServiceValidationService
         }
 
         if ($line->uses_job_supervisor) {
+            if ($job->supervisor_employee_id === null) {
+                throw new InvalidArgumentException('Select a Job Card supervisor before assigning this labour line.');
+            }
+            if ((int) $employee->getKey() !== (int) $job->supervisor_employee_id) {
+                throw new InvalidArgumentException('This labour line must use the Job Card supervisor.');
+            }
             if ($employee->designation->code !== VehicleServiceDesignationCode::Supervisor->value) {
-                throw new InvalidArgumentException('Only employees with the Supervisor designation can be assigned to this labour line.');
+                throw new InvalidArgumentException('The Job Card supervisor must retain the Supervisor designation.');
             }
 
             return $employee;

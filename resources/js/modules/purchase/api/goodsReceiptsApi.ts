@@ -39,6 +39,11 @@ export async function createGoodsReceipt(payload: GoodsReceiptPayload) {
     return response.data.data;
 }
 
+export async function generateGoodsReceiptBatchNumber() {
+    const response = await apiClient.post<ApiResource<{ batch_number: string }>>(`${endpoints.purchase}/goods-receipts/batch-number`, {});
+    return response.data.data;
+}
+
 export async function postGoodsReceipt(id: number, payload: PurchaseActionPayload) {
     const response = await apiClient.patch<ApiResource<GoodsReceipt>>(`${endpoints.purchase}/goods-receipts/${id}/post`, payload);
     return response.data.data;

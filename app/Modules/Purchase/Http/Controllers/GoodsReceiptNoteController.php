@@ -5,18 +5,21 @@ declare(strict_types=1);
 namespace Modules\Purchase\Http\Controllers;
 
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Modules\Inventory\Services\BatchNumberService;
 use Modules\Purchase\Constants\PurchaseAuditEvent;
 use Modules\Purchase\Enums\GoodsReceiptNoteStatus;
 use Modules\Purchase\Http\Controllers\Concerns\ScopesPurchaseRequests;
+use Modules\Purchase\Http\Requests\GenerateGoodsReceiptBatchNumberRequest;
 use Modules\Purchase\Http\Requests\ListPurchaseDocumentRequest;
 use Modules\Purchase\Http\Requests\PurchaseActionRequest;
 use Modules\Purchase\Http\Requests\StoreGoodsReceiptNoteRequest;
 use Modules\Purchase\Http\Resources\GoodsReceiptNoteResource;
 use Modules\Purchase\Models\GoodsReceiptNote;
 use Modules\Purchase\Services\GoodsReceiptNoteService;
-use Modules\Purchase\Services\PurchaseAuthorizationService;
 use Modules\Purchase\Services\PurchaseAuditService;
+use Modules\Purchase\Services\PurchaseAuthorizationService;
 use Modules\Purchase\Services\PurchaseDocumentPresentationService;
 use Modules\Purchase\Services\PurchaseGoodsReceiptPostingCoordinator;
 use Modules\Purchase\Services\PurchaseProcurementBalanceService;
@@ -69,6 +72,17 @@ final class GoodsReceiptNoteController
         $this->presentation->prepareGoodsReceipts($goodsReceipts->getCollection());
 
         return GoodsReceiptNoteResource::collection($goodsReceipts);
+    }
+
+    public function generateBatchNumber(
+        GenerateGoodsReceiptBatchNumberRequest $request,
+        BatchNumberService $numbers,
+    ): JsonResponse {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PurchaseAuthorizationService::GOODS_RECEIPTS_CREATE);
+
+        return response()->json([
+            'data' => ['batch_number' => $numbers->next($request->tenantId())],
+        ]);
     }
 
     public function store(StoreGoodsReceiptNoteRequest $request, GoodsReceiptNoteService $service): GoodsReceiptNoteResource
@@ -128,7 +142,7 @@ final class GoodsReceiptNoteController
 
     private function relations(): array
     {
-        return ['purchaseOrder', 'supplier', 'warehouse', 'warehouseLocation', 'lines.item', 'lines.variant', 'lines.uom', 'lines.purchaseOrderLine', 'adjustments'];
+        return ['purchaseOrder', 'supplier', 'warehouse', 'warehouseLocation', 'lines.item', 'lines.variant', 'lines.uom', 'lines.purchaseOrderLine', 'lines.batchAllocations.batch', 'adjustments'];
     }
 
     private function applyProgressFilters(Builder $query, ListPurchaseDocumentRequest $request): void

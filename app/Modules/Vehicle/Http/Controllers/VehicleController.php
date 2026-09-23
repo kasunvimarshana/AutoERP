@@ -8,6 +8,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Modules\Vehicle\Enums\VehicleStatus;
 use Modules\Vehicle\Http\Requests\ChangeVehicleStatusRequest;
+use Modules\Vehicle\Http\Requests\GenerateVehicleCodeRequest;
 use Modules\Vehicle\Http\Requests\ListVehicleRequest;
 use Modules\Vehicle\Http\Requests\StoreVehicleRequest;
 use Modules\Vehicle\Http\Requests\StoreVehicleWithRelationsRequest;
@@ -17,6 +18,7 @@ use Modules\Vehicle\Http\Resources\VehicleSummaryResource;
 use Modules\Vehicle\Models\Vehicle;
 use Modules\Vehicle\Services\VehicleAuthorizationService;
 use Modules\Vehicle\Services\VehicleCreationService;
+use Modules\Vehicle\Services\VehicleNumberService;
 use Modules\Vehicle\Services\VehicleQueryService;
 use Modules\Vehicle\Services\VehicleStatusService;
 use Modules\Vehicle\Services\VehicleUpdateService;
@@ -26,6 +28,7 @@ final class VehicleController
     public function __construct(
         private readonly VehicleQueryService $queries,
         private readonly VehicleCreationService $creation,
+        private readonly VehicleNumberService $numbers,
         private readonly VehicleUpdateService $updates,
         private readonly VehicleStatusService $statuses,
         private readonly VehicleAuthorizationService $authorization,
@@ -48,6 +51,15 @@ final class VehicleController
         $this->authorization->assert($request->currentUserId(), $request->tenantId(), VehicleAuthorizationService::CREATE);
 
         return $this->created($this->creation->create($request->toData()));
+    }
+
+    public function generateCode(GenerateVehicleCodeRequest $request): JsonResponse
+    {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), VehicleAuthorizationService::CREATE);
+
+        return response()->json([
+            'data' => ['code' => $this->numbers->nextCode($request->tenantId())],
+        ]);
     }
 
     public function storeWithRelations(StoreVehicleWithRelationsRequest $request): JsonResponse

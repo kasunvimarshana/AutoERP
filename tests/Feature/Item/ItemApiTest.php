@@ -30,19 +30,22 @@ final class ItemApiTest extends TestCase
             'item_category_id' => $categoryId,
             'item_brand_id' => $brandId,
             'base_uom_id' => $uomId,
+            'reorder_level' => '5.000000',
         ]))->assertCreated()
             ->assertJsonPath('data.category.code', 'PARTS')
             ->assertJsonPath('data.brand.code', 'GEN')
             ->assertJsonPath('data.base_uom.code', 'PCS')
+            ->assertJsonPath('data.reorder_level', '5.000000')
             ->assertJsonMissingPath('data.standard_price')
             ->assertJsonMissingPath('data.item_category_id')
             ->assertJsonMissingPath('data.item_brand_id')
             ->assertJsonMissingPath('data.base_uom_id');
 
         $itemId = (int) $response->json('data.id');
-        $this->withAuth($context)->putJson('/api/v1/items/'.$itemId, ['name' => 'Updated Item'])
+        $this->withAuth($context)->putJson('/api/v1/items/'.$itemId, ['name' => 'Updated Item', 'reorder_level' => '2.500000'])
             ->assertOk()
-            ->assertJsonPath('data.name', 'Updated Item');
+            ->assertJsonPath('data.name', 'Updated Item')
+            ->assertJsonPath('data.reorder_level', '2.500000');
 
         $this->withAuth($context)->putJson('/api/v1/items/'.$itemId, ['standard_price' => '12.340000'])
             ->assertUnprocessable()
@@ -50,7 +53,8 @@ final class ItemApiTest extends TestCase
 
         $this->withAuth($context)->getJson('/api/v1/items/lookup?search=ITM-001')
             ->assertOk()
-            ->assertJsonPath('data.0.code', 'ITM-001');
+            ->assertJsonPath('data.0.code', 'ITM-001')
+            ->assertJsonPath('data.0.reorder_level', '2.500000');
     }
 
     public function test_item_price_revisions_are_effective_dated_immutable_and_conflict_aware(): void

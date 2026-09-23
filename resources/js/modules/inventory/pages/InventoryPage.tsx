@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { hasPermission } from '@/modules/auth/accessControl';
 import { useAuth } from '@/modules/auth/AuthProvider';
 import { ContentHeader } from '@/shared/components/ContentHeader';
@@ -55,7 +56,11 @@ export default function InventoryPage() {
     const auth = useAuth();
     const can = (permission: string) => hasPermission(auth, permission);
     const canAny = (permissions: readonly string[]) => permissions.some(can);
-    const [tab, setTab] = useState<Tab>('dashboard');
+    const [searchParams, setSearchParams] = useSearchParams();
+    const requestedTab = searchParams.get('tab');
+    const tab: Tab = tabs.some((candidate) => candidate.id === requestedTab)
+        ? requestedTab as Tab
+        : 'dashboard';
     const [page, setPage] = useState(1);
     const [itemFilter, setItemFilter] = useState<NamedResource | null>(null);
 
@@ -82,6 +87,7 @@ export default function InventoryPage() {
     const canStockCountsApprove = can(inventoryPermissions.stockCountsApprove);
     const canStockCountsPost = can(inventoryPermissions.stockCountsPost);
     const canTrackingView = can(inventoryPermissions.trackingView);
+    const canTrackingManage = can(inventoryPermissions.trackingManage);
     const canOpenInventory = canAny(Object.values(inventoryPermissions));
 
     const tabAccess: Record<Tab, boolean> = {
@@ -93,12 +99,19 @@ export default function InventoryPage() {
         transfers: canTransfersView || canTransfersManage || canTransfersDispatch || canTransfersReceive,
         counts: canStockCountsView || canStockCountsManage || canStockCountsApprove || canStockCountsPost,
         costing: canValuationView || canCostAdjustmentsView || canCostAdjustmentsManage || canCostAdjustmentsPost,
-        tracking: canTrackingView,
+        tracking: canTrackingView || canTrackingManage,
         audit: canAuditView,
         reports: canOpenInventory,
     };
     const allowedTabs = tabs.filter((candidate) => tabAccess[candidate.id]);
     const activeTab = tabAccess[tab] ? tab : allowedTabs[0]?.id ?? 'dashboard';
+    const selectTab = (nextTab: Tab) => {
+        const nextSearchParams = new URLSearchParams(searchParams);
+        if (nextTab === 'dashboard') nextSearchParams.delete('tab');
+        else nextSearchParams.set('tab', nextTab);
+        setSearchParams(nextSearchParams);
+        setPage(1);
+    };
 
     const balances = useApi(
         (signal) => listStockBalances({ page, per_page: 25, item_id: itemFilter?.id }, signal),
@@ -155,7 +168,7 @@ export default function InventoryPage() {
                 </Panel>
             ) : (
                 <>
-                    <Tabs tabs={allowedTabs} active={activeTab} onChange={setTab} />
+                    <Tabs tabs={allowedTabs} active={activeTab} onChange={selectTab} />
                     <div className="mt-5">
                         {activeTab === 'dashboard' && (
                             <DashboardTab
@@ -233,7 +246,7 @@ export default function InventoryPage() {
                                 canPost={canCostAdjustmentsPost}
                             />
                         )}
-                        {activeTab === 'tracking' && <TrackingTab batches={batches} serials={serials} />}
+                        {activeTab === 'tracking' && <TrackingTab batches={batches} serials={serials} canManage={canTrackingManage} reload={reloadInventory} />}
                         {activeTab === 'audit' && <AuditTab states={states} />}
                         {activeTab === 'reports' && <ReportsTab />}
                     </div>

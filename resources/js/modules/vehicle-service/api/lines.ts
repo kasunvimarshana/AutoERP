@@ -1,11 +1,12 @@
 import { apiClient } from '@/shared/api/apiClient';
 import type { ApiCollection, ApiResource } from '@/shared/types/api';
-import type { VehicleServiceJobLine, VehicleServiceLinePayload } from '../vehicleServiceTypes';
+import type { VehicleServiceJobLine, VehicleServiceJobTotals, VehicleServiceLinePayload } from '../vehicleServiceTypes';
 import { vehicleServiceJobsEndpoint as jobs } from './endpoint';
 
 interface VehicleServiceLineMutationResponse<T> extends ApiResource<T> {
     meta: {
         row_version: number;
+        job_totals: VehicleServiceJobTotals;
         workforce_lines: VehicleServiceJobLine[];
     };
 }
@@ -14,6 +15,7 @@ export interface VehicleServiceLineMutationResult<T> {
     line: T;
     rowVersion: number;
     workforceLines: VehicleServiceJobLine[];
+    jobTotals: VehicleServiceJobTotals;
 }
 
 export const listVehicleServiceLines = (jobId: number, signal?: AbortSignal) =>
@@ -46,5 +48,6 @@ function toLineMutationResult<T>(response: { data: VehicleServiceLineMutationRes
         line: response.data.data,
         rowVersion: response.data.meta.row_version,
         workforceLines: response.data.meta.workforce_lines,
+        jobTotals: response.data.meta.job_totals,
     };
 }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { financePermissions } from '@/modules/finance/financePermissions';
+import { purchasePermissions } from '@/modules/purchase/purchasePermissions';
 import { vehicleServicePermissions } from '@/modules/vehicle-service/vehicleServicePermissions';
 import { resolveTenantRouteEntitlement } from './resolvedRouteEntitlements';
 
@@ -48,6 +49,16 @@ describe('resolved tenant route entitlements', () => {
         expect(resolveTenantRouteEntitlement('/customers')?.permissions).toContain('customers.view');
         expect(resolveTenantRouteEntitlement('/purchase/orders')?.permissions).toContain('purchase.orders.view');
         expect(resolveTenantRouteEntitlement('/vehicle-service/jobs')?.permissions).toContain(vehicleServicePermissions.jobsView);
+    });
+
+    it('protects Purchase-owned invoice and payment detail routes with Purchase permissions', () => {
+        const invoice = resolveTenantRouteEntitlement('/purchase/invoices/42');
+        const payment = resolveTenantRouteEntitlement('/purchase/payments/84');
+
+        expect(invoice?.modules).toContain('purchase');
+        expect(invoice?.permissions).toContain(purchasePermissions.supplierInvoicesView);
+        expect(payment?.modules).toEqual(expect.arrayContaining(['purchase', 'payment']));
+        expect(payment?.permissions).toContain(purchasePermissions.paymentsView);
     });
 
     it('protects the Inventory workspace route at its exact path', () => {

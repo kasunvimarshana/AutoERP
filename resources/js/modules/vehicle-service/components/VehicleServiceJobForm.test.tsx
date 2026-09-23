@@ -15,6 +15,10 @@ const apiMocks = vi.hoisted(() => ({
 
 vi.mock('../vehicleServiceApi', () => apiMocks);
 
+vi.mock('@/modules/auth/AuthProvider', () => ({
+    useAuth: () => ({ permissions: [] }),
+}));
+
 vi.mock('./VehicleServiceQuickVehicleModal', () => ({
     VehicleServiceQuickVehicleModal: () => null,
 }));
@@ -57,6 +61,9 @@ const existingJob: VehicleServiceJob = {
     supervisor_commission_amount: '0.000000',
     status: 'draft',
     subtotal: '0.000000',
+    line_discount_total: '0.000000',
+    job_discount_base: '0.000000',
+    job_discount_amount: '0.000000',
     discount_total: '0.000000',
     tax_total: '0.000000',
     charge_total: '0.000000',

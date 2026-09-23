@@ -246,7 +246,7 @@ export default function PurchaseInvoiceCreatePage() {
         setError(null);
         try {
             const invoice = await createPurchaseInvoice(payload());
-            navigate(`/invoices/${String(invoice.id ?? '')}?from=purchase`);
+            navigate(`/purchase/invoices/${String(invoice.id ?? '')}`);
         } catch (requestError) {
             setError(toApiError(requestError));
         } finally {

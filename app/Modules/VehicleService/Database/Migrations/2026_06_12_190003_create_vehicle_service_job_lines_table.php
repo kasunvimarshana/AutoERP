@@ -20,6 +20,8 @@ return new class extends Migration
             $table->string('line_source_type', 30);
             $table->foreignId('item_id')->nullable();
             $table->foreignId('item_variant_id')->nullable();
+            $table->foreignId('batch_id')->nullable();
+            $table->foreignId('batch_price_revision_id')->nullable();
             $table->foreignId('uom_id')->nullable();
             $table->text('description');
             $table->decimal('quantity', 20, 6);
@@ -49,6 +51,8 @@ return new class extends Migration
             $table->index(['tenant_id', 'organization_unit_id'], 'vehicle_service_job_lines_tenant_org_ix');
             $table->index(['vehicle_service_job_id', 'line_source_type'], 'vehicle_service_job_lines_job_type_ix');
             $table->index('parent_line_id', 'vehicle_service_job_lines_parent_ix');
+            $table->index('batch_id', 'vehicle_service_job_lines_batch_ix');
+            $table->index('batch_price_revision_id', 'vehicle_service_job_lines_batch_price_ix');
 
             $table->unique(['id', 'tenant_id'], 'vehicle_service_job_lines_id_tenant_uk');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'vehicle_service_job_lines_organization_unit_id_tenant_fk')
@@ -70,6 +74,14 @@ return new class extends Migration
             $table->foreign(['item_variant_id', 'tenant_id'], 'vehicle_service_job_lines_item_variant_id_tenant_fk')
                 ->references(['id', 'tenant_id'])
                 ->on('item_variants')
+                ->restrictOnDelete();
+            $table->foreign(['batch_id', 'tenant_id'], 'vehicle_service_job_lines_batch_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('inventory_batches')
+                ->restrictOnDelete();
+            $table->foreign(['batch_price_revision_id', 'tenant_id'], 'vehicle_service_job_lines_batch_price_id_tenant_fk')
+                ->references(['id', 'tenant_id'])
+                ->on('inventory_batch_price_revisions')
                 ->restrictOnDelete();
             $table->foreign(['uom_id', 'tenant_id'], 'vehicle_service_job_lines_uom_id_tenant_fk')
                 ->references(['id', 'tenant_id'])

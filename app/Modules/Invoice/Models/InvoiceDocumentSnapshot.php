@@ -17,10 +17,10 @@ final class InvoiceDocumentSnapshot extends TenantOwnedModel
 
     protected static function booted(): void
     {
-        static::updating(static function (): void {
+        self::updating(static function (): void {
             throw new LogicException('Invoice document snapshots are immutable.');
         });
-        static::deleting(static function (): void {
+        self::deleting(static function (): void {
             throw new LogicException('Invoice document snapshots are retained with their invoice.');
         });
     }
@@ -37,6 +37,7 @@ final class InvoiceDocumentSnapshot extends TenantOwnedModel
             'supply_date' => 'date',
             'supply_period_start' => 'date',
             'supply_period_end' => 'date',
+            'purchaser_reference_fields' => 'array',
         ]);
     }
 

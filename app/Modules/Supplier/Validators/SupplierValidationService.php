@@ -26,11 +26,11 @@ final class SupplierValidationService
 {
     public function __construct(private readonly DecimalMath $math) {}
 
-    public function validateCreate(CreateSupplierData $data): void
+    public function validateCreate(CreateSupplierData $data, string $resolvedCode): void
     {
-        $this->assertText($data->code, 'Supplier code is required.');
-        $this->assertText($data->name, 'Supplier name is required.');
-        $this->assertCodeUnique($data->tenantId, $data->code);
+        $this->assertText($resolvedCode, 'Supplier code is required.');
+        $this->assertText($data->name, 'Supplier legal name is required.');
+        $this->assertCodeUnique($data->tenantId, $resolvedCode);
         if ($data->supplierNumber !== null) {
             $this->assertNumberUnique($data->tenantId, $data->supplierNumber);
         }
@@ -50,7 +50,7 @@ final class SupplierValidationService
             $this->assertCodeUnique((int) $supplier->tenant_id, $data->code, (int) $supplier->getKey());
         }
         if ($data->name !== null) {
-            $this->assertText($data->name, 'Supplier name is required.');
+            $this->assertText($data->name, 'Supplier legal name is required.');
         }
         if ($data->creditLimit !== null) {
             $this->assertNonNegative($data->creditLimit, 'Supplier credit limit cannot be negative.');

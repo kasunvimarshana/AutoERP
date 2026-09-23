@@ -26,28 +26,50 @@ final class FinanceSeeder extends Seeder
     private const OPENING_EFFECTIVE_DATE = '1900-01-01';
 
     private const TYPE_ASSET = 'ASSET';
+
     private const TYPE_LIABILITY = 'LIABILITY';
+
     private const TYPE_EQUITY = 'EQUITY';
+
     private const TYPE_REVENUE = 'REVENUE';
+
     private const TYPE_EXPENSE = 'EXPENSE';
 
     private const ACCOUNT_CASH = '1010';
+
     private const ACCOUNT_BANK = '1020';
+
     private const ACCOUNT_RECEIVABLE = '1100';
+
     private const ACCOUNT_INVENTORY = '1200';
+
     private const ACCOUNT_TAX_RECEIVABLE = '1300';
+
     private const ACCOUNT_SUPPLIER_ADVANCE = '1400';
+
     private const ACCOUNT_PAYABLE = '2100';
+
     private const ACCOUNT_GRNI = '2150';
+
     private const ACCOUNT_TAX_PAYABLE = '2200';
+
     private const ACCOUNT_CUSTOMER_ADVANCE = '2300';
+
     private const ACCOUNT_CUSTOMER_DEPOSIT = '2350';
+
     private const ACCOUNT_SALES_REVENUE = '4100';
+
     private const ACCOUNT_SERVICE_REVENUE = '4200';
+
     private const ACCOUNT_RENTAL_REVENUE = '4300';
+
     private const ACCOUNT_PURCHASE_EXPENSE = '5100';
+
     private const ACCOUNT_COST_OF_GOODS_SOLD = '5200';
+
     private const ACCOUNT_RENTAL_EXPENSE = '5300';
+
+    private const ACCOUNT_OPERATING_EXPENSE = '5400';
 
     public function run(): void
     {
@@ -124,6 +146,7 @@ final class FinanceSeeder extends Seeder
             'PURCHASE' => ['Purchase Expense', self::TYPE_EXPENSE],
             'COGS' => ['Cost of Goods Sold', self::TYPE_EXPENSE],
             'RENTAL_EXPENSE' => ['Rental Expense', self::TYPE_EXPENSE],
+            'OPERATING_EXPENSE' => ['Operating Expense', self::TYPE_EXPENSE],
         ];
 
         $categories = [];
@@ -195,6 +218,7 @@ final class FinanceSeeder extends Seeder
             [self::ACCOUNT_PURCHASE_EXPENSE, 'Purchase Expense', self::TYPE_EXPENSE, 'PURCHASE', false, false, false],
             [self::ACCOUNT_COST_OF_GOODS_SOLD, 'Cost of Goods Sold', self::TYPE_EXPENSE, 'COGS', false, false, false],
             [self::ACCOUNT_RENTAL_EXPENSE, 'Rental Expense', self::TYPE_EXPENSE, 'RENTAL_EXPENSE', false, false, false],
+            [self::ACCOUNT_OPERATING_EXPENSE, 'Operating Expense', self::TYPE_EXPENSE, 'OPERATING_EXPENSE', false, false, false],
         ];
         $controlCategories = [
             'AR',
@@ -317,6 +341,14 @@ final class FinanceSeeder extends Seeder
                     FinanceAccountRoleCode::Cash->value => self::ACCOUNT_CASH,
                     FinanceAccountRoleCode::Bank->value => self::ACCOUNT_BANK,
                     FinanceAccountRoleCode::CustomerDeposit->value => self::ACCOUNT_CUSTOMER_DEPOSIT,
+                ],
+            ],
+            FinancePostingProfileCode::ExpensePayment->value => [
+                'name' => 'Expense Payment',
+                'rules' => [
+                    FinanceAccountRoleCode::OperatingExpense->value => self::ACCOUNT_OPERATING_EXPENSE,
+                    FinanceAccountRoleCode::Cash->value => self::ACCOUNT_CASH,
+                    FinanceAccountRoleCode::Bank->value => self::ACCOUNT_BANK,
                 ],
             ],
             FinancePostingProfileCode::InventoryReceipt->value => [

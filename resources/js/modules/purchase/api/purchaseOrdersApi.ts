@@ -3,6 +3,7 @@ import { endpoints } from '@/shared/api/endpoints';
 import type { ApiCollection, ApiResource, ListParams } from '@/shared/types/api';
 import type { NamedResource } from '@/shared/types/common';
 import type { LookupLoadParams, LookupResult } from '@/shared/types/lookup';
+import type { WhatsAppVerificationStatus } from '@/shared/types/whatsAppVerification';
 import type {
     PurchaseAdjustmentCatalogueEntry,
     PurchaseActionPayload,
@@ -13,6 +14,17 @@ import type {
     PurchaseOrderPayload,
     PurchaseSupplierContext,
 } from '../purchaseTypes';
+export interface WhatsAppDocumentShare {
+    recipient: {
+        name: string;
+        phone: string;
+        verification_status: WhatsAppVerificationStatus;
+    };
+    document_url: string;
+    whatsapp_url: string;
+    expires_at: string;
+}
+
 
 export async function listPurchaseOrders(params: ListParams, signal?: AbortSignal) {
     const response = await apiClient.get<ApiCollection<PurchaseOrder>>(`${endpoints.purchase}/orders`, { params, signal });
@@ -37,6 +49,28 @@ export async function listInvoiceablePurchaseOrders(params: ListParams, signal?:
 
 export async function getPurchaseOrder(id: number, signal?: AbortSignal) {
     const response = await apiClient.get<ApiResource<PurchaseOrder>>(`${endpoints.purchase}/orders/${id}`, { signal });
+    return response.data.data;
+}
+
+export async function downloadPurchaseOrderPdf(id: number, purchaseOrderNumber?: string | null): Promise<void> {
+    const response = await apiClient.get<Blob>(`${endpoints.purchase}/orders/${id}/pdf`, {
+        responseType: 'blob',
+    });
+    const url = URL.createObjectURL(response.data);
+    const link = window.document.createElement('a');
+    const safeNumber = purchaseOrderNumber?.trim().replace(/[^A-Za-z0-9._-]+/g, '-') || String(id);
+    link.href = url;
+    link.download = `purchase-order-${safeNumber}.pdf`;
+    window.document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
+}
+
+export async function getPurchaseOrderWhatsAppShare(id: number) {
+    const response = await apiClient.post<ApiResource<WhatsAppDocumentShare>>(
+        `${endpoints.purchase}/orders/${id}/whatsapp-share`,
+    );
     return response.data.data;
 }
 

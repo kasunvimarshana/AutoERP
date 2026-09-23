@@ -28,7 +28,7 @@ final class TenantSeeder extends Seeder
             $code = strtoupper(trim((string) config('tenant.seeding.tenant.code')));
             $name = trim((string) config('tenant.seeding.tenant.name'));
 
-            TenantModel::query()->updateOrCreate(
+            TenantModel::query()->firstOrCreate(
                 ['code' => $code],
                 [
                     'uuid' => Uuid::uuid5(

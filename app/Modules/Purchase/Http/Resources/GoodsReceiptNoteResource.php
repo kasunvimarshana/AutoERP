@@ -57,11 +57,15 @@ final class GoodsReceiptNoteResource extends PurchaseResource
                 'tax_group_id' => $line->tax_group_id,
                 'line_total' => (string) $line->line_total,
                 'status' => $this->enumValue($line->status),
+                'batch_allocations' => $line->relationLoaded('batchAllocations') ? $line->batchAllocations->map(fn ($allocation): array => [
+                    'id' => (int) $allocation->getKey(),
+                    'batch' => $allocation->relationLoaded('batch') ? $this->summary($allocation->batch, ['batch_number', 'lot_number']) : null,
+                    'quantity' => (string) $allocation->quantity,
+                ])->all() : [],
             ])->all(), []),
             'adjustments' => $this->whenLoaded('adjustments', fn () => PurchaseHeaderAdjustmentResource::collection($this->adjustments)->resolve($request), []),
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
         ];
     }
-
 }

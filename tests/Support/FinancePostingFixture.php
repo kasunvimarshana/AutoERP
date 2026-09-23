@@ -14,24 +14,52 @@ final class FinancePostingFixture
     private const OPENING_EFFECTIVE_DATE = '1900-01-01';
 
     private const ASSET_TYPE = 'ASSET';
+
     private const LIABILITY_TYPE = 'LIABILITY';
+
     private const REVENUE_TYPE = 'REVENUE';
+
     private const EXPENSE_TYPE = 'EXPENSE';
 
     private const CASH_ACCOUNT = '1010';
+
     private const BANK_ACCOUNT = '1020';
+
     private const RECEIVABLE_ACCOUNT = '1100';
+
     private const INVENTORY_ACCOUNT = '1200';
+
     private const TAX_RECEIVABLE_ACCOUNT = '1300';
+
     private const SUPPLIER_ADVANCE_ACCOUNT = '1400';
+
     private const PAYABLE_ACCOUNT = '2100';
+
     private const GRNI_ACCOUNT = '2150';
+
     private const TAX_PAYABLE_ACCOUNT = '2200';
+
     private const CUSTOMER_ADVANCE_ACCOUNT = '2300';
+
     private const SALES_REVENUE_ACCOUNT = '4100';
+
     private const SERVICE_REVENUE_ACCOUNT = '4200';
+
     private const PURCHASE_EXPENSE_ACCOUNT = '5100';
+
     private const COST_OF_GOODS_SOLD_ACCOUNT = '5200';
+
+    private const OPERATING_EXPENSE_ACCOUNT = '5400';
+
+    public static function seedExpensePaymentProfile(int $tenantId, ?int $organizationUnitId = null): void
+    {
+        $accounts = self::accounts($tenantId, $organizationUnitId);
+        self::profile($tenantId, $organizationUnitId, FinancePostingProfileCode::ExpensePayment->value, [
+            FinanceAccountRoleCode::OperatingExpense->value => $accounts[FinanceAccountRoleCode::OperatingExpense->value],
+            FinanceAccountRoleCode::Cash->value => $accounts[FinanceAccountRoleCode::Cash->value],
+            FinanceAccountRoleCode::Bank->value => $accounts[FinanceAccountRoleCode::Bank->value],
+        ]);
+    }
 
     public static function seedCustomerPaymentProfiles(int $tenantId, ?int $organizationUnitId = null): void
     {
@@ -172,6 +200,7 @@ final class FinancePostingFixture
             FinanceAccountRoleCode::ServiceRevenue->value => self::account($tenantId, $organizationUnitId, $revenueTypeId, self::SERVICE_REVENUE_ACCOUNT, 'Service Revenue', 'credit'),
             FinanceAccountRoleCode::Expense->value => self::account($tenantId, $organizationUnitId, $expenseTypeId, self::PURCHASE_EXPENSE_ACCOUNT, 'Purchase Expense', 'debit'),
             FinanceAccountRoleCode::CostOfGoodsSold->value => self::account($tenantId, $organizationUnitId, $expenseTypeId, self::COST_OF_GOODS_SOLD_ACCOUNT, 'Cost of Goods Sold', 'debit'),
+            FinanceAccountRoleCode::OperatingExpense->value => self::account($tenantId, $organizationUnitId, $expenseTypeId, self::OPERATING_EXPENSE_ACCOUNT, 'Operating Expense', 'debit'),
         ];
     }
 
