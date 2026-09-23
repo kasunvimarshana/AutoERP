@@ -1,3 +1,5 @@
+import type { ExpenseReportOverview } from './expenseReportTypes';
+
 export interface SummaryDocumentMetrics {
     document_count: number;
     subtotal: string;
@@ -67,6 +69,7 @@ export interface SummaryReportResult {
         total_expenses: string;
         net_profit: string;
     };
+    operating_expenses: ExpenseReportOverview;
     capabilities: {
         sales_returns: SummaryCapability;
         purchase_returns: SummaryCapability;

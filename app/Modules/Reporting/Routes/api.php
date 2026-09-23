@@ -29,6 +29,7 @@ Route::prefix('api/v1/reports')->middleware($middleware)->name('api.v1.reports.'
         Route::get('/', [ReportController::class, 'index'])->name('index');
         Route::get('dashboard', DashboardController::class)->name('dashboard');
         Route::get('summary', [OperationalReportController::class, 'summary'])->name('summary');
+        Route::get('expenses', [OperationalReportController::class, 'expenses'])->name('expenses');
         Route::get('purchase/detailed', [OperationalReportController::class, 'detailedPurchase'])->name('purchase.detailed');
         Route::get('purchase/grn-payables', [OperationalReportController::class, 'grnPayables'])->name('purchase.grn-payables');
         Route::get('vehicle-service/detailed', [OperationalReportController::class, 'detailedVehicleService'])->name('vehicle-service.detailed');
@@ -52,6 +53,9 @@ Route::prefix('api/v1/reports')->middleware($middleware)->name('api.v1.reports.'
     });
 
     Route::middleware($requires(ReportingAuthorizationService::REPORTS_EXPORT))->group(function () use ($exportFormats): void {
+        Route::get('expenses/export/{format}', [OperationalReportController::class, 'exportExpenses'])
+            ->whereIn('format', $exportFormats)
+            ->name('expenses.export');
         Route::get('purchase/detailed/export/{format}', [OperationalReportController::class, 'exportDetailedPurchase'])
             ->whereIn('format', $exportFormats)
             ->name('purchase.detailed.export');

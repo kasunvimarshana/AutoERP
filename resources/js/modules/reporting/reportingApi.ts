@@ -17,6 +17,8 @@ import type {
     GrnPayablesReportResult,
     VehicleServiceHistoryParams,
     VehicleServiceHistoryResult,
+    ExpenseReportParams,
+    ExpenseReportResult,
 } from './reportingTypes';
 
 export async function listReports(signal?: AbortSignal): Promise<ReportDefinition[]> {
@@ -37,7 +39,7 @@ export async function runReport(key: string, params: ReportParams, signal?: Abor
 export async function exportReport(
     key: string,
     format: ReportFormat,
-    params: ReportParams | TechnicianWorkReportParams | EmployeeCommissionReportParams | OperationalReportParams | GrnPayablesReportParams | VehicleServiceHistoryParams,
+    params: ReportParams | TechnicianWorkReportParams | EmployeeCommissionReportParams | OperationalReportParams | GrnPayablesReportParams | VehicleServiceHistoryParams | ExpenseReportParams,
     previewWindow?: Window | null,
 ): Promise<void> {
     const response = await apiClient.get<Blob>(`${endpoints.reports}/${key}/export/${format}`, {
@@ -136,4 +138,13 @@ export async function runSummaryReport(
     });
 
     return response.data.data;
+}
+
+export async function runExpenseReport(
+    params: ExpenseReportParams,
+    signal?: AbortSignal,
+): Promise<ExpenseReportResult> {
+    const response = await apiClient.get<ExpenseReportResult>(`${endpoints.reports}/expenses`, { params, signal });
+
+    return response.data;
 }

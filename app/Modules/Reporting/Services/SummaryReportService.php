@@ -31,6 +31,7 @@ final class SummaryReportService
         private readonly FinanceStatementService $statements,
         private readonly ReportBrandingResolver $branding,
         private readonly SalesSettlementBreakdownService $salesSettlements,
+        private readonly ExpenseReportService $expenses,
     ) {}
 
     /**
@@ -109,6 +110,12 @@ final class SummaryReportService
                 ),
             ],
             'performance' => $this->performance($tenantId, $organizationUnitId, $dateFrom, $dateTo),
+            'operating_expenses' => $this->expenses->overview(
+                $tenantId,
+                $organizationUnitId,
+                $dateFrom,
+                $dateTo,
+            ),
             'capabilities' => [
                 'sales_returns' => [
                     'available' => true,

@@ -55,3 +55,13 @@ export type {
     VehicleServiceHistoryResult,
     VehicleServiceHistoryRow,
 } from './vehicleServiceHistoryTypes';
+export type {
+    ExpenseBreakdownRow,
+    ExpenseEventType,
+    ExpenseFilterOption,
+    ExpenseReportOverview,
+    ExpenseReportParams,
+    ExpenseReportResult,
+    ExpenseReportSummary,
+    ExpenseTrendRow,
+} from './expenseReportTypes';

@@ -11,6 +11,7 @@ import { auditPermissions } from "@/modules/audit/auditPermissions";
 import { referenceDataPermissions } from "@/modules/reference-data/referenceDataPermissions";
 import { tenantPermissions } from "@/modules/tenant/tenantPermissions";
 import { financePermissions } from "@/modules/finance/financePermissions";
+import { expensePermissions } from "@/modules/expense/expensePermissions";
 import { paymentPermissions } from "@/modules/payment/paymentPermissions";
 import { purchasePermissions } from "@/modules/purchase/purchasePermissions";
 import { reportingPermissions } from "@/modules/reporting/reportingPermissions";
@@ -675,6 +676,49 @@ export const tenantNavigationSections: NavigationSection[] = [
         label: "Finance",
         items: [
             {
+                id: "expense-workspace",
+                type: "module",
+                label: "Expenses",
+                icon: "payment",
+                access: operationalAccess(["finance"]),
+                children: [
+                    {
+                        id: "expenses",
+                        type: "link",
+                        label: "All Expenses",
+                        to: "/expenses",
+                        match: ["/expenses"],
+                        exclude: ["/expenses/create", "/expenses/types"],
+                        access: {
+                            ...operationalAccess(["finance"]),
+                            permissions: [expensePermissions.view],
+                        },
+                    },
+                    {
+                        id: "add-expense",
+                        type: "link",
+                        label: "Add Expense",
+                        to: "/expenses/create",
+                        match: ["/expenses/create"],
+                        access: {
+                            ...operationalAccess(["finance"]),
+                            permissions: [expensePermissions.create],
+                        },
+                    },
+                    {
+                        id: "expense-types",
+                        type: "link",
+                        label: "Expense Types",
+                        to: "/expenses/types",
+                        match: ["/expenses/types"],
+                        access: {
+                            ...operationalAccess(["finance"]),
+                            permissions: [expensePermissions.typesView],
+                        },
+                    },
+                ],
+            },
+            {
                 id: "finance-workspace",
                 type: "module",
                 label: "Finance",
@@ -874,6 +918,17 @@ export const tenantNavigationSections: NavigationSection[] = [
                         label: "Summary Reports",
                         to: "/reports/summary",
                         match: ["/reports/summary"],
+                        access: {
+                            ...operationalAccess(["reporting"]),
+                            permissions: [reportingPermissions.view],
+                        },
+                    },
+                    {
+                        id: "expense-report",
+                        type: "link",
+                        label: "Expense Report",
+                        to: "/reports/expenses",
+                        match: ["/reports/expenses"],
                         access: {
                             ...operationalAccess(["reporting"]),
                             permissions: [reportingPermissions.view],

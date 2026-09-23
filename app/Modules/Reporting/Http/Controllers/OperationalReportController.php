@@ -7,12 +7,14 @@ namespace Modules\Reporting\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
 use Modules\Core\Http\Requests\TenantScopedRequest;
+use Modules\Reporting\Http\Requests\ExpenseReportRequest;
 use Modules\Reporting\Http\Requests\GrnPayablesReportRequest;
 use Modules\Reporting\Http\Requests\OperationalReportRequest;
 use Modules\Reporting\Http\Requests\SummaryReportRequest;
 use Modules\Reporting\Services\DetailedPurchaseReportService;
 use Modules\Reporting\Services\DetailedVehicleServiceReportService;
 use Modules\Reporting\Services\EmployeeIncentiveReportService;
+use Modules\Reporting\Services\ExpenseReportService;
 use Modules\Reporting\Services\GrnPayablesReportService;
 use Modules\Reporting\Services\ReportExport;
 use Modules\Reporting\Services\ReportingAuthorizationService;
@@ -25,6 +27,7 @@ final class OperationalReportController
         private readonly GrnPayablesReportService $grnPayables,
         private readonly DetailedVehicleServiceReportService $vehicleService,
         private readonly EmployeeIncentiveReportService $incentives,
+        private readonly ExpenseReportService $expenses,
         private readonly SummaryReportService $summary,
         private readonly ReportExport $export,
         private readonly ReportingAuthorizationService $authorization,
@@ -93,6 +96,28 @@ final class OperationalReportController
         );
     }
 
+    public function expenses(ExpenseReportRequest $request): JsonResponse
+    {
+        $this->assertView($request);
+
+        return response()->json($this->expenses->run($this->expenseInput($request)));
+    }
+
+    public function exportExpenses(ExpenseReportRequest $request, string $format): Response
+    {
+        $this->assertExport($request);
+        $input = $this->expenseInput($request);
+
+        return $this->export->export(
+            $format,
+            $this->expenses->definition(),
+            $this->expenses->exportRows($input)->all(),
+            $request->tenantId(),
+            $request->organizationUnitId(),
+            $input,
+        );
+    }
+
     public function detailedVehicleService(OperationalReportRequest $request): JsonResponse
     {
         $this->assertView($request);
@@ -151,6 +176,16 @@ final class OperationalReportController
 
     /** @return array<string, mixed> */
     private function grnPayablesInput(GrnPayablesReportRequest $request): array
+    {
+        return [
+            ...$request->validated(),
+            'tenant_id' => $request->tenantId(),
+            'organization_unit_id' => $request->organizationUnitId(),
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function expenseInput(ExpenseReportRequest $request): array
     {
         return [
             ...$request->validated(),

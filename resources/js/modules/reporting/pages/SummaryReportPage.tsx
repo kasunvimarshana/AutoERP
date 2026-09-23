@@ -215,6 +215,11 @@ export default function SummaryReportPage() {
                         </div>
                     </section>
 
+                    <OperatingExpenseSnapshot
+                        overview={result.operating_expenses}
+                        currency={currency}
+                    />
+
                     <section>
                         <SectionHeading
                             title="Cash movement"
@@ -238,6 +243,67 @@ export default function SummaryReportPage() {
                 </div>
             ) : null}
         </>
+    );
+}
+
+function OperatingExpenseSnapshot({
+    overview,
+    currency,
+}: {
+    overview: SummaryReportResult['operating_expenses'];
+    currency: string;
+}) {
+    const positiveTypes = overview.by_expense_type.filter((row) => Number(row.net_amount) > 0).slice(0, 3);
+    const positiveTotal = overview.by_expense_type.reduce((total, row) => total + Math.max(0, Number(row.net_amount)), 0);
+    const top = positiveTypes[0];
+    const topShare = top && positiveTotal > 0 ? Math.round((Number(top.net_amount) / positiveTotal) * 100) : 0;
+
+    return (
+        <section className="overflow-hidden rounded-2xl border border-sky-200 bg-white shadow-sm">
+            <div className="grid lg:grid-cols-[0.8fr_1.2fr]">
+                <div className="border-b border-sky-100 bg-sky-50 px-5 py-6 lg:border-b-0 lg:border-r sm:px-6">
+                    <h2 className="text-sm font-medium text-sky-800">Operating expenses</h2>
+                    <p className="mt-2 text-3xl font-bold tabular-nums tracking-tight text-slate-950">
+                        {money(overview.summary.net_amount, currency)}
+                    </p>
+                    <p className="mt-3 text-sm leading-6 text-slate-600">
+                        {overview.summary.event_count === 0
+                            ? 'No operating expenses were posted in this period.'
+                            : top
+                                ? `${overview.summary.posted_count} expenses were posted. ${top.name} was the largest category at ${topShare}%.`
+                                : `${overview.summary.posted_count} expenses and ${overview.summary.reversal_count} reversals affected this period.`}
+                    </p>
+                    <LinkButton to="/reports/expenses" className="mt-5">View expense report</LinkButton>
+                </div>
+                <div className="px-5 py-6 sm:px-6">
+                    <div className="flex items-center justify-between gap-4">
+                        <div>
+                            <h2 className="font-bold text-slate-950">Largest expense categories</h2>
+                            <p className="mt-1 text-sm text-slate-500">Net amounts after reversals dated in this period.</p>
+                        </div>
+                        <span className="shrink-0 text-xs text-slate-400">{overview.summary.reversal_count} reversals</span>
+                    </div>
+                    <div className="mt-5 space-y-4">
+                        {positiveTypes.length === 0 ? (
+                            <p className="py-5 text-center text-sm text-slate-500">No positive category balance to show.</p>
+                        ) : positiveTypes.map((row) => (
+                            <div key={row.id}>
+                                <div className="mb-2 flex items-center justify-between gap-4 text-sm">
+                                    <span className="truncate font-medium text-slate-700">{row.name}</span>
+                                    <span className="shrink-0 font-semibold tabular-nums text-slate-900">{money(row.net_amount, currency)}</span>
+                                </div>
+                                <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+                                    <div
+                                        className="h-full rounded-full bg-sky-600"
+                                        style={{ width: `${positiveTotal > 0 ? Math.max(3, (Number(row.net_amount) / positiveTotal) * 100) : 0}%` }}
+                                    />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        </section>
     );
 }
 

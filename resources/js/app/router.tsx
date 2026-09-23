@@ -13,6 +13,7 @@ import { PermissionRoute } from "@/modules/auth/PermissionRoute";
 import { PLATFORM_PERMISSION } from "./access/platformPermissions";
 import { RouteErrorPage } from "./errors/RouteErrorPage";
 import { tenantPermissions } from "@/modules/tenant/tenantPermissions";
+import { expensePermissions } from "@/modules/expense/expensePermissions";
 
 const LoginPage = lazy(() => import("@/modules/auth/LoginPage"));
 const AuditLogListPage = lazy(() => import("@/modules/audit/AuditLogListPage"));
@@ -232,6 +233,15 @@ const PaymentMethodListPage = lazy(
 const PaymentMethodFormPage = lazy(
     () => import("@/modules/payment/pages/PaymentMethodFormPage"),
 );
+const ExpenseListPage = lazy(
+    () => import("@/modules/expense/pages/ExpenseListPage"),
+);
+const ExpenseCreatePage = lazy(
+    () => import("@/modules/expense/pages/ExpenseCreatePage"),
+);
+const ExpenseTypesPage = lazy(
+    () => import("@/modules/expense/pages/ExpenseTypesPage"),
+);
 const ChequeTemplateListPage = lazy(
     () => import("@/modules/payment/cheque-print/ChequeTemplateListPage"),
 );
@@ -313,6 +323,9 @@ const ReportListPage = lazy(
 const ReportPage = lazy(() => import("@/modules/reporting/pages/ReportPage"));
 const SummaryReportPage = lazy(
     () => import("@/modules/reporting/pages/SummaryReportPage"),
+);
+const ExpenseReportPage = lazy(
+    () => import("@/modules/reporting/pages/ExpenseReportPage"),
 );
 const GrnPayablesReportPage = lazy(
     () => import("@/modules/reporting/pages/GrnPayablesReportPage"),
@@ -768,6 +781,18 @@ const appRouter = createBrowserRouter(
                             path="/payments/:id"
                             element={<PaymentDetailPage />}
                         />
+                        <Route
+                            path="/expenses"
+                            element={<PermissionRoute permission={expensePermissions.view}><ExpenseListPage /></PermissionRoute>}
+                        />
+                        <Route
+                            path="/expenses/create"
+                            element={<PermissionRoute permission={expensePermissions.create}><ExpenseCreatePage /></PermissionRoute>}
+                        />
+                        <Route
+                            path="/expenses/types"
+                            element={<PermissionRoute permission={expensePermissions.typesView}><ExpenseTypesPage /></PermissionRoute>}
+                        />
                         <Route path="/vouchers" element={<VoucherListPage />} />
                         <Route
                             path="/vouchers/:voucherType/:sourceId"
@@ -864,6 +889,10 @@ const appRouter = createBrowserRouter(
                         <Route
                             path="/reports/summary"
                             element={<SummaryReportPage />}
+                        />
+                        <Route
+                            path="/reports/expenses"
+                            element={<ExpenseReportPage />}
                         />
                         <Route
                             path="/reports/purchase/detailed"
