@@ -12,9 +12,16 @@ use Modules\Invoice\DTOs\InvoiceSourceData;
 use Modules\Invoice\Enums\AllocationMethod;
 use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Models\InvoiceAdjustmentAllocation;
+use Modules\Invoice\Models\InvoiceSource;
 
 final class InvoiceAdjustmentAllocationService
 {
+    private const ZERO = '0.000000';
+
+    private const PRODUCT_SCALE = DecimalMath::SCALE + DecimalMath::SCALE;
+
+    private const RELEASED_STATES = [InvoiceStatus::Cancelled->value, InvoiceStatus::Void->value, InvoiceStatus::Reversed->value];
+
     public function __construct(
         private readonly DecimalMath $math,
         private readonly InvoiceSourceAllocationService $sources,
@@ -144,7 +151,21 @@ final class InvoiceAdjustmentAllocationService
             throw new InvalidArgumentException('Source subtotal must be greater than zero for proportional allocation.');
         }
 
-        return $this->math->mul($sourceAmount, $this->math->div($selectedAmount, $source->sourceSubtotal, 12));
+        $previousBasis = $this->previouslyInvoicedBasis($data, $adjustment);
+        $cumulativeBasis = $this->math->add($previousBasis, $selectedAmount);
+        if ($this->math->compare($cumulativeBasis, $source->sourceSubtotal) > 0) {
+            throw new InvalidArgumentException('Proportional adjustment basis cannot exceed the source subtotal.');
+        }
+        $cumulativeAmount = $this->math->div(
+            $this->math->mul($sourceAmount, $cumulativeBasis, self::PRODUCT_SCALE),
+            $source->sourceSubtotal,
+        );
+        $amount = $this->math->sub($cumulativeAmount, $previouslyAllocated);
+        if ($this->math->isNegative($amount)) {
+            throw new InvalidArgumentException('Review earlier nonproportional adjustment allocations before allocating this source.');
+        }
+
+        return $amount;
     }
 
     private function previouslyAllocatedAmount(CreateInvoiceData $data, InvoiceAdjustmentData $adjustment): string
@@ -153,7 +174,7 @@ final class InvoiceAdjustmentAllocationService
             return '0.000000';
         }
 
-        return $this->math->normalize((string) InvoiceAdjustmentAllocation::query()
+        return $this->math->sum(InvoiceAdjustmentAllocation::query()
             ->where('tenant_id', $data->tenantId)
             ->when(
                 $data->organizationUnitId === null,
@@ -162,11 +183,29 @@ final class InvoiceAdjustmentAllocationService
             )
             ->where('source_adjustment_type', $adjustment->sourceAdjustmentType)
             ->where('source_adjustment_id', $adjustment->sourceAdjustmentId)
-            ->whereHas('invoice', fn ($query) => $query->whereNotIn('status', [
-                InvoiceStatus::Cancelled->value,
-                InvoiceStatus::Void->value,
-            ]))
-            ->sum('allocated_amount'));
+            ->whereHas('invoice', fn ($query) => $query->whereNotIn('status', self::RELEASED_STATES))
+            ->get(['allocated_amount'])->map(static fn (InvoiceAdjustmentAllocation $row): string => (string) $row->allocated_amount));
+    }
+
+    /** Only invoices that actually consumed this adjustment contribute its prior basis. */
+    private function previouslyInvoicedBasis(CreateInvoiceData $data, InvoiceAdjustmentData $adjustment): string
+    {
+        if ($adjustment->sourceAdjustmentType === null || $adjustment->sourceAdjustmentId === null) {
+            return self::ZERO;
+        }
+
+        $rows = InvoiceSource::query()->where('tenant_id', $data->tenantId)
+            ->when($data->organizationUnitId === null,
+                fn ($query) => $query->whereNull('organization_unit_id'),
+                fn ($query) => $query->where('organization_unit_id', $data->organizationUnitId))
+            ->where('source_type', $adjustment->sourceType)->where('source_id', $adjustment->sourceId)
+            ->whereHas('invoice', fn ($query) => $query->whereNotIn('status', self::RELEASED_STATES))
+            ->whereHas('invoice.adjustmentAllocations', fn ($query) => $query
+                ->where('source_adjustment_type', $adjustment->sourceAdjustmentType)
+                ->where('source_adjustment_id', $adjustment->sourceAdjustmentId))
+            ->get(['invoiced_amount']);
+
+        return $this->math->sum($rows->map(static fn (InvoiceSource $row): string => (string) $row->invoiced_amount));
     }
 
     private function findSource(CreateInvoiceData $data, ?string $sourceType, ?int $sourceId): ?InvoiceSourceData

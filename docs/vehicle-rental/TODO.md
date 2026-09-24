@@ -37,7 +37,7 @@ See [mileage-billing.md](mileage-billing.md). Whole-distance hire and other tari
 - [x] Integrate guided customer/owner charge controls into both chart entry points, with authenticated API and frontend tests.
 - [x] Exercise both sides through Invoice approval, Finance posting, reversal and reissue.
 
-See [usage-billing.md](usage-billing.md). Sections 16–20 describe the broader commercial engine; the four delivered usage components do not close their mileage, driver-base, deduction or settlement requirements.
+See [usage-billing.md](usage-billing.md). Sections 16–20 describe the broader commercial engine; these delivered components do not close driver-base, deduction or full settlement/reporting requirements. Mileage is now tracked in its separate completed delivery entry.
 
 ## Latest base-billing delivery — 2026-09-12
 
@@ -444,11 +444,13 @@ The normal operator should not manage technical relationship records directly.
 
 ## 16. Customer calculation engine
 
-- [ ] Accept only finalized eligible Running Chart/source evidence.
-- [ ] Resolve effective Customer Agreement/version for each usage scope.
-- [ ] Snapshot agreement/rate identity.
-- [ ] Calculate only policy-backed components.
-- [ ] Preserve exact quantity, rate, amount, and rounding source for every line.
+Checked engine invariants apply to delivered base-rent, mileage and recorded OT/night-out charges. The component expansion below remains separate. Base rent uses the agreement period; chart-based components require finalized charts.
+
+- [x] Accept only finalized eligible Running Chart/source evidence.
+- [x] Resolve effective Customer Agreement/version for each usage scope.
+- [x] Snapshot agreement/rate identity.
+- [x] Calculate only policy-backed components.
+- [x] Preserve exact quantity, rate, amount, and rounding source for every line.
 - [ ] Support component structure for:
   - base rental;
   - excess distance;
@@ -458,17 +460,17 @@ The normal operator should not manage technical relationship records directly.
   - supported other recoveries;
   - discount/credit;
   - tax through Tax owner module.
-- [ ] Fail explicitly when a required unresolved rule/configuration is missing.
-- [ ] Create immutable Customer Calculation snapshot.
-- [ ] Create a same-side source-consumption record/token.
-- [ ] Prevent duplicate customer-side consumption.
-- [ ] Do **not** mark owner-side evidence consumed.
+- [x] Fail explicitly when a required unresolved rule/configuration is missing.
+- [x] Create immutable Customer Calculation snapshot.
+- [x] Create a same-side source-consumption record/token.
+- [x] Prevent duplicate customer-side consumption.
+- [x] Do **not** mark owner-side evidence consumed.
 
 ## 17. Owner calculation engine
 
-- [ ] Accept the same finalized physical source evidence independently.
-- [ ] Resolve effective Owner/Lessor Agreement/version.
-- [ ] Snapshot owner rate identity.
+- [x] Accept the same finalized physical source evidence independently.
+- [x] Resolve effective Owner/Lessor Agreement/version.
+- [x] Snapshot owner rate identity.
 - [ ] Calculate only confirmed/configured components:
   - base owner rental payable;
   - owner excess-distance payable;
@@ -478,17 +480,17 @@ The normal operator should not manage technical relationship records directly.
   - supported fuel/repair/damage deductions;
   - supported advance/debit adjustments;
   - withholding only through confirmed Tax/Finance policy.
-- [ ] Create immutable Owner Calculation snapshot.
-- [ ] Create an owner-side source-consumption record/token.
-- [ ] Prevent duplicate owner-side consumption.
-- [ ] Do **not** depend on Customer Invoice amount or status.
+- [x] Create immutable Owner Calculation snapshot.
+- [x] Create an owner-side source-consumption record/token.
+- [x] Prevent duplicate owner-side consumption.
+- [x] Do **not** depend on Customer Invoice amount or status.
 
 ## 18. Calculation cancellation/reversal
 
-- [ ] Allow governed cancellation before downstream posting where owner-module state permits it.
-- [ ] Restore source eligibility only through explicit reversal/cancellation semantics.
-- [ ] Never delete consumed history.
-- [ ] Once downstream financial documents are posted, use Invoice/Payment/Finance reversal flows rather than Rental-local mutation.
+- [x] Allow governed cancellation before downstream posting where owner-module state permits it.
+- [x] Restore source eligibility only through explicit reversal/cancellation semantics.
+- [x] Never delete consumed history.
+- [x] Once downstream financial documents are posted, use Invoice/Payment/Finance reversal flows rather than Rental-local mutation.
 
 ---
 
@@ -496,24 +498,26 @@ The normal operator should not manage technical relationship records directly.
 
 ## 19. Customer Invoice handoff
 
-- [ ] Convert finalized Customer Calculation snapshot into the canonical Invoice owner-module request/DTO.
-- [ ] Use `Customer Invoice` terminology.
-- [ ] Preserve source Calculation/Running Chart references.
-- [ ] Pass semantic line/component identities; do not pass raw legacy GL codes from UI.
-- [ ] Use Tax-owner snapshots/configuration.
-- [ ] Use Finance semantic posting profile on posting.
-- [ ] Preserve idempotency so repeated request cannot create duplicate Invoice.
+Source-consumption guards reject duplicate commands and permit governed reissue; this is duplicate prevention, not a promise that every billing endpoint replays an identical response.
+
+- [x] Convert finalized Customer Calculation snapshot into the canonical Invoice owner-module request/DTO.
+- [x] Use `Customer Invoice` terminology.
+- [x] Preserve source Calculation/Running Chart references.
+- [x] Pass semantic line/component identities; do not pass raw legacy GL codes from UI.
+- [x] Use Tax-owner snapshots/configuration.
+- [x] Use Finance semantic posting profile on posting.
+- [x] Preserve idempotency so repeated request cannot create duplicate Invoice.
 - [ ] Expose downstream Invoice number/status/balance in Rental UI without duplicating Invoice state.
 
 ## 20. Owner Payable Voucher / Owner Settlement handoff
 
 - [ ] Use **Owner Payable Voucher / Owner Settlement** terminology.
 - [ ] Do not model the normal flow as a customer-style “Owner Invoice”.
-- [ ] Create canonical payable/AP financial document from Owner Calculation snapshot.
-- [ ] Preserve source Calculation/Running Chart references.
+- [x] Create canonical payable/AP financial document from Owner Calculation snapshot.
+- [x] Preserve source Calculation/Running Chart references.
 - [ ] Pass semantic components/deductions.
-- [ ] Use Tax/Finance owner modules for tax/withholding/posting.
-- [ ] Preserve idempotency.
+- [x] Use Tax/Finance owner modules for tax/withholding/posting.
+- [x] Preserve idempotency.
 - [ ] Expose payable number/status/balance in Rental UI.
 
 ## 21. Posted-document immutability

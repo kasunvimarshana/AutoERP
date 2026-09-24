@@ -2,7 +2,7 @@
 
 **Status:** Canonical working domain reference; evidence gaps remain; not a completed implementation or exhaustive audiovisual audit
 
-**Knowledge refresh date:** 2026-09-20 (customer security-deposit receipts and Payment disposition; audiovisual coverage remains incomplete)
+**Knowledge refresh date:** 2026-09-24 (Invoice adjustment reconciliation and verified TODO cleanup; audiovisual coverage remains incomplete)
 
 **Primary business source of truth and conflict tie-breaker:** TACGL legacy application/data corpus
 
@@ -12,7 +12,7 @@
 
 **Initial architecture baseline:** `d4aaa693706c2d3fe693244c8ea0f8d9e4ae326c`
 
-**Latest implemented baseline reviewed:** `f0ec8e6fff0eee82351367b06673ec604f7865dc`, plus the fresh [vehicle-use and Running Chart contract](vehicle-rental/operations.md). Operational capture, [base-rent estimation](vehicle-rental/base-rent.md) and [base-rent billing](vehicle-rental/base-billing.md) are implemented. Recorded OT/night-out, explicit-policy commercial mileage assessment and customer security-deposit receipt/disposition workflows are implemented. Other commercial components and complete audiovisual review remain outstanding. The [commercial research](vehicle-rental/commercial-research.md) distinguishes external evidence, implementation contracts and the shared Tax corrections.
+**Latest implemented baseline reviewed:** `250888bf1bc6b39aaf0aafbe1ea7275ca3068dda`, plus the fresh [vehicle-use and Running Chart contract](vehicle-rental/operations.md). Operational capture, [base-rent estimation](vehicle-rental/base-rent.md) and [base-rent billing](vehicle-rental/base-billing.md) are implemented. Recorded OT/night-out, explicit-policy commercial mileage assessment and customer security-deposit receipt/disposition workflows are implemented. Other commercial components and complete audiovisual review remain outstanding. The [commercial research](vehicle-rental/commercial-research.md) distinguishes external evidence, implementation contracts and the shared Tax corrections.
 
 **TACGL source file:** `TACGL.zip`
 
@@ -1667,3 +1667,12 @@ Payment owns approval, posting, explicit invoice allocation, refund and reversal
 The full self-contained workflow, evidence, permissions, concurrency boundaries, relationships and correction cases are in [Customer security deposits](vehicle-rental/deposits.md). These are documented implementation decisions supported by current module contracts and primary-source distinctions about refundable security, not unverified historical TACGL defaults. The API/UI tests execute receipt → Finance posting → invoice application → partial refund → refund reversal → receipt reversal with authentic authorization and synthetic configured ledger mappings.
 
 The newly supplied TACGL(10).zip is byte-identical to TACGL(9).zip (SHA-256 `79c240494943437978754169c3360bb7c6e35d911ef8263c4b2d6b6246384d77`). Its file inventory adds no password candidate or new business evidence. The 2026-09-17 instruction copies preserve the same ownership, concurrency, explicit migration and audit-history requirements.
+
+
+## 42. Invoice adjustment precision and financial release
+
+Invoice owns allocation of a source-level discount, charge or other supported header adjustment. A reversed invoice must release its adjustment capacity just as it releases source quantity; cancelled, voided and reversed invoices are consistently excluded from surviving allocations. This does not delete historical adjustments or reverse Tax/Finance outside their normal owner commands.
+
+For a proportional adjustment with persistent source-adjustment identity, calculate `truncate6(source adjustment × cumulative surviving invoiced basis ÷ source subtotal) − surviving allocated adjustment`. The prior basis includes only surviving invoices that actually consumed that adjustment identity. Multiply at the combined persisted-decimal scale before division, and sum persisted decimal strings with decimal arithmetic. This preserves the final residual without assigning unsupported extra charges. A one-unit adjustment over three equal installments produces 0.333333, 0.333333 and 0.333334. Releasing an earlier installment recomputes the next allocation from surviving amounts, not from a deleted or overwritten ledger.
+
+Reject basis exceeding the declared source subtotal and negative catch-up caused by incompatible prior manual allocations. Manual, first-invoice and last-invoice choices retain their existing meanings. Source-owning commands must hold their aggregate mutex for the full Invoice transaction; reading allocation history alone cannot serialize an empty source. The correction changes neither schema nor module relationships and does not introduce a Rental downtime entitlement, tariff or deduction policy by inference.
