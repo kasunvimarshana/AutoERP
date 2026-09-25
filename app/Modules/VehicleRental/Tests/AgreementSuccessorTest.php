@@ -33,8 +33,7 @@ final class AgreementSuccessorTest extends TestCase
         [$context, $customer, $owner] = $this->fixture();
         $this->withTenantExecutionContext($context->tenantId, function () use ($context, $customer, $owner): void {
             $service = app(AgreementService::class);
-            foreach ([AgreementKind::Customer => $customer, AgreementKind::Owner => $owner] as $kindValue => $input) {
-                $kind = AgreementKind::from($kindValue);
+            foreach ([[AgreementKind::Customer, $customer], [AgreementKind::Owner, $owner]] as [$kind, $input]) {
                 $record = $service->create($kind, $context, $input);
                 $record = $service->change($kind, $context, $record->id, $record->row_version, AgreementAction::Activate);
                 $successor = $service->successor($kind, $context, $record->id, $record->row_version, [
