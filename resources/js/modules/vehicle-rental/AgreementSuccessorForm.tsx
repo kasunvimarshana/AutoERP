@@ -28,7 +28,8 @@ export function AgreementSuccessorForm({ kind, agreement, onSaved, onCancel }: {
 
     return <form onSubmit={submit} className="space-y-3 border-t pt-4" aria-label="Create successor agreement">
         <h3 className="font-semibold">Future agreement revision</h3>
-        <p className="text-sm text-slate-600">Create a new Draft for future commercial terms. The current agreement closes at the effective boundary only when no vehicle use crosses it.</p>
+        <p className="text-sm text-slate-600">Create a new Draft for future commercial terms. The current agreement closes at the effective boundary only when no vehicle use crosses it and no retained base-rent charge reaches that date.</p>
+        <p className="text-sm text-slate-600">Existing commercial terms are copied for review, except the security-deposit requirement. A deposit belongs to its original Payment source and is never duplicated automatically; record a new deposit requirement on the successor Draft only when the new agreement explicitly requires it.</p>
         <ErrorAlert error={error} inline />
         <fieldset disabled={saving} className="grid gap-3 sm:grid-cols-2">
             <Input label="New agreement reference" value={reference} onChange={event => setReference(event.target.value)} required error={error?.fields.reference?.[0]} />
@@ -38,6 +39,6 @@ export function AgreementSuccessorForm({ kind, agreement, onSaved, onCancel }: {
             <Input label="End date" type="date" value={endsOn} onChange={event => setEndsOn(event.target.value)} error={error?.fields.ends_on?.[0]} />
             <Input label="Revision reason" value={reason} onChange={event => setReason(event.target.value)} required error={error?.fields.reason?.[0]} />
         </fieldset>
-        <div className="flex gap-2"><Button type="submit" loading={saving} disabled={!reference.trim() || !agreedOn || !startsOn || !reason.trim()}>Create successor draft</Button><Button variant="secondary" disabled={saving} onClick={onCancel}>Cancel</Button></div>
+        <div className="flex gap-2"><Button type="submit" loading={saving} disabled={!reference.trim() || !agreedOn || !startsOn || !reason.trim()}>Create successor draft</Button><Button type="button" variant="secondary" disabled={saving} onClick={onCancel}>Cancel</Button></div>
     </form>;
 }
