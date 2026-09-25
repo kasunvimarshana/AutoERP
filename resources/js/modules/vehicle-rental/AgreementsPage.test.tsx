@@ -3,14 +3,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@/shared/api/apiError';
 import AgreementsPage from './AgreementsPage';
 import { AgreementKind, AgreementStatus, RentalBasis, DriverMode, TERM_LABELS, type Agreement, type TermKey } from './agreements';
-import { listAgreements, transitionAgreement, saveAgreement } from './agreementApi';
+import { createAgreementSuccessor, listAgreements, transitionAgreement, saveAgreement } from './agreementApi';
 
 const session = vi.hoisted(() => ({ roles: [] as string[], permissions: [] as string[], permissionsLoaded: true }));
 vi.mock('@/modules/auth/AuthProvider', () => ({ useAuth: () => session }));
-vi.mock('./agreementApi', () => ({ listAgreements: vi.fn(), transitionAgreement: vi.fn(), saveAgreement: vi.fn() }));
+vi.mock('./agreementApi', () => ({ listAgreements: vi.fn(), transitionAgreement: vi.fn(), saveAgreement: vi.fn(), createAgreementSuccessor: vi.fn() }));
 const record: Agreement = {
     id: 103, reference: 'LESSEE-AGREEMENT', row_version: 7, status: AgreementStatus.Draft,
-    basis: RentalBasis.Monthly, driver_mode: DriverMode.SelfDrive,
+    basis: RentalBasis.Monthly, driver_mode: DriverMode.SelfDrive, supersedes_agreement: null,
     party: { id: 90, name: 'Example customer' }, currency: { id: 2, name: 'Rupee', code: 'LKR' },
     agreed_on: '2026-09-01', executing_on: null, starts_on: '2026-09-07', ends_on: null, notes: null,
     terms: Object.fromEntries(Object.keys(TERM_LABELS).map(key => [key, null])) as Record<TermKey, string | null>,
@@ -63,5 +63,19 @@ describe('Rental agreement review', () => {
         fireEvent.change(screen.getByLabelText('Closure reason'), { target: { value: 'Contract ended' } });
         expect(screen.getByRole('button', { name: 'Confirm closure' })).toBeEnabled();
         expect(screen.queryByRole('button', { name: 'Edit draft' })).not.toBeInTheDocument();
+    });
+    it('creates a future successor from an active agreement without editing active terms', async () => {
+        session.permissions.push('vehicle-rental.customer-agreements.manage');
+        vi.mocked(listAgreements).mockResolvedValue({ data: [{ ...record, status: AgreementStatus.Active }] });
+        vi.mocked(createAgreementSuccessor).mockResolvedValue({ ...record, id: 104, reference: 'LESSEE-R2', row_version: 1, supersedes_agreement: { id: record.id, reference: record.reference } });
+        render(<AgreementsPage kind={AgreementKind.Customer} />);
+        fireEvent.click(await screen.findByRole('button', { name: 'Review LESSEE-AGREEMENT' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Create successor' }));
+        fireEvent.change(screen.getByLabelText('New agreement reference'), { target: { value: 'LESSEE-R2' } });
+        fireEvent.change(screen.getByLabelText('Agreement date'), { target: { value: '2026-09-20' } });
+        fireEvent.change(screen.getByLabelText('Effective start date'), { target: { value: '2026-10-01' } });
+        fireEvent.change(screen.getByLabelText('Revision reason'), { target: { value: 'Future rate revision' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Create successor draft' }));
+        await waitFor(() => expect(createAgreementSuccessor).toHaveBeenCalledWith(AgreementKind.Customer, expect.objectContaining({ id: record.id }), expect.objectContaining({ reference: 'LESSEE-R2', starts_on: '2026-10-01', reason: 'Future rate revision' })));
     });
 });
