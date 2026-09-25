@@ -190,6 +190,11 @@ final class AgreementService
     private function activateSuccessor(AgreementKind $kind, AgreementContext $context, Agreement $predecessor, Agreement $successor): void
     {
         $this->assertSuccessorStartsAfter($predecessor, $successor->starts_on->toDateString());
+        $timezone = (string) config('app.timezone', 'UTC');
+        $effectiveDate = CarbonImmutable::createFromFormat('!'.AgreementFields::DATE_FORMAT, $successor->starts_on->toDateString(), $timezone);
+        if ($effectiveDate->isAfter(CarbonImmutable::today($timezone))) {
+            throw ValidationException::withMessages(['starts_on' => ['Keep this successor as Draft until its effective start date. Early activation would interrupt the still-current predecessor agreement.']]);
+        }
         $this->assertCutoverAvailable($kind, $context, $predecessor, $successor->starts_on->toDateString());
 
         $cutoff = CarbonImmutable::createFromFormat('!'.AgreementFields::DATE_FORMAT, $successor->starts_on->toDateString(), 'UTC')->subDay();
