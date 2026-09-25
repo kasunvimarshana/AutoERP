@@ -39,7 +39,8 @@ export interface Agreement {
     id: number; reference: string; row_version: number; status: AgreementStatus; basis: RentalBasis; driver_mode: DriverMode;
     supersedes_agreement?: { id: number; reference: string } | null;
     party: NamedResource; currency: NamedResource; vehicle?: { id: number; vehicle_number: string; registration_number: string | null };
-    agreed_on: string; executing_on: string | null; starts_on: string; ends_on: string | null; terms: Record<TermKey, string | null>; notes: string | null;
+    agreed_on: string; executing_on: string | null; starts_on: string; ends_on: string | null; effective_coverage_ends_on: string | null;
+    terms: Record<TermKey, string | null>; notes: string | null;
 }
 export interface AgreementPayload {
     reference: string; party_id: number; currency_id: number; vehicle_id?: number; agreed_on: string; executing_on: string | null; starts_on: string; ends_on: string | null;
