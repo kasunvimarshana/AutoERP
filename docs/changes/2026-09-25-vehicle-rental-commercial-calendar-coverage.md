@@ -96,8 +96,9 @@ The only schema addition is the scalar `closed_on` historical snapshot owned by 
 
 Official sources were rechecked on 2026-09-25 only as scope/ownership evidence:
 
-- IFRS Foundation, IFRS 15 contract-modification guidance: approved modifications require explicit modification accounting; it does not authorize silently rewriting already-transferred/historical economics.
-- Sri Lanka Inland Revenue Department circular index: 2026 publications include updated withholding guidance, reinforcing that tax/withholding treatment is effective-dated legal context owned by Tax/Payment rather than a Rental magic constant.
+- IFRS Foundation, IFRS 16 lease-modification guidance: lease modification accounting is classification- and fact-specific. It supports preserving explicit modification/effective-date lineage where IFRS 16 applies; it is not used here as a universal Vehicle Rental tariff or as a substitute for determining whether a specific AutoERP arrangement is a lease, service, or mixed contract.
+- IFRS 15 was also reviewed only to confirm that it is not a universal Vehicle Rental accounting basis; lease contracts are outside its general revenue-contract scope. No Rental runtime rule is derived from IFRS 15.
+- Sri Lanka Inland Revenue Department circular index: 2026 publications include updated withholding and invoice-format guidance, reinforcing that tax/withholding treatment is effective-dated legal context owned by Tax/Payment rather than a Rental magic constant.
 - MySQL/InnoDB reference manual: `SELECT ... FOR UPDATE` locks are transaction-scoped, supporting the existing transaction/lock discipline around shared mutable Rental state.
 
 No public operator tariff, statutory percentage, withholding threshold, tax rate or GL account was added to Rental from this research.
@@ -110,16 +111,18 @@ No brute force, dictionary attack, password mutation or unsupported guess was us
 
 ## Verification actually executed in this continuation
 
-The exact pre-snapshot continuation PHP set had already been materialized locally and passed `php -l` before the environment's GitHub DNS restriction prevented full checkout. The final snapshot delta adds/changes PHP in the Agreement model/resource/service/calendar/migration and focused tests; these files are re-materialized and syntax-checked as part of final branch verification before merge.
+- Exact final PHP contents were materialized for the additive migration, `RentalConfiguration`, `MileagePolicy`, `RentalCalendar`, `Agreement` and `AgreementResource`; all passed `php -l` under PHP 8.4.23.
+- The exact final `resources/js/modules/vehicle-rental/agreements.ts` delta parsed successfully with TypeScript 5.8.3.
+- The pre-snapshot continuation versions of `AgreementService`, `BaseRentPreview`, `MileageAllowance`, `AgreementClosureCoverageTest` and `AgreementTenantCalendarTest` had passed `php -l`; their final changed hunks were subsequently reviewed in the PR diff. Full dependency-backed execution of those tests is not claimed.
 
 Static review verifies:
 
-- no process-global `app.timezone` is used for Rental commercial-day decisions;
+- no process-global `app.timezone` remains in the changed Rental commercial-day path;
 - the raw `localization.timezone` key remains centralized behind `RentalConfiguration::WORKSPACE_TIMEZONE`;
 - base rent and mileage use the same immutable agreement coverage boundary;
-- no new relationship, Rental tax rate, GL account or legacy implementation was introduced.
+- the single schema addition is `closed_on`; no new relationship, Rental tax rate, GL account or legacy implementation was introduced.
 
-The current execution environment cannot materialize the complete GitHub checkout because outbound Git/GitHub checkout is DNS-blocked. GitHub Actions are intentionally not used. Therefore Composer/PHPUnit, frontend lint/typecheck/build, MySQL migration/fresh-schema and browser/UAT results are not claimed as re-executed unless a local checkout becomes available before merge. Existing pre-continuation acceptance evidence remains historical evidence only.
+The current execution environment cannot materialize the complete GitHub checkout because outbound Git/GitHub checkout is DNS-blocked. GitHub Actions are intentionally not used. Therefore Composer/PHPUnit, frontend lint/typecheck/build, MySQL migration/fresh-schema and browser/UAT results are not claimed as re-executed for this exact continuation delta. Existing pre-continuation acceptance evidence remains historical evidence only.
 
 ## Final design result
 
