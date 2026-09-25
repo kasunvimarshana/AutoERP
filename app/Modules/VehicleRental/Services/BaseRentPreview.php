@@ -8,16 +8,12 @@ use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
-use Modules\Configuration\Contracts\ConfigurationResolverInterface;
 use Modules\Core\Services\DecimalMath;
 use Modules\VehicleRental\Constants\AgreementFields;
-use Modules\VehicleRental\Constants\RentalConfiguration;
 use Modules\VehicleRental\Data\AgreementContext;
 use Modules\VehicleRental\Enums\AgreementKind;
-use Modules\VehicleRental\Enums\AgreementStatus;
 use Modules\VehicleRental\Enums\BaseRentPolicy;
 use Modules\VehicleRental\Enums\RentalBasis;
-use Modules\VehicleRental\Models\Agreement;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 final class BaseRentPreview
@@ -32,7 +28,7 @@ final class BaseRentPreview
     public function __construct(
         private readonly AgreementService $agreements,
         private readonly DecimalMath $math,
-        private readonly ConfigurationResolverInterface $configuration,
+        private readonly RentalCalendar $calendar,
     ) {}
 
     public function calculate(AgreementKind $kind, AgreementContext $context, int $id, array $input): array
@@ -54,7 +50,7 @@ final class BaseRentPreview
         $from = $this->date($data['from']);
         $until = $this->date($data['until']);
         $anchor = $this->date($agreement->starts_on->format(AgreementFields::DATE_FORMAT));
-        $coverageEnd = $this->coverageEnd($agreement, $context);
+        $coverageEnd = $this->calendar->coverageEnd($agreement, $context);
         if ($from->lessThan($anchor) || ($coverageEnd !== null && $until->toDateString() > $coverageEnd)) {
             throw ValidationException::withMessages(['from' => ['The complete preview period must be covered by this agreement.']]);
         }
@@ -85,23 +81,6 @@ final class BaseRentPreview
         return ['agreement' => ['id' => $agreement->id, 'reference' => $agreement->reference, 'version' => $agreement->row_version, 'kind' => $kind->value],
             'currency' => $agreement->currency_code_snapshot, 'policy' => $data['policy'], 'from' => $data['from'], 'until' => $data['until'],
             'basis' => $agreement->basis->value, 'rate' => $rate, 'segments' => $segments, 'base_rent' => $total];
-    }
-
-    private function coverageEnd(Agreement $agreement, AgreementContext $context): ?string
-    {
-        $contractEnd = $agreement->ends_on?->toDateString();
-        if ($agreement->status !== AgreementStatus::Closed || $agreement->closed_at === null) {
-            return $contractEnd;
-        }
-
-        $timezone = $this->configuration->value(
-            RentalConfiguration::WORKSPACE_TIMEZONE,
-            $context->tenantId,
-            $context->organizationUnitId,
-        );
-        $closedOn = $agreement->closed_at->setTimezone($timezone)->toDateString();
-
-        return $contractEnd === null || $closedOn < $contractEnd ? $closedOn : $contractEnd;
     }
 
     private function segment(CarbonImmutable $from, CarbonImmutable $end, CarbonImmutable $cycleStart, CarbonImmutable $cycleEnd, string $rate, bool $monthly): array
