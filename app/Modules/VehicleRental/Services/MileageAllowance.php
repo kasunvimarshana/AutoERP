@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Validation\ValidationException;
 use Modules\Configuration\Contracts\ConfigurationResolverInterface;
 use Modules\VehicleRental\Constants\AgreementFields;
+use Modules\VehicleRental\Constants\RentalConfiguration;
 use Modules\VehicleRental\Data\AgreementContext;
 use Modules\VehicleRental\Enums\AgreementKind;
 use Modules\VehicleRental\Enums\MileagePolicy;
@@ -29,7 +30,7 @@ final class MileageAllowance
         $charges = $this->charges($kind, $context, $agreement->id);
         // Once any assessment exists (even voided), preserve this agreement's commercial timezone.
         $first = (clone $charges)->orderBy('id')->first();
-        $timezone = $first?->calculation['timezone'] ?? $this->configuration->value(MileagePolicy::TIMEZONE_SETTING, $context->tenantId, $context->organizationUnitId);
+        $timezone = $first?->calculation['timezone'] ?? $this->configuration->value(RentalConfiguration::WORKSPACE_TIMEZONE, $context->tenantId, $context->organizationUnitId);
         $start = $chart->starts_at->setTimezone($timezone);
         $end = $chart->ends_at->setTimezone($timezone);
         $anchor = CarbonImmutable::parse($agreement->starts_on->toDateString(), $timezone)->startOfDay();
