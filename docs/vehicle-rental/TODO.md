@@ -6,7 +6,7 @@
 
 **Engineering authority:** latest `worktree-0.0.8`.
 
-**Continuation review base:** `8261887e9266ea52ad5fc225c64e4e52dad7563f`.
+**Continuation review base:** `ea3d6d6ef096d4338e06de7710b9c4c4ece8e1ae`.
 
 **Canonical domain/policy reference:** [knowledgebase.md](../knowledgebase.md).
 
@@ -46,6 +46,9 @@ This file is no longer an open list of speculative business questions. Historica
 - [x] Base, included/excess-KM, AC, driver, OT, night-out and deposit terms represented with exact nullable decimals.
 - [x] Unknown and zero remain distinct.
 - [x] Successor agreement lineage implemented for future commercial revisions.
+- [x] Successor lineage is physically persisted on both agreement tables and scoped by a composite self-FK to the same tenant and organization unit.
+- [x] At most one direct successor can reference a predecessor; database uniqueness protects the invariant under concurrency.
+- [x] Successor predecessor lineage is immutable after the Draft is created.
 - [x] Creating a successor Draft does not interrupt the current Active predecessor.
 - [x] Successor activation atomically revalidates cutover, closes predecessor boundary and activates successor.
 - [x] Successor effective-day activation is evaluated in the configured tenant/org workspace timezone.
@@ -246,12 +249,14 @@ This file is no longer an open list of speculative business questions. Historica
 - [x] Replacement stores a single predecessor link; no redundant inverse relationship.
 - [x] Running Chart belongs to Vehicle Use; agreement revisions are resolved through the frozen use.
 - [x] Running Chart -> HR employee is one-way and tenant-safe; HR does not depend on Rental.
-- [x] Successor Agreement -> predecessor is one-way and tenant-safe; no redundant inverse link.
-- [x] Composite tenant FKs rely on existing `(id, tenant_id)` unique keys in agreements/HR.
+- [x] Successor Agreement -> predecessor is one-way and tenant/org-safe; no redundant inverse link.
+- [x] Agreement successor self-FKs reference scoped `(id, tenant_id, organization_unit_id)` identities and `supersedes_agreement_id` is unique per agreement table.
+- [x] Existing cross-module composite tenant FKs continue to rely on their established scoped unique keys.
 - [x] Financial document state is not duplicated into mutable Rental columns.
 - [x] No new circular module dependency introduced.
-- [x] Closure/calendar correction adds only nullable date `closed_on` to each Rental agreement as an immutable historical snapshot; no new relationship, inverse pointer or duplicate ledger is introduced.
+- [x] Closure/calendar correction adds only nullable date `closed_on` to each Rental agreement as an immutable historical snapshot; no inverse pointer or duplicate ledger is introduced.
 - [x] Upgrade migration backfills pre-existing closed rows once from the effective Configuration-owned workspace timezone and then freezes the recorded date.
+- [x] Successor-lineage schema correction is additive and Rental-owned; it persists the already-defined relationship rather than introducing a compatibility workaround in another module.
 
 ---
 
@@ -289,6 +294,8 @@ The completion delta adds focused regression tests for:
 - [x] adjacent Vehicle Use boundary acceptance;
 - [x] successor cut-through rejection for retained base-rent/usage commercial periods;
 - [x] non-duplication of security-deposit requirement;
+- [x] competing second direct successor rejected by database uniqueness;
+- [x] successor predecessor lineage cannot be rewritten while Draft;
 - [x] closed-agreement base-rent coverage stops at closure while historical coverage remains billable;
 - [x] closed-agreement mileage cannot consume allowance or assess excess distance after closure;
 - [x] an earlier explicit contract end remains stricter than lifecycle closure;
@@ -299,11 +306,11 @@ The completion delta adds focused regression tests for:
 
 ### Verification evidence rule
 
-Only executed commands may be described as passed. This connector-only completion environment could inspect and mutate GitHub source but could not materialize the full repository locally because outbound Git/GitHub checkout was DNS-blocked; GitHub Actions were intentionally not used per project instruction. Therefore executable full-suite/lint/typecheck/build/migrate results for this exact continuation delta are not fabricated here. This is an execution-environment evidence note, not an open Vehicle Rental business/code requirement.
+Only executed commands may be described as passed. This connector-only completion environment can inspect and mutate GitHub source but cannot materialize the full repository locally because outbound Git/GitHub checkout is DNS-blocked; GitHub Actions are intentionally not used per project instruction. Therefore executable full-suite/lint/typecheck/build/migrate results for this exact continuation delta are not fabricated here. This is an execution-environment evidence note, not an open Vehicle Rental business/code requirement.
 
-For the 2026-09-25 closure/calendar continuation, exact changed PHP contents are syntax-checked where they can be materialized in the local runtime. Current-branch static review confirms Vehicle Use requires Active agreement coverage, historical financial settlement permits Closed agreements only for covered source periods, `closed_on` is the sole new Rental schema fact, and no relationship/circular dependency is introduced.
+For the 2026-09-25 successor-lineage continuation, exact changed PHP contents were materialized for syntax checking under PHP 8.4.23. Current-branch static review confirms the model/service/resource/frontend contract all use the same one-way successor relationship, the migration now persists it for both agreement tables, the self-FK is tenant/org scoped, and direct-successor uniqueness protects concurrent creation. The default PHPUnit configuration is SQLite `:memory:` and the repository declares Laravel `^12.0`; the migration uses portable Schema Builder operations rather than driver-specific SQL.
 
-The prior repository acceptance evidence remains historical evidence for the pre-continuation baseline. The dependency-backed Laravel/PHPUnit/frontend/MySQL suites for this new delta are not claimed as re-executed in this connector-only runtime.
+The prior repository acceptance evidence remains historical evidence for the pre-continuation baseline. Dependency-backed Laravel/PHPUnit/frontend/MySQL suites for this new delta are not claimed as re-executed in this connector-only runtime.
 
 ---
 
@@ -332,10 +339,11 @@ Vehicle Rental is considered functionally complete when the following remain tru
 8. same-side source consumption is not duplicated;
 9. company-owned vehicles do not fabricate external owner cost;
 10. no old Rental runtime or legacy magic values are reintroduced;
-11. migrations and relationships remain tenant-safe and directional;
-12. closed agreements cannot generate new base-rent or mileage commercial coverage beyond their immutable effective lifecycle boundary;
-13. future-effective agreement activation uses the configured tenant/org commercial calendar rather than a process-global timezone;
-14. recorded historical closure boundaries are persisted as immutable civil dates and are not reinterpreted after timezone configuration changes;
-15. future changes preserve this ledger and record actual verification evidence rather than assuming it.
+11. migrations and relationships remain tenant/org-safe and directional;
+12. one-way successor lineage is physically persisted, immutable and limited to one direct successor per predecessor;
+13. closed agreements cannot generate new base-rent or mileage commercial coverage beyond their immutable effective lifecycle boundary;
+14. future-effective agreement activation uses the configured tenant/org commercial calendar rather than a process-global timezone;
+15. recorded historical closure boundaries are persisted as immutable civil dates and are not reinterpreted after timezone configuration changes;
+16. future changes preserve this ledger and record actual verification evidence rather than assuming it.
 
 There are no remaining open product-policy TODO items in this ledger. Source-access limitations and environment-specific execution evidence are documented separately and must not be converted into speculative runtime behavior.
