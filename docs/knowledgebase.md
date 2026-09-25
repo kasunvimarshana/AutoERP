@@ -10,7 +10,7 @@
 
 **Authoritative engineering source:** latest `worktree-0.0.8`
 
-**Continuation review base:** `8261887e9266ea52ad5fc225c64e4e52dad7563f`
+**Continuation review base:** `ea3d6d6ef096d4338e06de7710b9c4c4ece8e1ae`
 
 **Architecture policy:** root `RULES.md` / `AGENTS.md`
 
@@ -230,6 +230,8 @@ The successor effective-day check uses the same configured tenant/org commercial
 A successor keeps the same counterparty; an owner-agreement successor also keeps the same physical supplied vehicle. A different party/owner vehicle is a new agreement, not a rate revision.
 
 The successor relationship is intentionally one-way (`successor -> predecessor`). No redundant stored inverse relationship is required. One predecessor can have at most one direct successor; the successor can later become the predecessor of another revision, producing a clean chain.
+
+The relationship is persisted by nullable `supersedes_agreement_id` on both agreement tables. Database constraints keep the predecessor inside the same tenant and organization unit and enforce at most one direct successor under concurrency. The predecessor link is immutable once the successor Draft is created; Draft editing changes commercial terms, not revision ancestry.
 
 Security-deposit requirements are not copied automatically because Payment receipts are linked to the original agreement source. If the amended agreement genuinely creates a new requirement, the operator records it explicitly on the successor Draft.
 
@@ -511,11 +513,13 @@ Required controls include:
 - explicit DB transactions for multi-row transitions;
 - stable lock ordering around shared physical vehicle and commercial source state;
 - optimistic expected-version checks;
-- tenant-safe composite foreign keys;
+- tenant/org-safe composite foreign keys;
 - database uniqueness for successor lineage and source-consumption identities;
 - immutable finalized/posted history;
 - conflict instead of last-write-wins;
 - retry only by re-running the complete command and revalidating current state.
+
+Agreement revision lineage is constrained at the database layer as well as the application layer: the self foreign key includes predecessor ID, tenant ID and organization-unit ID; `supersedes_agreement_id` is unique per agreement table; and model updates cannot rewrite that lineage after successor creation.
 
 Important competing operations:
 
@@ -526,6 +530,7 @@ Important competing operations:
 | Customer vs owner billing | both may independently consume the same physical source |
 | Finalize/reverse vs bill | committed source state and financial source state cannot disagree |
 | Successor activation vs use/charge | commercial boundary cannot bisect retained operational/financial history |
+| Two successor creations | one predecessor can have at most one direct successor; database uniqueness resolves the race |
 | Manual closure vs commercial calculation | no new base-rent or mileage commercial coverage may extend after immutable `closed_on` |
 | Timezone reconfiguration vs historical closure | changing `localization.timezone` cannot reinterpret an already-recorded `closed_on` boundary |
 | Two driver charts | same authoritative driver cannot have overlapping finalized Rental usage |
@@ -600,7 +605,7 @@ The clean schema intentionally avoids redundant bidirectional state:
 - Successor Agreement stores one predecessor link; no stored inverse link is required.
 - Financial document IDs/statuses are not duplicated as mutable Rental truth; source allocations in Invoice are authoritative.
 
-These relationships are deliberately directional and high-cohesion. The commercial-calendar correction adds only the scalar `closed_on` historical snapshot to each Rental agreement; it adds no relationship, inverse pointer, module dependency or duplicate ledger. The snapshot is justified because a historical civil-day boundary cannot be safely recomputed forever from mutable timezone configuration.
+These relationships are deliberately directional and high-cohesion. Successor lineage is now physically persisted and constrained in the agreement tables because the service, resource and revision lifecycle already depend on that relation; this corrects the owning schema rather than adding a compatibility workaround elsewhere. The commercial-calendar correction adds only the scalar `closed_on` historical snapshot to each Rental agreement. Neither change introduces an inverse pointer, circular module dependency or duplicate ledger.
 
 ---
 
@@ -673,6 +678,7 @@ The fresh `app/Modules/VehicleRental` implementation includes:
 - separate customer and owner agreements;
 - tenant-safe identity snapshots and histories;
 - expected-version lifecycle commands;
+- persisted, tenant/org-scoped one-way successor lineage with one direct successor per predecessor and immutable revision ancestry;
 - effective successor Draft/review/activation flow using the tenant/org commercial calendar;
 - immutable agreement closure snapshots (`closed_at` audit instant plus `closed_on` civil date), with effective coverage using the stricter of `ends_on` and `closed_on`;
 - closure-aware base-rent and mileage coverage so a Closed agreement cannot generate future commercial periods while historical covered periods remain available;
@@ -726,12 +732,12 @@ For any future Rental change, verify at minimum:
 
 1. tenant/organization isolation;
 2. expected-version/stale-write behavior;
-3. DB FK/unique constraints;
+3. DB FK/unique constraints, including successor revision scope/uniqueness;
 4. customer/owner independence;
 5. source revision snapshot correctness;
 6. duplicate-consumption rejection;
 7. reversal/reissue lineage;
-8. migration fresh-install and upgrade behavior, including immutable lifecycle-date backfill where applicable;
+8. migration fresh-install and upgrade behavior, including immutable lifecycle-date backfill and agreement successor-lineage persistence where applicable;
 9. SQLite and MySQL/MariaDB transaction behavior where relevant;
 10. frontend unit/integration tests, typecheck, lint and build;
 11. authenticated browser/UAT for changed operator flows.
