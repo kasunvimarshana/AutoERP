@@ -58,8 +58,7 @@ abstract class Agreement extends TenantOwnedModel
             return $contractEnd;
         }
 
-        $timezone = (string) config('app.timezone', 'UTC');
-        $closedOn = $this->closed_at->setTimezone($timezone)->toDateString();
+        $closedOn = $this->closed_at->setTimezone((string) config('app.timezone'))->toDateString();
 
         return $contractEnd === null || $closedOn < $contractEnd ? $closedOn : $contractEnd;
     }
