@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Modules\VehicleRental\Services;
 
 use Carbon\CarbonImmutable;
+use DateTimeInterface;
+use LogicException;
 use Modules\Configuration\Contracts\ConfigurationResolverInterface;
 use Modules\VehicleRental\Constants\RentalConfiguration;
 use Modules\VehicleRental\Data\AgreementContext;
@@ -29,16 +31,24 @@ final class RentalCalendar
         return CarbonImmutable::today($this->timezone($context));
     }
 
-    public function coverageEnd(Agreement $agreement, AgreementContext $context, ?string $timezone = null): ?string
+    public function civilDate(AgreementContext $context, DateTimeInterface $instant): string
+    {
+        return CarbonImmutable::instance($instant)
+            ->setTimezone($this->timezone($context))
+            ->toDateString();
+    }
+
+    public function coverageEnd(Agreement $agreement, AgreementContext $context): ?string
     {
         $contractEnd = $agreement->ends_on?->toDateString();
-        if ($agreement->status !== AgreementStatus::Closed || $agreement->closed_at === null) {
+        if ($agreement->status !== AgreementStatus::Closed) {
             return $contractEnd;
         }
+        if ($agreement->closed_on === null) {
+            throw new LogicException('Closed rental agreement is missing its immutable closure date. Run the Vehicle Rental migrations before calculating charges.');
+        }
 
-        $closedOn = $agreement->closed_at
-            ->setTimezone($timezone ?? $this->timezone($context))
-            ->toDateString();
+        $closedOn = $agreement->closed_on->toDateString();
 
         return $contractEnd === null || $closedOn < $contractEnd ? $closedOn : $contractEnd;
     }
