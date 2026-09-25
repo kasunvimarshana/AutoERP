@@ -16,7 +16,7 @@ That was inconsistent with the canonical rule "do not invent money": a real phys
 - Commercial coverage ends at the stricter of contractual `ends_on` and immutable lifecycle `closed_on`, when either exists.
 - Base-rent calculations use their recorded `from` / `until` period.
 - Mileage uses its recorded `supply_from` / `supply_until` period.
-- Running Chart usage charges derive the true half-open physical interval from the immutable chart timestamp snapshot, so an exact midnight end belongs to the preceding covered instant rather than inventing an extra service day.
+- Running Chart usage charges derive the true half-open physical interval from the immutable chart timestamp snapshot, convert the instants to the Configuration-owned tenant/org commercial timezone, and then compare civil dates. An exact midnight end therefore belongs to the preceding covered instant instead of inventing an extra service day.
 - Fallback to the persisted charge period exists only for source types without a more precise immutable calculation period.
 
 If the source period is not covered, financial handoff fails atomically. The physical Running Chart remains finalized and auditable. Any genuine uncovered financial consequence requires a valid agreement revision or an explicit governed adjustment in the owning financial workflow.
@@ -29,7 +29,7 @@ The guard belongs in `RentalChargeDocuments` because that service is the existin
 
 ## Regression coverage
 
-`RentalChargeCoverageTest` proves that a finalized physical overrun can be retained while both customer and owner automatic usage billing are rejected and rolled back when the chart extends beyond agreement coverage.
+`RentalChargeCoverageTest` proves that a finalized physical overrun can be retained while both customer and owner automatic usage billing are rejected and rolled back when the chart extends beyond agreement coverage. The fixture deliberately uses chart timestamps whose source offset remains on one civil date while the workspace calendar crosses into the next date, proving that coverage follows the configured commercial calendar rather than the client offset.
 
 ## Verification evidence
 
