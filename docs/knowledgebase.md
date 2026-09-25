@@ -10,7 +10,7 @@
 
 **Authoritative engineering source:** latest `worktree-0.0.8`
 
-**Continuation review base:** `ea3d6d6ef096d4338e06de7710b9c4c4ece8e1ae`
+**Continuation review base:** `1fc9ba3ca060c09edfaba3d95d981817d501cdda`
 
 **Architecture policy:** root `RULES.md` / `AGENTS.md`
 
@@ -285,6 +285,8 @@ Finalization freezes physical evidence. Corrections use reversal/correction line
 - correction lineage is explicit;
 - stale expected versions fail.
 
+Actual custody can overrun a planned operational end and the Running Chart must preserve that physical truth. An operational overrun does **not** silently extend customer or owner commercial terms: automatic financial handoff still requires the covered source period to fit the applicable agreement boundary.
+
 ### 8.3 Driver identity
 
 Driver identity is optional source evidence and has two explicit modes:
@@ -377,6 +379,12 @@ Production rule:
 
 No artificial owner payable or internal transfer cost is created for a company-owned vehicle unless Finance explicitly configures such a policy in the future.
 
+### 9.10 Commercial coverage of physical overruns
+
+Physical truth and commercial entitlement are separate. A finalized Running Chart may record usage that actually continued beyond the originally planned operational end, but automatic Rental money must remain inside the applicable agreement's commercial coverage.
+
+At customer Invoice / owner payable handoff, Rental derives the true source supply period from the immutable calculation evidence and rejects automatic financial creation when that period starts before `starts_on` or extends past the stricter of contractual `ends_on` and immutable lifecycle `closed_on`. This guard applies consistently to base-rent, mileage and typed usage charges. If an uncovered overrun has a genuine financial consequence, it requires a valid agreement revision or an explicit governed adjustment; the system does not silently reuse an expired rate.
+
 ---
 
 ## 10. Independent customer and owner financial paths
@@ -396,6 +404,8 @@ The fresh implementation combines Rental-side immutable charges with Invoice sou
 ### Historical revision
 
 Chart-based charges resolve the exact customer/owner agreement history revision frozen on the Vehicle Use. The current agreement row is not substituted for that historical revision.
+
+Before financial-document creation, the Rental handoff also validates the immutable source supply period against current effective agreement coverage. This is an entitlement guard, not a mutation of physical evidence or historical rates.
 
 ---
 
@@ -531,7 +541,8 @@ Important competing operations:
 | Finalize/reverse vs bill | committed source state and financial source state cannot disagree |
 | Successor activation vs use/charge | commercial boundary cannot bisect retained operational/financial history |
 | Two successor creations | one predecessor can have at most one direct successor; database uniqueness resolves the race |
-| Manual closure vs commercial calculation | no new base-rent or mileage commercial coverage may extend after immutable `closed_on` |
+| Physical custody overrun vs billing | preserve the actual Running Chart, but do not create automatic money outside agreement commercial coverage |
+| Manual closure vs commercial calculation | no new automatic Rental coverage may extend after immutable `closed_on` |
 | Timezone reconfiguration vs historical closure | changing `localization.timezone` cannot reinterpret an already-recorded `closed_on` boundary |
 | Two driver charts | same authoritative driver cannot have overlapping finalized Rental usage |
 | Deposit allocate/refund | one available balance cannot be spent twice |
@@ -605,7 +616,7 @@ The clean schema intentionally avoids redundant bidirectional state:
 - Successor Agreement stores one predecessor link; no stored inverse link is required.
 - Financial document IDs/statuses are not duplicated as mutable Rental truth; source allocations in Invoice are authoritative.
 
-These relationships are deliberately directional and high-cohesion. Successor lineage is now physically persisted and constrained in the agreement tables because the service, resource and revision lifecycle already depend on that relation; this corrects the owning schema rather than adding a compatibility workaround elsewhere. The commercial-calendar correction adds only the scalar `closed_on` historical snapshot to each Rental agreement. Neither change introduces an inverse pointer, circular module dependency or duplicate ledger.
+These relationships are deliberately directional and high-cohesion. Successor lineage is physically persisted and constrained in the agreement tables because the service, resource and revision lifecycle depend on that relation; this corrects the owning schema rather than adding a compatibility workaround elsewhere. The commercial-calendar correction adds only the scalar `closed_on` historical snapshot to each Rental agreement. The commercial-coverage guard adds no relationship or ledger at all; it validates immutable Rental source evidence immediately before the Invoice/AP owner-module handoff. None of these changes introduces an inverse pointer or circular module dependency.
 
 ---
 
@@ -692,6 +703,7 @@ The fresh `app/Modules/VehicleRental` implementation includes:
 - actual-calendar base-rent preview/billing;
 - explicit cycle-based mileage allowance/assessment with timezone snapshot preservation;
 - typed Normal/Double/Triple OT and Night-out pricing;
+- financial-handoff commercial coverage validation so physical overruns remain auditable without silently extending expired customer/owner terms;
 - independent customer/owner immutable Rental charges;
 - Invoice/Tax/Finance source handoff;
 - unchanged reissue and governed void after downstream release;
@@ -738,9 +750,10 @@ For any future Rental change, verify at minimum:
 6. duplicate-consumption rejection;
 7. reversal/reissue lineage;
 8. migration fresh-install and upgrade behavior, including immutable lifecycle-date backfill and agreement successor-lineage persistence where applicable;
-9. SQLite and MySQL/MariaDB transaction behavior where relevant;
-10. frontend unit/integration tests, typecheck, lint and build;
-11. authenticated browser/UAT for changed operator flows.
+9. commercial source coverage at financial handoff, including physical overrun without automatic money;
+10. SQLite and MySQL/MariaDB transaction behavior where relevant;
+11. frontend unit/integration tests, typecheck, lint and build;
+12. authenticated browser/UAT for changed operator flows.
 
 A change record must state which checks were actually executed. Never write "passed" for a check that was only statically reviewed.
 
@@ -757,9 +770,10 @@ When deciding Vehicle Rental behavior:
 5. Use only an explicit named policy/rate or an explicit authorized amount.
 6. Check same-side source consumption.
 7. Check tenant/org/permission/version constraints.
-8. Delegate financial-document, payment, tax and GL behavior to owner modules.
-9. Preserve immutable snapshots and correction lineage.
-10. If no automatic financial policy exists, create no automatic money; require an explicit governed adjustment rather than guessing.
+8. Confirm the source supply period remains inside effective agreement commercial coverage before automatic financial handoff.
+9. Delegate financial-document, payment, tax and GL behavior to owner modules.
+10. Preserve immutable snapshots and correction lineage.
+11. If no automatic financial policy exists, create no automatic money; require an explicit governed adjustment rather than guessing.
 
 ---
 
@@ -773,4 +787,5 @@ When deciding Vehicle Rental behavior:
 6. Never hardcode a legacy rate, tax percentage, GL account or magic business code.
 7. Preserve customer/owner independence and historical revisions.
 8. Unknown historical formulas do not justify undefined runtime behavior: use named explicit policy where available, otherwise no automatic financial effect.
-9. Keep the operator workflow simple while enforcing strong hidden backend integrity.
+9. Preserve physical evidence even when it falls outside commercial coverage; never treat the physical overrun itself as authorization to bill.
+10. Keep the operator workflow simple while enforcing strong hidden backend integrity.
