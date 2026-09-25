@@ -194,7 +194,8 @@ Supported concepts include owner/supplier, supplied vehicle, independent base/mi
 - Activation freezes the effective revision.
 - Active commercial terms are not edited in place.
 - Closure preserves history.
-- Historical calculations keep their original agreement revision.
+- Manual closure is a lifecycle stop: new base-rent coverage cannot extend past the closure civil date. If the contract already has an earlier `ends_on`, that earlier date remains the stricter commercial boundary.
+- Historical calculations keep their original agreement revision and historical periods through the effective boundary remain billable.
 
 ### 6.4 Successor agreement
 
@@ -288,7 +289,7 @@ Driver identity is optional source evidence and has two explicit modes:
 
 `driver_observation` remains narrative evidence and is not an identity key.
 
-HR owns employee identity/lifecycle. Rental does not duplicate employees or payroll rates. Running Chart owns the fact that a driver performed a specific Rental usage.
+HR owns employee identity/lifecycle. Rental does not duplicate employees or payroll rates. The operator lookup is a Rental-permission-scoped, least-privilege façade over the HR-owned employee query and exposes only selector identity rather than HR contact data. Running Chart owns the fact that a driver performed a specific Rental usage.
 
 When authoritative driver identity is recorded, two Finalized Running Charts in the same tenant cannot overlap for that same driver. Adjacent periods are allowed. The constraint applies across different vehicles.
 
@@ -307,6 +308,7 @@ The shipped named policy is `actual_calendar_days_v1`.
 - Short-month anchors recover from the original anchor (for example, a day-31 contract does not permanently move the anchor after February).
 - Adjacent partial segments use cumulative decimal allocation so their sum reconciles with the full cycle.
 - Preview and billing require an explicit policy and agreement revision; no hidden `30-day` divisor exists.
+- Manual lifecycle closure caps new base-rent coverage at the closure civil date. It does not rewrite existing charges or the original contractual end date; an earlier explicit `ends_on` remains stricter.
 
 This is an explicit AutoERP production policy, not a claim that every historical TACGL customer used it.
 
@@ -519,6 +521,7 @@ Important competing operations:
 | Customer vs owner billing | both may independently consume the same physical source |
 | Finalize/reverse vs bill | committed source state and financial source state cannot disagree |
 | Successor activation vs use/charge | commercial boundary cannot bisect retained operational/financial history |
+| Manual closure vs base-rent billing | no new base-rent coverage may extend after the closure civil date |
 | Two driver charts | same authoritative driver cannot have overlapping finalized Rental usage |
 | Deposit allocate/refund | one available balance cannot be spent twice |
 
@@ -661,6 +664,7 @@ The fresh `app/Modules/VehicleRental` implementation includes:
 - tenant-safe identity snapshots and histories;
 - expected-version lifecycle commands;
 - effective successor Draft/review/activation flow;
+- closure-aware base-rent coverage so a Closed agreement cannot generate future periods while historical periods remain available;
 - bounded/open-ended vehicle planning;
 - owner-source and company-owned paths;
 - handover/return/cancel/replacement lineage;
