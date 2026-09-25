@@ -52,4 +52,24 @@ final class AgreementImmutabilityTest extends TestCase
             $agreement->save();
         });
     }
+
+    public function test_successor_predecessor_lineage_cannot_be_rewritten_while_draft(): void
+    {
+        [$context, $input] = $this->fixture();
+        $this->withTenantExecutionContext($context->tenantId, function () use ($context, $input): void {
+            $service = app(AgreementService::class);
+            $predecessor = $service->create(AgreementKind::Customer, $context, $input);
+            $predecessor = $service->change(AgreementKind::Customer, $context, $predecessor->id, $predecessor->row_version, AgreementAction::Activate);
+            $successor = $service->successor(AgreementKind::Customer, $context, $predecessor->id, $predecessor->row_version, [
+                'reference' => $predecessor->reference.'-R2',
+                'agreed_on' => '2026-09-20',
+                'starts_on' => '2026-10-01',
+                'reason' => 'Future commercial revision',
+            ]);
+
+            $this->expectException(LogicException::class);
+            $successor->supersedes_agreement_id = null;
+            $successor->save();
+        });
+    }
 }
