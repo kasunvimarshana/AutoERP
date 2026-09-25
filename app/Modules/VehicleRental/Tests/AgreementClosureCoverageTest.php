@@ -12,9 +12,11 @@ use Modules\VehicleRental\Constants\RentalConfiguration;
 use Modules\VehicleRental\Enums\AgreementAction;
 use Modules\VehicleRental\Enums\AgreementKind;
 use Modules\VehicleRental\Enums\BaseRentPolicy;
+use Modules\VehicleRental\Models\RunningChart;
 use Modules\VehicleRental\Services\AgreementService;
 use Modules\VehicleRental\Services\BaseRentBilling;
 use Modules\VehicleRental\Services\BaseRentPreview;
+use Modules\VehicleRental\Services\MileageAllowance;
 use Modules\VehicleRental\Services\RentalAuthorization;
 use Tests\TestCase;
 
@@ -83,6 +85,51 @@ final class AgreementClosureCoverageTest extends TestCase
             } catch (ValidationException) {
                 $this->assertDatabaseCount('vehicle_rental_customer_base_charges', 0);
                 $this->assertDatabaseCount('invoices', 0);
+            }
+        });
+    }
+
+    public function test_closed_open_ended_agreement_cannot_consume_future_mileage_allowance(): void
+    {
+        // The closure instant is 2026-07-01 in Asia/Colombo even though it is still June 30 UTC.
+        $this->travelTo(CarbonImmutable::parse('2026-06-30T19:00:00+00:00'));
+        [$context, $input] = $this->fixture();
+
+        $this->withTenantExecutionContext($context->tenantId, function () use ($context, $input): void {
+            $agreements = app(AgreementService::class);
+            $agreement = $agreements->create(AgreementKind::Customer, $context, array_replace($input, [
+                'agreed_on' => '2026-05-20',
+                'starts_on' => '2026-06-01',
+                'ends_on' => null,
+                'basis' => 'monthly',
+                'terms' => ['included_km' => '3100', 'excess_km_rate' => '90'],
+            ]));
+            $agreement = $agreements->change(AgreementKind::Customer, $context, $agreement->id, $agreement->row_version, AgreementAction::Activate);
+            $agreement = $agreements->change(AgreementKind::Customer, $context, $agreement->id, $agreement->row_version, AgreementAction::Close, reason: 'Rental ended');
+
+            $allowed = new RunningChart;
+            $allowed->forceFill([
+                'starts_at' => '2026-07-01T09:00:00+05:30',
+                'ends_at' => '2026-07-01T17:00:00+05:30',
+                'commercial_km' => '50',
+            ]);
+            $quote = app(MileageAllowance::class)->quote(AgreementKind::Customer, $context, $agreement, $allowed, $agreement->terms);
+            self::assertSame('2026-07-01', $quote['cycle_until']);
+            self::assertSame(1, $quote['covered_days']);
+
+            $future = new RunningChart;
+            $future->forceFill([
+                'starts_at' => '2026-07-02T09:00:00+05:30',
+                'ends_at' => '2026-07-02T17:00:00+05:30',
+                'commercial_km' => '50',
+            ]);
+
+            try {
+                app(MileageAllowance::class)->quote(AgreementKind::Customer, $context, $agreement, $future, $agreement->terms);
+                self::fail('A closed agreement consumed mileage allowance after its closure civil date.');
+            } catch (ValidationException $error) {
+                self::assertArrayHasKey('mileage', $error->errors());
+                $this->assertDatabaseCount('vehicle_rental_customer_usage_charges', 0);
             }
         });
     }
