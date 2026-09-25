@@ -21,7 +21,7 @@ final class DriverDirectoryTest extends TestCase
         [$context] = $this->fixture();
         $this->withTenantExecutionContext($context->tenantId, function () use ($context): void {
             $this->employee($context->tenantId, $context->organizationUnitId, 'DRV-AVAILABLE', 'Available Driver', 'available');
-            $this->employee($context->tenantId, $context->organizationUnitId, 'DRV-BUSY', 'Busy Driver', 'busy');
+            $this->employee($context->tenantId, $context->organizationUnitId, 'DRV-ASSIGNED', 'Assigned Driver', 'assigned');
 
             $authorization = $this->mock(RentalAuthorization::class);
             $authorization->shouldReceive('assertChart')->once()->with($context, RunningChartAction::Create, true);
