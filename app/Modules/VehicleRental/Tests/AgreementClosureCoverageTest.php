@@ -43,6 +43,9 @@ final class AgreementClosureCoverageTest extends TestCase
             $agreement = $agreements->change(AgreementKind::Customer, $context, $agreement->id, $agreement->row_version, AgreementAction::Activate);
             $agreement = $agreements->change(AgreementKind::Customer, $context, $agreement->id, $agreement->row_version, AgreementAction::Close, reason: 'Rental ended');
 
+            self::assertNull($agreement->ends_on);
+            self::assertSame('2026-09-20', $agreement->effectiveCoverageEndsOn());
+
             $preview = app(BaseRentPreview::class);
             $base = [
                 'expected_version' => $agreement->row_version,
@@ -91,6 +94,9 @@ final class AgreementClosureCoverageTest extends TestCase
             ]));
             $agreement = $agreements->change(AgreementKind::Customer, $context, $agreement->id, $agreement->row_version, AgreementAction::Activate);
             $agreement = $agreements->change(AgreementKind::Customer, $context, $agreement->id, $agreement->row_version, AgreementAction::Close, reason: 'Administrative closure');
+
+            self::assertSame('2026-09-18', $agreement->ends_on->toDateString());
+            self::assertSame('2026-09-18', $agreement->effectiveCoverageEndsOn());
 
             $this->expectException(ValidationException::class);
             app(BaseRentPreview::class)->calculate(AgreementKind::Customer, $context, $agreement->id, [
