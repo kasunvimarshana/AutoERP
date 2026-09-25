@@ -92,10 +92,18 @@ final class AgreementService
             }
             $cutoff = $successorStart->subDay();
             $foreignKey = $kind === AgreementKind::Customer ? 'customer_agreement_id' : 'owner_agreement_id';
-            $crossingUse = VehicleUse::query()->forTenant($context->tenantId)->where($foreignKey, $predecessor->id)
+            $uses = VehicleUse::query()->forTenant($context->tenantId)->where($foreignKey, $predecessor->id)
                 ->where('status', '!=', VehicleUseStatus::Cancelled->value)
-                ->where(fn ($query) => $query->whereNull('ends_at')->orWhere('ends_at', '>', $successorStart->startOfDay()))
-                ->lockForUpdate()->first(['id']);
+                ->orderBy('id')->lockForUpdate()->get(['id', 'ends_at_input']);
+            $crossingUse = $uses->first(function (VehicleUse $use) use ($data): bool {
+                if ($use->ends_at_input === null) {
+                    return true;
+                }
+                $end = OperationalTime::parse($use->ends_at_input, 'ends_at');
+                $boundary = CarbonImmutable::createFromFormat('!'.AgreementFields::DATE_FORMAT, $data['starts_on'], $end->getTimezone());
+
+                return $end > $boundary;
+            });
             if ($crossingUse !== null) {
                 throw ValidationException::withMessages(['starts_on' => ['Return or reschedule vehicle use that crosses the successor effective date before changing commercial terms.']]);
             }
