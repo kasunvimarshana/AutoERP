@@ -28,7 +28,7 @@ export function AgreementSuccessorForm({ kind, agreement, onSaved, onCancel }: {
 
     return <form onSubmit={submit} className="space-y-3 border-t pt-4" aria-label="Create successor agreement">
         <h3 className="font-semibold">Future agreement revision</h3>
-        <p className="text-sm text-slate-600">Create a Draft for future commercial terms without interrupting the current agreement. The predecessor remains Active while this Draft is reviewed. Activating the successor revalidates vehicle-use and financial cutover conflicts, then closes the predecessor at the effective boundary in the same transaction.</p>
+        <p className="text-sm text-slate-600">Create a Draft for future commercial terms without interrupting the current agreement. The predecessor remains Active while this Draft is reviewed. Activate the successor on or after its effective start date; activation revalidates vehicle-use and financial cutover conflicts, then closes the predecessor at the effective boundary in the same transaction.</p>
         <p className="text-sm text-slate-600">Existing commercial terms are copied for review, except the security-deposit requirement. A deposit belongs to its original Payment source and is never duplicated automatically; record a new deposit requirement on the successor Draft only when the amended agreement explicitly requires it.</p>
         <ErrorAlert error={error} inline />
         <fieldset disabled={saving} className="grid gap-3 sm:grid-cols-2">
