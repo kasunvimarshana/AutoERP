@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\VehicleRental\Services;
 
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -74,6 +75,9 @@ final class RunningChartService
         return $this->atomic(function () use ($context, $id, $expectedVersion, $action, $input, $reason): RunningChart {
             $snapshot = RunningChart::query()->forContext($context->tenantId, $context->organizationUnitId)->findOrFail($id);
             $use = $this->lockedUse($context, (int) $snapshot->vehicle_use_id);
+            if ($action === RunningChartAction::Finalize) {
+                $this->lockDriverTimeline($context, $snapshot);
+            }
             $chart = RunningChart::query()->forContext($context->tenantId, $context->organizationUnitId)->lockForUpdate()->findOrFail($id);
             $this->version($chart->row_version, $expectedVersion);
             if ($action === RunningChartAction::Update && $chart->status === RunningChartStatus::Draft) {
@@ -115,29 +119,48 @@ final class RunningChartService
         });
     }
 
-    private function assertDriverAvailable(AgreementContext $context, RunningChart $chart): void
+    private function lockDriverTimeline(AgreementContext $context, RunningChart $chart): void
     {
-        if ($chart->driver_identity_source === null) {
+        $timeline = $this->driverIdentityQuery($context, $chart);
+        if ($timeline === null) {
             return;
         }
 
-        $conflicts = RunningChart::query()->forTenant($context->tenantId)
-            ->whereKeyNot($chart->id)
+        // Lock every row for this identity in stable order before the current chart row. Two
+        // concurrent finalizations for the same driver therefore serialize before overlap checks.
+        $timeline->orderBy('id')->lockForUpdate()->get(['id']);
+    }
+
+    private function assertDriverAvailable(AgreementContext $context, RunningChart $chart): void
+    {
+        $conflicts = $this->driverIdentityQuery($context, $chart);
+        if ($conflicts === null) {
+            return;
+        }
+
+        if ($conflicts->whereKeyNot($chart->id)
             ->where('status', RunningChartStatus::Finalized->value)
             ->where('starts_at', '<', $chart->ends_at)
-            ->where('ends_at', '>', $chart->starts_at);
-
-        if ($chart->driver_identity_source === DriverIdentitySource::Employee) {
-            $conflicts->where('driver_identity_source', DriverIdentitySource::Employee->value)
-                ->where('driver_employee_id', $chart->driver_employee_id);
-        } else {
-            $conflicts->where('driver_identity_source', DriverIdentitySource::External->value)
-                ->where('driver_reference_snapshot', $chart->driver_reference_snapshot);
-        }
-
-        if ($conflicts->lockForUpdate()->first(['id']) !== null) {
+            ->where('ends_at', '>', $chart->starts_at)
+            ->first(['id']) !== null) {
             throw new ConflictHttpException('This driver already has finalized Rental usage during the selected period.');
         }
+    }
+
+    private function driverIdentityQuery(AgreementContext $context, RunningChart $chart): ?Builder
+    {
+        if ($chart->driver_identity_source === null) {
+            return null;
+        }
+
+        $query = RunningChart::query()->forTenant($context->tenantId);
+        if ($chart->driver_identity_source === DriverIdentitySource::Employee) {
+            return $query->where('driver_identity_source', DriverIdentitySource::Employee->value)
+                ->where('driver_employee_id', $chart->driver_employee_id);
+        }
+
+        return $query->where('driver_identity_source', DriverIdentitySource::External->value)
+            ->where('driver_reference_snapshot', $chart->driver_reference_snapshot);
     }
 
     private function lockedUse(AgreementContext $context, int $id): VehicleUse
