@@ -19,7 +19,7 @@ import { Input } from '@/shared/components/Input';
 import { Pagination } from '@/shared/components/Pagination';
 import type { PaginationMeta } from '@/shared/types/pagination';
 import { AgreementEditor } from './AgreementEditor';
-import { AgreementAction, AgreementKind, AgreementStatus, DriverMode, RentalBasis, TERM_LABELS, agreementPermissions, type Agreement, type TermKey } from './agreements';
+import { AgreementAction, AgreementKind, AgreementStatus, DriverMode, RentalBasis, agreementPermissions, termLabel, visibleTermKeys, type Agreement } from './agreements';
 
 export default function AgreementsPage({ kind }: { kind: AgreementKind }) {
     const auth = useAuth();
@@ -42,6 +42,7 @@ export default function AgreementsPage({ kind }: { kind: AgreementKind }) {
     const [showDeposits, setShowDeposits] = useState(false);
     const [showHistory, setShowHistory] = useState(false);
     const [showSuccessor, setShowSuccessor] = useState(false);
+    const termKeys = visibleTermKeys(kind);
     useEffect(() => {
         const controller = new AbortController();
         listAgreements(kind, page, controller.signal).then(result => {
@@ -59,7 +60,7 @@ export default function AgreementsPage({ kind }: { kind: AgreementKind }) {
         finally { setSaving(false); }
     }
     return <div>
-        <ContentHeader title={kind === AgreementKind.Customer ? 'Customer Rental Agreements' : 'Owner Rental Agreements'} description="Record agreed terms and preserve their history. Assign vehicles from active customer agreements and preserve custody history. Review charges and customer deposits from each agreement."
+        <ContentHeader title={kind === AgreementKind.Customer ? 'Customer Rental Agreements' : 'Owner Rental Agreements'} description={kind === AgreementKind.Customer ? 'Record customer commercial terms, vehicle use, billing and deposit context while preserving history.' : 'Record owner/lessor payable terms and supplied vehicle context independently from customer billing.'}
             actions={<><Button variant="secondary" onClick={reload} disabled={saving || editing !== null}>Reload</Button>{canManage && <Button onClick={() => { setEditing('new'); setSelected(null); }} disabled={saving || editing !== null}>New agreement</Button>}</>} />
         <ErrorAlert error={error} inline />
         {editing !== null && <AgreementEditor key={editing === 'new' ? 'new' : editing.id} kind={kind} record={editing === 'new' ? undefined : editing} onSaved={reload} onCancel={() => setEditing(null)} />}
@@ -74,7 +75,7 @@ export default function AgreementsPage({ kind }: { kind: AgreementKind }) {
             <p>{selected.currency.code} · {selected.driver_mode === DriverMode.SelfDrive ? 'Self-drive' : 'With driver'}{selected.vehicle ? ` · ${selected.vehicle.registration_number ?? selected.vehicle.vehicle_number}` : ''}</p>
             <p>Agreement date: {selected.agreed_on} · Executing date: {selected.executing_on ?? 'Not recorded'}</p>
             {selected.supersedes_agreement && <p className="text-sm text-slate-600">Successor of {selected.supersedes_agreement.reference}</p>}
-            <dl className="grid gap-3 sm:grid-cols-2">{(Object.keys(TERM_LABELS) as TermKey[]).map(key => <div key={key}><dt className="text-sm text-slate-500">{TERM_LABELS[key]}</dt><dd>{selected.terms[key] ?? 'Not specified'}</dd></div>)}</dl>
+            <dl className="grid gap-3 sm:grid-cols-2">{termKeys.map(key => <div key={key}><dt className="text-sm text-slate-500">{termLabel(kind, key)}</dt><dd>{selected.terms[key] ?? 'Not specified'}</dd></div>)}</dl>
             {selected.notes && <p>{selected.notes}</p>}
             <BaseRentPreviewPanel key={`${kind}-${selected.id}-${selected.row_version}`} kind={kind} agreement={selected} />
             {canBill && selected.status !== AgreementStatus.Draft && <BaseRentBillingPanel key={`billing-${kind}-${selected.id}-${selected.row_version}`} kind={kind} agreement={selected} />}
@@ -93,7 +94,7 @@ export default function AgreementsPage({ kind }: { kind: AgreementKind }) {
                 <p>{action === AgreementAction.Activate ? 'Activation freezes these terms. Confirm that the recorded details match the agreement. This does not reserve the vehicle or create a financial document.' : 'Close this agreement while preserving its original terms and history.'}</p>
                 {action === AgreementAction.Close && <Input label="Closure reason" value={reason} onChange={event => setReason(event.target.value)} required disabled={saving} error={error?.fields.reason?.[0]} />}
                 <Button onClick={confirm} loading={saving} disabled={action === AgreementAction.Close && !reason.trim()}>Confirm {action === AgreementAction.Activate ? 'activation' : 'closure'}</Button>
-                <Button variant="secondary" disabled={saving} onClick={() => setAction(null)}>Cancel</Button>
+                <Button type="button" variant="secondary" disabled={saving} onClick={() => setAction(null)}>Cancel</Button>
             </div>}
         </section>}
     </div>;
