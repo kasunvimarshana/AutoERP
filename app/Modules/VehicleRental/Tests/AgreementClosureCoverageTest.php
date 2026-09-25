@@ -25,6 +25,8 @@ final class AgreementClosureCoverageTest extends TestCase
     use BuildsRentalFixture;
     use RefreshDatabase;
 
+    private string $workspaceTimezone = 'Asia/Colombo';
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -33,7 +35,7 @@ final class AgreementClosureCoverageTest extends TestCase
             $mock->shouldReceive('value')
                 ->with(RentalConfiguration::WORKSPACE_TIMEZONE, \Mockery::type('int'), \Mockery::type('int'))
                 ->zeroOrMoreTimes()
-                ->andReturn('Asia/Colombo');
+                ->andReturnUsing(fn (): string => $this->workspaceTimezone);
         });
     }
 
@@ -55,6 +57,7 @@ final class AgreementClosureCoverageTest extends TestCase
             $agreement = $agreements->change(AgreementKind::Customer, $context, $agreement->id, $agreement->row_version, AgreementAction::Close, reason: 'Rental ended');
 
             self::assertNull($agreement->ends_on);
+            self::assertSame('2026-09-21', $agreement->closed_on->toDateString());
 
             $preview = app(BaseRentPreview::class);
             $base = [
@@ -107,6 +110,8 @@ final class AgreementClosureCoverageTest extends TestCase
             $agreement = $agreements->change(AgreementKind::Customer, $context, $agreement->id, $agreement->row_version, AgreementAction::Activate);
             $agreement = $agreements->change(AgreementKind::Customer, $context, $agreement->id, $agreement->row_version, AgreementAction::Close, reason: 'Rental ended');
 
+            self::assertSame('2026-07-01', $agreement->closed_on->toDateString());
+
             $allowed = new RunningChart;
             $allowed->forceFill([
                 'starts_at' => '2026-07-01T09:00:00+05:30',
@@ -134,6 +139,48 @@ final class AgreementClosureCoverageTest extends TestCase
         });
     }
 
+    public function test_workspace_timezone_change_cannot_move_a_recorded_closure_boundary(): void
+    {
+        $this->travelTo(CarbonImmutable::parse('2026-06-30T19:00:00+00:00'));
+        [$context, $input] = $this->fixture();
+
+        $this->withTenantExecutionContext($context->tenantId, function () use ($context, $input): void {
+            $agreements = app(AgreementService::class);
+            $agreement = $agreements->create(AgreementKind::Customer, $context, array_replace($input, [
+                'basis' => 'daily',
+                'starts_on' => '2026-06-01',
+                'ends_on' => null,
+                'terms' => ['base_rate' => '100'],
+            ]));
+            $agreement = $agreements->change(AgreementKind::Customer, $context, $agreement->id, $agreement->row_version, AgreementAction::Activate);
+            $agreement = $agreements->change(AgreementKind::Customer, $context, $agreement->id, $agreement->row_version, AgreementAction::Close, reason: 'Rental ended');
+
+            self::assertSame('2026-07-01', $agreement->closed_on->toDateString());
+
+            // The close instant would be June 30 in New York. Historical economics must not move
+            // when an administrator later changes the workspace timezone.
+            $this->workspaceTimezone = 'America/New_York';
+            $agreement = $agreement->refresh();
+            self::assertSame('2026-07-01', $agreement->closed_on->toDateString());
+
+            $preview = app(BaseRentPreview::class);
+            self::assertSame('100.000000', $preview->calculate(AgreementKind::Customer, $context, $agreement->id, [
+                'expected_version' => $agreement->row_version,
+                'policy' => BaseRentPolicy::ActualCalendarDays->value,
+                'from' => '2026-07-01',
+                'until' => '2026-07-01',
+            ])['base_rent']);
+
+            $this->expectException(ValidationException::class);
+            $preview->calculate(AgreementKind::Customer, $context, $agreement->id, [
+                'expected_version' => $agreement->row_version,
+                'policy' => BaseRentPolicy::ActualCalendarDays->value,
+                'from' => '2026-07-02',
+                'until' => '2026-07-02',
+            ]);
+        });
+    }
+
     public function test_contract_end_remains_the_stricter_boundary_after_closure(): void
     {
         $this->travelTo(CarbonImmutable::parse('2026-09-20T20:00:00+00:00'));
@@ -151,6 +198,7 @@ final class AgreementClosureCoverageTest extends TestCase
             $agreement = $agreements->change(AgreementKind::Customer, $context, $agreement->id, $agreement->row_version, AgreementAction::Close, reason: 'Administrative closure');
 
             self::assertSame('2026-09-18', $agreement->ends_on->toDateString());
+            self::assertSame('2026-09-21', $agreement->closed_on->toDateString());
 
             $this->expectException(ValidationException::class);
             app(BaseRentPreview::class)->calculate(AgreementKind::Customer, $context, $agreement->id, [
