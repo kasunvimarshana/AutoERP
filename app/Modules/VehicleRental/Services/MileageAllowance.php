@@ -43,7 +43,7 @@ final class MileageAllowance
             $cycleStart = $anchor->addMonthsNoOverflow($offset);
             $cycleEnd = $anchor->addMonthsNoOverflow($offset + 1);
         }
-        $agreementCoverageEnd = $this->calendar->coverageEnd($agreement, $context, $timezone);
+        $agreementCoverageEnd = $this->calendar->coverageEnd($agreement, $context);
         $coveredEnd = $agreementCoverageEnd === null
             ? $cycleEnd
             : $cycleEnd->min(CarbonImmutable::parse($agreementCoverageEnd, $timezone)->addDay()->startOfDay());
