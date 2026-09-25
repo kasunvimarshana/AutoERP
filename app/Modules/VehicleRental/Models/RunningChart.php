@@ -9,7 +9,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use LogicException;
 use Modules\Core\Models\TenantOwnedModel;
+use Modules\Hr\Models\HrEmployee;
 use Modules\VehicleRental\Constants\AgreementFields;
+use Modules\VehicleRental\Enums\DriverIdentitySource;
 use Modules\VehicleRental\Enums\RunningChartStatus;
 
 final class RunningChart extends TenantOwnedModel
@@ -18,7 +20,25 @@ final class RunningChart extends TenantOwnedModel
 
     protected function casts(): array
     {
-        return array_merge(parent::casts(), ['status' => RunningChartStatus::class, 'row_version' => 'integer', 'vehicle_use_version' => 'integer', 'starts_at' => 'immutable_datetime', 'ends_at' => 'immutable_datetime', 'finalized_at' => 'immutable_datetime', 'reversed_at' => 'immutable_datetime', 'start_odometer' => 'decimal:'.AgreementFields::DECIMAL_SCALE, 'end_odometer' => 'decimal:'.AgreementFields::DECIMAL_SCALE, 'garage_km' => 'decimal:'.AgreementFields::DECIMAL_SCALE, 'commercial_km' => 'decimal:'.AgreementFields::DECIMAL_SCALE, 'normal_ot_minutes' => 'integer', 'double_ot_minutes' => 'integer', 'triple_ot_minutes' => 'integer', 'night_outs' => 'integer']);
+        return array_merge(parent::casts(), [
+            'status' => RunningChartStatus::class,
+            'driver_identity_source' => DriverIdentitySource::class,
+            'row_version' => 'integer',
+            'vehicle_use_version' => 'integer',
+            'driver_employee_id' => 'integer',
+            'starts_at' => 'immutable_datetime',
+            'ends_at' => 'immutable_datetime',
+            'finalized_at' => 'immutable_datetime',
+            'reversed_at' => 'immutable_datetime',
+            'start_odometer' => 'decimal:'.AgreementFields::DECIMAL_SCALE,
+            'end_odometer' => 'decimal:'.AgreementFields::DECIMAL_SCALE,
+            'garage_km' => 'decimal:'.AgreementFields::DECIMAL_SCALE,
+            'commercial_km' => 'decimal:'.AgreementFields::DECIMAL_SCALE,
+            'normal_ot_minutes' => 'integer',
+            'double_ot_minutes' => 'integer',
+            'triple_ot_minutes' => 'integer',
+            'night_outs' => 'integer',
+        ]);
     }
 
     public function scopeForContext(Builder $q, int $tenant, int $organization): Builder
@@ -29,6 +49,11 @@ final class RunningChart extends TenantOwnedModel
     public function vehicleUse(): BelongsTo
     {
         return $this->belongsTo(VehicleUse::class);
+    }
+
+    public function driverEmployee(): BelongsTo
+    {
+        return $this->belongsTo(HrEmployee::class, 'driver_employee_id')->withTrashed();
     }
 
     public function correctsChart(): BelongsTo
