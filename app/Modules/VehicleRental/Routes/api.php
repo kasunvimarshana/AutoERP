@@ -21,11 +21,11 @@ Route::prefix('api/v1/vehicle-rental')->middleware([
     config('core.current_organization_unit.middleware_alias', 'current.organization-unit').':required', 'tenant.feature:'.TenantFeature::VEHICLE_RENTAL,
 ])->group(function (): void {
     Route::prefix('{kind}/agreements')->whereIn('kind', array_column(AgreementKind::cases(), 'value'))->group(function (): void {
-        // Services authorize the customer and owner sides separately on every read and write.
         Route::get('/', [AgreementController::class, 'index']);
         Route::post('/', [AgreementController::class, 'store']);
         Route::get('{agreement}', [AgreementController::class, 'show'])->whereNumber('agreement');
         Route::put('{agreement}', [AgreementController::class, 'update'])->whereNumber('agreement');
+        Route::post('{agreement}/successor', [AgreementController::class, 'successor'])->whereNumber('agreement');
         Route::get('{agreement}/history', [AgreementController::class, 'history'])->whereNumber('agreement');
         Route::middleware('tenant.feature:'.TenantFeature::INVOICE)->group(function (): void {
             Route::get('{agreement}/base-charges', [BaseRentBillingController::class, 'index'])->whereNumber('agreement');
