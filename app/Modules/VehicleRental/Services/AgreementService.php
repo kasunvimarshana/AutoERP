@@ -29,7 +29,11 @@ use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 final class AgreementService
 {
-    public function __construct(private readonly RentalAuthorization $authorization, private readonly AgreementValidation $validation) {}
+    public function __construct(
+        private readonly RentalAuthorization $authorization,
+        private readonly AgreementValidation $validation,
+        private readonly RentalCalendar $calendar,
+    ) {}
 
     public function list(AgreementKind $kind, AgreementContext $context, int $perPage, ?string $search = null): LengthAwarePaginator
     {
@@ -190,9 +194,9 @@ final class AgreementService
     private function activateSuccessor(AgreementKind $kind, AgreementContext $context, Agreement $predecessor, Agreement $successor): void
     {
         $this->assertSuccessorStartsAfter($predecessor, $successor->starts_on->toDateString());
-        $timezone = (string) config('app.timezone', 'UTC');
+        $timezone = $this->calendar->timezone($context);
         $effectiveDate = CarbonImmutable::createFromFormat('!'.AgreementFields::DATE_FORMAT, $successor->starts_on->toDateString(), $timezone);
-        if ($effectiveDate->isAfter(CarbonImmutable::today($timezone))) {
+        if ($effectiveDate->isAfter($this->calendar->today($context))) {
             throw ValidationException::withMessages(['starts_on' => ['Keep this successor as Draft until its effective start date. Early activation would interrupt the still-current predecessor agreement.']]);
         }
         $this->assertCutoverAvailable($kind, $context, $predecessor, $successor->starts_on->toDateString());
