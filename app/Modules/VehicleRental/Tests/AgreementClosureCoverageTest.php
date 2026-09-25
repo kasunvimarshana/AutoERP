@@ -11,6 +11,7 @@ use Modules\VehicleRental\Enums\AgreementAction;
 use Modules\VehicleRental\Enums\AgreementKind;
 use Modules\VehicleRental\Enums\BaseRentPolicy;
 use Modules\VehicleRental\Services\AgreementService;
+use Modules\VehicleRental\Services\BaseRentBilling;
 use Modules\VehicleRental\Services\BaseRentPreview;
 use Modules\VehicleRental\Services\RentalAuthorization;
 use Tests\TestCase;
@@ -23,7 +24,7 @@ final class AgreementClosureCoverageTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->mock(RentalAuthorization::class, fn ($mock) => $mock->shouldReceive('assert')->zeroOrMoreTimes());
+        $this->mock(RentalAuthorization::class, fn ($mock) => $mock->shouldReceive('assert', 'assertBilling')->zeroOrMoreTimes());
     }
 
     public function test_closed_open_ended_agreement_cannot_create_future_base_rent_coverage(): void
@@ -56,6 +57,21 @@ final class AgreementClosureCoverageTest extends TestCase
                 self::fail('A closed agreement created future base-rent coverage.');
             } catch (ValidationException $error) {
                 self::assertArrayHasKey('from', $error->errors());
+            }
+
+            try {
+                app(BaseRentBilling::class)->create(AgreementKind::Customer, $context, $agreement->id, [
+                    'expected_version' => $agreement->row_version,
+                    'policy' => BaseRentPolicy::ActualCalendarDays->value,
+                    'from' => '2026-09-20',
+                    'until' => '2026-09-21',
+                    'invoice_date' => '2026-09-20',
+                    'exchange_rate' => '1',
+                ]);
+                self::fail('A closed agreement created a future base-rent charge.');
+            } catch (ValidationException) {
+                $this->assertDatabaseCount('vehicle_rental_customer_base_charges', 0);
+                $this->assertDatabaseCount('invoices', 0);
             }
         });
     }
