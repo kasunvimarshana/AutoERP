@@ -20,7 +20,7 @@ export const TERM_LABELS = {
 export type TermKey = keyof typeof TERM_LABELS;
 export interface Agreement {
     id: number; reference: string; row_version: number; status: AgreementStatus; basis: RentalBasis; driver_mode: DriverMode;
-    supersedes_agreement: { id: number; reference: string } | null;
+    supersedes_agreement?: { id: number; reference: string } | null;
     party: NamedResource; currency: NamedResource; vehicle?: { id: number; vehicle_number: string; registration_number: string | null };
     agreed_on: string; executing_on: string | null; starts_on: string; ends_on: string | null; terms: Record<TermKey, string | null>; notes: string | null;
 }
