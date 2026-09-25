@@ -50,10 +50,12 @@ final class AgreementTenantCalendarTest extends TestCase
             ]);
 
             $successor = $service->change(AgreementKind::Customer, $context, $successor->id, $successor->row_version, AgreementAction::Activate);
+            $predecessor = $predecessor->refresh();
 
             self::assertSame(AgreementStatus::Active, $successor->status);
-            self::assertSame(AgreementStatus::Closed, $predecessor->refresh()->status);
+            self::assertSame(AgreementStatus::Closed, $predecessor->status);
             self::assertSame('2026-09-30', $predecessor->ends_on->toDateString());
+            self::assertSame('2026-10-01', $predecessor->closed_on->toDateString());
         });
     }
 }
