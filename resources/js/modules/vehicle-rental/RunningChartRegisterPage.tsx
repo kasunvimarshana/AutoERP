@@ -34,9 +34,9 @@ export default function RunningChartRegisterPage() {
         } catch (failure) { setError(toApiError(failure)); }
     }
     return <main className="space-y-5 p-4">
-        <header><h1 className="text-2xl font-semibold">Running Chart register</h1><p>Review recorded usage, agreement context and corrections.</p></header>
+        <header><h1 className="text-2xl font-semibold">Running Chart register</h1><p>Review recorded usage, driver identity, agreement context and corrections.</p></header>
         <form aria-label="Filter Running Charts" onSubmit={apply} className="grid gap-3 rounded-lg border p-4 md:grid-cols-2">
-            <Input label="Chart, vehicle, agreement or party" value={search} onChange={event => setSearch(event.target.value)} error={error?.fields.search?.[0]} />
+            <Input label="Chart, vehicle, driver, agreement or party" value={search} onChange={event => setSearch(event.target.value)} error={error?.fields.search?.[0]} />
             <label className="block">Chart status<select className="block w-full rounded border p-2" value={status} onChange={event => setStatus(event.target.value as RunningChartStatus | '')}><option value="">All states</option>{Object.values(RunningChartStatus).map(value => <option key={value} value={value}>{CHART_LABELS[value]}</option>)}</select></label>
             <Input label="Period start (optional)" type="datetime-local" step={OPERATIONAL_TIME_STEP_SECONDS} value={from} onChange={event => setFrom(event.target.value)} error={error?.fields.from?.[0]} />
             <Input label="Period end (optional)" type="datetime-local" step={OPERATIONAL_TIME_STEP_SECONDS} value={until} onChange={event => setUntil(event.target.value)} error={error?.fields.until?.[0]} />
@@ -50,12 +50,14 @@ export default function RunningChartRegisterPage() {
                 <div className="flex flex-wrap justify-between gap-2"><h2 className="font-semibold">{row.reference} · {row.vehicle_use.vehicle_label}</h2><span>{CHART_LABELS[row.status]}</span></div>
                 <p>Customer: {row.customer_agreement.party_name} · {row.customer_agreement.reference}</p>
                 <p>{row.owner_agreement ? `Owner: ${row.owner_agreement.party_name} · ${row.owner_agreement.reference}` : 'Company supply'}</p>
+                <p>Driver: {row.driver ? `${row.driver.name} · ${row.driver.reference}` : 'Not recorded'}</p>
                 <p>{row.starts_at} — {row.ends_at}</p><p>Total distance: {row.total_km === null ? 'Not recorded' : `${row.total_km} km`}</p>
                 {row.replaces_vehicle && <p>Replaces vehicle {row.replaces_vehicle}</p>}{row.corrects_chart && <p>Corrects chart {row.corrects_chart.reference}</p>}
                 <Button variant="secondary" onClick={() => setSelected(selected === row.id ? null : row.id)}>Review {row.reference}</Button>
                 {selected === row.id && <div className="space-y-3 border-t pt-3">
                     <dl className="grid gap-2 sm:grid-cols-2">{Object.entries({ ...DISTANCE_LABELS, ...COUNT_LABELS }).map(([key, label]) => <div key={key}><dt>{label}</dt><dd>{row[key as keyof typeof DISTANCE_LABELS | keyof typeof COUNT_LABELS] ?? 'Not recorded'}</dd></div>)}</dl>
                     <p>Air conditioning: {row.ac_mode === null ? 'Not recorded' : AC_LABELS[row.ac_mode]}</p>
+                    <p>Authoritative driver: {row.driver ? `${row.driver.name} (${row.driver.source === 'employee' ? 'employee' : 'external'}) · ${row.driver.reference}` : 'Not recorded'}</p>
                     <p>Driver observation: {row.driver_observation ?? 'Not recorded'}</p><p>Notes: {row.notes ?? 'Not recorded'}</p>
                     <Button variant="secondary" onClick={() => setHistory(history === row.id ? null : row.id)}>Chart history</Button>
                     {history === row.id && <RunningChartHistoryPanel key={row.id} id={row.id} />}<UsageChargePanel chart={row} hasOwner={row.owner_agreement !== null} />
