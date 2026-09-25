@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Modules\VehicleRental\Services;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 use Modules\Vehicle\Models\Vehicle;
 use Modules\VehicleRental\Constants\AgreementFields;
@@ -53,6 +55,89 @@ final class AgreementService
             $this->record($record, $context, AgreementAction::Create);
 
             return $record->load($this->relations($kind));
+        });
+    }
+
+    public function successor(AgreementKind $kind, AgreementContext $context, int $id, int $expectedVersion, array $input): Agreement
+    {
+        $this->authorization->assert($context, $kind, true);
+        $this->validation->assertContext($context);
+        $data = Validator::make($input, [
+            'reference' => ['required', 'string', 'max:'.AgreementFields::REFERENCE_LENGTH],
+            'agreed_on' => ['required', 'date_format:'.AgreementFields::DATE_FORMAT],
+            'executing_on' => ['nullable', 'date_format:'.AgreementFields::DATE_FORMAT],
+            'starts_on' => ['required', 'date_format:'.AgreementFields::DATE_FORMAT],
+            'ends_on' => ['nullable', 'date_format:'.AgreementFields::DATE_FORMAT, 'after_or_equal:starts_on'],
+            'reason' => ['required', 'string', 'max:'.AgreementFields::NOTES_LENGTH],
+        ])->validate();
+        if (trim($data['reason']) === '') {
+            throw ValidationException::withMessages(['reason' => ['Explain the commercial change that requires a successor agreement.']]);
+        }
+
+        return $this->atomic(function () use ($kind, $context, $id, $expectedVersion, $data): Agreement {
+            $predecessor = $this->model($kind)::query()->forContext($context->tenantId, $context->organizationUnitId)->lockForUpdate()->findOrFail($id);
+            if ($predecessor->row_version !== $expectedVersion) {
+                throw new ConflictHttpException('This agreement changed. Reload it before creating a successor.');
+            }
+            if ($predecessor->status !== AgreementStatus::Active) {
+                throw ValidationException::withMessages(['status' => ['Only an active agreement can be superseded.']]);
+            }
+
+            $successorStart = CarbonImmutable::createFromFormat('!'.AgreementFields::DATE_FORMAT, $data['starts_on'], 'UTC');
+            $predecessorStart = CarbonImmutable::createFromFormat('!'.AgreementFields::DATE_FORMAT, $predecessor->starts_on->format(AgreementFields::DATE_FORMAT), 'UTC');
+            if ($successorStart <= $predecessorStart) {
+                throw ValidationException::withMessages(['starts_on' => ['A successor must start after the predecessor start date.']]);
+            }
+            $cutoff = $successorStart->subDay();
+            $foreignKey = $kind === AgreementKind::Customer ? 'customer_agreement_id' : 'owner_agreement_id';
+            $crossingUse = VehicleUse::query()->forTenant($context->tenantId)->where($foreignKey, $predecessor->id)
+                ->where('status', '!=', VehicleUseStatus::Cancelled->value)
+                ->where(fn ($query) => $query->whereNull('ends_at')->orWhere('ends_at', '>=', $successorStart->startOfDay()))
+                ->lockForUpdate()->first(['id']);
+            if ($crossingUse !== null) {
+                throw ValidationException::withMessages(['starts_on' => ['Return or reschedule vehicle use that crosses the successor effective date before changing commercial terms.']]);
+            }
+
+            $clone = [
+                'reference' => trim($data['reference']),
+                'party_id' => $kind === AgreementKind::Customer ? $predecessor->customer_id : $predecessor->supplier_id,
+                'currency_id' => $predecessor->currency_id,
+                'agreed_on' => $data['agreed_on'],
+                'executing_on' => $data['executing_on'] ?? null,
+                'starts_on' => $data['starts_on'],
+                'ends_on' => $data['ends_on'] ?? null,
+                'basis' => $predecessor->basis->value,
+                'driver_mode' => $predecessor->driver_mode->value,
+                'terms' => $predecessor->terms,
+                'notes' => $predecessor->notes,
+            ];
+            if ($kind === AgreementKind::Owner) {
+                $clone['vehicle_id'] = $predecessor->vehicle_id;
+            }
+            $validated = $this->validation->validate($clone, $kind, $context);
+
+            $predecessorEnd = $predecessor->ends_on;
+            if ($predecessorEnd === null || $predecessorEnd->toDateString() >= $data['starts_on']) {
+                $predecessor->ends_on = $cutoff->toDateString();
+            }
+            $predecessor->status = AgreementStatus::Closed;
+            $predecessor->closed_at = now();
+            $predecessor->row_version++;
+            $predecessor->save();
+            $this->record($predecessor, $context, AgreementAction::Supersede, trim($data['reason']));
+
+            $class = $this->model($kind);
+            $successor = new $class;
+            $successor->forceFill(array_merge($validated, [
+                'tenant_id' => $context->tenantId,
+                'organization_unit_id' => $context->organizationUnitId,
+                'supersedes_agreement_id' => $predecessor->id,
+                'row_version' => AgreementFields::INITIAL_VERSION,
+                'status' => AgreementStatus::Draft,
+            ]))->save();
+            $this->record($successor, $context, AgreementAction::Create, 'Successor of '.$predecessor->reference);
+
+            return $successor->load($this->relations($kind));
         });
     }
 
@@ -121,6 +206,6 @@ final class AgreementService
 
     private function relations(AgreementKind $kind): array
     {
-        return $kind === AgreementKind::Owner ? ['party', 'currency', 'vehicle'] : ['party', 'currency'];
+        return $kind === AgreementKind::Owner ? ['party', 'currency', 'vehicle', 'supersedesAgreement'] : ['party', 'currency', 'supersedesAgreement'];
     }
 }
