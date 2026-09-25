@@ -9,7 +9,7 @@ vi.mock('./baseRentPreviewApi', async importOriginal => ({ ...await importOrigin
 const agreement: Agreement = {
     id: 7, reference: 'CUSTOMER-A', row_version: 2, status: AgreementStatus.Active, basis: RentalBasis.Monthly, driver_mode: DriverMode.SelfDrive,
     party: { id: 2, name: 'Customer A' }, currency: { id: 1, name: 'Rupee', code: 'LKR' }, agreed_on: '2026-01-01', executing_on: null,
-    starts_on: '2026-01-31', ends_on: null, notes: null,
+    starts_on: '2026-01-31', ends_on: null, effective_coverage_ends_on: null, notes: null,
     terms: { ...Object.fromEntries(Object.keys(TERM_LABELS).map(key => [key, null])) as Record<TermKey, string | null>, base_rate: '3100.000000' },
 };
 const result: BaseRentPreview = {
@@ -32,6 +32,11 @@ it('requests the selected period and agreement revision and shows the denominato
     expect(screen.getByText(/does not include mileage/)).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Estimate through'), { target: { value: '2026-02-26' } });
     expect(screen.queryByRole('region', { name: 'Base rent estimate' })).not.toBeInTheDocument();
+});
+it('uses the server effective coverage boundary for closed agreement date inputs', () => {
+    setup({ ...agreement, status: AgreementStatus.Closed, effective_coverage_ends_on: '2026-02-15' });
+    expect(screen.getByLabelText('Estimate from')).toHaveAttribute('max', '2026-02-15');
+    expect(screen.getByLabelText('Estimate through')).toHaveAttribute('max', '2026-02-15');
 });
 it('shows stale-version errors without a result', async () => {
     vi.mocked(previewBaseRent).mockRejectedValue(new ApiError('Reload the agreement.', 409));
