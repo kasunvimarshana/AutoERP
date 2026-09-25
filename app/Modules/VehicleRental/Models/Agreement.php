@@ -63,6 +63,9 @@ abstract class Agreement extends TenantOwnedModel
 
             $allowed = ['row_version', 'updated_at'];
             if ($originalStatus === AgreementStatus::Active && $agreement->status === AgreementStatus::Closed) {
+                if ($agreement->closed_at === null || $agreement->closed_on === null) {
+                    throw new LogicException('Closing a rental agreement requires both the closure instant and immutable closure civil date.');
+                }
                 array_push($allowed, 'status', 'ends_on', 'closed_at', 'closed_on');
             }
 
