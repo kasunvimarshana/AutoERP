@@ -41,6 +41,11 @@ final class AgreementValidation
         }
         $input['reference'] = is_string($input['reference'] ?? null) ? trim($input['reference']) : $input['reference'] ?? null;
         $data = Validator::make($input, $rules)->validate();
+        if ($kind === AgreementKind::Owner && ($data['terms'][AgreementFields::DEPOSIT_REQUIREMENT] ?? null) !== null) {
+            throw ValidationException::withMessages([
+                'terms.'.AgreementFields::DEPOSIT_REQUIREMENT => ['Security deposits belong to Customer Agreements and the Payment-owned customer deposit workflow.'],
+            ]);
+        }
         $this->assertContext($context);
         // Snapshot canonical labels; never accept the client's display name as identity evidence.
         if ($kind === AgreementKind::Owner) {
