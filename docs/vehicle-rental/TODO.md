@@ -6,7 +6,7 @@
 
 **Engineering authority:** latest `worktree-0.0.8`.
 
-**Completion review base:** `16d1503bad25221c44ed5cff541c872e50c06dbb`.
+**Continuation review base:** `8261887e9266ea52ad5fc225c64e4e52dad7563f`.
 
 **Canonical domain/policy reference:** [knowledgebase.md](../knowledgebase.md).
 
@@ -24,7 +24,8 @@ This file is no longer an open list of speculative business questions. Historica
 - [x] Latest `worktree-0.0.8` reviewed as implementation authority.
 - [x] Removed legacy Rental runtime remains excluded.
 - [x] Vehicle Rental module responsibilities separated from Vehicle, HR, Customer, Supplier, Invoice, Payment, Tax, Finance, Reporting and Vehicle Service.
-- [x] Protected nested backup investigated only with source-derived exact password values and free tooling; none unlocked the payload. No brute force or guessed variants used.
+- [x] Protected nested backup investigated with free local tooling and source-derived evidence only; the archive is password-protected, has no archive comment, and accessible TACGL text/configuration yielded no explicit backup credential.
+- [x] No brute force, dictionary attack, arbitrary password mutation or unsupported password guess was used.
 - [x] Backup unavailability treated as source-access limitation rather than permission to invent runtime behavior.
 
 ---
@@ -36,7 +37,8 @@ This file is no longer an open list of speculative business questions. Historica
 - [x] Human-readable identity snapshots.
 - [x] Draft / Active / Closed lifecycle with optimistic row-version checks.
 - [x] Active commercial terms immutable.
-- [x] Manual closure stops new base-rent coverage at the closure civil date; an earlier contractual `ends_on` remains the stricter boundary.
+- [x] Manual closure stops new commercial coverage at the closure civil date; base rent and mileage use the same effective boundary, while an earlier contractual `ends_on` remains stricter.
+- [x] Rental commercial civil-day decisions use Configuration-owned tenant/org `localization.timezone`, not Laravel's process-global application timezone.
 - [x] Customer and owner rates remain independent.
 - [x] Monthly/Daily and Self-drive/With-driver context captured.
 - [x] Base, included/excess-KM, AC, driver, OT, night-out and deposit terms represented with exact nullable decimals.
@@ -44,6 +46,7 @@ This file is no longer an open list of speculative business questions. Historica
 - [x] Successor agreement lineage implemented for future commercial revisions.
 - [x] Creating a successor Draft does not interrupt the current Active predecessor.
 - [x] Successor activation atomically revalidates cutover, closes predecessor boundary and activates successor.
+- [x] Successor effective-day activation is evaluated in the configured tenant/org workspace timezone.
 - [x] Cutover cannot bisect non-cancelled Vehicle Use, retained base-rent charge or retained usage/mileage commercial period.
 - [x] Adjacent half-open use ending exactly at successor start is permitted.
 - [x] Successor retains predecessor counterparty; Owner successor retains supplied vehicle.
@@ -101,7 +104,7 @@ This file is no longer an open list of speculative business questions. Historica
 - [x] Original anchor recovered after short months.
 - [x] Cumulative decimal allocation makes adjacent partial segments reconcile to full cycle.
 - [x] Preview is read-only and version checked.
-- [x] Closed agreements cannot preview or create base-rent coverage after their closure civil date; historical periods through closure remain billable.
+- [x] Closed agreements cannot preview or create base-rent coverage after their tenant-local closure civil date; historical periods through closure remain billable.
 - [x] An explicit contractual end date remains authoritative when it is earlier than lifecycle closure.
 - [x] Immutable customer and owner base charges.
 - [x] Overlapping retained base-charge periods rejected.
@@ -119,6 +122,8 @@ This file is no longer an open list of speculative business questions. Historica
 - [x] Explicit excess-KM rate required.
 - [x] Commercial KM is the financial distance source; garage KM is not auto-priced.
 - [x] Daily/monthly cycle handling with timezone snapshot.
+- [x] Closed agreements cannot consume included-KM allowance or assess excess KM beyond their effective tenant-local closure boundary.
+- [x] Existing mileage pools retain their snapshotted timezone when later assessments are performed.
 - [x] Customer replacement charts share the configured customer cycle pool.
 - [x] Owner pool remains independent and tied to Owner Agreement.
 - [x] No cross-cycle carry-forward.
@@ -198,6 +203,7 @@ This file is no longer an open list of speculative business questions. Historica
 - [x] Finance semantic posting profiles used; legacy TACGL GL account numbers are not hardcoded.
 - [x] Customer revenue and owner cost use independent semantic posting directions.
 - [x] Accounting period, journal and reversal controls remain Finance-owned.
+- [x] 2026 official IRD material was rechecked as legal-context evidence only; no current statutory percentage or threshold was copied into Rental.
 
 ---
 
@@ -242,6 +248,7 @@ This file is no longer an open list of speculative business questions. Historica
 - [x] Composite tenant FKs rely on existing `(id, tenant_id)` unique keys in agreements/HR.
 - [x] Financial document state is not duplicated into mutable Rental columns.
 - [x] No new circular module dependency introduced.
+- [x] Closure/calendar correction required no schema or relationship change; ownership remains directional and unchanged.
 
 ---
 
@@ -280,26 +287,27 @@ The completion delta adds focused regression tests for:
 - [x] successor cut-through rejection for retained base-rent/usage commercial periods;
 - [x] non-duplication of security-deposit requirement;
 - [x] closed-agreement base-rent coverage stops at closure while historical coverage remains billable;
-- [x] an earlier explicit contract end remains stricter than lifecycle closure.
+- [x] closed-agreement mileage cannot consume allowance or assess excess distance after closure;
+- [x] an earlier explicit contract end remains stricter than lifecycle closure;
+- [x] successor activation follows the configured tenant-local effective date across a UTC-midnight boundary.
 
 ### Verification evidence rule
 
-Only executed commands may be described as passed. This connector-only completion environment could inspect and mutate GitHub source but could not materialize the repository locally because outbound Git/GitHub checkout was DNS-blocked; GitHub Actions were intentionally not used per project instruction. Therefore executable full-suite/lint/typecheck/build/migrate results for this exact completion delta are not fabricated here. This is an execution-environment evidence note, not an open Vehicle Rental business/code requirement.
+Only executed commands may be described as passed. This connector-only completion environment could inspect and mutate GitHub source but could not materialize the full repository locally because outbound Git/GitHub checkout was DNS-blocked; GitHub Actions were intentionally not used per project instruction. Therefore executable full-suite/lint/typecheck/build/migrate results for this exact continuation delta are not fabricated here. This is an execution-environment evidence note, not an open Vehicle Rental business/code requirement.
 
-For the 2026-09-25 closure-coverage continuation, the changed PHP service and focused regression test were materialized as equivalent local snippets and passed `php -l`. The full dependency-backed Laravel/PHPUnit/frontend/MySQL suites still require a normal repository checkout/environment and are not claimed as executed here.
+For the 2026-09-25 closure/calendar continuation, the exact current PHP contents of `RentalCalendar.php`, `AgreementService.php`, `BaseRentPreview.php`, `MileageAllowance.php`, `AgreementClosureCoverageTest.php`, and `AgreementTenantCalendarTest.php` were materialized under the local runtime and each passed `php -l` with no syntax errors. Current-branch static review also confirmed Vehicle Use requires Active agreement coverage, historical financial settlement permits Closed agreements while source-period checks remain enforced, and no schema/relationship change is required.
 
-The final merge must preserve the added tests and migration contracts so the normal local verification command set can execute without introducing any special paid dependency.
+The prior repository acceptance evidence remains historical evidence for the pre-continuation baseline. The dependency-backed Laravel/PHPUnit/frontend/MySQL suites for this new delta are not claimed as re-executed in this connector-only runtime.
 
 ---
 
 ## Q. Protected backup result
 
-- [x] Located nested encrypted RAR and listed encrypted entries.
-- [x] Parsed TACGL's explicit outer password table.
-- [x] Tested only the five exact stored nonblank password values with free local archive tooling.
-- [x] Confirmed none unlock the backup.
-- [x] Scanned DBF field names for additional password/secret/key/backup-password candidates; none found populated beyond the known password table.
-- [x] No brute force, dictionary attack or arbitrary password mutation performed.
+- [x] Located `DATABACKUP/!   CTACGLDATABACKUP202503271759.rar` and listed 86 encrypted entries with free local tooling.
+- [x] Confirmed all listed archive entries require a password and the RAR has no archive comment.
+- [x] Searched accessible TACGL text/configuration material for explicit backup-password/passcode/credential references; no explicit backup credential was found.
+- [x] The encrypted archive itself contains files named `password.DBF` / `password.CDX`, but those files are also password-protected and therefore are not accessible password evidence.
+- [x] No brute force, dictionary attack, arbitrary mutation or unsupported password guessing performed.
 - [x] Runtime completion does not depend on inaccessible backup contents.
 
 ---
@@ -319,7 +327,8 @@ Vehicle Rental is considered functionally complete when the following remain tru
 9. company-owned vehicles do not fabricate external owner cost;
 10. no old Rental runtime or legacy magic values are reintroduced;
 11. migrations and relationships remain tenant-safe and directional;
-12. closed agreements cannot generate new commercial coverage beyond their effective lifecycle boundary;
-13. future changes preserve this ledger and record actual verification evidence rather than assuming it.
+12. closed agreements cannot generate new base-rent or mileage commercial coverage beyond their effective tenant-local lifecycle boundary;
+13. future-effective agreement activation uses the configured tenant/org commercial calendar rather than a process-global timezone;
+14. future changes preserve this ledger and record actual verification evidence rather than assuming it.
 
 There are no remaining open product-policy TODO items in this ledger. Source-access limitations and environment-specific execution evidence are documented separately and must not be converted into speculative runtime behavior.
