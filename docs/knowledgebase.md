@@ -195,7 +195,9 @@ Supported concepts include owner/supplier, supplied vehicle, independent base/mi
 - Active commercial terms are not edited in place.
 - Closure preserves history.
 - Manual closure is a lifecycle stop: new commercial coverage, including base rent and mileage allowance/assessment, cannot extend past the closure civil date. If the contract already has an earlier `ends_on`, that earlier date remains the stricter commercial boundary.
-- The closure civil date is derived from Configuration-owned tenant/org `localization.timezone`; Rental does not use the process-global Laravel application timezone as a tenant commercial calendar.
+- `closed_at` records the audit instant. `closed_on` records the tenant/org civil date captured from that same instant at the Active -> Closed transition. `ends_on` remains the contractual/effective term boundary. These fields are intentionally distinct.
+- The closure civil date is derived once through Configuration-owned tenant/org `localization.timezone`, persisted as immutable `closed_on`, and is never recomputed later under a changed timezone. Rental does not use the process-global Laravel application timezone as a tenant commercial calendar.
+- Existing closed rows created before `closed_on` existed are backfilled once during the additive Rental migration using the effective workspace timezone available at migration time, then frozen. The old schema did not contain enough information to reconstruct any different historical civil date without guessing.
 - Historical calculations keep their original agreement revision and historical periods through the effective boundary remain billable.
 
 ### 6.4 Successor agreement
@@ -223,7 +225,7 @@ At activation the backend rejects a cutover that would:
 - cross a retained usage/mileage commercial period;
 - violate predecessor/successor date ordering.
 
-The successor effective-day check uses the same configured tenant/org commercial timezone as closure coverage. Adjacent half-open operational periods are allowed: use ending exactly at successor start is not an overlap.
+The successor effective-day check uses the same configured tenant/org commercial timezone as closure capture. Adjacent half-open operational periods are allowed: use ending exactly at successor start is not an overlap.
 
 A successor keeps the same counterparty; an owner-agreement successor also keeps the same physical supplied vehicle. A different party/owner vehicle is a new agreement, not a rate revision.
 
@@ -309,7 +311,7 @@ The shipped named policy is `actual_calendar_days_v1`.
 - Short-month anchors recover from the original anchor (for example, a day-31 contract does not permanently move the anchor after February).
 - Adjacent partial segments use cumulative decimal allocation so their sum reconciles with the full cycle.
 - Preview and billing require an explicit policy and agreement revision; no hidden `30-day` divisor exists.
-- Manual lifecycle closure caps new base-rent coverage at the tenant-local closure civil date. It does not rewrite existing charges or the original contractual end date; an earlier explicit `ends_on` remains stricter.
+- Manual lifecycle closure caps new base-rent coverage at immutable `closed_on`. It does not rewrite existing charges or the original contractual end date; an earlier explicit `ends_on` remains stricter.
 
 This is an explicit AutoERP production policy, not a claim that every historical TACGL customer used it.
 
@@ -320,7 +322,7 @@ The shipped mileage policy uses explicit commercial KM, explicit included KM and
 - blank is not zero;
 - zero allowance is distinct from unknown allowance;
 - mileage is assessed within a defined daily/monthly agreement cycle;
-- manual lifecycle closure caps allowance accrual/assessment at the same tenant-local effective agreement boundary used by base rent;
+- manual lifecycle closure caps allowance accrual/assessment at the same immutable agreement boundary used by base rent;
 - an existing mileage pool preserves its snapshotted timezone so later historical assessments do not silently move cycle boundaries after a configuration change;
 - customer allowance can be shared across replacement charts according to the named policy;
 - owner pools remain tied to their owner agreement;
@@ -524,7 +526,8 @@ Important competing operations:
 | Customer vs owner billing | both may independently consume the same physical source |
 | Finalize/reverse vs bill | committed source state and financial source state cannot disagree |
 | Successor activation vs use/charge | commercial boundary cannot bisect retained operational/financial history |
-| Manual closure vs commercial calculation | no new base-rent or mileage commercial coverage may extend after the tenant-local closure civil date |
+| Manual closure vs commercial calculation | no new base-rent or mileage commercial coverage may extend after immutable `closed_on` |
+| Timezone reconfiguration vs historical closure | changing `localization.timezone` cannot reinterpret an already-recorded `closed_on` boundary |
 | Two driver charts | same authoritative driver cannot have overlapping finalized Rental usage |
 | Deposit allocate/refund | one available balance cannot be spent twice |
 
@@ -597,7 +600,7 @@ The clean schema intentionally avoids redundant bidirectional state:
 - Successor Agreement stores one predecessor link; no stored inverse link is required.
 - Financial document IDs/statuses are not duplicated as mutable Rental truth; source allocations in Invoice are authoritative.
 
-These relationships are deliberately directional and high-cohesion. The commercial-calendar correction required no schema/relationship change and added no circular dependency.
+These relationships are deliberately directional and high-cohesion. The commercial-calendar correction adds only the scalar `closed_on` historical snapshot to each Rental agreement; it adds no relationship, inverse pointer, module dependency or duplicate ledger. The snapshot is justified because a historical civil-day boundary cannot be safely recomputed forever from mutable timezone configuration.
 
 ---
 
@@ -671,6 +674,7 @@ The fresh `app/Modules/VehicleRental` implementation includes:
 - tenant-safe identity snapshots and histories;
 - expected-version lifecycle commands;
 - effective successor Draft/review/activation flow using the tenant/org commercial calendar;
+- immutable agreement closure snapshots (`closed_at` audit instant plus `closed_on` civil date), with effective coverage using the stricter of `ends_on` and `closed_on`;
 - closure-aware base-rent and mileage coverage so a Closed agreement cannot generate future commercial periods while historical covered periods remain available;
 - bounded/open-ended vehicle planning;
 - owner-source and company-owned paths;
@@ -727,7 +731,7 @@ For any future Rental change, verify at minimum:
 5. source revision snapshot correctness;
 6. duplicate-consumption rejection;
 7. reversal/reissue lineage;
-8. migration fresh-install and upgrade behavior;
+8. migration fresh-install and upgrade behavior, including immutable lifecycle-date backfill where applicable;
 9. SQLite and MySQL/MariaDB transaction behavior where relevant;
 10. frontend unit/integration tests, typecheck, lint and build;
 11. authenticated browser/UAT for changed operator flows.
