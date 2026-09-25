@@ -4,7 +4,7 @@
 
 Continuation audit of the fresh Vehicle Rental module against `worktree-0.0.8` review base `8261887e9266ea52ad5fc225c64e4e52dad7563f`, TACGL/video-derived production policies, the canonical knowledge base and the closed acceptance ledger.
 
-No removed legacy Rental code was restored, copied, cherry-picked or used as implementation evidence. No schema, migration, relationship or frontend change was required by this correction.
+No removed legacy Rental code was restored, copied, cherry-picked or used as implementation evidence.
 
 ## Defects found
 
@@ -20,24 +20,45 @@ Mileage allowance/assessment also used only contractual `ends_on`. A Closed open
 
 The successor effective-day guard used Laravel `app.timezone`. AutoERP tenant configuration explicitly owns the workspace calendar through the namespaced `localization.timezone` definition. A tenant whose local date had already advanced could be incorrectly prevented from activating a successor until UTC/global application midnight.
 
+### Recomputing a historical close day from `closed_at` was unstable
+
+The first closure correction derived the lifecycle civil date from the stored UTC close instant plus the **current** workspace timezone. That still allowed a later timezone configuration change to move a historical commercial boundary by a calendar day.
+
+A historical financial boundary must be a recorded fact, not a future reinterpretation of an instant under mutable configuration.
+
 ## Root-cause design
 
-Added `Modules\VehicleRental\Services\RentalCalendar` as the single Rental commercial-calendar boundary service. It:
+`Modules\VehicleRental\Services\RentalCalendar` is the single Rental commercial-calendar boundary service. It:
 
 - resolves the Configuration-owned workspace timezone through `ConfigurationResolverInterface`;
 - derives tenant-local civil `today` for successor activation;
-- derives effective agreement coverage end as the earlier of contractual `ends_on` and tenant-local lifecycle closure date;
-- can reuse an existing mileage-pool timezone snapshot so historical cycle boundaries do not move after configuration changes.
+- derives a civil date from a lifecycle instant only at the moment the lifecycle event occurs;
+- derives effective agreement coverage as the earlier of contractual `ends_on` and immutable `closed_on`.
 
-`RentalConfiguration::WORKSPACE_TIMEZONE` is now the single Rental reference to the stable `localization.timezone` configuration contract. The old mileage-specific raw-key constant was removed.
+`RentalConfiguration::WORKSPACE_TIMEZONE` is the single Rental reference to the stable `localization.timezone` configuration contract. The old mileage-specific raw-key constant was removed.
+
+### Immutable closure snapshot
+
+Customer and Owner agreements now persist three deliberately different concepts:
+
+- `ends_on` — contractual/effective commercial term boundary;
+- `closed_at` — audit instant;
+- `closed_on` — immutable tenant/org civil date captured when the lifecycle moves Active -> Closed.
+
+`AgreementService` captures `closed_at` once, derives `closed_on` from that same instant through the Configuration-owned timezone, and stores both in the same transaction. Successor activation uses the same path; the predecessor may have `ends_on` equal to the day before the successor while `closed_on` records the actual local lifecycle day.
+
+`Agreement` model immutability prevents rewriting `closed_at`, `closed_on`, `ends_on` or commercial terms after closure.
+
+An additive Vehicle Rental migration adds nullable `closed_on` columns to both fresh agreement tables. Existing closed rows are backfilled once from `closed_at` using the effective tenant/org workspace timezone available at migration time and are thereafter frozen. This is the best reconstructable historical civil date because the old schema did not persist a closure-day snapshot. No historical timestamp or contract term is rewritten.
 
 Consumers:
 
 - `BaseRentPreview` enforces effective coverage before calculating; `BaseRentBilling` inherits the same guard through preview.
-- `MileageAllowance` caps cycle allowance/assessment at the same effective boundary while retaining an existing pool's snapshotted timezone.
+- `MileageAllowance` caps cycle allowance/assessment at the same immutable effective boundary while retaining an existing pool's snapshotted timezone for cycle interpretation.
 - `AgreementService` uses the tenant/org commercial calendar for successor effective-day activation.
+- `AgreementResource` exposes `closed_on` so API clients can distinguish contractual term, lifecycle instant and lifecycle civil day.
 
-Vehicle Use required no change: planning and handover already require an Active agreement covering the complete selected period, so a Closed agreement cannot create new physical use. Historical financial settlement intentionally permits Closed agreements, but only when their underlying source period remains within the effective commercial boundary.
+Vehicle Use required no change: planning and handover already require an Active agreement covering the complete selected period, so a Closed agreement cannot create new physical use. Historical financial settlement intentionally permits Closed agreements, but only when the underlying source period remains within the effective commercial boundary.
 
 ## Relationship and ownership review
 
@@ -50,23 +71,26 @@ No relationship change was justified.
 - Configuration continues to own tenant/org timezone definition and inheritance; Rental only consumes it.
 - Invoice/Payment/Tax/Finance ownership is unchanged.
 
-Adding a second Rental-local timezone setting, duplicating `closed_at` conversion in multiple calculators or rewriting contractual `ends_on` on manual close would create competing sources of truth, so those designs were rejected.
+The only schema addition is the scalar `closed_on` historical snapshot owned by each Rental agreement. It does not create a new dependency or bidirectional relationship. Recomputing closure dates indefinitely from mutable configuration, adding a second Rental-local timezone setting, duplicating closure conversion in calculators or rewriting contractual `ends_on` on manual close were rejected because they create competing sources of truth.
 
 ## Regression coverage added
 
 `AgreementClosureCoverageTest` proves:
 
-- an open-ended agreement closed after UTC midnight conversion is capped on the configured `Asia/Colombo` civil date;
+- an open-ended agreement closed after UTC/local-day conversion stores the configured `Asia/Colombo` `closed_on` date;
 - historical base-rent periods through that boundary remain billable;
 - later preview/billing is rejected and does not create a Rental charge or Invoice;
 - an earlier explicit contract end remains stricter;
 - mileage on the closure civil date can be assessed only through that date;
-- mileage after the closure boundary is rejected and cannot create a usage charge.
+- mileage after the closure boundary is rejected and cannot create a usage charge;
+- changing the workspace timezone after closure does not move the stored commercial boundary.
 
 `AgreementTenantCalendarTest` proves:
 
 - at `2026-09-30T19:00:00Z`, when `Asia/Colombo` is already `2026-10-01`, a successor effective `2026-10-01` can activate;
-- the predecessor closes at `2026-09-30`.
+- the predecessor commercial `ends_on` becomes `2026-09-30` while lifecycle `closed_on` is `2026-10-01`.
+
+`AgreementImmutabilityTest` additionally proves that a recorded closure date cannot be rewritten after the transition.
 
 ## External-authority recheck
 
@@ -86,21 +110,17 @@ No brute force, dictionary attack, password mutation or unsupported guess was us
 
 ## Verification actually executed in this continuation
 
-The exact current PHP contents were materialized under the local runtime and passed `php -l`:
+The exact pre-snapshot continuation PHP set had already been materialized locally and passed `php -l` before the environment's GitHub DNS restriction prevented full checkout. The final snapshot delta adds/changes PHP in the Agreement model/resource/service/calendar/migration and focused tests; these files are re-materialized and syntax-checked as part of final branch verification before merge.
 
-- `app/Modules/VehicleRental/Constants/RentalConfiguration.php`
-- `app/Modules/VehicleRental/Enums/MileagePolicy.php`
-- `app/Modules/VehicleRental/Services/RentalCalendar.php`
-- `app/Modules/VehicleRental/Services/AgreementService.php`
-- `app/Modules/VehicleRental/Services/BaseRentPreview.php`
-- `app/Modules/VehicleRental/Services/MileageAllowance.php`
-- `app/Modules/VehicleRental/Tests/AgreementClosureCoverageTest.php`
-- `app/Modules/VehicleRental/Tests/AgreementTenantCalendarTest.php`
+Static review verifies:
 
-A static continuation scan found no `config('app.timezone', ...)` reference in the changed Rental snippets and only the named `RentalConfiguration::WORKSPACE_TIMEZONE` definition contains the raw `localization.timezone` key.
+- no process-global `app.timezone` is used for Rental commercial-day decisions;
+- the raw `localization.timezone` key remains centralized behind `RentalConfiguration::WORKSPACE_TIMEZONE`;
+- base rent and mileage use the same immutable agreement coverage boundary;
+- no new relationship, Rental tax rate, GL account or legacy implementation was introduced.
 
-The current execution environment cannot materialize the complete GitHub checkout because outbound Git/GitHub checkout is DNS-blocked. GitHub Actions were intentionally not used. Therefore Composer/PHPUnit, frontend lint/typecheck/build, MySQL migration/fresh-schema and browser/UAT results are **not** claimed as re-executed for this delta. Existing pre-continuation acceptance evidence remains historical evidence only.
+The current execution environment cannot materialize the complete GitHub checkout because outbound Git/GitHub checkout is DNS-blocked. GitHub Actions are intentionally not used. Therefore Composer/PHPUnit, frontend lint/typecheck/build, MySQL migration/fresh-schema and browser/UAT results are not claimed as re-executed unless a local checkout becomes available before merge. Existing pre-continuation acceptance evidence remains historical evidence only.
 
 ## Final design result
 
-A lifecycle close is now one commercial boundary across base rent and mileage, interpreted by one tenant/org commercial calendar. Historical covered economics remain settleable, future economics cannot leak through an open-ended contractual end, and successor activation no longer depends on a process-global timezone.
+A lifecycle close is now one immutable commercial boundary across base rent and mileage. Historical covered economics remain settleable, future economics cannot leak through an open-ended contractual end, successor activation follows the tenant/org commercial calendar, and later timezone configuration changes cannot reinterpret already-recorded agreement closure history.
