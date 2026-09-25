@@ -13,6 +13,7 @@ export function BaseRentPreviewPanel({ kind, agreement }: { kind: AgreementKind;
     const [error, setError] = useState<ApiError | null>(null);
     const [busy, setBusy] = useState(false);
     const request = useRef<AbortController | null>(null);
+    const coverageEnd = agreement.effective_coverage_ends_on ?? undefined;
     useEffect(() => () => request.current?.abort(), []);
     async function calculate(event: FormEvent) {
         event.preventDefault();
@@ -29,8 +30,8 @@ export function BaseRentPreviewPanel({ kind, agreement }: { kind: AgreementKind;
             {agreement.basis === RentalBasis.Monthly && ' Monthly cycles start on the agreement anniversary, adjusted to the last day in shorter months; partial cycles use their actual number of days.'}
             {' '}This estimates base rent only. It does not include mileage, extras, deductions or tax, change the agreement, or create an invoice.</p>
         <form onSubmit={calculate} className="space-y-3">
-            <Input label="Estimate from" type="date" required min={agreement.starts_on} max={agreement.ends_on ?? undefined} value={from} disabled={busy} onChange={event => { setFrom(event.target.value); setResult(null); }} error={error?.fields.from?.[0]} />
-            <Input label="Estimate through" type="date" required min={from} max={agreement.ends_on ?? undefined} value={until} disabled={busy} onChange={event => { setUntil(event.target.value); setResult(null); }} error={error?.fields.until?.[0]} />
+            <Input label="Estimate from" type="date" required min={agreement.starts_on} max={coverageEnd} value={from} disabled={busy} onChange={event => { setFrom(event.target.value); setResult(null); }} error={error?.fields.from?.[0]} />
+            <Input label="Estimate through" type="date" required min={from} max={coverageEnd} value={until} disabled={busy} onChange={event => { setUntil(event.target.value); setResult(null); }} error={error?.fields.until?.[0]} />
             <ErrorAlert error={error} inline />
             <Button type="submit" loading={busy} disabled={!from || !until || agreement.terms.base_rate === null}>Calculate base rent</Button>
             {agreement.terms.base_rate === null && <p>Record a base rental rate to calculate an estimate.</p>}
