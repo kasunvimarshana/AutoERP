@@ -5,15 +5,14 @@ import { Select } from '@/shared/components/Select';
 import { LookupSelect } from '@/shared/components/LookupSelect';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { requestLookup } from '@/shared/api/lookupRequest';
-import { endpoints } from '@/shared/api/endpoints';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import type { NamedResource } from '@/shared/types/common';
 import type { LookupLoadParams } from '@/shared/types/lookup';
 import { createChart, updateChart } from './runningChartApi';
-import { AirConditioningMode, COUNT_LABELS, DISTANCE_LABELS, DriverIdentitySource, type ChartFacts, type RunningChart } from './runningCharts';
+import { AirConditioningMode, COUNT_LABELS, DISTANCE_LABELS, DRIVER_EMPLOYEE_API, DriverIdentitySource, type ChartFacts, type RunningChart } from './runningCharts';
 import { localTimestampValue, operationalTimeZone, OPERATIONAL_TIME_STEP_SECONDS, timestampWithOffset, type VehicleUse } from './vehicleUse';
 
-const employees = (params: LookupLoadParams) => requestLookup<Record<string, unknown>>(`${endpoints.hrEmployees}/lookup/available`, params)
+const employees = (params: LookupLoadParams) => requestLookup<Record<string, unknown>>(DRIVER_EMPLOYEE_API, params)
     .then(result => ({ ...result, data: result.data.map(row => ({ id: Number(row.id), name: String(row.display_name ?? row.name ?? row.employee_number ?? ''), code: String(row.employee_number ?? row.code ?? '') })) }));
 const driverSourceOptions = [
     { value: '', label: 'Not recorded' },
