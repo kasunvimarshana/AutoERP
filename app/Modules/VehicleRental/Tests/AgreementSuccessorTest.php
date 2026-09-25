@@ -29,7 +29,7 @@ final class AgreementSuccessorTest extends TestCase
         });
     }
 
-    public function test_active_agreement_is_closed_at_successor_boundary_without_rewriting_history(): void
+    public function test_successor_draft_preserves_predecessor_until_activation_then_closes_boundary_atomically(): void
     {
         [$context, $customer, $owner] = $this->fixture();
         $this->withTenantExecutionContext($context->tenantId, function () use ($context, $customer, $owner): void {
@@ -46,32 +46,40 @@ final class AgreementSuccessorTest extends TestCase
                 ]);
 
                 $record->refresh();
-                self::assertSame(AgreementStatus::Closed, $record->status);
-                self::assertSame('2026-09-30', $record->ends_on->toDateString());
+                self::assertSame(AgreementStatus::Active, $record->status);
+                self::assertNull($record->ends_on);
+                self::assertSame(2, $record->history()->count());
                 self::assertSame(AgreementStatus::Draft, $successor->status);
                 self::assertSame($record->id, $successor->supersedes_agreement_id);
-                self::assertSame($record->terms, $successor->terms);
                 self::assertSame($record->basis, $successor->basis);
                 self::assertSame($record->driver_mode, $successor->driver_mode);
+
+                $successor = $service->change($kind, $context, $successor->id, $successor->row_version, AgreementAction::Activate);
+                $record->refresh();
+                self::assertSame(AgreementStatus::Closed, $record->status);
+                self::assertSame('2026-09-30', $record->ends_on->toDateString());
+                self::assertSame(AgreementStatus::Active, $successor->status);
                 self::assertSame(3, $record->history()->count());
                 self::assertSame('2026-09-30', $record->history()->get()->last()->snapshot['ends_on']);
-                self::assertSame(1, $successor->history()->count());
+                self::assertSame(2, $successor->history()->count());
             }
         });
     }
 
-    public function test_successor_cannot_cut_through_existing_vehicle_use(): void
+    public function test_successor_activation_cannot_cut_through_existing_vehicle_use(): void
     {
         $this->activeFixture(function ($context, $customer, $owner, $input): void {
             app(VehicleUseService::class)->plan($context, $customer->id, $customer->row_version, $input);
-
-            $this->expectException(ValidationException::class);
-            app(AgreementService::class)->successor(AgreementKind::Customer, $context, $customer->id, $customer->row_version, [
+            $successor = app(AgreementService::class)->successor(AgreementKind::Customer, $context, $customer->id, $customer->row_version, [
                 'reference' => $customer->reference.'-R2',
                 'agreed_on' => '2026-09-07',
                 'starts_on' => '2026-09-08',
                 'reason' => 'Rate revision',
             ]);
+            self::assertSame(AgreementStatus::Active, $customer->refresh()->status);
+
+            $this->expectException(ValidationException::class);
+            app(AgreementService::class)->change(AgreementKind::Customer, $context, $successor->id, $successor->row_version, AgreementAction::Activate);
         });
     }
 
@@ -80,7 +88,6 @@ final class AgreementSuccessorTest extends TestCase
         $this->activeFixture(function ($context, $customer, $owner, $input): void {
             $input['ends_at'] = '2026-09-08T00:00:00+05:30';
             app(VehicleUseService::class)->plan($context, $customer->id, $customer->row_version, $input);
-
             $successor = app(AgreementService::class)->successor(AgreementKind::Customer, $context, $customer->id, $customer->row_version, [
                 'reference' => $customer->reference.'-R2',
                 'agreed_on' => '2026-09-07',
@@ -88,11 +95,13 @@ final class AgreementSuccessorTest extends TestCase
                 'reason' => 'Rate revision after completed planned period',
             ]);
 
-            self::assertSame('2026-09-08', $successor->starts_on->toDateString());
+            $successor = app(AgreementService::class)->change(AgreementKind::Customer, $context, $successor->id, $successor->row_version, AgreementAction::Activate);
+            self::assertSame(AgreementStatus::Active, $successor->status);
+            self::assertSame('2026-09-07', $customer->refresh()->ends_on->toDateString());
         });
     }
 
-    public function test_successor_cannot_reclassify_an_existing_future_base_charge(): void
+    public function test_successor_activation_cannot_reclassify_an_existing_future_base_charge(): void
     {
         [$context, $input] = $this->fixture();
         $this->withTenantExecutionContext($context->tenantId, function () use ($context, $input): void {
@@ -111,14 +120,15 @@ final class AgreementSuccessorTest extends TestCase
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
-
-            $this->expectException(ValidationException::class);
-            $service->successor(AgreementKind::Customer, $context, $record->id, $record->row_version, [
+            $successor = $service->successor(AgreementKind::Customer, $context, $record->id, $record->row_version, [
                 'reference' => $record->reference.'-R2',
                 'agreed_on' => '2026-09-20',
                 'starts_on' => '2026-10-01',
                 'reason' => 'Future rate revision',
             ]);
+
+            $this->expectException(ValidationException::class);
+            $service->change(AgreementKind::Customer, $context, $successor->id, $successor->row_version, AgreementAction::Activate);
         });
     }
 
