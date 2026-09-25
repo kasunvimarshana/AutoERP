@@ -28,7 +28,6 @@ export function BaseRentBillingPanel({ kind, agreement }: { kind: AgreementKind;
     const [lastPage, setLastPage] = useState(1);
     const [revision, setRevision] = useState(0);
     const inFlight = useRef(false);
-    const coverageEnd = agreement.effective_coverage_ends_on ?? undefined;
     useEffect(() => {
         const controller = new AbortController();
         loadBaseCharges(kind, agreement, page, controller.signal).then(value => {
@@ -55,8 +54,8 @@ export function BaseRentBillingPanel({ kind, agreement }: { kind: AgreementKind;
         <p className="my-3 text-sm">Create a {kind === AgreementKind.Customer ? 'customer invoice' : 'supplier payable'} draft from the recorded base rate and actual-calendar policy. Monthly partial periods use actual anniversary-cycle days. This bills base rent only; mileage, extras and deductions are separate. Tax uses the configured Tax rules. Review, approve and post in Invoice.</p>
         <form onSubmit={submit} className="space-y-3">
             {selected ? <p>{action === ChargeAction.Void ? 'Void original charge:' : 'Reissue original charge:'} {selected.from} – {selected.until} · {selected.currency} {selected.amount} <Button type="button" variant="secondary" disabled={busy} onClick={() => { setSelected(null); setAccepted(false); }}>Cancel selection</Button></p> : <>
-                <Input label="Charge from" type="date" required min={agreement.starts_on} max={coverageEnd} value={from} disabled={busy} onChange={e => { setFrom(e.target.value); setAccepted(false); }} />
-                <Input label="Charge through" type="date" required min={from} max={coverageEnd} value={until} disabled={busy} onChange={e => { setUntil(e.target.value); setAccepted(false); }} />
+                <Input label="Charge from" type="date" required min={agreement.starts_on} value={from} disabled={busy} onChange={e => { setFrom(e.target.value); setAccepted(false); }} />
+                <Input label="Charge through" type="date" required min={from} max={agreement.ends_on ?? undefined} value={until} disabled={busy} onChange={e => { setUntil(e.target.value); setAccepted(false); }} />
             </>}
             {selected && action === ChargeAction.Void ? <Input label="Void reason" required value={reason} disabled={busy} onChange={e => setReason(e.target.value)} /> : <>
             <Input label="Invoice date" type="date" required value={invoiceDate} disabled={busy} onChange={e => setInvoiceDate(e.target.value)} />

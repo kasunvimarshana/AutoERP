@@ -11,7 +11,7 @@ vi.mock('@/modules/payment/paymentApi', () => ({ listPaymentMethods: vi.fn() }))
 const agreement: Agreement = {
     id: 7, reference: 'CUSTOMER-A', row_version: 2, status: AgreementStatus.Active, basis: RentalBasis.Monthly, driver_mode: DriverMode.SelfDrive,
     party: { id: 2, name: 'Customer A' }, currency: { id: 1, name: 'Rupee', code: 'LKR' }, agreed_on: '2026-01-01', executing_on: null,
-    starts_on: '2026-01-31', ends_on: null, effective_coverage_ends_on: null, notes: null,
+    starts_on: '2026-01-31', ends_on: null, notes: null,
     terms: Object.fromEntries(Object.keys(TERM_LABELS).map(key => [key, null])) as Record<TermKey, string | null>,
 };
 beforeEach(() => {
