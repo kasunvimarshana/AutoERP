@@ -12,7 +12,7 @@ const record: Agreement = {
     id: 103, reference: 'LESSEE-AGREEMENT', row_version: 7, status: AgreementStatus.Draft,
     basis: RentalBasis.Monthly, driver_mode: DriverMode.SelfDrive, supersedes_agreement: null,
     party: { id: 90, name: 'Example customer' }, currency: { id: 2, name: 'Rupee', code: 'LKR' },
-    agreed_on: '2026-09-01', executing_on: null, starts_on: '2026-09-07', ends_on: null, notes: null,
+    agreed_on: '2026-09-01', executing_on: null, starts_on: '2026-09-07', ends_on: null, effective_coverage_ends_on: null, notes: null,
     terms: Object.fromEntries(Object.keys(TERM_LABELS).map(key => [key, null])) as Record<TermKey, string | null>,
 };
 beforeEach(() => {
@@ -29,6 +29,12 @@ describe('Rental agreement review', () => {
         expect(screen.queryByRole('button', { name: 'Edit draft' })).not.toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'Activate' })).not.toBeInTheDocument();
         expect(screen.getAllByText('Not specified')).toHaveLength(Object.keys(TERM_LABELS).length);
+    });
+    it('shows lifecycle coverage instead of calling a closed open-ended agreement open-ended', async () => {
+        vi.mocked(listAgreements).mockResolvedValue({ data: [{ ...record, status: AgreementStatus.Closed, effective_coverage_ends_on: '2026-09-20' }] });
+        render(<AgreementsPage kind={AgreementKind.Customer} />);
+        expect(await screen.findByText('2026-09-07 – 2026-09-20')).toBeInTheDocument();
+        expect(screen.queryByText('2026-09-07 – Open-ended')).not.toBeInTheDocument();
     });
     it('keeps review visible after a stale version is rejected and allows explicit reload', async () => {
         session.permissions.push('vehicle-rental.customer-agreements.manage');
