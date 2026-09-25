@@ -11,12 +11,12 @@ export const COUNT_LABELS = { normal_ot_minutes: 'Normal OT (minutes)', double_o
 export interface ChartFacts {
     reference: string; starts_at: string; ends_at: string; start_odometer: string | null; end_odometer: string | null; garage_km: string | null; commercial_km: string | null;
     normal_ot_minutes: number | null; double_ot_minutes: number | null; triple_ot_minutes: number | null; night_outs: number | null; ac_mode: AirConditioningMode | null;
-    driver_identity_source: DriverIdentitySource | null; driver_employee_id: number | null; driver_name_snapshot: string | null; driver_reference_snapshot: string | null;
+    driver_identity_source?: DriverIdentitySource | null; driver_employee_id?: number | null; driver_name_snapshot?: string | null; driver_reference_snapshot?: string | null;
     driver_observation: string | null; notes: string | null;
 }
 export interface RunningChart extends ChartFacts {
     id: number; row_version: number; status: RunningChartStatus; total_km: string | null; corrects_chart: { id: number; reference: string } | null;
-    driver: { source: DriverIdentitySource; employee_id: number | null; name: string; reference: string } | null;
+    driver?: { source: DriverIdentitySource; employee_id: number | null; name: string; reference: string } | null;
 }
 export interface ChartHistory { version: number; action: string; reason: string | null; actor: { name: string }; recorded_at: string; facts: ChartFacts }
 
