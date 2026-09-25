@@ -55,12 +55,13 @@ abstract class Agreement extends TenantOwnedModel
     {
         static::deleting(static fn () => throw new LogicException('Agreement history must be preserved.'));
         static::updating(static function (self $agreement): void {
-            if ($agreement->getRawOriginal('status') === AgreementStatus::Draft->value) {
+            $originalStatus = AgreementStatus::from((string) $agreement->getRawOriginal('status'));
+            if ($originalStatus === AgreementStatus::Draft) {
                 return;
             }
 
             $allowed = ['status', 'closed_at', 'row_version', 'updated_at'];
-            if ($agreement->status === AgreementStatus::Closed) {
+            if ($originalStatus === AgreementStatus::Active && $agreement->status === AgreementStatus::Closed) {
                 $allowed[] = 'ends_on';
             }
             if (array_diff(array_keys($agreement->getDirty()), $allowed) !== []) {
