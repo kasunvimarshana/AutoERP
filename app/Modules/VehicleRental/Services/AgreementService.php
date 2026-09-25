@@ -19,7 +19,9 @@ use Modules\VehicleRental\Enums\AgreementStatus;
 use Modules\VehicleRental\Enums\VehicleUseStatus;
 use Modules\VehicleRental\Models\Agreement;
 use Modules\VehicleRental\Models\CustomerAgreement;
+use Modules\VehicleRental\Models\CustomerBaseCharge;
 use Modules\VehicleRental\Models\OwnerAgreement;
+use Modules\VehicleRental\Models\OwnerBaseCharge;
 use Modules\VehicleRental\Models\VehicleUse;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
@@ -92,12 +94,23 @@ final class AgreementService
             $foreignKey = $kind === AgreementKind::Customer ? 'customer_agreement_id' : 'owner_agreement_id';
             $crossingUse = VehicleUse::query()->forTenant($context->tenantId)->where($foreignKey, $predecessor->id)
                 ->where('status', '!=', VehicleUseStatus::Cancelled->value)
-                ->where(fn ($query) => $query->whereNull('ends_at')->orWhere('ends_at', '>=', $successorStart->startOfDay()))
+                ->where(fn ($query) => $query->whereNull('ends_at')->orWhere('ends_at', '>', $successorStart->startOfDay()))
                 ->lockForUpdate()->first(['id']);
             if ($crossingUse !== null) {
                 throw ValidationException::withMessages(['starts_on' => ['Return or reschedule vehicle use that crosses the successor effective date before changing commercial terms.']]);
             }
 
+            $chargeClass = $kind === AgreementKind::Customer ? CustomerBaseCharge::class : OwnerBaseCharge::class;
+            if ($chargeClass::query()->forContext($context->tenantId, $context->organizationUnitId)
+                ->where('agreement_id', $predecessor->id)->whereNull('voided_at')
+                ->where('period_until', '>=', $data['starts_on'])->lockForUpdate()->first(['id']) !== null) {
+                throw ValidationException::withMessages(['starts_on' => ['The predecessor already has a base-rent charge on or after this date. Release and void that charge before moving the commercial boundary.']]);
+            }
+
+            $successorTerms = $predecessor->terms;
+            // A security deposit is received against a specific agreement source in Payment. Copying
+            // the old requirement would manufacture a second obligation without a Payment transfer.
+            $successorTerms['deposit_requirement'] = null;
             $clone = [
                 'reference' => trim($data['reference']),
                 'party_id' => $kind === AgreementKind::Customer ? $predecessor->customer_id : $predecessor->supplier_id,
@@ -108,7 +121,7 @@ final class AgreementService
                 'ends_on' => $data['ends_on'] ?? null,
                 'basis' => $predecessor->basis->value,
                 'driver_mode' => $predecessor->driver_mode->value,
-                'terms' => $predecessor->terms,
+                'terms' => $successorTerms,
                 'notes' => $predecessor->notes,
             ];
             if ($kind === AgreementKind::Owner) {
