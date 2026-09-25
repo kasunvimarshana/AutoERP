@@ -14,7 +14,7 @@ import { AirConditioningMode, COUNT_LABELS, DISTANCE_LABELS, DriverIdentitySourc
 import { localTimestampValue, operationalTimeZone, OPERATIONAL_TIME_STEP_SECONDS, timestampWithOffset, type VehicleUse } from './vehicleUse';
 
 const employees = (params: LookupLoadParams) => requestLookup<Record<string, unknown>>(`${endpoints.hrEmployees}/lookup/available`, params)
-    .then(result => ({ ...result, data: result.data.map(row => ({ id: Number(row.id), name: String(row.display_name ?? row.name), code: String(row.employee_number ?? row.code ?? '') })) }));
+    .then(result => ({ ...result, data: result.data.map(row => ({ id: Number(row.id), name: String(row.display_name ?? row.name ?? row.employee_number ?? ''), code: String(row.employee_number ?? row.code ?? '') })) }));
 const driverSourceOptions = [
     { value: '', label: 'Not recorded' },
     { value: DriverIdentitySource.Employee, label: 'Employee driver' },
@@ -69,6 +69,6 @@ export function RunningChartEditor({ use, chart, correction, onSaved, onCancel }
                 <Input label="Driver observation (optional)" value={driverObservation} onChange={e => setDriverObservation(e.target.value)} /><p>This is operational evidence only; employee pay remains owned by HR.</p>
                 <Input label="Notes" value={notes} onChange={e => setNotes(e.target.value)} />
             </div></details>
-        </fieldset><Button type="submit" loading={saving}>Save draft</Button> <Button variant="secondary" disabled={saving} onClick={onCancel}>Cancel</Button>
+        </fieldset><Button type="submit" loading={saving}>Save draft</Button> <Button type="button" variant="secondary" disabled={saving} onClick={onCancel}>Cancel</Button>
     </form>;
 }
