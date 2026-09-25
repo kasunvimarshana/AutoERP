@@ -51,18 +51,6 @@ abstract class Agreement extends TenantOwnedModel
         return $this->belongsTo(static::class, 'supersedes_agreement_id');
     }
 
-    public function effectiveCoverageEndsOn(): ?string
-    {
-        $contractEnd = $this->ends_on?->toDateString();
-        if ($this->status !== AgreementStatus::Closed || $this->closed_at === null) {
-            return $contractEnd;
-        }
-
-        $closedOn = $this->closed_at->setTimezone((string) config('app.timezone'))->toDateString();
-
-        return $contractEnd === null || $closedOn < $contractEnd ? $closedOn : $contractEnd;
-    }
-
     protected static function booted(): void
     {
         static::deleting(static fn () => throw new LogicException('Agreement history must be preserved.'));
