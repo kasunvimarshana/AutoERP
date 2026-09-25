@@ -113,7 +113,7 @@ final class RentalChargeDocuments
 
     private function assertCommercialCoverage(Agreement $agreement, RentalCharge $charge, AgreementContext $context): void
     {
-        [$from, $until] = $this->commercialPeriod($charge);
+        [$from, $until] = $this->commercialPeriod($charge, $context);
         $agreementStart = $agreement->starts_on->toDateString();
         $agreementEnd = $this->calendar->coverageEnd($agreement, $context);
 
@@ -125,7 +125,7 @@ final class RentalChargeDocuments
     }
 
     /** @return array{string, string} */
-    private function commercialPeriod(RentalCharge $charge): array
+    private function commercialPeriod(RentalCharge $charge, AgreementContext $context): array
     {
         $calculation = $charge->calculation;
         if (isset($calculation['supply_from'], $calculation['supply_until'])) {
@@ -135,8 +135,9 @@ final class RentalChargeDocuments
             return [(string) $calculation['from'], (string) $calculation['until']];
         }
         if (isset($calculation['chart']['starts_at'], $calculation['chart']['ends_at'])) {
-            $start = OperationalTime::parse($calculation['chart']['starts_at'], 'starts_at');
-            $end = OperationalTime::parse($calculation['chart']['ends_at'], 'ends_at');
+            $timezone = $this->calendar->timezone($context);
+            $start = OperationalTime::parse($calculation['chart']['starts_at'], 'starts_at')->setTimezone($timezone);
+            $end = OperationalTime::parse($calculation['chart']['ends_at'], 'ends_at')->setTimezone($timezone);
 
             return [$start->toDateString(), $end->subMicrosecond()->toDateString()];
         }
