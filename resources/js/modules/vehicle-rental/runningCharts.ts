@@ -4,6 +4,7 @@ export enum RunningChartAction { Finalize = 'finalize', Reverse = 'reverse' }
 export enum AirConditioningMode { NonAc = 'non_ac', Front = 'front', Dual = 'dual' }
 export enum DriverIdentitySource { Employee = 'employee', External = 'external' }
 export const CHART_API = `${AGREEMENT_API}/running-charts`;
+export const DRIVER_EMPLOYEE_API = `${AGREEMENT_API}/driver-employees`;
 export const CHART_PERMISSION = { view: 'vehicle-rental.running-charts.view', manage: 'vehicle-rental.running-charts.manage', finalize: 'vehicle-rental.running-charts.finalize', reverse: 'vehicle-rental.running-charts.reverse' } as const;
 export const CHART_LABELS = { [RunningChartStatus.Draft]: 'Draft', [RunningChartStatus.Finalized]: 'Finalized', [RunningChartStatus.Reversed]: 'Reversed' };
 export const DISTANCE_LABELS = { start_odometer: 'Start odometer', end_odometer: 'End odometer', garage_km: 'Garage distance (km)', commercial_km: 'Commercial distance (km)' } as const;
