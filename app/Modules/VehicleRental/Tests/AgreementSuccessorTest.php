@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\VehicleRental\Tests;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -29,7 +30,7 @@ final class AgreementSuccessorTest extends TestCase
         });
     }
 
-    public function test_successor_draft_preserves_predecessor_until_activation_then_closes_boundary_atomically(): void
+    public function test_successor_draft_preserves_predecessor_until_effective_activation_then_closes_boundary_atomically(): void
     {
         [$context, $customer, $owner] = $this->fixture();
         $this->withTenantExecutionContext($context->tenantId, function () use ($context, $customer, $owner): void {
@@ -54,6 +55,7 @@ final class AgreementSuccessorTest extends TestCase
                 self::assertSame($record->basis, $successor->basis);
                 self::assertSame($record->driver_mode, $successor->driver_mode);
 
+                $this->travelTo(CarbonImmutable::parse('2026-10-01T00:00:00+00:00'));
                 $successor = $service->change($kind, $context, $successor->id, $successor->row_version, AgreementAction::Activate);
                 $record->refresh();
                 self::assertSame(AgreementStatus::Closed, $record->status);
@@ -66,8 +68,34 @@ final class AgreementSuccessorTest extends TestCase
         });
     }
 
+    public function test_future_successor_cannot_be_activated_early(): void
+    {
+        $this->travelTo(CarbonImmutable::parse('2026-09-25T10:00:00+00:00'));
+        [$context, $input] = $this->fixture();
+        $this->withTenantExecutionContext($context->tenantId, function () use ($context, $input): void {
+            $service = app(AgreementService::class);
+            $record = $service->create(AgreementKind::Customer, $context, $input);
+            $record = $service->change(AgreementKind::Customer, $context, $record->id, $record->row_version, AgreementAction::Activate);
+            $successor = $service->successor(AgreementKind::Customer, $context, $record->id, $record->row_version, [
+                'reference' => $record->reference.'-R2',
+                'agreed_on' => '2026-09-25',
+                'starts_on' => '2026-10-01',
+                'reason' => 'Future rate revision',
+            ]);
+
+            try {
+                $service->change(AgreementKind::Customer, $context, $successor->id, $successor->row_version, AgreementAction::Activate);
+                self::fail('Future successor activated before its effective date.');
+            } catch (ValidationException) {
+                self::assertSame(AgreementStatus::Active, $record->refresh()->status);
+                self::assertSame(AgreementStatus::Draft, $successor->refresh()->status);
+            }
+        });
+    }
+
     public function test_successor_activation_cannot_cut_through_existing_vehicle_use(): void
     {
+        $this->travelTo(CarbonImmutable::parse('2026-09-08T12:00:00+00:00'));
         $this->activeFixture(function ($context, $customer, $owner, $input): void {
             app(VehicleUseService::class)->plan($context, $customer->id, $customer->row_version, $input);
             $successor = app(AgreementService::class)->successor(AgreementKind::Customer, $context, $customer->id, $customer->row_version, [
@@ -85,6 +113,7 @@ final class AgreementSuccessorTest extends TestCase
 
     public function test_vehicle_use_ending_exactly_at_successor_boundary_is_allowed(): void
     {
+        $this->travelTo(CarbonImmutable::parse('2026-09-08T12:00:00+00:00'));
         $this->activeFixture(function ($context, $customer, $owner, $input): void {
             $input['ends_at'] = '2026-09-08T00:00:00+05:30';
             app(VehicleUseService::class)->plan($context, $customer->id, $customer->row_version, $input);
@@ -103,6 +132,7 @@ final class AgreementSuccessorTest extends TestCase
 
     public function test_successor_activation_cannot_reclassify_an_existing_future_base_charge(): void
     {
+        $this->travelTo(CarbonImmutable::parse('2026-10-01T12:00:00+00:00'));
         [$context, $input] = $this->fixture();
         $this->withTenantExecutionContext($context->tenantId, function () use ($context, $input): void {
             $service = app(AgreementService::class);
