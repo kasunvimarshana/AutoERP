@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\VehicleRental\Services;
 
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -13,6 +14,7 @@ use Modules\Vehicle\Models\Vehicle;
 use Modules\VehicleRental\Constants\AgreementFields;
 use Modules\VehicleRental\Constants\OperationalFields;
 use Modules\VehicleRental\Data\AgreementContext;
+use Modules\VehicleRental\Enums\DriverIdentitySource;
 use Modules\VehicleRental\Enums\RunningChartAction;
 use Modules\VehicleRental\Enums\RunningChartStatus;
 use Modules\VehicleRental\Enums\VehicleUseStatus;
@@ -55,7 +57,7 @@ final class RunningChartService
                     throw ValidationException::withMessages(['corrects_chart_id' => ['Select a reversed chart from the same vehicle use.']]);
                 }
             }
-            $data = $this->validation->validate($input);
+            $data = $this->validation->validate($input, $context);
             $this->assertCoverage($use, $data['starts_at'], $data['ends_at']);
             $chart = new RunningChart;
             $chart->forceFill(array_merge($data, ['tenant_id' => $context->tenantId, 'organization_unit_id' => $context->organizationUnitId, 'vehicle_use_id' => $useId, 'vehicle_use_version' => $use->row_version, 'corrects_chart_id' => $corrects, 'status' => RunningChartStatus::Draft, 'row_version' => AgreementFields::INITIAL_VERSION]))->save();
@@ -76,7 +78,7 @@ final class RunningChartService
             $chart = RunningChart::query()->forContext($context->tenantId, $context->organizationUnitId)->lockForUpdate()->findOrFail($id);
             $this->version($chart->row_version, $expectedVersion);
             if ($action === RunningChartAction::Update && $chart->status === RunningChartStatus::Draft) {
-                $data = $this->validation->validate($input);
+                $data = $this->validation->validate($input, $context);
                 $this->assertCoverage($use, $data['starts_at'], $data['ends_at']);
                 $chart->forceFill($data);
             } elseif ($action === RunningChartAction::Finalize && $chart->status === RunningChartStatus::Draft) {
@@ -85,6 +87,7 @@ final class RunningChartService
                 if ((clone $timeline)->where('starts_at', '<', $chart->ends_at)->where('ends_at', '>', $chart->starts_at)->lockForUpdate()->first(['id']) !== null) {
                     throw new ConflictHttpException('Finalized usage already covers this vehicle period.');
                 }
+                $this->assertDriverAvailable($context, $chart);
                 $this->odometerContinuity->assertReading($context->tenantId, (int) $use->vehicle_id, $chart->starts_at->format(OperationalFields::DATABASE_TIMESTAMP_FORMAT), $chart->start_odometer);
                 $this->odometerContinuity->assertReading($context->tenantId, (int) $use->vehicle_id, $chart->ends_at->format(OperationalFields::DATABASE_TIMESTAMP_FORMAT), $chart->end_odometer);
                 $chart->vehicle_use_version = $use->row_version;
@@ -111,6 +114,31 @@ final class RunningChartService
 
             return $chart->load(['vehicleUse', 'correctsChart']);
         });
+    }
+
+    private function assertDriverAvailable(AgreementContext $context, RunningChart $chart): void
+    {
+        if ($chart->driver_identity_source === null) {
+            return;
+        }
+
+        $conflicts = RunningChart::query()->forTenant($context->tenantId)
+            ->whereKeyNot($chart->id)
+            ->where('status', RunningChartStatus::Finalized->value)
+            ->where('starts_at', '<', $chart->ends_at)
+            ->where('ends_at', '>', $chart->starts_at);
+
+        if ($chart->driver_identity_source === DriverIdentitySource::Employee) {
+            $conflicts->where('driver_identity_source', DriverIdentitySource::Employee->value)
+                ->where('driver_employee_id', $chart->driver_employee_id);
+        } else {
+            $conflicts->where('driver_identity_source', DriverIdentitySource::External->value)
+                ->where('driver_reference_snapshot', $chart->driver_reference_snapshot);
+        }
+
+        if ($conflicts->lockForUpdate()->first(['id']) !== null) {
+            throw new ConflictHttpException('This driver already has finalized Rental usage during the selected period.');
+        }
     }
 
     private function lockedUse(AgreementContext $context, int $id): VehicleUse
