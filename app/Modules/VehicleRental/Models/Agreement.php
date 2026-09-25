@@ -58,6 +58,10 @@ abstract class Agreement extends TenantOwnedModel
         static::updating(static function (self $agreement): void {
             $originalStatus = AgreementStatus::from((string) $agreement->getRawOriginal('status'));
             if ($originalStatus === AgreementStatus::Draft) {
+                if ($agreement->isDirty('supersedes_agreement_id')) {
+                    throw new LogicException('Agreement predecessor lineage is immutable once the successor draft is created.');
+                }
+
                 return;
             }
 
