@@ -7,9 +7,7 @@ namespace Modules\VehicleRental\Services;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Validation\ValidationException;
-use Modules\Configuration\Contracts\ConfigurationResolverInterface;
 use Modules\VehicleRental\Constants\AgreementFields;
-use Modules\VehicleRental\Constants\RentalConfiguration;
 use Modules\VehicleRental\Data\AgreementContext;
 use Modules\VehicleRental\Enums\AgreementKind;
 use Modules\VehicleRental\Enums\MileagePolicy;
@@ -23,14 +21,14 @@ use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 final class MileageAllowance
 {
-    public function __construct(private readonly ConfigurationResolverInterface $configuration) {}
+    public function __construct(private readonly RentalCalendar $calendar) {}
 
     public function quote(AgreementKind $kind, AgreementContext $context, Agreement $agreement, RunningChart $chart, array $terms): array
     {
         $charges = $this->charges($kind, $context, $agreement->id);
         // Once any assessment exists (even voided), preserve this agreement's commercial timezone.
         $first = (clone $charges)->orderBy('id')->first();
-        $timezone = $first?->calculation['timezone'] ?? $this->configuration->value(RentalConfiguration::WORKSPACE_TIMEZONE, $context->tenantId, $context->organizationUnitId);
+        $timezone = (string) ($first?->calculation['timezone'] ?? $this->calendar->timezone($context));
         $start = $chart->starts_at->setTimezone($timezone);
         $end = $chart->ends_at->setTimezone($timezone);
         $anchor = CarbonImmutable::parse($agreement->starts_on->toDateString(), $timezone)->startOfDay();
@@ -45,7 +43,10 @@ final class MileageAllowance
             $cycleStart = $anchor->addMonthsNoOverflow($offset);
             $cycleEnd = $anchor->addMonthsNoOverflow($offset + 1);
         }
-        $coveredEnd = $agreement->ends_on === null ? $cycleEnd : $cycleEnd->min(CarbonImmutable::parse($agreement->ends_on->toDateString(), $timezone)->addDay()->startOfDay());
+        $agreementCoverageEnd = $this->calendar->coverageEnd($agreement, $context, $timezone);
+        $coveredEnd = $agreementCoverageEnd === null
+            ? $cycleEnd
+            : $cycleEnd->min(CarbonImmutable::parse($agreementCoverageEnd, $timezone)->addDay()->startOfDay());
         if ($start->lessThan($anchor) || $end->greaterThan($coveredEnd)) {
             throw ValidationException::withMessages(['mileage' => ['Mileage evidence must fit wholly within one covered agreement cycle in '.$timezone.'. Do not estimate a distance split across cycles.']]);
         }
