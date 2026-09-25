@@ -10,4 +10,5 @@ enum AgreementAction: string
     case Update = 'update';
     case Activate = 'activate';
     case Close = 'close';
+    case Supersede = 'supersede';
 }
