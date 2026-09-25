@@ -8,11 +8,15 @@ use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Modules\VehicleRental\Constants\AgreementFields;
 use Modules\VehicleRental\Enums\AgreementAction;
 use Modules\VehicleRental\Enums\AgreementKind;
 use Modules\VehicleRental\Enums\AgreementStatus;
+use Modules\VehicleRental\Enums\RunningChartAction;
+use Modules\VehicleRental\Enums\UsageChargeComponent;
 use Modules\VehicleRental\Services\AgreementService;
 use Modules\VehicleRental\Services\RentalAuthorization;
+use Modules\VehicleRental\Services\RunningChartService;
 use Modules\VehicleRental\Services\VehicleUseService;
 use Tests\TestCase;
 
@@ -27,6 +31,7 @@ final class AgreementSuccessorTest extends TestCase
         $this->mock(RentalAuthorization::class, function ($mock): void {
             $mock->shouldReceive('assert')->zeroOrMoreTimes();
             $mock->shouldReceive('assertUse')->zeroOrMoreTimes();
+            $mock->shouldReceive('assertChart')->zeroOrMoreTimes();
         });
     }
 
@@ -152,6 +157,44 @@ final class AgreementSuccessorTest extends TestCase
             ]);
             $successor = $service->successor(AgreementKind::Customer, $context, $record->id, $record->row_version, [
                 'reference' => $record->reference.'-R2',
+                'agreed_on' => '2026-09-20',
+                'starts_on' => '2026-10-01',
+                'reason' => 'Future rate revision',
+            ]);
+
+            $this->expectException(ValidationException::class);
+            $service->change(AgreementKind::Customer, $context, $successor->id, $successor->row_version, AgreementAction::Activate);
+        });
+    }
+
+    public function test_successor_activation_cannot_reclassify_an_existing_usage_charge_period(): void
+    {
+        $this->travelTo(CarbonImmutable::parse('2026-10-01T12:00:00+00:00'));
+        $this->custodyFixture(function ($context, $use, $facts): void {
+            $charts = app(RunningChartService::class);
+            $chart = $charts->create($context, $use->id, $use->row_version, $facts);
+            $chart = $charts->change($context, $chart->id, $chart->row_version, RunningChartAction::Finalize);
+            $customer = $use->customerAgreement()->firstOrFail();
+
+            DB::table('vehicle_rental_customer_usage_charges')->insert([
+                'tenant_id' => $context->tenantId,
+                'organization_unit_id' => $context->organizationUnitId,
+                'agreement_id' => $customer->id,
+                'running_chart_id' => $chart->id,
+                'row_version' => AgreementFields::INITIAL_VERSION,
+                'component' => UsageChargeComponent::NormalOvertime->value,
+                'period_from' => '2026-09-20',
+                'period_until' => '2026-10-05',
+                'amount' => '100.000000',
+                'calculation' => json_encode(['policy' => 'test']),
+                'actor_id' => $context->actorId,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            $service = app(AgreementService::class);
+            $successor = $service->successor(AgreementKind::Customer, $context, $customer->id, $customer->row_version, [
+                'reference' => $customer->reference.'-R2',
                 'agreed_on' => '2026-09-20',
                 'starts_on' => '2026-10-01',
                 'reason' => 'Future rate revision',
