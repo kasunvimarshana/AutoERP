@@ -6,7 +6,7 @@
 
 **Engineering authority:** latest `worktree-0.0.8`.
 
-**Continuation review base:** `ea3d6d6ef096d4338e06de7710b9c4c4ece8e1ae`.
+**Continuation review base:** `1fc9ba3ca060c09edfaba3d95d981817d501cdda`.
 
 **Canonical domain/policy reference:** [knowledgebase.md](../knowledgebase.md).
 
@@ -37,7 +37,7 @@ This file is no longer an open list of speculative business questions. Historica
 - [x] Human-readable identity snapshots.
 - [x] Draft / Active / Closed lifecycle with optimistic row-version checks.
 - [x] Active commercial terms immutable.
-- [x] Manual closure stops new commercial coverage at the closure civil date; base rent and mileage use the same effective boundary, while an earlier contractual `ends_on` remains stricter.
+- [x] Manual closure stops new commercial coverage at the closure civil date; an earlier contractual `ends_on` remains stricter.
 - [x] `closed_at` stores the audit instant, `closed_on` stores the immutable tenant/org civil closure date captured from that same instant, and contractual `ends_on` remains a separate term boundary.
 - [x] Rental commercial civil-day decisions use Configuration-owned tenant/org `localization.timezone`, not Laravel's process-global application timezone.
 - [x] Later workspace timezone changes cannot reinterpret an already-recorded `closed_on` commercial boundary.
@@ -95,6 +95,7 @@ This file is no longer an open list of speculative business questions. Historica
 - [x] Narrative driver observation remains non-identity evidence.
 - [x] Same authoritative driver cannot finalize overlapping usage across two vehicles.
 - [x] Adjacent driver periods are permitted.
+- [x] Physical custody overrun can remain auditable Running Chart evidence without silently extending customer/owner commercial entitlement.
 - [x] HR payroll/compensation is not duplicated in Rental.
 - [x] No unsupported extra Running Chart approval ceremony added.
 
@@ -166,6 +167,8 @@ This file is no longer an open list of speculative business questions. Historica
 - [x] Customer handoff uses Invoice Sales/Outbound semantics.
 - [x] Owner handoff uses Invoice/AP Purchase/Inbound semantics.
 - [x] Human-facing owner terminology is Owner Payable Voucher / Owner Settlement.
+- [x] Financial handoff validates the immutable source supply period against effective agreement coverage before creating customer or owner money.
+- [x] Physical overrun outside commercial coverage rolls back the attempted Rental charge/invoice while retaining finalized operational evidence.
 - [x] Invoice source allocation preserves Rental source lineage.
 - [x] Posted/live Invoice state is owned by Invoice rather than copied as Rental truth.
 - [x] Corrections use owner-module cancel/reverse/adjustment/reissue semantics.
@@ -257,6 +260,7 @@ This file is no longer an open list of speculative business questions. Historica
 - [x] Closure/calendar correction adds only nullable date `closed_on` to each Rental agreement as an immutable historical snapshot; no inverse pointer or duplicate ledger is introduced.
 - [x] Upgrade migration backfills pre-existing closed rows once from the effective Configuration-owned workspace timezone and then freezes the recorded date.
 - [x] Successor-lineage schema correction is additive and Rental-owned; it persists the already-defined relationship rather than introducing a compatibility workaround in another module.
+- [x] Commercial overrun protection adds no relationship or duplicate state; it is enforced at the existing Rental financial handoff boundary.
 
 ---
 
@@ -302,13 +306,14 @@ The completion delta adds focused regression tests for:
 - [x] successor activation follows the configured tenant-local effective date across a UTC-midnight boundary;
 - [x] workspace timezone change after closure cannot move the stored commercial boundary;
 - [x] recorded `closed_on` cannot be rewritten after closure;
-- [x] successor cutover keeps contractual `ends_on` distinct from lifecycle `closed_on`.
+- [x] successor cutover keeps contractual `ends_on` distinct from lifecycle `closed_on`;
+- [x] finalized physical overrun remains auditable while both customer and owner automatic usage billing outside agreement coverage roll back atomically.
 
 ### Verification evidence rule
 
 Only executed commands may be described as passed. This connector-only completion environment can inspect and mutate GitHub source but cannot materialize the full repository locally because outbound Git/GitHub checkout is DNS-blocked; GitHub Actions are intentionally not used per project instruction. Therefore executable full-suite/lint/typecheck/build/migrate results for this exact continuation delta are not fabricated here. This is an execution-environment evidence note, not an open Vehicle Rental business/code requirement.
 
-For the 2026-09-25 successor-lineage continuation, exact changed PHP contents were materialized for syntax checking under PHP 8.4.23. Current-branch static review confirms the model/service/resource/frontend contract all use the same one-way successor relationship, the migration now persists it for both agreement tables, the self-FK is tenant/org scoped, and direct-successor uniqueness protects concurrent creation. The default PHPUnit configuration is SQLite `:memory:` and the repository declares Laravel `^12.0`; the migration uses portable Schema Builder operations rather than driver-specific SQL.
+For the 2026-09-25 commercial-overrun continuation, the exact changed `RentalChargeDocuments.php` blob and the new `RentalChargeCoverageTest.php` blob were materialized locally and syntax-checked under the available PHP runtime. Static review confirms the financial guard derives the most precise immutable source period available, preserves half-open Running Chart end semantics, uses the existing `RentalCalendar` effective coverage rule, and runs before Invoice/AP document creation inside the caller's transaction.
 
 The prior repository acceptance evidence remains historical evidence for the pre-continuation baseline. Dependency-backed Laravel/PHPUnit/frontend/MySQL suites for this new delta are not claimed as re-executed in this connector-only runtime.
 
@@ -341,7 +346,7 @@ Vehicle Rental is considered functionally complete when the following remain tru
 10. no old Rental runtime or legacy magic values are reintroduced;
 11. migrations and relationships remain tenant/org-safe and directional;
 12. one-way successor lineage is physically persisted, immutable and limited to one direct successor per predecessor;
-13. closed agreements cannot generate new base-rent or mileage commercial coverage beyond their immutable effective lifecycle boundary;
+13. no automatic Rental financial handoff can create customer or owner money outside the effective agreement commercial boundary, even when physical evidence records a real operational overrun;
 14. future-effective agreement activation uses the configured tenant/org commercial calendar rather than a process-global timezone;
 15. recorded historical closure boundaries are persisted as immutable civil dates and are not reinterpreted after timezone configuration changes;
 16. future changes preserve this ledger and record actual verification evidence rather than assuming it.

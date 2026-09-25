@@ -35,10 +35,17 @@ final class RentalChargeDocuments
 
     private const FIRST_LINE = 1;
 
-    public function __construct(private readonly TaxedSourceInvoiceFactory $factory, private readonly InvoiceCreationService $invoices, private readonly InvoiceSourceService $sources) {}
+    public function __construct(
+        private readonly TaxedSourceInvoiceFactory $factory,
+        private readonly InvoiceCreationService $invoices,
+        private readonly InvoiceSourceService $sources,
+        private readonly RentalCalendar $calendar,
+    ) {}
 
     public function issue(AgreementKind $kind, AgreementContext $context, Agreement $agreement, RentalCharge $charge, string $sourceType, string $description, array $data): Invoice
     {
+        $this->assertCommercialCoverage($agreement, $charge, $context);
+
         $customer = $kind === AgreementKind::Customer;
         $source = new CreateInvoiceData(tenantId: $context->tenantId, organizationUnitId: $context->organizationUnitId,
             invoiceType: $customer ? InvoiceType::Sales : InvoiceType::Purchase, direction: $customer ? InvoiceDirection::Outbound : InvoiceDirection::Inbound,
@@ -102,5 +109,39 @@ final class RentalChargeDocuments
             }
         }
         $charge->forceFill(['voided_at' => now(), 'voided_by' => $context->actorId, 'void_reason' => trim($data['reason']), 'row_version' => $charge->row_version + 1])->save();
+    }
+
+    private function assertCommercialCoverage(Agreement $agreement, RentalCharge $charge, AgreementContext $context): void
+    {
+        [$from, $until] = $this->commercialPeriod($charge, $context);
+        $agreementStart = $agreement->starts_on->toDateString();
+        $agreementEnd = $this->calendar->coverageEnd($agreement, $context);
+
+        if ($from < $agreementStart || ($agreementEnd !== null && $until > $agreementEnd)) {
+            throw ValidationException::withMessages([
+                'agreement' => ['Automatic Rental billing must stay within the agreement commercial coverage. Record the physical overrun, but use a valid agreement revision or an explicitly authorized financial adjustment for any uncovered amount.'],
+            ]);
+        }
+    }
+
+    /** @return array{string, string} */
+    private function commercialPeriod(RentalCharge $charge, AgreementContext $context): array
+    {
+        $calculation = $charge->calculation;
+        if (isset($calculation['supply_from'], $calculation['supply_until'])) {
+            return [(string) $calculation['supply_from'], (string) $calculation['supply_until']];
+        }
+        if (isset($calculation['from'], $calculation['until'])) {
+            return [(string) $calculation['from'], (string) $calculation['until']];
+        }
+        if (isset($calculation['chart']['starts_at'], $calculation['chart']['ends_at'])) {
+            $timezone = $this->calendar->timezone($context);
+            $start = OperationalTime::parse($calculation['chart']['starts_at'], 'starts_at')->setTimezone($timezone);
+            $end = OperationalTime::parse($calculation['chart']['ends_at'], 'ends_at')->setTimezone($timezone);
+
+            return [$start->toDateString(), $end->subMicrosecond()->toDateString()];
+        }
+
+        return [(string) $charge->period_from, (string) $charge->period_until];
     }
 }
