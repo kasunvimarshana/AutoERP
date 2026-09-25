@@ -25,7 +25,7 @@ final class DriverDirectory
             $context->tenantId,
             $context->organizationUnitId,
             $perPage,
-            'active',
+            'available',
         );
     }
 }
