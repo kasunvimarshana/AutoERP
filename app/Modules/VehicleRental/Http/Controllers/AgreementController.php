@@ -40,6 +40,13 @@ final class AgreementController
         return new AgreementResource($this->agreements->change(AgreementKind::from($kind), $request->context(), $agreement, $request->expectedVersion(), AgreementAction::Update, $request->only(AgreementFields::MUTABLE)));
     }
 
+    public function successor(AgreementRequest $request, string $kind, int $agreement): JsonResponse
+    {
+        $successor = $this->agreements->successor(AgreementKind::from($kind), $request->context(), $agreement, $request->expectedVersion(), $request->only(['reference', 'agreed_on', 'executing_on', 'starts_on', 'ends_on', 'reason']));
+
+        return (new AgreementResource($successor))->response()->setStatusCode(Response::HTTP_CREATED);
+    }
+
     public function transition(AgreementRequest $request, string $kind, int $agreement, string $action): AgreementResource
     {
         return new AgreementResource($this->agreements->change(AgreementKind::from($kind), $request->context(), $agreement, $request->expectedVersion(), AgreementAction::from($action), reason: $request->validated('reason')));
