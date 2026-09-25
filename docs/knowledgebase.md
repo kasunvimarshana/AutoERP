@@ -10,7 +10,7 @@
 
 **Authoritative engineering source:** latest `worktree-0.0.8`
 
-**Completion review base:** `16d1503bad25221c44ed5cff541c872e50c06dbb`
+**Continuation review base:** `8261887e9266ea52ad5fc225c64e4e52dad7563f`
 
 **Architecture policy:** root `RULES.md` / `AGENTS.md`
 
@@ -81,7 +81,7 @@ Rules and decisions use these classes:
 - contract changes must preserve already-consumed historical economics instead of rewriting them;
 - database locking must be transaction-scoped and backed by uniqueness/FK constraints where possible.
 
-IFRS 15 contract-modification guidance is supporting accounting context for prospective contract changes, not a replacement for TACGL terms. Sri Lankan IRD circulars/gazettes are supporting statutory context owned by Tax/Invoice/Payment, not hardcoded Rental tariff rules.
+IFRS 15 contract-modification guidance is supporting accounting context for prospective contract changes, not a replacement for TACGL terms. Sri Lankan IRD circulars/gazettes are supporting statutory context owned by Tax/Invoice/Payment, not hardcoded Rental tariff rules. The 2026-09-25 recheck of official IFRS, IRD and MySQL material did not justify any new Rental tariff, tax percentage or ownership exception.
 
 ---
 
@@ -194,7 +194,11 @@ Supported concepts include owner/supplier, supplied vehicle, independent base/mi
 - Activation freezes the effective revision.
 - Active commercial terms are not edited in place.
 - Closure preserves history.
-- Historical calculations keep their original agreement revision.
+- Manual closure is a lifecycle stop: new commercial coverage, including base rent and mileage allowance/assessment, cannot extend past the closure civil date. If the contract already has an earlier `ends_on`, that earlier date remains the stricter commercial boundary.
+- `closed_at` records the audit instant. `closed_on` records the tenant/org civil date captured from that same instant at the Active -> Closed transition. `ends_on` remains the contractual/effective term boundary. These fields are intentionally distinct.
+- The closure civil date is derived once through Configuration-owned tenant/org `localization.timezone`, persisted as immutable `closed_on`, and is never recomputed later under a changed timezone. Rental does not use the process-global Laravel application timezone as a tenant commercial calendar.
+- Existing closed rows created before `closed_on` existed are backfilled once during the additive Rental migration using the effective workspace timezone available at migration time, then frozen. The old schema did not contain enough information to reconstruct any different historical civil date without guessing.
+- Historical calculations keep their original agreement revision and historical periods through the effective boundary remain billable.
 
 ### 6.4 Successor agreement
 
@@ -221,7 +225,7 @@ At activation the backend rejects a cutover that would:
 - cross a retained usage/mileage commercial period;
 - violate predecessor/successor date ordering.
 
-Adjacent half-open operational periods are allowed: use ending exactly at successor start is not an overlap.
+The successor effective-day check uses the same configured tenant/org commercial timezone as closure capture. Adjacent half-open operational periods are allowed: use ending exactly at successor start is not an overlap.
 
 A successor keeps the same counterparty; an owner-agreement successor also keeps the same physical supplied vehicle. A different party/owner vehicle is a new agreement, not a rate revision.
 
@@ -288,7 +292,7 @@ Driver identity is optional source evidence and has two explicit modes:
 
 `driver_observation` remains narrative evidence and is not an identity key.
 
-HR owns employee identity/lifecycle. Rental does not duplicate employees or payroll rates. Running Chart owns the fact that a driver performed a specific Rental usage.
+HR owns employee identity/lifecycle. Rental does not duplicate employees or payroll rates. The operator lookup is a Rental-permission-scoped, least-privilege façade over the HR-owned employee query and exposes only selector identity rather than HR contact data. Running Chart owns the fact that a driver performed a specific Rental usage.
 
 When authoritative driver identity is recorded, two Finalized Running Charts in the same tenant cannot overlap for that same driver. Adjacent periods are allowed. The constraint applies across different vehicles.
 
@@ -307,6 +311,7 @@ The shipped named policy is `actual_calendar_days_v1`.
 - Short-month anchors recover from the original anchor (for example, a day-31 contract does not permanently move the anchor after February).
 - Adjacent partial segments use cumulative decimal allocation so their sum reconciles with the full cycle.
 - Preview and billing require an explicit policy and agreement revision; no hidden `30-day` divisor exists.
+- Manual lifecycle closure caps new base-rent coverage at immutable `closed_on`. It does not rewrite existing charges or the original contractual end date; an earlier explicit `ends_on` remains stricter.
 
 This is an explicit AutoERP production policy, not a claim that every historical TACGL customer used it.
 
@@ -317,6 +322,8 @@ The shipped mileage policy uses explicit commercial KM, explicit included KM and
 - blank is not zero;
 - zero allowance is distinct from unknown allowance;
 - mileage is assessed within a defined daily/monthly agreement cycle;
+- manual lifecycle closure caps allowance accrual/assessment at the same immutable agreement boundary used by base rent;
+- an existing mileage pool preserves its snapshotted timezone so later historical assessments do not silently move cycle boundaries after a configuration change;
 - customer allowance can be shared across replacement charts according to the named policy;
 - owner pools remain tied to their owner agreement;
 - no cross-cycle carry-forward;
@@ -519,6 +526,8 @@ Important competing operations:
 | Customer vs owner billing | both may independently consume the same physical source |
 | Finalize/reverse vs bill | committed source state and financial source state cannot disagree |
 | Successor activation vs use/charge | commercial boundary cannot bisect retained operational/financial history |
+| Manual closure vs commercial calculation | no new base-rent or mileage commercial coverage may extend after immutable `closed_on` |
+| Timezone reconfiguration vs historical closure | changing `localization.timezone` cannot reinterpret an already-recorded `closed_on` boundary |
 | Two driver charts | same authoritative driver cannot have overlapping finalized Rental usage |
 | Deposit allocate/refund | one available balance cannot be spent twice |
 
@@ -571,6 +580,10 @@ Workshop/service/off-road evidence and its availability blocker.
 
 Cross-module analytical presentation/export where appropriate.
 
+### Configuration owns
+
+Tenant/org configuration definitions, inheritance and validated workspace timezone values. Rental consumes the stable `localization.timezone` key through `ConfigurationResolverInterface`; it does not create a parallel timezone setting.
+
 A missing owner-module behavior is fixed in that owner module, never compensated for by a Rental-local ledger or compatibility patch.
 
 ---
@@ -587,7 +600,7 @@ The clean schema intentionally avoids redundant bidirectional state:
 - Successor Agreement stores one predecessor link; no stored inverse link is required.
 - Financial document IDs/statuses are not duplicated as mutable Rental truth; source allocations in Invoice are authoritative.
 
-These relationships are deliberately directional and high-cohesion. No circular stored dependency was added.
+These relationships are deliberately directional and high-cohesion. The commercial-calendar correction adds only the scalar `closed_on` historical snapshot to each Rental agreement; it adds no relationship, inverse pointer, module dependency or duplicate ledger. The snapshot is justified because a historical civil-day boundary cannot be safely recomputed forever from mutable timezone configuration.
 
 ---
 
@@ -660,7 +673,9 @@ The fresh `app/Modules/VehicleRental` implementation includes:
 - separate customer and owner agreements;
 - tenant-safe identity snapshots and histories;
 - expected-version lifecycle commands;
-- effective successor Draft/review/activation flow;
+- effective successor Draft/review/activation flow using the tenant/org commercial calendar;
+- immutable agreement closure snapshots (`closed_at` audit instant plus `closed_on` civil date), with effective coverage using the stricter of `ends_on` and `closed_on`;
+- closure-aware base-rent and mileage coverage so a Closed agreement cannot generate future commercial periods while historical covered periods remain available;
 - bounded/open-ended vehicle planning;
 - owner-source and company-owned paths;
 - handover/return/cancel/replacement lineage;
@@ -669,7 +684,7 @@ The fresh `app/Modules/VehicleRental` implementation includes:
 - odometer continuity;
 - authoritative Employee/External driver identity snapshots and driver-overlap finalization guard;
 - actual-calendar base-rent preview/billing;
-- explicit cycle-based mileage allowance/assessment;
+- explicit cycle-based mileage allowance/assessment with timezone snapshot preservation;
 - typed Normal/Double/Triple OT and Night-out pricing;
 - independent customer/owner immutable Rental charges;
 - Invoice/Tax/Finance source handoff;
@@ -687,9 +702,9 @@ Nested protected archive:
 
 `DATABACKUP/!   CTACGLDATABACKUP202503271759.rar`
 
-The outer corpus exposes one explicit password table. Its five exact nonblank stored values were tested against the protected RAR using free local archive tooling. None unlocked the encrypted payload. A broader DBF field-name scan found no other populated password/secret/key/backup-password field. No guessed variants, dictionary attack or brute force was used.
+Free local archive inspection lists 86 entries and reports every listed entry as password-protected. The RAR has no archive comment. Accessible TACGL text/configuration was searched for explicit backup-password/passcode/credential references and no explicit backup credential was found. The encrypted archive itself contains `password.DBF` / `password.CDX`, but those files are also protected and are not accessible password evidence.
 
-Therefore the backup remains unavailable source evidence. This is a source-access limitation, not an undefined production rule: runtime behavior is governed by the explicit policies in this knowledge base.
+No guessed variants, dictionary attack, brute force or arbitrary password mutation was used. Therefore the backup remains unavailable source evidence. This is a source-access limitation, not an undefined production rule: runtime behavior is governed by the explicit policies in this knowledge base.
 
 ---
 
@@ -716,7 +731,7 @@ For any future Rental change, verify at minimum:
 5. source revision snapshot correctness;
 6. duplicate-consumption rejection;
 7. reversal/reissue lineage;
-8. migration fresh-install and upgrade behavior;
+8. migration fresh-install and upgrade behavior, including immutable lifecycle-date backfill where applicable;
 9. SQLite and MySQL/MariaDB transaction behavior where relevant;
 10. frontend unit/integration tests, typecheck, lint and build;
 11. authenticated browser/UAT for changed operator flows.

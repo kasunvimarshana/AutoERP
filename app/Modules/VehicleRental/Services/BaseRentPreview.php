@@ -25,7 +25,11 @@ final class BaseRentPreview
 
     private const DATE_TIMEZONE = 'UTC';
 
-    public function __construct(private readonly AgreementService $agreements, private readonly DecimalMath $math) {}
+    public function __construct(
+        private readonly AgreementService $agreements,
+        private readonly DecimalMath $math,
+        private readonly RentalCalendar $calendar,
+    ) {}
 
     public function calculate(AgreementKind $kind, AgreementContext $context, int $id, array $input): array
     {
@@ -46,7 +50,8 @@ final class BaseRentPreview
         $from = $this->date($data['from']);
         $until = $this->date($data['until']);
         $anchor = $this->date($agreement->starts_on->format(AgreementFields::DATE_FORMAT));
-        if ($from->lessThan($anchor) || ($agreement->ends_on !== null && $until->toDateString() > $agreement->ends_on->toDateString())) {
+        $coverageEnd = $this->calendar->coverageEnd($agreement, $context);
+        if ($from->lessThan($anchor) || ($coverageEnd !== null && $until->toDateString() > $coverageEnd)) {
             throw ValidationException::withMessages(['from' => ['The complete preview period must be covered by this agreement.']]);
         }
         if ($until->greaterThanOrEqualTo($from->addYears(self::MAX_PREVIEW_YEARS))) {

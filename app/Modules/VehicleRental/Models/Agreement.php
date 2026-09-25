@@ -31,6 +31,7 @@ abstract class Agreement extends TenantOwnedModel
             'agreed_on' => 'date:'.AgreementFields::DATE_FORMAT,
             'starts_on' => 'date:'.AgreementFields::DATE_FORMAT,
             'ends_on' => 'date:'.AgreementFields::DATE_FORMAT,
+            'closed_on' => 'date:'.AgreementFields::DATE_FORMAT,
             'activated_at' => 'immutable_datetime',
             'closed_at' => 'immutable_datetime',
         ]);
@@ -60,12 +61,16 @@ abstract class Agreement extends TenantOwnedModel
                 return;
             }
 
-            $allowed = ['status', 'closed_at', 'row_version', 'updated_at'];
+            $allowed = ['row_version', 'updated_at'];
             if ($originalStatus === AgreementStatus::Active && $agreement->status === AgreementStatus::Closed) {
-                $allowed[] = 'ends_on';
+                if ($agreement->closed_at === null || $agreement->closed_on === null) {
+                    throw new LogicException('Closing a rental agreement requires both the closure instant and immutable closure civil date.');
+                }
+                array_push($allowed, 'status', 'ends_on', 'closed_at', 'closed_on');
             }
+
             if (array_diff(array_keys($agreement->getDirty()), $allowed) !== []) {
-                throw new LogicException('Activated agreement terms are immutable. Use a successor agreement for future commercial changes.');
+                throw new LogicException('Activated agreement terms and recorded lifecycle boundaries are immutable. Use a successor agreement for future commercial changes.');
             }
         });
     }

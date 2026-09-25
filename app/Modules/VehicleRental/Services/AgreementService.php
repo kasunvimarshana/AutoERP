@@ -29,7 +29,11 @@ use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 final class AgreementService
 {
-    public function __construct(private readonly RentalAuthorization $authorization, private readonly AgreementValidation $validation) {}
+    public function __construct(
+        private readonly RentalAuthorization $authorization,
+        private readonly AgreementValidation $validation,
+        private readonly RentalCalendar $calendar,
+    ) {}
 
     public function list(AgreementKind $kind, AgreementContext $context, int $perPage, ?string $search = null): LengthAwarePaginator
     {
@@ -174,8 +178,7 @@ final class AgreementService
                     ->whereIn('status', [VehicleUseStatus::Planned->value, VehicleUseStatus::InCustody->value])->lockForUpdate()->first(['id']) !== null) {
                     throw ValidationException::withMessages(['status' => ['Return vehicles and cancel remaining plans before closing this agreement.']]);
                 }
-                $record->status = AgreementStatus::Closed;
-                $record->closed_at = now();
+                $this->stampClosure($record, $context);
             } else {
                 throw ValidationException::withMessages(['status' => ['This action is invalid for the current state. Activated terms cannot be edited.']]);
             }
@@ -190,9 +193,9 @@ final class AgreementService
     private function activateSuccessor(AgreementKind $kind, AgreementContext $context, Agreement $predecessor, Agreement $successor): void
     {
         $this->assertSuccessorStartsAfter($predecessor, $successor->starts_on->toDateString());
-        $timezone = (string) config('app.timezone', 'UTC');
+        $timezone = $this->calendar->timezone($context);
         $effectiveDate = CarbonImmutable::createFromFormat('!'.AgreementFields::DATE_FORMAT, $successor->starts_on->toDateString(), $timezone);
-        if ($effectiveDate->isAfter(CarbonImmutable::today($timezone))) {
+        if ($effectiveDate->isAfter($this->calendar->today($context))) {
             throw ValidationException::withMessages(['starts_on' => ['Keep this successor as Draft until its effective start date. Early activation would interrupt the still-current predecessor agreement.']]);
         }
         $this->assertCutoverAvailable($kind, $context, $predecessor, $successor->starts_on->toDateString());
@@ -201,11 +204,18 @@ final class AgreementService
         if ($predecessor->ends_on === null || $predecessor->ends_on->toDateString() >= $successor->starts_on->toDateString()) {
             $predecessor->ends_on = $cutoff->toDateString();
         }
-        $predecessor->status = AgreementStatus::Closed;
-        $predecessor->closed_at = now();
+        $this->stampClosure($predecessor, $context);
         $predecessor->row_version++;
         $predecessor->save();
         $this->record($predecessor, $context, AgreementAction::Supersede, 'Activated successor '.$successor->reference);
+    }
+
+    private function stampClosure(Agreement $agreement, AgreementContext $context): void
+    {
+        $closedAt = now();
+        $agreement->status = AgreementStatus::Closed;
+        $agreement->closed_at = $closedAt;
+        $agreement->closed_on = $this->calendar->civilDate($context, $closedAt);
     }
 
     private function assertCutoverAvailable(AgreementKind $kind, AgreementContext $context, Agreement $predecessor, string $successorStart): void

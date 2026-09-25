@@ -34,6 +34,7 @@ final class AgreementResource extends JsonResource
             'notes' => $this->notes,
             'activated_at' => $this->activated_at?->toIso8601String(),
             'closed_at' => $this->closed_at?->toIso8601String(),
+            'closed_on' => $this->closed_on?->toDateString(),
         ];
     }
 }
