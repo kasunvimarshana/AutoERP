@@ -6,7 +6,7 @@
 
 **Engineering authority:** latest `worktree-0.0.8`.
 
-**Continuation review base:** `1fc9ba3ca060c09edfaba3d95d981817d501cdda`.
+**Continuation review base:** `fdf660726e712595f35fd2c27f376e7e76824f64`.
 
 **Canonical domain/policy reference:** [knowledgebase.md](../knowledgebase.md).
 
@@ -74,6 +74,7 @@ This file is no longer an open list of speculative business questions. Historica
 - [x] Replacement alone creates no automatic surcharge, duplicate base rent or credit.
 - [x] Workshop/off-road availability alone creates no automatic downtime financial deduction.
 - [x] Insurance/revenue-licence documents are not universal Rental blockers without an explicit Rental policy.
+- [x] Vehicle-use odometer casts reuse `AgreementFields::DECIMAL_SCALE`; no duplicate raw decimal scale remains in the Rental model.
 
 ---
 
@@ -90,8 +91,12 @@ This file is no longer an open list of speculative business questions. Historica
 - [x] Normal/Double/Triple OT stored as typed integer minutes.
 - [x] Night-out count stored explicitly.
 - [x] Authoritative optional driver identity implemented.
+- [x] Structured driver identity is physically persisted by the Running Chart schema (`driver_identity_source`, employee ID, immutable name/reference snapshots).
 - [x] Employee driver references HR-owned identity with immutable name/employee-number snapshots.
+- [x] Running Chart -> HR employee uses a one-way tenant-scoped composite FK; HR remains independent from Rental.
+- [x] HR tenant-global employees remain valid because organization visibility is intentionally owned by HR's query service rather than incorrectly forced to organization equality in the FK.
 - [x] External driver requires stable business reference and name snapshot.
+- [x] Driver timeline indexes match employee/external overlap queries.
 - [x] Narrative driver observation remains non-identity evidence.
 - [x] Same authoritative driver cannot finalize overlapping usage across two vehicles.
 - [x] Adjacent driver periods are permitted.
@@ -251,15 +256,18 @@ This file is no longer an open list of speculative business questions. Historica
 - [x] Vehicle Use is the meeting point of Customer Agreement, actual vehicle and optional Owner source.
 - [x] Replacement stores a single predecessor link; no redundant inverse relationship.
 - [x] Running Chart belongs to Vehicle Use; agreement revisions are resolved through the frozen use.
-- [x] Running Chart -> HR employee is one-way and tenant-safe; HR does not depend on Rental.
+- [x] Running Chart -> HR employee is one-way and physically tenant-safe through `(driver_employee_id, tenant_id)`; HR does not depend on Rental.
+- [x] HR organization visibility is not duplicated in Rental schema because HR intentionally permits tenant-global employees (`organization_unit_id = null`) as well as organization-owned employees.
 - [x] Successor Agreement -> predecessor is one-way and tenant/org-safe; no redundant inverse link.
 - [x] Agreement successor self-FKs reference scoped `(id, tenant_id, organization_unit_id)` identities and `supersedes_agreement_id` is unique per agreement table.
+- [x] Existing replacement/correction self-lineage remains one-way; state/boundary/same-source semantics stay transactionally enforced by their owning services instead of adding partial redundant database rules that cannot express the full invariant.
 - [x] Existing cross-module composite tenant FKs continue to rely on their established scoped unique keys.
 - [x] Financial document state is not duplicated into mutable Rental columns.
 - [x] No new circular module dependency introduced.
 - [x] Closure/calendar correction adds only nullable date `closed_on` to each Rental agreement as an immutable historical snapshot; no inverse pointer or duplicate ledger is introduced.
 - [x] Upgrade migration backfills pre-existing closed rows once from the effective Configuration-owned workspace timezone and then freezes the recorded date.
 - [x] Successor-lineage schema correction is additive and Rental-owned; it persists the already-defined relationship rather than introducing a compatibility workaround in another module.
+- [x] Running Chart driver schema correction is additive and Rental-owned; it persists the already-defined structured identity rather than moving driver logic into HR or another module.
 - [x] Commercial overrun protection adds no relationship or duplicate state; it is enforced at the existing Rental financial handoff boundary.
 
 ---
@@ -289,6 +297,8 @@ The completion delta adds focused regression tests for:
 - [x] employee driver tenant scoping and immutable snapshots;
 - [x] external driver stable reference normalization;
 - [x] foreign-tenant driver rejection;
+- [x] Running Chart fresh-schema structured driver columns;
+- [x] database-level cross-tenant HR employee reference rejection;
 - [x] finalized driver identity immutability;
 - [x] overlapping same-driver use across two vehicles;
 - [x] adjacent non-overlapping external-driver periods;
@@ -313,9 +323,11 @@ The completion delta adds focused regression tests for:
 
 Only executed commands may be described as passed. This connector-only completion environment can inspect and mutate GitHub source but cannot materialize the full repository locally because outbound Git/GitHub checkout is DNS-blocked; GitHub Actions are intentionally not used per project instruction. Therefore executable full-suite/lint/typecheck/build/migrate results for this exact continuation delta are not fabricated here. This is an execution-environment evidence note, not an open Vehicle Rental business/code requirement.
 
-For the 2026-09-25 commercial-overrun continuation, the exact changed `RentalChargeDocuments.php` blob and the new `RentalChargeCoverageTest.php` blob were materialized locally and syntax-checked under the available PHP runtime. Static review confirms the financial guard derives the most precise immutable source period available, preserves half-open Running Chart end semantics, uses the existing `RentalCalendar` effective coverage rule, and runs before Invoice/AP document creation inside the caller's transaction.
+For the 2026-09-25 Running Chart driver-schema continuation, the exact migration, `RunningChartDriverSchemaTest.php`, and `VehicleUse.php` blobs were materialized locally and syntax-checked under PHP 8.4.23. Local `git hash-object` values match their GitHub blob SHAs. Static review confirms the FK uses HR's existing `(id, tenant_id)` unique identity, leaves organization visibility to HR's tenant/global-org query contract, and indexes the exact identity predicates used by Running Chart overlap checks.
 
-The prior repository acceptance evidence remains historical evidence for the pre-continuation baseline. Dependency-backed Laravel/PHPUnit/frontend/MySQL suites for this new delta are not claimed as re-executed in this connector-only runtime.
+For the earlier commercial-overrun continuation, the exact changed `RentalChargeDocuments.php` blob and `RentalChargeCoverageTest.php` blob were likewise materialized and syntax-checked; the financial guard uses the existing `RentalCalendar` effective coverage rule before Invoice/AP document creation.
+
+The prior repository acceptance evidence remains historical evidence for the pre-continuation baseline. Dependency-backed Laravel/PHPUnit/frontend/MySQL suites for these exact deltas are not claimed as re-executed in this connector-only runtime.
 
 ---
 
@@ -338,17 +350,18 @@ Vehicle Rental is considered functionally complete when the following remain tru
 2. customer and owner economics are independent and revision-driven;
 3. Running Chart is immutable physical evidence with governed correction;
 4. physical vehicle/source/use/replacement/driver history is integrity-protected;
-5. every automatic monetary effect comes from an explicit named/configured policy and exact source evidence;
-6. undefined historical tariffs resolve to **no automatic monetary effect**, not an invented formula;
-7. Invoice/Payment/Tax/Finance/Reporting responsibilities stay in their owner modules;
-8. same-side source consumption is not duplicated;
-9. company-owned vehicles do not fabricate external owner cost;
-10. no old Rental runtime or legacy magic values are reintroduced;
-11. migrations and relationships remain tenant/org-safe and directional;
-12. one-way successor lineage is physically persisted, immutable and limited to one direct successor per predecessor;
-13. no automatic Rental financial handoff can create customer or owner money outside the effective agreement commercial boundary, even when physical evidence records a real operational overrun;
-14. future-effective agreement activation uses the configured tenant/org commercial calendar rather than a process-global timezone;
-15. recorded historical closure boundaries are persisted as immutable civil dates and are not reinterpreted after timezone configuration changes;
-16. future changes preserve this ledger and record actual verification evidence rather than assuming it.
+5. structured driver identity is physically represented in the fresh schema, tenant-safe, and independent from HR payroll ownership;
+6. every automatic monetary effect comes from an explicit named/configured policy and exact source evidence;
+7. undefined historical tariffs resolve to **no automatic monetary effect**, not an invented formula;
+8. Invoice/Payment/Tax/Finance/Reporting responsibilities stay in their owner modules;
+9. same-side source consumption is not duplicated;
+10. company-owned vehicles do not fabricate external owner cost;
+11. no old Rental runtime or legacy magic values are reintroduced;
+12. migrations and relationships remain tenant/org-safe and directional;
+13. one-way successor lineage is physically persisted, immutable and limited to one direct successor per predecessor;
+14. no automatic Rental financial handoff can create customer or owner money outside the effective agreement commercial boundary, even when physical evidence records a real operational overrun;
+15. future-effective agreement activation uses the configured tenant/org commercial calendar rather than a process-global timezone;
+16. recorded historical closure boundaries are persisted as immutable civil dates and are not reinterpreted after timezone configuration changes;
+17. future changes preserve this ledger and record actual verification evidence rather than assuming it.
 
 There are no remaining open product-policy TODO items in this ledger. Source-access limitations and environment-specific execution evidence are documented separately and must not be converted into speculative runtime behavior.
