@@ -9,7 +9,7 @@ vi.mock('./baseRentBillingApi', () => ({ billBaseRent: vi.fn(), loadBaseCharges:
 const agreement: Agreement = {
     id: 7, reference: 'CUSTOMER-A', row_version: 2, status: AgreementStatus.Active, basis: RentalBasis.Monthly, driver_mode: DriverMode.SelfDrive,
     party: { id: 2, name: 'Customer A' }, currency: { id: 1, name: 'Rupee', code: 'LKR' }, agreed_on: '2026-01-01', executing_on: null,
-    starts_on: '2026-01-31', ends_on: null, notes: null,
+    starts_on: '2026-01-31', ends_on: null, effective_coverage_ends_on: null, notes: null,
     terms: { ...Object.fromEntries(Object.keys(TERM_LABELS).map(key => [key, null])) as Record<TermKey, string | null>, base_rate: '3100.000000' },
 };
 
@@ -19,8 +19,8 @@ beforeEach(() => {
     vi.mocked(loadBaseCharges).mockResolvedValue({ data: [], current_page: 1, last_page: 1 });
     vi.mocked(billBaseRent).mockResolvedValue({ id: 21, invoice_number: 'INV-21', grand_total: '3100.000000' });
 });
-function setup() {
-    render(<MemoryRouter><BaseRentBillingPanel kind={AgreementKind.Customer} agreement={agreement} /></MemoryRouter>);
+function setup(record = agreement) {
+    render(<MemoryRouter><BaseRentBillingPanel kind={AgreementKind.Customer} agreement={record} /></MemoryRouter>);
     fireEvent.click(screen.getByText('Bill base rent'));
 }
 function documentFields() {
@@ -36,6 +36,11 @@ it('requires explicit policy acceptance and sends dates with verified document i
     fireEvent.click(screen.getByRole('button', { name: 'Create invoice draft' }));
     expect(await screen.findByRole('link', { name: 'INV-21' })).toHaveAttribute('href', '/invoices/21');
     expect(billBaseRent).toHaveBeenCalledWith(AgreementKind.Customer, agreement, { from: '2026-01-31', until: '2026-02-27' }, { invoice_date: '2026-02-27', due_date: null, exchange_rate: '1' });
+});
+it('uses the server effective coverage boundary for closed agreement date inputs', () => {
+    setup({ ...agreement, status: AgreementStatus.Closed, effective_coverage_ends_on: '2026-02-15' });
+    expect(screen.getByLabelText('Charge from')).toHaveAttribute('max', '2026-02-15');
+    expect(screen.getByLabelText('Charge through')).toHaveAttribute('max', '2026-02-15');
 });
 it('surfaces conflicting billing without a success message', async () => {
     vi.mocked(billBaseRent).mockRejectedValue(new ApiError('Period already charged.', 409));
