@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace Modules\VehicleRental\Services;
 
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
-use Modules\Hr\Models\HrEmployee;
+use Modules\Hr\Services\EmployeeQueryService;
 use Modules\VehicleRental\Constants\AgreementFields;
 use Modules\VehicleRental\Constants\RunningChartFields;
 use Modules\VehicleRental\Data\AgreementContext;
@@ -16,6 +17,8 @@ use Modules\VehicleRental\Enums\DriverIdentitySource;
 
 final class RunningChartValidation
 {
+    public function __construct(private readonly EmployeeQueryService $employees) {}
+
     public function validate(array $input, AgreementContext $context): array
     {
         $rules = [
@@ -84,10 +87,9 @@ final class RunningChartValidation
             if ($data['driver_employee_id'] === null) {
                 throw ValidationException::withMessages(['driver_employee_id' => ['Select the employee who drove this usage.']]);
             }
-            $employee = HrEmployee::query()->where('tenant_id', $context->tenantId)
-                ->where(fn ($query) => $query->whereNull('organization_unit_id')->orWhere('organization_unit_id', $context->organizationUnitId))
-                ->whereKey($data['driver_employee_id'])->first();
-            if ($employee === null) {
+            try {
+                $employee = $this->employees->employee((int) $data['driver_employee_id'], $context->tenantId, $context->organizationUnitId);
+            } catch (ModelNotFoundException) {
                 throw ValidationException::withMessages(['driver_employee_id' => ['Select an employee available to this organization.']]);
             }
             $data['driver_name_snapshot'] = $employee->display_name;
