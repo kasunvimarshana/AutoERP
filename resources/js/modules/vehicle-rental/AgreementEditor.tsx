@@ -11,7 +11,7 @@ import { LookupSelect } from '@/shared/components/LookupSelect';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import type { NamedResource } from '@/shared/types/common';
 import type { LookupLoadParams } from '@/shared/types/lookup';
-import { AgreementKind, DriverMode, RentalBasis, TERM_LABELS, type Agreement, type TermKey } from './agreements';
+import { AgreementKind, DriverMode, RentalBasis, termLabel, visibleTermKeys, type Agreement, type TermKey } from './agreements';
 
 const currencies = (params: LookupLoadParams) => requestLookup<NamedResource>(endpoints.currencies, params);
 const vehicles = (params: LookupLoadParams) => requestLookup<Record<string, unknown>>(`${endpoints.vehicles}/lookup/active`, params)
@@ -35,14 +35,16 @@ export function AgreementEditor({ kind, record, onSaved, onCancel }: { kind: Agr
     const [error, setError] = useState<ApiError | null>(null);
     const [saving, setSaving] = useState(false);
     const fieldError = (key: string) => error?.fields[key]?.[0];
+    const termKeys = visibleTermKeys(kind);
     async function submit(event: FormEvent) {
         event.preventDefault();
         if (!party || !currency || (kind === AgreementKind.Owner && !vehicle)) return;
         setSaving(true); setError(null);
         try {
+            const submittedTerms = Object.fromEntries(termKeys.map(key => [key, terms[key] ?? null])) as Partial<Record<TermKey, string | null>>;
             await saveAgreement(kind, { reference, party_id: party.id, currency_id: currency.id,
                 ...(kind === AgreementKind.Owner ? { vehicle_id: vehicle!.id } : {}), agreed_on: agreedOn, executing_on: executingOn || null, starts_on: startsOn,
-                ends_on: endsOn || null, basis, driver_mode: driver, terms, notes: notes || null, expected_version: record?.row_version }, record?.id);
+                ends_on: endsOn || null, basis, driver_mode: driver, terms: submittedTerms, notes: notes || null, expected_version: record?.row_version }, record?.id);
             onSaved();
         } catch (failure) { setError(toApiError(failure)); } finally { setSaving(false); }
     }
@@ -65,10 +67,10 @@ export function AgreementEditor({ kind, record, onSaved, onCancel }: { kind: Agr
             <summary className="cursor-pointer font-medium">Agreed rates and allowances</summary>
             <p className="my-3 text-sm text-slate-600">Enter only the terms agreed with this party. Blank means unknown; enter zero only when explicitly agreed.</p>
             <fieldset disabled={saving} className="grid gap-4 sm:grid-cols-2">
-                {(Object.keys(TERM_LABELS) as TermKey[]).map(key => <Input key={key} label={TERM_LABELS[key]} inputMode="decimal" value={terms[key] ?? ''} onChange={e => setTerms({ ...terms, [key]: e.target.value || null })} error={fieldError(`terms.${key}`)} />)}
+                {termKeys.map(key => <Input key={key} label={termLabel(kind, key)} inputMode="decimal" value={terms[key] ?? ''} onChange={e => setTerms({ ...terms, [key]: e.target.value || null })} error={fieldError(`terms.${key}`)} />)}
             </fieldset>
         </details>
         <Input label="Notes" value={notes} onChange={e => setNotes(e.target.value)} disabled={saving} error={fieldError('notes')} />
-        <div className="flex gap-2"><Button type="submit" loading={saving} disabled={!party || !currency || (kind === AgreementKind.Owner && !vehicle)}>Save draft</Button><Button variant="secondary" disabled={saving} onClick={onCancel}>Cancel</Button></div>
+        <div className="flex gap-2"><Button type="submit" loading={saving} disabled={!party || !currency || (kind === AgreementKind.Owner && !vehicle)}>Save draft</Button><Button type="button" variant="secondary" disabled={saving} onClick={onCancel}>Cancel</Button></div>
     </form>;
 }
