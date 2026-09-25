@@ -20,8 +20,10 @@ use Modules\VehicleRental\Enums\VehicleUseStatus;
 use Modules\VehicleRental\Models\Agreement;
 use Modules\VehicleRental\Models\CustomerAgreement;
 use Modules\VehicleRental\Models\CustomerBaseCharge;
+use Modules\VehicleRental\Models\CustomerUsageCharge;
 use Modules\VehicleRental\Models\OwnerAgreement;
 use Modules\VehicleRental\Models\OwnerBaseCharge;
+use Modules\VehicleRental\Models\OwnerUsageCharge;
 use Modules\VehicleRental\Models\VehicleUse;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
@@ -82,42 +84,14 @@ final class AgreementService
                 throw new ConflictHttpException('This agreement changed. Reload it before creating a successor.');
             }
             if ($predecessor->status !== AgreementStatus::Active) {
-                throw ValidationException::withMessages(['status' => ['Only an active agreement can be superseded.']]);
+                throw ValidationException::withMessages(['status' => ['Only an active agreement can have a successor draft.']]);
             }
-
-            $successorStart = CarbonImmutable::createFromFormat('!'.AgreementFields::DATE_FORMAT, $data['starts_on'], 'UTC');
-            $predecessorStart = CarbonImmutable::createFromFormat('!'.AgreementFields::DATE_FORMAT, $predecessor->starts_on->format(AgreementFields::DATE_FORMAT), 'UTC');
-            if ($successorStart <= $predecessorStart) {
-                throw ValidationException::withMessages(['starts_on' => ['A successor must start after the predecessor start date.']]);
-            }
-            $cutoff = $successorStart->subDay();
-            $foreignKey = $kind === AgreementKind::Customer ? 'customer_agreement_id' : 'owner_agreement_id';
-            $uses = VehicleUse::query()->forTenant($context->tenantId)->where($foreignKey, $predecessor->id)
-                ->where('status', '!=', VehicleUseStatus::Cancelled->value)
-                ->orderBy('id')->lockForUpdate()->get(['id', 'ends_at_input']);
-            $crossingUse = $uses->first(function (VehicleUse $use) use ($data): bool {
-                if ($use->ends_at_input === null) {
-                    return true;
-                }
-                $end = OperationalTime::parse($use->ends_at_input, 'ends_at');
-                $boundary = CarbonImmutable::createFromFormat('!'.AgreementFields::DATE_FORMAT, $data['starts_on'], $end->getTimezone());
-
-                return $end > $boundary;
-            });
-            if ($crossingUse !== null) {
-                throw ValidationException::withMessages(['starts_on' => ['Return or reschedule vehicle use that crosses the successor effective date before changing commercial terms.']]);
-            }
-
-            $chargeClass = $kind === AgreementKind::Customer ? CustomerBaseCharge::class : OwnerBaseCharge::class;
-            if ($chargeClass::query()->forContext($context->tenantId, $context->organizationUnitId)
-                ->where('agreement_id', $predecessor->id)->whereNull('voided_at')
-                ->where('period_until', '>=', $data['starts_on'])->lockForUpdate()->first(['id']) !== null) {
-                throw ValidationException::withMessages(['starts_on' => ['The predecessor already has a base-rent charge on or after this date. Release and void that charge before moving the commercial boundary.']]);
-            }
+            $this->assertSuccessorStartsAfter($predecessor, $data['starts_on']);
 
             $successorTerms = $predecessor->terms;
-            // A security deposit is received against a specific agreement source in Payment. Copying
-            // the old requirement would manufacture a second obligation without a Payment transfer.
+            // Payment receipts remain attached to the predecessor agreement. A successor must not
+            // manufacture a second security-deposit obligation; operators can explicitly set a new
+            // requirement while reviewing the successor draft if the amended contract requires one.
             $successorTerms[AgreementFields::DEPOSIT_REQUIREMENT] = null;
             $clone = [
                 'reference' => trim($data['reference']),
@@ -137,16 +111,6 @@ final class AgreementService
             }
             $validated = $this->validation->validate($clone, $kind, $context);
 
-            $predecessorEnd = $predecessor->ends_on;
-            if ($predecessorEnd === null || $predecessorEnd->toDateString() >= $data['starts_on']) {
-                $predecessor->ends_on = $cutoff->toDateString();
-            }
-            $predecessor->status = AgreementStatus::Closed;
-            $predecessor->closed_at = now();
-            $predecessor->row_version++;
-            $predecessor->save();
-            $this->record($predecessor, $context, AgreementAction::Supersede, trim($data['reason']));
-
             $class = $this->model($kind);
             $successor = new $class;
             $successor->forceFill(array_merge($validated, [
@@ -156,7 +120,7 @@ final class AgreementService
                 'row_version' => AgreementFields::INITIAL_VERSION,
                 'status' => AgreementStatus::Draft,
             ]))->save();
-            $this->record($successor, $context, AgreementAction::Create, 'Successor of '.$predecessor->reference);
+            $this->record($successor, $context, AgreementAction::Create, trim($data['reason']));
 
             return $successor->load($this->relations($kind));
         });
@@ -168,18 +132,37 @@ final class AgreementService
 
         return $this->atomic(function () use ($kind, $context, $id, $expectedVersion, $action, $input, $reason): Agreement {
             $this->validation->assertContext($context);
+            $snapshot = $this->model($kind)::query()->forContext($context->tenantId, $context->organizationUnitId)->findOrFail($id);
+
             if ($kind === AgreementKind::Owner && $action === AgreementAction::Update) {
-                $snapshot = OwnerAgreement::query()->forContext($context->tenantId, $context->organizationUnitId)->findOrFail($id);
                 $vehicleIds = array_unique([(int) $snapshot->vehicle_id, (int) ($input['vehicle_id'] ?? $snapshot->vehicle_id)]);
                 Vehicle::query()->forTenant($context->tenantId, $context->organizationUnitId)->whereIn('id', $vehicleIds)->orderBy('id')->lockForUpdate()->get();
             }
+
+            $predecessor = null;
+            if ($action === AgreementAction::Activate && $snapshot->status === AgreementStatus::Draft && $snapshot->supersedes_agreement_id !== null) {
+                $predecessor = $this->model($kind)::query()->forContext($context->tenantId, $context->organizationUnitId)
+                    ->lockForUpdate()->findOrFail((int) $snapshot->supersedes_agreement_id);
+            }
+
             $record = $this->model($kind)::query()->forContext($context->tenantId, $context->organizationUnitId)->lockForUpdate()->findOrFail($id);
             if ($record->row_version !== $expectedVersion) {
                 throw new ConflictHttpException('This agreement changed. Reload it before continuing.');
             }
+
             if ($action === AgreementAction::Update && $record->status === AgreementStatus::Draft) {
-                $record->forceFill($this->validation->validate($input, $kind, $context));
+                $validated = $this->validation->validate($input, $kind, $context);
+                if ($record->supersedes_agreement_id !== null) {
+                    $this->assertSuccessorIdentity($kind, $context, $record, $validated);
+                }
+                $record->forceFill($validated);
             } elseif ($action === AgreementAction::Activate && $record->status === AgreementStatus::Draft) {
+                if ($record->supersedes_agreement_id !== null) {
+                    if ($predecessor === null || $predecessor->status !== AgreementStatus::Active) {
+                        throw new ConflictHttpException('The predecessor agreement is no longer active. Review the successor before activation.');
+                    }
+                    $this->activateSuccessor($kind, $context, $predecessor, $record);
+                }
                 $record->status = AgreementStatus::Active;
                 $record->activated_at = now();
             } elseif ($action === AgreementAction::Close && $record->status === AgreementStatus::Active) {
@@ -202,6 +185,79 @@ final class AgreementService
 
             return $record->load($this->relations($kind));
         });
+    }
+
+    private function activateSuccessor(AgreementKind $kind, AgreementContext $context, Agreement $predecessor, Agreement $successor): void
+    {
+        $this->assertSuccessorStartsAfter($predecessor, $successor->starts_on->toDateString());
+        $this->assertCutoverAvailable($kind, $context, $predecessor, $successor->starts_on->toDateString());
+
+        $cutoff = CarbonImmutable::createFromFormat('!'.AgreementFields::DATE_FORMAT, $successor->starts_on->toDateString(), 'UTC')->subDay();
+        if ($predecessor->ends_on === null || $predecessor->ends_on->toDateString() >= $successor->starts_on->toDateString()) {
+            $predecessor->ends_on = $cutoff->toDateString();
+        }
+        $predecessor->status = AgreementStatus::Closed;
+        $predecessor->closed_at = now();
+        $predecessor->row_version++;
+        $predecessor->save();
+        $this->record($predecessor, $context, AgreementAction::Supersede, 'Activated successor '.$successor->reference);
+    }
+
+    private function assertCutoverAvailable(AgreementKind $kind, AgreementContext $context, Agreement $predecessor, string $successorStart): void
+    {
+        $foreignKey = $kind === AgreementKind::Customer ? 'customer_agreement_id' : 'owner_agreement_id';
+        $uses = VehicleUse::query()->forTenant($context->tenantId)->where($foreignKey, $predecessor->id)
+            ->where('status', '!=', VehicleUseStatus::Cancelled->value)
+            ->orderBy('id')->lockForUpdate()->get(['id', 'ends_at_input']);
+        $crossingUse = $uses->first(function (VehicleUse $use) use ($successorStart): bool {
+            if ($use->ends_at_input === null) {
+                return true;
+            }
+            $end = OperationalTime::parse($use->ends_at_input, 'ends_at');
+            $boundary = CarbonImmutable::createFromFormat('!'.AgreementFields::DATE_FORMAT, $successorStart, $end->getTimezone());
+
+            return $end > $boundary;
+        });
+        if ($crossingUse !== null) {
+            throw ValidationException::withMessages(['starts_on' => ['Return or reschedule vehicle use that crosses the successor effective date before activation.']]);
+        }
+
+        $baseChargeClass = $kind === AgreementKind::Customer ? CustomerBaseCharge::class : OwnerBaseCharge::class;
+        if ($baseChargeClass::query()->forContext($context->tenantId, $context->organizationUnitId)
+            ->where('agreement_id', $predecessor->id)->whereNull('voided_at')
+            ->where('period_until', '>=', $successorStart)->lockForUpdate()->first(['id']) !== null) {
+            throw ValidationException::withMessages(['starts_on' => ['The predecessor has a base-rent charge on or after this date. Release and void that charge before activation.']]);
+        }
+
+        $usageChargeClass = $kind === AgreementKind::Customer ? CustomerUsageCharge::class : OwnerUsageCharge::class;
+        if ($usageChargeClass::query()->forContext($context->tenantId, $context->organizationUnitId)
+            ->where('agreement_id', $predecessor->id)->whereNull('voided_at')
+            ->where('period_until', '>=', $successorStart)->lockForUpdate()->first(['id']) !== null) {
+            throw ValidationException::withMessages(['starts_on' => ['The predecessor has a usage assessment whose commercial period reaches this date. Release and void that assessment before activation.']]);
+        }
+    }
+
+    private function assertSuccessorIdentity(AgreementKind $kind, AgreementContext $context, Agreement $successor, array $validated): void
+    {
+        $predecessor = $this->model($kind)::query()->forContext($context->tenantId, $context->organizationUnitId)
+            ->findOrFail((int) $successor->supersedes_agreement_id);
+        $partyField = $kind === AgreementKind::Customer ? 'customer_id' : 'supplier_id';
+        if ((int) $validated[$partyField] !== (int) $predecessor->{$partyField}) {
+            throw ValidationException::withMessages(['party_id' => ['A successor must keep the predecessor counterparty. Create a new agreement for a different party.']]);
+        }
+        if ($kind === AgreementKind::Owner && (int) $validated['vehicle_id'] !== (int) $predecessor->vehicle_id) {
+            throw ValidationException::withMessages(['vehicle_id' => ['An owner-agreement successor must keep the same supplied vehicle. Create a new owner agreement for another vehicle.']]);
+        }
+        $this->assertSuccessorStartsAfter($predecessor, $validated['starts_on']);
+    }
+
+    private function assertSuccessorStartsAfter(Agreement $predecessor, string $successorStart): void
+    {
+        $next = CarbonImmutable::createFromFormat('!'.AgreementFields::DATE_FORMAT, $successorStart, 'UTC');
+        $current = CarbonImmutable::createFromFormat('!'.AgreementFields::DATE_FORMAT, $predecessor->starts_on->format(AgreementFields::DATE_FORMAT), 'UTC');
+        if ($next <= $current) {
+            throw ValidationException::withMessages(['starts_on' => ['A successor must start after the predecessor start date.']]);
+        }
     }
 
     private function record(Agreement $record, AgreementContext $context, AgreementAction $action, ?string $reason = null): void
