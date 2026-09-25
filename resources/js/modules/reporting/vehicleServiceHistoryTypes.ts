@@ -22,7 +22,12 @@ export interface VehicleServiceHistoryLine {
 }
 
 export interface VehicleServiceHistoryRow {
-    id: number;
+    id: string;
+    live_job_id: number | null;
+    source: 'current' | 'legacy';
+    source_label: string;
+    job_type: string;
+    job_type_label: string;
     job_number: string;
     job_date: string | null;
     status: string;
