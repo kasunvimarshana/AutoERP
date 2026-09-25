@@ -118,7 +118,7 @@ final class AgreementService
             $successorTerms = $predecessor->terms;
             // A security deposit is received against a specific agreement source in Payment. Copying
             // the old requirement would manufacture a second obligation without a Payment transfer.
-            $successorTerms['deposit_requirement'] = null;
+            $successorTerms[AgreementFields::DEPOSIT_REQUIREMENT] = null;
             $clone = [
                 'reference' => trim($data['reference']),
                 'party_id' => $kind === AgreementKind::Customer ? $predecessor->customer_id : $predecessor->supplier_id,
