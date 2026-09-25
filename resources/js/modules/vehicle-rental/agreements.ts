@@ -18,6 +18,23 @@ export const TERM_LABELS = {
     night_out_rate: 'Night-out rate', deposit_requirement: 'Agreed security deposit',
 } as const;
 export type TermKey = keyof typeof TERM_LABELS;
+export const CUSTOMER_ONLY_TERM_KEYS = new Set<TermKey>(['deposit_requirement']);
+const OWNER_TERM_LABEL_OVERRIDES: Partial<Record<TermKey, string>> = {
+    base_rate: 'Owner base rental payable',
+    excess_km_rate: 'Owner excess distance payable per km',
+    non_ac_rate: 'Owner Non-AC rate',
+    front_ac_rate: 'Owner Front AC rate',
+    dual_ac_rate: 'Owner Dual AC rate',
+    driver_rate: 'Owner driver reimbursement amount',
+    normal_ot_rate: 'Owner normal overtime reimbursement hourly rate',
+    double_ot_rate: 'Owner double overtime reimbursement hourly rate',
+    triple_ot_rate: 'Owner triple overtime reimbursement hourly rate',
+    night_out_rate: 'Owner night-out reimbursement rate',
+};
+export const visibleTermKeys = (kind: AgreementKind): TermKey[] =>
+    (Object.keys(TERM_LABELS) as TermKey[]).filter(key => kind === AgreementKind.Customer || !CUSTOMER_ONLY_TERM_KEYS.has(key));
+export const termLabel = (kind: AgreementKind, key: TermKey): string =>
+    kind === AgreementKind.Owner ? OWNER_TERM_LABEL_OVERRIDES[key] ?? TERM_LABELS[key] : TERM_LABELS[key];
 export interface Agreement {
     id: number; reference: string; row_version: number; status: AgreementStatus; basis: RentalBasis; driver_mode: DriverMode;
     supersedes_agreement?: { id: number; reference: string } | null;
