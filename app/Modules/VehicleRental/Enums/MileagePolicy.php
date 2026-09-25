@@ -12,7 +12,5 @@ enum MileagePolicy: string
 
     public const COMPONENT = 'excess_distance';
 
-    public const TIMEZONE_SETTING = 'localization.timezone';
-
     public const MONTHS_PER_YEAR = 12;
 }
