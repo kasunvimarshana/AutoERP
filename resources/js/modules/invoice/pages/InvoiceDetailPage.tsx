@@ -13,6 +13,7 @@ import {
 } from '../invoiceApi';
 import { hasInvoicePermission, invoicePermissions } from '../invoicePermissions';
 import { vehicleServicePermissions } from '@/modules/vehicle-service/vehicleServicePermissions';
+import { hasPaymentPermission, paymentPermissions } from '@/modules/payment/paymentPermissions';
 import { useApi } from '@/shared/hooks/useApi';
 import { useOnDemandTab } from '@/shared/hooks/useOnDemandTab';
 import { ContentHeader } from '@/shared/components/ContentHeader';
@@ -41,6 +42,12 @@ const summaryTab: TabItem<Tab> = { id: 'summary', label: 'Summary' };
 const linesTab: TabItem<Tab> = { id: 'lines', label: 'Lines' };
 const settlementStatuses = ['posted', 'partially_paid'] as const;
 const retiredSourceInvoiceTypes = new Set(['rental', 'vehicle_finance']);
+const freshRentalSourceTypes = new Set([
+    'vehicle_rental_customer_base_charge',
+    'vehicle_rental_owner_base_charge',
+    'vehicle_rental_customer_usage_charge',
+    'vehicle_rental_owner_usage_charge',
+]);
 
 export default function InvoiceDetailPage() {
     const id = Number(useParams().id);
@@ -52,6 +59,7 @@ export default function InvoiceDetailPage() {
     const canReverse = hasInvoicePermission(auth, invoicePermissions.reverse);
     const canCancel = hasInvoicePermission(auth, invoicePermissions.cancel);
     const canCreateVehicleServicePayment = hasPermission(auth, vehicleServicePermissions.paymentsCreate);
+    const canCreatePayment = hasPaymentPermission(auth, paymentPermissions.create);
     const [searchParams] = useSearchParams();
     const [action, setAction] = useState<InvoiceAction | null>(null);
     const [actionError, setActionError] = useState<ApiError | null>(null);
@@ -92,8 +100,13 @@ export default function InvoiceDetailPage() {
     const isServiceInvoice = value.invoice_type === 'service' && value.direction === 'outbound';
     const isSupplierInvoice = value.invoice_type === 'purchase' && value.direction === 'inbound';
     const isRetiredSourceInvoice = retiredSourceInvoiceTypes.has(value.invoice_type ?? '');
+    const hasFreshRentalSource = (value.sources ?? []).some((source) => freshRentalSourceTypes.has(source.source_type));
     const canSettleServiceInvoice = hasVehicleServiceJobContext
         && isServiceInvoice
+        && settlementStatuses.includes(value.status as typeof settlementStatuses[number])
+        && isPositiveDecimal(value.balance_due ?? '0');
+    const canSettleRentalInvoice = hasFreshRentalSource
+        && !isRetiredSourceInvoice
         && settlementStatuses.includes(value.status as typeof settlementStatuses[number])
         && isPositiveDecimal(value.balance_due ?? '0');
     const printUrl = `/invoices/${id}/print`;
@@ -157,6 +170,11 @@ export default function InvoiceDetailPage() {
                         {canSettleServiceInvoice && canCreateVehicleServicePayment ? (
                             <LinkButton to={`/vehicle-service/jobs/${vehicleServiceJobId}/payment`}>
                                 Pay this invoice
+                            </LinkButton>
+                        ) : null}
+                        {canSettleRentalInvoice && canCreatePayment ? (
+                            <LinkButton to={`/payments/create?invoice_id=${id}`}>
+                                {value.direction === 'outbound' ? 'Receive customer payment' : 'Pay owner'}
                             </LinkButton>
                         ) : null}
                         {!isRetiredSourceInvoice && value.status === 'draft' && canApprove ? (
