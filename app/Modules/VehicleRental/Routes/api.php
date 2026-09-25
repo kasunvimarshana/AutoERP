@@ -11,6 +11,7 @@ use Modules\VehicleRental\Enums\VehicleUseAction;
 use Modules\VehicleRental\Http\Controllers\AgreementController;
 use Modules\VehicleRental\Http\Controllers\BaseRentBillingController;
 use Modules\VehicleRental\Http\Controllers\DepositReceiptController;
+use Modules\VehicleRental\Http\Controllers\DriverDirectoryController;
 use Modules\VehicleRental\Http\Controllers\RunningChartController;
 use Modules\VehicleRental\Http\Controllers\UsageChargeBillingController;
 use Modules\VehicleRental\Http\Controllers\VehicleUseController;
@@ -20,6 +21,7 @@ Route::prefix('api/v1/vehicle-rental')->middleware([
     config('core.current_user.middleware_alias', 'current.user'), config('core.current_tenant.middleware_alias', 'current.tenant'),
     config('core.current_organization_unit.middleware_alias', 'current.organization-unit').':required', 'tenant.feature:'.TenantFeature::VEHICLE_RENTAL,
 ])->group(function (): void {
+    Route::get('driver-employees', [DriverDirectoryController::class, 'index']);
     Route::prefix('{kind}/agreements')->whereIn('kind', array_column(AgreementKind::cases(), 'value'))->group(function (): void {
         Route::get('/', [AgreementController::class, 'index']);
         Route::post('/', [AgreementController::class, 'store']);
