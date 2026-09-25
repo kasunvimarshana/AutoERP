@@ -178,8 +178,7 @@ final class AgreementService
                     ->whereIn('status', [VehicleUseStatus::Planned->value, VehicleUseStatus::InCustody->value])->lockForUpdate()->first(['id']) !== null) {
                     throw ValidationException::withMessages(['status' => ['Return vehicles and cancel remaining plans before closing this agreement.']]);
                 }
-                $record->status = AgreementStatus::Closed;
-                $record->closed_at = now();
+                $this->stampClosure($record, $context);
             } else {
                 throw ValidationException::withMessages(['status' => ['This action is invalid for the current state. Activated terms cannot be edited.']]);
             }
@@ -205,11 +204,18 @@ final class AgreementService
         if ($predecessor->ends_on === null || $predecessor->ends_on->toDateString() >= $successor->starts_on->toDateString()) {
             $predecessor->ends_on = $cutoff->toDateString();
         }
-        $predecessor->status = AgreementStatus::Closed;
-        $predecessor->closed_at = now();
+        $this->stampClosure($predecessor, $context);
         $predecessor->row_version++;
         $predecessor->save();
         $this->record($predecessor, $context, AgreementAction::Supersede, 'Activated successor '.$successor->reference);
+    }
+
+    private function stampClosure(Agreement $agreement, AgreementContext $context): void
+    {
+        $closedAt = now();
+        $agreement->status = AgreementStatus::Closed;
+        $agreement->closed_at = $closedAt;
+        $agreement->closed_on = $this->calendar->civilDate($context, $closedAt);
     }
 
     private function assertCutoverAvailable(AgreementKind $kind, AgreementContext $context, Agreement $predecessor, string $successorStart): void
