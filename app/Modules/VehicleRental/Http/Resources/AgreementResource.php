@@ -30,7 +30,6 @@ final class AgreementResource extends JsonResource
             'executing_on' => $this->executing_on?->toDateString(),
             'starts_on' => $this->starts_on->toDateString(),
             'ends_on' => $this->ends_on?->toDateString(),
-            'effective_coverage_ends_on' => $this->effectiveCoverageEndsOn(),
             'terms' => $this->terms,
             'notes' => $this->notes,
             'activated_at' => $this->activated_at?->toIso8601String(),
