@@ -40,11 +40,14 @@ final class RunningChartRegisterService
             ->when($until !== null, fn ($q) => $q->where('starts_at', '<', OperationalTime::database($until)))
             ->when($search !== '', fn ($q) => $q->where(function ($match) use ($search): void {
                 $pattern = '%'.$search.'%';
-                $match->where('reference', 'like', $pattern)->orWhereHas('vehicleUse', function ($use) use ($pattern): void {
-                    $use->where('vehicle_label_snapshot', 'like', $pattern)
-                        ->orWhereHas('customerAgreement', fn ($agreement) => $agreement->where('reference', 'like', $pattern)->orWhere('party_name_snapshot', 'like', $pattern))
-                        ->orWhereHas('ownerAgreement', fn ($agreement) => $agreement->where('reference', 'like', $pattern)->orWhere('party_name_snapshot', 'like', $pattern));
-                });
+                $match->where('reference', 'like', $pattern)
+                    ->orWhere('driver_name_snapshot', 'like', $pattern)
+                    ->orWhere('driver_reference_snapshot', 'like', $pattern)
+                    ->orWhereHas('vehicleUse', function ($use) use ($pattern): void {
+                        $use->where('vehicle_label_snapshot', 'like', $pattern)
+                            ->orWhereHas('customerAgreement', fn ($agreement) => $agreement->where('reference', 'like', $pattern)->orWhere('party_name_snapshot', 'like', $pattern))
+                            ->orWhereHas('ownerAgreement', fn ($agreement) => $agreement->where('reference', 'like', $pattern)->orWhere('party_name_snapshot', 'like', $pattern));
+                    });
             }))
             ->orderByDesc('starts_at')->orderByDesc('id')->paginate($perPage);
     }
