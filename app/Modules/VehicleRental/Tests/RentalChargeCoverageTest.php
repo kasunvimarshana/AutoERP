@@ -64,8 +64,10 @@ final class RentalChargeCoverageTest extends TestCase
             $charts = app(RunningChartService::class);
             $chart = $charts->create($context, $use->id, $use->row_version, [
                 'reference' => 'OVERRUN-CHART',
-                'starts_at' => '2026-09-07T22:00:00+05:30',
-                'ends_at' => '2026-09-08T01:00:00+05:30',
+                // Both inputs are September 7 in their source offset, but the workspace default UTC
+                // calendar sees the half-open usage as September 7 through September 8.
+                'starts_at' => '2026-09-07T19:00:00-04:00',
+                'ends_at' => '2026-09-07T21:00:00-04:00',
                 'normal_ot_minutes' => 60,
             ]);
             $chart = $charts->change($context, $chart->id, $chart->row_version, RunningChartAction::Finalize);
