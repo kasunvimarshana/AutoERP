@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use LogicException;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\Vehicle\Models\Vehicle;
+use Modules\VehicleRental\Constants\AgreementFields;
 use Modules\VehicleRental\Enums\VehicleUseStatus;
 
 final class VehicleUse extends TenantOwnedModel
@@ -20,7 +21,7 @@ final class VehicleUse extends TenantOwnedModel
     {
         return array_merge(parent::casts(), ['row_version' => 'integer', 'status' => VehicleUseStatus::class,
             'starts_at' => 'immutable_datetime', 'ends_at' => 'immutable_datetime', 'handed_over_at' => 'immutable_datetime', 'returned_at' => 'immutable_datetime',
-            'handover_odometer' => 'decimal:6', 'return_odometer' => 'decimal:6']);
+            'handover_odometer' => 'decimal:'.AgreementFields::DECIMAL_SCALE, 'return_odometer' => 'decimal:'.AgreementFields::DECIMAL_SCALE]);
     }
 
     public function scopeForContext(Builder $query, int $tenant, int $organization): Builder

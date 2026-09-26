@@ -13,7 +13,10 @@ use Modules\VehicleRental\Models\OwnerAgreement;
 
 final class OwnerSourceService
 {
-    public function __construct(private readonly RentalAuthorization $authorization) {}
+    public function __construct(
+        private readonly RentalAuthorization $authorization,
+        private readonly RentalCalendar $calendar,
+    ) {}
 
     public function list(AgreementContext $context, int $vehicle, array $input, int $perPage): LengthAwarePaginator
     {
@@ -23,15 +26,17 @@ final class OwnerSourceService
             'search' => ['nullable', 'string', 'max:'.AgreementFields::REFERENCE_LENGTH],
         ])->validate();
         [$start, $end] = OperationalTime::plannedPeriod($data['starts_at'], $data['ends_at']);
+        $coverageFrom = $this->calendar->civilDate($context, $start);
+        $coverageUntil = $end === null ? null : $this->calendar->civilDate($context, $end->subMicrosecond());
         $search = trim($data['search'] ?? '');
 
         return OwnerAgreement::query()->forContext($context->tenantId, $context->organizationUnitId)
             ->where('vehicle_id', $vehicle)->where('status', AgreementStatus::Active->value)
-            ->where('starts_on', '<=', $start->toDateString())
-            ->where(function ($coverage) use ($end): void {
+            ->where('starts_on', '<=', $coverageFrom)
+            ->where(function ($coverage) use ($coverageUntil): void {
                 $coverage->whereNull('ends_on');
-                if ($end !== null) {
-                    $coverage->orWhere('ends_on', '>=', $end->subSecond()->toDateString());
+                if ($coverageUntil !== null) {
+                    $coverage->orWhere('ends_on', '>=', $coverageUntil);
                 }
             })
             ->when($search !== '', fn ($q) => $q->where(fn ($terms) => $terms->where('reference', 'like', '%'.$search.'%')->orWhere('party_name_snapshot', 'like', '%'.$search.'%')))

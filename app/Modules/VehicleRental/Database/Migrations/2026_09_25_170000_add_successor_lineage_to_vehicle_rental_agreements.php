@@ -24,15 +24,22 @@ return new class extends Migration
     public function up(): void
     {
         foreach (self::TABLES as $tableName => $constraints) {
-            Schema::table($tableName, function (Blueprint $table) use ($tableName, $constraints): void {
-                $table->unsignedBigInteger('supersedes_agreement_id')->nullable()->after('organization_unit_id');
+            // The earlier upgrade migration owns the successor column and its original
+            // tenant-scoped constraints. This migration only strengthens those constraints;
+            // it must not try to create the column a second time on fresh installs.
+            Schema::table($tableName, function (Blueprint $table) use ($constraints): void {
+                $table->dropForeign($constraints['successor_foreign']);
+                $table->dropUnique($constraints['successor_unique']);
+            });
 
+            Schema::table($tableName, function (Blueprint $table) use ($tableName, $constraints): void {
                 // The scoped identity supports a self-FK that cannot point to another tenant/org.
                 $table->unique(
                     ['id', 'tenant_id', 'organization_unit_id'],
                     $constraints['identity_unique'],
                 );
-                // One agreement revision may have at most one direct successor.
+                // Agreement IDs are globally unique, so one predecessor ID can have only one
+                // direct successor regardless of tenant while the FK also enforces tenant/org scope.
                 $table->unique('supersedes_agreement_id', $constraints['successor_unique']);
                 $table->foreign(
                     ['supersedes_agreement_id', 'tenant_id', 'organization_unit_id'],
@@ -51,7 +58,21 @@ return new class extends Migration
                 $table->dropForeign($constraints['successor_foreign']);
                 $table->dropUnique($constraints['successor_unique']);
                 $table->dropUnique($constraints['identity_unique']);
-                $table->dropColumn('supersedes_agreement_id');
+            });
+
+            // Restore the exact constraints owned by the earlier upgrade migration. Its own
+            // down() remains responsible for eventually removing supersedes_agreement_id.
+            Schema::table($tableName, function (Blueprint $table) use ($tableName, $constraints): void {
+                $table->unique(
+                    ['tenant_id', 'supersedes_agreement_id'],
+                    $constraints['successor_unique'],
+                );
+                $table->foreign(
+                    ['supersedes_agreement_id', 'tenant_id'],
+                    $constraints['successor_foreign'],
+                )->references(['id', 'tenant_id'])
+                    ->on($tableName)
+                    ->restrictOnDelete();
             });
         }
     }

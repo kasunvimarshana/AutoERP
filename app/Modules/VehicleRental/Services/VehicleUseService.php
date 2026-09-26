@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\VehicleRental\Services;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -32,7 +33,8 @@ final class VehicleUseService
 {
     public function __construct(private readonly RentalAuthorization $authorization, private readonly AgreementValidation $validation,
         private readonly VehicleAvailabilityService $availability, private readonly VehicleUseAvailabilityBlocker $rentalBlocker,
-        private readonly CompanyVehicleCoverageService $companyCoverage, private readonly OdometerContinuity $odometerContinuity) {}
+        private readonly CompanyVehicleCoverageService $companyCoverage, private readonly OdometerContinuity $odometerContinuity,
+        private readonly RentalCalendar $calendar) {}
 
     public function list(AgreementContext $context, int $customerAgreement, int $perPage): LengthAwarePaginator
     {
@@ -62,14 +64,14 @@ final class VehicleUseService
             $vehicle = $this->lockVehicle($context, (int) $data['vehicle_id']);
             $customer = CustomerAgreement::query()->forContext($context->tenantId, $context->organizationUnitId)->lockForUpdate()->findOrFail($customerAgreement);
             $this->version($customer->row_version, $expectedAgreementVersion);
-            $this->coverage($customer, $start->toDateString(), $end?->subSecond()->toDateString());
+            $this->coveragePeriod($customer, $context, $start, $end);
             $owner = null;
             if (($data['owner_agreement_id'] ?? null) !== null) {
                 $owner = OwnerAgreement::query()->forContext($context->tenantId, $context->organizationUnitId)->lockForUpdate()->findOrFail($data['owner_agreement_id']);
                 if ((int) $owner->vehicle_id !== (int) $vehicle->id) {
                     throw ValidationException::withMessages(['owner_agreement_id' => ['Owner agreement must cover the selected vehicle.']]);
                 }
-                $this->coverage($owner, $start->toDateString(), $end?->subSecond()->toDateString());
+                $this->coveragePeriod($owner, $context, $start, $end);
             } elseif (! $this->companyCoverage->covers($context->tenantId, (int) $vehicle->id, OperationalTime::database($start), ($end === null ? null : OperationalTime::database($end)))) {
                 throw ValidationException::withMessages(['owner_agreement_id' => ['Select the owner agreement, or record valid company ownership in Vehicle for the full planned period.']]);
             }
@@ -118,9 +120,9 @@ final class VehicleUseService
                 if ($at->isFuture() || $at < $record->starts_at || ($record->ends_at !== null && $at >= $record->ends_at)) {
                     throw ValidationException::withMessages(['occurred_at' => ['Record an actual handover within the planned period, not a future event.']]);
                 }
-                $this->coverage($customer, $at->toDateString(), $at->toDateString());
+                $this->coverageInstant($customer, $context, $at);
                 if ($owner !== null) {
-                    $this->coverage($owner, $at->toDateString(), $at->toDateString());
+                    $this->coverageInstant($owner, $context, $at);
                 }
                 $this->assertAvailable($context, (int) $record->vehicle_id, OperationalTime::database($at), $record->ends_at?->format(OperationalFields::DATABASE_TIMESTAMP_FORMAT), (int) $record->id);
                 if ($owner === null && ! $this->companyCoverage->covers($context->tenantId, (int) $record->vehicle_id, OperationalTime::database($at), $record->ends_at?->format(OperationalFields::DATABASE_TIMESTAMP_FORMAT))) {
@@ -201,7 +203,20 @@ final class VehicleUseService
         return Vehicle::query()->where('tenant_id', $context->tenantId)->where(fn ($q) => $q->whereNull('organization_unit_id')->orWhere('organization_unit_id', $context->organizationUnitId))->lockForUpdate()->findOrFail($id);
     }
 
-    private function coverage(Agreement $agreement, string $start, ?string $end): void
+    private function coveragePeriod(Agreement $agreement, AgreementContext $context, CarbonImmutable $start, ?CarbonImmutable $end): void
+    {
+        $from = $this->calendar->civilDate($context, $start);
+        $until = $end === null ? null : $this->calendar->civilDate($context, $end->subMicrosecond());
+        $this->assertCoverage($agreement, $from, $until);
+    }
+
+    private function coverageInstant(Agreement $agreement, AgreementContext $context, CarbonImmutable $instant): void
+    {
+        $date = $this->calendar->civilDate($context, $instant);
+        $this->assertCoverage($agreement, $date, $date);
+    }
+
+    private function assertCoverage(Agreement $agreement, string $start, ?string $end): void
     {
         if ($agreement->status !== AgreementStatus::Active || $agreement->starts_on->toDateString() > $start || ($agreement->ends_on !== null && ($end === null || $agreement->ends_on->toDateString() < $end))) {
             throw ValidationException::withMessages(['agreement' => ['An active agreement must cover the complete selected period.']]);

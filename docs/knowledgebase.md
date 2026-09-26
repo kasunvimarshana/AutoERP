@@ -2,7 +2,7 @@
 
 **Status:** Canonical Vehicle Rental business/domain and production-policy reference for AutoERP.
 
-**Knowledge refresh date:** 2026-09-25
+**Knowledge refresh date:** 2026-09-26
 
 **Primary business source / conflict tie-breaker:** TACGL legacy application/data corpus
 
@@ -10,7 +10,7 @@
 
 **Authoritative engineering source:** latest `worktree-0.0.8`
 
-**Continuation review base:** `1fc9ba3ca060c09edfaba3d95d981817d501cdda`
+**Continuation review base:** `fdf660726e712595f35fd2c27f376e7e76824f64`
 
 **Architecture policy:** root `RULES.md` / `AGENTS.md`
 
@@ -250,6 +250,10 @@ Backend integrity must prevent:
 - stale state changes;
 - broken replacement lineage;
 - use conflicting with the shared Vehicle/Vehicle-Service availability contract.
+
+Agreement-day coverage for Vehicle Use planning, actual handover and Owner-source lookup is evaluated in the Configuration-owned tenant/org `localization.timezone`. The timestamp's submitted offset is preserved as operational evidence but is not the commercial-calendar authority. Planned periods are half-open: the start instant and the last covered instant before `ends_at` are converted to the workspace calendar before comparing agreement civil dates. The Owner-source selector uses the same conversion as the assignment command so lookup eligibility cannot disagree with backend enforcement around timezone boundaries.
+
+Actual return remains physical evidence and may occur after a commercial boundary. Recording that return does not extend customer or owner entitlement; automatic money remains subject to the separate commercial-coverage guard at financial handoff.
 
 ### Replacement production policy
 
@@ -529,7 +533,7 @@ Required controls include:
 - conflict instead of last-write-wins;
 - retry only by re-running the complete command and revalidating current state.
 
-Agreement revision lineage is constrained at the database layer as well as the application layer: the self foreign key includes predecessor ID, tenant ID and organization-unit ID; `supersedes_agreement_id` is unique per agreement table; and model updates cannot rewrite that lineage after successor creation.
+Agreement revision lineage is constrained at the database layer as well as the application layer: the self foreign key includes predecessor ID, tenant ID and organization-unit ID; `supersedes_agreement_id` is unique per agreement table; and model updates cannot rewrite that lineage after successor creation. The migration chain has one owner for creating `supersedes_agreement_id`; the later migration only hardens its constraints, so fresh and upgrade paths do not compete to create the same schema fact.
 
 Important competing operations:
 
@@ -541,6 +545,7 @@ Important competing operations:
 | Finalize/reverse vs bill | committed source state and financial source state cannot disagree |
 | Successor activation vs use/charge | commercial boundary cannot bisect retained operational/financial history |
 | Two successor creations | one predecessor can have at most one direct successor; database uniqueness resolves the race |
+| Client timestamp offset vs assignment/source lookup | commercial date coverage is evaluated in tenant/org `localization.timezone`; submitted offsets remain evidence, not calendar authority |
 | Physical custody overrun vs billing | preserve the actual Running Chart, but do not create automatic money outside agreement commercial coverage |
 | Manual closure vs commercial calculation | no new automatic Rental coverage may extend after immutable `closed_on` |
 | Timezone reconfiguration vs historical closure | changing `localization.timezone` cannot reinterpret an already-recorded `closed_on` boundary |
@@ -616,7 +621,7 @@ The clean schema intentionally avoids redundant bidirectional state:
 - Successor Agreement stores one predecessor link; no stored inverse link is required.
 - Financial document IDs/statuses are not duplicated as mutable Rental truth; source allocations in Invoice are authoritative.
 
-These relationships are deliberately directional and high-cohesion. Successor lineage is physically persisted and constrained in the agreement tables because the service, resource and revision lifecycle depend on that relation; this corrects the owning schema rather than adding a compatibility workaround elsewhere. The commercial-calendar correction adds only the scalar `closed_on` historical snapshot to each Rental agreement. The commercial-coverage guard adds no relationship or ledger at all; it validates immutable Rental source evidence immediately before the Invoice/AP owner-module handoff. None of these changes introduces an inverse pointer or circular module dependency.
+These relationships are deliberately directional and high-cohesion. Successor lineage is physically persisted and constrained in the agreement tables because the service, resource and revision lifecycle depend on that relation; this corrects the owning schema rather than adding a compatibility workaround elsewhere. The commercial-calendar correction adds only the scalar `closed_on` historical snapshot to each Rental agreement. Assignment/source lookup and financial-coverage calendar alignment add no schema relationship at all; they consume the same Configuration-owned calendar source. The financial-coverage guard adds no relationship or ledger; it validates immutable Rental source evidence immediately before the Invoice/AP owner-module handoff. None of these changes introduces an inverse pointer or circular module dependency.
 
 ---
 
@@ -693,7 +698,8 @@ The fresh `app/Modules/VehicleRental` implementation includes:
 - effective successor Draft/review/activation flow using the tenant/org commercial calendar;
 - immutable agreement closure snapshots (`closed_at` audit instant plus `closed_on` civil date), with effective coverage using the stricter of `ends_on` and `closed_on`;
 - closure-aware base-rent and mileage coverage so a Closed agreement cannot generate future commercial periods while historical covered periods remain available;
-- bounded/open-ended vehicle planning;
+- bounded/open-ended vehicle planning whose agreement-day coverage uses the tenant/org commercial calendar;
+- Owner-source lookup using the same tenant/org commercial calendar as Vehicle Use enforcement;
 - owner-source and company-owned paths;
 - handover/return/cancel/replacement lineage;
 - reciprocal Vehicle/Vehicle-Service availability integration;
@@ -745,15 +751,17 @@ For any future Rental change, verify at minimum:
 1. tenant/organization isolation;
 2. expected-version/stale-write behavior;
 3. DB FK/unique constraints, including successor revision scope/uniqueness;
-4. customer/owner independence;
-5. source revision snapshot correctness;
-6. duplicate-consumption rejection;
-7. reversal/reissue lineage;
-8. migration fresh-install and upgrade behavior, including immutable lifecycle-date backfill and agreement successor-lineage persistence where applicable;
-9. commercial source coverage at financial handoff, including physical overrun without automatic money;
-10. SQLite and MySQL/MariaDB transaction behavior where relevant;
-11. frontend unit/integration tests, typecheck, lint and build;
-12. authenticated browser/UAT for changed operator flows.
+4. migration ownership/order when both base and upgrade migration directories are loaded;
+5. customer/owner independence;
+6. source revision snapshot correctness;
+7. duplicate-consumption rejection;
+8. reversal/reissue lineage;
+9. migration fresh-install and upgrade behavior, including immutable lifecycle-date backfill and agreement successor-lineage persistence where applicable;
+10. tenant/org commercial-calendar consistency across agreement lifecycle, vehicle assignment/source lookup and financial coverage;
+11. commercial source coverage at financial handoff, including physical overrun without automatic money;
+12. SQLite and MySQL/MariaDB transaction behavior where relevant;
+13. frontend unit/integration tests, typecheck, lint and build;
+14. authenticated browser/UAT for changed operator flows.
 
 A change record must state which checks were actually executed. Never write "passed" for a check that was only statically reviewed.
 
@@ -770,10 +778,11 @@ When deciding Vehicle Rental behavior:
 5. Use only an explicit named policy/rate or an explicit authorized amount.
 6. Check same-side source consumption.
 7. Check tenant/org/permission/version constraints.
-8. Confirm the source supply period remains inside effective agreement commercial coverage before automatic financial handoff.
-9. Delegate financial-document, payment, tax and GL behavior to owner modules.
-10. Preserve immutable snapshots and correction lineage.
-11. If no automatic financial policy exists, create no automatic money; require an explicit governed adjustment rather than guessing.
+8. Resolve agreement civil-day coverage through the Configuration-owned tenant/org commercial calendar rather than a client timestamp offset.
+9. Confirm the source supply period remains inside effective agreement commercial coverage before automatic financial handoff.
+10. Delegate financial-document, payment, tax and GL behavior to owner modules.
+11. Preserve immutable snapshots and correction lineage.
+12. If no automatic financial policy exists, create no automatic money; require an explicit governed adjustment rather than guessing.
 
 ---
 

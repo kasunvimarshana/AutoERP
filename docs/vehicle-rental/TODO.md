@@ -1,12 +1,12 @@
 # Vehicle Rental clean rebuild — completion and acceptance ledger
 
-**Status:** Closed implementation ledger for the fresh Vehicle Rental module as reconciled on 2026-09-25.
+**Status:** Closed implementation ledger for the fresh Vehicle Rental module as reconciled on 2026-09-26.
 
 **Business authority:** TACGL primary/tie-breaker; four supplied Vehicle Rental videos authoritative for practical workflow.
 
 **Engineering authority:** latest `worktree-0.0.8`.
 
-**Continuation review base:** `1fc9ba3ca060c09edfaba3d95d981817d501cdda`.
+**Continuation review base:** `fdf660726e712595f35fd2c27f376e7e76824f64`.
 
 **Canonical domain/policy reference:** [knowledgebase.md](../knowledgebase.md).
 
@@ -66,6 +66,10 @@ This file is no longer an open list of speculative business questions. Historica
 - [x] Externally supplied vehicles require valid Owner Agreement/source coverage.
 - [x] Company-owned vehicle path does not fabricate Owner Agreement/payable data.
 - [x] Planned start/end coverage and open-ended use supported.
+- [x] Vehicle Use agreement-day coverage is evaluated in tenant/org `localization.timezone`, not the client timestamp offset.
+- [x] Owner-source lookup uses the same tenant/org commercial calendar as Vehicle Use enforcement.
+- [x] Half-open planned periods use the final covered instant before `ends_at` for agreement-day coverage.
+- [x] Actual handover coverage uses the handover instant converted to the same tenant/org commercial calendar.
 - [x] Actual handover/return evidence and odometer captured.
 - [x] Vehicle overlap rejection.
 - [x] Shared Vehicle/Vehicle-Service availability contract reused; no direct cross-module table workaround.
@@ -254,12 +258,14 @@ This file is no longer an open list of speculative business questions. Historica
 - [x] Running Chart -> HR employee is one-way and tenant-safe; HR does not depend on Rental.
 - [x] Successor Agreement -> predecessor is one-way and tenant/org-safe; no redundant inverse link.
 - [x] Agreement successor self-FKs reference scoped `(id, tenant_id, organization_unit_id)` identities and `supersedes_agreement_id` is unique per agreement table.
+- [x] Successor column creation has one migration owner; later migration only strengthens constraints, avoiding duplicate fresh-schema column creation.
 - [x] Existing cross-module composite tenant FKs continue to rely on their established scoped unique keys.
 - [x] Financial document state is not duplicated into mutable Rental columns.
 - [x] No new circular module dependency introduced.
 - [x] Closure/calendar correction adds only nullable date `closed_on` to each Rental agreement as an immutable historical snapshot; no inverse pointer or duplicate ledger is introduced.
 - [x] Upgrade migration backfills pre-existing closed rows once from the effective Configuration-owned workspace timezone and then freezes the recorded date.
 - [x] Successor-lineage schema correction is additive and Rental-owned; it persists the already-defined relationship rather than introducing a compatibility workaround in another module.
+- [x] Vehicle-use/Owner-source calendar alignment adds no schema relationship or duplicate state; both consume Configuration-owned `localization.timezone`.
 - [x] Commercial overrun protection adds no relationship or duplicate state; it is enforced at the existing Rental financial handoff boundary.
 
 ---
@@ -267,6 +273,7 @@ This file is no longer an open list of speculative business questions. Historica
 ## O. Frontend/operator acceptance contract
 
 - [x] Human-readable Customer/Supplier/Vehicle selectors.
+- [x] Owner-source selector and backend Vehicle Use eligibility apply the same tenant/org commercial-calendar coverage rule.
 - [x] Employee driver lookup uses a Rental-scoped least-privilege façade over the HR-owned employee query; HR contact data is not exposed to the selector.
 - [x] No raw database IDs in normal workflow.
 - [x] Agreement review separates Draft edit from lifecycle transitions.
@@ -307,15 +314,17 @@ The completion delta adds focused regression tests for:
 - [x] workspace timezone change after closure cannot move the stored commercial boundary;
 - [x] recorded `closed_on` cannot be rewritten after closure;
 - [x] successor cutover keeps contractual `ends_on` distinct from lifecycle `closed_on`;
-- [x] finalized physical overrun remains auditable while both customer and owner automatic usage billing outside agreement coverage roll back atomically.
+- [x] finalized physical overrun remains auditable while both customer and owner automatic usage billing outside agreement coverage roll back atomically;
+- [x] Vehicle Use planning/handover uses tenant/org commercial dates rather than submitted client-offset dates;
+- [x] Owner-source lookup returns the same tenant-calendar eligibility as Vehicle Use enforcement across offset boundaries.
 
 ### Verification evidence rule
 
 Only executed commands may be described as passed. This connector-only completion environment can inspect and mutate GitHub source but cannot materialize the full repository locally because outbound Git/GitHub checkout is DNS-blocked; GitHub Actions are intentionally not used per project instruction. Therefore executable full-suite/lint/typecheck/build/migrate results for this exact continuation delta are not fabricated here. This is an execution-environment evidence note, not an open Vehicle Rental business/code requirement.
 
-For the 2026-09-25 commercial-overrun continuation, the exact changed `RentalChargeDocuments.php` blob and the new `RentalChargeCoverageTest.php` blob were materialized locally and syntax-checked under the available PHP runtime. Static review confirms the financial guard derives the most precise immutable source period available, preserves half-open Running Chart end semantics, uses the existing `RentalCalendar` effective coverage rule, and runs before Invoice/AP document creation inside the caller's transaction.
+For the 2026-09-26 migration/calendar continuation, exact changed PHP contents were materialized and syntax-checked with the available PHP runtime. The successor hardening migration, `VehicleUse`, `VehicleUseService`, `OwnerSourceService`, `VehicleUseTenantCalendarTest` and `OwnerSourceTenantCalendarTest` all report `No syntax errors detected`. Static review confirms that the module registers both base and upgrade migration directories, successor column creation now has a single migration owner, and the later migration only strengthens/restores constraints. Vehicle Use and Owner-source lookup now use the same `RentalCalendar` tenant/org civil-date conversion already used by successor activation and financial coverage.
 
-The prior repository acceptance evidence remains historical evidence for the pre-continuation baseline. Dependency-backed Laravel/PHPUnit/frontend/MySQL suites for this new delta are not claimed as re-executed in this connector-only runtime.
+A direct checkout retry on 2026-09-26 still returned `Could not resolve host: github.com`. Dependency-backed Laravel/PHPUnit/frontend/MySQL suites for this exact delta are therefore not claimed as re-executed, and no GitHub Actions result is used as a substitute.
 
 ---
 
@@ -344,11 +353,12 @@ Vehicle Rental is considered functionally complete when the following remain tru
 8. same-side source consumption is not duplicated;
 9. company-owned vehicles do not fabricate external owner cost;
 10. no old Rental runtime or legacy magic values are reintroduced;
-11. migrations and relationships remain tenant/org-safe and directional;
+11. migrations and relationships remain tenant/org-safe, directional and single-owner for each schema fact;
 12. one-way successor lineage is physically persisted, immutable and limited to one direct successor per predecessor;
-13. no automatic Rental financial handoff can create customer or owner money outside the effective agreement commercial boundary, even when physical evidence records a real operational overrun;
-14. future-effective agreement activation uses the configured tenant/org commercial calendar rather than a process-global timezone;
-15. recorded historical closure boundaries are persisted as immutable civil dates and are not reinterpreted after timezone configuration changes;
-16. future changes preserve this ledger and record actual verification evidence rather than assuming it.
+13. Vehicle Use eligibility and Owner-source lookup resolve agreement days through the same tenant/org commercial calendar used by lifecycle and billing;
+14. no automatic Rental financial handoff can create customer or owner money outside the effective agreement commercial boundary, even when physical evidence records a real operational overrun;
+15. future-effective agreement activation uses the configured tenant/org commercial calendar rather than a process-global timezone;
+16. recorded historical closure boundaries are persisted as immutable civil dates and are not reinterpreted after timezone configuration changes;
+17. future changes preserve this ledger and record actual verification evidence rather than assuming it.
 
 There are no remaining open product-policy TODO items in this ledger. Source-access limitations and environment-specific execution evidence are documented separately and must not be converted into speculative runtime behavior.
