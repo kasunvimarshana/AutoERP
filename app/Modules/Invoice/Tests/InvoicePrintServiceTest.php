@@ -164,7 +164,7 @@ final class InvoicePrintServiceTest extends TestCase
         $this->assertSame(1, $dompdf->getCanvas()->get_page_count());
     }
 
-    public function test_service_invoice_a5_layout_is_focused_landscape_and_fits_one_page(): void
+    public function test_service_invoice_a5_layout_is_focused_portrait_and_fits_one_page(): void
     {
         [$tenantId, $organizationUnitId] = $this->scope();
         $customerId = $this->customer($tenantId, $organizationUnitId, 'A5 Compact Customer');
@@ -207,7 +207,7 @@ final class InvoicePrintServiceTest extends TestCase
         $printHtml = view('invoice.print', $prints->viewData($invoice))->render();
 
         $this->assertStringContainsString('class="layout-a5 pdf-output"', $html);
-        $this->assertStringContainsString('@page { size: A5 landscape; margin: 6mm; }', $printHtml);
+        $this->assertStringContainsString('@page { size: A5 portrait; margin: 6mm; }', $printHtml);
         $this->assertStringContainsString('Item Name', $html);
         $this->assertStringNotContainsString('>Reference<', $html);
         $this->assertStringNotContainsString('Description of Goods or Services', $html);
@@ -228,7 +228,7 @@ final class InvoicePrintServiceTest extends TestCase
         $dompdf->render();
 
         $this->assertSame(InvoicePrintLayout::CompactA5, $layout);
-        $this->assertSame('landscape', $layout->orientation());
+        $this->assertSame('portrait', $layout->orientation());
         $this->assertSame(1, $dompdf->getCanvas()->get_page_count());
     }
 
@@ -299,7 +299,7 @@ final class InvoicePrintServiceTest extends TestCase
         $this->assertSame(1, $dompdf->getCanvas()->get_page_count());
     }
 
-    public function test_purchase_invoice_uses_focused_landscape_layout_and_realized_payment_method(): void
+    public function test_purchase_invoice_uses_focused_portrait_layout_and_realized_payment_method(): void
     {
         [$tenantId, $organizationUnitId] = $this->scope();
         $customerId = $this->customer($tenantId, $organizationUnitId, 'Supplier Invoice Party');

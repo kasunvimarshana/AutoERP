@@ -23,7 +23,7 @@ enum InvoicePrintLayout: string
     {
         return match ($this) {
             self::StandardA4 => 'portrait',
-            self::CompactA5 => 'landscape',
+            self::CompactA5 => 'portrait',
         };
     }
 
