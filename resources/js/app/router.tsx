@@ -158,6 +158,9 @@ const WarehouseLocationDetailPage = lazy(
 const FastPurchasePage = lazy(
     () => import("@/modules/purchase/pages/FastPurchasePage"),
 );
+const SellingWorkspacePage = lazy(
+    () => import('@/modules/selling/pages/SellingWorkspacePage'),
+);
 const PurchaseOrderListPage = lazy(
     () => import("@/modules/purchase/pages/PurchaseOrderListPage"),
 );
@@ -647,6 +650,14 @@ const appRouter = createBrowserRouter(
                         <Route
                             path="/warehouse-locations/:id"
                             element={<WarehouseLocationDetailPage />}
+                        />
+                        <Route
+                            path="/selling"
+                            element={<SellingWorkspacePage />}
+                        />
+                        <Route
+                            path="/selling/sales/:id"
+                            element={<SellingWorkspacePage />}
                         />
                         <Route
                             path="/purchase/fast-purchase"

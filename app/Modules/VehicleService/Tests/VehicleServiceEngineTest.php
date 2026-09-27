@@ -843,17 +843,18 @@ final class VehicleServiceEngineTest extends TestCase
             'updated_at' => now(),
         ]);
 
-        $document = $this->withTenantExecutionContext(
+        $printData = $this->withTenantExecutionContext(
             (int) $context['tenant_id'],
             function () use ($invoice): array {
                 $invoice = Invoice::query()
                     ->with(['tenant', 'organizationUnit', 'lines', 'documentSnapshot'])
                     ->findOrFail($invoice->getKey());
 
-                return app(InvoicePrintService::class)->viewData($invoice)['document'];
+                return app(InvoicePrintService::class)->viewData($invoice, mode: 'pdf');
             },
         );
-        $html = view('invoice.print', ['mode' => 'pdf', 'document' => $document])->render();
+        $document = $printData['document'];
+        $html = view('invoice.print', $printData)->render();
 
         $this->assertSame($expectedFields, $document['purchaser_reference_fields']);
         $this->assertStringContainsString('Job No:</span> '.$expectedFields[0]['value'], $html);

@@ -37,6 +37,7 @@ final class TenantPlanSchema
         TenantFeature::WAREHOUSE => 'Warehouses',
         TenantFeature::INVENTORY => 'Inventory',
         TenantFeature::PURCHASE => 'Purchasing',
+        TenantFeature::SELLING => 'Selling',
         TenantFeature::VEHICLE => 'Vehicles',
         TenantFeature::VEHICLE_SERVICE => 'Vehicle service',
         TenantFeature::VEHICLE_RENTAL => 'Vehicle rental',

@@ -14,6 +14,7 @@ import { financePermissions } from "@/modules/finance/financePermissions";
 import { expensePermissions } from "@/modules/expense/expensePermissions";
 import { paymentPermissions } from "@/modules/payment/paymentPermissions";
 import { purchasePermissions } from "@/modules/purchase/purchasePermissions";
+import { sellingPermissions } from "@/modules/selling/sellingPermissions";
 import { reportingPermissions } from "@/modules/reporting/reportingPermissions";
 import { inventoryPermissions } from "@/modules/inventory/inventoryPermissions";
 import { warehousePermissions } from "@/modules/warehouse/warehousePermissions";
@@ -501,6 +502,29 @@ export const tenantNavigationSections: NavigationSection[] = [
                         access: {
                             ...operationalAccess(["inventory", "reporting"]),
                             permissions: [reportingPermissions.view],
+                        },
+                    },
+                ],
+            },
+            {
+                id: "selling",
+                type: "module",
+                label: "Selling",
+                icon: "purchase",
+                access: {
+                    ...operationalAccess(["selling", "customer", "item", "inventory", "invoice", "warehouse"]),
+                    permissions: [sellingPermissions.salesView, sellingPermissions.salesCreate, sellingPermissions.returnsView, sellingPermissions.returnsCreate],
+                },
+                children: [
+                    {
+                        id: "sales-workspace",
+                        type: "link",
+                        label: "Sales",
+                        to: "/selling",
+                        match: ["/selling"],
+                        access: {
+                            ...operationalAccess(["selling", "customer", "item", "inventory", "invoice", "warehouse"]),
+                            permissions: [sellingPermissions.salesView, sellingPermissions.salesCreate, sellingPermissions.returnsView, sellingPermissions.returnsCreate],
                         },
                     },
                 ],

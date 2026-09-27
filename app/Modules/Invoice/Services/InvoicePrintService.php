@@ -258,6 +258,7 @@ final class InvoicePrintService
         return in_array($this->enumValue($invoice->invoice_type), [
             InvoiceType::Service->value,
             InvoiceType::Purchase->value,
+            InvoiceType::Sales->value,
         ], true);
     }
 
