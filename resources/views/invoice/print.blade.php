@@ -107,6 +107,11 @@
         .signature-line { border-top: 1px dotted #333; padding-top: 3px; }
         .pdf-output { background: #fff; }
         .pdf-output .sheet { width: auto; min-height: 0; margin: 0; padding: 0; }
+        .layout-a4 { font-size: 16px; line-height: 1.3; }
+        .layout-a4 .title-box { font-size: 18px; }
+        .layout-a4 .warning,
+        .layout-a4 .muted { font-size: 12px; }
+        .layout-a4 .print-trace { font-size: 10px; }
         .layout-a5 { font-family: Arial, Helvetica, sans-serif; font-size: 8px; line-height: 1.15; }
         .layout-a5 .controls { width: 148mm; }
         .layout-a5 .sheet { width: 148mm; min-height: 210mm; padding: 6mm; }
