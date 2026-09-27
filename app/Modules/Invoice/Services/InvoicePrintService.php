@@ -154,13 +154,7 @@ final class InvoicePrintService
             InvoicePrintLayout::CONFIGURATION_KEY,
         );
 
-        $configuredLayout = InvoicePrintLayout::from((string) $value);
-
-        if ($configuredLayout === InvoicePrintLayout::CompactA5 && $this->usesFocusedPrint($invoice)) {
-            return InvoicePrintLayout::CompactA5Portrait;
-        }
-
-        return $configuredLayout;
+        return InvoicePrintLayout::from((string) $value);
     }
 
     public function filename(Invoice $invoice): string

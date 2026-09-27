@@ -110,9 +110,6 @@
         .layout-a5 { font-family: Arial, Helvetica, sans-serif; font-size: 8px; line-height: 1.15; }
         .layout-a5 .controls { width: 210mm; }
         .layout-a5 .sheet { width: 210mm; min-height: 148mm; padding: 6mm; }
-        .layout-a5-portrait .controls,
-        .layout-a5-portrait .sheet { width: 148mm; }
-        .layout-a5-portrait .sheet { min-height: 210mm; }
         .layout-a5 .field-table { margin-bottom: 3px; }
         .layout-a5 .field-table td { padding: 3px 5px; }
         .layout-a5 .field-table .gap { width: 6px; }
@@ -137,7 +134,8 @@
         @media print {
             body { background: #fff; }
             .controls { display: none !important; }
-            .sheet { width: auto; min-height: 0; margin: 0; padding: 0; }
+            .sheet,
+            .layout-a5 .sheet { width: auto; min-height: 0; margin: 0; padding: 0; }
         }
     </style>
 </head>
