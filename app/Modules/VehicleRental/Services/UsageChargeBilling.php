@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\VehicleRental\Services;
 
-use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
@@ -29,8 +28,15 @@ use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 final class UsageChargeBilling
 {
-    public function __construct(private readonly RunningChartService $charts, private readonly AgreementService $agreements,
-        private readonly RentalAuthorization $authorization, private readonly RentalChargeDocuments $documents, private readonly InvoiceSourceService $sources, private readonly MileageAllowance $mileage) {}
+    public function __construct(
+        private readonly RunningChartService $charts,
+        private readonly AgreementService $agreements,
+        private readonly RentalAuthorization $authorization,
+        private readonly RentalChargeDocuments $documents,
+        private readonly InvoiceSourceService $sources,
+        private readonly MileageAllowance $mileage,
+        private readonly RentalCalendar $calendar,
+    ) {}
 
     public function previewMileage(AgreementKind $kind, AgreementContext $context, int $chartId): array
     {
@@ -99,11 +105,12 @@ final class UsageChargeBilling
             $rate = $quote['rate'];
             $quantity = $quote['quantity'];
             $amount = $quote['amount'];
-            $start = CarbonImmutable::parse($chart->starts_at_input);
-            $end = $chart->ends_at->setTimezone($start->getTimezone());
+            $timezone = $this->calendar->timezone($context);
+            $start = $chart->starts_at->setTimezone($timezone);
+            $end = $chart->ends_at->setTimezone($timezone);
             $calculation = ['policy' => $data['policy'], 'component' => $component->value, 'label' => $component->label(),
                 'quantity' => $quantity, 'denominator' => $component->denominator(), 'rate' => $rate, 'amount' => $amount,
-                'currency' => $agreement->currency_code_snapshot,
+                'currency' => $agreement->currency_code_snapshot, 'timezone' => $timezone,
                 'agreement' => ['id' => $agreement->id, 'reference' => $agreement->reference, 'version' => $revision->row_version, 'kind' => $kind->value],
                 'chart' => ['id' => $chart->id, 'reference' => $chart->reference, 'version' => $chart->row_version,
                     'starts_at' => $chart->starts_at_input, 'ends_at' => $chart->ends_at_input],
@@ -111,7 +118,7 @@ final class UsageChargeBilling
             $charge = new $class;
             $charge->forceFill(['tenant_id' => $context->tenantId, 'organization_unit_id' => $context->organizationUnitId,
                 'agreement_id' => $agreement->id, 'running_chart_id' => $chart->id, 'component' => $component->value,
-                'period_from' => $start->toDateString(), 'period_until' => $end->toDateString(),
+                'period_from' => $start->toDateString(), 'period_until' => $end->subMicrosecond()->toDateString(),
                 'amount' => $amount, 'calculation' => $calculation, 'actor_id' => $context->actorId])->save();
 
             return $this->issue($kind, $context, $agreement, $charge, $data);
