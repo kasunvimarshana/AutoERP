@@ -45,7 +45,8 @@ final class RentalChargeDocuments
 
     public function issue(AgreementKind $kind, AgreementContext $context, Agreement $agreement, RentalCharge $charge, string $sourceType, string $description, array $data): Invoice
     {
-        $this->assertCommercialCoverage($agreement, $charge, $context);
+        [$supplyFrom, $supplyUntil] = $this->chargePeriods->resolve($charge, $context);
+        $this->assertCommercialCoverage($agreement, $supplyFrom, $supplyUntil, $context);
 
         $customer = $kind === AgreementKind::Customer;
         $source = new CreateInvoiceData(tenantId: $context->tenantId, organizationUnitId: $context->organizationUnitId,
@@ -53,11 +54,11 @@ final class RentalChargeDocuments
             invoiceDate: $data['invoice_date'], dueDate: $data['due_date'] ?? null, currencyId: $agreement->currency_id, exchangeRate: $data['exchange_rate'],
             partyType: $customer ? InvoicePartyType::Customer->value : InvoicePartyType::Supplier->value,
             partyId: $customer ? $agreement->customer_id : $agreement->supplier_id, createdBy: $context->actorId,
-            supplyPeriodStart: $charge->calculation['supply_from'] ?? $charge->period_from, supplyPeriodEnd: $charge->calculation['supply_until'] ?? $charge->period_until,
+            supplyPeriodStart: $supplyFrom, supplyPeriodEnd: $supplyUntil,
             lines: [new InvoiceLineData(lineNumber: self::FIRST_LINE, description: $description, quantity: self::WHOLE_CHARGE,
                 unitPrice: $charge->amount, lineType: InvoiceLineType::Service, sourceLineType: $sourceType, sourceLineId: $charge->id)],
             sources: [new InvoiceSourceData(tenantId: $context->tenantId, organizationUnitId: $context->organizationUnitId, sourceType: $sourceType, sourceId: $charge->id,
-                sourceDocumentNumber: $agreement->reference, sourceDocumentDate: $charge->period_from, sourceSubtotal: $charge->amount, sourceGrandTotal: $charge->amount)],
+                sourceDocumentNumber: $agreement->reference, sourceDocumentDate: $supplyFrom, sourceSubtotal: $charge->amount, sourceGrandTotal: $charge->amount)],
             sourceLines: [new InvoiceSourceLineData(tenantId: $context->tenantId, organizationUnitId: $context->organizationUnitId, sourceType: $sourceType, sourceId: $charge->id,
                 sourceLineType: $sourceType, sourceLineId: $charge->id, sourceQuantity: self::WHOLE_CHARGE, invoicedQuantity: self::WHOLE_CHARGE,
                 sourceUnitPrice: $charge->amount, sourceLineTotal: $charge->amount, invoicedLineTotal: $charge->amount)]);
@@ -112,9 +113,8 @@ final class RentalChargeDocuments
         $charge->forceFill(['voided_at' => now(), 'voided_by' => $context->actorId, 'void_reason' => trim($data['reason']), 'row_version' => $charge->row_version + 1])->save();
     }
 
-    private function assertCommercialCoverage(Agreement $agreement, RentalCharge $charge, AgreementContext $context): void
+    private function assertCommercialCoverage(Agreement $agreement, string $from, string $until, AgreementContext $context): void
     {
-        [$from, $until] = $this->chargePeriods->resolve($charge, $context);
         $agreementStart = $agreement->starts_on->toDateString();
         $agreementEnd = $this->calendar->coverageEnd($agreement, $context);
 
