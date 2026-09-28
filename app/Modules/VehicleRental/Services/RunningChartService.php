@@ -142,6 +142,10 @@ final class RunningChartService
             ->where('status', RunningChartStatus::Finalized->value)
             ->where('starts_at', '<', $chart->ends_at)
             ->where('ends_at', '>', $chart->starts_at)
+            // Use a current/locking read after waiting on the identity timeline. A normal
+            // REPEATABLE READ snapshot can miss a competing finalization that committed while
+            // this transaction was blocked on the driver mutex.
+            ->lockForUpdate()
             ->first(['id']) !== null) {
             throw new ConflictHttpException('This driver already has finalized Rental usage during the selected period.');
         }
