@@ -18,6 +18,7 @@ use Modules\Inventory\Services\BatchTrackingService;
 use Modules\Inventory\Services\SellableBatchLookupService;
 use Modules\Inventory\Services\StockMovementService;
 use Modules\Inventory\Services\StockReservationService;
+use Modules\Inventory\Services\WarehouseItemAvailabilityLookup;
 use Modules\Item\Enums\ItemPriceType;
 use Modules\Item\Enums\TrackingType;
 use Tests\Support\CurrencyFixture;
@@ -108,6 +109,16 @@ final class InventoryBatchManagementTest extends InventoryTestCase
         $this->assertSame('20.000000', $newBatchOption?->resolved_service_unit_price);
         $this->assertSame(2.0, (float) $newBatchOption?->available_stock_quantity);
         $this->assertSame(1.0, (float) $newBatchOption?->reserved_stock_quantity);
+        $warehouseBatches = $this->withTenantExecutionContext($tenantId, fn () => app(WarehouseItemAvailabilityLookup::class)->availableBatchesByItemIds(
+            [(int) $item->getKey()],
+            $tenantId,
+            null,
+            $warehouseId,
+        ));
+        $this->assertSame([
+            ['batch_number' => 'NEW-PRICE', 'lot_number' => null, 'available_quantity' => '2.000000'],
+            ['batch_number' => 'OLD-PRICE', 'lot_number' => null, 'available_quantity' => '2.000000'],
+        ], $warehouseBatches[(int) $item->getKey()]);
         $serializedOption = (new SellableBatchOptionResource($newBatchOption))->toArray(Request::create('/'));
         $this->assertSame('1.000000', $serializedOption['reserved_stock_quantity']);
         $this->assertSame('4.000000', $serializedOption['reorder_level']);

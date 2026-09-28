@@ -31,6 +31,12 @@ Route::prefix('api/v1')
         Route::get('warehouses/default', [WarehouseController::class, 'defaultWarehouse'])
             ->middleware($requires(WarehouseAuthorizationService::WAREHOUSES_VIEW))
             ->name('warehouses.default');
+        Route::get('warehouses/automatic-source', [WarehouseController::class, 'automaticSource'])
+            ->middleware([
+                $requires(WarehouseAuthorizationService::WAREHOUSES_VIEW),
+                $requires(WarehouseAuthorizationService::LOCATIONS_VIEW),
+            ])
+            ->name('warehouses.automatic-source');
         Route::patch('warehouses/{warehouse}/activate', [WarehouseController::class, 'activate'])
             ->whereNumber('warehouse')
             ->middleware($requires(WarehouseAuthorizationService::WAREHOUSES_ACTIVATE))

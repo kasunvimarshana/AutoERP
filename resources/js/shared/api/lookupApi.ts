@@ -29,8 +29,15 @@ export interface ItemLookupResource extends NamedResource {
     is_stockable?: boolean;
     is_combo?: boolean;
     resolved_service_unit_price?: string | null;
+    resolved_sales_unit_price?: string | null;
+    tenant_base_currency?: (NamedResource & { symbol?: string | null }) | null;
     resolved_purchase_unit_price?: string | null;
     available_stock_quantity?: string | null;
+    available_batches?: Array<{
+        batch_number: string;
+        lot_number: string | null;
+        available_quantity: string;
+    }>;
     reserved_stock_quantity?: string | null;
     reorder_level?: string | null;
     batch?: (NamedResource & { batch_number?: string; lot_number?: string; expiry_date?: string | null }) | null;
@@ -44,8 +51,11 @@ const lookup = <T extends NamedResource = NamedResource>(
 ): Promise<LookupResult<T>> =>
     requestLookup<T>(url, params);
 
-const itemLookup = (url: string, params: LookupLoadParams): Promise<LookupResult<ItemLookupResource>> =>
-    requestLookup<ItemLookupResource>(url, params);
+const itemLookup = (
+    url: string,
+    params: LookupLoadParams,
+    filters: Record<string, string | number | boolean | null | undefined> = {},
+): Promise<LookupResult<ItemLookupResource>> => requestLookup<ItemLookupResource>(url, params, filters);
 
 async function mappedLookup<T extends NamedResource>(
     url: string,
@@ -72,6 +82,15 @@ export const lookupApi = {
     }),
     // Stock quantities are live transactional data and must not be served from the lookup cache.
     stockableItems: (params: LookupLoadParams) => itemLookup(`${endpoints.items}/lookup/stockable`, params),
+    sellingStockableItems: (params: LookupLoadParams, warehouseId: number | null, saleDate: string, warehouseLocationId: number | null) => itemLookup(
+        `${endpoints.selling}/items/lookup`,
+        params,
+        {
+            ...(warehouseId === null ? {} : { warehouse_id: warehouseId }),
+            ...(warehouseLocationId === null ? {} : { warehouse_location_id: warehouseLocationId }),
+            sale_date: saleDate,
+        },
+    ),
     untrackedStockableItems: (params: LookupLoadParams) => itemLookup(`${endpoints.items}/lookup/untracked-stockable`, params),
     batchTrackedStockableItems: (params: LookupLoadParams) => itemLookup(`${endpoints.items}/lookup/batch-tracked-stockable`, params),
     serviceBatchItems: (params: LookupLoadParams) => itemLookup(`${endpoints.inventory}/batches/service-options`, params),

@@ -24,12 +24,14 @@ use Modules\Item\Enums\ItemPriceType;
 use Modules\Item\Enums\ItemType;
 use Modules\Item\Enums\TrackingType;
 use Modules\Item\Models\Item;
+use Modules\Item\Services\ItemAuthorizationService;
 use Modules\Item\Services\ItemCreationService;
 use Modules\Item\Services\ItemPriceService;
 use Modules\Selling\Services\SalePostingService;
 use Modules\Selling\Services\SaleReturnPostingService;
 use Modules\Selling\Services\SellingAuthorizationService;
 use Modules\Tenant\Models\TenantModel;
+use Modules\Warehouse\Services\WarehouseAuthorizationService;
 use Tests\Support\ActiveTenantSubscriptionFixture;
 use Tests\Support\CurrencyFixture;
 use Tests\Support\FinancePostingFixture;
@@ -65,6 +67,58 @@ final class SellingWorkflowTest extends TestCase
             ->assertNotFound();
     }
 
+    public function test_item_lookup_shows_stock_available_in_the_selected_warehouse(): void
+    {
+        $context = $this->context();
+        $token = $this->authenticateSalesViewer($context['tenant_id'], true);
+
+        $this->withTenantExecutionContext($context['tenant_id'], function () use ($context): void {
+            $otherLocationId = (int) DB::table('warehouse_locations')->insertGetId([
+                'tenant_id' => $context['tenant_id'],
+                'warehouse_id' => $context['warehouse_id'],
+                'name' => 'Other location '.$context['tenant_id'],
+                'code' => 'LOC-OTHER-'.$context['tenant_id'],
+                'type' => 'bin',
+                'is_active' => true,
+                'is_pickable' => true,
+                'is_receivable' => true,
+                'is_default' => false,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+            foreach ([[$context['warehouse_id'], $context['location_id'], '5.000000'], [$context['warehouse_id'], $otherLocationId, '9.000000']] as [$warehouseId, $warehouseLocationId, $quantity]) {
+                app(StockMovementService::class)->record(new StockMovementData(
+                    tenantId: $context['tenant_id'],
+                    movementDate: '2026-09-26',
+                    movementType: InventoryMovementType::Receipt,
+                    direction: InventoryDirection::In,
+                    itemId: $context['item_id'],
+                    warehouseId: $warehouseId,
+                    warehouseLocationId: $warehouseLocationId,
+                    quantity: $quantity,
+                    unitCost: '20.000000',
+                    uomId: $context['uom_id'],
+                ));
+            }
+        });
+
+        $this->withToken($token)
+            ->withHeader('X-Tenant-Id', (string) $context['tenant_id'])
+            ->getJson('/api/v1/selling/items/lookup?warehouse_id='.$context['warehouse_id'].'&warehouse_location_id='.$context['location_id'].'&sale_date=2026-09-26&search=Sales')
+            ->assertOk()
+            ->assertJsonPath('data.0.id', $context['item_id'])
+            ->assertJsonPath('data.0.available_stock_quantity', '5.000000')
+            ->assertJsonPath('data.0.resolved_sales_unit_price', '100.000000')
+            ->assertJsonPath('data.0.available_batches', []);
+
+        $this->withToken($token)
+            ->withHeader('X-Tenant-Id', (string) $context['tenant_id'])
+            ->getJson('/api/v1/warehouses/automatic-source')
+            ->assertOk()
+            ->assertJsonPath('data.warehouse.id', $context['warehouse_id'])
+            ->assertJsonPath('data.location.id', $context['location_id']);
+    }
+
     public function test_sale_posts_invoice_and_stock_atomically_and_return_records_credit_note(): void
     {
         $context = $this->context();
@@ -78,6 +132,7 @@ final class SellingWorkflowTest extends TestCase
                 direction: InventoryDirection::In,
                 itemId: $context['item_id'],
                 warehouseId: $context['warehouse_id'],
+                warehouseLocationId: $context['location_id'],
                 quantity: '5.000000',
                 unitCost: '20.000000',
                 uomId: $context['uom_id'],
@@ -88,6 +143,7 @@ final class SellingWorkflowTest extends TestCase
                 'organization_unit_id' => null,
                 'customer_id' => $context['customer_id'],
                 'warehouse_id' => $context['warehouse_id'],
+                'warehouse_location_id' => $context['location_id'],
                 'sale_date' => '2026-09-26',
                 'lines' => [[
                     'item_id' => $context['item_id'],
@@ -105,6 +161,10 @@ final class SellingWorkflowTest extends TestCase
             $this->assertSame('200.000000', (string) $sale->invoice->grand_total);
             $this->assertTrue(app(InvoicePrintService::class)->viewData($sale->invoice)['document']['uses_focused_print']);
             $this->assertSame(1, InventoryMovement::query()->where('source_type', 'sale')->count());
+            $this->assertDatabaseHas('inventory_movements', [
+                'source_type' => 'sale',
+                'warehouse_location_id' => $context['location_id'],
+            ]);
             $this->assertSame('3.000000', (string) InventoryStockBalance::query()->firstOrFail()->quantity_on_hand);
 
             try {
@@ -190,6 +250,19 @@ final class SellingWorkflowTest extends TestCase
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+        $locationId = (int) DB::table('warehouse_locations')->insertGetId([
+            'tenant_id' => $tenantId,
+            'warehouse_id' => $warehouseId,
+            'name' => 'Default location '.$suffix,
+            'code' => 'LOC-'.$suffix,
+            'type' => 'bin',
+            'is_active' => true,
+            'is_pickable' => true,
+            'is_receivable' => true,
+            'is_default' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
         $customerId = (int) DB::table('customers')->insertGetId([
             'tenant_id' => $tenantId,
             'customer_number' => 'CUS-'.$suffix,
@@ -224,12 +297,13 @@ final class SellingWorkflowTest extends TestCase
             'tenant_id' => $tenantId,
             'customer_id' => $customerId,
             'warehouse_id' => $warehouseId,
+            'location_id' => $locationId,
             'uom_id' => $uomId,
             'item_id' => (int) $item->getKey(),
         ];
     }
 
-    private function authenticateSalesViewer(int $tenantId): string
+    private function authenticateSalesViewer(int $tenantId, bool $canCreate = false): string
     {
         ActiveTenantSubscriptionFixture::create($tenantId, [
             'selling',
@@ -274,16 +348,29 @@ final class SellingWorkflowTest extends TestCase
             'created_at' => now(),
             'updated_at' => now(),
         ]);
-        foreach ([
+        $permissions = [
             SellingAuthorizationService::SALES_VIEW,
             SellingAuthorizationService::RETURNS_VIEW,
-        ] as $permission) {
+        ];
+        $descriptions = SellingAuthorizationService::descriptions();
+        if ($canCreate) {
+            $permissions[] = SellingAuthorizationService::SALES_CREATE;
+            $permissions[] = ItemAuthorizationService::VIEW;
+            $permissions[] = WarehouseAuthorizationService::WAREHOUSES_VIEW;
+            $permissions[] = WarehouseAuthorizationService::LOCATIONS_VIEW;
+            $descriptions = [
+                ...$descriptions,
+                ...ItemAuthorizationService::descriptions(),
+                ...WarehouseAuthorizationService::descriptions(),
+            ];
+        }
+        foreach ($permissions as $permission) {
             $permissionId = (int) DB::table('permissions')->insertGetId([
                 'tenant_id' => $tenantId,
                 'name' => $permission,
                 'guard_name' => 'auth-api',
                 'module' => 'selling',
-                'description' => SellingAuthorizationService::descriptions()[$permission],
+                'description' => $descriptions[$permission],
                 'row_version' => 1,
                 'created_at' => now(),
                 'updated_at' => now(),

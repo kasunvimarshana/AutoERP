@@ -325,32 +325,10 @@ final class VehicleServiceInventoryIntegrationService
     /** @return array{WarehouseModel|null, WarehouseLocationModel|null} */
     private function automaticSource(VehicleServiceJob $job): array
     {
-        $warehouse = $this->warehouseDefaults->resolveDefaultWarehouse(
+        return $this->warehouseDefaults->resolveAutomaticSource(
             (int) $job->tenant_id,
             $job->organization_unit_id,
         );
-        if (! $warehouse instanceof WarehouseModel && $job->organization_unit_id !== null) {
-            $warehouse = $this->warehouseDefaults->resolveDefaultWarehouse((int) $job->tenant_id, null);
-        }
-        if (! $warehouse instanceof WarehouseModel) {
-            $warehouses = WarehouseModel::query()
-                ->forTenant((int) $job->tenant_id, $job->organization_unit_id)
-                ->where('is_active', true)
-                ->orderBy('id')
-                ->limit(2)
-                ->get();
-            $warehouse = $warehouses->count() === 1 ? $warehouses->first() : null;
-        }
-
-        $location = $warehouse instanceof WarehouseModel
-            ? $this->warehouseDefaults->resolveDefaultLocation($warehouse)
-            : null;
-        if ($warehouse instanceof WarehouseModel && ! $location instanceof WarehouseLocationModel) {
-            $locations = $warehouse->locations()->where('is_active', true)->orderBy('id')->limit(2)->get();
-            $location = $locations->count() === 1 ? $locations->first() : null;
-        }
-
-        return [$warehouse, $location];
     }
 
     private function assertInsideJobTransaction(): void

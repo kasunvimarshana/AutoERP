@@ -10,6 +10,54 @@ use Modules\Warehouse\Models\WarehouseModel;
 
 final class WarehouseDefaultResolver
 {
+    /** @return array{WarehouseModel|null, WarehouseLocationModel|null} */
+    public function resolveAutomaticSource(
+        int $tenantId,
+        ?int $organizationUnitId,
+        ?int $warehouseId = null,
+    ): array {
+        $warehouse = $warehouseId === null
+            ? $this->resolveDefaultWarehouse($tenantId, $organizationUnitId)
+            : WarehouseModel::query()
+                ->forTenant($tenantId, $organizationUnitId)
+                ->where('is_active', true)
+                ->find($warehouseId);
+
+        if ($warehouseId !== null && $warehouse === null) {
+            return [null, null];
+        }
+
+        if (! $warehouse instanceof WarehouseModel && $organizationUnitId !== null) {
+            $warehouse = $this->resolveDefaultWarehouse($tenantId, null);
+        }
+
+        if (! $warehouse instanceof WarehouseModel) {
+            $warehouses = WarehouseModel::query()
+                ->forTenant($tenantId, $organizationUnitId)
+                ->where('is_active', true)
+                ->orderBy('id')
+                ->limit(2)
+                ->get();
+            $warehouse = $warehouses->count() === 1 ? $warehouses->first() : null;
+        }
+
+        if (! $warehouse instanceof WarehouseModel) {
+            return [null, null];
+        }
+
+        $location = $this->resolveDefaultLocation($warehouse);
+        if (! $location instanceof WarehouseLocationModel) {
+            $locations = $warehouse->locations()
+                ->where('is_active', true)
+                ->orderBy('id')
+                ->limit(2)
+                ->get();
+            $location = $locations->count() === 1 ? $locations->first() : null;
+        }
+
+        return [$warehouse, $location];
+    }
+
     public function resolveDefaultWarehouse(int $tenantId, ?int $organizationUnitId): ?WarehouseModel
     {
         return WarehouseModel::query()

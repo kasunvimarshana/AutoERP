@@ -18,6 +18,10 @@ $permissionMiddleware = (string) config('user.tenant.permission_middleware_alias
 $requires = static fn (string $permission): string => $permissionMiddleware.':'.$permission;
 
 Route::prefix('api/v1/selling')->middleware($middleware)->name('api.v1.selling.')->group(function () use ($requires): void {
+    Route::get('items/lookup', [SaleController::class, 'itemLookup'])->middleware([
+        'tenant.feature:item',
+        $requires(SellingAuthorizationService::SALES_CREATE),
+    ])->name('items.lookup');
     Route::get('sales', [SaleController::class, 'index'])->middleware($requires(SellingAuthorizationService::SALES_VIEW))->name('sales.index');
     Route::post('sales', [SaleController::class, 'store'])->middleware($requires(SellingAuthorizationService::SALES_CREATE))->name('sales.store');
     Route::get('sales/{sale}', [SaleController::class, 'show'])->whereNumber('sale')->middleware([

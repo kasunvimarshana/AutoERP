@@ -3,6 +3,7 @@ import type { ApiCollection, ApiResource } from '@/shared/types/api';
 import type { LookupLoadParams, LookupResult } from '@/shared/types/lookup';
 import type { NamedResource } from '@/shared/types/common';
 import { requestLookup } from '@/shared/api/lookupRequest';
+import { endpoints } from '@/shared/api/endpoints';
 
 export interface SaleLine {
     id: number;
@@ -28,6 +29,7 @@ export interface SaleDocument {
     status: string;
     customer: (NamedResource & { customer_number: string }) | null;
     warehouse: NamedResource | null;
+    warehouse_location: NamedResource | null;
     lines: SaleLine[];
     invoice: { id: number; number: string; status: string; grand_total: string; balance_due: string } | null;
     returns?: Array<{ id: number; number: string; date: string; reason: string; credit_amount: string; credit_allocated_amount: string; credit_available_amount: string; lines: Array<{ sale_line_id: number; quantity: string; credit_amount: string }> }>;
@@ -36,6 +38,7 @@ export interface SaleDocument {
 export interface SalePayload {
     customer_id: number;
     warehouse_id: number;
+    warehouse_location_id?: number;
     sale_date: string;
     due_date?: string;
     lines: Array<{ item_id: number; uom_id: number; quantity: string; item_variant_id?: number; batch_id?: number; serial_number_id?: number }>;
@@ -72,4 +75,25 @@ export function searchSellingCustomers(params: LookupLoadParams): Promise<Lookup
 
 export function searchSellingWarehouses(params: LookupLoadParams): Promise<LookupResult<NamedResource>> {
     return requestLookup('/api/v1/warehouses', params, { is_active: true });
+}
+
+export interface SellingWarehouseSource {
+    warehouse: NamedResource | null;
+    location: NamedResource | null;
+}
+
+export async function getSellingWarehouseSource(warehouseId?: number, signal?: AbortSignal): Promise<SellingWarehouseSource> {
+    const response = await apiClient.get<ApiResource<SellingWarehouseSource>>(`${endpoints.warehouses}/automatic-source`, {
+        signal,
+        params: warehouseId ? { warehouse_id: warehouseId } : undefined,
+    });
+
+    return response.data.data;
+}
+
+export function searchSellingLocations(params: LookupLoadParams, warehouseId?: number | null): Promise<LookupResult<NamedResource>> {
+    return requestLookup(endpoints.warehouseLocations, params, {
+        warehouse_id: warehouseId ?? undefined,
+        is_active: true,
+    });
 }

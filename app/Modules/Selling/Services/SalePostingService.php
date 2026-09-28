@@ -95,7 +95,7 @@ final class SalePostingService
                     throw new InvalidArgumentException('Completed sale request has no sale reference.');
                 }
 
-                return Sale::query()->with(['customer', 'warehouse', 'lines.item', 'lines.uom', 'invoice'])
+                return Sale::query()->with(['customer', 'warehouse', 'warehouseLocation', 'lines.item', 'lines.uom', 'invoice'])
                     ->where('tenant_id', $tenantId)->findOrFail((int) $saleId);
             }
             if (! $idempotency->wasRecentlyCreated || $idempotency->status !== IdempotencyStatus::InProgress) {

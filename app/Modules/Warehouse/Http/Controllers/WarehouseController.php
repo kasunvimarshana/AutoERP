@@ -10,7 +10,9 @@ use Modules\Core\DTOs\PagedResult;
 use Modules\Core\Results\Error;
 use Modules\Core\Results\Result;
 use Modules\Warehouse\Http\Requests\ListWarehouseRequest;
+use Modules\Warehouse\Http\Requests\ResolveWarehouseSourceRequest;
 use Modules\Warehouse\Http\Requests\UpsertWarehouseRequest;
+use Modules\Warehouse\Http\Resources\WarehouseLocationResource;
 use Modules\Warehouse\Http\Resources\WarehouseResource;
 use Modules\Warehouse\Models\WarehouseModel;
 use Modules\Warehouse\Services\WarehouseAuthorizationService;
@@ -146,6 +148,29 @@ final class WarehouseController extends Controller
             'data' => $warehouse instanceof WarehouseModel
                 ? (new WarehouseResource($warehouse->load(['organizationUnit', 'defaultLocation'])->loadCount('locations')))->resolve($request)
                 : null,
+        ]);
+    }
+
+    public function automaticSource(ResolveWarehouseSourceRequest $request): JsonResponse
+    {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), WarehouseAuthorizationService::WAREHOUSES_VIEW);
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), WarehouseAuthorizationService::LOCATIONS_VIEW);
+
+        [$warehouse, $location] = $this->defaults->resolveAutomaticSource(
+            $request->tenantId(),
+            $request->organizationUnitId(),
+            $request->filled('warehouse_id') ? (int) $request->validated('warehouse_id') : null,
+        );
+
+        return response()->json([
+            'data' => [
+                'warehouse' => $warehouse instanceof WarehouseModel
+                    ? (new WarehouseResource($warehouse->load(['organizationUnit', 'defaultLocation'])))->resolve($request)
+                    : null,
+                'location' => $location === null
+                    ? null
+                    : (new WarehouseLocationResource($location->load(['warehouse', 'parent', 'organizationUnit'])))->resolve($request),
+            ],
         ]);
     }
 

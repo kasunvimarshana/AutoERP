@@ -25,6 +25,7 @@ export const endpoints = {
     itemBrands: '/api/v1/item-brands',
     inventory: '/api/v1/inventory',
     purchase: '/api/v1/purchase',
+    selling: '/api/v1/selling',
     invoices: '/api/v1/invoices',
     payments: '/api/v1/payments',
     expenses: '/api/v1/expenses',

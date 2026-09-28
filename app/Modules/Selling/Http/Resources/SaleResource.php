@@ -30,6 +30,11 @@ final class SaleResource extends JsonResource
                 'id' => (int) $this->warehouse->getKey(),
                 'name' => $this->warehouse->name,
             ]),
+            'warehouse_location' => $this->whenLoaded('warehouseLocation', fn (): ?array => $this->warehouseLocation === null ? null : [
+                'id' => (int) $this->warehouseLocation->getKey(),
+                'code' => $this->warehouseLocation->code,
+                'name' => $this->warehouseLocation->name,
+            ]),
             'lines' => $this->whenLoaded('lines', fn (): array => $this->lines->map(static fn ($line): array => [
                 'id' => (int) $line->getKey(),
                 'line_number' => (int) $line->line_number,
