@@ -8,7 +8,7 @@ export function formatQuantity(
     if (!match) return '0';
 
     const integer = (match[2].replace(/^0+(?=\d)/, '') || '0').replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-    const safePrecision = Math.max(0, precision);
+    const safePrecision = Math.min(Math.max(0, precision), 3);
     const safeMinimumPrecision = Math.min(Math.max(0, minimumPrecision), safePrecision);
     const significantFraction = (match[3] ?? '').slice(0, safePrecision).replace(/0+$/, '');
     const fraction = significantFraction.padEnd(safeMinimumPrecision, '0');

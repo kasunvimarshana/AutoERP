@@ -3,6 +3,7 @@ import { lookupApi, type ItemLookupResource } from '@/shared/api/lookupApi';
 import { Button } from '@/shared/components/Button';
 import { Input } from '@/shared/components/Input';
 import { LookupSelect } from '@/shared/components/LookupSelect';
+import { MoneyDisplay } from '@/shared/components/MoneyDisplay';
 import type { LookupLoadParams, LookupResult } from '@/shared/types/lookup';
 import type { VehicleServiceLineSourceType } from '../../vehicleServiceTypes';
 import {
@@ -209,7 +210,7 @@ function ItemOption({ option, active }: { option: ItemLookupResource; active: bo
                     <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
                         <span className="font-medium text-sky-700">Batch {option.batch.batch_number ?? option.batch.code}{option.batch.lot_number ? ` / Lot ${option.batch.lot_number}` : ''}</span>
                         <span className={stockNoticeClass(option)}>{stockNotice(option)}</span>
-                        <span className="font-semibold text-emerald-700">Service price: {option.resolved_service_unit_price ?? '0.000000'}</span>
+                        <span className="font-semibold text-emerald-700">Service price: <MoneyDisplay value={option.resolved_service_unit_price ?? '0'} /></span>
                     </div>
                 ) : (
                     <div className={`mt-1 text-xs ${stockNoticeClass(option)}`}>{stockNotice(option)}</div>

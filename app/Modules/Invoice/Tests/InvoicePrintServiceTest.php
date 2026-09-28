@@ -204,8 +204,10 @@ final class InvoicePrintServiceTest extends TestCase
             mode: 'pdf',
             printContext: $context,
         ))->render();
+        $printHtml = view('invoice.print', $prints->viewData($invoice))->render();
 
-        $this->assertStringContainsString('layout-a5-portrait', $html);
+        $this->assertStringContainsString('class="layout-a5 pdf-output"', $html);
+        $this->assertStringContainsString('@page { size: A5 portrait; margin: 6mm; }', $printHtml);
         $this->assertStringContainsString('Item Name', $html);
         $this->assertStringNotContainsString('>Reference<', $html);
         $this->assertStringNotContainsString('Description of Goods or Services', $html);
@@ -225,7 +227,7 @@ final class InvoicePrintServiceTest extends TestCase
         $dompdf->setPaper($layout->paperSize(), $layout->orientation());
         $dompdf->render();
 
-        $this->assertSame(InvoicePrintLayout::CompactA5Portrait, $layout);
+        $this->assertSame(InvoicePrintLayout::CompactA5, $layout);
         $this->assertSame('portrait', $layout->orientation());
         $this->assertSame(1, $dompdf->getCanvas()->get_page_count());
     }
@@ -328,7 +330,7 @@ final class InvoicePrintServiceTest extends TestCase
         $data = $prints->viewData($invoice, mode: 'pdf');
         $html = view('invoice.print', $data)->render();
 
-        $this->assertSame(InvoicePrintLayout::CompactA5Portrait, $prints->layout($invoice));
+        $this->assertSame(InvoicePrintLayout::CompactA5, $prints->layout($invoice));
         $this->assertSame('Cash', $data['document']['resolved_payment_mode']);
         $this->assertSame('Brake Pad', $data['document']['lines'][0]['display_name']);
         $this->assertStringContainsString('Mode of Payment:</span> Cash', $html);

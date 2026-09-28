@@ -121,7 +121,7 @@ function DocumentSettingsEditor({
                 value={value}
                 options={[
                     { value: STANDARD_A4, label: 'A4 Standard - Portrait' },
-                    { value: COMPACT_A5, label: 'A5 Compact - Landscape' },
+                    { value: COMPACT_A5, label: 'A5 Compact - Portrait' },
                 ]}
                 hint="This changes the paper layout only. Issued invoice values and legal snapshots remain unchanged."
                 onChange={(event) => setValue(event.target.value)}
