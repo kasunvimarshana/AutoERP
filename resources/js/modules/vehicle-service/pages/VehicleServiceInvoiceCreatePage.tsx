@@ -9,6 +9,8 @@ import { DetailGrid } from '@/shared/components/DetailGrid';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
 import { LoadingState } from '@/shared/components/LoadingState';
+import { MoneyDisplay } from '@/shared/components/MoneyDisplay';
+import { QuantityDisplay } from '@/shared/components/QuantityDisplay';
 import { Panel } from '@/shared/components/Panel';
 import { Textarea } from '@/shared/components/Textarea';
 import { useApi } from '@/shared/hooks/useApi';
@@ -76,9 +78,9 @@ function VehicleServiceInvoiceEditor({ jobId, job, billableLines, loadError }: {
                 <DataTable rows={billableLines} rowKey={(line) => line.id} columns={[
                     { key: 'line', header: 'Line', render: (line) => line.line_number },
                     { key: 'description', header: 'Description', render: (line) => line.description },
-                    { key: 'quantity', header: 'Job quantity', render: (line) => line.quantity },
-                    { key: 'invoiced', header: 'Already invoiced', render: (line) => line.invoiced_quantity ?? '0.000000' },
-                    { key: 'remaining', header: 'Remaining', render: (line) => line.remaining_billable_quantity ?? line.quantity },
+                    { key: 'quantity', header: 'Job quantity', render: (line) => <QuantityDisplay value={line.quantity} minimumPrecision={2} /> },
+                    { key: 'invoiced', header: 'Already invoiced', render: (line) => <QuantityDisplay value={line.invoiced_quantity ?? '0'} minimumPrecision={2} /> },
+                    { key: 'remaining', header: 'Remaining', render: (line) => <QuantityDisplay value={line.remaining_billable_quantity ?? line.quantity} minimumPrecision={2} /> },
                     {
                         key: 'invoice',
                         header: 'Invoice now',
@@ -95,8 +97,8 @@ function VehicleServiceInvoiceEditor({ jobId, job, billableLines, loadError }: {
                                 />
                             ),
                     },
-                    { key: 'price', header: 'Unit price', render: (line) => line.unit_price },
-                    { key: 'total', header: 'Total', render: (line) => line.line_total },
+                    { key: 'price', header: 'Unit price', render: (line) => <MoneyDisplay value={line.unit_price} /> },
+                    { key: 'total', header: 'Total', render: (line) => <MoneyDisplay value={line.line_total} /> },
                 ]} />
                 <Panel title="Invoice details">
                     <div className="space-y-4">
@@ -133,11 +135,11 @@ function VehicleServiceInvoiceEditor({ jobId, job, billableLines, loadError }: {
                             }}>Create & post invoice</Button>
                         </div>
                         {preview && <DetailGrid items={[
-                            { label: 'Subtotal', value: preview.subtotal },
-                            { label: 'Discount', value: preview.discountTotal },
-                            { label: 'Tax', value: preview.taxTotal },
-                            { label: 'Charges', value: preview.chargeTotal },
-                            { label: 'Grand total', value: preview.grandTotal },
+                            { label: 'Subtotal', value: <MoneyDisplay value={preview.subtotal} /> },
+                            { label: 'Discount', value: <MoneyDisplay value={preview.discountTotal} /> },
+                            { label: 'Tax', value: <MoneyDisplay value={preview.taxTotal} /> },
+                            { label: 'Charges', value: <MoneyDisplay value={preview.chargeTotal} /> },
+                            { label: 'Grand total', value: <MoneyDisplay value={preview.grandTotal} /> },
                         ]} />}
                     </div>
                 </Panel>
