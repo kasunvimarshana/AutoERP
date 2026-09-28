@@ -28,14 +28,42 @@ use Modules\Item\Services\ItemCreationService;
 use Modules\Item\Services\ItemPriceService;
 use Modules\Selling\Services\SalePostingService;
 use Modules\Selling\Services\SaleReturnPostingService;
+use Modules\Selling\Services\SellingAuthorizationService;
 use Modules\Tenant\Models\TenantModel;
+use Tests\Support\ActiveTenantSubscriptionFixture;
 use Tests\Support\CurrencyFixture;
 use Tests\Support\FinancePostingFixture;
+use Tests\Support\OrganizationUnitFixture;
+use Tests\Support\TenantAuthenticationFixture;
+use Tests\Support\TenantUserFixture;
 use Tests\TestCase;
 
 final class SellingWorkflowTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_sales_list_uses_a_concrete_scoped_request(): void
+    {
+        $context = $this->context();
+        $token = $this->authenticateSalesViewer($context['tenant_id']);
+
+        $this->withToken($token)
+            ->withHeader('X-Tenant-Id', (string) $context['tenant_id'])
+            ->getJson('/api/v1/selling/sales?per_page=50')
+            ->assertOk()
+            ->assertJsonPath('data', []);
+    }
+
+    public function test_sale_detail_uses_a_concrete_scoped_request(): void
+    {
+        $context = $this->context();
+        $token = $this->authenticateSalesViewer($context['tenant_id']);
+
+        $this->withToken($token)
+            ->withHeader('X-Tenant-Id', (string) $context['tenant_id'])
+            ->getJson('/api/v1/selling/sales/999999')
+            ->assertNotFound();
+    }
 
     public function test_sale_posts_invoice_and_stock_atomically_and_return_records_credit_note(): void
     {
@@ -199,5 +227,93 @@ final class SellingWorkflowTest extends TestCase
             'uom_id' => $uomId,
             'item_id' => (int) $item->getKey(),
         ];
+    }
+
+    private function authenticateSalesViewer(int $tenantId): string
+    {
+        ActiveTenantSubscriptionFixture::create($tenantId, [
+            'selling',
+            'customer',
+            'item',
+            'inventory',
+            'invoice',
+            'warehouse',
+        ]);
+        $organizationUnitId = OrganizationUnitFixture::create([
+            'tenant_id' => $tenantId,
+            'name' => 'Sales test unit '.$tenantId,
+            'code' => 'SELL-TEST-'.$tenantId,
+        ]);
+        $email = 'selling-viewer-'.$tenantId.'@example.test';
+        $userId = TenantUserFixture::create([
+            'tenant_id' => $tenantId,
+            'first_name' => 'Selling',
+            'last_name' => 'Viewer',
+            'email' => $email,
+            'password' => 'secret-password',
+            'status' => 'active',
+            'row_version' => 1,
+        ]);
+        DB::table('user_organization_units')->insert([
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => $organizationUnitId,
+            'user_id' => $userId,
+            'status' => 'active',
+            'is_default' => true,
+            'default_marker' => 'default',
+            'row_version' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $roleId = (int) DB::table('roles')->insertGetId([
+            'tenant_id' => $tenantId,
+            'name' => 'Selling viewer '.$tenantId,
+            'guard_name' => 'auth-api',
+            'description' => 'Selling API read test role',
+            'row_version' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        foreach ([
+            SellingAuthorizationService::SALES_VIEW,
+            SellingAuthorizationService::RETURNS_VIEW,
+        ] as $permission) {
+            $permissionId = (int) DB::table('permissions')->insertGetId([
+                'tenant_id' => $tenantId,
+                'name' => $permission,
+                'guard_name' => 'auth-api',
+                'module' => 'selling',
+                'description' => SellingAuthorizationService::descriptions()[$permission],
+                'row_version' => 1,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+            DB::table('role_permissions')->insert([
+                'tenant_id' => $tenantId,
+                'role_id' => $roleId,
+                'permission_id' => $permissionId,
+                'row_version' => 1,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+        DB::table('user_roles')->insert([
+            'tenant_id' => $tenantId,
+            'user_id' => $userId,
+            'role_id' => $roleId,
+            'row_version' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        TenantAuthenticationFixture::provision($tenantId, $userId, $email);
+
+        return (string) $this->withHeader('X-Tenant-Id', (string) $tenantId)
+            ->postJson('/api/v1/auth/login', [
+                'organization_unit_id' => $organizationUnitId,
+                'identifier' => $email,
+                'password' => 'secret-password',
+            ])
+            ->assertOk()
+            ->json('token');
     }
 }

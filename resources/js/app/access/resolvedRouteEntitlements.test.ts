@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { financePermissions } from '@/modules/finance/financePermissions';
 import { purchasePermissions } from '@/modules/purchase/purchasePermissions';
+import { sellingPermissions } from '@/modules/selling/sellingPermissions';
 import { vehicleServicePermissions } from '@/modules/vehicle-service/vehicleServicePermissions';
 import { resolveTenantRouteEntitlement } from './resolvedRouteEntitlements';
 
@@ -66,6 +67,21 @@ describe('resolved tenant route entitlements', () => {
 
         expect(entitlement?.modules).toContain('inventory');
         expect(entitlement?.requiresOrganizationUnit).toBe(true);
+    });
+
+    it('resolves Selling workspace routes with their module and permission requirements', () => {
+        for (const path of ['/selling', '/selling/sales/42']) {
+            const entitlement = resolveTenantRouteEntitlement(path);
+
+            expect(entitlement?.modules).toEqual(['selling', 'customer', 'item', 'inventory', 'invoice', 'warehouse']);
+            expect(entitlement?.requiresOrganizationUnit).toBe(true);
+            expect(entitlement?.permissions).toEqual([
+                sellingPermissions.salesView,
+                sellingPermissions.salesCreate,
+                sellingPermissions.returnsView,
+                sellingPermissions.returnsCreate,
+            ]);
+        }
     });
 
     it('returns no entitlement for an unregistered route', () => {

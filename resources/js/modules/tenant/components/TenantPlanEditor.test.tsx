@@ -74,6 +74,7 @@ describe('TenantPlanEditor', () => {
         for (const module of TENANT_MODULES) {
             expect(screen.getByLabelText(module.label)).toBeInTheDocument();
         }
+        expect(screen.getByLabelText('Selling')).toBeInTheDocument();
     });
 
     it('submits human resources when the HR commercial module is enabled', async () => {
