@@ -40,6 +40,7 @@ final class RentalChargeDocuments
         private readonly InvoiceCreationService $invoices,
         private readonly InvoiceSourceService $sources,
         private readonly RentalCalendar $calendar,
+        private readonly RentalChargePeriod $chargePeriods,
     ) {}
 
     public function issue(AgreementKind $kind, AgreementContext $context, Agreement $agreement, RentalCharge $charge, string $sourceType, string $description, array $data): Invoice
@@ -113,7 +114,7 @@ final class RentalChargeDocuments
 
     private function assertCommercialCoverage(Agreement $agreement, RentalCharge $charge, AgreementContext $context): void
     {
-        [$from, $until] = $this->commercialPeriod($charge, $context);
+        [$from, $until] = $this->chargePeriods->resolve($charge, $context);
         $agreementStart = $agreement->starts_on->toDateString();
         $agreementEnd = $this->calendar->coverageEnd($agreement, $context);
 
@@ -122,26 +123,5 @@ final class RentalChargeDocuments
                 'agreement' => ['Automatic Rental billing must stay within the agreement commercial coverage. Record the physical overrun, but use a valid agreement revision or an explicitly authorized financial adjustment for any uncovered amount.'],
             ]);
         }
-    }
-
-    /** @return array{string, string} */
-    private function commercialPeriod(RentalCharge $charge, AgreementContext $context): array
-    {
-        $calculation = $charge->calculation;
-        if (isset($calculation['supply_from'], $calculation['supply_until'])) {
-            return [(string) $calculation['supply_from'], (string) $calculation['supply_until']];
-        }
-        if (isset($calculation['from'], $calculation['until'])) {
-            return [(string) $calculation['from'], (string) $calculation['until']];
-        }
-        if (isset($calculation['chart']['starts_at'], $calculation['chart']['ends_at'])) {
-            $timezone = $this->calendar->timezone($context);
-            $start = OperationalTime::parse($calculation['chart']['starts_at'], 'starts_at')->setTimezone($timezone);
-            $end = OperationalTime::parse($calculation['chart']['ends_at'], 'ends_at')->setTimezone($timezone);
-
-            return [$start->toDateString(), $end->subMicrosecond()->toDateString()];
-        }
-
-        return [(string) $charge->period_from, (string) $charge->period_until];
     }
 }
