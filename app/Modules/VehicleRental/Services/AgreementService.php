@@ -16,6 +16,7 @@ use Modules\VehicleRental\Data\AgreementContext;
 use Modules\VehicleRental\Enums\AgreementAction;
 use Modules\VehicleRental\Enums\AgreementKind;
 use Modules\VehicleRental\Enums\AgreementStatus;
+use Modules\VehicleRental\Enums\MileagePolicy;
 use Modules\VehicleRental\Enums\VehicleUseStatus;
 use Modules\VehicleRental\Models\Agreement;
 use Modules\VehicleRental\Models\CustomerAgreement;
@@ -24,6 +25,7 @@ use Modules\VehicleRental\Models\CustomerUsageCharge;
 use Modules\VehicleRental\Models\OwnerAgreement;
 use Modules\VehicleRental\Models\OwnerBaseCharge;
 use Modules\VehicleRental\Models\OwnerUsageCharge;
+use Modules\VehicleRental\Models\RunningChart;
 use Modules\VehicleRental\Models\VehicleUse;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
@@ -220,18 +222,22 @@ final class AgreementService
 
     private function assertCutoverAvailable(AgreementKind $kind, AgreementContext $context, Agreement $predecessor, string $successorStart): void
     {
+        $boundary = CarbonImmutable::createFromFormat(
+            '!'.AgreementFields::DATE_FORMAT,
+            $successorStart,
+            $this->calendar->timezone($context),
+        );
         $foreignKey = $kind === AgreementKind::Customer ? 'customer_agreement_id' : 'owner_agreement_id';
         $uses = VehicleUse::query()->forTenant($context->tenantId)->where($foreignKey, $predecessor->id)
             ->where('status', '!=', VehicleUseStatus::Cancelled->value)
-            ->orderBy('id')->lockForUpdate()->get(['id', 'ends_at_input']);
-        $crossingUse = $uses->first(function (VehicleUse $use) use ($successorStart): bool {
-            if ($use->ends_at_input === null) {
-                return true;
-            }
-            $end = OperationalTime::parse($use->ends_at_input, 'ends_at');
-            $boundary = CarbonImmutable::createFromFormat('!'.AgreementFields::DATE_FORMAT, $successorStart, $end->getTimezone());
-
-            return $end > $boundary;
+            ->orderBy('id')->lockForUpdate()->get(['id', 'status', 'ends_at', 'returned_at']);
+        $crossingUse = $uses->first(static function (VehicleUse $use) use ($boundary): bool {
+            return match ($use->status) {
+                VehicleUseStatus::InCustody => true,
+                VehicleUseStatus::Returned => $use->returned_at === null || $use->returned_at->greaterThan($boundary),
+                VehicleUseStatus::Planned => $use->ends_at === null || $use->ends_at->greaterThan($boundary),
+                VehicleUseStatus::Cancelled => false,
+            };
         });
         if ($crossingUse !== null) {
             throw ValidationException::withMessages(['starts_on' => ['Return or reschedule vehicle use that crosses the successor effective date before activation.']]);
@@ -245,10 +251,20 @@ final class AgreementService
         }
 
         $usageChargeClass = $kind === AgreementKind::Customer ? CustomerUsageCharge::class : OwnerUsageCharge::class;
-        if ($usageChargeClass::query()->forContext($context->tenantId, $context->organizationUnitId)
-            ->where('agreement_id', $predecessor->id)->whereNull('voided_at')
+        $usageCharges = $usageChargeClass::query()->forContext($context->tenantId, $context->organizationUnitId)
+            ->where('agreement_id', $predecessor->id)->whereNull('voided_at');
+        if ((clone $usageCharges)->where('component', MileagePolicy::COMPONENT)
             ->where('period_until', '>=', $successorStart)->lockForUpdate()->first(['id']) !== null) {
-            throw ValidationException::withMessages(['starts_on' => ['The predecessor has a usage assessment whose commercial period reaches this date. Release and void that assessment before activation.']]);
+            throw ValidationException::withMessages(['starts_on' => ['The predecessor has a mileage assessment whose commercial cycle reaches this date. Release and void that assessment before activation.']]);
+        }
+
+        $nonMileageChartIds = (clone $usageCharges)->where('component', '!=', MileagePolicy::COMPONENT)
+            ->orderBy('id')->lockForUpdate()->pluck('running_chart_id');
+        if ($nonMileageChartIds->isNotEmpty()
+            && RunningChart::query()->forContext($context->tenantId, $context->organizationUnitId)
+                ->whereIn('id', $nonMileageChartIds)->where('ends_at', '>', OperationalTime::database($boundary))
+                ->orderBy('id')->lockForUpdate()->first(['id']) !== null) {
+            throw ValidationException::withMessages(['starts_on' => ['The predecessor has a usage charge backed by physical evidence that crosses this date. Release and void that charge before activation.']]);
         }
     }
 
