@@ -1,5 +1,5 @@
 export function formatMoney(value?: string | number | null, currency = 'LKR'): string {
-    const decimal = normalizeDecimal(value, 2, 6);
+    const decimal = normalizeDecimal(value, 2, 3);
     const symbol = currencySymbol(currency);
     return `${symbol}${symbol.length > 1 ? ' ' : ''}${decimal.sign}${groupInteger(decimal.integer)}.${decimal.fraction}`;
 }

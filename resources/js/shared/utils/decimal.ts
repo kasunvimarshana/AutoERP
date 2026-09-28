@@ -1,6 +1,6 @@
 const SCALE = 6;
 const FACTOR = 10n ** BigInt(SCALE);
-const decimalPattern = /^-?\d+(\.\d+)?$/;
+const decimalPattern = /^-?\d+(\.\d*)?$/;
 
 function scaled(value: string | number | null | undefined): bigint {
     const input = String(value ?? '0').trim();
@@ -51,6 +51,19 @@ export function isDecimalString(value: string): boolean {
 
 export function normalizeDecimalInput(value: string): string {
     return value.replace(/[^\d.-]/g, '');
+}
+
+export function finalizeDecimalInput(value: string): string {
+    return value.endsWith('.') ? value.slice(0, -1) : value;
+}
+
+export function formatDecimalInputDisplay(value: string | number | undefined): string {
+    const raw = String(value ?? '');
+    const match = raw.match(/^(-?\d+)(?:\.(\d+))?$/);
+    if (!match) return raw;
+
+    const fraction = (match[2] ?? '').slice(0, 3).replace(/0+$/, '').padEnd(2, '0');
+    return `${match[1]}${fraction ? `.${fraction}` : ''}`;
 }
 
 export function compareDecimalStrings(left: string, right: string): -1 | 0 | 1 {

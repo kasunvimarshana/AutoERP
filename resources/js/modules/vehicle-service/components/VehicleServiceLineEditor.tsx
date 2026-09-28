@@ -559,9 +559,9 @@ function LineMobileDetails({
             />
             <SummaryValue label="UOM" value={line.uom?.code ?? '-'} />
             {showStock && <SummaryValue label="Stock" value={stockStateLabel(line)} />}
-            {showPricing && <SummaryValue label="Price" value={row.isComboChild && !line.is_billable ? 'Included in pack' : line.unit_price} />}
-            {showPricing && <SummaryValue label="Discount" value={line.discount_amount} />}
-            {showPricing && <SummaryValue label="Total" value={line.line_total} />}
+            {showPricing && <SummaryValue label="Price" value={row.isComboChild && !line.is_billable ? 'Included in pack' : <MoneyDisplay value={line.unit_price} />} />}
+            {showPricing && <SummaryValue label="Discount" value={<MoneyDisplay value={line.discount_amount} />} />}
+            {showPricing && <SummaryValue label="Total" value={<MoneyDisplay value={line.line_total} />} />}
         </div>
     );
 }
@@ -665,7 +665,7 @@ function renderLineUnitPrice(row: VehicleServiceLineDisplayRow) {
         return (
             <div className="space-y-0.5">
                 <div className="text-xs font-medium uppercase tracking-wide text-slate-500">Included</div>
-                <div className="text-xs text-slate-400">{row.line.unit_price}</div>
+                <div className="text-xs text-slate-400"><MoneyDisplay value={row.line.unit_price} /></div>
             </div>
         );
     }
@@ -686,7 +686,7 @@ function renderLineTotal(row: VehicleServiceLineDisplayRow) {
         return (
             <div className="space-y-0.5">
                 <div className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Included</div>
-                <div className="text-xs font-medium text-slate-400">{row.line.line_total}</div>
+                <div className="text-xs font-medium text-slate-400"><MoneyDisplay value={row.line.line_total} /></div>
             </div>
         );
     }

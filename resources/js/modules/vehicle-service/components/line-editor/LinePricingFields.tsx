@@ -1,5 +1,6 @@
 import { fieldError, type ApiError } from '@/shared/api/apiError';
 import { DecimalInput } from '@/shared/components/DecimalInput';
+import { MoneyDisplay } from '@/shared/components/MoneyDisplay';
 import type { VehicleServiceLineFormValue } from './lineForm';
 
 export function LinePricingFields({ value, total, error, set }: {
@@ -21,7 +22,7 @@ export function LinePricingFields({ value, total, error, set }: {
             />
             <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
                 <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Total</span>
-                <strong className="mt-1 block text-lg tabular-nums text-slate-900">{total}</strong>
+                <strong className="mt-1 block text-lg tabular-nums text-slate-900"><MoneyDisplay value={total} /></strong>
             </div>
         </>
     );
