@@ -33,6 +33,7 @@ final class AgreementService
         private readonly RentalAuthorization $authorization,
         private readonly AgreementValidation $validation,
         private readonly RentalCalendar $calendar,
+        private readonly RentalChargePeriod $chargePeriods,
     ) {}
 
     public function list(AgreementKind $kind, AgreementContext $context, int $perPage, ?string $search = null): LengthAwarePaginator
@@ -224,14 +225,13 @@ final class AgreementService
         $uses = VehicleUse::query()->forTenant($context->tenantId)->where($foreignKey, $predecessor->id)
             ->where('status', '!=', VehicleUseStatus::Cancelled->value)
             ->orderBy('id')->lockForUpdate()->get(['id', 'ends_at_input']);
-        $crossingUse = $uses->first(function (VehicleUse $use) use ($successorStart): bool {
+        $boundary = CarbonImmutable::createFromFormat('!'.AgreementFields::DATE_FORMAT, $successorStart, $this->calendar->timezone($context));
+        $crossingUse = $uses->first(function (VehicleUse $use) use ($boundary): bool {
             if ($use->ends_at_input === null) {
                 return true;
             }
-            $end = OperationalTime::parse($use->ends_at_input, 'ends_at');
-            $boundary = CarbonImmutable::createFromFormat('!'.AgreementFields::DATE_FORMAT, $successorStart, $end->getTimezone());
 
-            return $end > $boundary;
+            return OperationalTime::parse($use->ends_at_input, 'ends_at') > $boundary;
         });
         if ($crossingUse !== null) {
             throw ValidationException::withMessages(['starts_on' => ['Return or reschedule vehicle use that crosses the successor effective date before activation.']]);
@@ -245,9 +245,10 @@ final class AgreementService
         }
 
         $usageChargeClass = $kind === AgreementKind::Customer ? CustomerUsageCharge::class : OwnerUsageCharge::class;
-        if ($usageChargeClass::query()->forContext($context->tenantId, $context->organizationUnitId)
+        $usageCharges = $usageChargeClass::query()->forContext($context->tenantId, $context->organizationUnitId)
             ->where('agreement_id', $predecessor->id)->whereNull('voided_at')
-            ->where('period_until', '>=', $successorStart)->lockForUpdate()->first(['id']) !== null) {
+            ->orderBy('id')->lockForUpdate()->get();
+        if ($usageCharges->contains(fn ($charge): bool => $this->chargePeriods->resolve($charge, $context)[1] >= $successorStart)) {
             throw ValidationException::withMessages(['starts_on' => ['The predecessor has a usage assessment whose commercial period reaches this date. Release and void that assessment before activation.']]);
         }
     }
