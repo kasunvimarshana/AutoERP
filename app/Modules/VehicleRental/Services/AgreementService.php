@@ -223,15 +223,18 @@ final class AgreementService
         $foreignKey = $kind === AgreementKind::Customer ? 'customer_agreement_id' : 'owner_agreement_id';
         $uses = VehicleUse::query()->forTenant($context->tenantId)->where($foreignKey, $predecessor->id)
             ->where('status', '!=', VehicleUseStatus::Cancelled->value)
-            ->orderBy('id')->lockForUpdate()->get(['id', 'ends_at_input']);
-        $crossingUse = $uses->first(function (VehicleUse $use) use ($successorStart): bool {
-            if ($use->ends_at_input === null) {
-                return true;
-            }
-            $end = OperationalTime::parse($use->ends_at_input, 'ends_at');
-            $boundary = CarbonImmutable::createFromFormat('!'.AgreementFields::DATE_FORMAT, $successorStart, $end->getTimezone());
+            ->orderBy('id')->lockForUpdate()->get(['id', 'status', 'ends_at', 'returned_at']);
+        $boundary = CarbonImmutable::createFromFormat('!'.AgreementFields::DATE_FORMAT, $successorStart, $this->calendar->timezone($context));
+        $crossingUse = $uses->first(static function (VehicleUse $use) use ($boundary): bool {
+            // A planned return never proves that physical custody ended. Completed uses
+            // use their actual return; still-open custody cannot be cut over retrospectively.
+            $end = match ($use->status) {
+                VehicleUseStatus::Planned => $use->ends_at,
+                VehicleUseStatus::Returned => $use->returned_at,
+                default => null,
+            };
 
-            return $end > $boundary;
+            return $end === null || $end > $boundary;
         });
         if ($crossingUse !== null) {
             throw ValidationException::withMessages(['starts_on' => ['Return or reschedule vehicle use that crosses the successor effective date before activation.']]);

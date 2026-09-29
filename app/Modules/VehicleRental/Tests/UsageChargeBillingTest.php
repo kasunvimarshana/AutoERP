@@ -235,10 +235,10 @@ final class UsageChargeBillingTest extends TestCase
             $c = $service->change(AgreementKind::Customer, $context, $c->id, $c->row_version, AgreementAction::Activate);
             $o = $service->change(AgreementKind::Owner, $context, $o->id, $o->row_version, AgreementAction::Activate);
             $uses = app(VehicleUseService::class);
-            $use = $uses->plan($context, $c->id, $c->row_version, ['vehicle_id' => $owner['vehicle_id'], 'owner_agreement_id' => $o->id, 'starts_at' => '2026-09-07T00:00:00+05:30', 'ends_at' => '2026-09-10T00:00:00+05:30']);
-            $use = $uses->transition($context, $use->id, $use->row_version, VehicleUseAction::Handover, ['occurred_at' => '2026-09-07T00:00:00+05:30', 'reason' => 'Collected']);
+            $use = $uses->plan($context, $c->id, $c->row_version, ['vehicle_id' => $owner['vehicle_id'], 'owner_agreement_id' => $o->id, 'starts_at' => '2026-09-07T00:00:00+00:00', 'ends_at' => '2026-09-10T00:00:00+00:00']);
+            $use = $uses->transition($context, $use->id, $use->row_version, VehicleUseAction::Handover, ['occurred_at' => '2026-09-07T00:00:00+00:00', 'reason' => 'Collected']);
             $chart = app(RunningChartService::class)->create($context, $use->id, $use->row_version, array_replace([
-                'reference' => 'CHART-BILL', 'starts_at' => '2026-09-07T00:00:00+05:30', 'ends_at' => '2026-09-09T00:00:00+05:30',
+                'reference' => 'CHART-BILL', 'starts_at' => '2026-09-07T00:00:00+00:00', 'ends_at' => '2026-09-09T00:00:00+00:00',
                 'normal_ot_minutes' => 1470, 'double_ot_minutes' => 60, 'triple_ot_minutes' => 30, 'night_outs' => 2,
             ], $facts));
             $chart = app(RunningChartService::class)->change($context, $chart->id, $chart->row_version, RunningChartAction::Finalize);

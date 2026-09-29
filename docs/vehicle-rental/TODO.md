@@ -1,12 +1,12 @@
 # Vehicle Rental clean rebuild — completion and acceptance ledger
 
-**Status:** Closed implementation ledger for the fresh Vehicle Rental module as reconciled on 2026-09-26.
+**Status:** Closed implementation ledger for the fresh Vehicle Rental module as reconciled on 2026-09-29; executable verification is recorded below.
 
 **Business authority:** TACGL primary/tie-breaker; four supplied Vehicle Rental videos authoritative for practical workflow.
 
 **Engineering authority:** latest `worktree-0.0.8`.
 
-**Continuation review base:** `fdf660726e712595f35fd2c27f376e7e76824f64`.
+**Continuation review base:** `c87010bd2281e8a8ce24c82f36e15521ac944c8a`.
 
 **Canonical domain/policy reference:** [knowledgebase.md](../knowledgebase.md).
 
@@ -320,11 +320,14 @@ The completion delta adds focused regression tests for:
 
 ### Verification evidence rule
 
-Only executed commands may be described as passed. This connector-only completion environment can inspect and mutate GitHub source but cannot materialize the full repository locally because outbound Git/GitHub checkout is DNS-blocked; GitHub Actions are intentionally not used per project instruction. Therefore executable full-suite/lint/typecheck/build/migrate results for this exact continuation delta are not fabricated here. This is an execution-environment evidence note, not an open Vehicle Rental business/code requirement.
+Only executed commands may be described as passed. On 2026-09-29 a full checkout and free local PHP/Node dependencies became available. Executable verification found a fresh-install foreign-key-drop failure and successor boundary defects that static checks had not established. These are fixed in the responsible Rental migration/service paths; the baseline architecture test was preserved rather than exempting the new alteration migrations.
 
-For the 2026-09-26 migration/calendar continuation, exact changed PHP contents were materialized and syntax-checked with the available PHP runtime. The successor hardening migration, `VehicleUse`, `VehicleUseService`, `OwnerSourceService`, `VehicleUseTenantCalendarTest` and `OwnerSourceTenantCalendarTest` all report `No syntax errors detected`. Static review confirms that the module registers both base and upgrade migration directories, successor column creation now has a single migration owner, and the later migration only strengthens/restores constraints. Vehicle Use and Owner-source lookup now use the same `RentalCalendar` tenant/org civil-date conversion already used by successor activation and financial coverage.
+- [x] SQLite fresh installation compiles portable FK drops.
+- [x] Driver/successor/closure upgrade migrations roll back and reapply; all 12 Rental tables retain identical column, FK and index metadata, with no FK violations.
+- [x] Successor checks use tenant-calendar midnight and actual returned custody; open custody cannot be treated as returned from its planned end.
+- [x] Existing arithmetic/source tests use explicit timestamps inside their configured UTC calendar; cross-tenant tests execute each tenant scope separately.
 
-A direct checkout retry on 2026-09-26 still returned `Could not resolve host: github.com`. Dependency-backed Laravel/PHPUnit/frontend/MySQL suites for this exact delta are therefore not claimed as re-executed, and no GitHub Actions result is used as a substitute.
+Exact final command results are in [the verification record](../changes/2026-09-29-rental-executable-verification.md). Real InnoDB contention, production-data migration and human UAT are separate release evidence and are not established by SQLite or unit tests. The prior inability to clone was an environment limitation of earlier sessions, not a reason to skip verification in this session.
 
 ---
 

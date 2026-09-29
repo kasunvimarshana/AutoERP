@@ -27,7 +27,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('vehicle_rental_running_charts', function (Blueprint $table): void {
-            $table->dropForeign('vrc_driver_employee_fk');
+            $table->dropForeign(['driver_employee_id', 'tenant_id'])->index('vrc_driver_employee_fk');
             $table->dropIndex('vrc_driver_employee_period_ix');
             $table->dropIndex('vrc_driver_external_period_ix');
             $table->dropColumn(['driver_identity_source', 'driver_employee_id', 'driver_name_snapshot', 'driver_reference_snapshot']);

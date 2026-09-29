@@ -2,7 +2,7 @@
 
 **Status:** Canonical Vehicle Rental business/domain and production-policy reference for AutoERP.
 
-**Knowledge refresh date:** 2026-09-26
+**Knowledge refresh date:** 2026-09-29
 
 **Primary business source / conflict tie-breaker:** TACGL legacy application/data corpus
 
@@ -10,7 +10,7 @@
 
 **Authoritative engineering source:** latest `worktree-0.0.8`
 
-**Continuation review base:** `fdf660726e712595f35fd2c27f376e7e76824f64`
+**Continuation review base:** `c87010bd2281e8a8ce24c82f36e15521ac944c8a`
 
 **Architecture policy:** root `RULES.md` / `AGENTS.md`
 
@@ -225,7 +225,7 @@ At activation the backend rejects a cutover that would:
 - cross a retained usage/mileage commercial period;
 - violate predecessor/successor date ordering.
 
-The successor effective-day check uses the same configured tenant/org commercial timezone as closure capture. Adjacent half-open operational periods are allowed: use ending exactly at successor start is not an overlap.
+The successor effective-day check uses the same configured tenant/org commercial timezone as closure capture. Adjacent half-open operational periods are allowed: use ending exactly at successor start is not an overlap. The vehicle-use boundary check uses that same timezone, regardless of the submitted timestamp offset. Planned use is checked against its planned end; Returned use is checked against its actual return; In Custody always blocks cutover until a return is recorded. An elapsed planned return does not prove custody ended. An early actual return can release a later/open-ended plan, while a late actual return still blocks an earlier cutover. Customer and owner successors apply the same rule independently.
 
 A successor keeps the same counterparty; an owner-agreement successor also keeps the same physical supplied vehicle. A different party/owner vehicle is a new agreement, not a rate revision.
 
@@ -798,3 +798,10 @@ When deciding Vehicle Rental behavior:
 8. Unknown historical formulas do not justify undefined runtime behavior: use named explicit policy where available, otherwise no automatic financial effect.
 9. Preserve physical evidence even when it falls outside commercial coverage; never treat the physical overrun itself as authorization to bill.
 10. Keep the operator workflow simple while enforcing strong hidden backend integrity.
+
+
+### Executed verification refresh — 2026-09-29
+
+The current checkout was recovered after scratch maintenance and independently matched to GitHub before changes. Dependency-backed verification exposed and corrected a fresh SQLite migration failure: named-only foreign-key drops cannot be compiled by Laravel's SQLite grammar. Drop commands now supply the local column list for SQLite and the original explicit constraint name for MySQL. The already-published migration filenames remain unchanged so recorded migration identities are preserved. Closure and successor-constraint alterations now reside in `Database/UpgradeMigrations`, which the provider already loads alongside the one-table creation baseline. No new relationship or column was introduced by this correction.
+
+Successor regression cases reproduce both client-offset directions, exact tenant-calendar midnight, open custody after planned end, late return, early return and returned open-ended use. See the [execution and correction record](changes/2026-09-29-rental-executable-verification.md) for exact suite and migration results. Historical statements that execution was unavailable describe those earlier sessions, not this restored checkout. SQLite verification is not evidence of real InnoDB contention or production-data/UAT acceptance.

@@ -36,11 +36,11 @@ final class OwnerSourceTest extends TestCase
             $agreements = app(AgreementService::class);
             $source = $agreements->create(AgreementKind::Owner, $context, array_replace($input, ['ends_on' => '2026-09-10']));
             $lookup = app(OwnerSourceService::class);
-            $period = ['starts_at' => '2026-09-07T00:00:00+05:30', 'ends_at' => '2026-09-11T00:00:00+05:30'];
+            $period = ['starts_at' => '2026-09-07T00:00:00+00:00', 'ends_at' => '2026-09-11T00:00:00+00:00'];
             self::assertSame(0, $lookup->list($context, $input['vehicle_id'], $period, 10)->total());
             $source = $agreements->change(AgreementKind::Owner, $context, $source->id, $source->row_version, AgreementAction::Activate);
             self::assertSame(1, $lookup->list($context, $input['vehicle_id'], $period, 10)->total());
-            foreach ([['starts_at' => '2026-09-06T23:59:59+05:30'], ['ends_at' => '2026-09-11T00:00:01+05:30'], ['ends_at' => null]] as $outside) {
+            foreach ([['starts_at' => '2026-09-06T23:59:59+00:00'], ['ends_at' => '2026-09-11T00:00:01+00:00'], ['ends_at' => null]] as $outside) {
                 self::assertSame(0, $lookup->list($context, $input['vehicle_id'], array_replace($period, $outside), 10)->total());
             }
             $agreements->change(AgreementKind::Owner, $context, $source->id, $source->row_version, AgreementAction::Close, reason: 'Source ended');
@@ -50,17 +50,20 @@ final class OwnerSourceTest extends TestCase
 
     public function test_open_ended_source_search_cannot_escape_vehicle_tenant_or_branch(): void
     {
-        $this->activeFixture(function ($context, $customer, $owner, $period): void {
+        [$foreign, , $foreignOwner] = $this->fixture();
+        $vehicleId = null;
+        $this->activeFixture(function ($context, $customer, $owner, $period) use ($foreignOwner, &$vehicleId): void {
+            $vehicleId = $owner->vehicle_id;
             $lookup = app(OwnerSourceService::class);
             $period['ends_at'] = null;
             $period['search'] = $owner->party_name_snapshot;
             self::assertSame(1, $lookup->list($context, $owner->vehicle_id, $period, 10)->total());
             $otherOrg = OrganizationUnitFixture::create(['tenant_id' => $context->tenantId, 'code' => 'SOURCE-OTHER', 'name' => 'Other source']);
             self::assertSame(0, $lookup->list(new AgreementContext($context->tenantId, $otherOrg, $context->actorId), $owner->vehicle_id, $period, 10)->total());
-            [$foreign, , $foreignOwner] = $this->fixture();
-            self::assertSame(0, $lookup->list($foreign, $owner->vehicle_id, $period, 10)->total());
             self::assertSame(0, $lookup->list($context, $foreignOwner['vehicle_id'], $period, 10)->total());
         });
+        $this->withTenantExecutionContext($foreign->tenantId, fn () => self::assertSame(0, app(OwnerSourceService::class)
+            ->list($foreign, $vehicleId, ['starts_at' => '2026-09-07T09:00:00+00:00', 'ends_at' => null], 10)->total()));
     }
 
     public function test_missing_invalid_and_reversed_periods_fail_explicitly(): void
