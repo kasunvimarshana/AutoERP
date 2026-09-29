@@ -137,8 +137,8 @@ final class UsageChargeTenantCalendarTest extends TestCase
             ]);
 
             $charge = CustomerUsageCharge::query()->sole();
-            self::assertSame($expectedFrom, $charge->period_from->toDateString());
-            self::assertSame($expectedUntil, $charge->period_until->toDateString());
+            self::assertSame($expectedFrom, (string) $charge->period_from);
+            self::assertSame($expectedUntil, (string) $charge->period_until);
             self::assertSame('Asia/Colombo', $charge->calculation['timezone']);
             self::assertSame($expectedFrom, $charge->calculation['supply_from']);
             self::assertSame($expectedUntil, $charge->calculation['supply_until']);
