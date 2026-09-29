@@ -114,9 +114,10 @@ final class InvoiceStatusService
                 $type->belongsToRetiredSourceModule()
                 && ! in_array($to, [InvoiceStatus::PartiallyPaid, InvoiceStatus::Paid], true)
             ) {
-                throw new InvalidArgumentException(
-                    'Historical Vehicle Finance invoices are read-only except for settlement updates.',
-                );
+                throw new InvalidArgumentException(sprintf(
+                    'Historical %s invoices are read-only except for settlement updates.',
+                    $type->retiredSourceLabel(),
+                ));
             }
 
             $this->assertCanTransition($from, $to);

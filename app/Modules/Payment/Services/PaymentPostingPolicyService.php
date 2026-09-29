@@ -61,7 +61,7 @@ final class PaymentPostingPolicyService
         $partyType = trim((string) $payment->party_type);
         $sourceType = trim((string) $payment->source_type);
 
-        if ($sourceType === PaymentSourceType::RentalDepositRequirement->value) {
+        if (PaymentSourceType::tryFrom($sourceType)?->isRentalDeposit() === true) {
             if ($direction !== PaymentDirection::Inbound || $partyType !== 'customer') {
                 throw new InvalidArgumentException('Rental deposit payments must be inbound customer advances.');
             }

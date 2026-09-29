@@ -16,6 +16,8 @@ use Modules\Tax\DTOs\TaxLineCalculationResult;
 
 final class TaxCalculationService
 {
+    private const ZERO = '0.000000';
+
     public function __construct(
         private readonly DecimalMath $math,
         private readonly TaxDeterminationService $determination,
@@ -23,17 +25,14 @@ final class TaxCalculationService
 
     public function calculate(TaxCalculationData $data): TaxCalculationResult
     {
+        $this->validateLines($data->lines);
         $lineResults = [];
-        $lineTaxableTotal = '0.000000';
-        $lineTaxTotal = '0.000000';
-        $lineWithholdingTotal = '0.000000';
-        $lineTotal = '0.000000';
+        $lineTaxableTotal = self::ZERO;
+        $lineTaxTotal = self::ZERO;
+        $lineWithholdingTotal = self::ZERO;
+        $lineTotal = self::ZERO;
 
         foreach ($data->lines as $line) {
-            if (! $line instanceof TaxCalculationLineData) {
-                continue;
-            }
-
             $result = $this->calculateLine($data, $line);
             $lineResults[] = $result;
             $lineTaxableTotal = $this->math->add($lineTaxableTotal, $result->taxableAmount);
@@ -43,8 +42,9 @@ final class TaxCalculationService
         }
 
         $headerTaxes = [];
-        $headerTaxTotal = '0.000000';
-        $headerWithholdingTotal = '0.000000';
+        $headerTaxTotal = self::ZERO;
+        $headerWithholdingTotal = self::ZERO;
+        $headerPaymentEffect = self::ZERO;
         $headerBase = $this->math->add(
             $this->math->sub($lineTaxableTotal, $data->headerDiscountBeforeTax),
             $data->headerChargeBeforeTax,
@@ -68,13 +68,14 @@ final class TaxCalculationService
             $headerTaxes = $header['taxes'];
             $headerTaxTotal = $header['tax_amount'];
             $headerWithholdingTotal = $header['withholding_amount'];
+            // Inclusive tax is already in the base; withholding reduces payment.
+            $headerPaymentEffect = $this->math->sub($header['total_amount'], $headerBase);
         }
 
         $total = $lineTotal;
         $total = $this->math->sub($total, $data->headerDiscountBeforeTax);
         $total = $this->math->add($total, $data->headerChargeBeforeTax);
-        $total = $this->math->add($total, $headerTaxTotal);
-        $total = $this->math->sub($total, $headerWithholdingTotal);
+        $total = $this->math->add($total, $headerPaymentEffect);
         $total = $this->math->sub($total, $data->headerDiscountAfterTax);
         $total = $this->math->add($total, $data->headerChargeAfterTax);
 
@@ -96,6 +97,21 @@ final class TaxCalculationService
             lineResults: $lineResults,
             headerTaxes: $headerTaxes,
         );
+    }
+
+    /** @param list<TaxCalculationLineData> $lines */
+    private function validateLines(array $lines): void
+    {
+        $seen = [];
+        foreach ($lines as $line) {
+            if (! $line instanceof TaxCalculationLineData) {
+                throw new InvalidArgumentException('Every calculation line must be TaxCalculationLineData.');
+            }
+            if (isset($seen[$line->lineNumber])) {
+                throw new InvalidArgumentException('Calculation line numbers must be unique.');
+            }
+            $seen[$line->lineNumber] = true;
+        }
     }
 
     private function calculateLine(TaxCalculationData $data, TaxCalculationLineData $line): TaxLineCalculationResult
@@ -150,8 +166,8 @@ final class TaxCalculationService
         usort($applicableTaxes, static fn (ApplicableTaxData $left, ApplicableTaxData $right): int => $left->sequence <=> $right->sequence);
 
         $currentTotal = $this->math->normalize($base);
-        $taxAmount = '0.000000';
-        $withholdingAmount = '0.000000';
+        $taxAmount = self::ZERO;
+        $withholdingAmount = self::ZERO;
         $results = [];
 
         foreach ($applicableTaxes as $tax) {
@@ -239,7 +255,7 @@ final class TaxCalculationService
         if ($this->math->isZero($rate)) {
             return [
                 'taxable' => $this->math->normalize($gross),
-                'amount' => '0.000000',
+                'amount' => self::ZERO,
             ];
         }
 

@@ -41,7 +41,7 @@ final class VehicleOwnershipCommandService
                 $this->closeCurrent((int) $vehicle->getKey(), $data->ownerType->value, $start);
             }
 
-            $ownership = new VehicleOwnership();
+            $ownership = new VehicleOwnership;
             $ownership->forceFill([
                 'row_version' => 1,
                 'tenant_id' => $tenantId,
@@ -85,7 +85,6 @@ final class VehicleOwnershipCommandService
             if ($locked->ended_at !== null) {
                 throw new ConflictHttpException('An ended ownership relationship cannot become current.');
             }
-            $this->lockedVehicle((int) $locked->vehicle_id, (int) $locked->tenant_id, $locked->organization_unit_id);
             $this->lockVehicleOwnerships((int) $locked->vehicle_id);
             $this->closeCurrent(
                 (int) $locked->vehicle_id,
@@ -167,6 +166,8 @@ final class VehicleOwnershipCommandService
 
     private function lockOwnership(VehicleOwnership $ownership, int $expectedVersion): VehicleOwnership
     {
+        // Availability admission and ownership changes share a vehicle-first lock order.
+        $this->lockedVehicle((int) $ownership->vehicle_id, (int) $ownership->tenant_id, $ownership->organization_unit_id);
         /** @var VehicleOwnership $locked */
         $locked = VehicleOwnership::query()->lockForUpdate()->findOrFail($ownership->getKey());
         if ((int) $locked->row_version !== $expectedVersion) {

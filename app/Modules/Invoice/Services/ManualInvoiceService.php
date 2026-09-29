@@ -5,9 +5,6 @@ declare(strict_types=1);
 namespace Modules\Invoice\Services;
 
 use Illuminate\Support\Facades\DB;
-use InvalidArgumentException;
-use JsonException;
-use LogicException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Finance\Enums\FinanceAccountRoleCode;
 use Modules\Finance\Enums\FinancePostingProfileCode;
@@ -15,41 +12,25 @@ use Modules\Idempotency\Enums\IdempotencyStatus;
 use Modules\Idempotency\Services\IdempotencyService;
 use Modules\Invoice\Constants\InvoiceTaxMetadata;
 use Modules\Invoice\DTOs\CreateInvoiceData;
-use Modules\Invoice\DTOs\InvoiceAdjustmentData;
 use Modules\Invoice\DTOs\InvoiceCalculationResult;
 use Modules\Invoice\DTOs\InvoiceLineData;
 use Modules\Invoice\DTOs\ManualInvoiceData;
 use Modules\Invoice\DTOs\ManualInvoiceLineData;
-use Modules\Invoice\Enums\AdjustmentEffect;
-use Modules\Invoice\Enums\AdjustmentType;
-use Modules\Invoice\Enums\AllocationMethod;
 use Modules\Invoice\Enums\InvoiceDirection;
 use Modules\Invoice\Enums\InvoiceLineType;
 use Modules\Invoice\Enums\InvoicePartyType;
 use Modules\Invoice\Enums\InvoiceType;
 use Modules\Invoice\Models\Invoice;
-use Modules\Tax\DTOs\TaxAmountData;
-use Modules\Tax\DTOs\TaxCalculationData;
-use Modules\Tax\DTOs\TaxCalculationLineData;
-use Modules\Tax\DTOs\TaxLineCalculationResult;
-use Modules\Tax\Services\TaxCalculationService;
 
 final class ManualInvoiceService
 {
     private const IDEMPOTENCY_OPERATION = 'invoice.manual.create';
-    private const TAX_DOCUMENT_OUTBOUND = 'invoice_outbound_manual';
-    private const TAX_DOCUMENT_INBOUND = 'invoice_inbound_manual';
-    private const CALCULATION_TYPE_FIXED = 'fixed';
-    private const WITHHOLDING_ADJUSTMENT_NAME = 'Tax withholding';
-    private const WITHHOLDING_ADJUSTMENT_DESCRIPTION = 'Withholding calculated by the Tax module.';
-    private const ZERO = '0.000000';
 
     public function __construct(
         private readonly DecimalMath $math,
-        private readonly TaxCalculationService $taxes,
+        private readonly TaxedSourceInvoiceFactory $sourceInvoices,
         private readonly InvoiceCreationService $invoices,
         private readonly IdempotencyService $idempotency,
-        private readonly InvoicePostingPlanFactory $postingPlans,
     ) {}
 
     public function preview(ManualInvoiceData $data): InvoiceCalculationResult
@@ -100,154 +81,39 @@ final class ManualInvoiceService
 
     private function prepare(ManualInvoiceData $data): CreateInvoiceData
     {
-        $partyType = InvoicePartyType::forDirection($data->direction);
-        $partyId = $this->partyId($data);
-        $taxCalculation = $this->taxes->calculate(new TaxCalculationData(
-            tenantId: $data->tenantId,
-            documentType: $this->taxDocumentType($data->direction),
-            documentDate: $data->invoiceDate,
-            organizationUnitId: $data->organizationUnitId,
-            customerId: $data->customerId,
-            supplierId: $data->supplierId,
-            documentTaxGroupId: $data->documentTaxGroupId,
-            lines: $this->taxLines($data),
-        ));
-
-        $taxResults = [];
-        foreach ($taxCalculation->lineResults as $result) {
-            $taxResults[$result->lineNumber] = $result;
-        }
-
-        $lines = [];
-        $baseAmount = self::ZERO;
-        foreach (array_values($data->lines) as $index => $line) {
-            if (! $line instanceof ManualInvoiceLineData) {
-                throw new InvalidArgumentException('Manual invoice lines must be ManualInvoiceLineData instances.');
-            }
-
-            $lineNumber = $index + 1;
-            $taxResult = $taxResults[$lineNumber] ?? null;
-            if (! $taxResult instanceof TaxLineCalculationResult) {
-                throw new LogicException("Tax calculation result is missing for invoice line [{$lineNumber}].");
-            }
-
-            $quantity = $this->math->normalize($line->quantity);
-            $unitPrice = $this->math->normalize($line->unitPrice);
-            $discount = $this->math->normalize($line->discountAmount);
-            $charge = $this->math->normalize($line->chargeAmount);
-            $baseAmount = $this->math->add(
-                $baseAmount,
-                $this->math->add(
-                    $this->math->sub($this->math->mul($quantity, $unitPrice), $discount),
-                    $charge,
-                ),
-            );
-
-            $lines[] = new InvoiceLineData(
-                lineNumber: $lineNumber,
-                description: trim($line->description),
-                quantity: $quantity,
-                unitPrice: $unitPrice,
-                lineType: $line->lineType,
-                itemId: $line->itemId,
-                uomId: $line->uomId,
-                discountAmount: $discount,
-                taxAmount: $taxResult->taxAmount,
-                chargeAmount: $charge,
-                lineTotal: $this->math->add($taxResult->totalAmount, $taxResult->withholdingAmount),
-                metadata: [
-                    InvoiceTaxMetadata::TAX_GROUP_ID => $line->taxGroupId,
-                    InvoiceTaxMetadata::TAXES => array_map($this->taxSnapshot(...), $taxResult->taxes),
-                    InvoiceTaxMetadata::WITHHOLDING_AMOUNT => $taxResult->withholdingAmount,
-                ],
-            );
-        }
-
-        $adjustments = [];
-        if (! $this->math->isZero($taxCalculation->withholdingAmount)) {
-            $adjustments[] = new InvoiceAdjustmentData(
-                name: self::WITHHOLDING_ADJUSTMENT_NAME,
-                adjustmentType: AdjustmentType::Withholding,
-                effect: AdjustmentEffect::Decrease,
-                amount: $taxCalculation->withholdingAmount,
-                calculationType: self::CALCULATION_TYPE_FIXED,
-                allocationMethod: AllocationMethod::Manual,
-                isSystemGenerated: true,
-                description: self::WITHHOLDING_ADJUSTMENT_DESCRIPTION,
-            );
-        }
-
-        $postingPlan = match ($data->direction) {
-            InvoiceDirection::Outbound => $this->postingPlans->outbound(
-                FinancePostingProfileCode::SalesInvoice,
-                $data->invoiceDate,
-                FinanceAccountRoleCode::Revenue,
-                $baseAmount,
-                $taxCalculation->taxAmount,
-                $taxCalculation->withholdingAmount,
-                'Manual sales invoice',
-            ),
-            InvoiceDirection::Inbound => $this->postingPlans->inbound(
-                FinancePostingProfileCode::PurchaseInvoice,
-                $data->invoiceDate,
-                FinanceAccountRoleCode::Expense,
-                $baseAmount,
-                $taxCalculation->taxAmount,
-                $taxCalculation->withholdingAmount,
-                'Manual purchase invoice',
-            ),
-        };
-
-        return new CreateInvoiceData(
-            tenantId: $data->tenantId,
-            invoiceType: InvoiceType::Manual,
-            direction: $data->direction,
-            invoiceDate: $data->invoiceDate,
-            organizationUnitId: $data->organizationUnitId,
-            partyType: $partyType->value,
-            partyId: $partyId,
-            dueDate: $data->dueDate,
-            currencyId: $data->currencyId,
-            exchangeRate: $this->math->normalize($data->exchangeRate),
-            notes: $this->nullableTrimmed($data->notes),
-            createdBy: $data->createdBy,
-            lines: $lines,
-            adjustments: $adjustments,
-            taxCalculation: $taxCalculation,
-            postingPlan: $postingPlan,
-            supplyDate: $this->nullableTrimmed($data->supplyDate),
-            supplyPeriodStart: $this->nullableTrimmed($data->supplyPeriodStart),
-            supplyPeriodEnd: $this->nullableTrimmed($data->supplyPeriodEnd),
-            placeOfSupply: $this->nullableTrimmed($data->placeOfSupply),
-            paymentMode: $this->nullableTrimmed($data->paymentMode),
-            paymentTerms: $this->nullableTrimmed($data->paymentTerms),
+        $source = new CreateInvoiceData(
+            tenantId: $data->tenantId, invoiceType: InvoiceType::Manual, direction: $data->direction,
+            invoiceDate: $data->invoiceDate, organizationUnitId: $data->organizationUnitId,
+            partyType: InvoicePartyType::forDirection($data->direction)->value, partyId: $this->partyId($data),
+            dueDate: $data->dueDate, currencyId: $data->currencyId, exchangeRate: $this->math->normalize($data->exchangeRate),
+            notes: $this->nullableTrimmed($data->notes), createdBy: $data->createdBy, lines: $this->invoiceLines($data),
+            supplyDate: $this->nullableTrimmed($data->supplyDate), supplyPeriodStart: $this->nullableTrimmed($data->supplyPeriodStart),
+            supplyPeriodEnd: $this->nullableTrimmed($data->supplyPeriodEnd), placeOfSupply: $this->nullableTrimmed($data->placeOfSupply),
+            paymentMode: $this->nullableTrimmed($data->paymentMode), paymentTerms: $this->nullableTrimmed($data->paymentTerms),
         );
+
+        return $this->sourceInvoices->prepare($source,
+            $data->direction === InvoiceDirection::Outbound ? FinancePostingProfileCode::SalesInvoice : FinancePostingProfileCode::PurchaseInvoice,
+            $data->direction === InvoiceDirection::Outbound ? FinanceAccountRoleCode::Revenue : FinanceAccountRoleCode::Expense);
     }
 
-    /** @return list<TaxCalculationLineData> */
-    private function taxLines(ManualInvoiceData $data): array
+    /** @return list<InvoiceLineData> */
+    private function invoiceLines(ManualInvoiceData $data): array
     {
         $lines = [];
         foreach (array_values($data->lines) as $index => $line) {
             if (! $line instanceof ManualInvoiceLineData) {
                 throw new InvalidArgumentException('Manual invoice lines must be ManualInvoiceLineData instances.');
             }
-
             if ($line->lineType === InvoiceLineType::Item && $line->itemId === null) {
                 throw new InvalidArgumentException('Manual invoice item lines require an item reference.');
             }
-
-            $lines[] = new TaxCalculationLineData(
-                lineNumber: $index + 1,
-                quantity: $this->math->normalize($line->quantity),
-                unitPrice: $this->math->normalize($line->unitPrice),
-                itemId: $line->itemId,
-                taxGroupId: $line->taxGroupId,
-                discountBeforeTax: $this->math->normalize($line->discountAmount),
-                chargeAfterTax: $this->math->normalize($line->chargeAmount),
-            );
+            $lines[] = new InvoiceLineData(lineNumber: $index + 1, description: trim($line->description),
+                quantity: $this->math->normalize($line->quantity), unitPrice: $this->math->normalize($line->unitPrice),
+                lineType: $line->lineType, itemId: $line->itemId, uomId: $line->uomId,
+                discountAmount: $this->math->normalize($line->discountAmount), chargeAmount: $this->math->normalize($line->chargeAmount),
+                metadata: [InvoiceTaxMetadata::TAX_GROUP_ID => $line->taxGroupId ?? $data->documentTaxGroupId]);
         }
-
         if ($lines === []) {
             throw new InvalidArgumentException('Manual invoice requires at least one line.');
         }
@@ -267,35 +133,6 @@ final class ManualInvoiceService
         }
 
         return $partyId;
-    }
-
-    private function taxDocumentType(InvoiceDirection $direction): string
-    {
-        return match ($direction) {
-            InvoiceDirection::Outbound => self::TAX_DOCUMENT_OUTBOUND,
-            InvoiceDirection::Inbound => self::TAX_DOCUMENT_INBOUND,
-        };
-    }
-
-    /** @return array<string, int|string|bool> */
-    private function taxSnapshot(TaxAmountData $tax): array
-    {
-        return [
-            'tax_id' => $tax->taxId,
-            'tax_code' => $tax->taxCode,
-            'tax_name' => $tax->taxName,
-            'tax_type' => $tax->taxType,
-            'calculation_method' => $tax->calculationMethod,
-            'rate' => $tax->rate,
-            'sequence' => $tax->sequence,
-            'taxable_amount' => $tax->taxableAmount,
-            'tax_amount' => $tax->taxAmount,
-            'total_after_tax' => $tax->totalAfterTax,
-            'is_withholding' => $tax->isWithholding,
-            'recoverable' => $tax->recoverable,
-            'payable' => $tax->payable,
-            'receivable' => $tax->receivable,
-        ];
     }
 
     private function invoiceInScope(ManualInvoiceData $data, int $invoiceId): Invoice

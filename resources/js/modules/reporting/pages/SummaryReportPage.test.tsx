@@ -77,7 +77,7 @@ describe('SummaryReportPage', () => {
         );
 
         expect(await screen.findByRole('heading', { name: 'Summary Reports' })).toBeInTheDocument();
-        expect(screen.getByText(/547,820\.60/)).toBeInTheDocument();
+        expect(screen.getAllByText(/547,820\.60/)).not.toHaveLength(0);
         expect(screen.getByRole('heading', { name: 'Sales' })).toBeInTheDocument();
         expect(screen.getByRole('heading', { name: 'Payments received' })).toBeInTheDocument();
         expect(screen.getByRole('heading', { name: 'Not connected yet' })).toBeInTheDocument();

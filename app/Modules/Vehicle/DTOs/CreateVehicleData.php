@@ -35,7 +35,7 @@ final readonly class CreateVehicleData
         public ?string $color = null,
         public ?VehicleFuelType $fuelType = null,
         public ?VehicleTransmissionType $transmissionType = null,
-        public string $odometerReading = '0.000000',
+        public ?string $odometerReading = null,
         public ?string $odometerUnit = null,
         public ?string $fuelLevel = null,
         public VehicleStatus $status = VehicleStatus::Active,

@@ -6,21 +6,26 @@ namespace Modules\VehicleRental\Providers;
 
 use Illuminate\Support\ServiceProvider;
 use Modules\Core\Contracts\PermissionDefinitionRegistryInterface;
-use Modules\VehicleRental\Constants\VehicleRentalPermission;
+use Modules\Core\Tenancy\TenantFeature;
+use Modules\Vehicle\Contracts\VehicleAvailabilityBlockerInterface;
+use Modules\VehicleRental\Services\RentalAuthorization;
+use Modules\VehicleRental\Services\VehicleUseAvailabilityBlocker;
 
 final class VehicleRentalServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        $this->mergeConfigFrom(__DIR__.'/../Config/vehicle-rental.php', 'vehicle-rental');
+        $this->app->singleton(VehicleUseAvailabilityBlocker::class);
+        $this->app->tag([VehicleUseAvailabilityBlocker::class], VehicleAvailabilityBlockerInterface::TAG);
     }
 
     public function boot(): void
     {
-        $this->app->make(PermissionDefinitionRegistryInterface::class)
-            ->register('vehicle-rental', VehicleRentalPermission::descriptions());
-
+        $this->app->make(PermissionDefinitionRegistryInterface::class)->register(TenantFeature::VEHICLE_RENTAL, RentalAuthorization::descriptions());
+        $this->loadMigrationsFrom([
+            __DIR__.'/../Database/Migrations',
+            __DIR__.'/../Database/UpgradeMigrations',
+        ]);
         $this->loadRoutesFrom(__DIR__.'/../Routes/api.php');
-        $this->loadMigrationsFrom(__DIR__.'/../Database/Migrations');
     }
 }

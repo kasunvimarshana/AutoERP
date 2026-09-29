@@ -22,4 +22,25 @@ final readonly class TaxAmountData
         public bool $payable = false,
         public bool $receivable = false,
     ) {}
+
+    /** @return array<string, int|string|bool> */
+    public function toArray(): array
+    {
+        return [
+            'tax_id' => $this->taxId,
+            'tax_code' => $this->taxCode,
+            'tax_name' => $this->taxName,
+            'tax_type' => $this->taxType,
+            'calculation_method' => $this->calculationMethod,
+            'rate' => $this->rate,
+            'sequence' => $this->sequence,
+            'taxable_amount' => $this->taxableAmount,
+            'tax_amount' => $this->taxAmount,
+            'total_after_tax' => $this->totalAfterTax,
+            'is_withholding' => $this->isWithholding,
+            'recoverable' => $this->recoverable,
+            'payable' => $this->payable,
+            'receivable' => $this->receivable,
+        ];
+    }
 }

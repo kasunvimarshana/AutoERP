@@ -30,7 +30,7 @@ return new class extends Migration
             $table->string('color')->nullable();
             $table->string('fuel_type')->nullable();
             $table->string('transmission_type')->nullable();
-            $table->decimal('odometer_reading', 20, 6)->default('0.000000');
+            $table->decimal('odometer_reading', 20, 6)->nullable();
             $table->string('odometer_unit')->nullable();
             $table->string('fuel_level')->nullable();
             $table->string('status')->default('active');

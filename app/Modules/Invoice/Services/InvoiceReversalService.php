@@ -54,9 +54,10 @@ final class InvoiceReversalService
                 ? $invoice->invoice_type
                 : InvoiceType::from((string) $invoice->invoice_type);
             if ($type->belongsToRetiredSourceModule()) {
-                throw new InvalidArgumentException(
-                    'Historical Vehicle Finance invoices cannot be reversed after their source module was retired.',
-                );
+                throw new InvalidArgumentException(sprintf(
+                    'Historical %s invoices cannot be reversed after their source module was retired.',
+                    $type->retiredSourceLabel(),
+                ));
             }
 
             $status = $invoice->status instanceof InvoiceStatus

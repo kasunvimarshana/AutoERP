@@ -41,6 +41,22 @@ describe('invoice lifecycle handoff', () => {
         expect(detail).toContain('to={`/vehicle-service/jobs/${vehicleServiceJobId}/payment`}');
     });
 
+    it('hands fresh rental invoices to the generic Payment-owned settlement workflow', () => {
+        const detail = sourceFile('resources/js/modules/invoice/pages/InvoiceDetailPage.tsx');
+        const payment = sourceFile('resources/js/modules/payment/pages/PaymentEntryPage.tsx');
+
+        expect(detail).toContain("'vehicle_rental_customer_base_charge'");
+        expect(detail).toContain("'vehicle_rental_owner_base_charge'");
+        expect(detail).toContain("'vehicle_rental_customer_usage_charge'");
+        expect(detail).toContain("'vehicle_rental_owner_usage_charge'");
+        expect(detail).toContain('hasPaymentPermission(auth, paymentPermissions.create)');
+        expect(detail).toContain('to={`/payments/create?invoice_id=${id}`}');
+        expect(detail).toContain("value.direction === 'outbound' ? 'Receive customer payment' : 'Pay owner'");
+        expect(payment).toContain("searchParams.get('invoice_id')");
+        expect(payment).toContain('PAYMENT_TYPE_CUSTOMER_RECEIPT');
+        expect(payment).toContain('PAYMENT_TYPE_SUPPLIER_PAYMENT');
+    });
+
     it('keeps invoices from retired source modules read-only', () => {
         const detail = sourceFile('resources/js/modules/invoice/pages/InvoiceDetailPage.tsx');
 

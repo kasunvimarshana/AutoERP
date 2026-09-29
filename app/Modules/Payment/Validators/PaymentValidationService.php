@@ -155,14 +155,16 @@ final class PaymentValidationService
 
     private function validateSemanticPostingContract(CreatePaymentData $data): void
     {
+        if (PaymentSourceType::tryFrom((string) $data->sourceType)?->isRentalDeposit() === true
+            && ($data->paymentType !== PaymentType::Advance || $data->direction !== PaymentDirection::Inbound
+                || $data->partyType !== 'customer' || $data->sourceId === null || $data->sourceId < 1 || $data->allocations !== [])) {
+            throw new InvalidArgumentException('Rental deposits require an inbound customer advance, a source identity and no initial allocations.');
+        }
         if ($data->paymentType === PaymentType::Advance) {
             $isCustomerAdvance = $data->direction === PaymentDirection::Inbound && $data->partyType === 'customer';
             $isSupplierAdvance = $data->direction === PaymentDirection::Outbound && $data->partyType === 'supplier';
             if (! $isCustomerAdvance && ! $isSupplierAdvance) {
                 throw new InvalidArgumentException('Advance payment requires an inbound customer or outbound supplier party.');
-            }
-            if ($data->sourceType === PaymentSourceType::RentalDepositRequirement->value && $data->allocations !== []) {
-                throw new InvalidArgumentException('Rental deposit receipt cannot allocate invoices during payment creation.');
             }
         }
 

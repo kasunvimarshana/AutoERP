@@ -50,7 +50,9 @@ final class VehicleCreationService
                     'color' => $data->color,
                     'fuel_type' => $data->fuelType,
                     'transmission_type' => $data->transmissionType,
-                    'odometer_reading' => $this->math->normalize($data->odometerReading),
+                    'odometer_reading' => $data->odometerReading === null
+                        ? null
+                        : $this->math->normalize($data->odometerReading),
                     'odometer_unit' => $data->odometerUnit,
                     'fuel_level' => $data->fuelLevel,
                     'status' => $data->status,

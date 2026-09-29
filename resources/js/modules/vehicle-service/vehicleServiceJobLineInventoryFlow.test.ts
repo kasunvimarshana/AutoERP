@@ -35,7 +35,7 @@ describe('Vehicle Service job-line inventory flow', () => {
     });
 
     it('uses the existing Inventory issue API after line creation and preserves pending recovery on failure', () => {
-        expect(lineEditorSource).toContain('const lineVersion = expectedVersion + 1');
+        expect(lineEditorSource).toContain('const lineVersion = mutation.rowVersion');
         expect(lineEditorSource).toContain('expected_version: lineVersion');
         expect(lineEditorSource).toContain('line_ids: [saved.id]');
         expect(lineEditorSource).toContain("status: 'issued'");

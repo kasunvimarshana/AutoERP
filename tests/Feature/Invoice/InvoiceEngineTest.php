@@ -24,10 +24,12 @@ use Modules\Invoice\Enums\InvoiceType;
 use Modules\Invoice\Services\InvoiceBalanceService;
 use Modules\Invoice\Services\InvoiceCreationService;
 use Modules\Invoice\Services\InvoicePostingPlanFactory;
+use Modules\Invoice\Services\InvoiceReversalService;
 use Modules\Invoice\Services\InvoiceStatusService;
 use Modules\Supplier\Enums\SupplierStatus;
 use Modules\Supplier\Enums\SupplierType;
 use Tests\Support\FinancePostingFixture;
+use Tests\Support\OrganizationUnitFixture;
 use Tests\TestCase;
 
 final class InvoiceEngineTest extends TestCase
@@ -326,6 +328,60 @@ final class InvoiceEngineTest extends TestCase
         )));
     }
 
+    public function test_proportional_adjustment_preserves_final_residual_and_released_capacity(): void
+    {
+        $tenant = $this->createTenant();
+        $this->withTenantExecutionContext($tenant, function () use ($tenant): void {
+            $creator = app(InvoiceCreationService::class);
+            $invoices = [];
+            foreach (['A', 'B', 'C'] as $number) {
+                $invoices[] = $creator->create($this->fractionalAdjustmentData($tenant, $number));
+            }
+            $this->assertSame(['0.333333', '0.333333', '0.333334'], array_map(fn ($invoice) => (string) $invoice->charge_total, $invoices));
+            app(InvoiceStatusService::class)->transitionIfVersion($invoices[0], InvoiceStatus::Cancelled, $invoices[0]->row_version);
+            $replacement = $creator->create($this->fractionalAdjustmentData($tenant, 'REPLACEMENT'));
+            $this->assertSame('0.333333', (string) $replacement->charge_total);
+            $this->assertSame('0.000000', (string) $replacement->adjustmentAllocations->sole()->remaining_amount);
+        });
+    }
+
+    public function test_reversed_invoice_releases_adjustment_as_well_as_source_capacity(): void
+    {
+        $tenant = $this->createTenant();
+        $this->withTenantExecutionContext($tenant, function () use ($tenant): void {
+            FinancePostingFixture::seedCustomerInvoiceProfiles($tenant);
+            $creator = app(InvoiceCreationService::class);
+            $first = $creator->create($this->fractionalAdjustmentData($tenant, 'ORIGINAL', whole: true));
+            $status = app(InvoiceStatusService::class);
+            $first = $status->transitionIfVersion($first, InvoiceStatus::Approved, $first->row_version);
+            $first = $status->transitionIfVersion($first, InvoiceStatus::Posted, $first->row_version);
+            $first = app(InvoiceReversalService::class)->reverse($first, $first->row_version, now()->toDateString(), 'Correct source document');
+            $this->assertSame(InvoiceStatus::Reversed, $first->status);
+            $replacement = $creator->create($this->fractionalAdjustmentData($tenant, 'REISSUED', whole: true));
+            $this->assertSame('1.000000', (string) $replacement->charge_total);
+            $this->assertSame('0.000000', (string) $replacement->adjustmentAllocations->sole()->previously_allocated_amount);
+            $this->assertDatabaseCount('invoice_adjustment_allocations', 2);
+        });
+    }
+
+    private function fractionalAdjustmentData(int $tenant, string $number, bool $whole = false): CreateInvoiceData
+    {
+        $quantity = $whole ? '3' : '1';
+
+        return new CreateInvoiceData(tenantId: $tenant, invoiceType: InvoiceType::Manual, direction: InvoiceDirection::Outbound,
+            invoiceDate: '2026-06-06', invoiceNumber: 'FRACTION-'.$number,
+            lines: [new InvoiceLineData(lineNumber: 1, description: 'Fractional source', quantity: $quantity, unitPrice: '1',
+                sourceLineType: 'fraction_line', sourceLineId: 1)],
+            sources: [new InvoiceSourceData(tenantId: $tenant, sourceType: 'fraction', sourceId: 1, sourceSubtotal: '3', sourceAdjustmentTotal: '1', sourceGrandTotal: '4')],
+            sourceLines: [new InvoiceSourceLineData(tenantId: $tenant, sourceType: 'fraction', sourceId: 1, sourceLineType: 'fraction_line', sourceLineId: 1,
+                sourceQuantity: '3', invoicedQuantity: $quantity, sourceUnitPrice: '1', sourceLineTotal: '3')],
+            adjustments: [new InvoiceAdjustmentData(name: 'Shared charge', adjustmentType: AdjustmentType::Charge, effect: AdjustmentEffect::Increase,
+                amount: '1', sourceAdjustmentType: 'fraction_adjustment', sourceAdjustmentId: 1, sourceType: 'fraction', sourceId: 1,
+                allocationMethod: AllocationMethod::Proportional)],
+            postingPlan: $whole ? app(InvoicePostingPlanFactory::class)->outbound(FinancePostingProfileCode::SalesInvoice, '2026-06-06',
+                FinanceAccountRoleCode::Revenue, '4', description: 'Source and charge') : null);
+    }
+
     private function progressiveInvoiceData(
         int $tenantId,
         int $supplierId,
@@ -456,7 +512,7 @@ final class InvoiceEngineTest extends TestCase
 
     private function createOrganizationUnit(int $tenantId, string $name): int
     {
-        return (int) \Tests\Support\OrganizationUnitFixture::create([
+        return (int) OrganizationUnitFixture::create([
             'tenant_id' => $tenantId,
             'row_version' => 1,
             'name' => $name,

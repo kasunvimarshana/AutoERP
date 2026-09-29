@@ -9,7 +9,6 @@ const organizationApi = source('resources/js/modules/organization-unit/organizat
 const legalProfilePanel = source('resources/js/modules/organization-unit/components/OrganizationUnitLegalProfilePanel.tsx');
 const organizationDrawer = source('resources/js/modules/organization-unit/components/OrganizationUnitDetailDrawer.tsx');
 const invoicePrint = source('resources/views/invoice/print.blade.php');
-const rentalFactory = source('app/Modules/VehicleRental/Services/RentalFinancialDocumentDataFactory.php');
 const snapshotService = source('app/Modules/Invoice/Services/InvoiceDocumentSnapshotService.php');
 
 describe('invoice legal print foundation', () => {
@@ -40,13 +39,6 @@ describe('invoice legal print foundation', () => {
         expect(invoicePrint).toContain("$document['number_label']");
         expect(invoicePrint).toContain("$document['amount_in_words']");
         expect(invoicePrint).toContain("$document['place_of_supply']");
-    });
-
-    it('keeps rental supply and agreed payment terms with the Vehicle Rental owner', () => {
-        expect(rentalFactory).toContain('supplyPeriodStart: $calculation->period_start?->toDateString()');
-        expect(rentalFactory).toContain('supplyPeriodEnd: $calculation->period_end?->toDateString()');
-        expect(rentalFactory).toContain('paymentMode: $this->paymentMode($paymentTermsDays)');
-        expect(rentalFactory).toContain('paymentTerms: $this->paymentTerms($paymentTermsDays)');
     });
 
     it('keeps organization legal registration details optional', () => {

@@ -44,6 +44,15 @@ final class PaymentPostingPolicyTest extends TestCase
         self::assertSame(PaymentPostingRole::CustomerDeposit, $policy->unappliedRole);
     }
 
+    public function test_fresh_agreement_deposit_uses_customer_deposit_liability(): void
+    {
+        $policy = $this->policy()->resolve($this->payment(PaymentType::Advance, PaymentDirection::Inbound,
+            'customer', PaymentSourceType::RentalAgreementDeposit->value));
+        self::assertSame(PaymentPostingProfile::RentalDeposit->value, $policy->postingProfileCode);
+        self::assertSame(PaymentPostingRole::CustomerDeposit, $policy->unappliedRole);
+        self::assertSame(PaymentPostingRole::Receivable, $policy->allocationTargetRole);
+    }
+
     public function test_supplier_advance_uses_supplier_advance_asset(): void
     {
         $policy = $this->policy()->resolve($this->payment(
@@ -71,7 +80,7 @@ final class PaymentPostingPolicyTest extends TestCase
 
     private function policy(): PaymentPostingPolicyService
     {
-        return new PaymentPostingPolicyService(new PaymentRefundPolicyService());
+        return new PaymentPostingPolicyService(new PaymentRefundPolicyService);
     }
 
     private function payment(
@@ -80,7 +89,7 @@ final class PaymentPostingPolicyTest extends TestCase
         ?string $partyType,
         ?string $sourceType = null,
     ): Payment {
-        $payment = new Payment();
+        $payment = new Payment;
         $payment->forceFill([
             'tenant_id' => 1,
             'organization_unit_id' => null,

@@ -1,0 +1,201 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Modules\VehicleRental\Services;
+
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
+use Modules\Vehicle\Models\Vehicle;
+use Modules\VehicleRental\Constants\AgreementFields;
+use Modules\VehicleRental\Constants\OperationalFields;
+use Modules\VehicleRental\Data\AgreementContext;
+use Modules\VehicleRental\Enums\DriverIdentitySource;
+use Modules\VehicleRental\Enums\RunningChartAction;
+use Modules\VehicleRental\Enums\RunningChartStatus;
+use Modules\VehicleRental\Enums\VehicleUseStatus;
+use Modules\VehicleRental\Models\CustomerUsageCharge;
+use Modules\VehicleRental\Models\OwnerUsageCharge;
+use Modules\VehicleRental\Models\RunningChart;
+use Modules\VehicleRental\Models\VehicleUse;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
+
+final class RunningChartService
+{
+    public function __construct(private readonly RentalAuthorization $authorization, private readonly AgreementValidation $contextValidation, private readonly RunningChartValidation $validation, private readonly OdometerContinuity $odometerContinuity) {}
+
+    public function list(AgreementContext $context, int $useId, int $perPage): LengthAwarePaginator
+    {
+        $this->authorization->assertChart($context, RunningChartAction::Create, false);
+        VehicleUse::query()->forContext($context->tenantId, $context->organizationUnitId)->findOrFail($useId);
+
+        return RunningChart::query()->forContext($context->tenantId, $context->organizationUnitId)->where('vehicle_use_id', $useId)->with(['vehicleUse', 'correctsChart'])->orderByDesc('starts_at')->orderByDesc('id')->paginate($perPage);
+    }
+
+    public function find(AgreementContext $context, int $id): RunningChart
+    {
+        $this->authorization->assertChart($context, RunningChartAction::Create, false);
+
+        return RunningChart::query()->forContext($context->tenantId, $context->organizationUnitId)->with(['vehicleUse', 'correctsChart'])->findOrFail($id);
+    }
+
+    public function create(AgreementContext $context, int $useId, int $expectedUseVersion, array $input, ?int $corrects = null): RunningChart
+    {
+        $this->authorization->assertChart($context, RunningChartAction::Create, true);
+        $this->contextValidation->assertContext($context);
+
+        return $this->atomic(function () use ($context, $useId, $expectedUseVersion, $input, $corrects): RunningChart {
+            $use = $this->lockedUse($context, $useId);
+            $this->version($use->row_version, $expectedUseVersion);
+            if ($corrects !== null) {
+                $original = RunningChart::query()->forContext($context->tenantId, $context->organizationUnitId)->lockForUpdate()->findOrFail($corrects);
+                if ((int) $original->vehicle_use_id !== $useId || $original->status !== RunningChartStatus::Reversed) {
+                    throw ValidationException::withMessages(['corrects_chart_id' => ['Select a reversed chart from the same vehicle use.']]);
+                }
+            }
+            $data = $this->validation->validate($input, $context);
+            $this->assertCoverage($use, $data['starts_at'], $data['ends_at']);
+            $chart = new RunningChart;
+            $chart->forceFill(array_merge($data, ['tenant_id' => $context->tenantId, 'organization_unit_id' => $context->organizationUnitId, 'vehicle_use_id' => $useId, 'vehicle_use_version' => $use->row_version, 'corrects_chart_id' => $corrects, 'status' => RunningChartStatus::Draft, 'row_version' => AgreementFields::INITIAL_VERSION]))->save();
+            $this->record($chart, $context, RunningChartAction::Create);
+
+            return $chart->load(['vehicleUse', 'correctsChart']);
+        });
+    }
+
+    public function change(AgreementContext $context, int $id, int $expectedVersion, RunningChartAction $action, array $input = [], ?string $reason = null): RunningChart
+    {
+        $this->authorization->assertChart($context, $action, true);
+        $this->contextValidation->assertContext($context);
+
+        return $this->atomic(function () use ($context, $id, $expectedVersion, $action, $input, $reason): RunningChart {
+            $snapshot = RunningChart::query()->forContext($context->tenantId, $context->organizationUnitId)->findOrFail($id);
+            $use = $this->lockedUse($context, (int) $snapshot->vehicle_use_id);
+            if ($action === RunningChartAction::Finalize) {
+                $this->lockDriverTimeline($context, $snapshot);
+            }
+            $chart = RunningChart::query()->forContext($context->tenantId, $context->organizationUnitId)->lockForUpdate()->findOrFail($id);
+            $this->version($chart->row_version, $expectedVersion);
+            if ($action === RunningChartAction::Update && $chart->status === RunningChartStatus::Draft) {
+                $data = $this->validation->validate($input, $context);
+                $this->assertCoverage($use, $data['starts_at'], $data['ends_at']);
+                $chart->forceFill($data);
+            } elseif ($action === RunningChartAction::Finalize && $chart->status === RunningChartStatus::Draft) {
+                $this->assertCoverage($use, $chart->starts_at->format(OperationalFields::DATABASE_TIMESTAMP_FORMAT), $chart->ends_at->format(OperationalFields::DATABASE_TIMESTAMP_FORMAT));
+                $timeline = RunningChart::query()->forTenant($context->tenantId)->whereKeyNot($chart->id)->where('status', RunningChartStatus::Finalized->value)->whereHas('vehicleUse', fn ($q) => $q->where('vehicle_id', $use->vehicle_id));
+                if ((clone $timeline)->where('starts_at', '<', $chart->ends_at)->where('ends_at', '>', $chart->starts_at)->lockForUpdate()->first(['id']) !== null) {
+                    throw new ConflictHttpException('Finalized usage already covers this vehicle period.');
+                }
+                $this->assertDriverAvailable($context, $chart);
+                $this->odometerContinuity->assertReading($context->tenantId, (int) $use->vehicle_id, $chart->starts_at->format(OperationalFields::DATABASE_TIMESTAMP_FORMAT), $chart->start_odometer);
+                $this->odometerContinuity->assertReading($context->tenantId, (int) $use->vehicle_id, $chart->ends_at->format(OperationalFields::DATABASE_TIMESTAMP_FORMAT), $chart->end_odometer);
+                $chart->vehicle_use_version = $use->row_version;
+                $chart->status = RunningChartStatus::Finalized;
+                $chart->finalized_at = now();
+            } elseif ($action === RunningChartAction::Reverse && $chart->status === RunningChartStatus::Finalized) {
+                Validator::make(['reason' => $reason], ['reason' => ['required', 'string', 'max:'.AgreementFields::NOTES_LENGTH]])->validate();
+                if (trim($reason ?? '') === '') {
+                    throw ValidationException::withMessages(['reason' => ['Explain the reversal.']]);
+                }
+                foreach ([CustomerUsageCharge::class, OwnerUsageCharge::class] as $charges) {
+                    if ($charges::query()->forTenant($context->tenantId)->where('running_chart_id', $chart->id)->whereNull('voided_at')->lockForUpdate()->exists()) {
+                        throw new ConflictHttpException('Release the invoices and void all customer and owner usage charges before reversing this chart.');
+                    }
+                }
+                $chart->status = RunningChartStatus::Reversed;
+                $chart->reversed_at = now();
+            } else {
+                throw ValidationException::withMessages(['status' => ['Invalid action. Finalized evidence cannot be edited.']]);
+            }
+            $chart->row_version++;
+            $chart->save();
+            $this->record($chart, $context, $action, $reason);
+
+            return $chart->load(['vehicleUse', 'correctsChart']);
+        });
+    }
+
+    private function lockDriverTimeline(AgreementContext $context, RunningChart $chart): void
+    {
+        $timeline = $this->driverIdentityQuery($context, $chart);
+        if ($timeline === null) {
+            return;
+        }
+
+        // Lock every row for this identity in stable order before the current chart row. Two
+        // concurrent finalizations for the same driver therefore serialize before overlap checks.
+        $timeline->orderBy('id')->lockForUpdate()->get(['id']);
+    }
+
+    private function assertDriverAvailable(AgreementContext $context, RunningChart $chart): void
+    {
+        $conflicts = $this->driverIdentityQuery($context, $chart);
+        if ($conflicts === null) {
+            return;
+        }
+
+        if ($conflicts->whereKeyNot($chart->id)
+            ->where('status', RunningChartStatus::Finalized->value)
+            ->where('starts_at', '<', $chart->ends_at)
+            ->where('ends_at', '>', $chart->starts_at)
+            ->first(['id']) !== null) {
+            throw new ConflictHttpException('This driver already has finalized Rental usage during the selected period.');
+        }
+    }
+
+    private function driverIdentityQuery(AgreementContext $context, RunningChart $chart): ?Builder
+    {
+        if ($chart->driver_identity_source === null) {
+            return null;
+        }
+
+        $query = RunningChart::query()->forTenant($context->tenantId);
+        if ($chart->driver_identity_source === DriverIdentitySource::Employee) {
+            return $query->where('driver_identity_source', DriverIdentitySource::Employee->value)
+                ->where('driver_employee_id', $chart->driver_employee_id);
+        }
+
+        return $query->where('driver_identity_source', DriverIdentitySource::External->value)
+            ->where('driver_reference_snapshot', $chart->driver_reference_snapshot);
+    }
+
+    private function lockedUse(AgreementContext $context, int $id): VehicleUse
+    {
+        $snapshot = VehicleUse::query()->forContext($context->tenantId, $context->organizationUnitId)->findOrFail($id);
+        Vehicle::query()->withTrashed()->where('tenant_id', $context->tenantId)->lockForUpdate()->findOrFail($snapshot->vehicle_id);
+
+        return VehicleUse::query()->forContext($context->tenantId, $context->organizationUnitId)->lockForUpdate()->findOrFail($id);
+    }
+
+    private function assertCoverage(VehicleUse $use, string $start, string $end): void
+    {
+        if (! in_array($use->status, [VehicleUseStatus::InCustody, VehicleUseStatus::Returned], true) || $use->handed_over_at === null || $start < $use->handed_over_at->format(OperationalFields::DATABASE_TIMESTAMP_FORMAT) || ($use->returned_at !== null && $end > $use->returned_at->format(OperationalFields::DATABASE_TIMESTAMP_FORMAT))) {
+            throw ValidationException::withMessages(['period' => ['Usage must fall within actual customer custody.']]);
+        }
+    }
+
+    private function version(int $actual, int $expected): void
+    {
+        if ($actual !== $expected) {
+            throw new ConflictHttpException('This record changed. Reload before continuing.');
+        }
+    }
+
+    private function record(RunningChart $chart, AgreementContext $context, RunningChartAction $action, ?string $reason = null): void
+    {
+        $chart->history()->make()->forceFill(['tenant_id' => $context->tenantId, 'actor_id' => $context->actorId, 'row_version' => $chart->row_version, 'action' => $action->value, 'reason' => $reason, 'snapshot' => $chart->attributesToArray(), 'recorded_at' => now()])->save();
+    }
+
+    private function atomic(callable $operation): RunningChart
+    {
+        try {
+            return DB::transaction($operation);
+        } catch (UniqueConstraintViolationException $error) {
+            throw new ConflictHttpException('Chart reference or correction already exists. Reload and review.', $error);
+        }
+    }
+}

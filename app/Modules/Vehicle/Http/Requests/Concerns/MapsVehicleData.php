@@ -38,7 +38,7 @@ trait MapsVehicleData
             color: $this->nullableString($vehicle, 'color'),
             fuelType: isset($vehicle['fuel_type']) && $vehicle['fuel_type'] !== null ? VehicleFuelType::from((string) $vehicle['fuel_type']) : null,
             transmissionType: isset($vehicle['transmission_type']) && $vehicle['transmission_type'] !== null ? VehicleTransmissionType::from((string) $vehicle['transmission_type']) : null,
-            odometerReading: (string) ($vehicle['odometer_reading'] ?? '0.000000'),
+            odometerReading: $this->nullableString($vehicle, 'odometer_reading'),
             odometerUnit: $this->nullableString($vehicle, 'odometer_unit'),
             fuelLevel: $this->nullableString($vehicle, 'fuel_level'),
             status: VehicleStatus::from((string) ($vehicle['status'] ?? VehicleStatus::Active->value)),

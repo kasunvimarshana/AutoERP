@@ -84,7 +84,7 @@ export interface VehicleSummary {
     current_customer?: { relationship_id: number; id: number; code: string; name: string; started_at?: string | null } | null;
     current_supplier?: { relationship_id: number; id: number; code: string; name: string; started_at?: string | null } | null;
     status: VehicleStatus;
-    odometer_reading: string;
+    odometer_reading: string | null;
     odometer_unit?: string | null;
     created_at?: string | null;
     updated_at?: string | null;

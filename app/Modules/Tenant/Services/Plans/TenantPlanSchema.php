@@ -10,11 +10,15 @@ use Modules\Core\Tenancy\TenantPlanLimit;
 
 final class TenantPlanSchema
 {
-    public const SCHEMA_VERSION = 2;
+    public const SCHEMA_VERSION = 4;
+
+    private const RETIRED_VEHICLE_RENTAL_MODULE = 'vehicle-rental';
 
     /** @var array<int, list<string>> */
     private const RETIRED_MODULES_BY_SCHEMA_VERSION = [
-        1 => [TenantFeature::VEHICLE_RENTAL],
+        1 => [self::RETIRED_VEHICLE_RENTAL_MODULE],
+        2 => [self::RETIRED_VEHICLE_RENTAL_MODULE],
+        3 => [self::RETIRED_VEHICLE_RENTAL_MODULE],
     ];
 
     /** @var list<string> */
@@ -38,8 +42,8 @@ final class TenantPlanSchema
         TenantFeature::INVENTORY => 'Inventory',
         TenantFeature::PURCHASE => 'Purchasing',
         TenantFeature::VEHICLE => 'Vehicles',
-        TenantFeature::VEHICLE_SERVICE => 'Vehicle service',
         TenantFeature::VEHICLE_RENTAL => 'Vehicle rental',
+        TenantFeature::VEHICLE_SERVICE => 'Vehicle service',
         TenantFeature::INVOICE => 'Invoicing',
         TenantFeature::PAYMENT => 'Payments',
         TenantFeature::FINANCE => 'Finance',
@@ -86,7 +90,7 @@ final class TenantPlanSchema
         );
     }
 
-    /** @return array{enabled_modules:list<string>} */
+    /** @param list<string> $retiredModules @return array{enabled_modules:list<string>} */
     private function normalizeFeaturePayload(mixed $features, array $retiredModules): array
     {
         $features = $features ?? [];
