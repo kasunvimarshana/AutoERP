@@ -224,12 +224,13 @@ final class AgreementService
         $uses = VehicleUse::query()->forTenant($context->tenantId)->where($foreignKey, $predecessor->id)
             ->where('status', '!=', VehicleUseStatus::Cancelled->value)
             ->orderBy('id')->lockForUpdate()->get(['id', 'ends_at_input']);
-        $crossingUse = $uses->first(function (VehicleUse $use) use ($successorStart): bool {
+        $timezone = $this->calendar->timezone($context);
+        $boundary = CarbonImmutable::createFromFormat('!'.AgreementFields::DATE_FORMAT, $successorStart, $timezone);
+        $crossingUse = $uses->first(function (VehicleUse $use) use ($boundary, $timezone): bool {
             if ($use->ends_at_input === null) {
                 return true;
             }
-            $end = OperationalTime::parse($use->ends_at_input, 'ends_at');
-            $boundary = CarbonImmutable::createFromFormat('!'.AgreementFields::DATE_FORMAT, $successorStart, $end->getTimezone());
+            $end = OperationalTime::parse($use->ends_at_input, 'ends_at')->setTimezone($timezone);
 
             return $end > $boundary;
         });
