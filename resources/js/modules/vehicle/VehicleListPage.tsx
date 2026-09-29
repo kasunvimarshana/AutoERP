@@ -15,9 +15,8 @@ import { useDebounce } from '@/shared/hooks/useDebounce';
 import type { PaginationMeta } from '@/shared/types/pagination';
 import { listVehicles, setVehicleActive } from './vehicleApi';
 import type { VehicleSummary } from './vehicleTypes';
-import { LookupSelect } from '@/shared/components/LookupSelect';
-import { lookupApi } from '@/shared/api/lookupApi';
-import type { NamedResource } from '@/shared/types/common';
+import type { CustomerSummary } from '@/modules/customer/customerTypes';
+import { CustomerLookupSelect } from '@/modules/customer/components/CustomerLookupSelect';
 import { notifySuccess } from '@/shared/notifications/appToast';
 import { hasVehiclePermission, vehiclePermissions } from './vehiclePermissions';
 
@@ -40,7 +39,7 @@ export default function VehicleListPage() {
     const [rows, setRows] = useState<VehicleSummary[]>([]);
     const [meta, setMeta] = useState<PaginationMeta | undefined>();
     const [search, setSearch] = useState('');
-    const [customer, setCustomer] = useState<NamedResource | null>(null);
+    const [customer, setCustomer] = useState<CustomerSummary | null>(null);
     const [page, setPage] = useState(1);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<ApiError | null>(null);
@@ -89,7 +88,7 @@ export default function VehicleListPage() {
             <ContentHeader title={title} description={description} actions={canCreate ? <LinkButton to="/vehicles/create">New vehicle</LinkButton> : undefined} />
             <div className="mb-4 grid max-w-4xl gap-3 md:grid-cols-2">
                 <Input label="Search" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="Number, registration, chassis, engine, VIN" />
-                <LookupSelect label="Customer" value={customer} onChange={(value) => { setCustomer(value); setPage(1); }} search={lookupApi.customers} />
+                <CustomerLookupSelect value={customer} onChange={(value) => { setCustomer(value); setPage(1); }} />
             </div>
             {hasFilters && (
                 <div className="mb-4 flex flex-wrap items-center gap-2 text-sm text-slate-600">

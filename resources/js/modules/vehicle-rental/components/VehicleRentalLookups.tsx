@@ -25,6 +25,7 @@ import type {
 
 export interface RentalLookupOption extends NamedResource {
     subtitle?: string | null;
+    whatsappNumber?: string | null;
     billingBasis?: RentalBillingBasis;
     startsOn?: string | null;
     endsOn?: string | null;
@@ -69,11 +70,12 @@ export function RentalCustomerLookup({ value, onChange, error, disabled, require
             id: item.id,
             code: item.code,
             name: item.name || item.display_name || item.code,
+            whatsappNumber: item.mobile ?? null,
             defaultCurrency: namedReference(item.default_currency),
         }),
     ), []);
 
-    return <ReferenceLookup label="Customer" value={value} onChange={onChange} search={search} error={error} disabled={disabled} required={required} />;
+    return <ReferenceLookup label="Customer" value={value} onChange={onChange} search={search} error={error} disabled={disabled} required={required} customerContactMode />;
 }
 
 export function RentalSupplierLookup({ value, onChange, error, disabled, required }: LookupProps) {
@@ -247,12 +249,14 @@ function ReferenceLookup({
     loadOnOpen = false,
     placeholder,
     renderEmptyState,
+    customerContactMode = false,
 }: LookupProps & {
     label: string;
     search: (params: LookupLoadParams) => Promise<LookupResult<RentalLookupOption>>;
     loadOnOpen?: boolean;
     placeholder?: string;
     renderEmptyState?: (state: { searchText: string }) => ReactNode;
+    customerContactMode?: boolean;
 }) {
     return (
         <GenericLookupSelect
@@ -260,12 +264,11 @@ function ReferenceLookup({
             value={reference(value)}
             onChange={onChange}
             search={search}
-            formatLabel={(item) => [item.code, item.name].filter(Boolean).join(' - ')}
+            formatLabel={(item) => customerContactMode ? item.name ?? '' : [item.code, item.name].filter(Boolean).join(' - ')}
             renderOption={(item) => (
-                <div>
-                    <p>{[item.code, item.name].filter(Boolean).join(' - ')}</p>
-                    {item.subtitle && <p className="text-xs text-slate-500">{item.subtitle}</p>}
-                </div>
+                customerContactMode
+                    ? <div className="flex min-w-0 items-center gap-2"><span className="truncate">{item.name}</span><span className="shrink-0 whitespace-nowrap text-xs text-slate-500">{item.whatsappNumber?.trim() || '—'}</span></div>
+                    : <div><p>{[item.code, item.name].filter(Boolean).join(' - ')}</p>{item.subtitle && <p className="text-xs text-slate-500">{item.subtitle}</p>}</div>
             )}
             renderEmptyState={renderEmptyState}
             error={error}

@@ -11,7 +11,7 @@ import { Panel } from '@/shared/components/Panel';
 import { Textarea } from '@/shared/components/Textarea';
 import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
-import { searchCustomers } from '@/modules/customer/customerApi';
+import { CustomerLookupSelect } from '@/modules/customer/components/CustomerLookupSelect';
 import { InventoryDimensionFields, emptyInventoryDimensions, type InventoryDimensionValue } from '@/modules/inventory/components/InventoryDimensionFields';
 import { multiplyDecimal } from '@/shared/utils/decimal';
 import type { ItemLookupResource } from '@/shared/api/lookupApi';
@@ -229,7 +229,7 @@ export default function SellingWorkspacePage() {
                 <form className="space-y-5" onSubmit={(event) => void submitSale(event)}>
                     <Panel title="Sale details">
                         <div className="grid gap-4 md:grid-cols-2">
-                            <LookupSelect<CustomerSummary> label="Customer" value={customer} onChange={setCustomer} search={searchCustomers} placeholder="Search customers..." required />
+                            <CustomerLookupSelect value={customer} onChange={setCustomer} placeholder="Search customers..." required />
                             <LookupSelect<NamedResource> label="Warehouse" value={warehouse} onChange={changeWarehouse} search={searchSellingWarehouses} placeholder="Choose a warehouse..." required loadOnOpen minSearchLength={0} />
                             <LookupSelect<NamedResource> label="Location" value={warehouseLocation} onChange={setWarehouseLocation} search={locationSearch} placeholder={warehouse ? 'Choose a location...' : 'Choose a warehouse first'} disabled={!warehouse || resolvingSource} loadOnOpen minSearchLength={0} />
                             <Input label="Sale date" type="date" value={saleDate} onChange={(event) => setSaleDate(event.target.value)} required />

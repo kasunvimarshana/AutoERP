@@ -1,17 +1,17 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { hasPermission } from '@/modules/auth/accessControl';
 import { useAuth } from '@/modules/auth/AuthProvider';
 import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
-import { lookupApi, type VehicleLookupResource } from '@/shared/api/lookupApi';
+import type { VehicleLookupResource } from '@/shared/api/lookupApi';
 import { Button } from '@/shared/components/Button';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
-import { GenericLookupSelect } from '@/shared/components/GenericLookupSelect';
 import { Input } from '@/shared/components/Input';
 import { Modal } from '@/shared/components/Modal';
 import { Panel } from '@/shared/components/Panel';
 import { Select } from '@/shared/components/Select';
 import { WhatsAppVerificationPanel } from '@/shared/components/WhatsAppVerificationPanel';
-import { customerTypes, type CustomerPayload } from '@/modules/customer/customerTypes';
+import { customerTypes, type CustomerPayload, type CustomerSummary } from '@/modules/customer/customerTypes';
+import { CustomerLookupSelect } from '@/modules/customer/components/CustomerLookupSelect';
 import { confirmCustomerWhatsAppVerification, createCustomer, getCustomerWhatsAppVerification, startCustomerWhatsAppVerification } from '@/modules/customer/customerApi';
 import {
     DEFAULT_CUSTOMER_STATUS,
@@ -55,7 +55,7 @@ export function VehicleServiceQuickVehicleModal({
     const auth = useAuth();
     const canVerifyCustomer = hasPermission(auth, 'customers.update');
     const [customerMode, setCustomerMode] = useState<CustomerMode>('existing');
-    const [existingCustomer, setExistingCustomer] = useState<NamedResource | null>(null);
+    const [existingCustomer, setExistingCustomer] = useState<CustomerSummary | null>(null);
     const [customerPayload, setCustomerPayload] = useState<CustomerPayload>(defaultCustomerPayload());
     const [vehiclePayload, setVehiclePayload] = useState<VehiclePayload>(defaultVehiclePayload(initialVehicleNumber));
     const [make, setMake] = useState<VehicleMake | null>(null);
@@ -67,8 +67,6 @@ export function VehicleServiceQuickVehicleModal({
     const [error, setError] = useState<ApiError | null>(null);
     const [verifyAfterSave, setVerifyAfterSave] = useState(false);
     const [createdForVerification, setCreatedForVerification] = useState<{ vehicle: VehicleLookupResource; customer: NamedResource } | null>(null);
-
-    const customerSearch = useMemo(() => lookupApi.customers, []);
 
     useEffect(() => {
         if (!open) return;
@@ -283,14 +281,11 @@ export function VehicleServiceQuickVehicleModal({
                     </div>
 
                     {customerMode === 'existing' ? (
-                        <GenericLookupSelect
-                            label="Customer"
+                        <CustomerLookupSelect
                             value={existingCustomer}
                             onChange={setExistingCustomer}
-                            search={customerSearch}
-                            formatLabel={(resource) => `${resource.code ?? ''} ${resource.name}`.trim()}
                             error={customerError(error, 'customer_id', 'owner_id', 'ownerships.0.owner_id')}
-                            placeholder="Search customer by code or name"
+                            placeholder="Search customers by name or WhatsApp number"
                             loadOnOpen
                             minSearchLength={0}
                             dropdownPlacement="top"
