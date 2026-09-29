@@ -59,7 +59,7 @@ final class ItemQueryService
             ->find($id);
 
         if ($item instanceof Item) {
-            return $item;
+            return $this->resolveSummaryPrices($item, $organizationUnitId);
         }
 
         $this->assertItemIsNotOwnedByAnotherScope($id, $tenantId, $organizationUnitId);
@@ -95,6 +95,27 @@ final class ItemQueryService
     private function summaryRelations(): array
     {
         return ['category', 'brand', 'tenant.baseCurrency', 'baseUom', 'defaultTaxGroup', 'purchaseTaxGroup', 'salesTaxGroup'];
+    }
+
+    private function resolveSummaryPrices(Item $item, ?int $organizationUnitId): Item
+    {
+        $item->setAttribute('resolved_sales_unit_price', $this->prices->resolvePrice(
+            item: $item,
+            context: ItemPriceResolutionService::CONTEXT_SALES,
+            organizationUnitId: $organizationUnitId,
+        )->amount);
+        $item->setAttribute('resolved_service_unit_price', $this->prices->resolvePrice(
+            item: $item,
+            context: ItemPriceResolutionService::CONTEXT_SERVICE,
+            organizationUnitId: $organizationUnitId,
+        )->amount);
+        $item->setAttribute('resolved_purchase_unit_price', $this->prices->resolvePrice(
+            item: $item,
+            context: ItemPriceResolutionService::CONTEXT_PURCHASE,
+            organizationUnitId: $organizationUnitId,
+        )->amount);
+
+        return $item;
     }
 
     private function applyCriteria(Builder $query, array $criteria): void

@@ -21,6 +21,9 @@ export interface ItemSummary extends NamedResource {
     brand?: NamedResource | null;
     tenant_base_currency?: NamedResource | null;
     base_uom?: NamedResource | null;
+    resolved_sales_unit_price?: string | null;
+    resolved_service_unit_price?: string | null;
+    resolved_purchase_unit_price?: string | null;
     default_tax_group_id?: number | null;
     purchase_tax_group_id?: number | null;
     sales_tax_group_id?: number | null;

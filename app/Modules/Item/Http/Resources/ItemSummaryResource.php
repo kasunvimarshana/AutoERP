@@ -37,6 +37,10 @@ final class ItemSummaryResource extends JsonResource
             'default_tax_group_id' => $this->default_tax_group_id,
             'purchase_tax_group_id' => $this->purchase_tax_group_id,
             'sales_tax_group_id' => $this->sales_tax_group_id,
+            'resolved_sales_unit_price' => $this->when(
+                array_key_exists('resolved_sales_unit_price', $this->resource->getAttributes()),
+                fn () => $this->resource->getAttribute('resolved_sales_unit_price'),
+            ),
             'resolved_service_unit_price' => $this->when(
                 array_key_exists('resolved_service_unit_price', $this->resource->getAttributes()),
                 fn () => $this->resource->getAttribute('resolved_service_unit_price'),
