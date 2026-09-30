@@ -325,7 +325,7 @@ export function PurchasePaymentCreateForm({ mode = 'create' }: { mode?: 'create'
             }
 
             const payment = await createPurchasePayment(paymentPayload());
-            navigate(`/payments/${payment.id}?from=purchase`);
+            navigate(`/purchase/payments/${payment.id}`);
         } catch (requestError) {
             setError(toApiError(requestError));
         } finally {
@@ -392,7 +392,7 @@ export function PurchasePaymentCreateForm({ mode = 'create' }: { mode?: 'create'
                                 <div className="grid gap-3 p-3 md:hidden">
                                     {(invoiceResult.data?.data ?? []).map((invoice) => (
                                         <article key={invoice.id} className="rounded-lg border border-slate-200 bg-white p-3">
-                                            <Link className="font-semibold text-sky-700 hover:underline" to={`/invoices/${invoice.id}?from=purchase`}>{invoice.invoice_number ?? 'Invoice'}</Link>
+                                            <Link className="font-semibold text-sky-700 hover:underline" to={`/purchase/invoices/${invoice.id}`}>{invoice.invoice_number ?? 'Invoice'}</Link>
                                             <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
                                                 <Summary label="Date" value={formatDate(invoice.invoice_date)} />
                                                 <Summary label="Status" value={invoice.status ?? '-'} />
@@ -475,7 +475,7 @@ function AllocationRow({ invoice, value, error, onChange }: {
 }) {
     return (
         <tr>
-            <td className="px-4 py-3"><Link className="font-semibold text-sky-700 hover:underline" to={`/invoices/${invoice.id}?from=purchase`}>{invoice.invoice_number ?? 'Invoice'}</Link></td>
+            <td className="px-4 py-3"><Link className="font-semibold text-sky-700 hover:underline" to={`/purchase/invoices/${invoice.id}`}>{invoice.invoice_number ?? 'Invoice'}</Link></td>
             <td className="px-4 py-3">{formatDate(invoice.invoice_date)}</td>
             <td className="px-4 py-3">{invoice.status ? <StatusBadge status={invoice.status} /> : '-'}</td>
             <td className="px-4 py-3"><MoneyDisplay value={balanceOf(invoice)} currency={invoice.currency?.code ?? undefined} /></td>

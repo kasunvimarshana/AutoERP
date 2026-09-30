@@ -7,6 +7,8 @@ namespace Modules\VehicleService\Models;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Modules\Core\Models\TenantOwnedModel;
+use Modules\Inventory\Models\InventoryBatch;
+use Modules\Inventory\Models\InventoryBatchPriceRevision;
 use Modules\Inventory\Models\InventoryMovement;
 use Modules\Item\Models\Item;
 use Modules\Item\Models\ItemVariant;
@@ -31,6 +33,8 @@ final class VehicleServiceJobLine extends TenantOwnedModel
             'line_source_type' => VehicleServiceLineSourceType::class,
             'item_id' => 'integer',
             'item_variant_id' => 'integer',
+            'batch_id' => 'integer',
+            'batch_price_revision_id' => 'integer',
             'uom_id' => 'integer',
             'quantity' => 'decimal:6',
             'unit_cost' => 'decimal:6',
@@ -81,6 +85,16 @@ final class VehicleServiceJobLine extends TenantOwnedModel
     public function uom(): BelongsTo
     {
         return $this->belongsTo(UnitOfMeasureModel::class, 'uom_id');
+    }
+
+    public function batch(): BelongsTo
+    {
+        return $this->belongsTo(InventoryBatch::class, 'batch_id');
+    }
+
+    public function batchPriceRevision(): BelongsTo
+    {
+        return $this->belongsTo(InventoryBatchPriceRevision::class, 'batch_price_revision_id');
     }
 
     public function inventoryMovement(): BelongsTo

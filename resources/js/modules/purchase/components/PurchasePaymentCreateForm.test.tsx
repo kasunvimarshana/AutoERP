@@ -84,7 +84,7 @@ describe('PurchasePaymentCreateForm', () => {
             expect.any(AbortSignal),
         ));
         const invoiceLinks = await screen.findAllByRole('link', { name: 'SI-42' });
-        expect(invoiceLinks[0]).toHaveAttribute('href', '/invoices/42?from=purchase');
+        expect(invoiceLinks[0]).toHaveAttribute('href', '/purchase/invoices/42');
         expect(screen.getByText('1-1 of 2')).toBeInTheDocument();
     });
 

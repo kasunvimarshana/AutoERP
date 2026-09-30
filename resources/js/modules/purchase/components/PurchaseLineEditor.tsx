@@ -32,15 +32,22 @@ export function PurchaseLineEditor({ lines, onChange, config, errorForLineField,
     purchaseDate?: string;
 }) {
     const [dialog, setDialog] = useState<LineDialog | null>(null);
+    const [createFormRevision, setCreateFormRevision] = useState(0);
     const { confirm, confirmDialog } = useConfirmDialog();
 
     const saveLine = (line: EditablePurchaseLine) => {
         if (dialog?.mode === 'edit') {
             onChange(lines.map((current, index) => index === dialog.index ? line : current));
+            setDialog(null);
         } else {
             onChange([...lines, line]);
+            if (config.continuousCreate) {
+                setDialog({ mode: 'create', line: emptyPurchaseLine(config.defaultLine) });
+                setCreateFormRevision((current) => current + 1);
+            } else {
+                setDialog(null);
+            }
         }
-        setDialog(null);
     };
 
     const removeLine = async (index: number) => {
@@ -66,7 +73,7 @@ export function PurchaseLineEditor({ lines, onChange, config, errorForLineField,
             <FormDrawer open={Boolean(dialog)} title={dialog?.mode === 'edit' ? 'Edit line' : 'Add line'} onClose={() => setDialog(null)}>
                 {dialog && (
                     <PurchaseLineForm
-                        key={dialog.mode === 'edit' ? `edit-${dialog.line.client_key}` : 'create'}
+                        key={dialog.mode === 'edit' ? `edit-${dialog.line.client_key}` : `create-${createFormRevision}`}
                         line={dialog.line}
                         mode={dialog.mode}
                         config={config}
@@ -75,6 +82,10 @@ export function PurchaseLineEditor({ lines, onChange, config, errorForLineField,
                         warehouseId={warehouseId}
                         purchaseDate={purchaseDate}
                         errorFor={(field) => dialog.mode === 'edit' ? errorForLineField(dialog.line, dialog.index, field) : undefined}
+                        onClear={config.continuousCreate && dialog.mode === 'create' ? () => {
+                            setDialog({ mode: 'create', line: emptyPurchaseLine(config.defaultLine) });
+                            setCreateFormRevision((current) => current + 1);
+                        } : undefined}
                         onCancel={() => setDialog(null)}
                         onSave={saveLine}
                     />

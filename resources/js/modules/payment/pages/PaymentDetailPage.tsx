@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { useLocation, useParams } from 'react-router-dom';
 import {
     approvePayment,
     getPayment,
@@ -49,8 +49,8 @@ const today = () => businessDateInputValue();
 
 export default function PaymentDetailPage() {
     const id = Number(useParams().id);
+    const location = useLocation();
     const auth = useAuth();
-    const [searchParams] = useSearchParams();
     const tabState = useOnDemandTab<Tab>('summary');
     const payment = useApi((signal) => getPayment(id, signal), [id]);
     const allocations = useApi((signal) => getPaymentAllocations(id, signal), [id], tabState.openedTabs.has('allocations'));
@@ -69,7 +69,7 @@ export default function PaymentDetailPage() {
     if (!paymentState.data) return <ErrorAlert error={payment.error} />;
 
     const value = paymentState.data;
-    const fromPurchase = searchParams.get('from') === 'purchase';
+    const fromPurchase = location.pathname.startsWith('/purchase/payments/');
     const chequeLine = value.lines?.find((line) => line.payment_method?.method_type === 'cheque') ?? null;
     const capabilities = value.capabilities ?? {};
     const canRefund = Boolean(capabilities.can_refund) && hasPaymentPermission(auth, paymentPermissions.refund);

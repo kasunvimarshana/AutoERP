@@ -22,6 +22,7 @@ export const inventoryPermissions = {
     stockCountsApprove: 'inventory.stock_counts.approve',
     stockCountsPost: 'inventory.stock_counts.post',
     trackingView: 'inventory.tracking.view',
+    trackingManage: 'inventory.tracking.manage',
 } as const;
 
 export const inventoryRoutePermissions = Object.values(inventoryPermissions);

@@ -12,7 +12,7 @@ export default function PurchaseInvoiceListPage() {
         <div className="space-y-5">
             <InvoiceListWorkspace
                 viewKey="supplier"
-                rowHref={(invoice) => `/invoices/${invoice.id}?from=purchase`}
+                rowHref={(invoice) => `/purchase/invoices/${invoice.id}`}
                 renderHeader={(view) => (
                     <PurchasePageHeader
                         title={view?.title ?? 'Supplier Invoices'}

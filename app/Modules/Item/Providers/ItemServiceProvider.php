@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace Modules\Item\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use Modules\Core\Contracts\PermissionDefinitionRegistryInterface;
 use Modules\Item\Services\ItemAuthorizationService;
 use Modules\Item\Services\Tax\ItemTaxContextProvider;
 use Modules\Tax\Contracts\TaxItemContextProviderInterface;
-use Modules\Core\Contracts\PermissionDefinitionRegistryInterface;
 
 final class ItemServiceProvider extends ServiceProvider
 {
@@ -23,6 +23,6 @@ final class ItemServiceProvider extends ServiceProvider
             ->register('item', ItemAuthorizationService::descriptions());
 
         $this->loadRoutesFrom(__DIR__.'/../Routes/api.php');
-        $this->loadMigrationsFrom(__DIR__.'/../Database/Migrations');
+        $this->loadMigrationsFrom([__DIR__.'/../Database/Migrations', __DIR__.'/../Database/UpgradeMigrations']);
     }
 }

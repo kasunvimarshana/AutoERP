@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Purchase\Services;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
 use Modules\Audit\Constants\AuditEventCategory;
 use Modules\Audit\Contracts\AuditRecorderInterface;
 use Modules\Audit\Data\AuditEventData;
@@ -49,6 +50,16 @@ final class PurchaseAuditService
         ], $metadata);
     }
 
+    /** @param array<string, mixed> $metadata */
+    public function recordDocumentInteraction(
+        string $eventName,
+        string $subjectType,
+        Model $document,
+        array $metadata = [],
+    ): void {
+        $this->record($eventName, $subjectType, $document, [], $metadata, $eventName.':'.Str::uuid());
+    }
+
     /**
      * @param  array<string, mixed>  $changes
      * @param  array<string, mixed>  $metadata
@@ -59,6 +70,7 @@ final class PurchaseAuditService
         Model $document,
         array $changes,
         array $metadata,
+        ?string $producerKey = null,
     ): void {
         $this->audit->record(new AuditEventData(
             eventName: $eventName,
@@ -74,7 +86,7 @@ final class PurchaseAuditService
                 'row_version' => $document->getAttribute('row_version'),
             ], $metadata),
             tags: ['purchase', $subjectType],
-            producerKey: $eventName.':'.$document->getKey().':'.$document->getAttribute('row_version'),
+            producerKey: $producerKey ?? $eventName.':'.$document->getKey().':'.$document->getAttribute('row_version'),
         ));
     }
 

@@ -109,6 +109,13 @@ No database tables. PrivateObject owns the private-storage capability and canoni
 | `warehouse_locations` | Stores warehouse location records used by the owning module. | `parent_id` -> `warehouse_locations`; `warehouse_id` -> `warehouses`; `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants` | unique `tenant_id,warehouse_id,name`; tenant scoped; organization-unit aware; soft deletes |
 | `warehouses` | Stores tenant warehouses and their organization-unit ownership. | `organization_unit_id` -> `organization_units`; `tenant_id` -> `tenants` | unique `tenant_id,name`; tenant scoped; organization-unit aware; soft deletes |
 
+## Expense
+
+| Table | Business purpose | Key relationships | Important constraints |
+| --- | --- | --- | --- |
+| `expense_types` | Stores tenant-wide, user-managed expense classifications reused by every branch. | `tenant_id` -> `tenants`; `created_by` -> `users` | unique `tenant_id,code`; tenant scoped; soft deletes; version checked |
+| `expenses` | Stores immutable branch-paid expense source documents and Cash/Bank posting traceability. | `expense_type_id` -> `expense_types`; `organization_unit_id` -> `organization_units`; `currency_id` -> `currencies`; `tenant_id` -> `tenants` | unique `tenant_id,expense_number`; tenant scoped; organization-unit required; posted records corrected by reversal |
+
 ## Finance
 
 | Table | Business purpose | Key relationships | Important constraints |

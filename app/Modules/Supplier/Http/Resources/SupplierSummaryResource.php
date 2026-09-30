@@ -26,12 +26,20 @@ final class SupplierSummaryResource extends JsonResource
             'email' => $this->email,
             'phone' => $this->phone,
             'mobile' => $this->mobile,
+            'whatsapp_contact' => $this->when(
+                array_key_exists('whatsapp_contact', $this->resource->getAttributes()),
+                fn () => $this->resource->getAttribute('whatsapp_contact'),
+            ),
             'default_currency' => $this->relationLoaded('defaultCurrency')
                 ? $this->namedResource($this->defaultCurrency, true)
                 : null,
             'categories' => $this->whenLoaded('categories', fn () => SupplierCategoryResource::collection($this->categories)->resolve($request)),
             'is_credit_allowed' => (bool) $this->is_credit_allowed,
             'is_advance_allowed' => (bool) $this->is_advance_allowed,
+            'total_due' => $this->when(
+                $this->resource->getAttribute('total_due') !== null,
+                fn (): array => (array) $this->resource->getAttribute('total_due'),
+            ),
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
         ];

@@ -1,4 +1,5 @@
 import type { NamedResource } from '@/shared/types/common';
+import type { WhatsAppVerificationRecipient, WhatsAppVerificationStatus } from '@/shared/types/whatsAppVerification';
 
 export const customerTypes = ['individual', 'company', 'government', 'internal', 'foreign', 'retail', 'wholesale', 'corporate', 'other'] as const;
 export const customerStatuses = ['pending_approval', 'active', 'inactive', 'on_hold', 'blacklisted'] as const;
@@ -6,6 +7,11 @@ export const customerAddressTypes = ['billing', 'shipping', 'registered', 'servi
 export const customerDocumentTypes = ['business_registration', 'tax_certificate', 'vat_certificate', 'svat_certificate', 'contract', 'license', 'insurance', 'id_document', 'other'] as const;
 export const customerDocumentStatuses = ['active', 'expired', 'revoked', 'pending'] as const;
 export const preferredCommunicationChannels = ['email', 'phone', 'mobile', 'sms', 'whatsapp', 'other'] as const;
+
+export interface CustomerVehicleSummary {
+    id: number;
+    registration_number?: string | null;
+}
 
 export interface CustomerSummary extends NamedResource {
     row_version: number;
@@ -17,10 +23,12 @@ export interface CustomerSummary extends NamedResource {
     email?: string | null;
     phone?: string | null;
     mobile?: string | null;
+    whatsapp_contact?: (WhatsAppVerificationRecipient & { status: WhatsAppVerificationStatus }) | null;
     default_currency?: NamedResource | null;
     categories?: CustomerCategory[];
     credit_allowed: boolean;
     advance_allowed: boolean;
+    current_vehicles?: CustomerVehicleSummary[];
     is_tax_exempt: boolean;
     marketing_consent: boolean;
 }
@@ -173,7 +181,7 @@ export interface CustomerWithRelationsPayload {
     contacts: CustomerContactPayload[];
     addresses: CustomerAddressPayload[];
     bank_accounts: CustomerBankAccountPayload[];
-    categories: number[];
-    documents: CustomerDocumentPayload[];
+    categories?: number[];
+    documents?: CustomerDocumentPayload[];
     credit_profile?: Omit<CustomerCreditProfile, 'id' | 'row_version'> | null;
 }

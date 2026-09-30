@@ -24,6 +24,7 @@ use Modules\Inventory\Enums\InventoryDirection;
 use Modules\Inventory\Enums\InventoryMovementType;
 use Modules\Inventory\Models\InventoryMovement;
 use Modules\Inventory\Models\InventoryStockBalance;
+use Modules\Inventory\Services\BatchNumberService;
 use Modules\Inventory\Services\InventoryNumberService;
 use Modules\Inventory\Services\InventoryStockCountService;
 use Modules\Inventory\Services\StockAdjustmentService;
@@ -138,6 +139,8 @@ final class InventoryIntegrityTest extends TestCase
         $this->assertSame("MOV-{$date}-000002", $numbers->next($firstTenant, 'MOV'));
         $this->assertSame("RES-{$date}-000001", $numbers->next($firstTenant, 'RES'));
         $this->assertSame("MOV-{$date}-000001", $numbers->next($secondTenant, 'MOV'));
+        $this->assertSame("BAT-{$date}-000001", app(BatchNumberService::class)->next($firstTenant));
+        $this->assertSame("BAT-{$date}-000002", app(BatchNumberService::class)->next($firstTenant));
     }
 
     public function test_stock_count_rejects_posting_after_stock_changes(): void

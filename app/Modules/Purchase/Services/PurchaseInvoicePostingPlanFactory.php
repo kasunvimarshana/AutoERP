@@ -20,6 +20,7 @@ use Modules\Item\Enums\ItemType;
 use Modules\Item\Models\Item;
 use Modules\Purchase\Enums\GoodsReceiptNoteLineStatus;
 use Modules\Purchase\Enums\GoodsReceiptNoteStatus;
+use Modules\Purchase\Models\GoodsReceiptNote;
 use Modules\Purchase\Models\GoodsReceiptNoteLine;
 use Modules\Purchase\Models\PurchaseHeaderAdjustment;
 
@@ -202,13 +203,15 @@ final class PurchaseInvoicePostingPlanFactory
             ->with('goodsReceiptNote')
             ->findOrFail($sourceLineId);
         $receipt = $receiptLine->goodsReceiptNote;
+        $hasPostedInventoryReceipt = $receiptLine->inventory_movement_id !== null
+            || $receiptLine->batchAllocations()->whereNotNull('inventory_movement_id')->exists();
         if ((int) $receiptLine->tenant_id !== $data->tenantId
             || $receiptLine->organization_unit_id !== $data->organizationUnitId
             || (int) $receiptLine->item_id !== (int) $itemId
             || $receiptLine->status !== GoodsReceiptNoteLineStatus::Posted
-            || ! $receipt instanceof \Modules\Purchase\Models\GoodsReceiptNote
+            || ! $receipt instanceof GoodsReceiptNote
             || $receipt->status !== GoodsReceiptNoteStatus::Posted
-            || $receiptLine->inventory_movement_id === null) {
+            || ! $hasPostedInventoryReceipt) {
             throw new InvalidArgumentException(
                 'Stockable purchase invoice line is not backed by a posted inventory receipt.',
             );

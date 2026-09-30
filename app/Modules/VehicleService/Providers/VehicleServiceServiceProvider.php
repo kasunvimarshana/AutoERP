@@ -8,6 +8,7 @@ use Illuminate\Support\ServiceProvider;
 use Modules\Core\Contracts\PermissionDefinitionRegistryInterface;
 use Modules\Invoice\Contracts\InvoiceSourceRestorationHandlerInterface;
 use Modules\Vehicle\Contracts\VehicleAvailabilityBlockerInterface;
+use Modules\VehicleService\Console\Commands\ImportLegacyVehicleServiceHistoryCommand;
 use Modules\VehicleService\Constants\VehicleServicePermission;
 use Modules\VehicleService\Services\Availability\VehicleServiceAvailabilityBlocker;
 use Modules\VehicleService\Services\Invoice\VehicleServiceInvoiceRestorationHandler;
@@ -33,6 +34,10 @@ final class VehicleServiceServiceProvider extends ServiceProvider
             ->register('vehicle-service', VehicleServicePermission::descriptions());
 
         $this->loadRoutesFrom(__DIR__.'/../Routes/api.php');
-        $this->loadMigrationsFrom(__DIR__.'/../Database/Migrations');
+        $this->loadMigrationsFrom([__DIR__.'/../Database/Migrations', __DIR__.'/../Database/UpgradeMigrations']);
+
+        if ($this->app->runningInConsole()) {
+            $this->commands([ImportLegacyVehicleServiceHistoryCommand::class]);
+        }
     }
 }

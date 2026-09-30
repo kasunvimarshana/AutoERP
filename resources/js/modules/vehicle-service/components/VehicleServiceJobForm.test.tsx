@@ -15,6 +15,10 @@ const apiMocks = vi.hoisted(() => ({
 
 vi.mock('../vehicleServiceApi', () => apiMocks);
 
+vi.mock('@/modules/auth/AuthProvider', () => ({
+    useAuth: () => ({ permissions: [] }),
+}));
+
 vi.mock('./VehicleServiceQuickVehicleModal', () => ({
     VehicleServiceQuickVehicleModal: () => null,
 }));
@@ -57,6 +61,9 @@ const existingJob: VehicleServiceJob = {
     supervisor_commission_amount: '0.000000',
     status: 'draft',
     subtotal: '0.000000',
+    line_discount_total: '0.000000',
+    job_discount_base: '0.000000',
+    job_discount_amount: '0.000000',
     discount_total: '0.000000',
     tax_total: '0.000000',
     charge_total: '0.000000',
@@ -105,8 +112,8 @@ describe('VehicleServiceJobForm', () => {
 
         await user.click(screen.getByRole('button', { name: 'Choose Vehicle' }));
         await user.click(screen.getByRole('button', { name: 'Choose Supervisor' }));
-        expect(screen.getByLabelText('Odometer')).toHaveValue('1200.000000');
-        expect(screen.getByLabelText('Next Service Mileage')).toHaveValue('6200.000000');
+        expect(screen.getByLabelText('Odometer')).toHaveValue('1200.00');
+        expect(screen.getByLabelText('Next Service Mileage')).toHaveValue('6200.00');
         await user.clear(screen.getByLabelText('Next Service Mileage'));
         await user.type(screen.getByLabelText('Next Service Mileage'), '15000');
         await user.type(screen.getByLabelText('Manual Job Card'), 'MJC-1042');
@@ -138,7 +145,7 @@ describe('VehicleServiceJobForm', () => {
         );
 
         await user.type(screen.getByLabelText('Odometer'), '3000');
-        expect(screen.getByLabelText('Next Service Mileage')).toHaveValue('8000.000000');
+        expect(screen.getByLabelText('Next Service Mileage')).toHaveValue('8000.00');
 
         await user.selectOptions(screen.getByLabelText('Type'), 'body_wash');
         expect(screen.getByLabelText('Odometer')).toBeDisabled();
@@ -171,7 +178,7 @@ describe('VehicleServiceJobForm', () => {
         expect(screen.getByLabelText('Odometer')).toBeEnabled();
         expect(screen.getByLabelText('Odometer')).toBeRequired();
         await user.type(screen.getByLabelText('Odometer'), '7000');
-        expect(screen.getByLabelText('Next Service Mileage')).toHaveValue('12000.000000');
+        expect(screen.getByLabelText('Next Service Mileage')).toHaveValue('12000.00');
         await user.clear(screen.getByLabelText('Next Service Mileage'));
         await user.type(screen.getByLabelText('Next Service Mileage'), '12500');
         expect(screen.getByLabelText('Next Service Mileage')).toHaveValue('12500');
@@ -221,7 +228,7 @@ describe('VehicleServiceJobForm', () => {
         expect(screen.getByLabelText('Odometer')).toHaveValue('');
 
         await user.type(screen.getByLabelText('Odometer'), '4000');
-        expect(screen.getByLabelText('Next Service Mileage')).toHaveValue('9000.000000');
+        expect(screen.getByLabelText('Next Service Mileage')).toHaveValue('9000.00');
         await user.clear(screen.getByLabelText('Next Service Mileage'));
         await user.type(screen.getByLabelText('Next Service Mileage'), '9500');
         await user.click(screen.getByRole('button', { name: 'Save job' }));

@@ -11,7 +11,9 @@ final class ReportDefinitionRegistry
 {
     public function __construct(
         private readonly ReportCatalog $catalog,
+        private readonly ExpenseReportService $expenses,
         private readonly DetailedPurchaseReportService $detailedPurchase,
+        private readonly GrnPayablesReportService $grnPayables,
         private readonly DetailedVehicleServiceReportService $detailedVehicleService,
     ) {}
 
@@ -51,7 +53,9 @@ final class ReportDefinitionRegistry
     private function specializedDefinitions(): array
     {
         return [
+            $this->expenses->definition(),
             $this->detailedPurchase->definition(),
+            $this->grnPayables->definition(),
             $this->detailedVehicleService->definition(),
         ];
     }

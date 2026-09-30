@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
@@ -17,17 +18,28 @@ import type {
 } from '../reportingTypes';
 
 const reportKey = 'vehicle-service/employee-commissions';
-const initialFilters: EmployeeCommissionReportParams = {
+const today = new Date();
+const currentMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+const localDate = (date: Date) => [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, '0'),
+    String(date.getDate()).padStart(2, '0'),
+].join('-');
+const defaultFilters: EmployeeCommissionReportParams = {
     page: 1,
     per_page: 25,
     group_by: 'employee',
     sort: 'job_date',
     direction: 'desc',
+    date_from: localDate(currentMonthStart),
+    date_to: localDate(today),
 };
 
 export default function EmployeeCommissionReportScreen() {
-    const [filters, setFilters] = useState(initialFilters);
-    const [draft, setDraft] = useState(initialFilters);
+    const [searchParams] = useSearchParams();
+    const initialFilters = useMemo(() => reportInitialFilters(searchParams), [searchParams]);
+    const [filters, setFilters] = useState(() => initialFilters);
+    const [draft, setDraft] = useState(() => initialFilters);
     const [result, setResult] = useState<EmployeeCommissionReportResult | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
@@ -76,7 +88,7 @@ export default function EmployeeCommissionReportScreen() {
         <>
             <ContentHeader
                 title="Employee Commission Report"
-                description="Commission results with independent Payment lifecycle filters."
+                description="Review commission earned by HR employees assigned to Vehicle Service labour."
                 actions={<LinkButton to="/reports" variant="secondary">All reports</LinkButton>}
             />
             <ErrorAlert error={error} title="Could not load employee commission report" />
@@ -93,7 +105,7 @@ export default function EmployeeCommissionReportScreen() {
                 {result && <EmployeeCommissionSummary result={result} />}
                 <div className="flex items-center justify-between gap-3">
                     <span className="text-sm text-slate-500">
-                        {loading ? 'Refreshing...' : `${result?.meta?.total ?? 0} commission entries`}
+                        {loading ? 'Refreshing...' : `${result?.summary.total_employees ?? 0} employees · ${result?.meta?.total ?? 0} commission entries`}
                     </span>
                     <ExportActions reportKey={reportKey} params={exportParams} />
                 </div>
@@ -121,4 +133,21 @@ function cleanParams(params: EmployeeCommissionReportParams): EmployeeCommission
     return Object.fromEntries(
         Object.entries(params).filter(([, value]) => value !== '' && value !== null && value !== undefined),
     ) as EmployeeCommissionReportParams;
+}
+
+function reportInitialFilters(searchParams: URLSearchParams): EmployeeCommissionReportParams {
+    const dateFrom = searchParams.get('date_from');
+    const dateTo = searchParams.get('date_to');
+    const search = searchParams.get('search')?.trim();
+
+    return {
+        ...defaultFilters,
+        date_from: isDateInput(dateFrom) ? dateFrom : defaultFilters.date_from,
+        date_to: isDateInput(dateTo) ? dateTo : defaultFilters.date_to,
+        search: search || undefined,
+    };
+}
+
+function isDateInput(value: string | null): value is string {
+    return value !== null && /^\d{4}-\d{2}-\d{2}$/.test(value);
 }

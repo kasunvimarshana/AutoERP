@@ -6,6 +6,7 @@ namespace Modules\Purchase\DTOs;
 
 final readonly class GoodsReceiptNoteLineData
 {
+    /** @param list<GoodsReceiptBatchAllocationData> $batchAllocations */
     public function __construct(
         public int $itemId,
         public string $receivedQuantity,
@@ -26,5 +27,6 @@ final readonly class GoodsReceiptNoteLineData
         public string $taxAmount = '0.000000',
         public string $chargeAmount = '0.000000',
         public ?int $taxGroupId = null,
+        public array $batchAllocations = [],
     ) {}
 }

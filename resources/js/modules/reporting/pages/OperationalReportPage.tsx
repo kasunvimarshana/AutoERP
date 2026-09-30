@@ -7,9 +7,7 @@ import { Panel } from '@/shared/components/Panel';
 import { Button, LinkButton } from '@/shared/components/Button';
 import { Input } from '@/shared/components/Input';
 import { Select } from '@/shared/components/Select';
-import { LookupSelect } from '@/shared/components/LookupSelect';
 import { GenericLookupSelect } from '@/shared/components/GenericLookupSelect';
-import { lookupApi } from '@/shared/api/lookupApi';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import type { NamedResource } from '@/shared/types/common';
 import type { VehicleSummary } from '@/modules/vehicle/vehicleTypes';
@@ -18,6 +16,8 @@ import { searchEmployees } from '@/modules/hr/hrApi';
 import type { EmployeeSummary, HrDepartment } from '@/modules/hr/hrTypes';
 import { HrDepartmentSelect } from '@/modules/hr/components/HrDepartmentSelect';
 import { ItemLookupSelect, SupplierLookupSelect } from '@/modules/purchase/components/PurchaseLookups';
+import { CustomerLookupSelect } from '@/modules/customer/components/CustomerLookupSelect';
+import type { CustomerSummary } from '@/modules/customer/customerTypes';
 import { ExportActions } from '../components/ExportActions';
 import { ReportDataGrid } from '../components/ReportDataGrid';
 import { runOperationalReport } from '../reportingApi';
@@ -75,7 +75,7 @@ function OperationalReportContent({ reportKey, kind }: OperationalReportPageProp
     const [error, setError] = useState<ApiError | null>(null);
     const [supplier, setSupplier] = useState<NamedResource | null>(null);
     const [item, setItem] = useState<NamedResource | null>(null);
-    const [customer, setCustomer] = useState<NamedResource | null>(null);
+    const [customer, setCustomer] = useState<CustomerSummary | null>(null);
     const [vehicle, setVehicle] = useState<VehicleSummary | null>(null);
     const [employee, setEmployee] = useState<EmployeeSummary | null>(null);
     const [department, setDepartment] = useState<HrDepartment | null>(null);
@@ -174,14 +174,12 @@ function OperationalReportContent({ reportKey, kind }: OperationalReportPageProp
                                 setDraft((current) => ({ ...current, item_id: value?.id ?? null }));
                             }}
                         />}
-                        {kind !== 'purchase' && <LookupSelect
-                            label="Customer"
+                        {kind !== 'purchase' && <CustomerLookupSelect
                             value={customer}
                             onChange={(value) => {
                                 setCustomer(value);
                                 setDraft((current) => ({ ...current, customer_id: value?.id ?? null }));
                             }}
-                            search={lookupApi.customers}
                             placeholder="Search customers..."
                         />}
                         {kind !== 'purchase' && <VehicleLookupSelect

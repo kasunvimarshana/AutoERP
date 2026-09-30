@@ -89,6 +89,14 @@ export interface VehicleServiceEmployeeAssignmentPayload {
     status?: 'assigned' | 'completed' | 'cancelled';
 }
 
+export interface VehicleServiceEmployeeAssignmentBatchPayload {
+    expected_version: number;
+    lines: Array<{
+        line_id: number;
+        employee_ids: number[];
+    }>;
+}
+
 export interface VehicleServiceJobLine {
     id: number;
     parent_line_id?: number | null;
@@ -103,6 +111,9 @@ export interface VehicleServiceJobLine {
     item?: NamedResource | null;
     item_variant_id?: number | null;
     item_variant?: NamedResource | null;
+    batch_id?: number | null;
+    batch?: (NamedResource & { batch_number?: string; lot_number?: string }) | null;
+    batch_price_revision_id?: number | null;
     uom_id?: number | null;
     uom?: NamedResource | null;
     description: string;
@@ -126,6 +137,10 @@ export interface VehicleServiceJobLine {
     is_billable: boolean;
     is_employee_assignable: boolean;
     inventory_movement_id?: number | null;
+    inventory_movement?: { id: number; status: string; reversed_at: string | null } | null;
+    available_stock_quantity?: string | null;
+    reserved_stock_quantity?: string | null;
+    reorder_level?: string | null;
     stock_on_hand?: string;
     stock_available?: string;
     issue_eligible?: boolean;
@@ -192,6 +207,9 @@ export interface VehicleServiceJob {
     fuel_level?: string | null;
     priority?: string | null;
     subtotal: string;
+    line_discount_total: string;
+    job_discount_base: string;
+    job_discount_amount: string;
     discount_total: string;
     tax_total: string;
     charge_total: string;
@@ -200,10 +218,48 @@ export interface VehicleServiceJob {
     net_after_commission: string;
     notes?: string | null;
     completed_at?: string | null;
+    job_discount?: VehicleServiceJobDiscount | null;
     inspection?: VehicleServiceInspection | null;
     lines?: VehicleServiceJobLine[];
     invoice_links?: VehicleServiceInvoiceLink[];
     payment_links?: VehicleServicePaymentLink[];
+}
+
+export type VehicleServiceDiscountCalculationType = 'fixed' | 'percentage';
+
+export interface VehicleServiceJobDiscount {
+    id: number;
+    revision: number;
+    action: 'set' | 'removed';
+    calculation_type: VehicleServiceDiscountCalculationType;
+    rate: string;
+    fixed_amount: string;
+    calculation_base: string;
+    calculated_amount: string;
+    reason: string;
+    changed_by?: NamedResource | null;
+    changed_at?: string | null;
+}
+
+export interface VehicleServiceJobDiscountPayload {
+    expected_version: number;
+    calculation_type: VehicleServiceDiscountCalculationType;
+    rate: string;
+    fixed_amount: string;
+    reason: string;
+}
+
+export interface VehicleServiceJobTotals {
+    subtotal: string;
+    line_discount_total: string;
+    job_discount_base: string;
+    job_discount_amount: string;
+    discount_total: string;
+    tax_total: string;
+    charge_total: string;
+    grand_total: string;
+    commission_cost_total: string;
+    net_after_commission: string;
 }
 
 export interface VehicleServiceJobPayload {
@@ -230,6 +286,9 @@ export interface VehicleServiceLinePayload {
     expected_version?: number;
     line_source_type: VehicleServiceLineSourceType;
     item_id?: number;
+    item_variant_id?: number;
+    batch_id?: number;
+    batch_price_revision_id?: number;
     uom_id?: number;
     description: string;
     quantity: string;
@@ -248,6 +307,7 @@ export interface VehicleServiceLinePayload {
     is_billable?: boolean;
     expand_combo?: boolean;
 }
+
 
 export interface VehicleServiceInvoicePreview {
     subtotal: string;
@@ -370,4 +430,12 @@ export interface VehicleServiceDocument {
     description?: string | null;
     uploaded_by?: number | null;
     created_at?: string | null;
+}
+export interface VehicleServiceCancellationPreview {
+    row_version: number;
+    can_cancel: boolean;
+    blockers: string[];
+    stock_returns: { description: string; quantity: string; uom: string | null; warehouse: string | null; location: string | null }[];
+    inventory_value: string;
+    commission_amount: string;
 }

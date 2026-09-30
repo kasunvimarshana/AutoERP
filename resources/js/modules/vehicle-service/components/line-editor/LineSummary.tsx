@@ -1,3 +1,6 @@
+import type { ReactNode } from 'react';
+import { MoneyDisplay } from '@/shared/components/MoneyDisplay';
+
 export interface LinePreview {
     subtotal: string;
     discount: string;
@@ -11,21 +14,21 @@ export function LineSummary({ preview }: { preview: LinePreview }) {
         <div className="rounded-lg border border-slate-200 p-4 text-sm">
             <h3 className="font-semibold text-slate-900">Pricing summary</h3>
             <div className="mt-3 grid gap-2 sm:grid-cols-5">
-                <SummaryValue label="Subtotal" value={preview.subtotal} />
-                <SummaryValue label="Discount" value={preview.discount} />
-                <SummaryValue label="Tax" value={preview.tax} />
-                <SummaryValue label="Charge" value={preview.charge} />
-                <SummaryValue label="Total" value={preview.total} />
+                <SummaryValue label="Subtotal" value={<MoneyDisplay value={preview.subtotal} />} />
+                <SummaryValue label="Discount" value={<MoneyDisplay value={preview.discount} />} />
+                <SummaryValue label="Tax" value={<MoneyDisplay value={preview.tax} />} />
+                <SummaryValue label="Charge" value={<MoneyDisplay value={preview.charge} />} />
+                <SummaryValue label="Total" value={<MoneyDisplay value={preview.total} />} />
             </div>
         </div>
     );
 }
 
-export function SummaryValue({ label, value }: { label: string; value: string }) {
+export function SummaryValue({ label, value }: { label: string; value: ReactNode }) {
     return (
         <div>
             <span className="text-xs uppercase text-slate-500">{label}</span>
-            <strong className="block tabular-nums text-slate-900">{value}</strong>
+            <div className="font-semibold tabular-nums text-slate-900">{value}</div>
         </div>
     );
 }

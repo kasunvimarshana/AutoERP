@@ -270,7 +270,7 @@ final class FinancePostingService implements FinancePostingInterface
     {
         return match ($sourceType) {
             'invoice', 'sales_invoice', 'purchase_invoice', 'vehicle_service_invoice' => JournalType::Invoice,
-            'payment', 'payment_received', 'payment_made' => JournalType::Payment,
+            'payment', 'payment_received', 'payment_made', 'expense' => JournalType::Payment,
             'contra', 'cash_transfer', 'bank_transfer', 'account_transfer' => JournalType::Contra,
             'adjustment', 'write_off', 'reclassification', 'rounding_adjustment' => JournalType::Adjustment,
             'opening_balance', 'opening' => JournalType::Opening,

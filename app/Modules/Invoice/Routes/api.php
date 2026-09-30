@@ -64,4 +64,8 @@ Route::prefix('api/v1/invoices')->middleware($middleware)->name('api.v1.invoices
         ->whereNumber('invoice')
         ->middleware($requires(InvoicePermission::VIEW))
         ->name('signed-print');
+    Route::post('{invoice}/whatsapp-share', [InvoiceController::class, 'whatsappShare'])
+        ->whereNumber('invoice')
+        ->middleware($requires(InvoicePermission::VIEW))
+        ->name('whatsapp-share');
 });

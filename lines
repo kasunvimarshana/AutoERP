@@ -1,0 +1,18 @@
+54:            (int) $job->tenant_id,
+55:            $job->organization_unit_id,
+57:        if (! $warehouse instanceof WarehouseModel && $job->organization_unit_id !== null) {
+58:            $warehouse = $this->warehouseDefaults->resolveDefaultWarehouse((int) $job->tenant_id, null);
+62:                ->forTenant((int) $job->tenant_id, $job->organization_unit_id)
+98:        return $job->lines()
+114:                    tenantId: (int) $job->tenant_id,
+117:                    organizationUnitId: $job->organization_unit_id,
+123:                    (int) $job->tenant_id,
+124:                    $job->organization_unit_id,
+155:                (int) $job->tenant_id,
+156:                $job->organization_unit_id,
+185:            $job = VehicleServiceJob::query()->lockForUpdate()->findOrFail($job->getKey());
+189:            $query = $job->lines()->with(['item', 'batch'])->whereNull('inventory_movement_id');
+210:                    tenantId: (int) $job->tenant_id,
+217:                    organizationUnitId: $job->organization_unit_id,
+223:                    sourceId: (int) $job->getKey(),
+226:                    description: 'Vehicle service job '.$job->job_number,

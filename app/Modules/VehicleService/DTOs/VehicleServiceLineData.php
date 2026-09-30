@@ -16,6 +16,8 @@ final readonly class VehicleServiceLineData
         public ?int $parentLineId = null,
         public ?int $itemId = null,
         public ?int $itemVariantId = null,
+        public ?int $batchId = null,
+        public ?int $batchPriceRevisionId = null,
         public ?int $uomId = null,
         public string $unitCost = '0.000000',
         public bool $usesJobSupervisor = false,

@@ -7,21 +7,21 @@ namespace Modules\Customer\Validators;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
-use Modules\ReferenceData\Models\CurrencyModel;
 use Modules\Customer\DTOs\CreateCustomerData;
 use Modules\Customer\DTOs\UpdateCustomerData;
 use Modules\Customer\Models\Customer;
 use Modules\Customer\Models\CustomerCategory;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
+use Modules\ReferenceData\Models\CurrencyModel;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 final class CustomerValidationService
 {
-    public function validateCreate(CreateCustomerData $data): void
+    public function validateCreate(CreateCustomerData $data, string $resolvedCode): void
     {
-        $this->assertText($data->code, 'Customer code is required.');
+        $this->assertText($resolvedCode, 'Customer code is required.');
         $this->assertText($data->name, 'Customer name is required.');
-        $this->assertCodeUnique($data->tenantId, $data->code);
+        $this->assertCodeUnique($data->tenantId, $resolvedCode);
         if ($data->customerNumber !== null) {
             $this->assertNumberUnique($data->tenantId, $data->customerNumber);
         }

@@ -17,8 +17,12 @@ use Modules\Purchase\Services\PurchaseAuthorizationService;
 use Modules\Purchase\Services\PurchaseOrderService;
 use Modules\Supplier\Services\SupplierAuthorizationService;
 use Modules\User\Services\UserAccessResolver;
+use Tests\Support\ActiveTenantSubscriptionFixture;
 use Tests\Support\CurrencyFixture;
 use Tests\Support\FinancePostingFixture;
+use Tests\Support\OrganizationUnitFixture;
+use Tests\Support\TenantAuthenticationFixture;
+use Tests\Support\TenantUserFixture;
 use Tests\TestCase;
 
 final class PurchaseOrderApiTest extends TestCase
@@ -43,6 +47,93 @@ final class PurchaseOrderApiTest extends TestCase
             ->assertJsonPath('data.lines.0.uom.code', $context['uom_code'])
             ->assertJsonPath('data.lines.0.line_total', '101.100000')
             ->assertJsonPath('data.grand_total', '101.100000');
+    }
+
+    public function test_purchase_order_pdf_can_be_downloaded_with_view_permission(): void
+    {
+        $context = $this->context();
+        $order = $this->withAuth($context)
+            ->postJson('/api/v1/purchase/orders', $this->payload($context, ['notes' => 'Deliver before month end']))
+            ->assertCreated()
+            ->json('data');
+
+        $response = $this->withAuth($context)->get('/api/v1/purchase/orders/'.$order['id'].'/pdf');
+
+        $response->assertOk()
+            ->assertHeader('Content-Type', 'application/pdf')
+            ->assertHeader('Content-Disposition', 'attachment; filename="purchase-order-'.$order['purchase_order_number'].'.pdf"');
+        self::assertStringStartsWith('%PDF-', $response->getContent());
+    }
+
+    public function test_purchase_order_pdf_is_tenant_scoped(): void
+    {
+        $owner = $this->context('PDFOWNER');
+        $other = $this->context('PDFOTHER');
+        $orderId = $this->withAuth($owner)
+            ->postJson('/api/v1/purchase/orders', $this->payload($owner))
+            ->assertCreated()
+            ->json('data.id');
+
+        $this->withAuth($other)
+            ->get('/api/v1/purchase/orders/'.$orderId.'/pdf')
+            ->assertNotFound();
+    }
+
+    public function test_approved_purchase_order_can_open_whatsapp_with_a_signed_pdf_link(): void
+    {
+        $context = $this->context('POSHARE');
+        DB::table('suppliers')->where('id', $context['supplier_id'])->update(['mobile' => '0771234567']);
+        $order = $this->withAuth($context)
+            ->postJson('/api/v1/purchase/orders', $this->payload($context))
+            ->assertCreated()
+            ->json('data');
+
+        $submitted = $this->withAuth($context)
+            ->patchJson('/api/v1/purchase/orders/'.$order['id'].'/submit', $this->actionPayload($context, 'purchase_orders', (int) $order['id']))
+            ->assertOk()
+            ->json('data');
+        self::assertSame('pending_approval', $submitted['status']);
+
+        $this->withAuth($context)
+            ->patchJson('/api/v1/purchase/orders/'.$order['id'].'/approve', $this->actionPayload($context, 'purchase_orders', (int) $order['id']))
+            ->assertOk()
+            ->assertJsonPath('data.status', 'approved');
+
+        $share = $this->withAuth($context)
+            ->postJson('/api/v1/purchase/orders/'.$order['id'].'/whatsapp-share')
+            ->assertOk()
+            ->assertJsonPath('data.recipient.phone', '94771234567')
+            ->assertJsonPath('data.recipient.verification_status', 'unverified')
+            ->json('data');
+
+        self::assertStringStartsWith('https://wa.me/94771234567?text=', $share['whatsapp_url']);
+        self::assertStringContainsString('/shared/purchase-orders/', $share['document_url']);
+        self::assertNotEmpty($share['expires_at']);
+
+        $pdf = $this->get($share['document_url'])->assertOk();
+        $pdf->assertHeader('Content-Type', 'application/pdf');
+        self::assertStringStartsWith('%PDF-', $pdf->getContent());
+
+        DB::table('purchase_orders')->where('id', $order['id'])->update(['status' => 'cancelled']);
+        $this->get($share['document_url'])->assertNotFound();
+    }
+
+    public function test_approved_unreceived_purchase_order_hides_supplier_invoice_capability(): void
+    {
+        $context = $this->context('POUNRECEIVED');
+        $order = $this->createApprovedHttpOrder($context, '10.000000');
+
+        $this->withAuth($context)
+            ->getJson('/api/v1/purchase/orders/'.$order['id'])
+            ->assertOk()
+            ->assertJsonPath('data.status', 'approved')
+            ->assertJsonPath('data.receipt_status', 'not_received')
+            ->assertJsonPath('data.capabilities.can_invoice', false)
+            ->assertJsonPath('data.capabilities.details.can_invoice.code', 'not_received')
+            ->assertJsonPath(
+                'data.capabilities.details.can_invoice.reason',
+                'Purchase order must have received quantity before supplier invoicing.',
+            );
     }
 
     public function test_create_purchase_order_with_header_adjustments_is_decimal_safe(): void
@@ -244,6 +335,7 @@ final class PurchaseOrderApiTest extends TestCase
             ->assertJsonPath('data.invoice_status', 'partially_invoiced')
             ->assertJsonPath('data.return_status', 'partially_returned')
             ->assertJsonPath('data.capabilities.can_receive', true)
+            ->assertJsonPath('data.capabilities.can_invoice', true)
             ->assertJsonPath('data.capabilities.details.can_receive.allowed', true)
             ->assertJsonPath('data.capabilities.details.can_close.code', 'remaining_receivable')
             ->assertJsonMissingPath('data.capabilities.can_return')
@@ -284,6 +376,37 @@ final class PurchaseOrderApiTest extends TestCase
             ->assertOk()
             ->json('data');
         $this->assertNull(collect($eligible)->firstWhere('id', $orderId));
+    }
+
+    public function test_batch_receivable_line_exposes_tracking_and_indexes_missing_allocation_error(): void
+    {
+        $context = $this->context('HTTPBATCHRECV');
+        DB::table('items')->where('id', $context['item_id'])->update(['tracking_type' => 'batch']);
+        $order = $this->createApprovedHttpOrder($context, '4.000000');
+        $orderId = (int) $order['id'];
+        $lineId = (int) $order['lines'][0]['id'];
+
+        $this->withAuth($context)->getJson('/api/v1/purchase/orders/'.$orderId.'/receivable-lines')
+            ->assertOk()
+            ->assertJsonPath('data.0.item.tracking_type', 'batch');
+
+        $this->withAuth($context)->postJson('/api/v1/purchase/goods-receipts', [
+            'tenant_id' => $context['tenant_id'],
+            'organization_unit_id' => $context['organization_unit_id'],
+            'received_date' => '2026-06-18',
+            'warehouse_id' => $context['warehouse_id'],
+            'purchase_order_id' => $orderId,
+            'lines' => [[
+                'item_id' => $context['item_id'],
+                'uom_id' => $context['uom_id'],
+                'purchase_order_line_id' => $lineId,
+                'ordered_quantity' => '4.000000',
+                'received_quantity' => '4.000000',
+                'accepted_quantity' => '4.000000',
+                'unit_price' => '10.000000',
+            ]],
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['lines.0.batch_allocations']);
     }
 
     public function test_partial_grn_invoice_http_flow_keeps_remaining_invoiceable_eligible(): void
@@ -1132,7 +1255,7 @@ final class PurchaseOrderApiTest extends TestCase
 
     private function createOrganizationUnit(int $tenantId, string $suffix): int
     {
-        return (int) \Tests\Support\OrganizationUnitFixture::create([
+        return (int) OrganizationUnitFixture::create([
             'tenant_id' => $tenantId,
             'name' => 'Main '.$suffix,
             'code' => 'MAIN-'.$suffix,
@@ -1282,7 +1405,7 @@ final class PurchaseOrderApiTest extends TestCase
     {
         $suffix = $suffix !== '' ? $suffix : Str::upper(Str::random(4));
         $tenantId = $this->createTenant($suffix);
-        \Tests\Support\ActiveTenantSubscriptionFixture::create($tenantId);
+        ActiveTenantSubscriptionFixture::create($tenantId);
         $organizationUnitId = $this->createOrganizationUnit($tenantId, $suffix);
         FinancePostingFixture::seedPurchasePostingProfiles($tenantId, $organizationUnitId);
         $user = $this->createAuthContext($tenantId, $organizationUnitId, $suffix, $permissions);
@@ -1311,14 +1434,13 @@ final class PurchaseOrderApiTest extends TestCase
 
     /**
      * @param  list<string>|null  $permissions
-     *
      * @return array{token: string, user_id: int, role_id: int}
      */
     private function createAuthContext(int $tenantId, int $organizationUnitId, string $suffix, ?array $permissions = null): array
     {
         $now = now();
         $email = 'purchase-'.Str::lower($suffix).'@example.test';
-        $userId = (int) \Tests\Support\TenantUserFixture::create([
+        $userId = (int) TenantUserFixture::create([
             'tenant_id' => $tenantId,
             'first_name' => 'Purchase',
             'last_name' => 'Tester',
@@ -1372,7 +1494,7 @@ final class PurchaseOrderApiTest extends TestCase
             'updated_at' => $now,
         ]);
 
-        \Tests\Support\TenantAuthenticationFixture::provision($tenantId, $userId, $email);
+        TenantAuthenticationFixture::provision($tenantId, $userId, $email);
 
         $token = (string) $this->withHeader('X-Tenant-Id', (string) $tenantId)->postJson('/api/v1/auth/login', [
             'organization_unit_id' => $organizationUnitId,
@@ -1426,7 +1548,6 @@ final class PurchaseOrderApiTest extends TestCase
 
     /**
      * @param  list<string>  $names
-     *
      * @return list<int>
      */
     private function seedPurchasePermissions(int $tenantId, array $names): array

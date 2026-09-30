@@ -46,6 +46,7 @@ final class ItemCreationService
                 'purchase_tax_group_id' => $data->purchaseTaxGroupId,
                 'sales_tax_group_id' => $data->salesTaxGroupId,
                 'is_stockable' => $data->isStockable,
+                'reorder_level' => $data->isStockable ? $data->reorderLevel : null,
                 'is_combo' => in_array($data->itemType, [ItemType::Combo, ItemType::Package], true),
                 'is_tax_exempt' => $data->isTaxExempt,
                 'is_active' => $data->isActive,

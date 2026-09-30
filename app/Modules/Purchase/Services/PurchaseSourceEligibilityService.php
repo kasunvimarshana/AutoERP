@@ -136,7 +136,7 @@ final class PurchaseSourceEligibilityService
                 'id' => (int) $line->getKey(),
                 'line_number' => (int) $line->line_number,
                 'item_id' => $line->item_id,
-                'item' => $this->summary($line->item, ['code', 'name', 'sku']),
+                'item' => $this->summary($line->item, ['code', 'name', 'sku', 'tracking_type']),
                 'item_variant_id' => $line->item_variant_id,
                 'item_variant' => $this->summary($line->variant, ['code', 'name', 'sku']),
                 'uom_id' => $line->uom_id,

@@ -67,13 +67,24 @@ final class CustomerQueryService
     {
         $search = trim((string) ($criteria['search'] ?? ''));
         if ($search !== '') {
-            $query->where(function (Builder $scope) use ($search): void {
+            $vehicleCustomerIds = array_values(array_unique(array_filter(
+                array_map(
+                    static fn (mixed $customerId): int => (int) $customerId,
+                    (array) ($criteria['current_vehicle_customer_ids'] ?? []),
+                ),
+                static fn (int $customerId): bool => $customerId > 0,
+            )));
+            $query->where(function (Builder $scope) use ($search, $vehicleCustomerIds): void {
                 $scope->where('customer_number', 'like', "%{$search}%")
                     ->orWhere('code', 'like', "%{$search}%")
                     ->orWhere('name', 'like', "%{$search}%")
                     ->orWhere('email', 'like', "%{$search}%")
                     ->orWhere('phone', 'like', "%{$search}%")
                     ->orWhere('mobile', 'like', "%{$search}%");
+
+                if ($vehicleCustomerIds !== []) {
+                    $scope->orWhereIn('customers.id', $vehicleCustomerIds);
+                }
             });
         }
 

@@ -20,7 +20,7 @@ final readonly class CreateSupplierData
      */
     public function __construct(
         public int $tenantId,
-        public string $code,
+        public ?string $code,
         public string $name,
         public SupplierType $supplierType,
         public ?int $organizationUnitId = null,

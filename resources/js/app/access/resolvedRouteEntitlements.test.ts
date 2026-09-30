@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { financePermissions } from '@/modules/finance/financePermissions';
+import { purchasePermissions } from '@/modules/purchase/purchasePermissions';
+import { sellingPermissions } from '@/modules/selling/sellingPermissions';
 import { vehicleServicePermissions } from '@/modules/vehicle-service/vehicleServicePermissions';
 import { resolveTenantRouteEntitlement } from './resolvedRouteEntitlements';
 
@@ -50,11 +52,36 @@ describe('resolved tenant route entitlements', () => {
         expect(resolveTenantRouteEntitlement('/vehicle-service/jobs')?.permissions).toContain(vehicleServicePermissions.jobsView);
     });
 
+    it('protects Purchase-owned invoice and payment detail routes with Purchase permissions', () => {
+        const invoice = resolveTenantRouteEntitlement('/purchase/invoices/42');
+        const payment = resolveTenantRouteEntitlement('/purchase/payments/84');
+
+        expect(invoice?.modules).toContain('purchase');
+        expect(invoice?.permissions).toContain(purchasePermissions.supplierInvoicesView);
+        expect(payment?.modules).toEqual(expect.arrayContaining(['purchase', 'payment']));
+        expect(payment?.permissions).toContain(purchasePermissions.paymentsView);
+    });
+
     it('protects the Inventory workspace route at its exact path', () => {
         const entitlement = resolveTenantRouteEntitlement('/inventory');
 
         expect(entitlement?.modules).toContain('inventory');
         expect(entitlement?.requiresOrganizationUnit).toBe(true);
+    });
+
+    it('resolves Selling workspace routes with their module and permission requirements', () => {
+        for (const path of ['/selling', '/selling/sales/42']) {
+            const entitlement = resolveTenantRouteEntitlement(path);
+
+            expect(entitlement?.modules).toEqual(['selling', 'customer', 'item', 'inventory', 'invoice', 'warehouse']);
+            expect(entitlement?.requiresOrganizationUnit).toBe(true);
+            expect(entitlement?.permissions).toEqual([
+                sellingPermissions.salesView,
+                sellingPermissions.salesCreate,
+                sellingPermissions.returnsView,
+                sellingPermissions.returnsCreate,
+            ]);
+        }
     });
 
     it('returns no entitlement for an unregistered route', () => {

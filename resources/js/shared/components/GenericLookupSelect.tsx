@@ -25,6 +25,7 @@ interface GenericLookupSelectProps<T extends NamedResource> extends LookupBehavi
     placeholder?: string;
     disabled?: boolean;
     required?: boolean;
+    autoFocus?: boolean;
     id?: string;
     recentResultsKey?: string;
     dropdownPlacement?: 'top' | 'bottom';
@@ -44,6 +45,7 @@ export function GenericLookupSelect<T extends NamedResource>({
     placeholder = 'Search by code or name',
     disabled = false,
     required = false,
+    autoFocus = false,
     id,
     recentResultsKey,
     dropdownPlacement = 'bottom',
@@ -290,6 +292,7 @@ export function GenericLookupSelect<T extends NamedResource>({
                 error={error ?? (value === null ? selectionError : '')}
                 disabled={disabled}
                 required={required}
+                autoFocus={autoFocus}
                 role="combobox"
                 autoComplete="off"
                 aria-expanded={open}
@@ -459,9 +462,10 @@ export function GenericLookupSelect<T extends NamedResource>({
             return;
         }
 
+        const hadUnselectedText = hasUserInput && inputValue.trim() !== '';
         setInputValue('');
         setHasUserInput(false);
-        if (required) setSelectionError(requiredSelectionMessage(label));
+        if (required && hadUnselectedText) setSelectionError(requiredSelectionMessage(label));
     }
 }
 

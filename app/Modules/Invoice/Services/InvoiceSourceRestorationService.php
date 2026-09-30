@@ -14,7 +14,7 @@ final class InvoiceSourceRestorationService
 {
     public function __construct(private readonly InvoiceSourceRestorationRegistry $handlers) {}
 
-    public function restore(Invoice $invoice, InvoiceStatus $terminalStatus): void
+    public function restore(Invoice $invoice, InvoiceStatus $terminalStatus, ?int $actorId = null, ?string $reason = null): void
     {
         $invoice->loadMissing('sourceLines');
         $this->handlers->restore(new InvoiceSourceRestorationContext(
@@ -24,6 +24,8 @@ final class InvoiceSourceRestorationService
                 ? null
                 : (int) $invoice->organization_unit_id,
             terminalStatus: $terminalStatus,
+            actorId: $actorId,
+            reason: $reason,
             sourceLines: $invoice->sourceLines
                 ->map(static fn (InvoiceSourceLine $sourceLine): InvoiceSourceLineSnapshot => new InvoiceSourceLineSnapshot(
                     sourceType: (string) $sourceLine->source_type,

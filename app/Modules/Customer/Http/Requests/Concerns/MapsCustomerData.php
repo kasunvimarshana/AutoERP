@@ -23,7 +23,7 @@ trait MapsCustomerData
     {
         return new CreateCustomerData(
             tenantId: $this->tenantId(),
-            code: (string) $customer['code'],
+            code: $this->nullableString($customer, 'code'),
             name: (string) $customer['name'],
             customerType: CustomerType::from((string) $customer['customer_type']),
             organizationUnitId: $this->organizationUnitId(),

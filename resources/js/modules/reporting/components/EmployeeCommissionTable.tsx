@@ -23,15 +23,11 @@ const columns = [
     ['employee', 'Employee', 'employee'],
     ['job', 'Job', 'job_number'],
     ['job_date', 'Date', 'job_date'],
-    ['customer', 'Customer', 'customer'],
     ['vehicle', 'Vehicle', 'vehicle'],
+    ['work', 'Work', ''],
     ['hours', 'Hours', 'assigned_hours'],
-    ['labour', 'Labour value', 'labour_amount'],
     ['commission', 'Commission', 'commission_amount'],
-    ['commission_status', 'Commission status', 'commission_status'],
-    ['invoice_progress', 'Invoice progress', ''],
-    ['payment_progress', 'Payment progress', ''],
-    ['job_status', 'Job status', 'job_status'],
+    ['commission_status', 'Status', 'commission_status'],
 ] as const;
 
 export function EmployeeCommissionTable({
@@ -61,7 +57,7 @@ export function EmployeeCommissionTable({
         <>
             <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
                 <div className="overflow-x-auto">
-                    <table className="min-w-[1500px] divide-y divide-slate-200 text-left text-sm">
+                    <table className="min-w-[920px] divide-y divide-slate-200 text-left text-sm">
                         <thead className="bg-slate-50 text-xs uppercase text-slate-500">
                             <tr>
                                 {columns.map(([key, label, sort]) => (
@@ -88,7 +84,7 @@ export function EmployeeCommissionTable({
                                                 {row.group_label}
                                                 {group && (
                                                     <span className="ml-3 font-normal text-sky-800">
-                                                        {group.total_jobs} jobs / {formatQuantity(group.total_hours)} hours / {formatMoney(group.total_commission)} commission
+                                                        {group.total_jobs} jobs · {formatQuantity(group.total_hours)} hours · {formatMoney(group.earned_commission)} earned · {formatMoney(group.pending_commission)} pending · {formatMoney(group.total_commission)} total
                                                     </span>
                                                 )}
                                             </td>
@@ -105,15 +101,11 @@ export function EmployeeCommissionTable({
                                         </td>
                                         <td className="whitespace-nowrap px-3 py-3"><Link className="text-sky-700 hover:underline" to={`/vehicle-service/jobs/${row.job.id}`}>{row.job_number}</Link></td>
                                         <td className="whitespace-nowrap px-3 py-3">{formatDate(row.job_date)}</td>
-                                        <td className="whitespace-nowrap px-3 py-3">{row.customer_name || '-'}</td>
                                         <td className="whitespace-nowrap px-3 py-3">{row.vehicle_label || '-'}</td>
+                                        <td className="max-w-xs px-3 py-3 text-slate-700">{row.line_description || '-'}</td>
                                         <td className="whitespace-nowrap px-3 py-3 text-right">{formatQuantity(row.assigned_hours)}</td>
-                                        <td className="whitespace-nowrap px-3 py-3 text-right">{formatMoney(row.labour_amount)}</td>
                                         <td className="whitespace-nowrap px-3 py-3 text-right font-semibold">{formatMoney(row.commission_amount)}</td>
-                                        <td className="whitespace-nowrap px-3 py-3">{humanize(row.commission_status)}</td>
-                                        <td className="whitespace-nowrap px-3 py-3">{humanize(row.invoice_progress)}</td>
-                                        <td className="whitespace-nowrap px-3 py-3">{humanize(row.payment_progress)}</td>
-                                        <td className="whitespace-nowrap px-3 py-3">{humanize(row.job_status)}</td>
+                                        <td className="whitespace-nowrap px-3 py-3"><span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">{humanize(row.commission_status)}</span></td>
                                     </tr>,
                                 );
 

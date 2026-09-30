@@ -15,6 +15,7 @@ enum FinanceAccountRoleCode: string
     case ServiceRevenue = 'service_revenue';
     case RentalRevenue = 'rental_revenue';
     case Expense = 'expense';
+    case OperatingExpense = 'operating_expense';
     case RentalExpense = 'rental_expense';
     case Inventory = 'inventory';
     case CostOfGoodsSold = 'cost_of_goods_sold';

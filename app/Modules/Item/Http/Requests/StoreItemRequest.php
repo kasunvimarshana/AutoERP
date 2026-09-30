@@ -37,6 +37,7 @@ final class StoreItemRequest extends TenantScopedRequest
             'purchase_tax_group_id' => ['nullable', 'integer', 'min:1', $this->tenantExists('tax_groups', 'id')],
             'sales_tax_group_id' => ['nullable', 'integer', 'min:1', $this->tenantExists('tax_groups', 'id')],
             'is_stockable' => ['nullable', 'boolean'],
+            'reorder_level' => ['nullable', 'decimal:0,6', 'min:0'],
             'is_combo' => ['nullable', 'boolean'],
             'is_tax_exempt' => ['nullable', 'boolean'],
             'is_active' => ['nullable', 'boolean'],

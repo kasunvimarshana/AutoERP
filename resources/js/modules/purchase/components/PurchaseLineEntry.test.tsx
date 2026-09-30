@@ -7,15 +7,16 @@ import { PurchaseOrderLineEditor, type EditablePurchaseLine } from './PurchaseOr
 import { fastPurchaseLineToPayload, purchaseOrderLineFromResource, purchaseOrderLineToPayload } from './purchaseLineAdapters';
 import type { FastPurchaseContext } from '../types/fastPurchaseTypes';
 vi.mock('./PurchaseLookups', () => ({
-    ItemLookupSelect: ({ value, onChange, error }: {
+    ItemLookupSelect: ({ value, onChange, error, autoFocus }: {
         value: { id: number; code?: string; name?: string } | null;
         onChange: (value: { id: number; code?: string; name?: string } | null) => void;
         error?: string;
+        autoFocus?: boolean;
     }) => (
         <div>
             <label>
                 Item
-                <input aria-label="Item" readOnly value={value?.name ?? ''} aria-invalid={Boolean(error)} />
+                <input aria-label="Item" readOnly value={value?.name ?? ''} aria-invalid={Boolean(error)} autoFocus={autoFocus} />
             </label>
             <button type="button" onClick={() => onChange({ id: 1, code: 'ITEM-1', name: 'Brake pad' })}>Choose brake pad</button>
             {error && <span>{error}</span>}
@@ -99,6 +100,9 @@ describe('Purchase line entry', () => {
         expect(await screen.findByText('Select an item.')).toBeInTheDocument();
         expect(onChange).not.toHaveBeenCalled();
         expect(screen.getByRole('dialog', { name: 'Add line' })).toBeInTheDocument();
+        await user.click(within(dialog).getByRole('button', { name: 'Clear' }));
+        expect(screen.queryByText('Select an item.')).not.toBeInTheDocument();
+        expect(within(dialog).getByLabelText('Item')).toHaveFocus();
     });
     it('adds a valid line only after drawer save', async () => {
         const user = userEvent.setup();
@@ -112,6 +116,9 @@ describe('Purchase line entry', () => {
         expect(onChange).toHaveBeenCalledTimes(1);
         expect(onChange.mock.calls[0][0]).toHaveLength(1);
         expect(onChange.mock.calls[0][0][0].item?.name).toBe('Brake pad');
+        const resetDialog = screen.getByRole('dialog', { name: 'Add line' });
+        expect(within(resetDialog).getByLabelText('Item')).toHaveValue('');
+        expect(within(resetDialog).getByLabelText('Item')).toHaveFocus();
     });
     it('edit cancel preserves the original row', async () => {
         const user = userEvent.setup();

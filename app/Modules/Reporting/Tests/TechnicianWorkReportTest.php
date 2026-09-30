@@ -8,6 +8,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
+use Modules\Core\Contracts\PermissionCheckerInterface;
 use Modules\Invoice\Enums\InvoiceDirection;
 use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Enums\InvoiceType;
@@ -22,6 +23,7 @@ use Modules\Payment\Enums\PaymentDirection;
 use Modules\Payment\Enums\PaymentDocumentStatus;
 use Modules\Payment\Enums\PaymentPostingStatus;
 use Modules\Payment\Enums\PaymentType;
+use Modules\Reporting\Services\EmployeeCommissionReportService;
 use Modules\Reporting\Services\ReportingAuthorizationService;
 use Modules\User\Constants\UserGuard;
 use Modules\User\Constants\UserSystemRole;
@@ -37,8 +39,11 @@ use Modules\VehicleService\Models\VehicleServiceLineEmployee;
 use Modules\VehicleService\Services\VehicleServiceEmployeeAssignmentService;
 use Modules\VehicleService\Services\VehicleServiceJobService;
 use Modules\VehicleService\Services\VehicleServiceLineService;
+use Modules\VehicleService\Services\VehicleServiceStatusService;
 use Spatie\LaravelPdf\Facades\Pdf;
 use Spatie\LaravelPdf\PdfBuilder;
+use Tests\Support\OrganizationUnitFixture;
+use Tests\Support\TenantUserFixture;
 use Tests\TestCase;
 
 final class TechnicianWorkReportTest extends TestCase
@@ -209,6 +214,31 @@ final class TechnicianWorkReportTest extends TestCase
             'commission_amount' => '25.000000',
         ]);
 
+        $dashboardPerformance = app(EmployeeCommissionReportService::class)->dashboardPerformance([
+            'tenant_id' => $context['tenant_id'],
+            'organization_unit_id' => $context['organization_unit_id'],
+            'date_from' => '2026-06-01',
+            'date_to' => '2026-06-30',
+        ], 2);
+
+        $this->assertCount(2, $dashboardPerformance);
+        $this->assertSame('EMP-COM', $dashboardPerformance[0]['employee']['code']);
+        $this->assertSame('100.000000', $dashboardPerformance[0]['labour_value']);
+        $this->assertSame('30.000000', $dashboardPerformance[0]['total_commission']);
+
+        $this->reportGetJson($context, '/api/v1/reports/dashboard?'.http_build_query([
+            'tenant_id' => $context['tenant_id'],
+            'organization_unit_id' => $context['organization_unit_id'],
+            'date_from' => '2026-06-01',
+            'date_to' => '2026-06-30',
+        ]))
+            ->assertOk()
+            ->assertJsonPath('data.employee_performance.0.employee.code', 'EMP-COM')
+            ->assertJsonPath('data.employee_performance.0.labour_value', '100.000000')
+            ->assertJsonPath('data.profitability.total_income', '0.000000')
+            ->assertJsonPath('data.profitability.gross_profit', '0.000000')
+            ->assertJsonPath('data.profitability.net_profit', '0.000000');
+
         $this->reportGetJson($context, '/api/v1/reports/vehicle-service/employee-commissions?'.http_build_query([
             ...$this->scope($context),
             'commission_source' => 'technician',
@@ -227,6 +257,138 @@ final class TechnicianWorkReportTest extends TestCase
             ->assertJsonPath('meta.total', 1)
             ->assertJsonPath('data.0.employee.code', 'SUP-COM')
             ->assertJsonPath('data.0.commission_amount', '25.000000');
+    }
+
+    public function test_employee_commission_report_uses_combo_supervisor_assignment_without_repeating_job_summary(): void
+    {
+        $context = $this->context('COM-COMBO-SUP');
+        $this->authorize($context);
+        $technicianLabour = $this->item(
+            $context['tenant_id'],
+            $context['organization_unit_id'],
+            'LAB-COM-COMBO-TECH',
+            $context['uom_id'],
+        );
+        $combo = $this->item(
+            $context['tenant_id'],
+            $context['organization_unit_id'],
+            'COMBO-COM-COMBO-SUP',
+            $context['uom_id'],
+            ItemType::Combo,
+        );
+        DB::table('item_bundles')->insert([
+            [
+                'tenant_id' => $context['tenant_id'],
+                'parent_item_id' => $combo->getKey(),
+                'child_item_id' => $context['labour']->getKey(),
+                'quantity' => '1.000000',
+                'uom_id' => $context['uom_id'],
+                'line_type' => 'labour',
+                'unit_cost' => '80.000000',
+                'uses_job_supervisor' => true,
+                'is_required' => true,
+                'sort_order' => 1,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'tenant_id' => $context['tenant_id'],
+                'parent_item_id' => $combo->getKey(),
+                'child_item_id' => $technicianLabour->getKey(),
+                'quantity' => '1.000000',
+                'uom_id' => $context['uom_id'],
+                'line_type' => 'labour',
+                'unit_cost' => '120.000000',
+                'uses_job_supervisor' => false,
+                'is_required' => true,
+                'sort_order' => 2,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ]);
+        $job = $this->createJob(
+            $context,
+            supervisorCommissionType: VehicleServiceCommissionType::Fixed,
+            supervisorCommissionValue: '50.000000',
+        );
+        $parent = $this->withTenantExecutionContext(
+            (int) $context['tenant_id'],
+            fn () => app(VehicleServiceLineService::class)->create($job, new VehicleServiceLineData(
+                lineSourceType: VehicleServiceLineSourceType::ComboParent,
+                description: 'Supervisor and technician combo',
+                quantity: '1.000000',
+                unitPrice: '2900.000000',
+                itemId: (int) $combo->getKey(),
+                uomId: (int) $combo->base_uom_id,
+            )),
+        );
+        $children = $this->withTenantExecutionContext(
+            (int) $context['tenant_id'],
+            fn () => $parent->children()->orderBy('line_number')->get(),
+        );
+        $supervisorLine = $children->firstWhere('uses_job_supervisor', true);
+        $technicianLine = $children->firstWhere('uses_job_supervisor', false);
+        $supervisorAssignment = $this->assignment(
+            $job,
+            $supervisorLine,
+            $context['supervisor_id'],
+            '0.000000',
+            '0.000000',
+            VehicleServiceCommissionType::Fixed,
+            '80.000000',
+        );
+        $technicianAssignment = $this->assignment(
+            $job,
+            $technicianLine,
+            $context['employee_id'],
+            '0.000000',
+            '0.000000',
+            VehicleServiceCommissionType::Fixed,
+            '120.000000',
+        );
+
+        $response = $this->reportGetJson(
+            $context,
+            '/api/v1/reports/vehicle-service/employee-commissions?'.http_build_query($this->scope($context)),
+        )
+            ->assertOk()
+            ->assertJsonPath('meta.total', 2)
+            ->assertJsonPath('summary.total_entries', 2)
+            ->assertJsonPath('summary.technician_commission', '120.000000')
+            ->assertJsonPath('summary.supervisor_commission', '80.000000')
+            ->assertJsonPath('summary.total_commission', '200.000000');
+
+        $response
+            ->assertJsonFragment([
+                'id' => 'supervisor-assignment-'.$supervisorAssignment->getKey(),
+                'commission_source' => 'supervisor',
+                'employee_code' => 'SUP-COM-COMBO-SUP',
+                'commission_amount' => '80.000000',
+            ])
+            ->assertJsonFragment([
+                'id' => 'technician-'.$technicianAssignment->getKey(),
+                'commission_source' => 'technician',
+                'employee_code' => 'EMP-COM-COMBO-SUP',
+                'commission_amount' => '120.000000',
+            ])
+            ->assertJsonMissing([
+                'line_description' => 'Job supervision',
+            ]);
+
+        $this->cancelCommissionJob($context, $job);
+        $this->reportGetJson($context, '/api/v1/reports/vehicle-service/employee-commissions?'.http_build_query($this->scope($context)))
+            ->assertOk()->assertJsonPath('meta.total', 0)->assertJsonPath('summary.total_commission', '0.000000');
+        $this->reportGetJson($context, '/api/v1/reports/vehicle-service/employee-commissions?'.http_build_query([
+            ...$this->scope($context), 'include_cancelled' => true,
+        ]))->assertOk()->assertJsonPath('meta.total', 2)
+            ->assertJsonPath('summary.total_commission', '0.000000')
+            ->assertJsonPath('summary.cancelled_commission', '200.000000')
+            ->assertJsonFragment(['id' => 'supervisor-assignment-'.$supervisorAssignment->getKey(), 'commission_status' => 'cancelled', 'commission_amount' => '80.000000'])
+            ->assertJsonFragment(['id' => 'technician-'.$technicianAssignment->getKey(), 'commission_status' => 'cancelled', 'commission_amount' => '120.000000']);
+        $this->withTenantExecutionContext((int) $context['tenant_id'], function () use ($supervisorAssignment, $technicianAssignment): void {
+            $this->assertSame('80.000000', $supervisorAssignment->fresh()->commission_amount);
+            $this->assertSame('120.000000', $technicianAssignment->fresh()->commission_amount);
+        });
     }
 
     public function test_employee_commission_report_filters_exports_and_isolates_scope(): void
@@ -294,9 +456,7 @@ final class TechnicianWorkReportTest extends TestCase
             VehicleServiceCommissionType::Fixed,
             '20.000000',
         );
-        $this->withTenantExecutionContext((int) $context['tenant_id'], function () use ($job): void {
-            $job->forceFill(['status' => VehicleServiceJobStatus::Cancelled])->save();
-        });
+        $this->cancelCommissionJob($context, $job);
 
         $this->reportGetJson($context, '/api/v1/reports/vehicle-service/employee-commissions?'.http_build_query($this->scope($context)))
             ->assertOk()
@@ -538,8 +698,7 @@ final class TechnicianWorkReportTest extends TestCase
         PaymentDocumentStatus $paymentDocumentStatus = PaymentDocumentStatus::Approved,
         PaymentPostingStatus $paymentPostingStatus = PaymentPostingStatus::Posted,
         PaymentAllocationState $paymentAllocationStatus = PaymentAllocationState::FullyAllocated,
-    ): void
-    {
+    ): void {
         $now = now();
         $invoiceId = (int) DB::table('invoices')->insertGetId([
             'tenant_id' => $context['tenant_id'],
@@ -602,15 +761,20 @@ final class TechnicianWorkReportTest extends TestCase
         ]);
     }
 
-    private function item(int $tenantId, int $organizationUnitId, string $code, int $uomId): Item
-    {
+    private function item(
+        int $tenantId,
+        int $organizationUnitId,
+        string $code,
+        int $uomId,
+        ItemType $itemType = ItemType::Labour,
+    ): Item {
         return $this->withTenantExecutionContext(
             $tenantId,
             fn (): Item => app(ItemCreationService::class)->create(new CreateItemData(
                 tenantId: $tenantId,
                 code: $code,
                 name: str_replace('-', ' ', $code),
-                itemType: ItemType::Labour,
+                itemType: $itemType,
                 organizationUnitId: $organizationUnitId,
                 trackingType: TrackingType::None,
                 costingMethod: CostingMethod::None,
@@ -635,7 +799,7 @@ final class TechnicianWorkReportTest extends TestCase
 
     private function organizationUnit(int $tenantId, string $code): int
     {
-        return (int) \Tests\Support\OrganizationUnitFixture::create([
+        return (int) OrganizationUnitFixture::create([
             'tenant_id' => $tenantId,
             'name' => 'Org '.$code,
             'code' => $code,
@@ -748,6 +912,17 @@ final class TechnicianWorkReportTest extends TestCase
         ]);
     }
 
+    private function cancelCommissionJob(array $context, VehicleServiceJob $job): void
+    {
+        $this->mock(PermissionCheckerInterface::class, fn ($mock) => $mock->shouldReceive('allows')->andReturnTrue());
+        $this->withTenantExecutionContext((int) $context['tenant_id'], function () use ($context, $job): void {
+            $job->refresh();
+            app(VehicleServiceStatusService::class)->change(
+                $job, VehicleServiceJobStatus::Cancelled, $context['user_id'], 'Customer cancelled', (int) $job->row_version,
+            );
+        });
+    }
+
     /** @param array<string, mixed> $context */
     private function authorize(array &$context): void
     {
@@ -755,7 +930,7 @@ final class TechnicianWorkReportTest extends TestCase
         $organizationUnitId = (int) $context['organization_unit_id'];
         $guard = UserGuard::TENANT_API;
         $now = now();
-        $userId = (int) \Tests\Support\TenantUserFixture::create([
+        $userId = (int) TenantUserFixture::create([
             'tenant_id' => $tenantId,
             'first_name' => 'Reporting',
             'last_name' => 'Administrator',

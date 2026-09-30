@@ -1,3 +1,4 @@
+import { expensePermissions } from '@/modules/expense/expensePermissions';
 import { financePermissions } from '@/modules/finance/financePermissions';
 import { paymentPermissions } from '@/modules/payment/paymentPermissions';
 import { reportingPermissions } from '@/modules/reporting/reportingPermissions';
@@ -5,6 +6,10 @@ import { taxPermissions } from '@/modules/tax/taxPermissions';
 import { operational, type EntitlementRule } from './routeEntitlementPolicy';
 
 export const financeRouteEntitlements: readonly EntitlementRule[] = [
+    operational('/expenses/create', ['finance'], [expensePermissions.create]),
+    operational('/expenses/types', ['finance'], [expensePermissions.typesView]),
+    operational('/expenses', ['finance'], [expensePermissions.view]),
+
     operational('/payments/methods/create', ['payment'], [paymentPermissions.methodsCreate]),
     operational('/payments/methods/:id/edit', ['payment'], [paymentPermissions.methodsUpdate]),
     operational('/payments/methods', ['payment'], [paymentPermissions.methodsView]),

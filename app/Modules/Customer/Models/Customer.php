@@ -64,6 +64,11 @@ final class Customer extends TenantOwnedModel
         return $this->hasMany(CustomerContact::class, 'customer_id');
     }
 
+    public function whatsappVerifications(): HasMany
+    {
+        return $this->hasMany(CustomerWhatsAppVerification::class, 'customer_id');
+    }
+
     public function addresses(): HasMany
     {
         return $this->hasMany(CustomerAddress::class, 'customer_id');

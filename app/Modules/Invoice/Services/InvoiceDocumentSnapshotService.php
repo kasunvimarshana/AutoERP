@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Invoice\Services;
 
 use BackedEnum;
+use InvalidArgumentException;
 use Modules\Invoice\DTOs\CreateInvoiceData;
 use Modules\Invoice\Enums\InvoiceDirection;
 use Modules\Invoice\Enums\InvoiceDocumentKind;
@@ -48,7 +49,7 @@ final class InvoiceDocumentSnapshotService
         $seller = $outbound ? $organization : $counterparty;
         $buyer = $outbound ? $counterparty : $organization;
 
-        $snapshot = new InvoiceDocumentSnapshot();
+        $snapshot = new InvoiceDocumentSnapshot;
         $snapshot->forceFill([
             'tenant_id' => $data->tenantId,
             'organization_unit_id' => $data->organizationUnitId,
@@ -65,10 +66,36 @@ final class InvoiceDocumentSnapshotService
                 ?? $this->nullableString($organizationProfile?->address),
             'payment_mode' => $this->nullableString($data->paymentMode),
             'payment_terms' => $this->nullableString($data->paymentTerms),
+            'purchaser_reference_fields' => $this->referenceFields($data->purchaserReferenceFields),
         ]);
         $snapshot->save();
 
         return $snapshot;
+    }
+
+    /**
+     * @param  array<mixed>  $fields
+     * @return list<array{label: string, value: string}>
+     */
+    private function referenceFields(array $fields): array
+    {
+        $normalized = [];
+
+        foreach ($fields as $field) {
+            if (! is_array($field)) {
+                throw new InvalidArgumentException('Invoice purchaser reference fields must be arrays.');
+            }
+
+            $label = $this->nullableString($field['label'] ?? null);
+            $value = $this->nullableString($field['value'] ?? null);
+            if ($label === null || $value === null) {
+                throw new InvalidArgumentException('Invoice purchaser reference fields require a label and value.');
+            }
+
+            $normalized[] = ['label' => $label, 'value' => $value];
+        }
+
+        return $normalized;
     }
 
     private function documentKind(Invoice $invoice, ?string $sellerVatRegistrationNumber): InvoiceDocumentKind

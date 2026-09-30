@@ -16,6 +16,7 @@ import { PermissionRoute } from "@/modules/auth/PermissionRoute";
 import { PLATFORM_PERMISSION } from "./access/platformPermissions";
 import { RouteErrorPage } from "./errors/RouteErrorPage";
 import { tenantPermissions } from "@/modules/tenant/tenantPermissions";
+import { expensePermissions } from "@/modules/expense/expensePermissions";
 
 const LoginPage = lazy(() => import("@/modules/auth/LoginPage"));
 const AuditLogListPage = lazy(() => import("@/modules/audit/AuditLogListPage"));
@@ -163,6 +164,9 @@ const WarehouseLocationDetailPage = lazy(
 const FastPurchasePage = lazy(
     () => import("@/modules/purchase/pages/FastPurchasePage"),
 );
+const SellingWorkspacePage = lazy(
+    () => import('@/modules/selling/pages/SellingWorkspacePage'),
+);
 const PurchaseOrderListPage = lazy(
     () => import("@/modules/purchase/pages/PurchaseOrderListPage"),
 );
@@ -237,6 +241,15 @@ const PaymentMethodListPage = lazy(
 );
 const PaymentMethodFormPage = lazy(
     () => import("@/modules/payment/pages/PaymentMethodFormPage"),
+);
+const ExpenseListPage = lazy(
+    () => import("@/modules/expense/pages/ExpenseListPage"),
+);
+const ExpenseCreatePage = lazy(
+    () => import("@/modules/expense/pages/ExpenseCreatePage"),
+);
+const ExpenseTypesPage = lazy(
+    () => import("@/modules/expense/pages/ExpenseTypesPage"),
 );
 const ChequeTemplateListPage = lazy(
     () => import("@/modules/payment/cheque-print/ChequeTemplateListPage"),
@@ -320,11 +333,20 @@ const ReportPage = lazy(() => import("@/modules/reporting/pages/ReportPage"));
 const SummaryReportPage = lazy(
     () => import("@/modules/reporting/pages/SummaryReportPage"),
 );
+const ExpenseReportPage = lazy(
+    () => import("@/modules/reporting/pages/ExpenseReportPage"),
+);
+const GrnPayablesReportPage = lazy(
+    () => import("@/modules/reporting/pages/GrnPayablesReportPage"),
+);
 const TechnicianWorkReportPage = lazy(
     () => import("@/modules/reporting/pages/TechnicianWorkReportPage"),
 );
 const EmployeeCommissionReportPage = lazy(
     () => import("@/modules/reporting/pages/EmployeeCommissionReportPage"),
+);
+const VehicleServiceHistoryReportPage = lazy(
+    () => import("@/modules/reporting/pages/VehicleServiceHistoryReportPage"),
 );
 const OperationalReportPage = lazy(
     () => import("@/modules/reporting/pages/OperationalReportPage"),
@@ -633,6 +655,14 @@ const appRouter = createBrowserRouter(
                             element={<WarehouseLocationDetailPage />}
                         />
                         <Route
+                            path="/selling"
+                            element={<SellingWorkspacePage />}
+                        />
+                        <Route
+                            path="/selling/sales/:id"
+                            element={<SellingWorkspacePage />}
+                        />
+                        <Route
                             path="/purchase/fast-purchase"
                             element={<FastPurchasePage />}
                         />
@@ -689,6 +719,10 @@ const appRouter = createBrowserRouter(
                             element={<PurchaseInvoiceCreatePage />}
                         />
                         <Route
+                            path="/purchase/invoices/:id"
+                            element={<InvoiceDetailPage />}
+                        />
+                        <Route
                             path="/purchase/payments"
                             element={<PurchasePaymentWorkspacePage />}
                         />
@@ -699,6 +733,10 @@ const appRouter = createBrowserRouter(
                         <Route
                             path="/purchase/payments/prepare"
                             element={<PurchasePaymentPreparePage />}
+                        />
+                        <Route
+                            path="/purchase/payments/:id"
+                            element={<PaymentDetailPage />}
                         />
                         <Route
                             path="/purchase/debit-notes"
@@ -756,6 +794,18 @@ const appRouter = createBrowserRouter(
                         <Route
                             path="/payments/:id"
                             element={<PaymentDetailPage />}
+                        />
+                        <Route
+                            path="/expenses"
+                            element={<PermissionRoute permission={expensePermissions.view}><ExpenseListPage /></PermissionRoute>}
+                        />
+                        <Route
+                            path="/expenses/create"
+                            element={<PermissionRoute permission={expensePermissions.create}><ExpenseCreatePage /></PermissionRoute>}
+                        />
+                        <Route
+                            path="/expenses/types"
+                            element={<PermissionRoute permission={expensePermissions.typesView}><ExpenseTypesPage /></PermissionRoute>}
                         />
                         <Route path="/vouchers" element={<VoucherListPage />} />
                         <Route
@@ -855,11 +905,19 @@ const appRouter = createBrowserRouter(
                             element={<SummaryReportPage />}
                         />
                         <Route
+                            path="/reports/expenses"
+                            element={<ExpenseReportPage />}
+                        />
+                        <Route
                             path="/reports/purchase/detailed"
                             element={<OperationalReportPage
                                     reportKey="purchase/detailed"
                                     kind="purchase"
                                 />}
+                        />
+                        <Route
+                            path="/reports/purchase/grn-payables"
+                            element={<GrnPayablesReportPage />}
                         />
                         <Route
                             path="/reports/vehicle-service/detailed"
@@ -882,6 +940,10 @@ const appRouter = createBrowserRouter(
                         <Route
                             path="/reports/vehicle-service/employee-commissions"
                             element={<EmployeeCommissionReportPage />}
+                        />
+                        <Route
+                            path="/reports/vehicle-service/service-history"
+                            element={<VehicleServiceHistoryReportPage />}
                         />
                         <Route
                             path="/reports/:key"

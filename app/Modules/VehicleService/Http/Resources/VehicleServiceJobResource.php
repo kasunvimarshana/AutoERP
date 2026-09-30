@@ -38,6 +38,9 @@ final class VehicleServiceJobResource extends JsonResource
             'fuel_level' => $this->fuel_level,
             'priority' => $this->priority,
             'subtotal' => (string) $this->subtotal,
+            'line_discount_total' => (string) $this->line_discount_total,
+            'job_discount_base' => (string) $this->job_discount_base,
+            'job_discount_amount' => (string) $this->job_discount_amount,
             'discount_total' => (string) $this->discount_total,
             'tax_total' => (string) $this->tax_total,
             'charge_total' => (string) $this->charge_total,
@@ -49,6 +52,18 @@ final class VehicleServiceJobResource extends JsonResource
             'approved_at' => $this->approved_at?->toISOString(),
             'completed_by' => $this->completed_by,
             'completed_at' => $this->completed_at?->toISOString(),
+            'job_discount' => $this->whenLoaded('currentDiscountRevision', function () use ($request) {
+                if ($this->currentDiscountRevision === null
+                    || $this->enum($this->currentDiscountRevision->action) === 'removed') {
+                    return null;
+                }
+
+                $data = (new VehicleServiceJobDiscountResource($this->currentDiscountRevision))->resolve($request);
+                $data['calculation_base'] = (string) $this->job_discount_base;
+                $data['calculated_amount'] = (string) $this->job_discount_amount;
+
+                return $data;
+            }),
             'inspection' => $this->whenLoaded('inspection', fn () => $this->inspection === null ? null : (new VehicleServiceInspectionResource($this->inspection))->resolve($request)),
             'lines' => $this->whenLoaded('lines', fn () => VehicleServiceJobLineResource::collection($this->lines)->resolve($request), []),
             'invoice_links' => $this->whenLoaded(

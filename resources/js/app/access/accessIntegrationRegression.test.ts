@@ -2,6 +2,7 @@ import { USE_PERMISSION, USE_REGISTER_PATH } from '@/modules/vehicle-rental/vehi
 import { TENANT_MODULE_CODE } from './tenantModules';
 import { describe, expect, it } from 'vitest';
 import { inventoryPermissions } from '@/modules/inventory/inventoryPermissions';
+import { sellingPermissions } from '@/modules/selling/sellingPermissions';
 import { financePermissions } from '@/modules/finance/financePermissions';
 import { hrPermissions } from '@/modules/hr/hrPermissions';
 import { uomPermissions } from '@/modules/uom/uomPermissions';
@@ -65,5 +66,14 @@ describe('tenant access integration regressions', () => {
         expect(visibleItemLabels([], [])).not.toContain('Vouchers');
         expect(visibleItemLabels([financePermissions.journalsView], ['finance'])).toContain('Vouchers');
         expect(resolveTenantRouteEntitlement('/vouchers')?.permissions).toContain(financePermissions.journalsView);
+    });
+
+    it('shows Selling only when its supporting modules and permission are enabled', () => {
+        const modules = ['selling', 'customer', 'item', 'inventory', 'invoice', 'warehouse'];
+
+        expect(visibleItemLabels([sellingPermissions.salesView], modules)).toContain('Selling');
+        expect(visibleItemLabels([sellingPermissions.salesView], modules)).toContain('Sales');
+        expect(visibleItemLabels([sellingPermissions.salesView], modules.filter((module) => module !== 'invoice'))).not.toContain('Selling');
+        expect(visibleItemLabels([], modules)).not.toContain('Selling');
     });
 });

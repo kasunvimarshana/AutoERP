@@ -4,16 +4,19 @@ declare(strict_types=1);
 
 namespace Modules\Invoice\Services;
 
+use Modules\Core\Services\DecimalMath;
 use Modules\Invoice\Contracts\InvoiceBalanceProviderInterface;
 use Modules\Invoice\DTOs\BalanceResultData;
 use Modules\Invoice\DTOs\InvoiceBalanceResult;
 use Modules\Invoice\Enums\InvoiceBalanceStatus;
+use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Models\Invoice;
 
 final class InvoiceBalanceProvider implements InvoiceBalanceProviderInterface
 {
     public function __construct(
         private readonly InvoiceStatusService $statuses,
+        private readonly DecimalMath $math,
     ) {}
 
     public function getInvoiceReferences(array $invoiceIds): array
@@ -64,6 +67,55 @@ final class InvoiceBalanceProvider implements InvoiceBalanceProviderInterface
         return $invoice->status instanceof \BackedEnum
             ? (string) $invoice->status->value
             : (string) $invoice->status;
+    }
+
+    public function getOutstandingTotalsForParties(
+        int $tenantId,
+        ?int $organizationUnitId,
+        string $partyType,
+        array $partyIds,
+    ): array {
+        $partyIds = array_values(array_unique(array_filter(
+            array_map(static fn (mixed $partyId): int => (int) $partyId, $partyIds),
+            static fn (int $partyId): bool => $partyId > 0,
+        )));
+
+        if ($partyIds === []) {
+            return [];
+        }
+
+        $query = Invoice::query()
+            ->join('invoice_balances', 'invoice_balances.invoice_id', '=', 'invoices.id')
+            ->where('invoices.tenant_id', $tenantId)
+            ->where('invoices.party_type', $partyType)
+            ->whereIn('invoices.party_id', $partyIds)
+            ->where('invoice_balances.remaining_amount', '>', '0')
+            ->whereNotIn('invoices.status', [
+                InvoiceStatus::Draft->value,
+                InvoiceStatus::Reversed->value,
+                InvoiceStatus::Cancelled->value,
+                InvoiceStatus::Void->value,
+            ]);
+
+        $organizationUnitId === null
+            ? $query->whereNull('invoices.organization_unit_id')
+            : $query->where('invoices.organization_unit_id', $organizationUnitId);
+
+        return $query
+            ->selectRaw('invoices.party_id, invoices.currency_code_snapshot, SUM(invoice_balances.remaining_amount) as total_due')
+            ->groupBy('invoices.party_id', 'invoices.currency_code_snapshot')
+            ->orderBy('invoices.currency_code_snapshot')
+            ->get()
+            ->groupBy(static fn (object $total): int => (int) $total->party_id)
+            ->mapWithKeys(fn ($totals, mixed $partyId): array => [
+                (int) $partyId => $totals->map(fn (object $total): array => [
+                    'amount' => $this->math->normalize((string) $total->total_due),
+                    'currency_code' => $total->currency_code_snapshot === null
+                        ? null
+                        : (string) $total->currency_code_snapshot,
+                ])->values()->all(),
+            ])
+            ->all();
     }
 
     public function getPayableBalancesForParty(

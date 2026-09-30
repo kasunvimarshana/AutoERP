@@ -52,6 +52,7 @@ final class InventoryPermissionBoundaryTest extends TestCase
             'api.v1.inventory.stock-counts.approve' => InventoryPermission::STOCK_COUNTS_APPROVE,
             'api.v1.inventory.stock-counts.post' => InventoryPermission::STOCK_COUNTS_POST,
             'api.v1.inventory.batches.index' => InventoryPermission::TRACKING_VIEW,
+            'api.v1.inventory.batches.generate-number' => InventoryPermission::TRACKING_MANAGE,
             'api.v1.inventory.serials.index' => InventoryPermission::TRACKING_VIEW,
         ];
 

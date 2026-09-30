@@ -16,6 +16,8 @@ final readonly class InvoiceSourceRestorationContext
         public ?int $organizationUnitId,
         public InvoiceStatus $terminalStatus,
         public array $sourceLines,
+        public ?int $actorId = null,
+        public ?string $reason = null,
     ) {
         if (! in_array($terminalStatus, [
             InvoiceStatus::Cancelled,

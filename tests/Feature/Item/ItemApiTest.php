@@ -7,11 +7,14 @@ namespace Tests\Feature\Item;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use InvalidArgumentException;
 use Modules\Item\Models\Item;
 use Modules\Item\Services\ItemAuthorizationService;
 use Modules\Item\Services\ItemPriceResolutionService;
+use Tests\Support\ActiveTenantSubscriptionFixture;
 use Tests\Support\CurrencyFixture;
+use Tests\Support\OrganizationUnitFixture;
+use Tests\Support\TenantAuthenticationFixture;
+use Tests\Support\TenantUserFixture;
 use Tests\TestCase;
 
 final class ItemApiTest extends TestCase
@@ -30,19 +33,22 @@ final class ItemApiTest extends TestCase
             'item_category_id' => $categoryId,
             'item_brand_id' => $brandId,
             'base_uom_id' => $uomId,
+            'reorder_level' => '5.000000',
         ]))->assertCreated()
             ->assertJsonPath('data.category.code', 'PARTS')
             ->assertJsonPath('data.brand.code', 'GEN')
             ->assertJsonPath('data.base_uom.code', 'PCS')
+            ->assertJsonPath('data.reorder_level', '5.000000')
             ->assertJsonMissingPath('data.standard_price')
             ->assertJsonMissingPath('data.item_category_id')
             ->assertJsonMissingPath('data.item_brand_id')
             ->assertJsonMissingPath('data.base_uom_id');
 
         $itemId = (int) $response->json('data.id');
-        $this->withAuth($context)->putJson('/api/v1/items/'.$itemId, ['name' => 'Updated Item'])
+        $this->withAuth($context)->putJson('/api/v1/items/'.$itemId, ['name' => 'Updated Item', 'reorder_level' => '2.500000'])
             ->assertOk()
-            ->assertJsonPath('data.name', 'Updated Item');
+            ->assertJsonPath('data.name', 'Updated Item')
+            ->assertJsonPath('data.reorder_level', '2.500000');
 
         $this->withAuth($context)->putJson('/api/v1/items/'.$itemId, ['standard_price' => '12.340000'])
             ->assertUnprocessable()
@@ -50,7 +56,8 @@ final class ItemApiTest extends TestCase
 
         $this->withAuth($context)->getJson('/api/v1/items/lookup?search=ITM-001')
             ->assertOk()
-            ->assertJsonPath('data.0.code', 'ITM-001');
+            ->assertJsonPath('data.0.code', 'ITM-001')
+            ->assertJsonPath('data.0.reorder_level', '2.500000');
     }
 
     public function test_item_price_revisions_are_effective_dated_immutable_and_conflict_aware(): void
@@ -566,7 +573,7 @@ final class ItemApiTest extends TestCase
 
     private function createOrganizationUnit(int $tenantId, string $name, string $code): int
     {
-        return (int) \Tests\Support\OrganizationUnitFixture::create([
+        return (int) OrganizationUnitFixture::create([
             'tenant_id' => $tenantId,
             'name' => $name,
             'code' => $code,
@@ -601,8 +608,8 @@ final class ItemApiTest extends TestCase
             'activated_at' => $now,
             'created_at' => $now,
             'updated_at' => $now]);
-        \Tests\Support\ActiveTenantSubscriptionFixture::create($tenantId);
-        $organizationUnitId = (int) \Tests\Support\OrganizationUnitFixture::create([
+        ActiveTenantSubscriptionFixture::create($tenantId);
+        $organizationUnitId = (int) OrganizationUnitFixture::create([
             'tenant_id' => $tenantId,
             'name' => 'Main',
             'code' => 'MAIN',
@@ -613,7 +620,7 @@ final class ItemApiTest extends TestCase
             'updated_at' => $now,
         ]);
         $email = (string) ($overrides['email'] ?? 'item-admin@example.test');
-        $userId = (int) \Tests\Support\TenantUserFixture::create([
+        $userId = (int) TenantUserFixture::create([
             'tenant_id' => $tenantId,
             'first_name' => 'Item',
             'last_name' => 'Tester',
@@ -662,7 +669,7 @@ final class ItemApiTest extends TestCase
             'created_at' => $now,
             'updated_at' => $now,
         ]);
-        \Tests\Support\TenantAuthenticationFixture::provision($tenantId, $userId, $email);
+        TenantAuthenticationFixture::provision($tenantId, $userId, $email);
 
         $token = (string) $this->withHeader('X-Tenant-Id', (string) $tenantId)->postJson('/api/v1/auth/login', [
             'organization_unit_id' => $organizationUnitId,

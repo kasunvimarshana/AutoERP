@@ -2,6 +2,7 @@ import { apiClient } from '@/shared/api/apiClient';
 import type { ApiCollection, ApiResource } from '@/shared/types/api';
 import type {
     VehicleServiceEmployeeAssignment,
+    VehicleServiceEmployeeAssignmentBatchPayload,
     VehicleServiceEmployeeAssignmentPayload,
     VehicleServiceJobLine,
 } from '../vehicleServiceTypes';
@@ -18,6 +19,15 @@ export const createVehicleServiceEmployee = (
 ) =>
     apiClient.post<ApiResource<VehicleServiceEmployeeAssignment>>(
         `${jobs}/${jobId}/lines/${lineId}/employees`,
+        payload,
+    ).then((response) => response.data.data);
+
+export const createVehicleServiceEmployeeBatch = (
+    jobId: number,
+    payload: VehicleServiceEmployeeAssignmentBatchPayload,
+) =>
+    apiClient.post<ApiCollection<VehicleServiceEmployeeAssignment>>(
+        `${jobs}/${jobId}/employees/batch`,
         payload,
     ).then((response) => response.data.data);
 

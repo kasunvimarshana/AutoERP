@@ -4,15 +4,17 @@ declare(strict_types=1);
 
 namespace Modules\VehicleService\Services;
 
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
+use Modules\Hr\Models\HrEmployee;
 use Modules\Item\Enums\ItemType;
+use Modules\VehicleService\DTOs\VehicleServiceEmployeeAssignmentBatchEntryData;
 use Modules\VehicleService\DTOs\VehicleServiceEmployeeAssignmentData;
 use Modules\VehicleService\Enums\VehicleServiceCommissionType;
 use Modules\VehicleService\Enums\VehicleServiceLineSourceType;
-use Modules\Hr\Models\HrEmployee;
 use Modules\VehicleService\Models\VehicleServiceJob;
 use Modules\VehicleService\Models\VehicleServiceJobLine;
 use Modules\VehicleService\Models\VehicleServiceLineEmployee;
@@ -43,6 +45,7 @@ final class VehicleServiceEmployeeAssignmentService
             $line = $job->lines()->findOrFail($line->getKey());
             $this->assertExpectedVersion($job, $expectedVersion);
             $this->assertLine($job, $line);
+            $versionBefore = (int) $job->row_version;
             $this->validator->assertMutable($job);
             $this->validator->assertEmployeeAssignable($line);
             $employee = $this->validator->workforceEmployee($job, $line, $data->employeeId);
@@ -55,10 +58,85 @@ final class VehicleServiceEmployeeAssignmentService
                 'assigned_at' => now(),
             ]));
             $this->calculations->recalculateAssignments($line);
-            $this->calculations->recalculateJob($job);
-            $this->bumpJobVersion($job);
+            $this->recalculateJobAndEnsureVersionBump($job, $versionBefore);
 
             return $assignment->refresh()->load('employee');
+        });
+    }
+
+    /**
+     * @param  list<VehicleServiceEmployeeAssignmentBatchEntryData>  $entries
+     * @return Collection<int, VehicleServiceLineEmployee>
+     */
+    public function createBatch(
+        VehicleServiceJob $job,
+        array $entries,
+        ?int $expectedVersion = null,
+    ): Collection {
+        return DB::transaction(function () use ($job, $entries, $expectedVersion): Collection {
+            $job = VehicleServiceJob::query()->lockForUpdate()->findOrFail($job->getKey());
+            $this->assertExpectedVersion($job, $expectedVersion);
+            $this->validator->assertMutable($job);
+            $versionBefore = (int) $job->row_version;
+
+            $assignmentKeys = collect($entries)->map(
+                static fn (VehicleServiceEmployeeAssignmentBatchEntryData $entry): string => $entry->lineId.':'.$entry->assignment->employeeId,
+            );
+            if ($assignmentKeys->unique()->count() !== $assignmentKeys->count()) {
+                throw new InvalidArgumentException('An employee can only be included once per workforce line.');
+            }
+
+            $lineIds = collect($entries)->map(
+                static fn (VehicleServiceEmployeeAssignmentBatchEntryData $entry): int => $entry->lineId,
+            )->unique()->values();
+            /** @var Collection<int, VehicleServiceJobLine> $lines */
+            $lines = $job->lines()->whereKey($lineIds)->lockForUpdate()->get()->keyBy(
+                static fn (VehicleServiceJobLine $line): int => (int) $line->getKey(),
+            );
+
+            if ($lines->count() !== $lineIds->count()) {
+                throw new InvalidArgumentException('One or more workforce lines do not belong to the service job.');
+            }
+
+            $prepared = collect($entries)->map(function (VehicleServiceEmployeeAssignmentBatchEntryData $entry) use ($job, $lines): array {
+                $line = $lines->get($entry->lineId);
+                if (! $line instanceof VehicleServiceJobLine) {
+                    throw new InvalidArgumentException('One or more workforce lines do not belong to the service job.');
+                }
+                $this->validator->assertEmployeeAssignable($line);
+                $employee = $this->validator->workforceEmployee($job, $line, $entry->assignment->employeeId);
+                if ($line->employeeAssignments()->where('employee_id', $employee->getKey())->exists()) {
+                    throw new InvalidArgumentException('Employee is already assigned to this workforce line.');
+                }
+
+                return [
+                    'line' => $line,
+                    'attributes' => $this->attributes($line, $entry->assignment, $employee),
+                ];
+            });
+
+            $assignments = $prepared->map(function (array $row) use ($job): VehicleServiceLineEmployee {
+                /** @var VehicleServiceJobLine $line */
+                $line = $row['line'];
+                $assignment = VehicleServiceLineEmployee::query()->create(array_merge($row['attributes'], [
+                    'tenant_id' => $job->tenant_id,
+                    'organization_unit_id' => $job->organization_unit_id,
+                    'vehicle_service_job_id' => $job->getKey(),
+                    'vehicle_service_job_line_id' => $line->getKey(),
+                    'assigned_at' => now(),
+                ]));
+
+                return $assignment;
+            });
+
+            $lines->each(
+                fn (VehicleServiceJobLine $line) => $this->calculations->recalculateAssignments($line),
+            );
+            $this->recalculateJobAndEnsureVersionBump($job, $versionBefore);
+
+            return $assignments->map(
+                static fn (VehicleServiceLineEmployee $assignment): VehicleServiceLineEmployee => $assignment->refresh()->load('employee'),
+            );
         });
     }
 
@@ -75,6 +153,7 @@ final class VehicleServiceEmployeeAssignmentService
             $assignment = $line->employeeAssignments()->findOrFail($assignment->getKey());
             $this->assertExpectedVersion($job, $expectedVersion);
             $this->assertAssignment($job, $line, $assignment);
+            $versionBefore = (int) $job->row_version;
             $this->validator->assertMutable($job);
             $this->validator->assertEmployeeAssignable($line);
             $employee = $this->validator->workforceEmployee($job, $line, $data->employeeId);
@@ -83,8 +162,7 @@ final class VehicleServiceEmployeeAssignmentService
             $assignment->completed_at = $data->status === 'completed' ? now() : null;
             $assignment->save();
             $this->calculations->recalculateAssignments($line);
-            $this->calculations->recalculateJob($job);
-            $this->bumpJobVersion($job);
+            $this->recalculateJobAndEnsureVersionBump($job, $versionBefore);
 
             return $assignment->refresh()->load('employee');
         });
@@ -95,19 +173,18 @@ final class VehicleServiceEmployeeAssignmentService
         VehicleServiceJobLine $line,
         VehicleServiceLineEmployee $assignment,
         ?int $expectedVersion = null,
-    ): void
-    {
+    ): void {
         DB::transaction(function () use ($job, $line, $assignment, $expectedVersion): void {
             $job = VehicleServiceJob::query()->lockForUpdate()->findOrFail($job->getKey());
             $line = $job->lines()->findOrFail($line->getKey());
             $assignment = $line->employeeAssignments()->findOrFail($assignment->getKey());
             $this->assertExpectedVersion($job, $expectedVersion);
             $this->assertAssignment($job, $line, $assignment);
+            $versionBefore = (int) $job->row_version;
             $this->validator->assertMutable($job);
             $assignment->delete();
             $this->calculations->recalculateAssignments($line);
-            $this->calculations->recalculateJob($job);
-            $this->bumpJobVersion($job);
+            $this->recalculateJobAndEnsureVersionBump($job, $versionBefore);
         });
     }
 
@@ -215,6 +292,14 @@ final class VehicleServiceEmployeeAssignmentService
         if ((int) $assignment->vehicle_service_job_id !== (int) $job->getKey()
             || (int) $assignment->vehicle_service_job_line_id !== (int) $line->getKey()) {
             throw new InvalidArgumentException('Employee assignment does not belong to the selected service job line.');
+        }
+    }
+
+    private function recalculateJobAndEnsureVersionBump(VehicleServiceJob $job, int $versionBefore): void
+    {
+        $this->calculations->recalculateJob($job);
+        if ((int) $job->row_version === $versionBefore) {
+            $this->bumpJobVersion($job);
         }
     }
 }

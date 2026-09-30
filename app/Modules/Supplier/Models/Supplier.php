@@ -10,9 +10,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Modules\ReferenceData\Models\CurrencyModel;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\OrganizationUnit\Models\OrganizationUnitModel;
+use Modules\ReferenceData\Models\CurrencyModel;
 use Modules\Supplier\Enums\SupplierStatus;
 use Modules\Supplier\Enums\SupplierType;
 use Modules\Tenant\Models\TenantModel;
@@ -61,6 +61,11 @@ final class Supplier extends TenantOwnedModel
     public function contacts(): HasMany
     {
         return $this->hasMany(SupplierContact::class, 'supplier_id');
+    }
+
+    public function whatsappVerifications(): HasMany
+    {
+        return $this->hasMany(SupplierWhatsAppVerification::class, 'supplier_id');
     }
 
     public function addresses(): HasMany

@@ -101,7 +101,7 @@ final class InventoryReservationAllocationTest extends InventoryTestCase
         $warehouseId = $this->createWarehouse($tenantId, 'WH-ALLOC');
 
         $this->withTenantExecutionContext($tenantId, function () use ($tenantId, $warehouseId): void {
-            $fefoItem = $this->createItem($tenantId, 'FEFO-ITEM');
+            $fefoItem = $this->createItem($tenantId, 'FEFO-ITEM', TrackingType::Batch);
             $fefoItem->metadata = ['inventory' => ['allocation_method' => 'fefo']];
             $fefoItem->save();
             $lateBatch = app(BatchTrackingService::class)->create($tenantId, (int) $fefoItem->getKey(), 'LATE');

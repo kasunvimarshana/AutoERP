@@ -16,6 +16,7 @@ enum FinancePostingProfileCode: string
     case CustomerAdvance = 'customer_advance';
     case SupplierAdvance = 'supplier_advance';
     case RentalDeposit = 'rental_deposit';
+    case ExpensePayment = 'expense_payment';
     case InventoryReceipt = 'inventory_receipt';
     case InventoryIssue = 'inventory_issue';
     case SalesReturn = 'sales_return';

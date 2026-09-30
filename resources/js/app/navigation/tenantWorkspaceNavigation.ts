@@ -20,7 +20,10 @@ function inventoryNavigation(item: NavigationItem): NavigationItem {
         access: { ...item.access, permissions: inventoryRoutePermissions },
         children: item.children.map((child) => ({
             ...child,
-            access: { ...child.access, permissions: inventoryRoutePermissions },
+            access: {
+                ...child.access,
+                permissions: child.access?.permissions ?? inventoryRoutePermissions,
+            },
         })),
     };
 }

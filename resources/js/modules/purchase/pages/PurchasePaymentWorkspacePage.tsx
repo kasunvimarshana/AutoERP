@@ -32,7 +32,7 @@ export default function PurchasePaymentWorkspacePage() {
     const canCreatePayment = hasPurchasePermission(auth, purchasePermissions.paymentsExecute);
 
     const columns: DataColumn<Payment>[] = [
-        { key: 'payment', header: 'Payment', render: (row) => <Link className="font-semibold text-sky-700 hover:underline" to={`/payments/${row.id}?from=purchase`}>{row.payment_number ?? 'Payment number unavailable'}</Link> },
+        { key: 'payment', header: 'Payment', render: (row) => <Link className="font-semibold text-sky-700 hover:underline" to={`/purchase/payments/${row.id}`}>{row.payment_number ?? 'Payment number unavailable'}</Link> },
         { key: 'date', header: 'Date', render: (row) => formatDate(row.payment_date) },
         { key: 'party', header: 'Supplier', render: (row) => readableRelation(row.party) },
         { key: 'type', header: 'Type', render: (row) => `${humanize(row.payment_type)} / ${humanize(row.direction)}` },
@@ -54,7 +54,7 @@ export default function PurchasePaymentWorkspacePage() {
             <ErrorAlert error={result.error} />
             {result.loading
                 ? <LoadingState />
-                : <DataTable rows={result.data?.data ?? []} columns={columns} rowKey={(row) => row.id} rowHref={(row) => `/payments/${row.id}?from=purchase`} emptyMessage="No supplier payments found." />}
+                : <DataTable rows={result.data?.data ?? []} columns={columns} rowKey={(row) => row.id} rowHref={(row) => `/purchase/payments/${row.id}`} emptyMessage="No supplier payments found." />}
             <Pagination meta={result.data?.meta} onPageChange={setPage} />
         </div>
     );

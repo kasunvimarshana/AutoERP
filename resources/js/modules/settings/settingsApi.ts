@@ -9,6 +9,7 @@ import type {
     ConfigurationImportResult,
     ConfigurationOrganizationTarget,
     ConfigurationRevisionPage,
+    ResolvedConfiguration,
     ConfigurationScope,
     ConfigurationTransferDocument,
     PlatformConfigurationTarget,
@@ -57,6 +58,15 @@ export async function listConfigurationEntries(
         data: response.data.data.map(validateEntry),
         existing_keys: response.data.existing_keys.map(assertCanonicalConfigurationKey),
     };
+}
+
+export async function getResolvedConfiguration(key: string, signal?: AbortSignal): Promise<ResolvedConfiguration> {
+    assertCanonicalConfigurationKey(key);
+    const response = await apiClient.get<ApiResource<ResolvedConfiguration>>(
+        `${tenantConfigurationBase}/resolved/${encodeURIComponent(key)}`,
+        { signal },
+    );
+    return response.data.data;
 }
 
 export async function exportGlobalConfiguration(signal?: AbortSignal): Promise<ConfigurationTransferDocument> {

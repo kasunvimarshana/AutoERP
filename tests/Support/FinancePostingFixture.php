@@ -81,6 +81,18 @@ final class FinancePostingFixture
         ]);
     }
 
+    private const OPERATING_EXPENSE_ACCOUNT = '5400';
+
+    public static function seedExpensePaymentProfile(int $tenantId, ?int $organizationUnitId = null): void
+    {
+        $accounts = self::accounts($tenantId, $organizationUnitId);
+        self::profile($tenantId, $organizationUnitId, FinancePostingProfileCode::ExpensePayment->value, [
+            FinanceAccountRoleCode::OperatingExpense->value => $accounts[FinanceAccountRoleCode::OperatingExpense->value],
+            FinanceAccountRoleCode::Cash->value => $accounts[FinanceAccountRoleCode::Cash->value],
+            FinanceAccountRoleCode::Bank->value => $accounts[FinanceAccountRoleCode::Bank->value],
+        ]);
+    }
+
     public static function seedCustomerPaymentProfiles(int $tenantId, ?int $organizationUnitId = null): void
     {
         self::seedCustomerInvoiceProfiles($tenantId, $organizationUnitId);
@@ -220,6 +232,7 @@ final class FinancePostingFixture
             FinanceAccountRoleCode::ServiceRevenue->value => self::account($tenantId, $organizationUnitId, $revenueTypeId, self::SERVICE_REVENUE_ACCOUNT, 'Service Revenue', 'credit'),
             FinanceAccountRoleCode::Expense->value => self::account($tenantId, $organizationUnitId, $expenseTypeId, self::PURCHASE_EXPENSE_ACCOUNT, 'Purchase Expense', 'debit'),
             FinanceAccountRoleCode::CostOfGoodsSold->value => self::account($tenantId, $organizationUnitId, $expenseTypeId, self::COST_OF_GOODS_SOLD_ACCOUNT, 'Cost of Goods Sold', 'debit'),
+            FinanceAccountRoleCode::OperatingExpense->value => self::account($tenantId, $organizationUnitId, $expenseTypeId, self::OPERATING_EXPENSE_ACCOUNT, 'Operating Expense', 'debit'),
         ];
     }
 

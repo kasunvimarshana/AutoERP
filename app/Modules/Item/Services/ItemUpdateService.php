@@ -54,6 +54,7 @@ final class ItemUpdateService
                 'purchase_tax_group_id' => $data->purchaseTaxGroupId,
                 'sales_tax_group_id' => $data->salesTaxGroupId,
                 'is_stockable' => $data->isStockable,
+                'reorder_level' => $data->reorderLevel,
                 'is_combo' => $data->isCombo,
                 'is_tax_exempt' => $data->isTaxExempt,
                 'is_active' => $data->isActive,
@@ -69,6 +70,9 @@ final class ItemUpdateService
                 ? $resolvedType
                 : ItemType::from((string) $resolvedType);
             $attributes['is_combo'] = in_array($resolvedType, [ItemType::Combo, ItemType::Package], true);
+            if (($attributes['is_stockable'] ?? $item->is_stockable) === false) {
+                $attributes['reorder_level'] = null;
+            }
             if (! in_array('item_type', $data->provided, true) && ! in_array('is_combo', $data->provided, true)) {
                 unset($attributes['is_combo']);
             }

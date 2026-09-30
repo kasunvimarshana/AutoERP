@@ -40,10 +40,9 @@ final class VehicleServiceLineRuleService
         if ($line->children()->exists() && (
             $data->lineSourceType !== VehicleServiceLineSourceType::ComboParent
             || $data->itemId !== (int) $line->item_id
-            || $this->math->compare($data->quantity, (string) $line->quantity) !== 0
         )) {
             throw new InvalidArgumentException(
-                'Expanded combo item and quantity cannot be changed. Remove and add the combo again.',
+                'Expanded combo items cannot be changed. Remove and add the combo again.',
             );
         }
     }

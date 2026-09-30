@@ -67,6 +67,10 @@ Tables (2): `unit_of_measures`, `uom_conversions`.
 
 Tables (2): `warehouses`, `warehouse_locations`.
 
+### Expense
+
+Tables (2): `expense_types`, `expenses`.
+
 ### Finance
 
 Tables (14): `finance_account_types`, `finance_account_categories`, `finance_accounts`, `finance_dimensions`, `finance_posting_profiles`, `finance_posting_profile_rules`, `finance_journal_entries`, `finance_journal_lines`, `finance_ledger_entries`, `finance_account_balances`, `finance_bank_reconciliations`, `finance_bank_statement_lines`, `finance_budgets`, `finance_budget_lines`.

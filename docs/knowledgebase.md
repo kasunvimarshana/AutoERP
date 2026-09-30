@@ -900,3 +900,10 @@ No runtime code, schema, API, permission or frontend behavior is changed by this
 9. Preserve historical commercial revisions and financial lineage.
 10. Keep the operator workflow simple while enforcing strong hidden backend integrity.
 11. When evidence is insufficient, document uncertainty and fail safely instead of inventing a rule.
+
+
+## 33. Integrated release verification — 2026-09-30
+
+The Selling/worktree integration preserves the fresh Rental runtime and the business policies above. Customer and owner financial workflows continue to use Invoice, Payment, Tax and Finance ownership. Supplier balance presentation now consumes a Supplier-owned contract implemented by Invoice, avoiding a circular module dependency without duplicating balance logic. No removed Rental code or new inferred tariff is introduced.
+
+The merged runtime passed 881 backend tests on both SQLite and MariaDB/InnoDB, and 374 frontend tests. Fresh/upgrade and rollback/reapply schemas match across 238 tables on both engines. See [the integrated release record](changes/2026-09-30-integrated-release-verification.md) for exact scope, known lint warnings, the GitHub billing-related CI startup failure, and the distinction between repository publication and live deployment. These checks do not claim multi-process contention, production-data rehearsal or human UAT.

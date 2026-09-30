@@ -34,7 +34,7 @@ final class StoreCustomerRequest extends TenantScopedRequest
             $key('tenant_id') => $prefix === '' ? ['required', 'integer', 'min:1'] : ['prohibited'],
             $key('organization_unit_id') => $prefix === '' ? ['nullable', 'integer', 'min:1'] : ['prohibited'],
             $key('customer_number') => ['nullable', 'string', 'max:80'],
-            $key('code') => ['required', 'string', 'max:80'],
+            $key('code') => ['nullable', 'string', 'max:80'],
             $key('name') => ['required', 'string', 'max:255'],
             $key('customer_type') => ['required', Rule::enum(CustomerType::class)],
             $key('status') => ['nullable', Rule::enum(CustomerStatus::class)],

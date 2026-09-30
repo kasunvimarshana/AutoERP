@@ -7,7 +7,11 @@ namespace Modules\VehicleService\Services;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
+use Modules\Inventory\Models\InventoryBatchPriceRevision;
+use Modules\Inventory\Validators\InventoryValidationService;
+use Modules\Item\Enums\ItemPriceType;
 use Modules\Item\Enums\ItemType;
+use Modules\Item\Enums\TrackingType;
 use Modules\Item\Models\Item;
 use Modules\Item\Models\ItemUnit;
 use Modules\Item\Models\ItemVariant;
@@ -18,7 +22,10 @@ use Modules\VehicleService\Models\VehicleServiceJob;
 
 final class VehicleServiceLineValidator
 {
-    public function __construct(private readonly DecimalMath $math) {}
+    public function __construct(
+        private readonly DecimalMath $math,
+        private readonly InventoryValidationService $inventoryValidator,
+    ) {}
 
     public function validate(VehicleServiceJob $job, VehicleServiceLineData $data): ?Item
     {
@@ -79,8 +86,42 @@ final class VehicleServiceLineValidator
             VehicleServiceLineSourceType::ComboChild => $this->assertComboChild($job, $data->parentLineId, $item),
             VehicleServiceLineSourceType::ExternalItem => null,
         };
+        $this->validateTracking($item, $data);
 
         return $item;
+    }
+
+    private function validateTracking(Item $item, VehicleServiceLineData $data): void
+    {
+        $tracking = $item->tracking_type instanceof TrackingType
+            ? $item->tracking_type
+            : TrackingType::from((string) $item->tracking_type);
+        $batchTracked = in_array($tracking, [TrackingType::Batch, TrackingType::Lot], true);
+
+        if ($batchTracked && $data->batchId === null) {
+            throw ValidationException::withMessages(['batch_id' => ['Select a batch or lot for this inventory item.']]);
+        }
+        if (! $batchTracked && ($data->batchId !== null || $data->batchPriceRevisionId !== null)) {
+            throw ValidationException::withMessages(['batch_id' => ['Batch references are only allowed for batch or lot tracked items.']]);
+        }
+        if (! $batchTracked) {
+            return;
+        }
+
+        $batch = $this->inventoryValidator->batch($item, $data->batchId, $data->itemVariantId);
+        if ($data->batchPriceRevisionId === null) {
+            return;
+        }
+
+        $price = InventoryBatchPriceRevision::query()
+            ->where('tenant_id', $item->tenant_id)
+            ->where('batch_id', $batch?->getKey())
+            ->where('price_type', ItemPriceType::Service->value)
+            ->whereNull('recorded_to')
+            ->findOrFail($data->batchPriceRevisionId);
+        if ((int) $price->uom_id !== (int) ($data->uomId ?? $item->base_uom_id)) {
+            throw ValidationException::withMessages(['batch_price_revision_id' => ['The selected batch price does not match the line UOM.']]);
+        }
     }
 
     private function item(VehicleServiceJob $job, int $itemId): Item
