@@ -10,7 +10,11 @@
 
 **Authoritative engineering source:** latest `worktree-0.0.8`
 
-**Authoritative branch head reviewed:** `9f492b5094039522c53b4e7509be296217b2d5b9`
+**Executed Vehicle Rental runtime baseline:** `9f492b5094039522c53b4e7509be296217b2d5b9`
+
+**Live authoritative branch head:** resolve from Git/release records; it is intentionally not embedded here because documentation-only release commits would otherwise make this document self-stale.
+
+**Latest current-head re-verification:** [`changes/2026-10-01-vehicle-rental-current-head-reverification.md`](changes/2026-10-01-vehicle-rental-current-head-reverification.md)
 
 **Architecture policy:** root `RULES.md` / `AGENTS.md`
 
@@ -744,26 +748,43 @@ These are implementation policies, not claims that TACGL universally proves them
 
 ## 27. Current implementation reconciliation — 2026-10-01
 
-Authoritative branch reviewed: `worktree-0.0.8` at `9f492b5094039522c53b4e7509be296217b2d5b9`.
+Executed Vehicle Rental runtime baseline: `9f492b5094039522c53b4e7509be296217b2d5b9`.
 
-The previous canonical knowledge-base review referenced `8b74ff48a1dbf2a07220f5edcb36dabc3086f980`.
+Current authoritative branch at this re-verification start: `worktree-0.0.8` at `1035f4f4a7ad35a4ef633b155883fc8e31d72b57`.
 
-Comparison result:
+Comparison result from the executed runtime baseline to that current head:
 
-- current branch is 50 commits ahead of that prior review point;
-- no files under `app/Modules/VehicleRental` changed in that delta;
-- later changes are concentrated in other modules such as Selling, Inventory, Invoice/Payment, Reporting, Vehicle Service, Expense and supporting core modules;
-- therefore this audit found no evidence-backed reason to modify Vehicle Rental runtime code in this pass.
+- current branch is eight commits ahead of the executed runtime baseline;
+- no file under `app/Modules/VehicleRental` changed;
+- no file under `resources/js/modules/vehicle-rental` changed;
+- later runtime changes are confined to other owning modules and shared UI/reporting integration;
+- the only shared component change directly used by Rental that required targeted re-review was `LookupSelect`, which added an optional custom label formatter while preserving the existing `code - name` formatter as the default;
+- therefore this audit found no evidence-backed Vehicle Rental runtime, schema or frontend defect that justifies a production-code change.
 
-The current Vehicle Rental implementation still contains the clean fresh module with dedicated constants/data/database/enums/http/models/providers/routes/services/tests structure and continues to rely on owner modules for master and financial responsibilities.
+The current Vehicle Rental implementation remains the clean fresh module with dedicated constants/data/database/enums/http/models/providers/routes/services/tests structure and continues to rely on owner modules for master and financial responsibilities.
 
-The implementation acceptance ledger at `docs/vehicle-rental/TODO.md` remains the executable completion ledger. It records closed coverage for agreements, successor revisions, vehicle source/use, Running Charts, base rent, mileage, OT/night-out, billing/settlement, deposits, financial handoff, permissions, relationships, UI and verification.
+The implementation acceptance ledger at `docs/vehicle-rental/TODO.md` remains a closed acceptance ledger. It records completed coverage for agreements, successor revisions, vehicle source/use, Running Charts, base rent, mileage, OT/night-out, billing/settlement, deposits, financial handoff, permissions, relationships, UI and verification. It contains no remaining open product-policy TODO item.
+
+### Relationship re-verification
+
+The retained relationships remain directional and responsibility-owned:
+
+- successor Agreement → predecessor Agreement;
+- Vehicle Use → Customer Agreement;
+- Vehicle Use → optional Owner Agreement/source;
+- Vehicle Use → physical Vehicle;
+- replacement Vehicle Use → predecessor Vehicle Use;
+- Running Chart → Vehicle Use;
+- corrected Running Chart → reversed predecessor chart;
+- Rental source charge → owner-module financial document through source allocation.
+
+The database enforces unique one-way replacement/correction/successor links, tenant/org-scoped identity where required, and frozen agreement/use revision references. No redundant inverse pointer, circular Rental dependency, duplicate mutable Invoice/Payment status or second Rental financial ledger was found.
 
 ### Audit conclusion
 
-This pass is a **documentation reconciliation**, not a speculative code-change batch.
+This pass is a **current-head documentation reconciliation**, not a speculative code-change batch.
 
-No legacy Rental code was restored or reused. No compatibility patch was introduced. No unproved business rule was converted into money.
+No legacy Rental code was restored or reused. No compatibility patch was introduced. No unproved business rule was converted into money. No runtime/schema relationship change is justified by the available evidence.
 
 ---
 
@@ -771,7 +792,19 @@ No legacy Rental code was restored or reused. No compatibility patch was introdu
 
 Only commands actually executed may be described as passed.
 
-The existing acceptance ledger contains previously executed SQLite/MySQL/frontend verification records for the Rental implementation. This documentation-only reconciliation does not claim that those suites were rerun in the present connector environment.
+The exact Vehicle Rental runtime retained by this re-verification is the previously executed integrated runtime baseline. Its recorded full-system gates are:
+
+- SQLite backend: 881 tests / 9,693 assertions passed;
+- MariaDB 10.11.7 / InnoDB backend: 881 tests / 9,693 assertions passed;
+- frontend Vitest: 101 files / 374 tests passed;
+- TypeScript typecheck passed;
+- Vite production build passed;
+- ESLint completed with zero errors and three inherited non-Rental warnings;
+- SQLite and MariaDB clean install, baseline upgrade, rollback/reapply and fresh seeding passed;
+- 238-table fresh/upgrade/rollback schema metadata parity passed on both engines;
+- foreign-key/integrity checks and final source/conflict review passed.
+
+The current continuation revalidated runtime ancestry, source evidence, critical services, schema relationships, permissions and the additive shared `LookupSelect` change. A fresh dependency-backed full suite is not claimed when the execution environment cannot obtain a repository clone; GitHub Actions are not used under the project's free-tools-only rule.
 
 Future runtime changes must verify, as applicable:
 
