@@ -18,6 +18,10 @@ final class ItemSummaryResource extends JsonResource
             'id' => (int) $this->getKey(),
             'code' => $this->code,
             'name' => $this->name,
+            'has_duplicate_name' => $this->when(
+                array_key_exists('has_duplicate_name', $this->resource->getAttributes()),
+                fn () => (bool) $this->resource->getAttribute('has_duplicate_name'),
+            ),
             'sku' => $this->sku,
             'barcode' => $this->barcode,
             'item_type' => $this->enumValue($this->item_type),
@@ -44,6 +48,10 @@ final class ItemSummaryResource extends JsonResource
             'resolved_service_unit_price' => $this->when(
                 array_key_exists('resolved_service_unit_price', $this->resource->getAttributes()),
                 fn () => $this->resource->getAttribute('resolved_service_unit_price'),
+            ),
+            'has_service_price' => $this->when(
+                array_key_exists('has_service_price', $this->resource->getAttributes()),
+                fn () => (bool) $this->resource->getAttribute('has_service_price'),
             ),
             'resolved_purchase_unit_price' => $this->when(
                 array_key_exists('resolved_purchase_unit_price', $this->resource->getAttributes()),

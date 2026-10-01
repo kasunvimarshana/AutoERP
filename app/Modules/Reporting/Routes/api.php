@@ -9,6 +9,7 @@ use Modules\Reporting\Http\Controllers\OperationalReportController;
 use Modules\Reporting\Http\Controllers\ReportController;
 use Modules\Reporting\Http\Controllers\TechnicianWorkReportController;
 use Modules\Reporting\Http\Controllers\VehicleServiceHistoryReportController;
+use Modules\Reporting\Http\Controllers\VehicleServiceSalesSummaryReportController;
 use Modules\Reporting\Services\ReportingAuthorizationService;
 
 $middleware = [
@@ -38,6 +39,8 @@ Route::prefix('api/v1/reports')->middleware($middleware)->name('api.v1.reports.'
             ->name('vehicle-service.employee-commissions');
         Route::get('vehicle-service/service-history', [VehicleServiceHistoryReportController::class, 'index'])
             ->name('vehicle-service.service-history');
+        Route::get('vehicle-service/sales-summary', [VehicleServiceSalesSummaryReportController::class, 'index'])
+            ->name('vehicle-service.sales-summary');
 
         Route::get('{report}', [ReportController::class, 'show'])->where('report', '[A-Za-z0-9._-]+')->name('show');
         Route::get('{report}/run', [ReportController::class, 'run'])->where('report', '[A-Za-z0-9._-]+')->name('run');

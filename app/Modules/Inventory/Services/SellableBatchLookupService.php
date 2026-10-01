@@ -11,6 +11,7 @@ use Modules\Inventory\Enums\BatchStatus;
 use Modules\Inventory\Models\InventoryBatch;
 use Modules\Item\Enums\ItemPriceType;
 use Modules\Item\Enums\TrackingType;
+use Modules\Item\Services\ItemQueryService;
 use Modules\Item\Services\ItemPriceResolutionService;
 use Modules\Tenant\Models\TenantModel;
 
@@ -19,6 +20,7 @@ final class SellableBatchLookupService
     public function __construct(
         private readonly BatchPriceService $batchPrices,
         private readonly ItemPriceResolutionService $itemPrices,
+        private readonly ItemQueryService $itemQueries,
         private readonly DecimalMath $math,
     ) {}
 
@@ -73,9 +75,12 @@ final class SellableBatchLookupService
 
         $paginator = $query->orderBy('item_id')->orderBy('batch_number')->paginate(min($perPage, 50));
         $currencyId = TenantModel::query()->whereKey($tenantId)->value('base_currency_id');
+        $items = $paginator->getCollection()->pluck('item')->filter();
+        $duplicateNames = $this->itemQueries->duplicateNames($items, $tenantId, $organizationUnitId);
 
         foreach ($paginator->getCollection() as $batch) {
             $item = $batch->item;
+            $item?->setAttribute('has_duplicate_name', in_array(mb_strtolower(trim((string) $item->name)), $duplicateNames, true));
             $uomId = $item?->base_uom_id;
             $batchPrice = $currencyId === null || $uomId === null
                 ? null
@@ -105,6 +110,7 @@ final class SellableBatchLookupService
             );
             $batch->setAttribute('batch_price_revision_id', $batchPrice?->getKey());
             $batch->setAttribute('resolved_service_unit_price', $batchPrice?->amount ?? $fallback?->amount ?? '0.000000');
+            $batch->setAttribute('has_service_price', $batchPrice !== null || $fallback?->amount !== null);
             $batch->setAttribute('price_source', $batchPrice === null ? ($fallback?->source ?? 'manual') : 'batch_price_revision');
         }
 

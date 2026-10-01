@@ -55,6 +55,7 @@ export type {
     VehicleServiceHistoryResult,
     VehicleServiceHistoryRow,
 } from './vehicleServiceHistoryTypes';
+export type { VehicleServiceSalesSummaryParams, VehicleServiceSalesSummaryResult, VehicleServiceSalesSummaryRow } from './vehicleServiceSalesSummaryTypes';
 export type {
     ExpenseBreakdownRow,
     ExpenseEventType,
