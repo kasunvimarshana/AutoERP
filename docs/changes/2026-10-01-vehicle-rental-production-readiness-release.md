@@ -15,7 +15,7 @@ Business authority remains TACGL as the primary conflict tie-breaker plus the fo
 - `9f492b5... -> e9ce7ec...` contains exactly two documentation files: `docs/knowledgebase.md` and the 2026-10-01 knowledge-base reconciliation record.
 - Therefore the application/runtime tree at the release candidate is identical to the previously executed and verified integrated runtime.
 - `docs/vehicle-rental/TODO.md` contains no unchecked implementation items and remains a closed acceptance ledger rather than an open backlog.
-- No open pull request currently targets `worktree-0.0.8`.
+- At review start, no pre-existing open pull request targeted `worktree-0.0.8`; this release PR is the only review branch introduced by this pass.
 
 ## Runtime re-audit
 
@@ -69,18 +69,19 @@ Confirmed:
 - 86 listed encrypted entries;
 - archive reports password protection;
 - no archive comment;
-- outer TACGL payload contains an accessible `tacdata/password.DBF`, but its rows are application-user credential records and are not evidence of the RAR password;
-- TACGL error history contains `BACKUPM` / `BACKUPD` executions, including activity by `DHULANJANA` around the dated backup, but it contains no backup credential;
+- outer TACGL payload contains an accessible `tacdata/password.DBF`, but its seven rows are application-user credential records and are not evidence of the RAR password;
+- TACGL error history contains `BACKUPM` / `BACKUPD` executions, including `BACKUPM` activity by `DHULANJANA` on 2025-03-27 immediately before the dated backup, but it contains no backup credential;
 - static executable/configuration searches exposed no explicit archive password or WinRAR command containing a recoverable credential.
 
 No brute force, dictionary attack, arbitrary password mutation, credential reuse guessing or unsupported password attempt was performed. The archive password was not legitimately recovered. Backup access is not required for the completed runtime because all implemented monetary behavior is based on accessible TACGL/video evidence or named documented AutoERP production policy.
 
 ## External standards/research boundary
 
-A narrow current-authority review was used only to validate ownership boundaries, not to invent project-specific Rental rates:
+A narrow current-authority review was used only to validate ownership and concurrency boundaries, not to invent project-specific Rental rates:
 
-- IFRS 16 continues to distinguish lease accounting and does not supply AutoERP's customer/owner tariff formulas.
-- Sri Lanka Inland Revenue material remains effective-dated and was amended during 2026 for VAT/SSCL/WHT-related law and administration.
+- IFRS Foundation's IFRS 16 material continues to define lease accounting principles but does not supply AutoERP's customer/owner tariff formulas.
+- Sri Lanka Inland Revenue's 2026 circular register includes revised VAT invoice guidance and WHT/AIT guidance, and the April 2026 SSCL notice records effective-dated statutory changes. This reinforces that statutory treatment must remain configuration/effective-date owned rather than embedded as Rental constants.
+- MySQL 8.4 documents `SELECT ... FOR UPDATE` / `FOR SHARE` as transaction-scoped locking reads for protecting related updates, consistent with AutoERP's explicit transactional concurrency controls.
 
 Therefore Rental correctly delegates tax/withholding/accounting policy to the Tax/Payment/Finance owners and does not hardcode statutory percentages, thresholds or GL accounts.
 
@@ -100,7 +101,9 @@ The exact runtime tree retained by this release previously passed the integrated
 - foreign-key/integrity checks passed;
 - final source diff, conflict markers and unresolved Git index entries were checked.
 
-Those commands were not falsely described as freshly rerun in this connector session. Their applicability is established by the verified commit ancestry: the only subsequent change before this record is documentation-only, so the released application tree is the tested tree.
+Those commands were not falsely described as freshly rerun in this connector session. Their applicability is established by the verified commit ancestry: the only subsequent changes before this record are documentation-only, so the released application tree is the tested tree.
+
+A fresh checkout was attempted again in this pass, but the execution container could not resolve `github.com`; no local rerun result is therefore claimed. No GitHub Actions run was started, consistent with the project's free-tools/no-Actions instruction.
 
 ## Production-release conclusion
 
