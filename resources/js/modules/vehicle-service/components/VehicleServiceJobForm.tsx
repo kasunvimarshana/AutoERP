@@ -63,12 +63,8 @@ const vehicleCustomer = (selectedVehicle: VehicleLookupResource | null, fallback
 };
 const currentCustomerOwner = (vehicle: VehicleLookupResource | null, fallback: NamedResource | null) =>
     vehicle?.current_customer?.name ?? fallback?.name ?? '-';
-const vehicleLookupLabel = (vehicle: VehicleLookupResource): string => {
-    const modelName = vehicle.model?.name?.trim();
-    return [vehicle.code, modelName]
-        .filter((value): value is string => typeof value === 'string' && value.trim() !== '')
-        .join(' ');
-};
+const vehicleLookupLabel = (vehicle: VehicleLookupResource): string =>
+    vehicle.registration_number?.trim() || vehicle.name?.trim() || vehicle.code?.trim() || '';
 
 export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
     const supervisorRequiredMessage = 'Select a valid supervisor from the list.';
@@ -220,7 +216,7 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
                             search={searchVehicle}
                             formatLabel={vehicleLookupLabel}
                             error={errorFor('vehicle_id')}
-                            placeholder="Search by vehicle number or model"
+                            placeholder="Search by registration number or model"
                             loadOnOpen
                             minSearchLength={0}
                             debounceMs={1000}

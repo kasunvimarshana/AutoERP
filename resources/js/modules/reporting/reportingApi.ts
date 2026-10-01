@@ -19,6 +19,8 @@ import type {
     VehicleServiceHistoryResult,
     ExpenseReportParams,
     ExpenseReportResult,
+    VehicleServiceSalesSummaryParams,
+    VehicleServiceSalesSummaryResult,
 } from './reportingTypes';
 
 export async function listReports(signal?: AbortSignal): Promise<ReportDefinition[]> {
@@ -108,6 +110,11 @@ export async function runEmployeeCommissionReport(params: EmployeeCommissionRepo
 
 export async function runVehicleServiceHistoryReport(params: VehicleServiceHistoryParams, signal?: AbortSignal): Promise<VehicleServiceHistoryResult> {
     const response = await apiClient.get<VehicleServiceHistoryResult>(`${endpoints.reports}/vehicle-service/service-history`, { params, signal });
+    return response.data;
+}
+
+export async function runVehicleServiceSalesSummaryReport(params: VehicleServiceSalesSummaryParams, signal?: AbortSignal): Promise<VehicleServiceSalesSummaryResult> {
+    const response = await apiClient.get<VehicleServiceSalesSummaryResult>(`${endpoints.reports}/vehicle-service/sales-summary`, { params, signal });
     return response.data;
 }
 

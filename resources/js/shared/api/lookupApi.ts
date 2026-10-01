@@ -22,6 +22,8 @@ export interface VehicleLookupResource extends NamedResource {
 
 export interface ItemLookupResource extends NamedResource {
     item_id?: number;
+    has_duplicate_name?: boolean;
+    has_service_price?: boolean;
     item_variant_id?: number | null;
     item_type?: 'stock' | 'non_stock' | 'service' | 'labour' | 'asset' | 'consumable' | 'package' | 'combo';
     tracking_type?: 'none' | 'batch' | 'lot' | 'serial';

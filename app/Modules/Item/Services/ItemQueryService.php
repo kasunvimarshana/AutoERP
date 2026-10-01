@@ -48,8 +48,39 @@ final class ItemQueryService
         };
 
         $paginator = $this->paginate($criteria, $tenantId, $organizationUnitId, min($perPage, 50));
+        $duplicateNames = $this->duplicateNames($paginator->getCollection(), $tenantId, $organizationUnitId);
+
+        $paginator->getCollection()->each(function (Item $item) use ($duplicateNames): void {
+            $item->setAttribute('has_duplicate_name', in_array(mb_strtolower(trim((string) $item->name)), $duplicateNames, true));
+        });
 
         return $this->resolveLookupServicePrices($paginator, $organizationUnitId);
+    }
+
+    /** @param iterable<Item> $items
+     * @return list<string>
+     */
+    public function duplicateNames(iterable $items, int $tenantId, ?int $organizationUnitId): array
+    {
+        $names = collect($items)
+            ->map(fn (Item $item): string => (string) $item->name)
+            ->unique()
+            ->values();
+
+        if ($names->isEmpty()) {
+            return [];
+        }
+
+        return Item::query()
+            ->forTenant($tenantId, $organizationUnitId)
+            ->active()
+            ->whereIn('name', $names)
+            ->select('name')
+            ->groupBy('name')
+            ->havingRaw('COUNT(*) > 1')
+            ->pluck('name')
+            ->map(fn (string $name): string => mb_strtolower(trim($name)))
+            ->all();
     }
 
     public function find(int $id, int $tenantId, ?int $organizationUnitId): Item
@@ -179,6 +210,7 @@ final class ItemQueryService
             );
 
             $item->setAttribute('resolved_service_unit_price', $resolvedServicePrice->amount ?? $this->math->normalize('0'));
+            $item->setAttribute('has_service_price', $resolvedServicePrice->amount !== null);
             $item->setAttribute('resolved_purchase_unit_price', $resolvedPurchasePrice->amount);
             $item->setAttribute(
                 'available_stock_quantity',
