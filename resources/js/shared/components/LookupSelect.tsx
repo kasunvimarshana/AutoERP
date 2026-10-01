@@ -8,6 +8,7 @@ export interface LookupSelectProps<T extends NamedResource = NamedResource> exte
     value: T | null;
     onChange: (resource: T | null) => void;
     search: LookupLoader<T>;
+    formatLabel?: (resource: T) => string;
     renderOption?: (resource: T, state: { active: boolean; selected: boolean }) => ReactNode;
     placeholder?: string;
     error?: string;
@@ -25,6 +26,7 @@ export function LookupSelect<T extends NamedResource = NamedResource>({
     value,
     onChange,
     search,
+    formatLabel: customFormatLabel,
     renderOption,
     placeholder = 'Search...',
     error,
@@ -40,8 +42,11 @@ export function LookupSelect<T extends NamedResource = NamedResource>({
     perPage,
     debounceMs,
 }: LookupSelectProps<T>) {
-    const formatLabel = useCallback((resource: NamedResource) =>
+    const defaultFormatLabel = useCallback((resource: NamedResource) =>
         resource.code ? `${resource.code} - ${resource.name}` : resource.name, []);
+    const formatLabel = useCallback((resource: T) => customFormatLabel
+        ? customFormatLabel(resource)
+        : defaultFormatLabel(resource), [customFormatLabel, defaultFormatLabel]);
 
     return (
         <GenericLookupSelect
