@@ -2,7 +2,7 @@
 
 **Status:** Canonical Vehicle Rental business/domain and production-policy reference for AutoERP.
 
-**Knowledge refresh date:** 2026-09-29
+**Knowledge refresh date:** 2026-10-01
 
 **Primary business source / conflict tie-breaker:** TACGL legacy application/data corpus
 
@@ -10,11 +10,7 @@
 
 **Authoritative engineering source:** latest `worktree-0.0.8`
 
-**Authoritative branch head reviewed:** `8b74ff48a1dbf2a07220f5edcb36dabc3086f980`
-
-**Validated runtime baseline:** `2c80584446536fa8b1ebfec4c05adbd129706f45`
-
-**Pre-release completion-audit head:** `890d14bbacaa39b0e271faa3fa83b08ee596b2e6`
+**Authoritative branch head reviewed:** `9f492b5094039522c53b4e7509be296217b2d5b9`
 
 **Architecture policy:** root `RULES.md` / `AGENTS.md`
 
@@ -24,9 +20,9 @@
 
 ## 1. Purpose and authority
 
-This document is the self-contained Vehicle Rental source of truth for AutoERP. It records the business meaning proven by TACGL and the supplied videos and reconciles that evidence with the fresh Vehicle Rental implementation on `worktree-0.0.8`.
+This document is the self-contained Vehicle Rental source of truth for AutoERP. It captures the Vehicle Rental business meaning proven by TACGL and the supplied videos, separates proven business behavior from safe AutoERP production policy, and reconciles both with the fresh Vehicle Rental implementation on the authoritative `worktree-0.0.8` branch.
 
-It is not a screen-by-screen legacy specification and is not permission to restore, copy, cherry-pick or revive removed Rental code.
+It is **not** a screen-by-screen legacy specification and it is **not** permission to restore, copy, cherry-pick or revive removed Rental code.
 
 Three rules govern every Vehicle Rental decision:
 
@@ -36,7 +32,7 @@ Three rules govern every Vehicle Rental decision:
 
 > **Keep the operator workflow simple; enforce integrity behind the workflow.**
 
-When sources conflict, use this precedence:
+Source precedence:
 
 1. TACGL business evidence;
 2. directly demonstrated video workflow evidence;
@@ -58,30 +54,40 @@ Canonical upload:
 
 Dated upload supplied in this audit:
 
-- `TACGL(20260929-164333).zip`
+- `TACGL(20261001-005122).zip`
 - SHA-256: `79c240494943437978754169c3360bb7c6e35d911ef8263c4b2d6b6246384d77`
 - 452 non-directory business files.
 
-The two ZIP files have different outer packaging but contain the same business payload. After normalizing the canonical archive's outer `TACGL/` wrapper, all 452 relative paths and every per-file SHA-256 are identical. The dated archive therefore adds no conflicting business evidence.
+The canonical and dated ZIPs contain the same normalized business payload. After removing the canonical archive's outer `TACGL/` wrapper, every relative path and every per-file SHA-256 matches. The dated package therefore adds no conflicting business evidence.
 
 Corroborating package:
 
 - `TACGL.rar`
 - SHA-256: `0001a91ab4dfdf31d60f669b30f1ccc2da475d7841b2ceea505ef97eff5bedbf`
 
-The protected nested backup remains unavailable without a valid password. It must not be brute-forced and inaccessible content must not be used as justification to invent hidden rules.
+The protected nested backup remains unavailable without a valid password. Inaccessible content is not evidence and must not be used to invent hidden rules.
 
-TACGL provides evidence for:
+TACGL is a Visual FoxPro-era ERP corpus containing, among other artifacts:
 
-- vehicle, debtor/customer and creditor/owner/supplier masters;
-- transaction, invoice, receipt, payment and allocation data;
-- cheque, bank and GL structures;
-- vehicle/job/service structures;
-- charge/type vocabulary;
-- report layouts and calculations;
-- historical allocation/error/mismatch procedures.
+- vehicle master data;
+- debtor/customer and creditor/owner/supplier masters;
+- invoice, transaction, receipt, payment and allocation data;
+- cheque, bank and general-ledger structures;
+- vehicle/job/service data;
+- report layouts and financial statements;
+- historical repair/error-detection procedures.
 
-TACGL is a business-evidence source, not an architecture template.
+Concrete schema evidence includes:
+
+- `scfveh.DBF` with vehicle code, customer/owner reference, make/model, engine/chassis, service-mileage and audit fields;
+- `scfdeb.DBF` for debtor/customer master and balances/credit controls;
+- `scfcre.DBF` for creditor/supplier master;
+- `scfinv.DBF` for invoice references, vehicle, job, debtor, quantity/rate/value, VAT/NBT and audit fields;
+- `scftdb.DBF` and `scftcr.DBF` for debtor/creditor subledger transactions and balances;
+- `scfglt.DBF` for GL transaction date/reference/account/amount/cheque/job and posting metadata;
+- `scftxn.DBF` for transaction-level item/vehicle/customer/supplier/value/tax fields.
+
+These structures corroborate a dual-sided receivable/payable business with accounting integration. They are business evidence, not a schema template for AutoERP.
 
 ### 2.2 Video corpus
 
@@ -92,18 +98,18 @@ TACGL is a business-evidence source, not an architecture template.
 | `2.mp4` | 21:14 | `cd2ba1399f149003f19080327458e4bbe4619b88eed9416053c7f8d21431c36f` | Rental transactions/reports, allocation/reconciliation and legacy repair procedures |
 | `ScreenVideo_03-04-2026_18-02-52.mp4` | 12:24 | `c9853b7923e7cb95f1014cf598416faa550bfbd56f19da56b613f160d0528ce9` | Workshop / Vehicle Service availability boundary, not Rental pricing |
 
-The four videos total approximately 1 hour 56 minutes 26 seconds. The workshop-focused video supports shared vehicle availability, maintenance and off-road boundaries only; it is not a source for Rental tariffs.
+The four videos total approximately 1 hour 56 minutes 26 seconds. The workshop-focused video is supporting evidence for vehicle availability, maintenance and off-road boundaries only; it is not a source for Rental tariffs.
 
 ### 2.3 Evidence classes
 
-Every rule belongs to one of these classes:
+Every rule in this document belongs to one of these classes:
 
 - **Explicit-TACGL** — directly represented by TACGL data/report/accounting evidence.
-- **Explicit-Video** — directly demonstrated in supplied workflow evidence.
-- **Cross-source** — supported independently by TACGL and video evidence.
+- **Explicit-Video** — directly demonstrated in the supplied workflow evidence.
+- **Cross-source** — supported independently by TACGL and the videos.
 - **Integrity-derived** — the narrowest technical rule required to preserve proven business meaning safely.
 - **Observed precedent only** — an actual historical example that is not proof of a universal rule.
-- **Production policy** — an explicit safe AutoERP decision adopted because runtime behavior must be deterministic.
+- **Production policy** — an explicit AutoERP decision required to make runtime behavior deterministic and safe.
 - **Legacy mechanism rejected** — historical design behavior that must not be copied.
 
 When evidence is incomplete:
@@ -112,8 +118,8 @@ When evidence is incomplete:
 2. keep unknown distinct from zero;
 3. do not convert one example into a universal formula;
 4. do not add hidden fallback rates, thresholds or account codes;
-5. use only a named production policy where documented;
-6. otherwise create no automatic financial effect and use an explicit governed adjustment if the business later authorizes one.
+5. use a named production policy only where it is explicitly documented;
+6. otherwise create no automatic financial effect.
 
 ---
 
@@ -162,7 +168,7 @@ Owner / Lessor / Supplier                   Customer / Lessee
 
 ## 4. Canonical operator workflow
 
-The practical workflow should stay close to the videos:
+The normal user-facing workflow should remain close to the videos:
 
 ```text
 Vehicle / Customer / Owner Setup
@@ -177,9 +183,9 @@ Vehicle / Customer / Owner Setup
 → Reports / Audit
 ```
 
-Customer Billing and Owner Settlement are parallel outcomes of the same operational evidence. The diagram is not a strict serial dependency between those two branches.
+Customer Billing and Owner Settlement are parallel outcomes of the same operational evidence. They are not a strict serial chain.
 
-A company-owned vehicle does not require an artificial external Owner Agreement merely to reuse the external-owner path. No fictitious Owner payable is created unless an explicit Finance policy requires an internal transfer model.
+A company-owned vehicle does not require an artificial external Owner Agreement merely to reuse the external-owner path. No fictitious Owner payable is created unless a separate explicit Finance policy requires internal transfer accounting.
 
 ---
 
@@ -193,7 +199,7 @@ The party renting the vehicle from the business. Customer-side economic directio
 
 The external party supplying a vehicle to the business. Owner-side economic direction is payable/cost.
 
-The normal operator-facing Owner-side document is **Owner Payable Voucher**, **Owner Settlement** or **Lessor Settlement**. The business meaning demonstrated by the legacy Payment Payable processing must not be presented as a customer-style sales invoice.
+The normal operator-facing owner-side document is **Owner Payable Voucher**, **Owner Settlement** or **Lessor Settlement**. The legacy Payment Payable processing must not be presented as a customer-style sales invoice.
 
 ### Customer Receipt
 
@@ -209,34 +215,34 @@ The Running Chart is physical operational truth, not a financial document. It re
 
 ### Vehicle Use / Assignment
 
-The hidden integrity aggregate that records effective vehicle use, custody, source coverage and replacement lineage. The operator does not need a technical allocation wizard for normal agreement-first vehicle selection.
+The integrity aggregate that records effective vehicle use, custody, source coverage and replacement lineage. Normal users should not be forced through a technical allocation wizard when agreement-context vehicle selection is sufficient.
 
 ---
 
-## 6. Master-data ownership
+## 6. Module ownership
 
-Vehicle Rental reuses canonical masters; it must not clone them.
+Vehicle Rental reuses canonical masters and financial modules. It must not clone them.
 
-- Vehicle identity/registration/ownership: **Vehicle** module.
-- Customer identity/contact: **Customer** module.
-- Owner/supplier identity/contact: **Supplier/party** owner module.
-- Employee driver identity/status: **HR** module.
-- Currency/tax configuration: appropriate **Configuration/Tax** owners.
-- Accounts/posting profiles/journals: **Finance** module.
-- Invoice/AP documents: **Invoice/AP** owner.
-- Receipts/payments/allocations: **Payment** owner.
-- Workshop/off-road state: **Vehicle Service** owner.
-- Cross-module presentation: **Reporting** where appropriate.
+- Vehicle identity, registration and ownership: **Vehicle**.
+- Customer identity/contact: **Customer**.
+- Owner/supplier identity/contact: **Supplier / party owner**.
+- Employee driver identity/status: **HR**.
+- Currency/tax configuration: **Configuration / Tax**.
+- Accounts, posting profiles and journals: **Finance**.
+- Customer and AP documents: **Invoice/AP**.
+- Receipts, payments and allocations: **Payment**.
+- Workshop/off-road state: **Vehicle Service**.
+- Cross-module reporting: **Reporting** where appropriate.
 
-A missing owner-module capability must be fixed in the owner module, not worked around inside Rental.
+A missing capability must be fixed in the module that owns it; Rental must not compensate with a duplicate ledger, duplicate master or cross-module workaround.
 
 ---
 
 ## 7. Agreements
 
-Two separate agreement types exist:
+Two separate agreement types exist.
 
-### Customer Agreement
+### 7.1 Customer Agreement
 
 Defines what the business may charge the customer. Proven commercial vocabulary includes:
 
@@ -251,7 +257,7 @@ Defines what the business may charge the customer. Proven commercial vocabulary 
 - currency/tax context;
 - effective period.
 
-### Owner Agreement
+### 7.2 Owner Agreement
 
 Defines what the business may owe an external owner/supplier. Owner rates and reimbursements are independent from Customer rates. Proven concepts include:
 
@@ -263,55 +269,57 @@ Defines what the business may owe an external owner/supplier. Owner rates and re
 - currency/tax/withholding context where explicitly configured;
 - effective period.
 
-### Agreement lifecycle
+### 7.3 Agreement lifecycle
 
-Canonical lifecycle:
+Canonical production lifecycle:
 
 ```text
 Draft → Active → Closed
 ```
 
-Rules:
+Production rules:
 
 - Draft commercial terms may be edited with optimistic concurrency.
 - Active commercial terms are immutable.
 - Future commercial changes use successor/revision lineage rather than mutating history.
-- Activation validates party, currency, dates, required commercial context and overlap/cutover rules.
-- Closure prevents new coverage after the effective closure boundary without rewriting historical periods.
-- Every financial calculation stores/follows the exact effective agreement revision.
+- Activation validates party, currency, dates, commercial context and overlap/cutover rules.
+- Closure stops new coverage after the effective closure boundary without rewriting historical periods.
+- Every financial calculation retains the exact effective agreement revision.
+- Successor lineage is one-way and scope-safe; redundant inverse state is not required.
+- A successor Draft does not silently terminate an active predecessor.
 
 ---
 
 ## 8. Vehicle source, selection, custody and replacement
 
-Normal UI flow:
+Normal UI:
 
 ```text
 Open active agreement → Select vehicle → enter period/driver details → Save
 ```
 
-Backend integrity may maintain effective-dated source/use records, but users should not be forced through a separate technical allocation workflow unless the business explicitly requires it.
+Backend integrity may maintain effective-dated source/use records, but that complexity should stay behind the operator workflow.
 
-### External owner vehicle
+### 8.1 External owner vehicle
 
-Customer use must resolve valid Owner-source coverage for the vehicle/period where external supply is required.
+Customer use must resolve valid owner-supply coverage where external supply is required.
 
-Planning coverage uses civil-date eligibility where defined by the current production policy; actual handover/replacement enforces operational timestamp integrity and active source coverage.
+Planning eligibility and actual operational eligibility are distinct concerns. AutoERP currently uses civil-date planning rules and exact operational timestamp rules where those policies are explicitly defined.
 
-### Company-owned vehicle
+### 8.2 Company-owned vehicle
 
 No artificial Owner Agreement or Owner payable is manufactured.
 
-### Required controls
+### 8.3 Required controls
 
 - reject overlapping physical use of the same vehicle;
 - reject cross-tenant/cross-org relationships;
 - enforce agreement-period coverage;
 - enforce external owner/source coverage when required;
-- reuse shared Vehicle/Vehicle-Service availability contracts;
+- reuse shared Vehicle / Vehicle-Service availability contracts;
 - lock concurrent use/replacement changes deterministically;
 - preserve replacement predecessor/successor lineage;
-- replacement alone does not create an automatic second base rent, surcharge or credit;
+- replacement alone does not create a second base rent, surcharge or credit;
 - workshop/off-road status alone does not create an automatic downtime deduction.
 
 Insurance and revenue-licence records remain Vehicle-owned documents and are not universal Rental assignment blockers without an explicit Rental policy.
@@ -329,17 +337,17 @@ Operational events are distinct from planning:
 - odometer and timestamp evidence must remain consistent;
 - genuine concurrent updates are rejected rather than silently overwritten.
 
-A replacement may preserve the same driver. The source/use checks must distinguish the linked source from unrelated overlapping assignments so valid source linkage does not create a false driver conflict.
+A replacement may preserve the same driver. Linked source/use records must be distinguished from unrelated overlapping assignments so valid source linkage does not create false overlap rejection.
 
 ---
 
 ## 10. Running Chart
 
-### Purpose
+### 10.1 Purpose
 
-The Running Chart is the central operational evidence record.
+The Running Chart is the central operational evidence record shared by the customer and owner commercial sides.
 
-### Core evidence
+### 10.2 Core evidence
 
 Where applicable it records:
 
@@ -353,7 +361,7 @@ Where applicable it records:
 - night-out count;
 - notes and correction lineage.
 
-### Lifecycle
+### 10.3 Lifecycle
 
 ```text
 Draft → Finalized → Reversed / Corrected
@@ -361,14 +369,16 @@ Draft → Finalized → Reversed / Corrected
 
 Do not introduce extra Submit/Verify/Approve stages unless explicit business evidence requires them.
 
-### Finalization rules
+### 10.4 Finalization rules
 
 - end time must not precede start time;
 - odometer values must be physically valid and continuity-safe;
 - required vehicle/use context must be valid;
 - authoritative driver overlap must be prevented;
-- finalization freezes the operational evidence;
+- finalization freezes operational evidence;
 - corrections create traceable lineage rather than mutating finalized facts.
+
+Physical custody overrun may remain auditable evidence even when commercial entitlement does not extend beyond agreement coverage. Physical truth must not be rewritten to make billing succeed.
 
 ---
 
@@ -392,7 +402,7 @@ Base rental
 = Customer Invoice amount
 ```
 
-This is a component model, not permission to apply every component automatically. A component has financial effect only when the agreement/policy proves its entitlement and formula.
+This is a component model, not permission to apply every component automatically.
 
 Rules:
 
@@ -433,7 +443,28 @@ Rules:
 
 ---
 
-## 13. Mileage policy
+## 13. Base rent and proration
+
+TACGL/video evidence proves Daily and Monthly business concepts, but does not prove every edge-case proration convention.
+
+AutoERP production policy currently uses named policy `actual_calendar_days_v1` for deterministic base-rent treatment.
+
+Policy requirements:
+
+- explicit base rate required; blank is not zero;
+- Daily uses civil-day calculation;
+- Monthly uses anniversary-cycle actual-day proration;
+- original anchor is preserved across short months;
+- cumulative allocation must allow adjacent partial segments to reconcile to the full cycle;
+- overlapping retained base-charge periods are rejected;
+- Customer and Owner base charges are independent;
+- no hidden fixed-30 divisor is inferred from legacy precedent.
+
+This is **Production policy**, not a claim that TACGL proves a universal calendar formula.
+
+---
+
+## 14. Mileage policy
 
 Keep physical and commercial mileage distinct.
 
@@ -441,209 +472,90 @@ Keep physical and commercial mileage distinct.
 - Garage mileage is physical evidence unless an explicit commercial policy says otherwise.
 - Automatic pricing uses the configured commercial mileage policy.
 - Included/free kilometres are evaluated independently on Customer and Owner sides.
-- A Customer mileage allowance must never be reused as the Owner allowance.
+- Customer allowance must never be reused as Owner allowance.
 - Cycle-based pooling/reset must be explicit and reproducible.
-- No hidden maximum-kilometre or fallback rule may be inferred from one historical example.
+- Customer replacement charts may share the configured customer allowance cycle where the named policy defines that behavior.
+- Owner pool remains independent and tied to Owner Agreement.
+- Same-side mileage duplicate consumption is rejected.
+- Zero-cost assessment may still consume allowance where the policy explicitly defines consumption.
+- No hidden maximum-kilometre, carry-forward or fallback rule may be inferred from one historical example.
 
 ---
 
-## 14. Driver, overtime and night-out
+## 15. OT, night-out, AC and driver monetary treatment
 
-The videos prove that driver salary, Normal/Double/Triple OT and night-out are meaningful commercial concepts. They do not prove that Rental should derive statutory qualification rules from clock time.
+### Overtime
 
-Production boundary:
+- Normal/Double/Triple categories are separate facts.
+- Runtime does not infer which OT category applies from clock time unless an explicit policy is configured.
+- Monetary calculation requires an explicit matching rate.
+- Minute/hour conversion uses a named constant, not a hidden threshold.
 
-- Running Chart stores typed OT minutes and explicit night-out count;
-- Rental prices those facts only if the relevant agreement/rate permits it;
-- HR owns employee compensation rules;
-- Rental must not invent payroll salary/proration rules;
-- external-driver identity uses stable business reference plus immutable display snapshot where needed.
+### Night-out
 
----
+- Night-out is an explicit count/evidence concept.
+- Runtime does not infer night-out automatically from timestamps.
+- Monetary effect requires an explicit rate/policy.
 
-## 15. Deposits
+### AC mode
 
-Deposits are financial liabilities/advances, not Rental-local cash balances.
+- Non-AC / Front-AC / Dual-AC are proven business concepts.
+- There is no implicit mode-to-rate fallback.
+- Recording AC evidence does not itself authorize an automatic charge without an explicit component policy.
 
-- Rental may define a deposit requirement and link the business context.
-- Payment owns receipt identity, application, refund, forfeiture/disposition and reversal.
-- No automatic forfeiture is inferred.
-- Deposit application priority is explicit Payment policy; do not guess it.
-- Received, applied, refunded, forfeited/disposed and remaining amounts must reconcile.
-- Wrong party, direction or payment classification must not be reused as a Rental deposit receipt.
+### Driver salary / compensation
 
----
-
-## 16. Debit notes, credit notes, fuel, repair and damage
-
-Legacy evidence shows these concepts exist, but historical occurrence is not proof of automatic entitlement.
-
-Production rule:
-
-- preserve the underlying fact/evidence;
-- require explicit approved financial adjustment when liability/entitlement is not proven automatically;
-- create the financial document in its owning module;
-- retain source link and audit lineage;
-- never hardcode a universal fuel/repair/damage deduction formula without evidence.
+- Agreement driver amounts are commercial terms.
+- Employee payroll/compensation remains HR-owned.
+- Rental must not invent an employee-pay formula from customer recoveries or owner reimbursements.
 
 ---
 
-## 17. Invoice, receipt, payable and payment ownership
+## 16. Deposits, receipts, owner payments and financial ownership
 
-### Customer side
+- Security deposit requirement must be explicit; there is no universal deposit amount.
+- Customer deposit receipt uses Payment ownership.
+- Applied/refunded/unapplied balance comes from Payment source of truth.
+- Duplicate balance spend is prevented through Payment controls.
+- No automatic deposit forfeiture is inferred from missing return/damage evidence.
+- Customer Receipt remains Payment-owned.
+- Owner Payment remains Payment/AP-owned.
+- Cheque/payment instrument lifecycle remains Payment-owned.
+- Bank reconciliation remains Finance-owned.
+- Rental does not implement a second cash, cheque, payable or bank ledger.
 
-```text
-Rental calculation → Invoice-owned Customer Invoice → Payment-owned Customer Receipt / allocation
-```
+---
 
-### Owner side
+## 17. Adjustments, deductions and exception policy
 
-```text
-Rental calculation → AP/Invoice-owned Owner Payable Voucher → Payment-owned Owner Payment / allocation
-```
+TACGL and the videos show concepts such as fuel, repair and other owner-side deductions/recoveries. They do **not** prove that every such event is automatically chargeable or deductible.
 
-Rental owns the business source and calculated component snapshots. It does not duplicate mutable Invoice or Payment balances/statuses.
+Therefore:
 
-Posted financial documents must not have generic Edit/Delete behavior. Corrections use reversal, credit/debit adjustment or governed reissue according to the financial owner module.
+- fuel/repair/damage/accident/insurance-excess/meal/highway/parking/miscellaneous concepts are possible adjustment purposes, not automatic entitlements;
+- no generic auto-billable `other_charge` bucket should manufacture money;
+- an exceptional financial adjustment requires explicit source evidence, side, approved amount, reason and tax treatment;
+- posted adjustments use the appropriate financial owner module;
+- original Rental agreement/rate/source snapshots are never rewritten to simulate a deduction or credit;
+- replacement and downtime must not double-apply the same incident automatically.
 
 ---
 
 ## 18. Tax, withholding and Finance
 
-- Tax percentages, withholding thresholds and statutory rounding are not hardcoded in Rental.
-- Tax/withholding resolution is effective-dated and delegated to the Tax/Payment owners.
-- Finance owns account mappings, posting profiles, journals, accounting periods and bank reconciliation.
-- Rental never exposes raw GL IDs in normal operator forms.
-- Source-to-journal relationships remain traceable.
-- Legacy GL mismatch/error procedures are evidence that accounting integrity mattered; AutoERP should prevent invalid states rather than rely on post-error repair scripts.
+- Tax percentages are not hardcoded in Rental.
+- Tax applicability, effective dates and rounding remain Tax-owned.
+- Owner withholding remains Tax/Payment-owned and effective-dated.
+- Rental does not evaluate statutory aggregate thresholds independently per vehicle/branch/invoice.
+- Finance semantic posting profiles are used; TACGL GL account numbers are not copied as magic values.
+- Customer revenue and owner cost use independent semantic posting directions.
+- Accounting-period, journal and reversal controls remain Finance-owned.
+
+TACGL accounting structures prove the existence of accounting integration, not a requirement to reproduce legacy account codes or repair procedures.
 
 ---
 
-## 19. Cheques and bank reconciliation
-
-TACGL/videos demonstrate cheque/payment and bank-reconciliation workflows as part of the wider Rental financial lifecycle.
-
-Rental must not implement a parallel cheque engine. It hands financial documents/payments to the canonical Payment/Finance capabilities and reporting surfaces the resulting status.
-
----
-
-## 20. Reporting requirements
-
-Useful reporting views include:
-
-- Customer agreement/current terms;
-- Owner agreement/current terms;
-- vehicle use/custody/replacement history;
-- Running Chart history;
-- Customer invoice/receipt/outstanding balance;
-- Owner payable/payment/outstanding balance;
-- vehicle-wise revenue/cost/margin analysis without deriving one side from the other;
-- Customer statements;
-- Owner statements;
-- mileage/usage summaries;
-- deposit reconciliation;
-- cheque/bank-reconciliation status;
-- audit/correction lineage.
-
-Historical reports may expose legacy fields, but reports must not become a mechanism for silently repairing invalid production state.
-
----
-
-## 21. Validation and integrity rules
-
-### Tenant and organization
-
-- every Rental aggregate is tenant scoped;
-- organization-unit scope is explicit where required;
-- cross-tenant/cross-org foreign relationships are rejected;
-- API authorization and database constraints both protect ownership boundaries.
-
-### Concurrency
-
-- writes are atomic;
-- mutable aggregates use expected-version / row-version checks;
-- deterministic lock ordering is used where multiple shared records are locked;
-- stale writes fail explicitly;
-- retries must not create duplicate financial documents or duplicate source consumption.
-
-### History
-
-- original transaction values are preserved;
-- finalized/posted facts are not overwritten;
-- corrections use explicit lineage;
-- agreement rate/source revisions remain reconstructable.
-
-### Relationships
-
-- avoid unnecessary bidirectional links;
-- use explicit composite tenant/org-safe foreign keys where applicable;
-- expose human-readable related objects to the UI rather than raw IDs;
-- keep ownership direction clear.
-
----
-
-## 22. UI/UX contract
-
-User speed and clarity take priority over exposing technical detail.
-
-Rules:
-
-- no raw database IDs;
-- searchable human-readable Customer/Owner/Vehicle/Driver selectors;
-- no generic Customer-vs-Owner side selector when page context already determines the side;
-- agreement-first vehicle selection;
-- Draft edit separated from Activate/Close/Supersede lifecycle actions;
-- Active commercial terms read-only;
-- Running Chart entry fast and table/form oriented;
-- uncommon evidence moved to secondary/advanced sections;
-- unknown fields may stay blank;
-- zero is entered only when known;
-- Customer Billing and Owner Settlement shown as independent branches;
-- financial document links open owner-module records;
-- permissions hide actions the user cannot execute;
-- audit/history is available without crowding primary workflows;
-- do not create a page for every backend table.
-
-Recommended main navigation:
-
-```text
-Vehicle Rental
-├── Overview
-├── Agreements
-│   ├── Customer Agreements
-│   └── Owner Agreements
-├── Running Charts
-├── Customer Billing
-├── Owner Settlements
-├── Deposits
-└── Reports
-```
-
-A standalone Assignments/Vehicle Use screen may remain for timeline review, handover, return, replacement and cancellation, but normal assignment starts from the relevant agreement.
-
----
-
-## 23. Permissions and audit
-
-Permissions should be capability-based, not numeric legacy user levels.
-
-Separate as appropriate:
-
-- view agreements;
-- manage Draft agreements;
-- activate/close/supersede agreements;
-- manage vehicle use/custody;
-- create/finalize/correct Running Charts;
-- create Customer calculations;
-- create Owner calculations;
-- view deposits;
-- perform Payment/Finance actions only through those modules' permissions.
-
-Every sensitive transition retains actor/time/reason/context as appropriate. Password-register or numeric-level legacy authorization must never be recreated.
-
----
-
-## 24. Business states and valid transitions
+## 19. States and valid transitions
 
 ### Agreement
 
@@ -651,259 +563,286 @@ Every sensitive transition retains actor/time/reason/context as appropriate. Pas
 Draft → Active → Closed
 ```
 
-Successor creation preserves predecessor history and future-effective lineage.
+Invalid examples:
 
-### Vehicle Use / Assignment
+- silently mutating Active commercial terms;
+- reopening history by changing predecessor rates in place;
+- using an expired/closed agreement for new commercial coverage.
 
-Conceptually:
+### Vehicle Use
+
+Conceptual operational progression:
 
 ```text
-Planned → In Custody / Active → Returned
-   └────→ Cancelled
+Planned → Active/Handover → Returned
+                   ↘ Replacement lineage
 ```
 
-Replacement creates linked predecessor/successor use; it is not destructive mutation of history.
+The exact storage model may differ, but physical overlap, source coverage and lineage invariants must hold.
 
 ### Running Chart
 
 ```text
-Draft → Finalized → Reversed / Corrected
+Draft → Finalized → Reversed/Corrected
 ```
-
-### Calculation
-
-A calculation is an immutable source snapshot once committed to a financial handoff. Cancellation/reissue must release/re-establish consumption explicitly and idempotently.
 
 ### Financial documents
 
-Lifecycle belongs to Invoice/AP/Payment/Finance. Rental must not duplicate their state machines.
+Financial lifecycle is owned by Invoice/Payment/Finance. Rental must not duplicate mutable financial status columns as a second source of truth.
 
 ---
 
-## 25. Explicitly rejected legacy mechanisms
+## 20. Validation and integrity rules
 
-Do not restore or recreate:
+### Scope
 
-- removed old Rental runtime or compatibility layer;
-- direct mutable agreement-to-vehicle hard binding without historical use lineage;
-- Customer revenue as source of Owner payable;
-- same Running Chart/component billed twice on the same side;
-- posted Invoice/Payment destructive edit/delete;
-- duplicate Owner and leasing-company calculation engines without real commercial difference;
-- raw Customer/Vehicle/GL codes in normal UI;
-- numeric user levels or Password Register authorization;
-- hardcoded legacy rates, taxes, thresholds or GL account numbers;
-- post-error allocation/GL repair procedures as the primary integrity model;
-- insurance/revenue-licence Rental blockers without explicit Rental policy;
-- a user-facing technical workflow merely because a backend integrity table exists.
+- current tenant is authoritative;
+- organization scope is authoritative where applicable;
+- client input cannot override trusted tenant/org/user context;
+- cross-tenant/cross-org references are rejected.
 
----
+### Relationships
 
-## 26. Historically ambiguous rules and current production decisions
+- users select human-readable Customer/Supplier/Vehicle/Driver values;
+- raw foreign keys are never manually typed in normal UI;
+- APIs return meaningful related summaries rather than isolated IDs where practical.
 
-TACGL and the videos do not prove every universal formula. Production behavior must nevertheless be deterministic, explicit and safe.
+### Time and concurrency
 
-| Area | Production decision |
-|---|---|
-| Partial-month proration | Use only the named shipped policy: actual-calendar anniversary-cycle proration; no hidden fixed divisor. |
-| Included-KM pooling | Explicit cycle-based Customer and Owner policies, independently evaluated. |
-| Replacement charging | Replacement itself creates no automatic surcharge, second base rent or credit. |
-| Downtime | Workshop/off-road evidence creates no automatic financial deduction. |
-| Garage KM | Physical evidence only by default; automatic mileage pricing uses commercial KM. |
-| Accident/insurance excess | Requires explicit approved adjustment; liability is not inferred. |
-| Deposit priority/forfeiture | Payment-owned explicit disposition; no automatic forfeiture. |
-| Tax | Tax-owned effective-dated configuration; no Rental hardcode. |
-| Withholding | Tax/Payment-owned effective-dated policy; no Rental hardcode. |
-| AC rates | No implicit AC-mode fallback. |
-| OT qualification | Rental stores typed OT minutes; it does not infer category from clock time. |
-| Night-out qualification | Explicit count/evidence; no automatic clock-time inference. |
-| Driver salary/proration | No invented payroll formula; HR owns compensation. |
-| Running Chart approval | Draft/Finalized/Reversed-Corrected only unless new authoritative business evidence requires more. |
-| Insurance/revenue licence | Vehicle-owned documents, not universal Rental assignment blockers. |
-| Owner vs leasing company | One Owner/Lessor engine unless proven commercial behavior differs. |
-| Company-owned vehicle | No artificial Owner Agreement/payable. |
-| Miscellaneous recovery | Explicit governed adjustment only; historical occurrence is not automatic entitlement. |
+- concurrency-sensitive transitions require expected row/version semantics;
+- deterministic lock order is used for multi-row physical operations;
+- tenant/org commercial-calendar policy is used for civil-date decisions;
+- exact operational timestamps remain exact for custody/overlap/Running Chart evidence;
+- a later configuration change must not reinterpret already recorded immutable commercial boundaries.
 
-The distinction is important:
+### Financial boundaries
 
-> **No automatic effect** does not mean **the business can never apply an explicit governed effect**.
+- no automatic Rental financial handoff may create customer or owner money outside effective agreement coverage;
+- physical evidence outside commercial coverage may remain auditable without becoming billable/payable;
+- same-side source consumption is idempotent and duplicate-safe.
 
 ---
 
-## 27. Current AutoERP implementation reconciliation
+## 21. Legacy mechanisms that must not be copied
 
-The fresh `app/Modules/VehicleRental` implementation is present on `worktree-0.0.8`. It does not depend on the removed legacy Rental runtime.
+The legacy application is rich in business knowledge but weak as an architecture template.
 
-The module contains dedicated responsibilities for:
+Reject these mechanisms:
 
-- agreement lifecycle and validation;
-- base-rent billing/preview;
-- mileage allowance;
-- vehicle use/source/custody/replacement;
-- operational time and odometer continuity;
-- Running Chart register/lifecycle/validation;
-- usage-charge billing;
-- Rental authorization;
-- Rental-specific deposit linkage/receipt orchestration;
-- shared vehicle-use availability integration.
+- direct agreement-to-vehicle binding without durable use/source history;
+- same vehicle being logically available to overlapping customers;
+- posted invoice/payment destructive edit/delete;
+- customer billing derived from owner economics or vice versa;
+- duplicate owner/leasing-company workflows for the same business meaning;
+- raw customer/vehicle/GL codes exposed as operator workflow;
+- numeric user levels or password-register design;
+- invalid states created first and repaired later by mismatch/allocation procedures;
+- copied TACGL account numbers as AutoERP magic values;
+- compatibility patches that revive removed Rental code.
 
-Cross-cutting financial responsibilities remain in their owner modules.
+Preserve the **business meaning**, not the legacy implementation defects.
 
-The closed implementation acceptance ledger records completion of:
+---
 
-- separate Customer and Owner agreements;
-- tenant/org-safe snapshots and histories;
-- optimistic concurrency lifecycle commands;
-- successor agreement lineage;
-- company-owned and external Owner-source paths;
+## 22. Reporting and traceability
+
+Required business traceability includes:
+
+- vehicle-use register/detail/history;
+- Running Chart register/detail/history;
+- Customer and Owner Agreement history;
+- immutable Rental charge/settlement calculation breakdown and source references;
+- Invoice/AP source allocation back to Rental source;
+- Customer/Owner/Vehicle views where appropriate;
+- customer/owner balances, receipts/payments, tax, journals and bank reconciliation through their owner modules;
+- profitability/margin from independent customer revenue and owner cost, never from guessed owner cost.
+
+Legacy report names and layouts are supporting evidence for information needs, not a requirement to copy old screens or report engine structure.
+
+---
+
+## 23. Permissions and API behavior
+
+Permissions are separated by responsibility and commercial side. At minimum the implementation must distinguish:
+
+- Customer Agreement view/manage;
+- Owner Agreement view/manage;
+- Vehicle Use/custody view/manage;
+- Running Chart view/manage/finalize/reverse;
+- Customer billing authorization;
+- Owner settlement authorization.
+
+Deposit, receipt, payment, tax and finance authorization remain delegated to the modules that own those financial responsibilities.
+
+API rules:
+
+- use trusted tenant/org context;
+- use controlled lookups for related data;
+- return human-readable related summaries;
+- reject stale expected versions;
+- return clear validation/conflict messages;
+- never accept client-declared posted financial truth that can be resolved server-side.
+
+---
+
+## 24. User-experience contract
+
+The business videos demonstrate a practical, task-oriented system. AutoERP should preserve that simplicity while hiding stronger integrity controls behind it.
+
+Principles:
+
+- speed and clarity over information overload;
 - agreement-first vehicle selection;
-- handover/return/cancel/replacement lineage;
-- Vehicle/Vehicle-Service availability integration;
-- Running Chart Draft/Finalize/Reverse/Correction;
-- odometer and driver integrity;
-- named base-rent proration;
-- mileage pools/assessments;
-- typed OT/night-out pricing;
-- independent Customer and Owner calculations;
-- Invoice/AP handoff;
-- Payment-owned deposit/receipt/payment behavior;
-- Tax/Finance ownership;
-- guided frontend workflows;
-- relationship and concurrency controls.
-
-The release record states that the validated runtime baseline passed the recorded executable gates and later release-candidate commits were documentation-only. Therefore this source reconciliation does not justify inventing new runtime code merely to create a delta.
+- compact forms, not giant technical wizards;
+- Running Chart as a fast operational entry/review surface;
+- customer and owner financial panels clearly separated;
+- human-readable labels instead of raw IDs/codes;
+- no unnecessary approval ceremony;
+- technical allocation/history data visible only where it helps the user understand or resolve a real business issue;
+- destructive-looking actions must reflect true domain lifecycle, not generic CRUD.
 
 ---
 
-## 28. Verification baseline and future gate
+## 25. Ambiguous, incomplete or unproven rules
 
-Recorded release evidence for the validated runtime baseline includes:
+The following are **not** safely derivable as universal TACGL rules and must not be guessed:
 
-- Laravel / SQLite: 820 tests / 8,913 assertions;
-- frontend Vitest: 88 files / 327 tests;
+1. universal partial-month proration formula;
+2. a fixed 30-day monthly divisor;
+3. free-KM pooling across every replacement or arbitrary period;
+4. replacement-day double charging;
+5. universal downtime credit/deduction formula;
+6. universal fuel/repair/damage deduction priority;
+7. universal security-deposit application priority;
+8. universal automatic deposit forfeiture rule;
+9. universal tax/withholding percentage or threshold;
+10. automatic AC surcharge from AC evidence alone;
+11. automatic OT category inference from clock time;
+12. automatic night-out inference from timestamps;
+13. automatic financial effect of every miscellaneous legacy charge type.
+
+Where AutoERP needs deterministic behavior, it must use a named production policy documented explicitly. Otherwise the monetary effect is absent until a governed business rule is provided.
+
+---
+
+## 26. Current AutoERP production-policy decisions
+
+These are implementation policies, not claims that TACGL universally proves them:
+
+- agreement lifecycle: Draft → Active → Closed;
+- commercial revisions use successor lineage rather than in-place mutation;
+- `actual_calendar_days_v1` is the named base-rent proration policy;
+- tenant/org localization timezone is the commercial civil-day source of truth;
+- Vehicle Use planning may use explicit civil-date eligibility while actual handover/replacement uses exact timestamps;
+- Running Chart lifecycle is Draft → Finalized → Reversed/Corrected without extra unproven approval stages;
+- same-side source consumption is duplicate-safe;
+- customer and owner calculations remain independent;
+- posted financial records remain owned and immutable under Invoice/Payment/Finance rules;
+- undefined historical tariffs create no automatic financial effect.
+
+---
+
+## 27. Current implementation reconciliation — 2026-10-01
+
+Authoritative branch reviewed: `worktree-0.0.8` at `9f492b5094039522c53b4e7509be296217b2d5b9`.
+
+The previous canonical knowledge-base review referenced `8b74ff48a1dbf2a07220f5edcb36dabc3086f980`.
+
+Comparison result:
+
+- current branch is 50 commits ahead of that prior review point;
+- no files under `app/Modules/VehicleRental` changed in that delta;
+- later changes are concentrated in other modules such as Selling, Inventory, Invoice/Payment, Reporting, Vehicle Service, Expense and supporting core modules;
+- therefore this audit found no evidence-backed reason to modify Vehicle Rental runtime code in this pass.
+
+The current Vehicle Rental implementation still contains the clean fresh module with dedicated constants/data/database/enums/http/models/providers/routes/services/tests structure and continues to rely on owner modules for master and financial responsibilities.
+
+The implementation acceptance ledger at `docs/vehicle-rental/TODO.md` remains the executable completion ledger. It records closed coverage for agreements, successor revisions, vehicle source/use, Running Charts, base rent, mileage, OT/night-out, billing/settlement, deposits, financial handoff, permissions, relationships, UI and verification.
+
+### Audit conclusion
+
+This pass is a **documentation reconciliation**, not a speculative code-change batch.
+
+No legacy Rental code was restored or reused. No compatibility patch was introduced. No unproved business rule was converted into money.
+
+---
+
+## 28. Testing and verification policy
+
+Only commands actually executed may be described as passed.
+
+The existing acceptance ledger contains previously executed SQLite/MySQL/frontend verification records for the Rental implementation. This documentation-only reconciliation does not claim that those suites were rerun in the present connector environment.
+
+Future runtime changes must verify, as applicable:
+
+- focused Vehicle Rental tests;
+- full Laravel suite;
+- MySQL/InnoDB suite;
+- migration upgrade/rollback behavior;
 - TypeScript typecheck;
 - ESLint;
-- production Vite build;
-- fresh SQLite migration/seed;
-- rollback/reapply of the September 25 Rental upgrade migrations with foreign-key integrity clean;
-- MySQL grammar compilation of changed constraint migrations.
+- frontend tests;
+- production build;
+- database FK/index integrity;
+- tenant/org isolation;
+- critical customer/owner financial handoff;
+- human browser smoke/UAT for agreement → vehicle → Running Chart → billing/settlement.
 
-For every future Vehicle Rental change, verify as applicable:
-
-1. tenant/organization isolation;
-2. permission boundaries;
-3. expected-version/stale-write behavior;
-4. foreign-key/uniqueness constraints;
-5. migration ownership/order and upgrade path;
-6. Customer/Owner independence;
-7. historical agreement/source revision correctness;
-8. duplicate same-side consumption rejection;
-9. reversal/reissue/correction lineage;
-10. commercial-calendar consistency;
-11. physical custody vs commercial entitlement;
-12. SQLite behavior where supported;
-13. MySQL/MariaDB behavior where relevant;
-14. frontend tests/typecheck/lint/build;
-15. authenticated browser/UAT for changed operator flows.
-
-A change record must state exactly which checks were executed. Never claim a test passed when it was only statically reviewed.
+Real production readiness additionally requires operational evidence such as deployment rehearsal, backup/restore, queues/scheduler, mail/storage/cache connectivity, TLS/secrets and user acceptance.
 
 ---
 
-## 29. AI-agent decision procedure
+## 29. AI-agent decision rules
 
-When deciding Vehicle Rental behavior:
+Any AI Agent modifying Vehicle Rental must follow this decision sequence:
 
-1. Identify the physical event.
-2. Identify the financial side, if any: Customer or Owner.
-3. Resolve the exact agreement and frozen/effective revision.
-4. Resolve the physical source evidence.
-5. Resolve the tenant/org commercial calendar where civil dates matter.
-6. Use only an explicit named policy/rate or explicit authorized amount.
-7. Check same-side source consumption.
-8. Check physical vehicle/driver conflicts.
-9. Check tenant/org/permission/version constraints.
-10. Keep automatic financial coverage inside the applicable agreement boundary.
-11. Delegate Invoice/Payment/Tax/Finance behavior to those owner modules.
-12. Preserve immutable snapshots and correction lineage.
-13. If no automatic financial policy exists, create no automatic money and require an explicit governed adjustment instead of guessing.
-
----
-
-## 30. Remaining work classification
-
-The implementation TODO is a closed acceptance ledger, not a speculative rebuild list.
-
-### Confirmed business/runtime work already implemented
-
-- agreements and revision lineage;
-- vehicle source/use/custody/replacement;
-- Running Chart evidence and correction;
-- Customer/Owner independent calculations;
-- financial handoff and source traceability;
-- deposits/payment ownership;
-- availability, concurrency, permissions and audit foundations;
-- production UI workflows.
-
-### Decision-required only when new evidence/business direction appears
-
-Do not reopen these by assumption:
-
-- a different universal proration convention;
-- automatic replacement surcharge/credit;
-- automatic downtime deduction;
-- automatic garage-KM billing;
-- universal accident/insurance liability;
-- automatic deposit-forfeiture priority;
-- new tax/withholding formulas;
-- extra Running Chart approval stages;
-- new Owner-vs-leasing commercial engine split.
-
-### Safe next coding rule
-
-Do not change runtime code unless a reproducible defect, authoritative new business rule or owner-module capability gap is identified. Fix that root cause in the owning module with the smallest verified change.
+1. Identify the business question and owner module.
+2. Search this knowledge base and the TACGL/video evidence class for the rule.
+3. If explicit evidence exists, preserve the business meaning.
+4. If only a legacy mechanism exists, do not copy it automatically.
+5. If a runtime integrity rule is required, choose the narrowest rule that preserves the proven meaning.
+6. If a named AutoERP production policy already exists, use the single source of truth for that policy.
+7. If evidence is insufficient and no production policy exists, do not invent a monetary effect.
+8. Keep financial ownership in Invoice/Payment/Tax/Finance.
+9. Keep master ownership in Vehicle/Customer/Supplier/HR.
+10. Keep the user-facing workflow simple and human-readable.
+11. Preserve immutable historical snapshots and traceable correction lineage.
+12. Add tests for every new invariant and every resolved ambiguity.
+13. Record the evidence class and verification in documentation/change records.
 
 ---
 
-## 31. Source-reconciliation result — 2026-09-29
+## 30. Definition of Done
 
-This audit revalidated the exact source set supplied in the current conversation and reconciled it with the latest authoritative implementation branch.
+Vehicle Rental remains functionally complete only while all of the following stay true:
 
-Confirmed:
-
-- `TACGL.zip` SHA-256 and file count;
-- `TACGL(20260929-164333).zip` SHA-256 and file count;
-- all 452 normalized business files are byte-identical between the two ZIPs;
-- `TACGL.rar` SHA-256;
-- all four video SHA-256 values and durations;
-- the current `worktree-0.0.8` head at audit start: `8b74ff48a1dbf2a07220f5edcb36dabc3086f980`;
-- the current branch contains the fresh Vehicle Rental module and the closed acceptance ledger;
-- the latest branch release record is documentation-only after the validated runtime baseline;
-- no source conflict or evidence-backed unfinished runtime feature was discovered in this revalidation.
-
-This refresh corrects the dated TACGL archive filename in the canonical knowledge base from the earlier packaging label to the exact current upload `TACGL(20260929-164333).zip` while preserving the verified hash/content-equivalence result.
-
-No runtime code, schema, API, permission or frontend behavior is changed by this source-reconciliation update.
+1. practical TACGL/video workflow is available without legacy UI complexity;
+2. customer and owner economics are independent and revision-driven;
+3. Running Chart is immutable physical evidence with governed correction;
+4. physical vehicle/source/use/replacement/driver history is integrity-protected;
+5. every automatic monetary effect comes from an explicit named/configured policy and exact source evidence;
+6. undefined historical tariffs resolve to **no automatic monetary effect**, not an invented formula;
+7. Invoice/Payment/Tax/Finance/Reporting responsibilities stay in their owner modules;
+8. same-side source consumption is not duplicated;
+9. company-owned vehicles do not fabricate external owner cost;
+10. no old Rental runtime or legacy magic values are reintroduced;
+11. migrations and relationships remain tenant/org-safe, directional and single-owner for each schema fact;
+12. successor/revision lineage remains physically persisted and immutable;
+13. Vehicle Use eligibility and Owner-source lookup use the same documented commercial-calendar policy;
+14. no automatic Rental financial handoff can create customer or owner money outside effective agreement coverage;
+15. future-effective agreement activation uses the configured tenant/org commercial calendar;
+16. recorded historical commercial boundaries are not reinterpreted after timezone configuration changes;
+17. user-facing workflow remains simple enough to reflect the videos' practical operation;
+18. future changes preserve this knowledge base and record actual verification evidence rather than assumptions.
 
 ---
 
-## 32. Final authority statement
+## 31. Final source-of-truth statement
 
-1. TACGL is the primary Vehicle Rental business source and conflict tie-breaker.
-2. The four supplied videos are authoritative practical workflow evidence.
-3. `worktree-0.0.8` is the authoritative implementation source.
-4. `RULES.md` / `AGENTS.md` govern engineering quality, module ownership and maintainability.
-5. Never restore or reuse the removed legacy Rental implementation.
-6. Never hardcode legacy rates, taxes, GL accounts or unexplained magic business values.
-7. Preserve Customer/Owner independence.
-8. Preserve physical truth separately from financial entitlement.
-9. Preserve historical commercial revisions and financial lineage.
-10. Keep the operator workflow simple while enforcing strong hidden backend integrity.
-11. When evidence is insufficient, document uncertainty and fail safely instead of inventing a rule.
+TACGL and the supplied videos define the Vehicle Rental **business meaning**.
 
+`worktree-0.0.8` defines the current AutoERP **implementation**.
 
-## 33. Integrated release verification — 2026-09-30
+`RULES.md` / `AGENTS.md` define the **engineering constraints**.
 
-The Selling/worktree integration preserves the fresh Rental runtime and the business policies above. Customer and owner financial workflows continue to use Invoice, Payment, Tax and Finance ownership. Supplier balance presentation now consumes a Supplier-owned contract implemented by Invoice, avoiding a circular module dependency without duplicating balance logic. No removed Rental code or new inferred tariff is introduced.
-
-The merged runtime passed 881 backend tests on both SQLite and MariaDB/InnoDB, and 374 frontend tests. Fresh/upgrade and rollback/reapply schemas match across 238 tables on both engines. See [the integrated release record](changes/2026-09-30-integrated-release-verification.md) for exact scope, known lint warnings, the GitHub billing-related CI startup failure, and the distinction between repository publication and live deployment. These checks do not claim multi-process contention, production-data rehearsal or human UAT.
+This document reconciles those authorities without copying legacy design defects, without inventing unsupported business rules, and without moving responsibilities into modules that do not own them.
