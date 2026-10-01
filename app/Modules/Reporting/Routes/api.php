@@ -10,6 +10,7 @@ use Modules\Reporting\Http\Controllers\ReportController;
 use Modules\Reporting\Http\Controllers\TechnicianWorkReportController;
 use Modules\Reporting\Http\Controllers\VehicleRentalReportController;
 use Modules\Reporting\Http\Controllers\VehicleServiceHistoryReportController;
+use Modules\Reporting\Http\Controllers\VehicleServiceSalesSummaryReportController;
 use Modules\Reporting\Services\ReportingAuthorizationService;
 
 $middleware = [
@@ -39,6 +40,8 @@ Route::prefix('api/v1/reports')->middleware($middleware)->name('api.v1.reports.'
             ->name('vehicle-service.employee-commissions');
         Route::get('vehicle-service/service-history', [VehicleServiceHistoryReportController::class, 'index'])
             ->name('vehicle-service.service-history');
+        Route::get('vehicle-service/sales-summary', [VehicleServiceSalesSummaryReportController::class, 'index'])
+            ->name('vehicle-service.sales-summary');
 
         Route::middleware('tenant.feature:vehicle-rental')->group(function (): void {
             Route::get('vehicle-rental/running-chart', [VehicleRentalReportController::class, 'runningChart'])->name('vehicle-rental.running-chart');

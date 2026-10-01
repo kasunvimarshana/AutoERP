@@ -1002,6 +1002,17 @@ export const tenantNavigationSections: NavigationSection[] = [
                             permissions: [reportingPermissions.view],
                         },
                     },
+                    {
+                        id: "vehicle-service-sales-summary-report",
+                        type: "link",
+                        label: "Service Sales Summary",
+                        to: "/reports/vehicle-service/sales-summary",
+                        match: ["/reports/vehicle-service/sales-summary"],
+                        access: {
+                            ...operationalAccess(["reporting"]),
+                            permissions: [reportingPermissions.view],
+                        },
+                    },
                 ],
             },
             {

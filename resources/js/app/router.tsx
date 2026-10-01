@@ -342,6 +342,9 @@ const EmployeeCommissionReportPage = lazy(
 const VehicleServiceHistoryReportPage = lazy(
     () => import("@/modules/reporting/pages/VehicleServiceHistoryReportPage"),
 );
+const VehicleServiceSalesSummaryReportPage = lazy(
+    () => import("@/modules/reporting/pages/VehicleServiceSalesSummaryReportPage"),
+);
 const OperationalReportPage = lazy(
     () => import("@/modules/reporting/pages/OperationalReportPage"),
 );
@@ -941,6 +944,10 @@ const appRouter = createBrowserRouter(
                         <Route
                             path="/reports/vehicle-service/service-history"
                             element={<VehicleServiceHistoryReportPage />}
+                        />
+                        <Route
+                            path="/reports/vehicle-service/sales-summary"
+                            element={<VehicleServiceSalesSummaryReportPage />}
                         />
                         <Route
                             path="/reports/:key"
