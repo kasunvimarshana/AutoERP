@@ -13,7 +13,7 @@ const chart = { id: 5, row_version: 2, reference: 'CHART-A', status: RunningChar
 beforeEach(() => { vi.clearAllMocks(); session.permissions = [CHART_PERMISSION.view]; vi.mocked(listCharts).mockResolvedValue({ data: [chart] }); });
 describe('Running Chart review', () => {
  it('preserves unknown distance and hides unauthorized actions', async () => {
-  render(<RunningChartsPanel use={use} />); expect(await screen.findByText('CHART-A · Finalized')).toBeInTheDocument(); expect(screen.getByText('Total distance: Not recorded km')).toBeInTheDocument(); expect(screen.queryByRole('button', { name: 'Reverse usage' })).not.toBeInTheDocument(); expect(screen.queryByRole('button', { name: 'Record usage' })).not.toBeInTheDocument();
+  render(<RunningChartsPanel use={use} />); expect(await screen.findByText('CHART-A')).toBeInTheDocument(); expect(screen.getByText('Finalized')).toBeInTheDocument(); expect(screen.getByText('Total distance: Not recorded')).toBeInTheDocument(); expect(screen.queryByRole('button', { name: 'Reverse usage' })).not.toBeInTheDocument(); expect(screen.queryByRole('button', { name: 'Record usage' })).not.toBeInTheDocument();
  });
  it('requires a reason and preserves stale revision errors', async () => {
   session.permissions.push(CHART_PERMISSION.reverse); vi.mocked(transitionChart).mockRejectedValue(new ApiError('This record changed. Reload before continuing.', 409));
