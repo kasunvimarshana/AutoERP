@@ -130,7 +130,9 @@ export default function VehicleServicePaymentPreparePage() {
         const onlyMethod = firstPaymentMethodId === '' && paymentMethods.length === 1 ? paymentMethods[0] : null;
         if (!onlyInvoice && !onlyMethod) return;
 
+        let cancelled = false;
         queueMicrotask(() => {
+            if (cancelled) return;
             if (onlyInvoice) {
                 setInvoiceId((current) => current || String(onlyInvoice.invoice_id));
             }
@@ -143,6 +145,8 @@ export default function VehicleServicePaymentPreparePage() {
                 };
             }));
         });
+
+        return () => { cancelled = true; };
     }, [eligibleInvoices, firstPaymentMethodId, invoiceId, paymentMethods]);
     const invoice = eligibleInvoices.find((link) => link.invoice_id === Number(invoiceId));
     const paymentTotal = sumDecimals(rows.map((row) => row.amount || ZERO_AMOUNT));
