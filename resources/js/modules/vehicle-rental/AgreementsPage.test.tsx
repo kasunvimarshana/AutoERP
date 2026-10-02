@@ -9,7 +9,7 @@ import { createAgreementSuccessor, listAgreements, transitionAgreement, saveAgre
 
 const session = vi.hoisted(() => ({ roles: [] as string[], permissions: [] as string[], permissionsLoaded: true }));
 vi.mock('@/modules/auth/AuthProvider', () => ({ useAuth: () => session }));
-vi.mock('./agreementApi', () => ({ listAgreements: vi.fn(), transitionAgreement: vi.fn(), saveAgreement: vi.fn(), createAgreementSuccessor: vi.fn() }));
+vi.mock('./agreementApi', () => ({ listAgreements: vi.fn(), transitionAgreement: vi.fn(), saveAgreement: vi.fn(), createAgreementSuccessor: vi.fn(), agreementHistory: vi.fn() }));
 const record: Agreement = {
     id: 103, reference: 'LESSEE-AGREEMENT', row_version: 7, status: AgreementStatus.Draft,
     basis: RentalBasis.Monthly, driver_mode: DriverMode.SelfDrive, supersedes_agreement: null,
