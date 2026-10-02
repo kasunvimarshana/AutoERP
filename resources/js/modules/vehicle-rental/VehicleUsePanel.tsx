@@ -8,6 +8,7 @@ import { Button } from '@/shared/components/Button';
 import { Input } from '@/shared/components/Input';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Pagination } from '@/shared/components/Pagination';
+import { QuantityDisplay } from '@/shared/components/QuantityDisplay';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import type { PaginationMeta } from '@/shared/types/pagination';
 import { AgreementStatus, type Agreement } from './agreements';
@@ -35,7 +36,7 @@ export function VehicleUsePanel({ agreement, canManage }: { agreement: Agreement
         {(adding || replacement) && <VehicleUseEditor replacement={replacement ?? undefined} agreement={agreement} onSaved={reload} onCancel={() => { setAdding(false); setReplacement(null); }} />}
         {loading ? <p role="status">Loading vehicle use…</p> : rows.map(row => <article key={row.id} className="space-y-2 rounded-lg border p-4">
             <div className="flex flex-wrap items-center gap-2"><p className="font-medium">{row.vehicle.label}</p><StatusBadge status={row.status} /></div><p>{row.starts_at} — {row.ends_at ?? 'Open-ended'}</p>{row.replaces_use && <p>Replaces {row.replaces_use.vehicle_label}</p>}<p>{row.owner_agreement ? `Owner: ${row.owner_agreement.party_name} · ${row.owner_agreement.reference}` : 'Company supply'}</p>
-            {row.handed_over_at && <p>Actual handover: {row.handed_over_at} · Odometer: {row.handover_odometer ?? 'Not recorded'}</p>}{row.returned_at && <p>Actual return: {row.returned_at} · Odometer: {row.return_odometer ?? 'Not recorded'}</p>}
+            {row.handed_over_at && <p>Actual handover: {row.handed_over_at} · Odometer: {row.handover_odometer === null ? 'Not recorded' : <QuantityDisplay value={row.handover_odometer} />}</p>}{row.returned_at && <p>Actual return: {row.returned_at} · Odometer: {row.return_odometer === null ? 'Not recorded' : <QuantityDisplay value={row.return_odometer} />}</p>}
             <div className="flex flex-wrap gap-2"><Button type="button" variant="secondary" disabled={saving} aria-expanded={history === row.id} onClick={() => setHistory(history === row.id ? null : row.id)}>{history === row.id ? 'Hide vehicle-use history' : 'Vehicle-use history'}</Button>{canManage && !adding && !replacement && !action && row.status === VehicleUseStatus.Planned && <><Button onClick={() => choose(row, VehicleUseAction.Handover)}>Hand over vehicle</Button><Button variant="secondary" onClick={() => choose(row, VehicleUseAction.Cancel)}>Cancel plan</Button></>}{canManage && !adding && !replacement && !action && row.status === VehicleUseStatus.InCustody && <><Button onClick={() => choose(row, VehicleUseAction.Return)}>Record return</Button><Button variant="secondary" onClick={() => setReplacement(row)}>Replace vehicle</Button></>}</div>
             {hasPermission(auth, CHART_PERMISSION.view) && <Button type="button" variant="secondary" aria-expanded={charts === row.id} onClick={() => setCharts(charts === row.id ? null : row.id)}>{charts === row.id ? 'Hide Running Charts' : 'Running Charts'}</Button>}{charts === row.id && <RunningChartsPanel key={row.id} use={row} />}
             {history === row.id && <VehicleUseHistoryPanel key={row.id} id={row.id} />}
