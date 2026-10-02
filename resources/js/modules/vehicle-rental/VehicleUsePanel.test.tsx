@@ -13,7 +13,8 @@ beforeEach(() => { vi.clearAllMocks(); vi.mocked(listVehicleUses).mockResolvedVa
 describe('Rental vehicle use', () => {
     it('shows readable vehicle and source context with no writes for view-only access', async () => {
         render(<VehicleUsePanel agreement={agreement} canManage={false} />);
-        expect(await screen.findByText('CAR-1234 · Planned')).toBeInTheDocument();
+        expect(await screen.findByText('CAR-1234')).toBeInTheDocument();
+        expect(screen.getByText('Planned')).toBeInTheDocument();
         expect(screen.getByText('Company supply')).toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'Assign vehicle' })).not.toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'Hand over vehicle' })).not.toBeInTheDocument();
