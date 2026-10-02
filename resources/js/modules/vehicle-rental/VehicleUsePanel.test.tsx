@@ -36,6 +36,7 @@ describe('Rental vehicle use', () => {
         render(<VehicleUsePanel agreement={agreement} canManage />);
         expect(await screen.findByRole('button', { name: 'Record return' })).toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'Cancel plan' })).not.toBeInTheDocument();
+        expect(screen.getByText('With customer')).toBeInTheDocument();
         expect(screen.getByText(/Odometer: Not recorded/)).toBeInTheDocument();
     });
 });
@@ -47,4 +48,13 @@ it('requires the actual event time before a handover can be confirmed', async ()
     expect(screen.getByRole('button', { name: 'Confirm action' })).toBeDisabled();
     fireEvent.change(screen.getByLabelText('Actual event time'), { target: { value: '2026-09-07T09:00' } });
     expect(screen.getByRole('button', { name: 'Confirm action' })).toBeEnabled();
+});
+
+it('removes stale rows when a vehicle-use reload fails', async () => {
+    render(<VehicleUsePanel agreement={agreement} canManage={false} />);
+    expect(await screen.findByText('CAR-1234')).toBeInTheDocument();
+    vi.mocked(listVehicleUses).mockRejectedValue(new ApiError('Vehicle uses could not be loaded.', 500));
+    fireEvent.click(screen.getByRole('button', { name: 'Reload vehicles' }));
+    expect(await screen.findByText('Vehicle uses could not be loaded.')).toBeInTheDocument();
+    expect(screen.queryByText('CAR-1234')).not.toBeInTheDocument();
 });
