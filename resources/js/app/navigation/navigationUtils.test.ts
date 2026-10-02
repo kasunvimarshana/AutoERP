@@ -226,9 +226,11 @@ describe('navigation access and matching', () => {
             'GRN Payables',
             'Employee Commission',
             'Vehicle Service History',
+            'Service Sales Summary',
         ]);
         expect(findNavigationMatch('/reports/summary', '', tenantNavigationSections)?.item.id).toBe('summary-reports');
         expect(findNavigationMatch('/reports/expenses', '', tenantNavigationSections)?.item.id).toBe('expense-report');
+        expect(findNavigationMatch('/reports/vehicle-service/sales-summary', '', tenantNavigationSections)?.item.id).toBe('vehicle-service-sales-summary-report');
     });
 
     it('requires an Inventory permission before showing Inventory navigation', () => {
