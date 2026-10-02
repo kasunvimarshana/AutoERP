@@ -4,6 +4,7 @@ import { Input } from '@/shared/components/Input';
 import { Select } from '@/shared/components/Select';
 import { LookupSelect } from '@/shared/components/LookupSelect';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
+import { Textarea } from '@/shared/components/Textarea';
 import { requestLookup } from '@/shared/api/lookupRequest';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import type { NamedResource } from '@/shared/types/common';
@@ -71,8 +72,8 @@ export function RunningChartEditor({ use, chart, correction, onSaved, onCancel }
                 <Select label="Driver identity" options={driverSourceOptions} value={driverSource} onChange={e => { const source = e.target.value as DriverIdentitySource | ''; setDriverSource(source); if (source !== DriverIdentitySource.Employee) setDriverEmployee(null); }} error={error?.fields.driver_identity_source?.[0]} />
                 {driverSource === DriverIdentitySource.Employee && <LookupSelect label="Employee driver" value={driverEmployee} onChange={setDriverEmployee} search={employees} required error={error?.fields.driver_employee_id?.[0]} />}
                 {driverSource === DriverIdentitySource.External && <><Input label="External driver name" value={externalDriverName} onChange={e => setExternalDriverName(e.target.value)} required error={error?.fields.driver_name_snapshot?.[0]} /><Input label="External driver reference" value={externalDriverReference} onChange={e => setExternalDriverReference(e.target.value)} required error={error?.fields.driver_reference_snapshot?.[0]} hint="Use a stable business reference, not a temporary note." /></>}
-                <Input label="Driver observation (optional)" value={driverObservation} onChange={e => setDriverObservation(e.target.value)} error={error?.fields.driver_observation?.[0]} /><p>This is operational evidence only; employee pay remains owned by HR.</p>
-                <Input label="Notes" value={notes} onChange={e => setNotes(e.target.value)} error={error?.fields.notes?.[0]} />
+                <Textarea label="Driver observation (optional)" value={driverObservation} onChange={e => setDriverObservation(e.target.value)} error={error?.fields.driver_observation?.[0]} /><p>This is operational evidence only; employee pay remains owned by HR.</p>
+                <Textarea label="Notes" value={notes} onChange={e => setNotes(e.target.value)} error={error?.fields.notes?.[0]} />
             </div></details>
         </fieldset><div className="flex flex-wrap gap-2"><Button type="submit" loading={saving}>Save draft</Button><Button type="button" variant="secondary" disabled={saving} onClick={onCancel}>Cancel</Button></div>
     </form>;
