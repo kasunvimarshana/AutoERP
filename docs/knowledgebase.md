@@ -705,11 +705,15 @@ Principles:
 - operator-facing money and quantity values use shared presentation formatters; storage/calculation precision must not leak into the UI while exact backend values remain unchanged;
 - required operational evidence such as handover time or replacement reason disables the transition action until present instead of relying only on a server rejection;
 - register filters are explicitly resettable without mutating business data;
+- immutable Agreement, Vehicle Use and Running Chart history must present the business evidence already supplied by the backend using the same labels/formatters as current-state screens;
+- failed reloads must not leave stale rows visible as though they are current;
+- server validation remains authoritative, but actionable field errors are shown beside the exact operator input that must be corrected;
+- narrative business evidence such as notes, revisions, reversals, replacements and void reasons uses a multiline control rather than a narrow code/value input;
 - no unnecessary approval ceremony;
 - technical allocation/history data visible only where it helps the user understand or resolve a real business issue;
 - destructive-looking actions must reflect true domain lifecycle, not generic CRUD.
 
-The 2026-10-02 UI/UX finalization applies this contract without changing any commercial rule, calculation, relationship or module ownership. See [Vehicle Rental UI/UX finalization](changes/2026-10-02-vehicle-rental-ui-ux-finalization.md).
+The 2026-10-02 UI/UX finalization and its second end-to-end completion audit apply this contract without changing any commercial rule, calculation, relationship or module ownership. See [Vehicle Rental UI/UX finalization](changes/2026-10-02-vehicle-rental-ui-ux-finalization.md) and [Vehicle Rental end-to-end UI/UX audit completion](changes/2026-10-02-vehicle-rental-ui-ux-end-to-end-audit-completion.md).
 
 ---
 
@@ -812,7 +816,7 @@ The latest dependency-backed local verification supplied on 2026-10-02, immediat
 
 That backend run includes the Vehicle Rental agreement, successor/cutover, authenticated journey, base-rent, mileage, OT/night-out, deposit, Running Chart, driver, odometer, commercial-coverage, Vehicle Use and replacement test families.
 
-The 2026-10-02 UI/UX finalization is a frontend/navigation/test-only delta on top of that executed baseline. Focused regression tests were added for its interaction and presentation changes. In the audit environment, a post-change dependency-backed rerun could not be executed because no repository dependency tree is mounted and outbound DNS cannot resolve GitHub or the npm registry; GitHub Actions remain excluded by the free-tools-only instruction. Therefore the pre-change green run must not be described as a post-change execution result.
+The 2026-10-02 UI/UX finalization and the subsequent end-to-end UI/UX completion audit are frontend/shared-presentation/test/documentation deltas on top of that executed baseline. Focused regression tests were added for their interaction, immutable-history, stale-data, validation-feedback and presentation changes. In the audit environment, a post-change dependency-backed rerun could not be executed because no repository dependency tree is mounted and hosted GitHub Actions remain excluded by the free-tools-only instruction. Therefore the earlier green run must not be described as a post-change execution result.
 
 The exact Vehicle Rental runtime and migration lineage are unchanged from the earlier integrated cross-engine verification, which additionally recorded:
 
