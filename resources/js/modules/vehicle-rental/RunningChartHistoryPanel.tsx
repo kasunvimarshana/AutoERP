@@ -39,7 +39,7 @@ export function RunningChartHistoryPanel({ id }: { id: number }) {
                         <p>Driver identity: {row.facts.driver_identity_source === null || row.facts.driver_identity_source === undefined
                             ? 'Not recorded'
                             : row.facts.driver_identity_source === DriverIdentitySource.Employee
-                                ? 'Employee driver'
+                                ? `Employee driver · ${row.facts.driver_name_snapshot ?? 'Name not recorded'} · ${row.facts.driver_reference_snapshot ?? 'Reference not recorded'}`
                                 : `External driver · ${row.facts.driver_name_snapshot ?? 'Name not recorded'} · ${row.facts.driver_reference_snapshot ?? 'Reference not recorded'}`}</p>
                         <p>Driver observation: {row.facts.driver_observation ?? 'Not recorded'}</p>
                         <p>Notes: {row.facts.notes ?? 'Not recorded'}</p>
