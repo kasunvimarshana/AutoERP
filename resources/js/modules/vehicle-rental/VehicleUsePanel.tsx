@@ -47,7 +47,7 @@ export function VehicleUsePanel({ agreement, canManage }: { agreement: Agreement
             <p className="text-sm">{action.type === VehicleUseAction.Cancel ? 'Cancel the planned use and retain its history.' : `Record the actual event in ${operationalTimeZone}. An expected return alone never releases a vehicle.`}</p>
             <fieldset disabled={saving} className="space-y-3">{action.type !== VehicleUseAction.Cancel && <><Input label="Actual event time" type="datetime-local" step={OPERATIONAL_TIME_STEP_SECONDS} value={at} onChange={e => setAt(e.target.value)} required error={error?.fields.occurred_at?.[0]} /><Input label="Odometer (optional)" value={odometer} onChange={e => setOdometer(e.target.value)} inputMode="decimal" error={error?.fields.odometer?.[0]} /></>}
                 <Input label="Action reason" value={reason} onChange={e => setReason(e.target.value)} required error={error?.fields.reason?.[0]} />
-            </fieldset><Button type="submit" loading={saving} disabled={!reason.trim()}>Confirm action</Button> <Button variant="secondary" disabled={saving} onClick={() => setAction(null)}>Cancel</Button>
+            </fieldset><Button type="submit" loading={saving} disabled={!reason.trim() || (action.type !== VehicleUseAction.Cancel && !at)}>Confirm action</Button> <Button variant="secondary" disabled={saving} onClick={() => setAction(null)}>Cancel</Button>
         </form>}
     </section>;
 }
