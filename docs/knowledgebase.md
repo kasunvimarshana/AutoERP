@@ -2,7 +2,7 @@
 
 **Status:** Canonical Vehicle Rental business/domain and production-policy reference for AutoERP.
 
-**Knowledge refresh date:** 2026-10-01
+**Knowledge refresh date:** 2026-10-02
 
 **Primary business source / conflict tie-breaker:** TACGL legacy application/data corpus
 
@@ -14,7 +14,7 @@
 
 **Live authoritative branch head:** resolve from Git/release records; it is intentionally not embedded here because documentation-only release commits would otherwise make this document self-stale.
 
-**Latest current-head re-verification:** [`changes/2026-10-01-vehicle-rental-current-head-reverification.md`](changes/2026-10-01-vehicle-rental-current-head-reverification.md)
+**Latest current-head re-verification:** [`changes/2026-10-02-vehicle-rental-production-reverification.md`](changes/2026-10-02-vehicle-rental-production-reverification.md)
 
 **Architecture policy:** root `RULES.md` / `AGENTS.md`
 
@@ -746,24 +746,26 @@ These are implementation policies, not claims that TACGL universally proves them
 
 ---
 
-## 27. Current implementation reconciliation — 2026-10-01
+## 27. Current implementation reconciliation — 2026-10-02
 
 Executed Vehicle Rental runtime baseline: `9f492b5094039522c53b4e7509be296217b2d5b9`.
 
-Current authoritative branch at this re-verification start: `worktree-0.0.8` at `1035f4f4a7ad35a4ef633b155883fc8e31d72b57`.
+Current authoritative branch at this re-verification start: `worktree-0.0.8` at `7601749d35696556b3585a9737cd6bd4ec299c30`.
 
 Comparison result from the executed runtime baseline to that current head:
 
-- current branch is eight commits ahead of the executed runtime baseline;
+- current branch is 33 commits ahead of the executed runtime baseline;
 - no file under `app/Modules/VehicleRental` changed;
 - no file under `resources/js/modules/vehicle-rental` changed;
-- later runtime changes are confined to other owning modules and shared UI/reporting integration;
-- the only shared component change directly used by Rental that required targeted re-review was `LookupSelect`, which added an optional custom label formatter while preserving the existing `code - name` formatter as the default;
-- therefore this audit found no evidence-backed Vehicle Rental runtime, schema or frontend defect that justifies a production-code change.
+- no migration file changed after the executed Rental baseline;
+- later changes are confined to other owning modules, shared UI/reporting, tests and documentation;
+- therefore this audit found no evidence-backed Vehicle Rental runtime, schema, relationship or frontend defect that justifies a production-code change.
 
 The current Vehicle Rental implementation remains the clean fresh module with dedicated constants/data/database/enums/http/models/providers/routes/services/tests structure and continues to rely on owner modules for master and financial responsibilities.
 
-The implementation acceptance ledger at `docs/vehicle-rental/TODO.md` remains a closed acceptance ledger. It records completed coverage for agreements, successor revisions, vehicle source/use, Running Charts, base rent, mileage, OT/night-out, billing/settlement, deposits, financial handoff, permissions, relationships, UI and verification. It contains no remaining open product-policy TODO item.
+The implementation acceptance ledger at `docs/vehicle-rental/TODO.md` remains closed. It records completed coverage for agreements, successor revisions, vehicle source/use, Running Charts, base rent, mileage, OT/night-out, billing/settlement, deposits, financial handoff, permissions, relationships, UI and verification. It contains no remaining open product-policy TODO item.
+
+Fresh source reconciliation on 2026-10-02 again confirmed that both TACGL ZIPs contain the same 452 normalized business files with identical per-file hashes, and all four video hashes/durations match the registered audit corpus. The protected nested backup still contains 86 encrypted entries and no explicit recoverable credential was found through non-destructive source inspection; no brute-force or credential-reuse guessing is permitted.
 
 ### Relationship re-verification
 
@@ -778,13 +780,15 @@ The retained relationships remain directional and responsibility-owned:
 - corrected Running Chart → reversed predecessor chart;
 - Rental source charge → owner-module financial document through source allocation.
 
-The database enforces unique one-way replacement/correction/successor links, tenant/org-scoped identity where required, and frozen agreement/use revision references. No redundant inverse pointer, circular Rental dependency, duplicate mutable Invoice/Payment status or second Rental financial ledger was found.
+The database enforces unique one-way replacement/correction/successor links, tenant/org-scoped identity where required, frozen agreement/use revision references and restrictive history-preserving deletion behavior. No redundant inverse pointer, circular Rental dependency, duplicate mutable Invoice/Payment status or second Rental financial ledger was found.
 
 ### Audit conclusion
 
-This pass is a **current-head documentation reconciliation**, not a speculative code-change batch.
+This pass is a **current-head production re-verification**, not a speculative code-change batch.
 
 No legacy Rental code was restored or reused. No compatibility patch was introduced. No unproved business rule was converted into money. No runtime/schema relationship change is justified by the available evidence.
+
+Current authoritative external guidance was also rechecked only for ownership/integrity boundaries: IFRS 16 remains accounting guidance rather than an operational tariff source; Sri Lanka IRD VAT/WHT rules remain effective-dated Tax/Invoice/Payment concerns; and MySQL/InnoDB locking guidance remains consistent with the module's transactional lock discipline.
 
 ---
 
@@ -792,26 +796,32 @@ No legacy Rental code was restored or reused. No compatibility patch was introdu
 
 Only commands actually executed may be described as passed.
 
-The exact Vehicle Rental runtime retained by this re-verification is the previously executed integrated runtime baseline. Its recorded full-system gates are:
+The latest dependency-backed local verification supplied on 2026-10-02 records the current application gate as:
 
-- SQLite backend: 881 tests / 9,693 assertions passed;
-- MariaDB 10.11.7 / InnoDB backend: 881 tests / 9,693 assertions passed;
-- frontend Vitest: 101 files / 374 tests passed;
+- Laravel backend: **881 tests / 9,697 assertions passed**;
 - TypeScript typecheck passed;
-- Vite production build passed;
-- ESLint completed with zero errors and three inherited non-Rental warnings;
+- ESLint passed with no errors or warnings;
+- Vite production build passed with 693 modules transformed;
+- frontend Vitest: **101 / 101 test files passed**, **374 / 374 tests passed**.
+
+That backend run includes the current Vehicle Rental agreement, successor/cutover, authenticated journey, base-rent, mileage, OT/night-out, deposit, Running Chart, driver, odometer, commercial-coverage, Vehicle Use and replacement test families.
+
+The exact Vehicle Rental runtime and migration lineage are unchanged from the earlier integrated cross-engine verification, which additionally recorded:
+
+- SQLite backend verification passed;
+- MariaDB 10.11.7 / InnoDB backend verification passed;
 - SQLite and MariaDB clean install, baseline upgrade, rollback/reapply and fresh seeding passed;
 - 238-table fresh/upgrade/rollback schema metadata parity passed on both engines;
-- foreign-key/integrity checks and final source/conflict review passed.
+- foreign-key/integrity and final source/conflict review passed.
 
-The current continuation revalidated runtime ancestry, source evidence, critical services, schema relationships, permissions and the additive shared `LookupSelect` change. A fresh dependency-backed full suite is not claimed when the execution environment cannot obtain a repository clone; GitHub Actions are not used under the project's free-tools-only rule.
+No migration file changed after that executed Vehicle Rental baseline, so this continuation introduces no new schema behavior to qualify.
 
 Future runtime changes must verify, as applicable:
 
 - focused Vehicle Rental tests;
 - full Laravel suite;
-- MySQL/InnoDB suite;
-- migration upgrade/rollback behavior;
+- MySQL/InnoDB suite when database behavior changes;
+- migration upgrade/rollback behavior when schema changes;
 - TypeScript typecheck;
 - ESLint;
 - frontend tests;
@@ -821,7 +831,7 @@ Future runtime changes must verify, as applicable:
 - critical customer/owner financial handoff;
 - human browser smoke/UAT for agreement → vehicle → Running Chart → billing/settlement.
 
-Real production readiness additionally requires operational evidence such as deployment rehearsal, backup/restore, queues/scheduler, mail/storage/cache connectivity, TLS/secrets and user acceptance.
+Real production readiness additionally requires operational evidence such as deployment rehearsal, backup/restore, queues/scheduler, mail/storage/cache connectivity, TLS/secrets and user acceptance when those environment responsibilities are in scope.
 
 ---
 
