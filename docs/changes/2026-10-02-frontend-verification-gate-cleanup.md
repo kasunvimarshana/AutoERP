@@ -74,4 +74,16 @@ Static branch checks confirmed:
 - payment methods are memoized;
 - payment auto-defaults are deferred and cleanup-guarded.
 
-A fresh dependency-backed test rerun is not claimed here because the execution container cannot resolve `github.com` to obtain a repository checkout, and GitHub Actions are intentionally not used under the project's free-tools-only rule. The supplied local run remains the executed baseline that identified the exact frontend gate failures addressed by this change.
+## Post-fix local verification
+
+A fresh user-supplied local rerun after the fixes recorded the complete verification gate as green:
+
+- `php artisan test`: **881 passed / 9,697 assertions** in 98.95s;
+- `npm run typecheck -- --pretty false`: completed with no TypeScript errors;
+- `npm run lint`: completed with no ESLint errors or warnings;
+- `npm run build`: production build completed successfully, 693 modules transformed, in 9.22s;
+- `npm run test`: **101 / 101 test files passed** and **374 / 374 tests passed** in 29.89s.
+
+This supersedes the earlier execution limitation for this change. The frontend verification gate is now backed by an actual dependency-backed local rerun, not only static source review.
+
+GitHub Actions remain intentionally unused under the project's free-tools-only rule.
