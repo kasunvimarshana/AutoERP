@@ -7,6 +7,7 @@ import { StatusBadge } from '@/shared/components/StatusBadge';
 import { useApi } from '@/shared/hooks/useApi';
 import { humanize } from '@/shared/utils/object';
 import { vehicleUseHistory } from './vehicleUseApi';
+import { USE_LABELS } from './vehicleUse';
 
 export function VehicleUseHistoryPanel({ id }: { id: number }) {
     const [page, setPage] = useState(1);
@@ -21,7 +22,7 @@ export function VehicleUseHistoryPanel({ id }: { id: number }) {
                     <article key={row.version} className="space-y-2 rounded-lg border border-slate-200 p-3">
                         <div className="flex flex-wrap items-center gap-2">
                             <p className="font-medium">Revision {row.version} · {humanize(row.action)}</p>
-                            <StatusBadge status={row.status} />
+                            <StatusBadge status={row.status} label={USE_LABELS[row.status]} />
                         </div>
                         <p className="text-sm text-slate-600">{row.actor.name} · {row.recorded_at}</p>
                         <p>{row.vehicle_label} · {row.starts_at} — {row.ends_at ?? 'Open-ended'}</p>
