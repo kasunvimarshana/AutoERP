@@ -7,6 +7,8 @@ import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { Input } from '@/shared/components/Input';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
+import { LoadingState } from '@/shared/components/LoadingState';
+import { Textarea } from '@/shared/components/Textarea';
 import { Pagination } from '@/shared/components/Pagination';
 import { QuantityDisplay } from '@/shared/components/QuantityDisplay';
 import { StatusBadge } from '@/shared/components/StatusBadge';
@@ -22,7 +24,7 @@ export function VehicleUsePanel({ agreement, canManage }: { agreement: Agreement
     const [rows, setRows] = useState<VehicleUse[]>([]); const [page, setPage] = useState(1); const [meta, setMeta] = useState<PaginationMeta>(); const [revision, setRevision] = useState(0);
     const [error, setError] = useState<ApiError | null>(null); const [loading, setLoading] = useState(true); const [adding, setAdding] = useState(false);
     const [action, setAction] = useState<{ row: VehicleUse; type: VehicleUseAction } | null>(null); const [at, setAt] = useState(''); const [odometer, setOdometer] = useState(''); const [reason, setReason] = useState(''); const [saving, setSaving] = useState(false); const [history, setHistory] = useState<number | null>(null);
-    useEffect(() => { const c = new AbortController(); listVehicleUses(agreement.id, page, c.signal).then(r => { if (!c.signal.aborted) { setRows(r.data); setMeta(r.meta); setError(null); } }).catch(e => { if (!c.signal.aborted) setError(toApiError(e)); }).finally(() => { if (!c.signal.aborted) setLoading(false); }); return () => c.abort(); }, [agreement.id, page, revision]);
+    useEffect(() => { const c = new AbortController(); listVehicleUses(agreement.id, page, c.signal).then(r => { if (!c.signal.aborted) { setRows(r.data); setMeta(r.meta); setError(null); } }).catch(e => { if (!c.signal.aborted) { setRows([]); setMeta(undefined); setError(toApiError(e)); } }).finally(() => { if (!c.signal.aborted) setLoading(false); }); return () => c.abort(); }, [agreement.id, page, revision]);
     function reload() { setReplacement(null); setLoading(true); setAdding(false); setAction(null); setHistory(null); setRevision(v => v + 1); }
     function choose(row: VehicleUse, type: VehicleUseAction) { setAction({ row, type }); setAt(''); setOdometer(''); setReason(''); setError(null); }
     async function submit(event: FormEvent) {
@@ -34,19 +36,19 @@ export function VehicleUsePanel({ agreement, canManage }: { agreement: Agreement
         <div className="flex gap-2"><h3 className="grow text-lg font-semibold">Assigned vehicles</h3><Button variant="secondary" disabled={saving || adding || !!replacement} onClick={reload}>Reload vehicles</Button>{canManage && agreement.status === AgreementStatus.Active && <Button disabled={saving || adding || !!replacement || action !== null} onClick={() => setAdding(true)}>Assign vehicle</Button>}</div>
         <ErrorAlert error={error} inline />
         {(adding || replacement) && <VehicleUseEditor replacement={replacement ?? undefined} agreement={agreement} onSaved={reload} onCancel={() => { setAdding(false); setReplacement(null); }} />}
-        {loading ? <p role="status">Loading vehicle use…</p> : rows.map(row => <article key={row.id} className="space-y-2 rounded-lg border p-4">
+        {loading ? <LoadingState label="Loading assigned vehicles…" /> : error ? null : rows.map(row => <article key={row.id} className="space-y-2 rounded-lg border p-4">
             <div className="flex flex-wrap items-center gap-2"><p className="font-medium">{row.vehicle.label}</p><StatusBadge status={row.status} /></div><p>{row.starts_at} — {row.ends_at ?? 'Open-ended'}</p>{row.replaces_use && <p>Replaces {row.replaces_use.vehicle_label}</p>}<p>{row.owner_agreement ? `Owner: ${row.owner_agreement.party_name} · ${row.owner_agreement.reference}` : 'Company supply'}</p>
             {row.handed_over_at && <p>Actual handover: {row.handed_over_at} · Odometer: {row.handover_odometer === null ? 'Not recorded' : <QuantityDisplay value={row.handover_odometer} />}</p>}{row.returned_at && <p>Actual return: {row.returned_at} · Odometer: {row.return_odometer === null ? 'Not recorded' : <QuantityDisplay value={row.return_odometer} />}</p>}
             <div className="flex flex-wrap gap-2"><Button type="button" variant="secondary" disabled={saving} aria-expanded={history === row.id} onClick={() => setHistory(history === row.id ? null : row.id)}>{history === row.id ? 'Hide vehicle-use history' : 'Vehicle-use history'}</Button>{canManage && !adding && !replacement && !action && row.status === VehicleUseStatus.Planned && <><Button onClick={() => choose(row, VehicleUseAction.Handover)}>Hand over vehicle</Button><Button variant="secondary" onClick={() => choose(row, VehicleUseAction.Cancel)}>Cancel plan</Button></>}{canManage && !adding && !replacement && !action && row.status === VehicleUseStatus.InCustody && <><Button onClick={() => choose(row, VehicleUseAction.Return)}>Record return</Button><Button variant="secondary" onClick={() => setReplacement(row)}>Replace vehicle</Button></>}</div>
             {hasPermission(auth, CHART_PERMISSION.view) && <Button type="button" variant="secondary" aria-expanded={charts === row.id} onClick={() => setCharts(charts === row.id ? null : row.id)}>{charts === row.id ? 'Hide Running Charts' : 'Running Charts'}</Button>}{charts === row.id && <RunningChartsPanel key={row.id} use={row} />}
             {history === row.id && <VehicleUseHistoryPanel key={row.id} id={row.id} />}
         </article>)}
-        {!loading && rows.length === 0 && <p>No vehicles assigned.</p>}<Pagination meta={meta} onPageChange={value => { setPage(value); setAction(null); }} />
+        {!loading && !error && rows.length === 0 && <p className="text-sm text-slate-500">No vehicles assigned.</p>}<Pagination meta={meta} onPageChange={value => { setPage(value); setAction(null); }} />
         {action && <form onSubmit={submit} className="space-y-3 rounded-lg border p-4" aria-label={USE_ACTION_LABELS[action.type]}>
             <h3 className="font-semibold">{USE_ACTION_LABELS[action.type]} · {action.row.vehicle.label}</h3>
             <p className="text-sm">{action.type === VehicleUseAction.Cancel ? 'Cancel the planned use and retain its history.' : `Record the actual event in ${operationalTimeZone}. An expected return alone never releases a vehicle.`}</p>
             <fieldset disabled={saving} className="space-y-3">{action.type !== VehicleUseAction.Cancel && <><Input label="Actual event time" type="datetime-local" step={OPERATIONAL_TIME_STEP_SECONDS} value={at} onChange={e => setAt(e.target.value)} required error={error?.fields.occurred_at?.[0]} /><Input label="Odometer (optional)" value={odometer} onChange={e => setOdometer(e.target.value)} inputMode="decimal" error={error?.fields.odometer?.[0]} /></>}
-                <Input label="Action reason" value={reason} onChange={e => setReason(e.target.value)} required error={error?.fields.reason?.[0]} />
+                <Textarea label="Action reason" value={reason} onChange={e => setReason(e.target.value)} required error={error?.fields.reason?.[0]} />
             </fieldset><Button type="submit" loading={saving} disabled={!reason.trim() || (action.type !== VehicleUseAction.Cancel && !at)}>Confirm action</Button> <Button variant="secondary" disabled={saving} onClick={() => setAction(null)}>Cancel</Button>
         </form>}
     </section>;
