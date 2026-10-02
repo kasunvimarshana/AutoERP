@@ -67,17 +67,22 @@ describe('VehicleServicePaymentPreparePage', () => {
         const selects = screen.getAllByRole('combobox');
         await user.selectOptions(selects[0], '11');
         await user.selectOptions(selects[1], '3');
-        await user.click(screen.getByRole('button', { name: 'Receive, post and allocate' }));
+        await user.click(screen.getByRole('button', { name: 'Review payment' }));
+        await screen.findByText('Payment is ready to finalize');
+        await user.click(screen.getByRole('button', { name: 'Finalize payment' }));
 
         await waitFor(() => expect(apiMocks.createVehicleServicePayment).toHaveBeenCalledWith(9, expect.objectContaining({
             expected_version: 7,
             invoice_id: 11,
-            payment_method_id: 3,
-            amount: '100.000000',
+            lines: [{
+                amount: '100.000000',
+                payment_method_id: 3,
+                reference_number: undefined,
+            }],
         })));
         expect(await screen.findByText('Payment created and allocated successfully')).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Print bill' })).toBeInTheDocument();
-        expect(screen.queryByRole('button', { name: 'Receive, post and allocate' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Finalize payment' })).not.toBeInTheDocument();
     });
 
     it('uses transaction instrument details without exposing an internal Finance account', async () => {
@@ -106,10 +111,12 @@ describe('VehicleServicePaymentPreparePage', () => {
 
         await waitFor(() => expect(apiMocks.prepareVehicleServicePayment).toHaveBeenCalledWith(9, expect.objectContaining({
             expected_version: 7,
-            payment_method_id: 4,
-            reference_number: 'TRX-100',
-            instrument_number: 'TRX-100',
-            external_bank_name: 'Customer Bank',
+            lines: [expect.objectContaining({
+                payment_method_id: 4,
+                reference_number: 'TRX-100',
+                instrument_number: 'TRX-100',
+                external_bank_name: 'Customer Bank',
+            })],
         })));
         expect(await screen.findByText('Payment validation completed successfully')).toBeInTheDocument();
     });
@@ -122,7 +129,9 @@ describe('VehicleServicePaymentPreparePage', () => {
         const selects = screen.getAllByRole('combobox');
         await user.selectOptions(selects[0], '11');
         await user.selectOptions(selects[1], '3');
-        await user.click(screen.getByRole('button', { name: 'Receive, post and allocate' }));
+        await user.click(screen.getByRole('button', { name: 'Review payment' }));
+        await screen.findByText('Payment is ready to finalize');
+        await user.click(screen.getByRole('button', { name: 'Finalize payment' }));
 
         await screen.findByText('Payment created and allocated successfully');
         await user.click(screen.getByRole('button', { name: 'Print bill' }));

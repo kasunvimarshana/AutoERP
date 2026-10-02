@@ -51,6 +51,7 @@ use Modules\VehicleService\DTOs\VehicleServiceJobData;
 use Modules\VehicleService\DTOs\VehicleServiceJobDiscountData;
 use Modules\VehicleService\DTOs\VehicleServiceLineData;
 use Modules\VehicleService\DTOs\VehicleServicePaymentData;
+use Modules\VehicleService\DTOs\VehicleServicePaymentLineData;
 use Modules\VehicleService\Enums\VehicleServiceCommissionType;
 use Modules\VehicleService\Enums\VehicleServiceDiscountCalculationType;
 use Modules\VehicleService\Enums\VehicleServiceJobStatus;
@@ -796,8 +797,7 @@ final class VehicleServiceEngineTest extends TestCase
                 expectedVersion: $this->currentJobVersion($paymentJob),
                 invoiceId: (int) $invoice->getKey(),
                 paymentDate: '2026-06-07',
-                amount: '100.000000',
-                paymentMethodId: (int) $method->getKey(),
+                lines: [new VehicleServicePaymentLineData('100.000000', (int) $method->getKey())],
             ),
         );
         $this->assertSame(PaymentType::ServiceReceipt, $payment->paymentType);
@@ -1032,8 +1032,7 @@ final class VehicleServiceEngineTest extends TestCase
                 expectedVersion: $this->currentJobVersion($paymentJob),
                 invoiceId: (int) $invoice->getKey(),
                 paymentDate: '2026-06-07',
-                amount: '50.000000',
-                paymentMethodId: (int) $method->getKey(),
+                lines: [new VehicleServicePaymentLineData('50.000000', (int) $method->getKey())],
             ),
         );
 
@@ -1398,8 +1397,7 @@ final class VehicleServiceEngineTest extends TestCase
                 expectedVersion: $this->currentJobVersion($paymentJob),
                 invoiceId: (int) $invoice->getKey(),
                 paymentDate: '2026-06-07',
-                amount: '251.000000',
-                paymentMethodId: (int) $method->getKey(),
+                lines: [new VehicleServicePaymentLineData('251.000000', (int) $method->getKey())],
             ));
             $this->fail('Expected payment amount above the invoice balance to fail.');
         } catch (InvalidArgumentException $exception) {
@@ -1411,8 +1409,7 @@ final class VehicleServiceEngineTest extends TestCase
             expectedVersion: $this->currentJobVersion($paymentJob),
             invoiceId: (int) $invoice->getKey(),
             paymentDate: '2026-06-07',
-            amount: '100.000000',
-            paymentMethodId: (int) $method->getKey(),
+            lines: [new VehicleServicePaymentLineData('100.000000', (int) $method->getKey())],
         ));
         $this->assertSame(PaymentDocumentStatus::Approved, $first->document_status);
         $this->assertSame(PaymentPostingStatus::Posted, $first->posting_status);
@@ -1435,8 +1432,7 @@ final class VehicleServiceEngineTest extends TestCase
             expectedVersion: $this->currentJobVersion($paymentJob),
             invoiceId: (int) $invoice->getKey(),
             paymentDate: '2026-06-07',
-            amount: '150.000000',
-            paymentMethodId: (int) $method->getKey(),
+            lines: [new VehicleServicePaymentLineData('150.000000', (int) $method->getKey())],
         ));
         $this->assertSame(PaymentDocumentStatus::Approved, $second->document_status);
         $this->assertSame(PaymentPostingStatus::Posted, $second->posting_status);

@@ -20,6 +20,7 @@ use Modules\Invoice\Services\InvoiceSourceRestorationService;
 use Modules\Payment\DTOs\PaymentReversalData;
 use Modules\Payment\Services\PaymentReversalService;
 use Modules\VehicleService\DTOs\VehicleServicePaymentData;
+use Modules\VehicleService\DTOs\VehicleServicePaymentLineData;
 use Modules\VehicleService\Enums\VehicleServiceCommissionType;
 use Modules\VehicleService\Enums\VehicleServiceJobStatus;
 use Modules\VehicleService\Enums\VehicleServiceLineSourceType;
@@ -46,7 +47,7 @@ trait TestsVehicleServiceBillingReversal
         $this->paymentFinanceContext($context['tenant_id']);
         $receipt = $this->createServicePayment($job, new VehicleServicePaymentData(
             expectedVersion: $this->currentJobVersion($job), invoiceId: (int) $invoice->id,
-            paymentDate: now()->toDateString(), amount: $amount, paymentMethodId: (int) $this->paymentMethod($context)->id,
+            paymentDate: now()->toDateString(), lines: [new VehicleServicePaymentLineData($amount, (int) $this->paymentMethod($context)->id)],
         ));
         $this->assertSame($paidStatus, $this->refreshJob($job)->status);
         try {
