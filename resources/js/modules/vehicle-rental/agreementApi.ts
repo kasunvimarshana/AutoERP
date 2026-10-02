@@ -1,6 +1,6 @@
 import { apiClient } from '@/shared/api/apiClient';
 import type { ApiCollection, ApiResource } from '@/shared/types/api';
-import { AGREEMENT_API, PAGE_SIZE, AgreementKind, AgreementAction, type Agreement, type AgreementPayload, type AgreementSuccessorPayload } from './agreements';
+import { AGREEMENT_API, PAGE_SIZE, AgreementKind, AgreementAction, type Agreement, type AgreementHistory, type AgreementPayload, type AgreementSuccessorPayload } from './agreements';
 
 const url = (kind: AgreementKind) => `${AGREEMENT_API}/${kind}/agreements`;
 export const listAgreements = (kind: AgreementKind, page: number, signal?: AbortSignal) =>
@@ -11,3 +11,5 @@ export const createAgreementSuccessor = (kind: AgreementKind, record: Agreement,
     apiClient.post<ApiResource<Agreement>>(`${url(kind)}/${record.id}/successor`, { ...payload, expected_version: record.row_version }).then(r => r.data.data);
 export const transitionAgreement = (kind: AgreementKind, record: Agreement, action: AgreementAction, reason?: string) =>
     apiClient.post<ApiResource<Agreement>>(`${url(kind)}/${record.id}/${action}`, { expected_version: record.row_version, reason }).then(r => r.data.data);
+export const agreementHistory = (kind: AgreementKind, id: number, page: number, signal?: AbortSignal) =>
+    apiClient.get<ApiCollection<AgreementHistory>>(`${url(kind)}/${id}/history`, { params: { page, per_page: PAGE_SIZE }, signal }).then(r => r.data);
