@@ -115,7 +115,7 @@ export default function VehicleServicePaymentPreparePage() {
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
 
-    const paymentMethods = options.data?.methods ?? [];
+    const paymentMethods = useMemo(() => options.data?.methods ?? [], [options.data?.methods]);
     const eligibleInvoices = useMemo(
         () => (job.data?.invoice_links ?? []).filter((link) =>
             link.status === 'active'
@@ -124,23 +124,30 @@ export default function VehicleServicePaymentPreparePage() {
         ),
         [job.data?.invoice_links],
     );
+    const firstPaymentMethodId = rows[0]?.paymentMethodId ?? '';
     useEffect(() => {
-        if (!invoiceId && eligibleInvoices.length === 1) {
-            const [onlyInvoice] = eligibleInvoices;
-            setInvoiceId(String(onlyInvoice.invoice_id));
-            setRows((current) => current.map((row, index) => ({
-                ...row,
-                amount: index === 0 ? onlyInvoice.balance_due ?? onlyInvoice.invoice_total : ZERO_AMOUNT,
-            })));
-        }
+        const onlyInvoice = !invoiceId && eligibleInvoices.length === 1 ? eligibleInvoices[0] : null;
+        const onlyMethod = firstPaymentMethodId === '' && paymentMethods.length === 1 ? paymentMethods[0] : null;
+        if (!onlyInvoice && !onlyMethod) return;
 
-        if (paymentMethods.length === 1 && rows[0]?.paymentMethodId === '') {
-            const [onlyMethod] = paymentMethods;
-            setRows((current) => current.map((row, index) => index === 0
-                ? { ...row, paymentMethodId: String(onlyMethod.id) }
-                : row));
-        }
-    }, [eligibleInvoices, invoiceId, paymentMethods, rows]);
+        let cancelled = false;
+        queueMicrotask(() => {
+            if (cancelled) return;
+            if (onlyInvoice) {
+                setInvoiceId((current) => current || String(onlyInvoice.invoice_id));
+            }
+            setRows((current) => current.map((row, index) => {
+                if (index !== 0) return row;
+                return {
+                    ...row,
+                    ...(onlyInvoice ? { amount: onlyInvoice.balance_due ?? onlyInvoice.invoice_total } : {}),
+                    ...(onlyMethod && row.paymentMethodId === '' ? { paymentMethodId: String(onlyMethod.id) } : {}),
+                };
+            }));
+        });
+
+        return () => { cancelled = true; };
+    }, [eligibleInvoices, firstPaymentMethodId, invoiceId, paymentMethods]);
     const invoice = eligibleInvoices.find((link) => link.invoice_id === Number(invoiceId));
     const paymentTotal = sumDecimals(rows.map((row) => row.amount || ZERO_AMOUNT));
     const outstanding = invoice?.balance_due ?? ZERO_AMOUNT;

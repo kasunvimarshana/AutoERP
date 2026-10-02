@@ -29,8 +29,11 @@ export function EmployeePickerPanel({ lineLabel, selectedEmployeeIds, excludeIds
 
     useEffect(() => {
         const controller = new AbortController();
-        setLoading(true);
-        setError('');
+        queueMicrotask(() => {
+            if (controller.signal.aborted) return;
+            setLoading(true);
+            setError('');
+        });
         void lookupApi.availableNonSupervisorEmployees({
             search: debouncedSearch,
             page: 1,

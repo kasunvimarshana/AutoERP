@@ -1,17 +1,17 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { toApiError, type ApiError } from '@/shared/api/apiError';
+import { useMemo, useState, type FormEvent } from 'react';
 import { Button, LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { Panel } from '@/shared/components/Panel';
+import { useApi } from '@/shared/hooks/useApi';
 import { formatMoney } from '@/shared/utils/formatMoney';
 import { formatQuantity } from '@/shared/utils/formatQuantity';
 import { ItemLookupSelect } from '@/modules/item/components/ItemLookupSelect';
 import type { ItemSummary } from '@/modules/item/itemTypes';
 import { runVehicleServiceSalesSummaryReport } from '../reportingApi';
-import type { VehicleServiceSalesSummaryParams, VehicleServiceSalesSummaryResult, VehicleServiceSalesSummaryRow } from '../reportingTypes';
+import type { VehicleServiceSalesSummaryParams, VehicleServiceSalesSummaryRow } from '../reportingTypes';
 
 type DatePreset = 'today' | 'week' | 'month' | 'custom';
 
@@ -21,21 +21,11 @@ export default function VehicleServiceSalesSummaryReportPage() {
     const [preset, setPreset] = useState<DatePreset>('today');
     const [filters, setFilters] = useState<VehicleServiceSalesSummaryParams>(rangeFor('today'));
     const [draft, setDraft] = useState(filters);
-    const [result, setResult] = useState<VehicleServiceSalesSummaryResult | null>(null);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<ApiError | null>(null);
-
-    useEffect(() => {
-        const controller = new AbortController();
-        setLoading(true);
-        setError(null);
-        setResult(null);
-        void runVehicleServiceSalesSummaryReport({ ...filters, item_id: item?.id }, controller.signal)
-            .then((response) => { if (!controller.signal.aborted) setResult(response); })
-            .catch((requestError) => { if (!controller.signal.aborted) setError(toApiError(requestError)); })
-            .finally(() => { if (!controller.signal.aborted) setLoading(false); });
-        return () => controller.abort();
-    }, [filters, item]);
+    const report = useApi(
+        (signal) => runVehicleServiceSalesSummaryReport({ ...filters, item_id: item?.id }, signal),
+        [filters, item?.id],
+    );
+    const { data: result, loading, error } = report;
 
     const rankedBySales = useMemo(() => [...(result?.data ?? [])].sort((left, right) => Number(right.sales_amount) - Number(left.sales_amount)), [result]);
     const topSalesItem = rankedBySales[0] ?? null;
