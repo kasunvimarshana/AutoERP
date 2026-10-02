@@ -13,7 +13,7 @@ import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { compareDecimalStrings, isPositiveDecimal, sumDecimals } from '@/shared/utils/decimal';
 import { AgreementStatus, type Agreement } from './agreements';
-import { getDepositSummary, receiveDeposit, type DepositSummary } from './depositApi';
+import { getDepositSummary, receiveDeposit } from './depositApi';
 const DIRECTION = 'inbound';
 const FIRST_LINE = 1;
 const METHOD_PAGE_SIZE = 100;
