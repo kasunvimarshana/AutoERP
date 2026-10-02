@@ -55,7 +55,7 @@ it('shows server pricing and prevents billing an unknown component', async () =>
 });
 
 it('shows an explicit loading state without an incomplete agreement reference', () => {
-    vi.mocked(loadUsageCharges).mockReturnValue(new Promise(() => undefined));
+    vi.mocked(loadUsageCharges).mockReturnValue(new Promise<never>(() => undefined));
     render(<MemoryRouter><UsageChargeForm kind={AgreementKind.Customer} chart={chart} /></MemoryRouter>);
     expect(screen.getByText('Customer charges · CHART-A')).toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveTextContent('Loading customer charges…');
