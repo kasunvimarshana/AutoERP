@@ -72,11 +72,14 @@ export function VehicleServiceQuickVehicleModal({
         if (!open) return;
 
         const controller = new AbortController();
-        setLoadingVehicleDefaults(true);
-        setVehiclePayload(defaultVehiclePayload(initialVehicleNumber));
-        setMake(null);
-        setModel(null);
-        setType(null);
+        queueMicrotask(() => {
+            if (controller.signal.aborted) return;
+            setLoadingVehicleDefaults(true);
+            setVehiclePayload(defaultVehiclePayload(initialVehicleNumber));
+            setMake(null);
+            setModel(null);
+            setType(null);
+        });
         void loadVehicleCreationDefaults(controller.signal)
             .then(({ code }) => {
                 setVehiclePayload((current) => ({ ...current, code }));

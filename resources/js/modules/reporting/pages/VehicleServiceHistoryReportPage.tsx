@@ -1,8 +1,7 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import type { VehicleSummary } from '@/modules/vehicle/vehicleTypes';
 import { VehicleLookupSelect } from '@/modules/vehicle/components/VehicleLookupSelect';
-import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button, LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
@@ -10,6 +9,7 @@ import { Input } from '@/shared/components/Input';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { Pagination } from '@/shared/components/Pagination';
 import { Panel } from '@/shared/components/Panel';
+import { useApi } from '@/shared/hooks/useApi';
 import { Select } from '@/shared/components/Select';
 import { formatDate } from '@/shared/utils/formatDate';
 import { formatMoney } from '@/shared/utils/formatMoney';
@@ -36,20 +36,11 @@ export default function VehicleServiceHistoryReportPage() {
     const [vehicle, setVehicle] = useState<VehicleSummary | null>(null);
     const [filters, setFilters] = useState<VehicleServiceHistoryParams>({ page: 1, per_page: 10 });
     const [draft, setDraft] = useState(filters);
-    const [result, setResult] = useState<VehicleServiceHistoryResult | null>(null);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<ApiError | null>(null);
-
-    useEffect(() => {
-        const controller = new AbortController();
-        setLoading(true);
-        setError(null);
-        void runVehicleServiceHistoryReport({ ...filters, vehicle_id: vehicle?.id }, controller.signal)
-            .then((response) => { if (!controller.signal.aborted) setResult(response); })
-            .catch((requestError) => { if (!controller.signal.aborted) setError(toApiError(requestError)); })
-            .finally(() => { if (!controller.signal.aborted) setLoading(false); });
-        return () => controller.abort();
-    }, [filters, vehicle]);
+    const report = useApi(
+        (signal) => runVehicleServiceHistoryReport({ ...filters, vehicle_id: vehicle?.id }, signal),
+        [filters, vehicle?.id],
+    );
+    const { data: result, loading, error } = report;
 
     const apply = (event: FormEvent) => {
         event.preventDefault();
