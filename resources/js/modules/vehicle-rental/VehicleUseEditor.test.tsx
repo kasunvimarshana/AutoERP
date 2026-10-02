@@ -3,8 +3,8 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import { requestLookup } from '@/shared/api/lookupRequest';
 import { VehicleUseEditor } from './VehicleUseEditor';
 import { AGREEMENT_API, type Agreement } from './agreements';
-import { planVehicleUse } from './vehicleUseApi';
-import { timestampWithOffset } from './vehicleUse';
+import { planVehicleUse, replaceVehicleUse } from './vehicleUseApi';
+import { timestampWithOffset, VehicleUseStatus, type VehicleUse } from './vehicleUse';
 vi.mock('@/shared/api/lookupRequest', () => ({ requestLookup: vi.fn() }));
 vi.mock('./vehicleUseApi', () => ({ planVehicleUse: vi.fn(), replaceVehicleUse: vi.fn() }));
 const agreement = { id: 3, reference: 'CUSTOMER-A', row_version: 2 } as Agreement;
@@ -40,4 +40,41 @@ it('makes open-ended coverage explicit in the source request', async () => {
     fireEvent.change(screen.getByRole('combobox', { name: 'Owner agreement' }), { target: { value: 'OWNER' } });
     await screen.findByRole('option', { name: 'OWNER-A · Example Owner' });
     expect(requestLookup).toHaveBeenLastCalledWith(`${AGREEMENT_API}/vehicles/11/sources`, expect.any(Object), { starts_at: timestampWithOffset(start), ends_at: '' });
+});
+
+it('keeps company-owned assignment disabled until a planned handover is entered', async () => {
+    render(<VehicleUseEditor agreement={agreement} onSaved={vi.fn()} onCancel={vi.fn()} />);
+    fireEvent.change(screen.getByRole('combobox', { name: 'Vehicle' }), { target: { value: 'CAR' } });
+    fireEvent.click(await screen.findByRole('option', { name: 'CAR-123' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Company-owned vehicle' }));
+    expect(screen.getByRole('button', { name: 'Save assignment' })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('Planned handover'), { target: { value: '2026-09-07T09:00' } });
+    expect(screen.getByRole('button', { name: 'Save assignment' })).toBeEnabled();
+});
+
+it('requires a replacement reason before confirming an atomic replacement', async () => {
+    const replacement = {
+        id: 73,
+        row_version: 3,
+        status: VehicleUseStatus.InCustody,
+        customer_agreement: { id: 3, reference: 'CUSTOMER-A', party_name: 'Customer', version: 2 },
+        owner_agreement: null,
+        vehicle: { id: 6, label: 'CAR-OLD' },
+        starts_at: '2026-09-07T09:00:00+05:30',
+        ends_at: null,
+        handed_over_at: '2026-09-07T09:00:00+05:30',
+        returned_at: null,
+        handover_odometer: null,
+        return_odometer: null,
+        notes: null,
+    } as VehicleUse;
+    vi.mocked(replaceVehicleUse).mockResolvedValue({} as never);
+    render(<VehicleUseEditor agreement={agreement} replacement={replacement} onSaved={vi.fn()} onCancel={vi.fn()} />);
+    fireEvent.change(screen.getByRole('combobox', { name: 'Vehicle' }), { target: { value: 'CAR' } });
+    fireEvent.click(await screen.findByRole('option', { name: 'CAR-123' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Company-owned vehicle' }));
+    fireEvent.change(screen.getByLabelText('Replacement time'), { target: { value: '2026-09-08T09:00' } });
+    expect(screen.getByRole('button', { name: 'Confirm replacement' })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('Replacement reason'), { target: { value: 'Workshop replacement' } });
+    expect(screen.getByRole('button', { name: 'Confirm replacement' })).toBeEnabled();
 });
