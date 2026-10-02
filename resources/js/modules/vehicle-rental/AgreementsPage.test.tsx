@@ -92,5 +92,5 @@ it('formats financial terms and included distance for operator review', async ()
     render(<AgreementsPage kind={AgreementKind.Customer} />);
     fireEvent.click(await screen.findByRole('button', { name: 'Review LESSEE-AGREEMENT' }));
     expect(screen.getByText(formatMoney('3100.000000', 'LKR'))).toBeInTheDocument();
-    expect(screen.getByText(formatQuantity('100.000000') + ' km')).toBeInTheDocument();
+    expect(screen.getByText('Included distance (km)').parentElement).toHaveTextContent(formatQuantity('100.000000') + ' km');
 });
