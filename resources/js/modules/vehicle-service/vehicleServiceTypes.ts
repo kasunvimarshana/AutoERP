@@ -367,15 +367,17 @@ export interface VehicleServicePaymentPayload {
     expected_version: number;
     invoice_id: number;
     payment_date: string;
-    amount: string;
-    payment_method_id: number;
+    lines: Array<{
+        amount: string;
+        payment_method_id: number;
+        reference_number?: string;
+        external_bank_name?: string;
+        external_bank_branch?: string;
+        instrument_number?: string;
+        instrument_date?: string;
+    }>;
     currency_id?: number;
     exchange_rate?: string;
-    reference_number?: string;
-    external_bank_name?: string;
-    external_bank_branch?: string;
-    instrument_number?: string;
-    instrument_date?: string;
 }
 
 export interface VehicleServicePaymentCreated {

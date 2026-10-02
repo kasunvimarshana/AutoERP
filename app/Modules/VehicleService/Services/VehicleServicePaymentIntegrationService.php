@@ -21,6 +21,7 @@ use Modules\Payment\Services\PaymentCreationService;
 use Modules\Payment\Services\PaymentDocumentLifecycleService;
 use Modules\Payment\Services\PaymentPostingService;
 use Modules\VehicleService\DTOs\VehicleServicePaymentData;
+use Modules\VehicleService\DTOs\VehicleServicePaymentLineData;
 use Modules\VehicleService\Enums\VehicleServiceJobStatus;
 use Modules\VehicleService\Models\VehicleServiceJob;
 use Modules\VehicleService\Models\VehicleServicePaymentLink;
@@ -43,7 +44,15 @@ final class VehicleServicePaymentIntegrationService
     {
         $this->assertExpectedVersion($job, $data->expectedVersion);
         $billToCustomerId = $this->billToCustomerId($job);
-        if ($this->math->compare($data->amount, '0.000000') <= 0) {
+        if ($data->lines === []) {
+            throw new InvalidArgumentException('At least one payment method is required.');
+        }
+
+        $amount = $this->math->sum(array_map(
+            fn (VehicleServicePaymentLineData $line): string => $line->amount,
+            $data->lines,
+        ));
+        if ($this->math->compare($amount, '0.000000') <= 0) {
             throw new InvalidArgumentException('Payment amount must be greater than zero.');
         }
         if ($this->math->compare($data->exchangeRate, '0.000000') <= 0) {
@@ -76,7 +85,7 @@ final class VehicleServicePaymentIntegrationService
         if ($this->math->compare($balance->remainingAmount, '0.000000') <= 0) {
             throw new InvalidArgumentException('Payment invoice has no outstanding balance.');
         }
-        if ($this->math->compare($data->amount, $balance->remainingAmount) > 0) {
+        if ($this->math->compare($amount, $balance->remainingAmount) > 0) {
             throw new InvalidArgumentException('Payment amount cannot exceed invoice remaining balance.');
         }
 
@@ -92,26 +101,28 @@ final class VehicleServicePaymentIntegrationService
             sourceId: (int) $job->getKey(),
             currencyId: $data->currencyId ?? $balance->currencyId,
             exchangeRate: $data->exchangeRate,
-            referenceNumber: $data->referenceNumber,
             notes: 'Received from vehicle service job '.$job->job_number,
             createdBy: $data->createdBy,
-            lines: [new PaymentLineData(
-                amount: $data->amount,
-                paymentMethodId: $data->paymentMethodId,
-                referenceNumber: $data->referenceNumber,
-                instrumentDirection: 'received',
-                externalBankName: $data->externalBankName,
-                externalBankBranch: $data->externalBankBranch,
-                instrumentNumber: $data->instrumentNumber,
-                instrumentDate: $data->instrumentDate,
-                metadata: [
-                    'vehicle_service_job_id' => (int) $job->getKey(),
-                    'invoice_id' => $data->invoiceId,
-                ],
-            )],
+            lines: array_map(
+                fn (VehicleServicePaymentLineData $line): PaymentLineData => new PaymentLineData(
+                    amount: $line->amount,
+                    paymentMethodId: $line->paymentMethodId,
+                    referenceNumber: $line->referenceNumber,
+                    instrumentDirection: 'received',
+                    externalBankName: $line->externalBankName,
+                    externalBankBranch: $line->externalBankBranch,
+                    instrumentNumber: $line->instrumentNumber,
+                    instrumentDate: $line->instrumentDate,
+                    metadata: [
+                        'vehicle_service_job_id' => (int) $job->getKey(),
+                        'invoice_id' => $data->invoiceId,
+                    ],
+                ),
+                $data->lines,
+            ),
             allocations: [new PaymentAllocationData(
                 invoiceId: $data->invoiceId,
-                allocatedAmount: $data->amount,
+                allocatedAmount: $amount,
                 allocationDate: $data->paymentDate,
                 metadata: [
                     'vehicle_service_job_id' => (int) $job->getKey(),
