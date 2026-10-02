@@ -23,7 +23,7 @@ describe('Vehicle Use register', () => {
         expect(screen.getByText('Replaces vehicle CAR-OLD')).toBeInTheDocument();
         expect(vehicleUseHistory).not.toHaveBeenCalled();
         fireEvent.click(screen.getByRole('button', { name: 'Review CAR-1234' }));
-        expect(screen.getByText('Handover odometer: 0.000000')).toBeInTheDocument();
+        expect(screen.getByText('Handover odometer: 0')).toBeInTheDocument();
         expect(screen.getByText('Return odometer: Not recorded')).toBeInTheDocument();
         await waitFor(() => expect(vehicleUseHistory).toHaveBeenCalledWith(row.id, 1, expect.any(AbortSignal)));
     });
@@ -46,3 +46,14 @@ describe('Vehicle Use register', () => {
         expect(screen.queryByText('CAR-1234 · CUSTOMER-A')).not.toBeInTheDocument();
     });
 });
+
+    it('clears applied filters and reloads the unfiltered register', async () => {
+        render(<VehicleUseRegisterPage />); await screen.findByText('CAR-1234 · CUSTOMER-A');
+        vi.mocked(listVehicleUseRegister).mockResolvedValueOnce({ data: [] }).mockResolvedValueOnce({ data: [row] });
+        fireEvent.change(screen.getByLabelText('Vehicle, agreement or party'), { target: { value: 'CAR-OLD' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Apply filters' }));
+        await screen.findByText('No vehicle uses match these filters.');
+        fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
+        expect(await screen.findByText('CAR-1234 · CUSTOMER-A')).toBeInTheDocument();
+        expect(listVehicleUseRegister).toHaveBeenLastCalledWith({}, 1, expect.any(AbortSignal));
+    });

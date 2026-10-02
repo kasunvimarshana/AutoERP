@@ -13,7 +13,8 @@ beforeEach(() => { vi.clearAllMocks(); vi.mocked(listVehicleUses).mockResolvedVa
 describe('Rental vehicle use', () => {
     it('shows readable vehicle and source context with no writes for view-only access', async () => {
         render(<VehicleUsePanel agreement={agreement} canManage={false} />);
-        expect(await screen.findByText('CAR-1234 · Planned')).toBeInTheDocument();
+        expect(await screen.findByText('CAR-1234')).toBeInTheDocument();
+        expect(screen.getByText('Planned')).toBeInTheDocument();
         expect(screen.getByText('Company supply')).toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'Assign vehicle' })).not.toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'Hand over vehicle' })).not.toBeInTheDocument();
@@ -37,4 +38,13 @@ describe('Rental vehicle use', () => {
         expect(screen.queryByRole('button', { name: 'Cancel plan' })).not.toBeInTheDocument();
         expect(screen.getByText(/Odometer: Not recorded/)).toBeInTheDocument();
     });
+});
+
+it('requires the actual event time before a handover can be confirmed', async () => {
+    render(<VehicleUsePanel agreement={agreement} canManage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Hand over vehicle' }));
+    fireEvent.change(screen.getByLabelText('Action reason'), { target: { value: 'Vehicle collected' } });
+    expect(screen.getByRole('button', { name: 'Confirm action' })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('Actual event time'), { target: { value: '2026-09-07T09:00' } });
+    expect(screen.getByRole('button', { name: 'Confirm action' })).toBeEnabled();
 });

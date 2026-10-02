@@ -27,7 +27,7 @@ describe('Running Chart register', () => {
         expect(screen.getByText('Corrects chart CHART-ORIGINAL')).toBeInTheDocument();
         expect(screen.getByText('Replaces vehicle CAR-OLD')).toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: 'Review CHART-A' }));
-        expect(screen.getByText('0.000000')).toBeInTheDocument();
+        expect(screen.getByText('Garage distance (km)').parentElement).toHaveTextContent('0');
         expect(screen.getByText('Authoritative driver: Nimal Perera (employee) · DRV-027')).toBeInTheDocument();
         expect(screen.getByText('Driver observation: Signed chart received')).toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'Finalize usage' })).not.toBeInTheDocument();
@@ -49,3 +49,14 @@ describe('Running Chart register', () => {
         expect(screen.queryByText('CHART-A · CAR-1234')).not.toBeInTheDocument();
     });
 });
+
+    it('clears applied filters and reloads the unfiltered chart register', async () => {
+        render(<RunningChartRegisterPage />); await screen.findByText('CHART-A · CAR-1234');
+        vi.mocked(listChartRegister).mockResolvedValueOnce({ data: [] }).mockResolvedValueOnce({ data: [row] });
+        fireEvent.change(screen.getByLabelText('Chart status'), { target: { value: RunningChartStatus.Reversed } });
+        fireEvent.click(screen.getByRole('button', { name: 'Apply filters' }));
+        await screen.findByText('No Running Charts match these filters.');
+        fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
+        expect(await screen.findByText('CHART-A · CAR-1234')).toBeInTheDocument();
+        expect(listChartRegister).toHaveBeenLastCalledWith({}, 1, expect.any(AbortSignal));
+    });

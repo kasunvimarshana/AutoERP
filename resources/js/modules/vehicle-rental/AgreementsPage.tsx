@@ -16,10 +16,20 @@ import { Button } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
+import { MoneyDisplay } from '@/shared/components/MoneyDisplay';
 import { Pagination } from '@/shared/components/Pagination';
+import { QuantityDisplay } from '@/shared/components/QuantityDisplay';
+import { StatusBadge } from '@/shared/components/StatusBadge';
 import type { PaginationMeta } from '@/shared/types/pagination';
 import { AgreementEditor } from './AgreementEditor';
-import { AgreementAction, AgreementKind, AgreementStatus, DriverMode, RentalBasis, agreementPermissions, termLabel, visibleTermKeys, type Agreement } from './agreements';
+import { AgreementAction, AgreementKind, AgreementStatus, DriverMode, RentalBasis, agreementPermissions, termLabel, visibleTermKeys, type Agreement, type TermKey } from './agreements';
+
+function AgreementTermValue({ agreement, term }: { agreement: Agreement; term: TermKey }) {
+    const value = agreement.terms[term];
+    if (value === null) return <>Not specified</>;
+    if (term === 'included_km') return <><QuantityDisplay value={value} /> km</>;
+    return <MoneyDisplay value={value} currency={agreement.currency.code} />;
+}
 
 export default function AgreementsPage({ kind }: { kind: AgreementKind }) {
     const auth = useAuth();
@@ -66,24 +76,24 @@ export default function AgreementsPage({ kind }: { kind: AgreementKind }) {
         {editing !== null && <AgreementEditor key={editing === 'new' ? 'new' : editing.id} kind={kind} record={editing === 'new' ? undefined : editing} onSaved={reload} onCancel={() => setEditing(null)} />}
         {loading ? <p role="status">Loading agreements…</p> : <div className="mt-5 overflow-x-auto rounded-xl border border-slate-200 bg-white">
             <table className="w-full text-left text-sm"><caption className="sr-only">Rental agreements</caption><thead><tr>{['Reference', 'Party', 'Period', 'Basis', 'Status', 'Details'].map(label => <th className="p-3" key={label}>{label}</th>)}</tr></thead>
-                <tbody>{rows.map(row => <tr key={row.id} className="border-t border-slate-100"><td className="p-3">{row.reference}</td><td className="p-3">{row.party.name}</td><td className="p-3">{row.starts_on} – {row.ends_on ?? 'Open-ended'}</td><td className="p-3">{row.basis === RentalBasis.Daily ? 'Daily' : 'Monthly'}</td><td className="p-3 capitalize">{row.status}</td><td className="p-3"><Button variant="secondary" disabled={saving || editing !== null} onClick={() => { setSelected(row); setAction(null); setReason(''); setShowHistory(false); setShowVehicles(false); setShowDeposits(false); setShowSuccessor(false); }}>Review {row.reference}</Button></td></tr>)}</tbody>
+                <tbody>{rows.map(row => <tr key={row.id} className="border-t border-slate-100"><td className="p-3">{row.reference}</td><td className="p-3">{row.party.name}</td><td className="p-3">{row.starts_on} – {row.ends_on ?? 'Open-ended'}</td><td className="p-3">{row.basis === RentalBasis.Daily ? 'Daily' : 'Monthly'}</td><td className="p-3"><StatusBadge status={row.status} /></td><td className="p-3"><Button variant="secondary" disabled={saving || editing !== null} onClick={() => { setSelected(row); setAction(null); setReason(''); setShowHistory(false); setShowVehicles(false); setShowDeposits(false); setShowSuccessor(false); }}>Review {row.reference}</Button></td></tr>)}</tbody>
             </table>{rows.length === 0 && <p className="p-5 text-slate-500">No agreements have been recorded.</p>}
         </div>}
         <Pagination meta={meta} onPageChange={value => { setLoading(true); setPage(value); setSelected(null); }} />
         {selected && <section className="mt-5 space-y-4 rounded-xl border border-slate-200 bg-white p-5" aria-label="Agreement review">
-            <h2 className="text-xl font-semibold">{selected.reference} · {selected.party.name}</h2>
+            <div className="flex flex-wrap items-center gap-3"><h2 className="text-xl font-semibold">{selected.reference} · {selected.party.name}</h2><StatusBadge status={selected.status} /></div>
             <p>{selected.currency.code} · {selected.driver_mode === DriverMode.SelfDrive ? 'Self-drive' : 'With driver'}{selected.vehicle ? ` · ${selected.vehicle.registration_number ?? selected.vehicle.vehicle_number}` : ''}</p>
             <p>Agreement date: {selected.agreed_on} · Executing date: {selected.executing_on ?? 'Not recorded'}</p>
             {selected.supersedes_agreement && <p className="text-sm text-slate-600">Successor of {selected.supersedes_agreement.reference}</p>}
-            <dl className="grid gap-3 sm:grid-cols-2">{termKeys.map(key => <div key={key}><dt className="text-sm text-slate-500">{termLabel(kind, key)}</dt><dd>{selected.terms[key] ?? 'Not specified'}</dd></div>)}</dl>
+            <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{termKeys.map(key => <div key={key} className="rounded-lg bg-slate-50 p-3"><dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">{termLabel(kind, key)}</dt><dd className="mt-1 text-sm font-medium text-slate-900"><AgreementTermValue agreement={selected} term={key} /></dd></div>)}</dl>
             {selected.notes && <p>{selected.notes}</p>}
             <BaseRentPreviewPanel key={`${kind}-${selected.id}-${selected.row_version}`} kind={kind} agreement={selected} />
             {canBill && selected.status !== AgreementStatus.Draft && <BaseRentBillingPanel key={`billing-${kind}-${selected.id}-${selected.row_version}`} kind={kind} agreement={selected} />}
-            {kind === AgreementKind.Customer && hasPermission(auth, DEPOSIT_PERMISSION.view) && <Button variant="secondary" onClick={() => setShowDeposits(value => !value)}>{showDeposits ? 'Hide deposits' : 'View deposits'}</Button>}
+            {kind === AgreementKind.Customer && hasPermission(auth, DEPOSIT_PERMISSION.view) && <Button variant="secondary" aria-expanded={showDeposits} onClick={() => setShowDeposits(value => !value)}>{showDeposits ? 'Hide deposits' : 'View deposits'}</Button>}
             {kind === AgreementKind.Customer && hasPermission(auth, DEPOSIT_PERMISSION.view) && showDeposits && <DepositPanel key={selected.id} agreement={selected} canCreate={hasPermission(auth, DEPOSIT_PERMISSION.create)} />}
-            {kind === AgreementKind.Customer && canViewUse && <Button variant="secondary" onClick={() => setShowVehicles(value => !value)}>{showVehicles ? 'Hide vehicles' : 'View assigned vehicles'}</Button>}
+            {kind === AgreementKind.Customer && canViewUse && <Button variant="secondary" aria-expanded={showVehicles} onClick={() => setShowVehicles(value => !value)}>{showVehicles ? 'Hide vehicles' : 'View assigned vehicles'}</Button>}
             {kind === AgreementKind.Customer && canViewUse && showVehicles && <VehicleUsePanel key={selected.id} agreement={selected} canManage={canManageUse} />}
-            <Button variant="secondary" onClick={() => setShowHistory(value => !value)}>{showHistory ? 'Hide history' : 'View history'}</Button>
+            <Button variant="secondary" aria-expanded={showHistory} onClick={() => setShowHistory(value => !value)}>{showHistory ? 'Hide history' : 'View history'}</Button>
             {showHistory && <AgreementHistoryPanel key={selected.id} kind={kind} id={selected.id} />}
             {canManage && !action && !showSuccessor && <div className="flex gap-2">
                 {selected.status === AgreementStatus.Draft && <><Button variant="secondary" onClick={() => { setEditing(selected); setSelected(null); }}>Edit draft</Button><Button onClick={() => setAction(AgreementAction.Activate)}>Activate</Button></>}

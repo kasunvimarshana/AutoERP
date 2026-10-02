@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { ApiError } from '@/shared/api/apiError';
+import { formatMoney } from '@/shared/utils/formatMoney';
 import { MileageAssessmentPanel } from './MileageAssessmentPanel';
 import { AgreementKind } from './agreements';
 import { RunningChartStatus, type RunningChart } from './runningCharts';
@@ -12,7 +13,7 @@ const quote = { policy: MileagePolicy.CommercialCalendarCycles, timezone: 'Asia/
 beforeEach(() => { vi.clearAllMocks(); vi.mocked(quoteMileage).mockResolvedValue(quote); vi.mocked(assessMileage).mockResolvedValue({ assessment: { id: 1, row_version: 1 }, invoice: null }); });
 async function setup() {
     const saved = vi.fn(); render(<MemoryRouter><MileageAssessmentPanel kind={AgreementKind.Customer} chart={chart} onSaved={saved} /></MemoryRouter>);
-    await screen.findByText('LKR 0.000000');
+    await screen.findByText(formatMoney('0.000000', 'LKR'));
     fireEvent.change(screen.getByLabelText('Invoice date'), { target: { value: '2026-09-15' } });
     fireEvent.change(screen.getByLabelText('Exchange rate to base currency'), { target: { value: '1' } });
     return saved;

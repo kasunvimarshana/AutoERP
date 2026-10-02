@@ -50,4 +50,5 @@ it('shows receipt history without loading payment methods for a viewer', async (
     await waitFor(() => expect(getDepositSummary).toHaveBeenCalled());
     expect(screen.queryByRole('button', { name: 'Create deposit receipt' })).not.toBeInTheDocument();
     expect(listPaymentMethods).not.toHaveBeenCalled();
+    expect(await screen.findByText('No deposit receipts have been recorded.')).toBeInTheDocument();
 });

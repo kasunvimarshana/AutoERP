@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { ApiError } from '@/shared/api/apiError';
+import { formatMoney } from '@/shared/utils/formatMoney';
 import { BaseRentPreviewPanel } from './BaseRentPreviewPanel';
 import { BaseRentPolicy, previewBaseRent, type BaseRentPreview } from './baseRentPreviewApi';
 import { AgreementKind, AgreementStatus, DriverMode, RentalBasis, TERM_LABELS, type Agreement, type TermKey } from './agreements';
@@ -26,7 +27,9 @@ function setup(record = agreement) {
 }
 it('requests the selected period and agreement revision and shows the denominator', async () => {
     setup(); fireEvent.click(screen.getByRole('button', { name: 'Calculate base rent' }));
-    expect(await screen.findByText('Base rent: LKR 3100.000000')).toBeInTheDocument();
+    const estimate = await screen.findByRole('region', { name: 'Base rent estimate' });
+    expect(estimate).toHaveTextContent(formatMoney('3100.000000', 'LKR'));
+    expect(estimate).not.toHaveTextContent('3100.000000');
     expect(previewBaseRent).toHaveBeenCalledWith(AgreementKind.Customer, agreement, '2026-01-31', '2026-02-27', expect.any(AbortSignal));
     expect(screen.getByText('28 (2026-01-31 – 2026-02-27)')).toBeInTheDocument();
     expect(screen.getByText(/does not include mileage/)).toBeInTheDocument();
