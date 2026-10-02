@@ -56,7 +56,7 @@ export function DepositPanel({ agreement, canCreate }: { agreement: Agreement; c
         <h3 className="font-semibold">Security deposit · {agreement.currency.code}</h3>
         <p>Receive the agreed deposit, then open its payment to approve, post, apply to an invoice or refund. Draft receipts reserve collection capacity; they are not posted cash.</p>
         <ErrorAlert error={error ?? summaryRequest.error ?? methods.error} inline />
-        <Button variant="secondary" disabled={busy || summaryRequest.loading} onClick={summaryRequest.reload}>Refresh deposits</Button>
+        <Button variant="secondary" disabled={busy || summaryRequest.loading} onClick={() => { setError(null); summaryRequest.reload(); }}>Refresh deposits</Button>
         {summaryRequest.loading ? <LoadingState label="Loading deposit summary…" /> : summary && <>
             <p className="text-sm text-slate-700">Agreed: {summary.requirement === null ? 'Not specified' : <MoneyDisplay value={summary.requirement} currency={agreement.currency.code} />} · Net receipts including drafts: <MoneyDisplay value={summary.net_receipts} currency={agreement.currency.code} /> · Remaining collection capacity: {summary.remaining_to_receive === null ? 'Not specified' : <MoneyDisplay value={summary.remaining_to_receive} currency={agreement.currency.code} />}</p>
             {canCreate && agreement.status === AgreementStatus.Active && isPositiveDecimal(summary.remaining_to_receive ?? '0') && <fieldset disabled={busy} className="space-y-3">
