@@ -39,7 +39,9 @@ export default function RunningChartRegisterPage() {
         } catch (failure) { setError(toApiError(failure)); }
     }
     function clearFilters() {
-        setSearch(''); setStatus(''); setFrom(''); setUntil(''); setFilters({}); setPage(1); setSelected(null); setHistory(null); setError(null); setLoading(true);
+        const needsReload = page !== 1 || Object.values(filters).some(value => value !== undefined);
+        setSearch(''); setStatus(''); setFrom(''); setUntil(''); setSelected(null); setHistory(null); setError(null);
+        if (needsReload) { setLoading(true); setFilters({}); setPage(1); }
     }
     const statusOptions = Object.values(RunningChartStatus).map(value => ({ value, label: CHART_LABELS[value] }));
     return <main className="space-y-5 p-4">
