@@ -5,6 +5,7 @@ import { ContentHeader } from '@/shared/components/ContentHeader';
 import { Input } from '@/shared/components/Input';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { Pagination } from '@/shared/components/Pagination';
+import { QuantityDisplay } from '@/shared/components/QuantityDisplay';
 import { Panel } from '@/shared/components/Panel';
 import { Select } from '@/shared/components/Select';
 import { StatusBadge } from '@/shared/components/StatusBadge';
@@ -62,11 +63,14 @@ export default function RunningChartRegisterPage() {
                 <p>Customer: {row.customer_agreement.party_name} · {row.customer_agreement.reference}</p>
                 <p>{row.owner_agreement ? `Owner: ${row.owner_agreement.party_name} · ${row.owner_agreement.reference}` : 'Company supply'}</p>
                 <p>Driver: {row.driver ? `${row.driver.name} · ${row.driver.reference}` : 'Not recorded'}</p>
-                <p>{row.starts_at} — {row.ends_at}</p><p>Total distance: {row.total_km === null ? 'Not recorded' : `${row.total_km} km`}</p>
+                <p>{row.starts_at} — {row.ends_at}</p><p>Total distance: {row.total_km === null ? 'Not recorded' : <><QuantityDisplay value={row.total_km} /> km</>}</p>
                 {row.replaces_vehicle && <p>Replaces vehicle {row.replaces_vehicle}</p>}{row.corrects_chart && <p>Corrects chart {row.corrects_chart.reference}</p>}
                 <Button type="button" variant="secondary" aria-expanded={selected === row.id} onClick={() => setSelected(selected === row.id ? null : row.id)}>{selected === row.id ? 'Hide details' : 'Review ' + row.reference}</Button>
                 {selected === row.id && <div className="space-y-3 border-t pt-3">
-                    <dl className="grid gap-2 sm:grid-cols-2">{Object.entries({ ...DISTANCE_LABELS, ...COUNT_LABELS }).map(([key, label]) => <div key={key}><dt>{label}</dt><dd>{row[key as keyof typeof DISTANCE_LABELS | keyof typeof COUNT_LABELS] ?? 'Not recorded'}</dd></div>)}</dl>
+                    <dl className="grid gap-3 sm:grid-cols-2">
+                        {Object.entries(DISTANCE_LABELS).map(([key, label]) => <div key={key}><dt className="text-sm text-slate-500">{label}</dt><dd>{row[key as keyof typeof DISTANCE_LABELS] === null ? 'Not recorded' : <QuantityDisplay value={row[key as keyof typeof DISTANCE_LABELS] as string} />}</dd></div>)}
+                        {Object.entries(COUNT_LABELS).map(([key, label]) => <div key={key}><dt className="text-sm text-slate-500">{label}</dt><dd>{row[key as keyof typeof COUNT_LABELS] === null ? 'Not recorded' : <QuantityDisplay value={row[key as keyof typeof COUNT_LABELS] as number} precision={0} />}</dd></div>)}
+                    </dl>
                     <p>Air conditioning: {row.ac_mode === null ? 'Not recorded' : AC_LABELS[row.ac_mode]}</p>
                     <p>Authoritative driver: {row.driver ? `${row.driver.name} (${row.driver.source === 'employee' ? 'employee' : 'external'}) · ${row.driver.reference}` : 'Not recorded'}</p>
                     <p>Driver observation: {row.driver_observation ?? 'Not recorded'}</p><p>Notes: {row.notes ?? 'Not recorded'}</p>
