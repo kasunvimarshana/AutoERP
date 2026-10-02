@@ -21,8 +21,8 @@ export function MileageAssessmentPanel({ kind, chart, onSaved }: { kind: Agreeme
     async function submit(event: FormEvent) {
         event.preventDefault(); if (!quote || !accepted || inFlight.current) return;
         inFlight.current = true; setBusy(true); setError(null);
-        try { const result = await assessMileage(kind, chart, quote, { invoice_date: date, due_date: due || null, exchange_rate: exchange }); setRecorded(result); quoteRequest.setData(null); setAccepted(false); onSaved(); }
-        catch (failure) { setError(toApiError(failure)); quoteRequest.setData(null); setAccepted(false); }
+        try { const result = await assessMileage(kind, chart, quote, { invoice_date: date, due_date: due || null, exchange_rate: exchange }); setRecorded(result); quoteRequest.setData(() => null); setAccepted(false); onSaved(); }
+        catch (failure) { setError(toApiError(failure)); quoteRequest.setData(() => null); setAccepted(false); }
         finally { inFlight.current = false; setBusy(false); }
     }
     return <section aria-label="Mileage assessment" className="space-y-3">
