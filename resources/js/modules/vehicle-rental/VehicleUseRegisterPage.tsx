@@ -5,6 +5,7 @@ import { ContentHeader } from '@/shared/components/ContentHeader';
 import { Input } from '@/shared/components/Input';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { Pagination } from '@/shared/components/Pagination';
+import { QuantityDisplay } from '@/shared/components/QuantityDisplay';
 import { Panel } from '@/shared/components/Panel';
 import { Select } from '@/shared/components/Select';
 import { StatusBadge } from '@/shared/components/StatusBadge';
@@ -65,7 +66,7 @@ export default function VehicleUseRegisterPage() {
                 {row.replaces_use && <p>Replaces vehicle {row.replaces_use.vehicle_label}</p>}
                 <Button type="button" variant="secondary" aria-expanded={selected === row.id} onClick={() => setSelected(selected === row.id ? null : row.id)}>{selected === row.id ? 'Hide details' : 'Review ' + row.vehicle.label}</Button>
                 {selected === row.id && <div className="space-y-3 border-t pt-3">
-                    <p>Handover odometer: {row.handover_odometer ?? 'Not recorded'}</p><p>Return odometer: {row.return_odometer ?? 'Not recorded'}</p>
+                    <p>Handover odometer: {row.handover_odometer === null ? 'Not recorded' : <QuantityDisplay value={row.handover_odometer} />}</p><p>Return odometer: {row.return_odometer === null ? 'Not recorded' : <QuantityDisplay value={row.return_odometer} />}</p>
                     <p>Notes: {row.notes ?? 'Not recorded'}</p>
                     <VehicleUseHistoryPanel key={row.id} id={row.id} />
                 </div>}
