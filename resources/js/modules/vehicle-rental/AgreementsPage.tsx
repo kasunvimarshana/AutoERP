@@ -22,9 +22,9 @@ import { QuantityDisplay } from '@/shared/components/QuantityDisplay';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import type { PaginationMeta } from '@/shared/types/pagination';
 import { AgreementEditor } from './AgreementEditor';
-import { AgreementAction, AgreementKind, AgreementStatus, DriverMode, RentalBasis, agreementPermissions, termLabel, visibleTermKeys, type Agreement } from './agreements';
+import { AgreementAction, AgreementKind, AgreementStatus, DriverMode, RentalBasis, agreementPermissions, termLabel, visibleTermKeys, type Agreement, type TermKey } from './agreements';
 
-function AgreementTermValue({ agreement, term }: { agreement: Agreement; term: ReturnType<typeof visibleTermKeys>[number] }) {
+function AgreementTermValue({ agreement, term }: { agreement: Agreement; term: TermKey }) {
     const value = agreement.terms[term];
     if (value === null) return <>Not specified</>;
     if (term === 'included_km') return <><QuantityDisplay value={value} /> km</>;
