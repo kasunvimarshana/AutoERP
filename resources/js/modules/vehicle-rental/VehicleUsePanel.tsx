@@ -14,7 +14,7 @@ import { AgreementStatus, type Agreement } from './agreements';
 import { VehicleUseEditor } from './VehicleUseEditor';
 import { VehicleUseHistoryPanel } from './VehicleUseHistoryPanel';
 import { listVehicleUses, transitionVehicleUse } from './vehicleUseApi';
-import { operationalTimeZone, timestampWithOffset, VehicleUseStatus, VehicleUseAction, USE_LABELS, USE_ACTION_LABELS, type VehicleUse } from './vehicleUse';
+import { operationalTimeZone, OPERATIONAL_TIME_STEP_SECONDS, timestampWithOffset, VehicleUseStatus, VehicleUseAction, USE_ACTION_LABELS, type VehicleUse } from './vehicleUse';
 export function VehicleUsePanel({ agreement, canManage }: { agreement: Agreement; canManage: boolean }) {
     const auth = useAuth(); const [charts, setCharts] = useState<number | null>(null);
     const [replacement, setReplacement] = useState<VehicleUse | null>(null);
@@ -44,7 +44,7 @@ export function VehicleUsePanel({ agreement, canManage }: { agreement: Agreement
         {action && <form onSubmit={submit} className="space-y-3 rounded-lg border p-4" aria-label={USE_ACTION_LABELS[action.type]}>
             <h3 className="font-semibold">{USE_ACTION_LABELS[action.type]} · {action.row.vehicle.label}</h3>
             <p className="text-sm">{action.type === VehicleUseAction.Cancel ? 'Cancel the planned use and retain its history.' : `Record the actual event in ${operationalTimeZone}. An expected return alone never releases a vehicle.`}</p>
-            <fieldset disabled={saving} className="space-y-3">{action.type !== VehicleUseAction.Cancel && <><Input label="Actual event time" type="datetime-local" step={60} value={at} onChange={e => setAt(e.target.value)} required error={error?.fields.occurred_at?.[0]} /><Input label="Odometer (optional)" value={odometer} onChange={e => setOdometer(e.target.value)} inputMode="decimal" error={error?.fields.odometer?.[0]} /></>}
+            <fieldset disabled={saving} className="space-y-3">{action.type !== VehicleUseAction.Cancel && <><Input label="Actual event time" type="datetime-local" step={OPERATIONAL_TIME_STEP_SECONDS} value={at} onChange={e => setAt(e.target.value)} required error={error?.fields.occurred_at?.[0]} /><Input label="Odometer (optional)" value={odometer} onChange={e => setOdometer(e.target.value)} inputMode="decimal" error={error?.fields.odometer?.[0]} /></>}
                 <Input label="Action reason" value={reason} onChange={e => setReason(e.target.value)} required error={error?.fields.reason?.[0]} />
             </fieldset><Button type="submit" loading={saving} disabled={!reason.trim()}>Confirm action</Button> <Button variant="secondary" disabled={saving} onClick={() => setAction(null)}>Cancel</Button>
         </form>}
