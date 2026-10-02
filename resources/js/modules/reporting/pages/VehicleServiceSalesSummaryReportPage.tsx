@@ -11,7 +11,7 @@ import { formatQuantity } from '@/shared/utils/formatQuantity';
 import { ItemLookupSelect } from '@/modules/item/components/ItemLookupSelect';
 import type { ItemSummary } from '@/modules/item/itemTypes';
 import { runVehicleServiceSalesSummaryReport } from '../reportingApi';
-import type { VehicleServiceSalesSummaryParams, VehicleServiceSalesSummaryResult, VehicleServiceSalesSummaryRow } from '../reportingTypes';
+import type { VehicleServiceSalesSummaryParams, VehicleServiceSalesSummaryRow } from '../reportingTypes';
 
 type DatePreset = 'today' | 'week' | 'month' | 'custom';
 
