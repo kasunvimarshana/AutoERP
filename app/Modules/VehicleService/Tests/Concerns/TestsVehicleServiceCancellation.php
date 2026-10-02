@@ -26,6 +26,7 @@ use Modules\Payment\Enums\PaymentPostingStatus;
 use Modules\VehicleService\Constants\VehicleServiceFinanceSource;
 use Modules\VehicleService\Constants\VehicleServicePermission;
 use Modules\VehicleService\DTOs\VehicleServicePaymentData;
+use Modules\VehicleService\DTOs\VehicleServicePaymentLineData;
 use Modules\VehicleService\Enums\VehicleServiceCommissionType;
 use Modules\VehicleService\Enums\VehicleServiceJobStatus;
 use Modules\VehicleService\Enums\VehicleServiceLineSourceType;
@@ -235,7 +236,7 @@ trait TestsVehicleServiceCancellation
         $this->paymentFinanceContext($context['tenant_id']);
         $payment = $this->createServicePayment($job, new VehicleServicePaymentData(
             expectedVersion: $this->currentJobVersion($job), invoiceId: (int) $invoice->id,
-            paymentDate: '2026-06-07', amount: '50.000000', paymentMethodId: (int) $this->paymentMethod($context)->id,
+            paymentDate: '2026-06-07', lines: [new VehicleServicePaymentLineData('50.000000', (int) $this->paymentMethod($context)->id)],
         ));
         DB::table('invoices')->where('id', $invoice->id)->update(['status' => InvoiceStatus::Reversed->value]);
         // Isolate the payment guard from the independent terminal job-status guard.
