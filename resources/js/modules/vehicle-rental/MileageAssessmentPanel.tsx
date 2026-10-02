@@ -38,10 +38,10 @@ export function MileageAssessmentPanel({ kind, chart, onSaved }: { kind: Agreeme
                 <div><dt className="text-sm text-slate-500">Agreed rate per KM</dt><dd><MoneyDisplay value={quote.rate} currency={quote.currency} /></dd></div>
                 <div><dt className="text-sm text-slate-500">Amount before tax</dt><dd><MoneyDisplay value={quote.amount} currency={quote.currency} /></dd></div>
             </dl>
-            <Input label="Invoice date" type="date" required value={date} disabled={busy} onChange={e => setDate(e.target.value)} />
-            <Input label="Due date (optional)" type="date" min={date} value={due} disabled={busy} onChange={e => setDue(e.target.value)} />
-            <Input label="Exchange rate to base currency" required inputMode="decimal" value={exchange} disabled={busy} onChange={e => setExchange(e.target.value)} />
-            <p>Document inputs apply only when an amount is due. A zero assessment creates no invoice.</p>
+            <Input label="Invoice date" type="date" required value={date} disabled={busy} onChange={e => setDate(e.target.value)} error={error?.fields.invoice_date?.[0]} />
+            <Input label="Due date (optional)" type="date" min={date} value={due} disabled={busy} onChange={e => setDue(e.target.value)} error={error?.fields.due_date?.[0]} />
+            <Input label="Exchange rate to base currency" required inputMode="decimal" value={exchange} disabled={busy} onChange={e => setExchange(e.target.value)} error={error?.fields.exchange_rate?.[0]} />
+            <p>Document inputs are validated for every assessment. A zero assessment records allowance usage but creates no invoice.</p>
             <label className="flex gap-2"><input type="checkbox" checked={accepted} disabled={busy} onChange={e => setAccepted(e.target.checked)} />Apply this calendar-cycle policy and the displayed allowance allocation.</label>
             <Button type="submit" loading={busy} disabled={!accepted || !date || !exchange}>Record mileage assessment</Button>
         </form>}
