@@ -58,7 +58,7 @@ export default function VehicleUseRegisterPage() {
         {loading ? <LoadingState label="Loading vehicle use register…" /> : error ? null : <>
             {rows.length === 0 && <p>No vehicle uses match these filters.</p>}
             {rows.map(row => <article key={row.id} className="space-y-2 rounded-lg border p-4">
-                <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold">{row.vehicle.label} · {row.customer_agreement.reference}</h2><StatusBadge status={row.status} /></div>
+                <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold">{row.vehicle.label} · {row.customer_agreement.reference}</h2><StatusBadge status={row.status} label={USE_LABELS[row.status]} /></div>
                 <p>Customer: {row.customer_agreement.party_name}</p>
                 <p>{row.owner_agreement ? `Owner: ${row.owner_agreement.party_name} · ${row.owner_agreement.reference}` : 'Company supply'}</p>
                 <p>Planned: {row.starts_at} — {row.ends_at ?? 'Open-ended'}</p>

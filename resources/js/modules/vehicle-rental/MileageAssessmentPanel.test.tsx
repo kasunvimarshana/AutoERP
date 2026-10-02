@@ -32,3 +32,14 @@ it('clears stale pricing after a conflicting allowance change', async () => {
     fireEvent.click(screen.getByRole('button', { name: 'Reload mileage quote' }));
     await waitFor(() => expect(quoteMileage).toHaveBeenCalledTimes(2));
 });
+
+it('maps mileage document validation to its field and explains zero assessments accurately', async () => {
+    vi.mocked(assessMileage).mockRejectedValue(new ApiError('Please correct the highlighted fields.', 422, null, null, {
+        exchange_rate: ['Enter a positive exchange rate.'],
+    }));
+    await setup();
+    expect(screen.getByText(/Document inputs are validated for every assessment/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(screen.getByRole('button', { name: 'Record mileage assessment' }));
+    expect(await screen.findByText('Enter a positive exchange rate.')).toBeInTheDocument();
+});

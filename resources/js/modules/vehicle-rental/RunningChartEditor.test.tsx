@@ -25,4 +25,8 @@ it('uses integer controls for OT minutes and night-outs while keeping distance f
     expect(nightOuts).toHaveAttribute('step', '1');
     expect(odometer).toHaveAttribute('inputmode', 'decimal');
     expect(screen.getByRole('combobox', { name: 'Air conditioning' })).toHaveValue('');
+    const driverIdentity = screen.getByRole('combobox', { name: 'Driver identity' });
+    expect(driverIdentity).toHaveValue('');
+    expect(driverIdentity.querySelectorAll('option[value=""]')).toHaveLength(1);
+    expect(driverIdentity.querySelector('option[value=""]')).toHaveTextContent('Not recorded');
 });

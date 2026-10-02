@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { Button } from '@/shared/components/Button';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
+import { Textarea } from '@/shared/components/Textarea';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { createAgreementSuccessor } from './agreementApi';
 import { AgreementKind, type Agreement } from './agreements';
@@ -36,9 +37,9 @@ export function AgreementSuccessorForm({ kind, agreement, onSaved, onCancel }: {
             <Input label="Agreement date" type="date" value={agreedOn} onChange={event => setAgreedOn(event.target.value)} required error={error?.fields.agreed_on?.[0]} />
             <Input label="Executing date" type="date" value={executingOn} onChange={event => setExecutingOn(event.target.value)} error={error?.fields.executing_on?.[0]} />
             <Input label="Effective start date" type="date" value={startsOn} onChange={event => setStartsOn(event.target.value)} required error={error?.fields.starts_on?.[0]} />
-            <Input label="End date" type="date" value={endsOn} onChange={event => setEndsOn(event.target.value)} error={error?.fields.ends_on?.[0]} />
-            <Input label="Revision reason" value={reason} onChange={event => setReason(event.target.value)} required error={error?.fields.reason?.[0]} />
+            <Input label="End date" type="date" min={startsOn || undefined} value={endsOn} onChange={event => setEndsOn(event.target.value)} error={error?.fields.ends_on?.[0]} />
+            <div className="sm:col-span-2"><Textarea label="Revision reason" value={reason} onChange={event => setReason(event.target.value)} required error={error?.fields.reason?.[0]} /></div>
         </fieldset>
-        <div className="flex gap-2"><Button type="submit" loading={saving} disabled={!reference.trim() || !agreedOn || !startsOn || !reason.trim()}>Create successor draft</Button><Button type="button" variant="secondary" disabled={saving} onClick={onCancel}>Cancel</Button></div>
+        <div className="flex flex-wrap gap-2"><Button type="submit" loading={saving} disabled={!reference.trim() || !agreedOn || !startsOn || !reason.trim()}>Create successor draft</Button><Button type="button" variant="secondary" disabled={saving} onClick={onCancel}>Cancel</Button></div>
     </form>;
 }

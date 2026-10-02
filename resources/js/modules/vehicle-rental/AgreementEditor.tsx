@@ -9,6 +9,7 @@ import { Input } from '@/shared/components/Input';
 import { Select } from '@/shared/components/Select';
 import { LookupSelect } from '@/shared/components/LookupSelect';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
+import { Textarea } from '@/shared/components/Textarea';
 import type { NamedResource } from '@/shared/types/common';
 import type { LookupLoadParams } from '@/shared/types/lookup';
 import { AgreementKind, DriverMode, RentalBasis, termLabel, visibleTermKeys, type Agreement, type TermKey } from './agreements';
@@ -70,7 +71,7 @@ export function AgreementEditor({ kind, record, onSaved, onCancel }: { kind: Agr
                 {termKeys.map(key => <Input key={key} label={termLabel(kind, key)} inputMode="decimal" value={terms[key] ?? ''} onChange={e => setTerms({ ...terms, [key]: e.target.value || null })} error={fieldError(`terms.${key}`)} />)}
             </fieldset>
         </details>
-        <Input label="Notes" value={notes} onChange={e => setNotes(e.target.value)} disabled={saving} error={fieldError('notes')} />
-        <div className="flex gap-2"><Button type="submit" loading={saving} disabled={!party || !currency || (kind === AgreementKind.Owner && !vehicle)}>Save draft</Button><Button type="button" variant="secondary" disabled={saving} onClick={onCancel}>Cancel</Button></div>
+        <Textarea label="Notes" value={notes} onChange={e => setNotes(e.target.value)} disabled={saving} error={fieldError('notes')} />
+        <div className="flex flex-wrap gap-2"><Button type="submit" loading={saving} disabled={!reference.trim() || !party || !currency || !agreedOn || !startsOn || !basis || !driver || (kind === AgreementKind.Owner && !vehicle)}>Save draft</Button><Button type="button" variant="secondary" disabled={saving} onClick={onCancel}>Cancel</Button></div>
     </form>;
 }
