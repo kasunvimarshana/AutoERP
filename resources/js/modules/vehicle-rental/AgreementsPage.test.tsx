@@ -1,6 +1,8 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@/shared/api/apiError';
+import { formatMoney } from '@/shared/utils/formatMoney';
+import { formatQuantity } from '@/shared/utils/formatQuantity';
 import AgreementsPage from './AgreementsPage';
 import { AgreementKind, AgreementStatus, RentalBasis, DriverMode, TERM_LABELS, type Agreement, type TermKey } from './agreements';
 import { createAgreementSuccessor, listAgreements, transitionAgreement, saveAgreement } from './agreementApi';
@@ -78,4 +80,17 @@ describe('Rental agreement review', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Create successor draft' }));
         await waitFor(() => expect(createAgreementSuccessor).toHaveBeenCalledWith(AgreementKind.Customer, expect.objectContaining({ id: record.id }), expect.objectContaining({ reference: 'LESSEE-R2', starts_on: '2026-10-01', reason: 'Future rate revision' })));
     });
+});
+
+it('formats financial terms and included distance for operator review', async () => {
+    vi.mocked(listAgreements).mockResolvedValue({
+        data: [{
+            ...record,
+            terms: { ...record.terms, base_rate: '3100.000000', included_km: '100.000000' },
+        }],
+    });
+    render(<AgreementsPage kind={AgreementKind.Customer} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Review LESSEE-AGREEMENT' }));
+    expect(screen.getByText(formatMoney('3100.000000', 'LKR'))).toBeInTheDocument();
+    expect(screen.getByText('Included distance (km)').parentElement).toHaveTextContent(formatQuantity('100.000000') + ' km');
 });

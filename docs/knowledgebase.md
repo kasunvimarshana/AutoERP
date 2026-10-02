@@ -696,14 +696,20 @@ The business videos demonstrate a practical, task-oriented system. AutoERP shoul
 Principles:
 
 - speed and clarity over information overload;
-- agreement-first vehicle selection;
+- agreement-first workflow and navigation: Owner Agreements where external supply is needed, Customer Agreements, Vehicle Use, then Running Charts;
 - compact forms, not giant technical wizards;
 - Running Chart as a fast operational entry/review surface;
 - customer and owner financial panels clearly separated;
 - human-readable labels instead of raw IDs/codes;
+- shared status, loading, empty-state and disclosure patterns so operators can distinguish data state from financial state;
+- operator-facing money and quantity values use shared presentation formatters; storage/calculation precision must not leak into the UI while exact backend values remain unchanged;
+- required operational evidence such as handover time or replacement reason disables the transition action until present instead of relying only on a server rejection;
+- register filters are explicitly resettable without mutating business data;
 - no unnecessary approval ceremony;
 - technical allocation/history data visible only where it helps the user understand or resolve a real business issue;
 - destructive-looking actions must reflect true domain lifecycle, not generic CRUD.
+
+The 2026-10-02 UI/UX finalization applies this contract without changing any commercial rule, calculation, relationship or module ownership. See [Vehicle Rental UI/UX finalization](changes/2026-10-02-vehicle-rental-ui-ux-finalization.md).
 
 ---
 
@@ -796,15 +802,17 @@ Current authoritative external guidance was also rechecked only for ownership/in
 
 Only commands actually executed may be described as passed.
 
-The latest dependency-backed local verification supplied on 2026-10-02 records the current application gate as:
+The latest dependency-backed local verification supplied on 2026-10-02, immediately before the final Vehicle Rental UI/UX delta, recorded:
 
 - Laravel backend: **881 tests / 9,697 assertions passed**;
 - TypeScript typecheck passed;
 - ESLint passed with no errors or warnings;
-- Vite production build passed with 693 modules transformed;
+- Vite production build passed with 693 transformed modules;
 - frontend Vitest: **101 / 101 test files passed**, **374 / 374 tests passed**.
 
-That backend run includes the current Vehicle Rental agreement, successor/cutover, authenticated journey, base-rent, mileage, OT/night-out, deposit, Running Chart, driver, odometer, commercial-coverage, Vehicle Use and replacement test families.
+That backend run includes the Vehicle Rental agreement, successor/cutover, authenticated journey, base-rent, mileage, OT/night-out, deposit, Running Chart, driver, odometer, commercial-coverage, Vehicle Use and replacement test families.
+
+The 2026-10-02 UI/UX finalization is a frontend/navigation/test-only delta on top of that executed baseline. Focused regression tests were added for its interaction and presentation changes. In the audit environment, a post-change dependency-backed rerun could not be executed because no repository dependency tree is mounted and outbound DNS cannot resolve GitHub or the npm registry; GitHub Actions remain excluded by the free-tools-only instruction. Therefore the pre-change green run must not be described as a post-change execution result.
 
 The exact Vehicle Rental runtime and migration lineage are unchanged from the earlier integrated cross-engine verification, which additionally recorded:
 

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { listPaymentMethods } from '@/modules/payment/paymentApi';
 import { PaymentLineTable, type PaymentLineDraft } from '@/modules/payment/components/PaymentLineTable';
@@ -6,18 +6,19 @@ import { linePayload, lineIsValid } from '@/modules/payment/paymentLineInput';
 import { useApi } from '@/shared/hooks/useApi';
 import { Button } from '@/shared/components/Button';
 import { Input } from '@/shared/components/Input';
+import { LoadingState } from '@/shared/components/LoadingState';
+import { MoneyDisplay } from '@/shared/components/MoneyDisplay';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { compareDecimalStrings, isPositiveDecimal, sumDecimals } from '@/shared/utils/decimal';
 import { AgreementStatus, type Agreement } from './agreements';
-import { getDepositSummary, receiveDeposit, type DepositSummary } from './depositApi';
+import { getDepositSummary, receiveDeposit } from './depositApi';
 const DIRECTION = 'inbound';
 const FIRST_LINE = 1;
 const METHOD_PAGE_SIZE = 100;
 const emptyLine = (key: number): PaymentLineDraft => ({ key, paymentMethodId: '', amount: '', reference: '', metadata: {} });
 export function DepositPanel({ agreement, canCreate }: { agreement: Agreement; canCreate: boolean }) {
-    const [summary, setSummary] = useState<DepositSummary | null>(null);
     const [error, setError] = useState<ApiError | null>(null);
     const [revision, setRevision] = useState(0);
     const [busy, setBusy] = useState(false);
@@ -28,12 +29,8 @@ export function DepositPanel({ agreement, canCreate }: { agreement: Agreement; c
     const inFlight = useRef(false);
     const requests = useRef(new Map<string, string>());
     const methods = useApi(signal => listPaymentMethods({ direction: DIRECTION, per_page: METHOD_PAGE_SIZE }, signal), [], canCreate);
-    useEffect(() => {
-        const controller = new AbortController();
-        getDepositSummary(agreement.id, controller.signal).then(value => { if (!controller.signal.aborted) setSummary(value); })
-            .catch(failure => { if (!controller.signal.aborted) setError(toApiError(failure)); });
-        return () => controller.abort();
-    }, [agreement.id, revision]);
+    const summaryRequest = useApi(signal => getDepositSummary(agreement.id, signal), [agreement.id, revision]);
+    const summary = summaryRequest.data;
     const rows = methods.data?.data ?? [];
     const total = sumDecimals(lines.map(line => line.amount || '0'));
     const valid = summary !== null && summary.remaining_to_receive !== null && isPositiveDecimal(total) && isPositiveDecimal(rate)
@@ -58,13 +55,13 @@ export function DepositPanel({ agreement, canCreate }: { agreement: Agreement; c
     return <section className="space-y-3 border-t pt-4" aria-label="Security deposit">
         <h3 className="font-semibold">Security deposit · {agreement.currency.code}</h3>
         <p>Receive the agreed deposit, then open its payment to approve, post, apply to an invoice or refund. Draft receipts reserve collection capacity; they are not posted cash.</p>
-        <ErrorAlert error={error ?? methods.error} inline />
-        <Button variant="secondary" disabled={busy} onClick={() => setRevision(value => value + 1)}>Refresh deposits</Button>
-        {summary && <>
-            <p>Agreed: {summary.requirement ?? 'Not specified'} · Net receipts including drafts: {summary.net_receipts} · Remaining collection capacity: {summary.remaining_to_receive ?? 'Not specified'}</p>
+        <ErrorAlert error={error ?? summaryRequest.error ?? methods.error} inline />
+        <Button variant="secondary" disabled={busy || summaryRequest.loading} onClick={() => { setError(null); summaryRequest.reload(); }}>Refresh deposits</Button>
+        {summaryRequest.loading ? <LoadingState label="Loading deposit summary…" /> : summary && <>
+            <p className="text-sm text-slate-700">Agreed: {summary.requirement === null ? 'Not specified' : <MoneyDisplay value={summary.requirement} currency={agreement.currency.code} />} · Net receipts including drafts: <MoneyDisplay value={summary.net_receipts} currency={agreement.currency.code} /> · Remaining collection capacity: {summary.remaining_to_receive === null ? 'Not specified' : <MoneyDisplay value={summary.remaining_to_receive} currency={agreement.currency.code} />}</p>
             {canCreate && agreement.status === AgreementStatus.Active && isPositiveDecimal(summary.remaining_to_receive ?? '0') && <fieldset disabled={busy} className="space-y-3">
                 <Input label="Deposit receipt date" type="date" value={date} onChange={event => setDate(event.target.value)} required />
-                <Input label="Deposit exchange rate" value={rate} onChange={event => setRate(event.target.value)} required />
+                <Input label="Deposit exchange rate" inputMode="decimal" value={rate} onChange={event => setRate(event.target.value)} required />
                 <PaymentLineTable lines={lines} methods={rows} methodsLoading={methods.loading} total={total}
                     onLineChange={(key, patch) => setLines(current => current.map(line => line.key === key ? { ...line, ...patch } : line))}
                     onMetadataChange={(key, field, value) => setLines(current => current.map(line => line.key === key ? { ...line, metadata: { ...line.metadata, [field]: value } } : line))}
@@ -72,10 +69,10 @@ export function DepositPanel({ agreement, canCreate }: { agreement: Agreement; c
                     onRemoveLine={key => setLines(current => current.filter(line => line.key !== key))} />
                 <Button onClick={receive} disabled={!valid} loading={busy}>Create deposit receipt</Button>
             </fieldset>}
-            <ul>{summary.payments.map(payment => <li key={payment.id}>
+            {summary.payments.length === 0 ? <p className="text-sm text-slate-500">No deposit receipts have been recorded.</p> : <ul className="space-y-2">{summary.payments.map(payment => <li key={payment.id}>
                 <Link to={`/payments/${payment.id}`} className="text-blue-700 underline">{payment.payment_number}</Link>
-                {' · '}{payment.document_status} / {payment.posting_status} · Received {payment.total_amount} · Applied {payment.allocated_amount} · Refunded {payment.refunded_amount} · Unapplied {payment.unapplied_amount}
-            </li>)}</ul>
+                {' · '}{payment.document_status} / {payment.posting_status} · Received <MoneyDisplay value={payment.total_amount} currency={agreement.currency.code} /> · Applied <MoneyDisplay value={payment.allocated_amount} currency={agreement.currency.code} /> · Refunded <MoneyDisplay value={payment.refunded_amount} currency={agreement.currency.code} /> · Unapplied <MoneyDisplay value={payment.unapplied_amount} currency={agreement.currency.code} />
+            </li>)}</ul>}
         </>}
     </section>;
 }

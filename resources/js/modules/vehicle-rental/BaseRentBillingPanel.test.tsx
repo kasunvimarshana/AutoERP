@@ -43,7 +43,7 @@ it('surfaces conflicting billing without a success message', async () => {
     fireEvent.change(screen.getByLabelText('Charge through'), { target: { value: '2026-02-27' } });
     fireEvent.click(screen.getByRole('checkbox')); fireEvent.click(screen.getByRole('button', { name: 'Create invoice draft' }));
     expect(await screen.findByText('Period already charged.')).toBeInTheDocument();
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'INV-21' })).not.toBeInTheDocument();
 });
 it('reissues a released charge without sending replacement amounts or periods', async () => {
     vi.mocked(loadBaseCharges).mockResolvedValue({ data: [charge], current_page: 1, last_page: 1 });

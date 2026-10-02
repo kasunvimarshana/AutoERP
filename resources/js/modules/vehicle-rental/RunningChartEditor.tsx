@@ -19,6 +19,11 @@ const driverSourceOptions = [
     { value: DriverIdentitySource.Employee, label: 'Employee driver' },
     { value: DriverIdentitySource.External, label: 'External driver' },
 ];
+const acOptions = [
+    { value: AirConditioningMode.NonAc, label: 'Non-AC' },
+    { value: AirConditioningMode.Front, label: 'Front AC' },
+    { value: AirConditioningMode.Dual, label: 'Dual AC' },
+];
 
 export function RunningChartEditor({ use, chart, correction, onSaved, onCancel }: { use: VehicleUse; chart?: RunningChart; correction?: boolean; onSaved: () => void; onCancel: () => void }) {
     const [reference, setReference] = useState(correction ? '' : chart?.reference ?? '');
@@ -49,7 +54,8 @@ export function RunningChartEditor({ use, chart, correction, onSaved, onCancel }
             onSaved();
         } catch (failure) { setError(toApiError(failure)); } finally { setSaving(false); }
     }
-    const numeric = (key: string, label: string) => <Input key={key} label={label} value={values[key]} inputMode="decimal" onChange={e => setValues(v => ({ ...v, [key]: e.target.value }))} error={error?.fields[key]?.[0]} />;
+    const decimal = (key: string, label: string) => <Input key={key} label={label} value={values[key]} inputMode="decimal" onChange={e => setValues(v => ({ ...v, [key]: e.target.value }))} error={error?.fields[key]?.[0]} />;
+    const count = (key: string, label: string) => <Input key={key} label={label} type="number" min={0} step={1} inputMode="numeric" value={values[key]} onChange={e => setValues(v => ({ ...v, [key]: e.target.value }))} error={error?.fields[key]?.[0]} />;
     return <form aria-label="Running Chart" onSubmit={submit} className="space-y-3 rounded border p-4">
         <h4 className="font-semibold">{correction ? `Correct ${chart?.reference}` : chart ? 'Edit draft Running Chart' : 'Record Running Chart'}</h4>
         <p>Record actual usage in {operationalTimeZone}. Leave unknown observations blank; enter zero only when verified.</p><ErrorAlert error={error} inline />
@@ -57,17 +63,17 @@ export function RunningChartEditor({ use, chart, correction, onSaved, onCancel }
             <Input label="Chart reference" required value={reference} onChange={e => setReference(e.target.value)} error={error?.fields.reference?.[0]} />
             <Input label="Usage start" type="datetime-local" step={OPERATIONAL_TIME_STEP_SECONDS} required value={start} onChange={e => setStart(e.target.value)} error={error?.fields.starts_at?.[0]} />
             <Input label="Usage end" type="datetime-local" step={OPERATIONAL_TIME_STEP_SECONDS} required value={end} onChange={e => setEnd(e.target.value)} error={error?.fields.ends_at?.[0]} />
-            {numeric('start_odometer', DISTANCE_LABELS.start_odometer)}{numeric('end_odometer', DISTANCE_LABELS.end_odometer)}
-            <details><summary>Additional usage observations</summary><div className="space-y-3 pt-3">
-                {numeric('garage_km', DISTANCE_LABELS.garage_km)}{numeric('commercial_km', DISTANCE_LABELS.commercial_km)}
-                {Object.entries(COUNT_LABELS).map(([key, label]) => numeric(key, label))}
-                <label className="block">Air conditioning<select value={ac} onChange={e => setAc(e.target.value as AirConditioningMode | '')} className="block rounded border p-2"><option value="">Not recorded</option><option value={AirConditioningMode.NonAc}>Non-AC</option><option value={AirConditioningMode.Front}>Front AC</option><option value={AirConditioningMode.Dual}>Dual AC</option></select></label>
+            {decimal('start_odometer', DISTANCE_LABELS.start_odometer)}{decimal('end_odometer', DISTANCE_LABELS.end_odometer)}
+            <details><summary className="cursor-pointer font-medium">Additional usage observations</summary><div className="space-y-3 pt-3">
+                {decimal('garage_km', DISTANCE_LABELS.garage_km)}{decimal('commercial_km', DISTANCE_LABELS.commercial_km)}
+                {Object.entries(COUNT_LABELS).map(([key, label]) => count(key, label))}
+                <Select label="Air conditioning" placeholder="Not recorded" options={acOptions} value={ac} onChange={e => setAc(e.target.value as AirConditioningMode | '')} error={error?.fields.ac_mode?.[0]} />
                 <Select label="Driver identity" options={driverSourceOptions} value={driverSource} onChange={e => { const source = e.target.value as DriverIdentitySource | ''; setDriverSource(source); if (source !== DriverIdentitySource.Employee) setDriverEmployee(null); }} error={error?.fields.driver_identity_source?.[0]} />
                 {driverSource === DriverIdentitySource.Employee && <LookupSelect label="Employee driver" value={driverEmployee} onChange={setDriverEmployee} search={employees} required error={error?.fields.driver_employee_id?.[0]} />}
                 {driverSource === DriverIdentitySource.External && <><Input label="External driver name" value={externalDriverName} onChange={e => setExternalDriverName(e.target.value)} required error={error?.fields.driver_name_snapshot?.[0]} /><Input label="External driver reference" value={externalDriverReference} onChange={e => setExternalDriverReference(e.target.value)} required error={error?.fields.driver_reference_snapshot?.[0]} hint="Use a stable business reference, not a temporary note." /></>}
-                <Input label="Driver observation (optional)" value={driverObservation} onChange={e => setDriverObservation(e.target.value)} /><p>This is operational evidence only; employee pay remains owned by HR.</p>
-                <Input label="Notes" value={notes} onChange={e => setNotes(e.target.value)} />
+                <Input label="Driver observation (optional)" value={driverObservation} onChange={e => setDriverObservation(e.target.value)} error={error?.fields.driver_observation?.[0]} /><p>This is operational evidence only; employee pay remains owned by HR.</p>
+                <Input label="Notes" value={notes} onChange={e => setNotes(e.target.value)} error={error?.fields.notes?.[0]} />
             </div></details>
-        </fieldset><Button type="submit" loading={saving}>Save draft</Button> <Button type="button" variant="secondary" disabled={saving} onClick={onCancel}>Cancel</Button>
+        </fieldset><div className="flex flex-wrap gap-2"><Button type="submit" loading={saving}>Save draft</Button><Button type="button" variant="secondary" disabled={saving} onClick={onCancel}>Cancel</Button></div>
     </form>;
 }

@@ -1,9 +1,12 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useRef, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { InvoiceStatus } from '@/modules/invoice/invoiceTypes';
 import { Button } from '@/shared/components/Button';
 import { Input } from '@/shared/components/Input';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
+import { LoadingState } from '@/shared/components/LoadingState';
+import { MoneyDisplay } from '@/shared/components/MoneyDisplay';
+import { useApi } from '@/shared/hooks/useApi';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { AgreementKind, type Agreement } from './agreements';
 import { billBaseRent, loadBaseCharges, reissueBaseRent, voidBaseCharge, type BaseCharge, type CreatedRentalInvoice } from './baseRentBillingApi';
@@ -17,7 +20,6 @@ export function BaseRentBillingPanel({ kind, agreement }: { kind: AgreementKind;
     const [dueDate, setDueDate] = useState('');
     const [exchangeRate, setExchangeRate] = useState('');
     const [accepted, setAccepted] = useState(false);
-    const [charges, setCharges] = useState<BaseCharge[]>([]);
     const [selected, setSelected] = useState<BaseCharge | null>(null);
     const [action, setAction] = useState(ChargeAction.Reissue);
     const [reason, setReason] = useState('');
@@ -25,16 +27,11 @@ export function BaseRentBillingPanel({ kind, agreement }: { kind: AgreementKind;
     const [error, setError] = useState<ApiError | null>(null);
     const [busy, setBusy] = useState(false);
     const [page, setPage] = useState(1);
-    const [lastPage, setLastPage] = useState(1);
     const [revision, setRevision] = useState(0);
     const inFlight = useRef(false);
-    useEffect(() => {
-        const controller = new AbortController();
-        loadBaseCharges(kind, agreement, page, controller.signal).then(value => {
-            if (!controller.signal.aborted) { setCharges(value.data); setLastPage(value.last_page); }
-        }).catch(failure => { if (!controller.signal.aborted) setError(toApiError(failure)); });
-        return () => controller.abort();
-    }, [kind, agreement, page, revision]);
+    const chargeRequest = useApi(signal => loadBaseCharges(kind, agreement, page, signal), [kind, agreement.id, agreement.row_version, page, revision]);
+    const charges = chargeRequest.data?.data ?? [];
+    const lastPage = chargeRequest.data?.last_page ?? 1;
     async function submit(event: FormEvent) {
         event.preventDefault();
         if (inFlight.current || !accepted) return;
@@ -53,7 +50,7 @@ export function BaseRentBillingPanel({ kind, agreement }: { kind: AgreementKind;
     return <details className="rounded border p-3"><summary className="cursor-pointer font-medium">Bill base rent</summary>
         <p className="my-3 text-sm">Create a {kind === AgreementKind.Customer ? 'customer invoice' : 'supplier payable'} draft from the recorded base rate and actual-calendar policy. Monthly partial periods use actual anniversary-cycle days. This bills base rent only; mileage, extras and deductions are separate. Tax uses the configured Tax rules. Review, approve and post in Invoice.</p>
         <form onSubmit={submit} className="space-y-3">
-            {selected ? <p>{action === ChargeAction.Void ? 'Void original charge:' : 'Reissue original charge:'} {selected.from} – {selected.until} · {selected.currency} {selected.amount} <Button type="button" variant="secondary" disabled={busy} onClick={() => { setSelected(null); setAccepted(false); }}>Cancel selection</Button></p> : <>
+            {selected ? <p>{action === ChargeAction.Void ? 'Void original charge:' : 'Reissue original charge:'} {selected.from} – {selected.until} · <MoneyDisplay value={selected.amount} currency={selected.currency} /> <Button type="button" variant="secondary" disabled={busy} onClick={() => { setSelected(null); setAccepted(false); }}>Cancel selection</Button></p> : <>
                 <Input label="Charge from" type="date" required min={agreement.starts_on} value={from} disabled={busy} onChange={e => { setFrom(e.target.value); setAccepted(false); }} />
                 <Input label="Charge through" type="date" required min={from} max={agreement.ends_on ?? undefined} value={until} disabled={busy} onChange={e => { setUntil(e.target.value); setAccepted(false); }} />
             </>}
@@ -63,12 +60,12 @@ export function BaseRentBillingPanel({ kind, agreement }: { kind: AgreementKind;
             <Input label="Exchange rate to base currency" required inputMode="decimal" value={exchangeRate} disabled={busy} onChange={e => setExchangeRate(e.target.value)} />
             <p className="text-sm">Enter the verified accounting exchange rate; use one when both currencies are the same.</p></>}
             <label className="flex gap-2"><input type="checkbox" checked={accepted} disabled={busy} onChange={e => setAccepted(e.target.checked)} />{selected ? (action === ChargeAction.Void ? 'Void this charge after releasing its invoices; retain its calculation history.' : 'Reissue this unchanged base charge using the document details above.') : 'Apply the stated actual-calendar policy to this base charge.'}</label>
-            <ErrorAlert error={error} inline />
+            <ErrorAlert error={error ?? chargeRequest.error} inline />
             <Button type="submit" loading={busy} disabled={!accepted || (selected && action === ChargeAction.Void ? !reason.trim() : (!invoiceDate || !exchangeRate || (!selected && (!from || !until))))}>{selected && action === ChargeAction.Void ? 'Void charge' : 'Create invoice draft'}</Button>
         </form>
-        {created && <p role="status" className="mt-3">Created <Link className="underline" to={`/invoices/${created.id}`}>{created.invoice_number}</Link> · total {created.grand_total}</p>}
+        {created && <p role="status" className="mt-3">Created <Link className="underline" to={`/invoices/${created.id}`}>{created.invoice_number}</Link> · total <MoneyDisplay value={created.grand_total} currency={agreement.currency.code} /></p>}
         <section aria-label="Recorded base charges" className="mt-4"><h3 className="font-medium">Recorded base charges</h3>
-            {charges.map(charge => <div key={charge.id} className="my-2 border-t py-2"><p>{charge.from} – {charge.until} · {charge.currency} {charge.amount}</p>
+            {chargeRequest.loading ? <LoadingState label="Loading recorded base charges…" /> : charges.length === 0 ? <p className="mt-2 text-sm text-slate-500">No base-rent charges have been recorded.</p> : charges.map(charge => <div key={charge.id} className="my-2 border-t py-2"><p>{charge.from} – {charge.until} · <MoneyDisplay value={charge.amount} currency={charge.currency} /></p>
                 {charge.invoices.map(invoice => <p key={invoice.id}><Link className="underline" to={`/invoices/${invoice.id}`}>{invoice.number}</Link> · {invoice.status}</p>)}
                 {charge.voided_at && <p>Voided: {charge.void_reason}</p>}
                 {!charge.voided_at && charge.invoices.length > 0 && charge.invoices.every(invoice => RELEASED_INVOICE_STATES.has(invoice.status)) && <div className="flex gap-2"><Button type="button" variant="secondary" disabled={busy} onClick={() => { setSelected(charge); setAction(ChargeAction.Reissue); setAccepted(false); setCreated(null); }}>Reissue charge</Button><Button type="button" variant="secondary" disabled={busy} onClick={() => { setSelected(charge); setAction(ChargeAction.Void); setReason(''); setAccepted(false); setCreated(null); }}>Void charge</Button></div>}

@@ -9,9 +9,9 @@ export const rentalNavigationItem: NavigationModuleItem = {
     id: 'vehicle-rental', type: 'module', label: 'Vehicle Rental', icon: 'vehicle',
     access: access([agreementPermissions.customer.view, agreementPermissions.owner.view, CHART_PERMISSION.view, USE_PERMISSION.view]),
     children: [
+        { id: 'rental-owner-agreements', type: 'link', label: 'Owner Agreements', to: agreementPath(AgreementKind.Owner), access: access([agreementPermissions.owner.view]) },
+        { id: 'rental-customer-agreements', type: 'link', label: 'Customer Agreements', to: agreementPath(AgreementKind.Customer), access: access([agreementPermissions.customer.view]) },
         { id: 'rental-vehicle-uses', type: 'link', label: 'Vehicle Use Register', to: USE_REGISTER_PATH, access: access([USE_PERMISSION.view]) },
         { id: 'rental-running-charts', type: 'link', label: 'Running Chart Register', to: CHART_REGISTER_PATH, access: access([CHART_PERMISSION.view]) },
-        { id: 'rental-customer-agreements', type: 'link', label: 'Customer Agreements', to: agreementPath(AgreementKind.Customer), access: access([agreementPermissions.customer.view]) },
-        { id: 'rental-owner-agreements', type: 'link', label: 'Owner Agreements', to: agreementPath(AgreementKind.Owner), access: access([agreementPermissions.owner.view]) },
     ],
 };

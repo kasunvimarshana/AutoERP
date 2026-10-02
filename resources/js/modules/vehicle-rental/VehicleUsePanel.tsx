@@ -8,12 +8,14 @@ import { Button } from '@/shared/components/Button';
 import { Input } from '@/shared/components/Input';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Pagination } from '@/shared/components/Pagination';
+import { QuantityDisplay } from '@/shared/components/QuantityDisplay';
+import { StatusBadge } from '@/shared/components/StatusBadge';
 import type { PaginationMeta } from '@/shared/types/pagination';
 import { AgreementStatus, type Agreement } from './agreements';
 import { VehicleUseEditor } from './VehicleUseEditor';
 import { VehicleUseHistoryPanel } from './VehicleUseHistoryPanel';
 import { listVehicleUses, transitionVehicleUse } from './vehicleUseApi';
-import { operationalTimeZone, timestampWithOffset, VehicleUseStatus, VehicleUseAction, USE_LABELS, USE_ACTION_LABELS, type VehicleUse } from './vehicleUse';
+import { operationalTimeZone, OPERATIONAL_TIME_STEP_SECONDS, timestampWithOffset, VehicleUseStatus, VehicleUseAction, USE_ACTION_LABELS, type VehicleUse } from './vehicleUse';
 export function VehicleUsePanel({ agreement, canManage }: { agreement: Agreement; canManage: boolean }) {
     const auth = useAuth(); const [charts, setCharts] = useState<number | null>(null);
     const [replacement, setReplacement] = useState<VehicleUse | null>(null);
@@ -33,19 +35,19 @@ export function VehicleUsePanel({ agreement, canManage }: { agreement: Agreement
         <ErrorAlert error={error} inline />
         {(adding || replacement) && <VehicleUseEditor replacement={replacement ?? undefined} agreement={agreement} onSaved={reload} onCancel={() => { setAdding(false); setReplacement(null); }} />}
         {loading ? <p role="status">Loading vehicle use…</p> : rows.map(row => <article key={row.id} className="space-y-2 rounded-lg border p-4">
-            <p className="font-medium">{row.vehicle.label} · {USE_LABELS[row.status]}</p><p>{row.starts_at} — {row.ends_at ?? 'Open-ended'}</p>{row.replaces_use && <p>Replaces {row.replaces_use.vehicle_label}</p>}<p>{row.owner_agreement ? `Owner: ${row.owner_agreement.party_name} · ${row.owner_agreement.reference}` : 'Company supply'}</p>
-            {row.handed_over_at && <p>Actual handover: {row.handed_over_at} · Odometer: {row.handover_odometer ?? 'Not recorded'}</p>}{row.returned_at && <p>Actual return: {row.returned_at} · Odometer: {row.return_odometer ?? 'Not recorded'}</p>}
-            <div className="flex flex-wrap gap-2"><Button variant="secondary" disabled={saving} onClick={() => setHistory(history === row.id ? null : row.id)}>Vehicle-use history</Button>{canManage && !adding && !replacement && !action && row.status === VehicleUseStatus.Planned && <><Button onClick={() => choose(row, VehicleUseAction.Handover)}>Hand over vehicle</Button><Button variant="secondary" onClick={() => choose(row, VehicleUseAction.Cancel)}>Cancel plan</Button></>}{canManage && !adding && !replacement && !action && row.status === VehicleUseStatus.InCustody && <><Button onClick={() => choose(row, VehicleUseAction.Return)}>Record return</Button><Button variant="secondary" onClick={() => setReplacement(row)}>Replace vehicle</Button></>}</div>
-            {hasPermission(auth, CHART_PERMISSION.view) && <Button variant="secondary" onClick={() => setCharts(charts === row.id ? null : row.id)}>Running Charts</Button>}{charts === row.id && <RunningChartsPanel key={row.id} use={row} />}
+            <div className="flex flex-wrap items-center gap-2"><p className="font-medium">{row.vehicle.label}</p><StatusBadge status={row.status} /></div><p>{row.starts_at} — {row.ends_at ?? 'Open-ended'}</p>{row.replaces_use && <p>Replaces {row.replaces_use.vehicle_label}</p>}<p>{row.owner_agreement ? `Owner: ${row.owner_agreement.party_name} · ${row.owner_agreement.reference}` : 'Company supply'}</p>
+            {row.handed_over_at && <p>Actual handover: {row.handed_over_at} · Odometer: {row.handover_odometer === null ? 'Not recorded' : <QuantityDisplay value={row.handover_odometer} />}</p>}{row.returned_at && <p>Actual return: {row.returned_at} · Odometer: {row.return_odometer === null ? 'Not recorded' : <QuantityDisplay value={row.return_odometer} />}</p>}
+            <div className="flex flex-wrap gap-2"><Button type="button" variant="secondary" disabled={saving} aria-expanded={history === row.id} onClick={() => setHistory(history === row.id ? null : row.id)}>{history === row.id ? 'Hide vehicle-use history' : 'Vehicle-use history'}</Button>{canManage && !adding && !replacement && !action && row.status === VehicleUseStatus.Planned && <><Button onClick={() => choose(row, VehicleUseAction.Handover)}>Hand over vehicle</Button><Button variant="secondary" onClick={() => choose(row, VehicleUseAction.Cancel)}>Cancel plan</Button></>}{canManage && !adding && !replacement && !action && row.status === VehicleUseStatus.InCustody && <><Button onClick={() => choose(row, VehicleUseAction.Return)}>Record return</Button><Button variant="secondary" onClick={() => setReplacement(row)}>Replace vehicle</Button></>}</div>
+            {hasPermission(auth, CHART_PERMISSION.view) && <Button type="button" variant="secondary" aria-expanded={charts === row.id} onClick={() => setCharts(charts === row.id ? null : row.id)}>{charts === row.id ? 'Hide Running Charts' : 'Running Charts'}</Button>}{charts === row.id && <RunningChartsPanel key={row.id} use={row} />}
             {history === row.id && <VehicleUseHistoryPanel key={row.id} id={row.id} />}
         </article>)}
         {!loading && rows.length === 0 && <p>No vehicles assigned.</p>}<Pagination meta={meta} onPageChange={value => { setPage(value); setAction(null); }} />
         {action && <form onSubmit={submit} className="space-y-3 rounded-lg border p-4" aria-label={USE_ACTION_LABELS[action.type]}>
             <h3 className="font-semibold">{USE_ACTION_LABELS[action.type]} · {action.row.vehicle.label}</h3>
             <p className="text-sm">{action.type === VehicleUseAction.Cancel ? 'Cancel the planned use and retain its history.' : `Record the actual event in ${operationalTimeZone}. An expected return alone never releases a vehicle.`}</p>
-            <fieldset disabled={saving} className="space-y-3">{action.type !== VehicleUseAction.Cancel && <><Input label="Actual event time" type="datetime-local" value={at} onChange={e => setAt(e.target.value)} required error={error?.fields.occurred_at?.[0]} /><Input label="Odometer (optional)" value={odometer} onChange={e => setOdometer(e.target.value)} inputMode="decimal" error={error?.fields.odometer?.[0]} /></>}
+            <fieldset disabled={saving} className="space-y-3">{action.type !== VehicleUseAction.Cancel && <><Input label="Actual event time" type="datetime-local" step={OPERATIONAL_TIME_STEP_SECONDS} value={at} onChange={e => setAt(e.target.value)} required error={error?.fields.occurred_at?.[0]} /><Input label="Odometer (optional)" value={odometer} onChange={e => setOdometer(e.target.value)} inputMode="decimal" error={error?.fields.odometer?.[0]} /></>}
                 <Input label="Action reason" value={reason} onChange={e => setReason(e.target.value)} required error={error?.fields.reason?.[0]} />
-            </fieldset><Button type="submit" loading={saving} disabled={!reason.trim()}>Confirm action</Button> <Button variant="secondary" disabled={saving} onClick={() => setAction(null)}>Cancel</Button>
+            </fieldset><Button type="submit" loading={saving} disabled={!reason.trim() || (action.type !== VehicleUseAction.Cancel && !at)}>Confirm action</Button> <Button variant="secondary" disabled={saving} onClick={() => setAction(null)}>Cancel</Button>
         </form>}
     </section>;
 }
