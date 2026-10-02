@@ -9,7 +9,7 @@ import { StatusBadge } from '@/shared/components/StatusBadge';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import type { PaginationMeta } from '@/shared/types/pagination';
 import { VehicleUseStatus, type VehicleUse } from './vehicleUse';
-import { CHART_LABELS, CHART_PERMISSION, RunningChartAction, RunningChartStatus, type RunningChart } from './runningCharts';
+import { CHART_PERMISSION, RunningChartAction, RunningChartStatus, type RunningChart } from './runningCharts';
 import { listCharts, transitionChart } from './runningChartApi';
 import { UsageChargePanel } from './UsageChargePanel';
 import { RunningChartEditor } from './RunningChartEditor';
