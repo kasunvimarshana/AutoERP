@@ -3,6 +3,7 @@ import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
+import { MoneyDisplay } from '@/shared/components/MoneyDisplay';
 import { RentalBasis, type Agreement, type AgreementKind } from './agreements';
 import { previewBaseRent, type BaseRentPreview } from './baseRentPreviewApi';
 
@@ -36,12 +37,12 @@ export function BaseRentPreviewPanel({ kind, agreement }: { kind: AgreementKind;
             {agreement.terms.base_rate === null && <p>Record a base rental rate to calculate an estimate.</p>}
         </form>
         {result && <section aria-label="Base rent estimate" className="mt-4 overflow-x-auto">
-            <p className="font-semibold">Base rent: {result.currency} {result.base_rent}</p>
-            <p className="text-sm">{result.agreement.reference} · revision {result.agreement.version} · rate {result.rate}</p>
+            <p className="font-semibold">Base rent: <MoneyDisplay value={result.base_rent} currency={result.currency} /></p>
+            <p className="text-sm">{result.agreement.reference} · revision {result.agreement.version} · rate <MoneyDisplay value={result.rate} currency={result.currency} /></p>
             <table className="w-full text-left text-sm"><caption>Calculation by period</caption><thead><tr><th>Period</th><th>Days</th><th>Cycle days</th><th>Amount</th></tr></thead>
-                <tbody>{result.segments.map(segment => <tr key={segment.from}><td>{segment.from} – {segment.until}</td><td>{segment.days}</td><td>{segment.cycle_from ? `${segment.denominator_days} (${segment.cycle_from} – ${segment.cycle_until})` : 'Daily rate'}</td><td>{segment.amount}</td></tr>)}</tbody>
+                <tbody>{result.segments.map(segment => <tr key={segment.from}><td>{segment.from} – {segment.until}</td><td>{segment.days}</td><td>{segment.cycle_from ? `${segment.denominator_days} (${segment.cycle_from} – ${segment.cycle_until})` : 'Daily rate'}</td><td><MoneyDisplay value={segment.amount} currency={result.currency} /></td></tr>)}</tbody>
             </table>
-            <p className="text-xs text-slate-500">Six-decimal cumulative allocation keeps adjacent partial periods equal to their complete cycle.</p>
+            <p className="text-xs text-slate-500">Calculations retain full internal precision so adjacent partial periods reconcile to the complete cycle; displayed amounts use the standard money format.</p>
         </section>}
     </details>;
 }
