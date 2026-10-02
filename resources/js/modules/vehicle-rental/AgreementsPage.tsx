@@ -78,7 +78,7 @@ export default function AgreementsPage({ kind }: { kind: AgreementKind }) {
             <p>Agreement date: {selected.agreed_on} · Executing date: {selected.executing_on ?? 'Not recorded'}</p>
             {selected.supersedes_agreement && <p className="text-sm text-slate-600">Successor of {selected.supersedes_agreement.reference}</p>}
             <AgreementTermsGrid kind={kind} currency={selected.currency.code} terms={selected.terms} />
-            {selected.notes && <p>{selected.notes}</p>}
+            {selected.notes && <p><span className="font-medium">Notes:</span> {selected.notes}</p>}
             <BaseRentPreviewPanel key={`${kind}-${selected.id}-${selected.row_version}`} kind={kind} agreement={selected} />
             {canBill && selected.status !== AgreementStatus.Draft && <BaseRentBillingPanel key={`billing-${kind}-${selected.id}-${selected.row_version}`} kind={kind} agreement={selected} />}
             {kind === AgreementKind.Customer && hasPermission(auth, DEPOSIT_PERMISSION.view) && <Button variant="secondary" aria-expanded={showDeposits} onClick={() => setShowDeposits(value => !value)}>{showDeposits ? 'Hide deposits' : 'View deposits'}</Button>}
@@ -87,7 +87,7 @@ export default function AgreementsPage({ kind }: { kind: AgreementKind }) {
             {kind === AgreementKind.Customer && canViewUse && showVehicles && <VehicleUsePanel key={selected.id} agreement={selected} canManage={canManageUse} />}
             <Button variant="secondary" aria-expanded={showHistory} onClick={() => setShowHistory(value => !value)}>{showHistory ? 'Hide history' : 'View history'}</Button>
             {showHistory && <AgreementHistoryPanel key={selected.id} kind={kind} id={selected.id} />}
-            {canManage && !action && !showSuccessor && <div className="flex gap-2">
+            {canManage && !action && !showSuccessor && <div className="flex flex-wrap gap-2">
                 {selected.status === AgreementStatus.Draft && <><Button variant="secondary" onClick={() => { setEditing(selected); setSelected(null); }}>Edit draft</Button><Button onClick={() => setAction(AgreementAction.Activate)}>Activate</Button></>}
                 {selected.status === AgreementStatus.Active && <><Button variant="secondary" onClick={() => setShowSuccessor(true)}>Create successor</Button><Button variant="secondary" onClick={() => setAction(AgreementAction.Close)}>Close agreement</Button></>}
             </div>}
