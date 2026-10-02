@@ -84,3 +84,12 @@ it('maps billing validation errors back to document fields', async () => {
     expect(await screen.findByText('Choose a valid invoice date.')).toBeInTheDocument();
     expect(screen.getByText('Enter a positive exchange rate.')).toBeInTheDocument();
 });
+
+it('does not present a false empty charge history when the list request fails', async () => {
+    vi.mocked(loadBaseCharges).mockRejectedValue(new ApiError('Recorded charges could not be loaded.', 500));
+    render(<MemoryRouter><BaseRentBillingPanel kind={AgreementKind.Customer} agreement={agreement} /></MemoryRouter>);
+    fireEvent.click(screen.getByText('Bill base rent'));
+    expect(await screen.findByText('Recorded charges could not be loaded.')).toBeInTheDocument();
+    expect(screen.queryByText('No base-rent charges have been recorded.')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Create invoice draft' })).toBeDisabled();
+});
