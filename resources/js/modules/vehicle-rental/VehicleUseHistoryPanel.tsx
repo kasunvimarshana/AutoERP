@@ -1,12 +1,37 @@
-import { useEffect, useState } from 'react';
-import { toApiError, type ApiError } from '@/shared/api/apiError';
+import { useState } from 'react';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
+import { LoadingState } from '@/shared/components/LoadingState';
 import { Pagination } from '@/shared/components/Pagination';
-import type { PaginationMeta } from '@/shared/types/pagination';
+import { QuantityDisplay } from '@/shared/components/QuantityDisplay';
+import { StatusBadge } from '@/shared/components/StatusBadge';
+import { useApi } from '@/shared/hooks/useApi';
+import { humanize } from '@/shared/utils/object';
 import { vehicleUseHistory } from './vehicleUseApi';
-import type { VehicleUseHistory } from './vehicleUse';
+
 export function VehicleUseHistoryPanel({ id }: { id: number }) {
-    const [page, setPage] = useState(1); const [rows, setRows] = useState<VehicleUseHistory[]>([]); const [meta, setMeta] = useState<PaginationMeta>(); const [error, setError] = useState<ApiError | null>(null);
-    useEffect(() => { const c = new AbortController(); vehicleUseHistory(id, page, c.signal).then(r => { if (!c.signal.aborted) { setRows(r.data); setMeta(r.meta); setError(null); } }).catch(e => { if (!c.signal.aborted) setError(toApiError(e)); }); return () => c.abort(); }, [id, page]);
-    return <section aria-label="Vehicle-use history"><ErrorAlert error={error} inline />{rows.map(row => <article key={row.version} className="my-3 rounded border p-3"><p>{row.actor.name} · {row.action} · {row.recorded_at}</p><p>{row.vehicle_label} · {row.reason}</p><p>{row.starts_at} — {row.ends_at}</p>{row.handed_over_at && <p>Handed over: {row.handed_over_at} · Odometer: {row.handover_odometer ?? 'Not recorded'}</p>}{row.returned_at && <p>Returned: {row.returned_at} · Odometer: {row.return_odometer ?? 'Not recorded'}</p>}</article>)}<Pagination meta={meta} onPageChange={setPage} /></section>;
+    const [page, setPage] = useState(1);
+    const history = useApi(signal => vehicleUseHistory(id, page, signal), [id, page]);
+
+    return (
+        <section aria-label="Vehicle-use history" className="space-y-3">
+            <ErrorAlert error={history.error} inline />
+            {history.loading ? <LoadingState label="Loading vehicle-use history…" /> : history.data && <>
+                {history.data.data.length === 0 && <p className="text-sm text-slate-500">No vehicle-use history has been recorded.</p>}
+                {history.data.data.map((row) => (
+                    <article key={row.version} className="space-y-2 rounded-lg border border-slate-200 p-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <p className="font-medium">Revision {row.version} · {humanize(row.action)}</p>
+                            <StatusBadge status={row.status} />
+                        </div>
+                        <p className="text-sm text-slate-600">{row.actor.name} · {row.recorded_at}</p>
+                        <p>{row.vehicle_label} · {row.starts_at} — {row.ends_at ?? 'Open-ended'}</p>
+                        {row.reason && <p><span className="font-medium">Reason:</span> {row.reason}</p>}
+                        {row.handed_over_at && <p>Handed over: {row.handed_over_at} · Odometer: {row.handover_odometer === null ? 'Not recorded' : <QuantityDisplay value={row.handover_odometer} />}</p>}
+                        {row.returned_at && <p>Returned: {row.returned_at} · Odometer: {row.return_odometer === null ? 'Not recorded' : <QuantityDisplay value={row.return_odometer} />}</p>}
+                    </article>
+                ))}
+                <Pagination meta={history.data.meta} onPageChange={setPage} />
+            </>}
+        </section>
+    );
 }
