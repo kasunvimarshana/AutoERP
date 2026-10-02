@@ -15,21 +15,14 @@ import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
-import { Input } from '@/shared/components/Input';
-import { MoneyDisplay } from '@/shared/components/MoneyDisplay';
+import { LoadingState } from '@/shared/components/LoadingState';
 import { Pagination } from '@/shared/components/Pagination';
-import { QuantityDisplay } from '@/shared/components/QuantityDisplay';
 import { StatusBadge } from '@/shared/components/StatusBadge';
+import { Textarea } from '@/shared/components/Textarea';
 import type { PaginationMeta } from '@/shared/types/pagination';
 import { AgreementEditor } from './AgreementEditor';
-import { AgreementAction, AgreementKind, AgreementStatus, DriverMode, RentalBasis, agreementPermissions, termLabel, visibleTermKeys, type Agreement, type TermKey } from './agreements';
-
-function AgreementTermValue({ agreement, term }: { agreement: Agreement; term: TermKey }) {
-    const value = agreement.terms[term];
-    if (value === null) return <>Not specified</>;
-    if (term === 'included_km') return <><QuantityDisplay value={value} /> km</>;
-    return <MoneyDisplay value={value} currency={agreement.currency.code} />;
-}
+import { AgreementTermsGrid } from './AgreementTermsGrid';
+import { AgreementAction, AgreementKind, AgreementStatus, DriverMode, RentalBasis, agreementPermissions, type Agreement } from './agreements';
 
 export default function AgreementsPage({ kind }: { kind: AgreementKind }) {
     const auth = useAuth();
@@ -52,12 +45,11 @@ export default function AgreementsPage({ kind }: { kind: AgreementKind }) {
     const [showDeposits, setShowDeposits] = useState(false);
     const [showHistory, setShowHistory] = useState(false);
     const [showSuccessor, setShowSuccessor] = useState(false);
-    const termKeys = visibleTermKeys(kind);
     useEffect(() => {
         const controller = new AbortController();
         listAgreements(kind, page, controller.signal).then(result => {
             if (!controller.signal.aborted) { setRows(result.data); setMeta(result.meta); setError(null); }
-        }).catch(failure => { if (!controller.signal.aborted) setError(toApiError(failure)); })
+        }).catch(failure => { if (!controller.signal.aborted) { setRows([]); setMeta(undefined); setError(toApiError(failure)); } })
             .finally(() => { if (!controller.signal.aborted) setLoading(false); });
         return () => controller.abort();
     }, [kind, page, revision]);
@@ -74,7 +66,7 @@ export default function AgreementsPage({ kind }: { kind: AgreementKind }) {
             actions={<><Button variant="secondary" onClick={reload} disabled={saving || editing !== null}>Reload</Button>{canManage && <Button onClick={() => { setEditing('new'); setSelected(null); }} disabled={saving || editing !== null}>New agreement</Button>}</>} />
         <ErrorAlert error={error} inline />
         {editing !== null && <AgreementEditor key={editing === 'new' ? 'new' : editing.id} kind={kind} record={editing === 'new' ? undefined : editing} onSaved={reload} onCancel={() => setEditing(null)} />}
-        {loading ? <p role="status">Loading agreements…</p> : <div className="mt-5 overflow-x-auto rounded-xl border border-slate-200 bg-white">
+        {loading ? <LoadingState label="Loading agreements…" /> : error ? null : <div className="mt-5 overflow-x-auto rounded-xl border border-slate-200 bg-white">
             <table className="w-full text-left text-sm"><caption className="sr-only">Rental agreements</caption><thead><tr>{['Reference', 'Party', 'Period', 'Basis', 'Status', 'Details'].map(label => <th className="p-3" key={label}>{label}</th>)}</tr></thead>
                 <tbody>{rows.map(row => <tr key={row.id} className="border-t border-slate-100"><td className="p-3">{row.reference}</td><td className="p-3">{row.party.name}</td><td className="p-3">{row.starts_on} – {row.ends_on ?? 'Open-ended'}</td><td className="p-3">{row.basis === RentalBasis.Daily ? 'Daily' : 'Monthly'}</td><td className="p-3"><StatusBadge status={row.status} /></td><td className="p-3"><Button variant="secondary" disabled={saving || editing !== null} onClick={() => { setSelected(row); setAction(null); setReason(''); setShowHistory(false); setShowVehicles(false); setShowDeposits(false); setShowSuccessor(false); }}>Review {row.reference}</Button></td></tr>)}</tbody>
             </table>{rows.length === 0 && <p className="p-5 text-slate-500">No agreements have been recorded.</p>}
@@ -85,7 +77,7 @@ export default function AgreementsPage({ kind }: { kind: AgreementKind }) {
             <p>{selected.currency.code} · {selected.driver_mode === DriverMode.SelfDrive ? 'Self-drive' : 'With driver'}{selected.vehicle ? ` · ${selected.vehicle.registration_number ?? selected.vehicle.vehicle_number}` : ''}</p>
             <p>Agreement date: {selected.agreed_on} · Executing date: {selected.executing_on ?? 'Not recorded'}</p>
             {selected.supersedes_agreement && <p className="text-sm text-slate-600">Successor of {selected.supersedes_agreement.reference}</p>}
-            <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{termKeys.map(key => <div key={key} className="rounded-lg bg-slate-50 p-3"><dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">{termLabel(kind, key)}</dt><dd className="mt-1 text-sm font-medium text-slate-900"><AgreementTermValue agreement={selected} term={key} /></dd></div>)}</dl>
+            <AgreementTermsGrid kind={kind} currency={selected.currency.code} terms={selected.terms} />
             {selected.notes && <p>{selected.notes}</p>}
             <BaseRentPreviewPanel key={`${kind}-${selected.id}-${selected.row_version}`} kind={kind} agreement={selected} />
             {canBill && selected.status !== AgreementStatus.Draft && <BaseRentBillingPanel key={`billing-${kind}-${selected.id}-${selected.row_version}`} kind={kind} agreement={selected} />}
@@ -102,7 +94,7 @@ export default function AgreementsPage({ kind }: { kind: AgreementKind }) {
             {showSuccessor && selected.status === AgreementStatus.Active && <AgreementSuccessorForm kind={kind} agreement={selected} onSaved={reload} onCancel={() => setShowSuccessor(false)} />}
             {action && <div className="space-y-3 border-t pt-4">
                 <p>{action === AgreementAction.Activate ? 'Activation freezes these terms. Confirm that the recorded details match the agreement. This does not reserve the vehicle or create a financial document.' : 'Close this agreement while preserving its original terms and history.'}</p>
-                {action === AgreementAction.Close && <Input label="Closure reason" value={reason} onChange={event => setReason(event.target.value)} required disabled={saving} error={error?.fields.reason?.[0]} />}
+                {action === AgreementAction.Close && <Textarea label="Closure reason" value={reason} onChange={event => setReason(event.target.value)} required disabled={saving} error={error?.fields.reason?.[0]} />}
                 <Button onClick={confirm} loading={saving} disabled={action === AgreementAction.Close && !reason.trim()}>Confirm {action === AgreementAction.Activate ? 'activation' : 'closure'}</Button>
                 <Button type="button" variant="secondary" disabled={saving} onClick={() => setAction(null)}>Cancel</Button>
             </div>}
