@@ -89,11 +89,11 @@ export default function AgreementsPage({ kind }: { kind: AgreementKind }) {
             {selected.notes && <p>{selected.notes}</p>}
             <BaseRentPreviewPanel key={`${kind}-${selected.id}-${selected.row_version}`} kind={kind} agreement={selected} />
             {canBill && selected.status !== AgreementStatus.Draft && <BaseRentBillingPanel key={`billing-${kind}-${selected.id}-${selected.row_version}`} kind={kind} agreement={selected} />}
-            {kind === AgreementKind.Customer && hasPermission(auth, DEPOSIT_PERMISSION.view) && <Button variant="secondary" onClick={() => setShowDeposits(value => !value)}>{showDeposits ? 'Hide deposits' : 'View deposits'}</Button>}
+            {kind === AgreementKind.Customer && hasPermission(auth, DEPOSIT_PERMISSION.view) && <Button variant="secondary" aria-expanded={showDeposits} onClick={() => setShowDeposits(value => !value)}>{showDeposits ? 'Hide deposits' : 'View deposits'}</Button>}
             {kind === AgreementKind.Customer && hasPermission(auth, DEPOSIT_PERMISSION.view) && showDeposits && <DepositPanel key={selected.id} agreement={selected} canCreate={hasPermission(auth, DEPOSIT_PERMISSION.create)} />}
-            {kind === AgreementKind.Customer && canViewUse && <Button variant="secondary" onClick={() => setShowVehicles(value => !value)}>{showVehicles ? 'Hide vehicles' : 'View assigned vehicles'}</Button>}
+            {kind === AgreementKind.Customer && canViewUse && <Button variant="secondary" aria-expanded={showVehicles} onClick={() => setShowVehicles(value => !value)}>{showVehicles ? 'Hide vehicles' : 'View assigned vehicles'}</Button>}
             {kind === AgreementKind.Customer && canViewUse && showVehicles && <VehicleUsePanel key={selected.id} agreement={selected} canManage={canManageUse} />}
-            <Button variant="secondary" onClick={() => setShowHistory(value => !value)}>{showHistory ? 'Hide history' : 'View history'}</Button>
+            <Button variant="secondary" aria-expanded={showHistory} onClick={() => setShowHistory(value => !value)}>{showHistory ? 'Hide history' : 'View history'}</Button>
             {showHistory && <AgreementHistoryPanel key={selected.id} kind={kind} id={selected.id} />}
             {canManage && !action && !showSuccessor && <div className="flex gap-2">
                 {selected.status === AgreementStatus.Draft && <><Button variant="secondary" onClick={() => { setEditing(selected); setSelected(null); }}>Edit draft</Button><Button onClick={() => setAction(AgreementAction.Activate)}>Activate</Button></>}
