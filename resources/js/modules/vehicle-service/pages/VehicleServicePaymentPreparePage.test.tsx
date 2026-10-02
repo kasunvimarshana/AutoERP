@@ -118,7 +118,7 @@ describe('VehicleServicePaymentPreparePage', () => {
                 external_bank_name: 'Customer Bank',
             })],
         })));
-        expect(await screen.findByText('Payment validation completed successfully')).toBeInTheDocument();
+        expect(await screen.findByText('Payment is ready to finalize')).toBeInTheDocument();
     });
 
     it('prints the settled invoice from the same page after payment completion', async () => {
