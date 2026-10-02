@@ -53,3 +53,11 @@ it('shows server pricing and prevents billing an unknown component', async () =>
     expect(screen.getByText(/The agreed rate is not known/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Create invoice draft' })).toBeDisabled(); expect(billUsage).not.toHaveBeenCalled();
 });
+
+it('shows an explicit loading state without an incomplete agreement reference', () => {
+    vi.mocked(loadUsageCharges).mockReturnValue(new Promise(() => undefined));
+    render(<MemoryRouter><UsageChargeForm kind={AgreementKind.Customer} chart={chart} /></MemoryRouter>);
+    expect(screen.getByText('Customer charges · CHART-A')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Loading customer charges…');
+    expect(screen.queryByText(/undefined/)).not.toBeInTheDocument();
+});
