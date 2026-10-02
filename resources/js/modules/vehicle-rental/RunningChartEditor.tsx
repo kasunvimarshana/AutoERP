@@ -67,12 +67,12 @@ export function RunningChartEditor({ use, chart, correction, onSaved, onCancel }
             <details><summary className="cursor-pointer font-medium">Additional usage observations</summary><div className="space-y-3 pt-3">
                 {decimal('garage_km', DISTANCE_LABELS.garage_km)}{decimal('commercial_km', DISTANCE_LABELS.commercial_km)}
                 {Object.entries(COUNT_LABELS).map(([key, label]) => count(key, label))}
-                <Select label="Air conditioning" placeholder="Not recorded" options={acOptions} value={ac} onChange={e => setAc(e.target.value as AirConditioningMode | '')} />
+                <Select label="Air conditioning" placeholder="Not recorded" options={acOptions} value={ac} onChange={e => setAc(e.target.value as AirConditioningMode | '')} error={error?.fields.ac_mode?.[0]} />
                 <Select label="Driver identity" options={driverSourceOptions} value={driverSource} onChange={e => { const source = e.target.value as DriverIdentitySource | ''; setDriverSource(source); if (source !== DriverIdentitySource.Employee) setDriverEmployee(null); }} error={error?.fields.driver_identity_source?.[0]} />
                 {driverSource === DriverIdentitySource.Employee && <LookupSelect label="Employee driver" value={driverEmployee} onChange={setDriverEmployee} search={employees} required error={error?.fields.driver_employee_id?.[0]} />}
                 {driverSource === DriverIdentitySource.External && <><Input label="External driver name" value={externalDriverName} onChange={e => setExternalDriverName(e.target.value)} required error={error?.fields.driver_name_snapshot?.[0]} /><Input label="External driver reference" value={externalDriverReference} onChange={e => setExternalDriverReference(e.target.value)} required error={error?.fields.driver_reference_snapshot?.[0]} hint="Use a stable business reference, not a temporary note." /></>}
-                <Input label="Driver observation (optional)" value={driverObservation} onChange={e => setDriverObservation(e.target.value)} /><p>This is operational evidence only; employee pay remains owned by HR.</p>
-                <Input label="Notes" value={notes} onChange={e => setNotes(e.target.value)} />
+                <Input label="Driver observation (optional)" value={driverObservation} onChange={e => setDriverObservation(e.target.value)} error={error?.fields.driver_observation?.[0]} /><p>This is operational evidence only; employee pay remains owned by HR.</p>
+                <Input label="Notes" value={notes} onChange={e => setNotes(e.target.value)} error={error?.fields.notes?.[0]} />
             </div></details>
         </fieldset><div className="flex flex-wrap gap-2"><Button type="submit" loading={saving}>Save draft</Button><Button type="button" variant="secondary" disabled={saving} onClick={onCancel}>Cancel</Button></div>
     </form>;
