@@ -15,7 +15,7 @@ import { MileageAssessmentPanel } from './MileageAssessmentPanel';
 import { AgreementKind } from './agreements';
 import { BILLING_PERMISSION, type CreatedRentalInvoice } from './baseRentBillingApi';
 import { RunningChartStatus, type RunningChart } from './runningCharts';
-import { billUsage, loadUsageCharges, reissueUsage, voidUsage, USAGE_COMPONENT_LABELS, UsageChargeComponent, type UsageCharge, type UsageChargePage } from './usageChargeApi';
+import { billUsage, loadUsageCharges, reissueUsage, voidUsage, USAGE_COMPONENT_LABELS, UsageChargeComponent, type UsageCharge } from './usageChargeApi';
 
 enum ChargeAction { Create = 'create', Reissue = 'reissue', Void = 'void' }
 const RELEASED = new Set<string>([InvoiceStatus.Cancelled, InvoiceStatus.Void, InvoiceStatus.Reversed]);
@@ -55,10 +55,10 @@ export function UsageChargeForm({ kind, chart }: { kind: AgreementKind; chart: R
     }
     const quote = result?.components.find(value => value.component === component);
     return <div className="space-y-3">
-        <p>{result?.agreement.reference} · {kind === AgreementKind.Customer ? 'Customer invoice' : 'Owner payable'} · {chart.reference}</p>
+        <p className="font-medium">{kind === AgreementKind.Customer ? 'Customer charges' : 'Owner payables'} · {chart.reference}</p>
         <p className="text-sm">Bill a recorded OT or night-out component using this side’s assigned agreement. OT uses minutes × the category’s hourly rate ÷ 60, without another multiplier. Night-outs use count × agreed rate. Blank values cannot be billed. Review and post the draft in Invoice.</p>
         <ErrorAlert error={error ?? charges.error} inline />
-        {charges.loading ? <LoadingState label={kind === AgreementKind.Customer ? 'Loading customer charges…' : 'Loading owner payables…'} /> : result && <>
+        {charges.loading ? <LoadingState label={kind === AgreementKind.Customer ? 'Loading customer charges…' : 'Loading owner payables…'} /> : result && <><p className="text-sm text-slate-600">Agreement {result.agreement.reference}</p>
         {chart.status === RunningChartStatus.Finalized && <Button variant="secondary" disabled={busy} onClick={() => { setMileage(!mileage); setSelected(null); setAction(ChargeAction.Create); setAccepted(false); }}>{mileage ? 'OT and night-outs' : 'Assess mileage'}</Button>}
         {mileage && <MileageAssessmentPanel kind={kind} chart={chart} onSaved={() => setRevision(value => value + 1)} />}
         {!mileage && chart.status === RunningChartStatus.Finalized && <form aria-label="Bill chart component" onSubmit={submit} className="space-y-3">
