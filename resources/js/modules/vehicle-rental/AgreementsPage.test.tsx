@@ -94,3 +94,12 @@ it('formats financial terms and included distance for operator review', async ()
     expect(screen.getByText(formatMoney('3100.000000', 'LKR'))).toBeInTheDocument();
     expect(screen.getByText('Included distance (km)').parentElement).toHaveTextContent(formatQuantity('100.000000') + ' km');
 });
+
+it('removes stale agreements when a reload fails', async () => {
+    render(<AgreementsPage kind={AgreementKind.Customer} />);
+    expect(await screen.findByRole('button', { name: 'Review LESSEE-AGREEMENT' })).toBeInTheDocument();
+    vi.mocked(listAgreements).mockRejectedValue(new ApiError('Agreements could not be loaded.', 500));
+    fireEvent.click(screen.getByRole('button', { name: 'Reload' }));
+    expect(await screen.findByText('Agreements could not be loaded.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Review LESSEE-AGREEMENT' })).not.toBeInTheDocument();
+});
