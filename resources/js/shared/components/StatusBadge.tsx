@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { humanize } from '@/shared/utils/object';
 
 const positive = new Set(['active', 'approved', 'posted', 'paid', 'received', 'available', 'completed']);
@@ -5,8 +6,8 @@ const negative = new Set(['inactive', 'cancelled', 'void', 'voided', 'reversed',
 const informational = new Set(['submitted', 'processing', 'in_progress', 'open']);
 const neutral = new Set(['draft', 'pending', 'pending_approval']);
 
-export function StatusBadge({ status }: { status?: string | null }) {
-    return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${statusBadgeClassName(status)}`}>{humanize(status)}</span>;
+export function StatusBadge({ status, label }: { status?: string | null; label?: ReactNode }) {
+    return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${statusBadgeClassName(status)}`}>{label ?? humanize(status)}</span>;
 }
 
 export function statusBadgeClassName(status?: string | null): string {

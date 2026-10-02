@@ -39,8 +39,8 @@ export function BaseRentPreviewPanel({ kind, agreement }: { kind: AgreementKind;
         {result && <section aria-label="Base rent estimate" className="mt-4 overflow-x-auto">
             <p className="font-semibold">Base rent: <MoneyDisplay value={result.base_rent} currency={result.currency} /></p>
             <p className="text-sm">{result.agreement.reference} · revision {result.agreement.version} · rate <MoneyDisplay value={result.rate} currency={result.currency} /></p>
-            <table className="w-full text-left text-sm"><caption>Calculation by period</caption><thead><tr><th>Period</th><th>Days</th><th>Cycle days</th><th>Amount</th></tr></thead>
-                <tbody>{result.segments.map(segment => <tr key={segment.from}><td>{segment.from} – {segment.until}</td><td>{segment.days}</td><td>{segment.cycle_from ? `${segment.denominator_days} (${segment.cycle_from} – ${segment.cycle_until})` : 'Daily rate'}</td><td><MoneyDisplay value={segment.amount} currency={result.currency} /></td></tr>)}</tbody>
+            <table className="w-full text-left text-sm"><caption className="mb-2 text-left font-medium">Calculation by period</caption><thead className="border-b border-slate-200"><tr>{['Period', 'Days', 'Cycle days', 'Amount'].map(label => <th key={label} className="p-2 font-medium text-slate-600">{label}</th>)}</tr></thead>
+                <tbody>{result.segments.map(segment => <tr key={segment.from} className="border-b border-slate-100 last:border-0"><td className="p-2">{segment.from} – {segment.until}</td><td className="p-2">{segment.days}</td><td className="p-2">{segment.cycle_from ? `${segment.denominator_days} (${segment.cycle_from} – ${segment.cycle_until})` : 'Daily rate'}</td><td className="p-2"><MoneyDisplay value={segment.amount} currency={result.currency} /></td></tr>)}</tbody>
             </table>
             <p className="text-xs text-slate-500">Calculations retain full internal precision so adjacent partial periods reconcile to the complete cycle; displayed amounts use the standard money format.</p>
         </section>}

@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { ApiError } from '@/shared/api/apiError';
+import { formatMoney } from '@/shared/utils/formatMoney';
 import { UsageChargeForm } from './UsageChargePanel';
 import { AgreementKind } from './agreements';
 import { RunningChartStatus, type RunningChart } from './runningCharts';
@@ -60,4 +61,18 @@ it('shows an explicit loading state without an incomplete agreement reference', 
     expect(screen.getByText('Customer charges · CHART-A')).toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveTextContent('Loading customer charges…');
     expect(screen.queryByText(/undefined/)).not.toBeInTheDocument();
+});
+
+it('formats the server rate and maps usage billing validation to its field', async () => {
+    vi.mocked(billUsage).mockRejectedValue(new ApiError('Please correct the highlighted fields.', 422, null, null, {
+        exchange_rate: ['Enter a positive exchange rate.'],
+    }));
+    await setup();
+    documentFields();
+    fireEvent.change(screen.getByLabelText('Component'), { target: { value: UsageChargeComponent.NormalOvertime } });
+    expect(screen.getByRole('status')).toHaveTextContent(formatMoney('500.000000', 'LKR'));
+    expect(screen.getByRole('status')).not.toHaveTextContent('500.000000');
+    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(screen.getByRole('button', { name: 'Create invoice draft' }));
+    expect(await screen.findByText('Enter a positive exchange rate.')).toBeInTheDocument();
 });

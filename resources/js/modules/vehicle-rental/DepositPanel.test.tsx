@@ -52,3 +52,14 @@ it('shows receipt history without loading payment methods for a viewer', async (
     expect(listPaymentMethods).not.toHaveBeenCalled();
     expect(await screen.findByText('No deposit receipts have been recorded.')).toBeInTheDocument();
 });
+
+it('maps deposit validation errors to the receipt fields', async () => {
+    vi.mocked(receiveDeposit).mockRejectedValue(new ApiError('Please correct the highlighted fields.', 422, null, null, {
+        payment_date: ['Choose a valid receipt date.'],
+        exchange_rate: ['Enter a positive exchange rate.'],
+    }));
+    await fill();
+    fireEvent.click(screen.getByRole('button', { name: 'Create deposit receipt' }));
+    expect(await screen.findByText('Choose a valid receipt date.')).toBeInTheDocument();
+    expect(screen.getByText('Enter a positive exchange rate.')).toBeInTheDocument();
+});
