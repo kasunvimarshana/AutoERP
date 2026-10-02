@@ -39,3 +39,12 @@ describe('Rental vehicle use', () => {
         expect(screen.getByText(/Odometer: Not recorded/)).toBeInTheDocument();
     });
 });
+
+it('requires the actual event time before a handover can be confirmed', async () => {
+    render(<VehicleUsePanel agreement={agreement} canManage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Hand over vehicle' }));
+    fireEvent.change(screen.getByLabelText('Action reason'), { target: { value: 'Vehicle collected' } });
+    expect(screen.getByRole('button', { name: 'Confirm action' })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('Actual event time'), { target: { value: '2026-09-07T09:00' } });
+    expect(screen.getByRole('button', { name: 'Confirm action' })).toBeEnabled();
+});
