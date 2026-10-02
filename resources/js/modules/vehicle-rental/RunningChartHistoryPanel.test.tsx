@@ -50,3 +50,37 @@ it('shows complete formatted chart revision evidence without raw storage precisi
     expect(screen.queryByText(/\.000000/)).not.toBeInTheDocument();
     expect(screen.getByText('Notes: Verified')).toBeInTheDocument();
 });
+
+it('shows immutable employee driver snapshots when the chart used an employee driver', async () => {
+    vi.mocked(chartHistory).mockResolvedValue({
+        data: [{
+            version: 3,
+            action: 'finalize',
+            reason: null,
+            recorded_at: '2026-10-01T18:00:00+05:30',
+            actor: { name: 'Rental Admin' },
+            facts: {
+                reference: 'CHART-B',
+                starts_at: '2026-10-01T09:00:00+05:30',
+                ends_at: '2026-10-01T17:00:00+05:30',
+                start_odometer: null,
+                end_odometer: null,
+                garage_km: null,
+                commercial_km: null,
+                normal_ot_minutes: null,
+                double_ot_minutes: null,
+                triple_ot_minutes: null,
+                night_outs: null,
+                ac_mode: null,
+                driver_identity_source: DriverIdentitySource.Employee,
+                driver_employee_id: 27,
+                driver_name_snapshot: 'Rental Driver One',
+                driver_reference_snapshot: 'DRV-001',
+                driver_observation: null,
+                notes: null,
+            },
+        }],
+    });
+    render(<RunningChartHistoryPanel id={10} />);
+    expect(await screen.findByText(/Employee driver · Rental Driver One · DRV-001/)).toBeInTheDocument();
+});
