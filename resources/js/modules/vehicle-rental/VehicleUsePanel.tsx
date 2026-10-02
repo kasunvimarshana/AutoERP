@@ -33,7 +33,7 @@ export function VehicleUsePanel({ agreement, canManage }: { agreement: Agreement
         catch (failure) { setError(toApiError(failure)); } finally { setSaving(false); }
     }
     return <section aria-label="Assigned vehicles" className="space-y-4 border-t pt-4">
-        <div className="flex gap-2"><h3 className="grow text-lg font-semibold">Assigned vehicles</h3><Button variant="secondary" disabled={saving || adding || !!replacement} onClick={reload}>Reload vehicles</Button>{canManage && agreement.status === AgreementStatus.Active && <Button disabled={saving || adding || !!replacement || action !== null} onClick={() => setAdding(true)}>Assign vehicle</Button>}</div>
+        <div className="flex flex-wrap items-center gap-2"><h3 className="grow text-lg font-semibold">Assigned vehicles</h3><Button variant="secondary" disabled={saving || adding || !!replacement} onClick={reload}>Reload vehicles</Button>{canManage && agreement.status === AgreementStatus.Active && <Button disabled={saving || adding || !!replacement || action !== null} onClick={() => setAdding(true)}>Assign vehicle</Button>}</div>
         <ErrorAlert error={error} inline />
         {(adding || replacement) && <VehicleUseEditor replacement={replacement ?? undefined} agreement={agreement} onSaved={reload} onCancel={() => { setAdding(false); setReplacement(null); }} />}
         {loading ? <LoadingState label="Loading assigned vehicles…" /> : error ? null : rows.map(row => <article key={row.id} className="space-y-2 rounded-lg border p-4">
@@ -49,7 +49,7 @@ export function VehicleUsePanel({ agreement, canManage }: { agreement: Agreement
             <p className="text-sm">{action.type === VehicleUseAction.Cancel ? 'Cancel the planned use and retain its history.' : `Record the actual event in ${operationalTimeZone}. An expected return alone never releases a vehicle.`}</p>
             <fieldset disabled={saving} className="space-y-3">{action.type !== VehicleUseAction.Cancel && <><Input label="Actual event time" type="datetime-local" step={OPERATIONAL_TIME_STEP_SECONDS} value={at} onChange={e => setAt(e.target.value)} required error={error?.fields.occurred_at?.[0]} /><Input label="Odometer (optional)" value={odometer} onChange={e => setOdometer(e.target.value)} inputMode="decimal" error={error?.fields.odometer?.[0]} /></>}
                 <Textarea label="Action reason" value={reason} onChange={e => setReason(e.target.value)} required error={error?.fields.reason?.[0]} />
-            </fieldset><Button type="submit" loading={saving} disabled={!reason.trim() || (action.type !== VehicleUseAction.Cancel && !at)}>Confirm action</Button> <Button variant="secondary" disabled={saving} onClick={() => setAction(null)}>Cancel</Button>
+            </fieldset><div className="flex flex-wrap gap-2"><Button type="submit" loading={saving} disabled={!reason.trim() || (action.type !== VehicleUseAction.Cancel && !at)}>Confirm action</Button> <Button variant="secondary" disabled={saving} onClick={() => setAction(null)}>Cancel</Button>
         </form>}
     </section>;
 }
