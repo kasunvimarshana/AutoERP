@@ -42,6 +42,11 @@ export interface Agreement {
     agreed_on: string; executing_on: string | null; starts_on: string; ends_on: string | null; terms: Record<TermKey, string | null>; notes: string | null;
     activated_at?: string | null; closed_at?: string | null; closed_on?: string | null;
 }
+export interface AgreementHistory {
+    version: number; action: string; reason: string | null; recorded_at: string; actor: { name: string };
+    reference: string; party_name: string; currency_code: string; status: AgreementStatus; agreed_on: string; executing_on: string | null;
+    starts_on: string; ends_on: string | null; basis: RentalBasis; driver_mode: DriverMode; terms: Record<TermKey, string | null>; notes: string | null;
+}
 export interface AgreementPayload {
     reference: string; party_id: number; currency_id: number; vehicle_id?: number; agreed_on: string; executing_on: string | null; starts_on: string; ends_on: string | null;
     basis: RentalBasis | ''; driver_mode: DriverMode | ''; terms: Partial<Record<TermKey, string | null>>; notes: string | null; expected_version?: number;
