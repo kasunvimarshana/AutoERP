@@ -69,3 +69,17 @@ it('does not offer reissue or void for a live invoice', async () => {
     expect(screen.queryByRole('button', { name: 'Reissue charge' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Void charge' })).not.toBeInTheDocument();
 });
+
+it('maps billing validation errors back to document fields', async () => {
+    vi.mocked(billBaseRent).mockRejectedValue(new ApiError('Please correct the highlighted fields.', 422, null, null, {
+        invoice_date: ['Choose a valid invoice date.'],
+        exchange_rate: ['Enter a positive exchange rate.'],
+    }));
+    setup();
+    fireEvent.change(screen.getByLabelText('Charge through'), { target: { value: '2026-02-27' } });
+    documentFields();
+    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(screen.getByRole('button', { name: 'Create invoice draft' }));
+    expect(await screen.findByText('Choose a valid invoice date.')).toBeInTheDocument();
+    expect(screen.getByText('Enter a positive exchange rate.')).toBeInTheDocument();
+});
