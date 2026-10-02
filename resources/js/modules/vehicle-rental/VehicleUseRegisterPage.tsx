@@ -38,7 +38,9 @@ export default function VehicleUseRegisterPage() {
         } catch (failure) { setError(toApiError(failure)); }
     }
     function clearFilters() {
-        setSearch(''); setStatus(''); setFrom(''); setUntil(''); setFilters({}); setPage(1); setSelected(null); setError(null); setLoading(true);
+        const needsReload = page !== 1 || Object.values(filters).some(value => value !== undefined);
+        setSearch(''); setStatus(''); setFrom(''); setUntil(''); setSelected(null); setError(null);
+        if (needsReload) { setLoading(true); setFilters({}); setPage(1); }
     }
     const statusOptions = Object.values(VehicleUseStatus).map(value => ({ value, label: USE_LABELS[value] }));
     return <main className="space-y-5 p-4">
