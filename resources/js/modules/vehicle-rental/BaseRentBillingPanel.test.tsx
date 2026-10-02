@@ -19,16 +19,17 @@ beforeEach(() => {
     vi.mocked(loadBaseCharges).mockResolvedValue({ data: [], current_page: 1, last_page: 1 });
     vi.mocked(billBaseRent).mockResolvedValue({ id: 21, invoice_number: 'INV-21', grand_total: '3100.000000' });
 });
-function setup() {
+async function setup() {
     render(<MemoryRouter><BaseRentBillingPanel kind={AgreementKind.Customer} agreement={agreement} /></MemoryRouter>);
     fireEvent.click(screen.getByText('Bill base rent'));
+    await waitFor(() => expect(screen.queryByText('Loading recorded base charges…')).not.toBeInTheDocument());
 }
 function documentFields() {
     fireEvent.change(screen.getByLabelText('Invoice date'), { target: { value: '2026-02-27' } });
     fireEvent.change(screen.getByLabelText('Exchange rate to base currency'), { target: { value: '1' } });
 }
 it('requires explicit policy acceptance and sends dates with verified document inputs', async () => {
-    setup();
+    await setup();
     fireEvent.change(screen.getByLabelText('Charge through'), { target: { value: '2026-02-27' } });
     documentFields();
     expect(screen.getByRole('button', { name: 'Create invoice draft' })).toBeDisabled();
@@ -39,7 +40,7 @@ it('requires explicit policy acceptance and sends dates with verified document i
 });
 it('surfaces conflicting billing without a success message', async () => {
     vi.mocked(billBaseRent).mockRejectedValue(new ApiError('Period already charged.', 409));
-    setup(); documentFields();
+    await setup(); documentFields();
     fireEvent.change(screen.getByLabelText('Charge through'), { target: { value: '2026-02-27' } });
     fireEvent.click(screen.getByRole('checkbox')); fireEvent.click(screen.getByRole('button', { name: 'Create invoice draft' }));
     expect(await screen.findByText('Period already charged.')).toBeInTheDocument();
@@ -48,7 +49,7 @@ it('surfaces conflicting billing without a success message', async () => {
 it('reissues a released charge without sending replacement amounts or periods', async () => {
     vi.mocked(loadBaseCharges).mockResolvedValue({ data: [charge], current_page: 1, last_page: 1 });
     vi.mocked(reissueBaseRent).mockResolvedValue({ id: 22, invoice_number: 'INV-22', grand_total: '3100.000000' });
-    setup(); fireEvent.click(await screen.findByRole('button', { name: 'Reissue charge' })); documentFields();
+    await setup(); fireEvent.click(await screen.findByRole('button', { name: 'Reissue charge' })); documentFields();
     fireEvent.click(screen.getByRole('checkbox')); fireEvent.click(screen.getByRole('button', { name: 'Create invoice draft' }));
     await waitFor(() => expect(reissueBaseRent).toHaveBeenCalledWith(AgreementKind.Customer, agreement, charge, { invoice_date: '2026-02-27', due_date: null, exchange_rate: '1' }));
     expect(billBaseRent).not.toHaveBeenCalled();
@@ -56,7 +57,7 @@ it('reissues a released charge without sending replacement amounts or periods', 
 it('voids with a reason and charge revision without requiring new invoice fields', async () => {
     vi.mocked(loadBaseCharges).mockResolvedValue({ data: [charge], current_page: 1, last_page: 1 });
     vi.mocked(voidBaseCharge).mockResolvedValue({} as never);
-    setup(); fireEvent.click(await screen.findByRole('button', { name: 'Void charge' }));
+    await setup(); fireEvent.click(await screen.findByRole('button', { name: 'Void charge' }));
     fireEvent.change(screen.getByLabelText('Void reason'), { target: { value: 'Correct period' } });
     fireEvent.click(screen.getByRole('checkbox'));
     const buttons = screen.getAllByRole('button', { name: 'Void charge' }); fireEvent.click(buttons[0]);
@@ -65,7 +66,7 @@ it('voids with a reason and charge revision without requiring new invoice fields
 });
 it('does not offer reissue or void for a live invoice', async () => {
     vi.mocked(loadBaseCharges).mockResolvedValue({ data: [{ ...charge, invoices: [{ id: 20, number: 'INV-20', status: 'draft' }] }], current_page: 1, last_page: 1 });
-    setup(); await screen.findByRole('link', { name: 'INV-20' });
+    await setup(); await screen.findByRole('link', { name: 'INV-20' });
     expect(screen.queryByRole('button', { name: 'Reissue charge' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Void charge' })).not.toBeInTheDocument();
 });
@@ -75,7 +76,7 @@ it('maps billing validation errors back to document fields', async () => {
         invoice_date: ['Choose a valid invoice date.'],
         exchange_rate: ['Enter a positive exchange rate.'],
     }));
-    setup();
+    await setup();
     fireEvent.change(screen.getByLabelText('Charge through'), { target: { value: '2026-02-27' } });
     documentFields();
     fireEvent.click(screen.getByRole('checkbox'));
