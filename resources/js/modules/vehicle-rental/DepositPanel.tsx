@@ -8,6 +8,7 @@ import { Button } from '@/shared/components/Button';
 import { Input } from '@/shared/components/Input';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { MoneyDisplay } from '@/shared/components/MoneyDisplay';
+import { StatusBadge } from '@/shared/components/StatusBadge';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { businessDateInputValue } from '@/shared/utils/businessDate';
@@ -60,8 +61,8 @@ export function DepositPanel({ agreement, canCreate }: { agreement: Agreement; c
         {summaryRequest.loading ? <LoadingState label="Loading deposit summary…" /> : summary && <>
             <p className="text-sm text-slate-700">Agreed: {summary.requirement === null ? 'Not specified' : <MoneyDisplay value={summary.requirement} currency={agreement.currency.code} />} · Net receipts including drafts: <MoneyDisplay value={summary.net_receipts} currency={agreement.currency.code} /> · Remaining collection capacity: {summary.remaining_to_receive === null ? 'Not specified' : <MoneyDisplay value={summary.remaining_to_receive} currency={agreement.currency.code} />}</p>
             {canCreate && agreement.status === AgreementStatus.Active && isPositiveDecimal(summary.remaining_to_receive ?? '0') && <fieldset disabled={busy} className="space-y-3">
-                <Input label="Deposit receipt date" type="date" value={date} onChange={event => setDate(event.target.value)} required />
-                <Input label="Deposit exchange rate" inputMode="decimal" value={rate} onChange={event => setRate(event.target.value)} required />
+                <Input label="Deposit receipt date" type="date" value={date} onChange={event => setDate(event.target.value)} required error={error?.fields.payment_date?.[0]} />
+                <Input label="Deposit exchange rate" inputMode="decimal" value={rate} onChange={event => setRate(event.target.value)} required error={error?.fields.exchange_rate?.[0]} />
                 <PaymentLineTable lines={lines} methods={rows} methodsLoading={methods.loading} total={total}
                     onLineChange={(key, patch) => setLines(current => current.map(line => line.key === key ? { ...line, ...patch } : line))}
                     onMetadataChange={(key, field, value) => setLines(current => current.map(line => line.key === key ? { ...line, metadata: { ...line.metadata, [field]: value } } : line))}
@@ -71,7 +72,7 @@ export function DepositPanel({ agreement, canCreate }: { agreement: Agreement; c
             </fieldset>}
             {summary.payments.length === 0 ? <p className="text-sm text-slate-500">No deposit receipts have been recorded.</p> : <ul className="space-y-2">{summary.payments.map(payment => <li key={payment.id}>
                 <Link to={`/payments/${payment.id}`} className="text-blue-700 underline">{payment.payment_number}</Link>
-                {' · '}{payment.document_status} / {payment.posting_status} · Received <MoneyDisplay value={payment.total_amount} currency={agreement.currency.code} /> · Applied <MoneyDisplay value={payment.allocated_amount} currency={agreement.currency.code} /> · Refunded <MoneyDisplay value={payment.refunded_amount} currency={agreement.currency.code} /> · Unapplied <MoneyDisplay value={payment.unapplied_amount} currency={agreement.currency.code} />
+                {' · '}<StatusBadge status={payment.document_status} /> <StatusBadge status={payment.posting_status} /> · Received <MoneyDisplay value={payment.total_amount} currency={agreement.currency.code} /> · Applied <MoneyDisplay value={payment.allocated_amount} currency={agreement.currency.code} /> · Refunded <MoneyDisplay value={payment.refunded_amount} currency={agreement.currency.code} /> · Unapplied <MoneyDisplay value={payment.unapplied_amount} currency={agreement.currency.code} />
             </li>)}</ul>}
         </>}
     </section>;
