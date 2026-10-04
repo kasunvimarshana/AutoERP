@@ -77,7 +77,7 @@ final class AuthPayloadResource extends JsonResource
         ];
     }
 
-    /** @return array{id:int|string|null,code:string|null,name:string|null}|null */
+    /** @return array{id:int|string|null,code:string|null,name:string|null,path:string|null,timezone:string|null}|null */
     private function relationSummary(mixed $relation): ?array
     {
         if (! is_array($relation)) {
@@ -88,6 +88,8 @@ final class AuthPayloadResource extends JsonResource
             'id' => $relation['id'] ?? null,
             'code' => isset($relation['code']) ? (string) $relation['code'] : null,
             'name' => isset($relation['name']) ? (string) $relation['name'] : null,
+            'path' => isset($relation['path']) ? (string) $relation['path'] : null,
+            'timezone' => isset($relation['timezone']) ? (string) $relation['timezone'] : null,
         ];
     }
 
