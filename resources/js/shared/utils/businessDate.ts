@@ -9,8 +9,10 @@ interface DateParts {
     second: number;
 }
 
-interface LocalDateTimeParts extends DateParts {}
+type LocalDateTimeParts = DateParts;
 
+const MINUTES_PER_HOUR = 60;
+const TIME_PART_WIDTH = 2;
 const MILLISECONDS_PER_MINUTE = 60_000;
 const MILLISECONDS_PER_DAY = 86_400_000;
 const OFFSET_SAMPLE_DAY_SHIFTS = [-2, -1, 0, 1, 2] as const;
@@ -190,8 +192,8 @@ function sameDateParts(left: DateParts, right: DateParts): boolean {
 function formatOffset(offsetMinutes: number): string {
     const sign = offsetMinutes < 0 ? '-' : '+';
     const absolute = Math.abs(offsetMinutes);
-    const hours = Math.floor(absolute / 60);
-    const minutes = absolute % 60;
+    const hours = Math.floor(absolute / MINUTES_PER_HOUR);
+    const minutes = absolute % MINUTES_PER_HOUR;
     return `${sign}${pad(hours)}:${pad(minutes)}`;
 }
 
@@ -207,5 +209,5 @@ function isValidTimeZone(timeZone?: string | null): timeZone is string {
 }
 
 function pad(value: number): string {
-    return String(value).padStart(2, '0');
+    return String(value).padStart(TIME_PART_WIDTH, '0');
 }
