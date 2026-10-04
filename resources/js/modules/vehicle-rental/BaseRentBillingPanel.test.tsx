@@ -93,3 +93,14 @@ it('does not present a false empty charge history when the list request fails', 
     expect(screen.queryByText('No base-rent charges have been recorded.')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Create invoice draft' })).toBeDisabled();
 });
+
+it('lets the operator retry recorded base charges after a load failure', async () => {
+    vi.mocked(loadBaseCharges)
+        .mockRejectedValueOnce(new ApiError('Recorded charges could not be loaded.', 500))
+        .mockResolvedValueOnce({ data: [], current_page: 1, last_page: 1 });
+    render(<MemoryRouter><BaseRentBillingPanel kind={AgreementKind.Customer} agreement={agreement} /></MemoryRouter>);
+    fireEvent.click(screen.getByText('Bill base rent'));
+    expect(await screen.findByText('Recorded charges could not be loaded.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry recorded charges' }));
+    expect(await screen.findByText('No base-rent charges have been recorded.')).toBeInTheDocument();
+});
