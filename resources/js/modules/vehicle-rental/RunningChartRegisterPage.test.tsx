@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@/shared/api/apiError';
+import { configureBusinessTimeZone, formatBusinessDateTime } from '@/shared/utils/businessDate';
 import RunningChartRegisterPage from './RunningChartRegisterPage';
 import { listChartRegister } from './runningChartApi';
 import { DriverIdentitySource, RunningChartStatus, type ChartRegisterRow } from './runningCharts';
@@ -16,7 +17,8 @@ const row: ChartRegisterRow = {
     vehicle_use: { id: 12, vehicle_label: 'CAR-1234', version: 2 }, customer_agreement: { reference: 'CUSTOMER-A', party_name: 'Example Customer' }, owner_agreement: null,
     corrects_chart: { id: 8, reference: 'CHART-ORIGINAL' }, replaces_vehicle: 'CAR-OLD',
 };
-beforeEach(() => { vi.clearAllMocks(); vi.mocked(listChartRegister).mockResolvedValue({ data: [row] }); });
+beforeEach(() => { configureBusinessTimeZone('Asia/Colombo'); vi.clearAllMocks(); vi.mocked(listChartRegister).mockResolvedValue({ data: [row] }); });
+afterEach(() => configureBusinessTimeZone(null));
 describe('Running Chart register', () => {
     it('shows readable context, driver identity, correction lineage and preserved unknown measurements', async () => {
         render(<RunningChartRegisterPage />);
@@ -24,6 +26,7 @@ describe('Running Chart register', () => {
         expect(screen.getByText('Customer: Example Customer · CUSTOMER-A')).toBeInTheDocument();
         expect(screen.getByText('Driver: Nimal Perera · DRV-027')).toBeInTheDocument();
         expect(screen.getByText('Total distance: Not recorded')).toBeInTheDocument();
+        expect(screen.getByText(`${formatBusinessDateTime(row.starts_at)} — ${formatBusinessDateTime(row.ends_at)}`)).toBeInTheDocument();
         expect(screen.getByText('Corrects chart CHART-ORIGINAL')).toBeInTheDocument();
         expect(screen.getByText('Replaces vehicle CAR-OLD')).toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: 'Review CHART-A' }));
