@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Button } from '@/shared/components/Button';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { Pagination } from '@/shared/components/Pagination';
@@ -16,6 +17,7 @@ export function RunningChartHistoryPanel({ id }: { id: number }) {
     return (
         <section aria-label="Running Chart history" className="space-y-3">
             <ErrorAlert error={history.error} inline />
+            {history.error && <Button type="button" variant="secondary" onClick={history.reload}>Retry Running Chart history</Button>}
             {history.loading ? <LoadingState label="Loading Running Chart history…" /> : history.data && <>
                 {history.data.data.length === 0 && <p className="text-sm text-slate-500">No Running Chart history has been recorded.</p>}
                 {history.data.data.map((row) => (
