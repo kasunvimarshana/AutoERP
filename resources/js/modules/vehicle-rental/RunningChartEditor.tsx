@@ -62,7 +62,7 @@ export function RunningChartEditor({ use, chart, correction, onSaved, onCancel }
         <fieldset disabled={saving} className="space-y-3">
             <Input label="Chart reference" required value={reference} onChange={e => setReference(e.target.value)} error={error?.fields.reference?.[0]} />
             <Input label="Usage start" type="datetime-local" step={OPERATIONAL_TIME_STEP_SECONDS} required value={start} onChange={e => setStart(e.target.value)} error={error?.fields.starts_at?.[0]} />
-            <Input label="Usage end" type="datetime-local" step={OPERATIONAL_TIME_STEP_SECONDS} required value={end} onChange={e => setEnd(e.target.value)} error={error?.fields.ends_at?.[0]} />
+            <Input label="Usage end" type="datetime-local" step={OPERATIONAL_TIME_STEP_SECONDS} min={start || undefined} required value={end} onChange={e => setEnd(e.target.value)} error={error?.fields.ends_at?.[0]} />
             {decimal('start_odometer', DISTANCE_LABELS.start_odometer)}{decimal('end_odometer', DISTANCE_LABELS.end_odometer)}
             <details><summary className="cursor-pointer font-medium">Additional usage observations</summary><div className="space-y-3 pt-3">
                 {decimal('garage_km', DISTANCE_LABELS.garage_km)}{decimal('commercial_km', DISTANCE_LABELS.commercial_km)}
@@ -74,6 +74,6 @@ export function RunningChartEditor({ use, chart, correction, onSaved, onCancel }
                 <Textarea label="Driver observation (optional)" value={driverObservation} onChange={e => setDriverObservation(e.target.value)} error={error?.fields.driver_observation?.[0]} /><p>This is operational evidence only; employee pay remains owned by HR.</p>
                 <Textarea label="Notes" value={notes} onChange={e => setNotes(e.target.value)} error={error?.fields.notes?.[0]} />
             </div></details>
-        </fieldset><div className="flex flex-wrap gap-2"><Button type="submit" loading={saving}>Save draft</Button><Button type="button" variant="secondary" disabled={saving} onClick={onCancel}>Cancel</Button></div>
+        </fieldset><div className="flex flex-wrap gap-2"><Button type="submit" loading={saving} disabled={!reference.trim() || !start || !end || (driverSource === DriverIdentitySource.Employee && !driverEmployee) || (driverSource === DriverIdentitySource.External && (!externalDriverName.trim() || !externalDriverReference.trim()))}>Save draft</Button><Button type="button" variant="secondary" disabled={saving} onClick={onCancel}>Cancel</Button></div>
     </form>;
 }
