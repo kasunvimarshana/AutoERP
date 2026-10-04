@@ -34,8 +34,6 @@ describe('business date utilities', () => {
 
         expect(businessDateTimeInputValue(instant, 1, 'Asia/Colombo')).toBe('2027-01-02T01:30');
     });
-});
-
 
     it('serializes a business-local wall time with the configured timezone offset', () => {
         configureBusinessTimeZone('Asia/Colombo');
@@ -55,3 +53,4 @@ describe('business date utilities', () => {
         expect(() => businessDateTimeToOffsetTimestamp('2026-02-30T09:00', 'Asia/Colombo'))
             .toThrow('Select a valid local date and time.');
     });
+});
