@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
     businessDateInputValue,
     businessDateTimeInputValue,
+    businessDateTimeInputValueWithSeconds,
     businessTimeZoneLabel,
     businessTimestampWithOffset,
     configureBusinessTimeZone,
@@ -55,5 +56,6 @@ describe('business date utilities', () => {
         const timestamp = businessTimestampWithOffset('2026-09-07T09:00:15');
 
         expect(businessDateTimeInputValue(new Date(timestamp))).toBe('2026-09-07T09:00');
+        expect(businessDateTimeInputValueWithSeconds(new Date(timestamp))).toBe('2026-09-07T09:00:15');
     });
 });
