@@ -30,7 +30,7 @@ export function VehicleUseEditor({ agreement, replacement, onSaved, onCancel }: 
     return <form onSubmit={submit} className="space-y-4 rounded-lg border p-4" aria-label={replacement ? "Replace vehicle" : "Assign vehicle"}>
         <h3 className="font-semibold">{replacement ? `Replace ${replacement.vehicle.label}` : `Assign a vehicle to ${agreement.reference}`}</h3>
         <ErrorAlert error={error} inline />
-        <p className="text-sm text-slate-600">Times use {operationalTimeZone}. The planned end is the handover boundary for the next use, not a billing day-count rule.</p>
+        <p className="text-sm text-slate-600">Times use {operationalTimeZone()}. The planned end is the handover boundary for the next use, not a billing day-count rule.</p>
         <fieldset disabled={saving} className="grid gap-4 sm:grid-cols-2">
             <LookupSelect label="Vehicle" value={vehicle} onChange={value => { setVehicle(value); setOwner(null); }} search={vehicles} required error={error?.fields.vehicle_id?.[0]} />
             <Input label={replacement ? "Replacement time" : "Planned handover"} type="datetime-local" step={OPERATIONAL_TIME_STEP_SECONDS} value={start} onChange={e => { setStart(e.target.value); setOwner(null); }} required error={error?.fields.starts_at?.[0]} />
