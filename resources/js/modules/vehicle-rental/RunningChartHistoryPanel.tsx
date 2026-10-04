@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { Pagination } from '@/shared/components/Pagination';
+import { formatBusinessDateTime } from '@/shared/utils/businessDate';
 import { QuantityDisplay } from '@/shared/components/QuantityDisplay';
 import { useApi } from '@/shared/hooks/useApi';
 import { humanize } from '@/shared/utils/object';
@@ -21,10 +22,10 @@ export function RunningChartHistoryPanel({ id }: { id: number }) {
                     <article key={row.version} className="space-y-3 rounded-lg border border-slate-200 p-3">
                         <div>
                             <p className="font-medium">Revision {row.version} · {humanize(row.action)}</p>
-                            <p className="text-sm text-slate-600">{row.actor.name} · {row.recorded_at}</p>
+                            <p className="text-sm text-slate-600">{row.actor.name} · {formatBusinessDateTime(row.recorded_at)}</p>
                         </div>
                         {row.reason && <p><span className="font-medium">Reason:</span> {row.reason}</p>}
-                        <p>{row.facts.reference} · {row.facts.starts_at} — {row.facts.ends_at}</p>
+                        <p>{row.facts.reference} · {formatBusinessDateTime(row.facts.starts_at)} — {formatBusinessDateTime(row.facts.ends_at)}</p>
                         <dl className="grid gap-3 sm:grid-cols-2">
                             {Object.entries(DISTANCE_LABELS).map(([key, label]) => {
                                 const value = row.facts[key as keyof typeof DISTANCE_LABELS];
