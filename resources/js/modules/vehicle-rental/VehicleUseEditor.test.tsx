@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { requestLookup } from '@/shared/api/lookupRequest';
+import { configureBusinessTimeZone } from '@/shared/utils/businessDate';
 import { VehicleUseEditor } from './VehicleUseEditor';
 import { AGREEMENT_API, type Agreement } from './agreements';
 import { planVehicleUse, replaceVehicleUse } from './vehicleUseApi';
@@ -9,10 +10,12 @@ vi.mock('@/shared/api/lookupRequest', () => ({ requestLookup: vi.fn() }));
 vi.mock('./vehicleUseApi', () => ({ planVehicleUse: vi.fn(), replaceVehicleUse: vi.fn() }));
 const agreement = { id: 3, reference: 'CUSTOMER-A', row_version: 2 } as Agreement;
 beforeEach(() => {
+    configureBusinessTimeZone('Asia/Colombo');
     vi.clearAllMocks();
     vi.mocked(requestLookup).mockResolvedValueOnce({ data: [{ id: 11, registration_number: 'CAR-123', vehicle_number: 'CAR' }] })
         .mockResolvedValueOnce({ data: [{ id: 21, name: 'OWNER-A · Example Owner' }] });
 });
+afterEach(() => configureBusinessTimeZone(null));
 it('uses the planned period for owner lookup and clears its selection when dates change', async () => {
     render(<VehicleUseEditor agreement={agreement} onSaved={vi.fn()} onCancel={vi.fn()} />);
     fireEvent.change(screen.getByRole('combobox', { name: 'Vehicle' }), { target: { value: 'CAR' } });
