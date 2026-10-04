@@ -12,7 +12,7 @@ import { StatusBadge } from '@/shared/components/StatusBadge';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import type { PaginationMeta } from '@/shared/types/pagination';
 import { listVehicleUseRegister } from './vehicleUseApi';
-import { operationalTimeZone, OPERATIONAL_TIME_STEP_SECONDS, timestampWithOffset, USE_LABELS, VehicleUseStatus, type VehicleUse, type VehicleUseRegisterFilters } from './vehicleUse';
+import { formatOperationalDateTime, operationalTimeZone, OPERATIONAL_TIME_STEP_SECONDS, timestampWithOffset, USE_LABELS, VehicleUseStatus, type VehicleUse, type VehicleUseRegisterFilters } from './vehicleUse';
 import { VehicleUseHistoryPanel } from './VehicleUseHistoryPanel';
 
 export default function VehicleUseRegisterPage() {
@@ -27,7 +27,7 @@ export default function VehicleUseRegisterPage() {
         const controller = new AbortController();
         listVehicleUseRegister(filters, page, controller.signal).then(result => {
             if (!controller.signal.aborted) { setRows(result.data); setMeta(result.meta); setError(null); }
-        }).catch(failure => { if (!controller.signal.aborted) setError(toApiError(failure)); })
+        }).catch(failure => { if (!controller.signal.aborted) { setRows([]); setMeta(undefined); setError(toApiError(failure)); } })
             .finally(() => { if (!controller.signal.aborted) setLoading(false); });
         return () => controller.abort();
     }, [filters, page]);
@@ -51,7 +51,7 @@ export default function VehicleUseRegisterPage() {
             <Select label="Use status" placeholder="All states" options={statusOptions} value={status} onChange={event => setStatus(event.target.value as VehicleUseStatus | '')} />
             <Input label="Planned period start (optional)" type="datetime-local" step={OPERATIONAL_TIME_STEP_SECONDS} value={from} onChange={event => setFrom(event.target.value)} error={error?.fields.from?.[0]} />
             <Input label="Planned period end (optional)" type="datetime-local" step={OPERATIONAL_TIME_STEP_SECONDS} value={until} onChange={event => setUntil(event.target.value)} error={error?.fields.until?.[0]} />
-            <p className="text-sm text-slate-600 md:col-span-2">Filter times use {operationalTimeZone}. Results overlap the planned period. Actual custody is shown separately; no rental charges are calculated.</p>
+            <p className="text-sm text-slate-600 md:col-span-2">Filter times use {operationalTimeZone()}. Results overlap the planned period. Actual custody is shown separately; no rental charges are calculated.</p>
             <div className="flex flex-wrap gap-2 md:col-span-2"><Button type="submit" loading={loading}>Apply filters</Button><Button type="button" variant="secondary" onClick={clearFilters}>Clear filters</Button></div>
         </form></Panel>
         <ErrorAlert error={error} inline />
@@ -61,8 +61,8 @@ export default function VehicleUseRegisterPage() {
                 <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-semibold">{row.vehicle.label} · {row.customer_agreement.reference}</h2><StatusBadge status={row.status} label={USE_LABELS[row.status]} /></div>
                 <p>Customer: {row.customer_agreement.party_name}</p>
                 <p>{row.owner_agreement ? `Owner: ${row.owner_agreement.party_name} · ${row.owner_agreement.reference}` : 'Company supply'}</p>
-                <p>Planned: {row.starts_at} — {row.ends_at ?? 'Open-ended'}</p>
-                <p>Handed over: {row.handed_over_at ?? 'Not recorded'}</p><p>Returned: {row.returned_at ?? 'Not recorded'}</p>
+                <p>Planned: {formatOperationalDateTime(row.starts_at)} — {formatOperationalDateTime(row.ends_at, 'Open-ended')}</p>
+                <p>Handed over: {formatOperationalDateTime(row.handed_over_at)}</p><p>Returned: {formatOperationalDateTime(row.returned_at)}</p>
                 {row.replaces_use && <p>Replaces vehicle {row.replaces_use.vehicle_label}</p>}
                 <Button type="button" variant="secondary" aria-expanded={selected === row.id} onClick={() => setSelected(selected === row.id ? null : row.id)}>{selected === row.id ? 'Hide details' : 'Review ' + row.vehicle.label}</Button>
                 {selected === row.id && <div className="space-y-3 border-t pt-3">
