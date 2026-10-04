@@ -1,4 +1,11 @@
+import {
+    businessDateTimeInputValue,
+    businessDateTimeToOffsetTimestamp,
+    businessTimeZone,
+    formatBusinessDateTime,
+} from '@/shared/utils/businessDate';
 import { AGREEMENT_API } from './agreements';
+
 export enum VehicleUseStatus { Planned = 'planned', InCustody = 'in_custody', Returned = 'returned', Cancelled = 'cancelled' }
 export enum VehicleUseAction { Handover = 'handover', Return = 'return', Cancel = 'cancel' }
 export const USE_PERMISSION = { view: 'vehicle-rental.vehicle-use.view', manage: 'vehicle-rental.vehicle-use.manage' } as const;
@@ -18,21 +25,24 @@ export interface VehicleUseHistory {
     vehicle_label: string; status: VehicleUseStatus; starts_at: string; ends_at: string | null;
     handed_over_at: string | null; returned_at: string | null; handover_odometer: string | null; return_odometer: string | null;
 }
-const MINUTES_PER_HOUR = 60;
-const TIME_PART_WIDTH = 2;
-export const operationalTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-const MINUTE_TIMESTAMP_LENGTH = 16;
+
 export const OPERATIONAL_TIME_STEP_SECONDS = 1;
-export function timestampWithOffset(value: string): string {
-    const date = new Date(value);
-    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/.test(value) || Number.isNaN(date.getTime())) throw new Error('Select a valid local date and time.');
-    const offset = -date.getTimezoneOffset();
-    const pad = (part: number) => String(part).padStart(TIME_PART_WIDTH, '0');
-    return `${value.length === MINUTE_TIMESTAMP_LENGTH ? `${value}:00` : value}${offset < 0 ? '-' : '+'}${pad(Math.floor(Math.abs(offset) / MINUTES_PER_HOUR))}:${pad(Math.abs(offset) % MINUTES_PER_HOUR)}`;
+
+export function operationalTimeZone(): string {
+    return businessTimeZone();
 }
+
+export function timestampWithOffset(value: string): string {
+    return businessDateTimeToOffsetTimestamp(value);
+}
+
 export function localTimestampValue(value: string): string {
-    const date = new Date(value); const pad = (part: number) => String(part).padStart(TIME_PART_WIDTH, '0');
-    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? '' : businessDateTimeInputValue(date, 0, undefined, true);
+}
+
+export function formatOperationalDateTime(value: string | null | undefined, fallback = 'Not recorded'): string {
+    return formatBusinessDateTime(value, fallback);
 }
 
 export const USE_REGISTER_PATH = '/vehicle-rental/vehicle-uses';
