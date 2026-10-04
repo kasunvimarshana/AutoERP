@@ -1,5 +1,6 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, expect, it, vi } from 'vitest';
+import { ApiError } from '@/shared/api/apiError';
 import { formatMoney } from '@/shared/utils/formatMoney';
 import { agreementHistory } from './agreementApi';
 import { AgreementHistoryPanel } from './AgreementHistoryPanel';
@@ -55,4 +56,12 @@ it('shows an explicit loading state', () => {
     vi.mocked(agreementHistory).mockReturnValue(new Promise<never>(() => undefined));
     render(<AgreementHistoryPanel kind={AgreementKind.Customer} id={7} />);
     expect(screen.getByRole('status')).toHaveTextContent('Loading agreement history…');
+});
+
+it('lets the operator retry a failed agreement-history request', async () => {
+    vi.mocked(agreementHistory).mockRejectedValueOnce(new ApiError('Agreement history unavailable.', 500));
+    render(<AgreementHistoryPanel kind={AgreementKind.Owner} id={7} />);
+    expect(await screen.findByText('Agreement history unavailable.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry agreement history' }));
+    expect(await screen.findByText(/Revision 2 · Activate · Rental Admin/)).toBeInTheDocument();
 });
