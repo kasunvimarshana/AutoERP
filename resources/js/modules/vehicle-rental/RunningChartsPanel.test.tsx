@@ -2,7 +2,6 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@/shared/api/apiError';
 import { configureBusinessTimeZone, formatBusinessDateTime } from '@/shared/utils/businessDate';
-import { configureBusinessTimeZone, formatBusinessDateTime } from '@/shared/utils/businessDate';
 import { RunningChartsPanel } from './RunningChartsPanel';
 import { listCharts, transitionChart } from './runningChartApi';
 import { RunningChartAction, RunningChartStatus, CHART_PERMISSION, type RunningChart } from './runningCharts';
@@ -16,7 +15,7 @@ beforeEach(() => { configureBusinessTimeZone('Asia/Colombo'); vi.clearAllMocks()
 afterEach(() => configureBusinessTimeZone(null));
 describe('Running Chart review', () => {
  it('preserves unknown distance and hides unauthorized actions', async () => {
-  render(<RunningChartsPanel use={use} />); expect(await screen.findByText('CHART-A')).toBeInTheDocument(); expect(screen.getByText('Finalized')).toBeInTheDocument(); expect(screen.getByText('Total distance: Not recorded')).toBeInTheDocument(); expect(screen.getByText(`${formatBusinessDateTime(chart.starts_at)} — ${formatBusinessDateTime(chart.ends_at)}`)).toBeInTheDocument(); expect(screen.getByText(`${formatBusinessDateTime(chart.starts_at)} — ${formatBusinessDateTime(chart.ends_at)}`)).toBeInTheDocument(); expect(screen.queryByRole('button', { name: 'Reverse usage' })).not.toBeInTheDocument(); expect(screen.queryByRole('button', { name: 'Record usage' })).not.toBeInTheDocument();
+  render(<RunningChartsPanel use={use} />); expect(await screen.findByText('CHART-A')).toBeInTheDocument(); expect(screen.getByText('Finalized')).toBeInTheDocument(); expect(screen.getByText('Total distance: Not recorded')).toBeInTheDocument(); expect(screen.getByText(`${formatBusinessDateTime(chart.starts_at)} — ${formatBusinessDateTime(chart.ends_at)}`)).toBeInTheDocument(); expect(screen.queryByRole('button', { name: 'Reverse usage' })).not.toBeInTheDocument(); expect(screen.queryByRole('button', { name: 'Record usage' })).not.toBeInTheDocument();
  });
  it('requires a reason and preserves stale revision errors', async () => {
   session.permissions.push(CHART_PERMISSION.reverse); vi.mocked(transitionChart).mockRejectedValue(new ApiError('This record changed. Reload before continuing.', 409));
