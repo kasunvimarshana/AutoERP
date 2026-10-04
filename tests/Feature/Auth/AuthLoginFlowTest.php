@@ -8,6 +8,8 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\Auth\Services\Credentials\PasswordCredentialService;
+use Modules\Configuration\Constants\ConfigurationKey;
+use Modules\Configuration\Constants\ConfigurationValueType;
 use Modules\Tenant\Constants\TenantStatus;
 use Modules\User\Constants\PlatformOperatorStatus;
 use Modules\User\Constants\UserOrganizationUnitStatus;
@@ -32,6 +34,7 @@ final class AuthLoginFlowTest extends TestCase
             'name' => 'Main organization',
             'code' => 'MAIN',
         ]);
+        $this->setWorkspaceTimezones($tenantId, $organizationUnitId, 'Asia/Dubai', 'Asia/Colombo');
         $email = 'tenant-auth@example.test';
         $userId = TenantUserFixture::create([
             'tenant_id' => $tenantId,
@@ -67,7 +70,10 @@ final class AuthLoginFlowTest extends TestCase
             ->assertOk()
             ->assertJsonPath('user.email', $email)
             ->assertJsonPath('tenant.id', $tenantId)
+            ->assertJsonPath('tenant.timezone', 'Asia/Dubai')
             ->assertJsonPath('organization_unit.id', $organizationUnitId)
+            ->assertJsonPath('organization_unit.path', '/main')
+            ->assertJsonPath('organization_unit.timezone', 'Asia/Colombo')
             ->assertJsonPath('is_platform_operator', false);
 
         $token = trim((string) $login->json('token'));
@@ -88,7 +94,9 @@ final class AuthLoginFlowTest extends TestCase
             ->withHeader('X-Tenant-Id', (string) $tenantId)
             ->getJson('/api/v1/auth/me')
             ->assertOk()
-            ->assertJsonPath('user.email', $email);
+            ->assertJsonPath('user.email', $email)
+            ->assertJsonPath('tenant.timezone', 'Asia/Dubai')
+            ->assertJsonPath('organization_unit.timezone', 'Asia/Colombo');
 
         $this->withToken($token)
             ->withHeader('X-Tenant-Id', (string) $tenantId)
@@ -157,6 +165,39 @@ final class AuthLoginFlowTest extends TestCase
         $this->assertDatabaseHas('auth_platform_sessions', [
             'platform_operator_id' => $operatorId,
             'status' => 'revoked',
+        ]);
+    }
+
+
+    private function setWorkspaceTimezones(
+        int $tenantId,
+        int $organizationUnitId,
+        string $tenantTimezone,
+        string $organizationTimezone,
+    ): void {
+        $now = now();
+        DB::table('tenant_configuration_values')->insert([
+            'row_version' => 1,
+            'tenant_id' => $tenantId,
+            'key' => ConfigurationKey::WORKSPACE_TIMEZONE,
+            'definition_version' => 1,
+            'value' => json_encode($tenantTimezone, JSON_THROW_ON_ERROR),
+            'value_type' => ConfigurationValueType::STRING,
+            'is_sensitive' => false,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+        DB::table('organization_unit_configuration_values')->insert([
+            'row_version' => 1,
+            'tenant_id' => $tenantId,
+            'organization_unit_id' => $organizationUnitId,
+            'key' => ConfigurationKey::WORKSPACE_TIMEZONE,
+            'definition_version' => 1,
+            'value' => json_encode($organizationTimezone, JSON_THROW_ON_ERROR),
+            'value_type' => ConfigurationValueType::STRING,
+            'is_sensitive' => false,
+            'created_at' => $now,
+            'updated_at' => $now,
         ]);
     }
 
