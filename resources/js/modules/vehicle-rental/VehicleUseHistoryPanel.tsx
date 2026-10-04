@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Button } from '@/shared/components/Button';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { Pagination } from '@/shared/components/Pagination';
@@ -16,6 +17,7 @@ export function VehicleUseHistoryPanel({ id }: { id: number }) {
     return (
         <section aria-label="Vehicle-use history" className="space-y-3">
             <ErrorAlert error={history.error} inline />
+            {history.error && <Button type="button" variant="secondary" onClick={history.reload}>Retry vehicle-use history</Button>}
             {history.loading ? <LoadingState label="Loading vehicle-use history…" /> : history.data && <>
                 {history.data.data.length === 0 && <p className="text-sm text-slate-500">No vehicle-use history has been recorded.</p>}
                 {history.data.data.map((row) => (
