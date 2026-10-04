@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Button } from '@/shared/components/Button';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { Pagination } from '@/shared/components/Pagination';
@@ -18,6 +19,7 @@ export function AgreementHistoryPanel({ kind, id }: { kind: AgreementKind; id: n
         <section aria-label="Agreement history" className="space-y-3 border-t pt-4">
             <h3 className="font-semibold">Agreement history</h3>
             <ErrorAlert error={history.error} inline />
+            {history.error && <Button type="button" variant="secondary" onClick={history.reload}>Retry agreement history</Button>}
             {history.loading ? <LoadingState label="Loading agreement history…" /> : history.data && <>
                 {history.data.data.length === 0 && <p className="text-sm text-slate-500">No agreement history has been recorded.</p>}
                 {history.data.data.map((row) => (
