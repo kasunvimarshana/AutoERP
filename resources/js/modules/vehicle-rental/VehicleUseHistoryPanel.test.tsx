@@ -1,5 +1,6 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, expect, it, vi } from 'vitest';
+import { ApiError } from '@/shared/api/apiError';
 import { VehicleUseHistoryPanel } from './VehicleUseHistoryPanel';
 import { vehicleUseHistory } from './vehicleUseApi';
 import { VehicleUseStatus } from './vehicleUse';
@@ -34,4 +35,12 @@ it('shows business status labels and formatted immutable custody evidence', asyn
     expect(screen.getByText(/Odometer:/)).toHaveTextContent('12,500');
     expect(screen.queryByText(/12500\.000000/)).not.toBeInTheDocument();
     expect(screen.getByText(/Customer collected vehicle/)).toBeInTheDocument();
+});
+
+it('lets the operator retry a failed vehicle-use history request', async () => {
+    vi.mocked(vehicleUseHistory).mockRejectedValueOnce(new ApiError('Vehicle-use history unavailable.', 500));
+    render(<VehicleUseHistoryPanel id={3} />);
+    expect(await screen.findByText('Vehicle-use history unavailable.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry vehicle-use history' }));
+    expect(await screen.findByText('With customer')).toBeInTheDocument();
 });
