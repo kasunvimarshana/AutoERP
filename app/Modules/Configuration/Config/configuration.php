@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Modules\Configuration\Constants\ConfigurationKey;
 use Modules\Configuration\Constants\ConfigurationScope;
 use Modules\Configuration\Constants\ConfigurationValueType;
 
@@ -24,7 +25,7 @@ return [
             'runtime_mutable' => true,
             'inherit_organization_hierarchy' => true,
         ],
-        'localization.timezone' => [
+        ConfigurationKey::WORKSPACE_TIMEZONE => [
             'label' => 'Workspace timezone',
             'description' => 'IANA timezone used when presenting local dates and times to users.',
             'owner' => 'Configuration',
