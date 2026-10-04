@@ -22,7 +22,7 @@ export function VehicleUseEditor({ agreement, replacement, onSaved, onCancel }: 
     const [error, setError] = useState<ApiError | null>(null); const [saving, setSaving] = useState(false);
     const sources = useCallback((params: LookupLoadParams) => requestLookup<NamedResource>(`${AGREEMENT_API}/vehicles/${vehicle?.id}/sources`, params, { starts_at: timestampWithOffset(start), ends_at: end ? timestampWithOffset(end) : '' }), [vehicle?.id, start, end]);
     async function submit(event: FormEvent) {
-        event.preventDefault(); if (!vehicle || (!company && !owner)) return;
+        event.preventDefault(); if (!vehicle || !start || (!company && !owner)) return;
         setSaving(true); setError(null);
         try { const input = { vehicle_id: vehicle.id, owner_agreement_id: company ? null : owner!.id, starts_at: timestampWithOffset(start), ends_at: end ? timestampWithOffset(end) : null, notes: notes || null }; if (replacement) await replaceVehicleUse(replacement, { ...input, reason: notes, return_odometer: oldOdometer || null, handover_odometer: newOdometer || null }); else await planVehicleUse(agreement, input); onSaved(); }
         catch (failure) { setError(toApiError(failure)); } finally { setSaving(false); }
@@ -34,7 +34,7 @@ export function VehicleUseEditor({ agreement, replacement, onSaved, onCancel }: 
         <fieldset disabled={saving} className="grid gap-4 sm:grid-cols-2">
             <LookupSelect label="Vehicle" value={vehicle} onChange={value => { setVehicle(value); setOwner(null); }} search={vehicles} required error={error?.fields.vehicle_id?.[0]} />
             <Input label={replacement ? "Replacement time" : "Planned handover"} type="datetime-local" step={OPERATIONAL_TIME_STEP_SECONDS} value={start} onChange={e => { setStart(e.target.value); setOwner(null); }} required error={error?.fields.starts_at?.[0]} />
-            <Input label="Planned return (optional)" type="datetime-local" step={OPERATIONAL_TIME_STEP_SECONDS} value={end} onChange={e => { setEnd(e.target.value); setOwner(null); }} error={error?.fields.ends_at?.[0]} />
+            <Input label="Planned return (optional)" type="datetime-local" step={OPERATIONAL_TIME_STEP_SECONDS} min={start || undefined} value={end} onChange={e => { setEnd(e.target.value); setOwner(null); }} error={error?.fields.ends_at?.[0]} />
             <label className="flex items-center gap-2"><input type="checkbox" checked={company} onChange={event => { setCompany(event.target.checked); setOwner(null); }} />Company-owned vehicle</label>
             {company && <p className="text-sm text-slate-600">Vehicle ownership records must cover the entire period. No owner payable is created for company supply.</p>}
             {!company && vehicle && !start && <p>Enter the planned period to find owner agreements covering it.</p>}
