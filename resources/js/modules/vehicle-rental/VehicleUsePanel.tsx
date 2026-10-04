@@ -43,7 +43,7 @@ export function VehicleUsePanel({ agreement, canManage }: { agreement: Agreement
             {hasPermission(auth, CHART_PERMISSION.view) && <Button type="button" variant="secondary" aria-expanded={charts === row.id} onClick={() => setCharts(charts === row.id ? null : row.id)}>{charts === row.id ? 'Hide Running Charts' : 'Running Charts'}</Button>}{charts === row.id && <RunningChartsPanel key={row.id} use={row} />}
             {history === row.id && <VehicleUseHistoryPanel key={row.id} id={row.id} />}
         </article>)}
-        {!loading && !error && rows.length === 0 && <p className="text-sm text-slate-500">No vehicles assigned.</p>}<Pagination meta={meta} onPageChange={value => { setPage(value); setAction(null); }} />
+        {!loading && !error && rows.length === 0 && <p className="text-sm text-slate-500">No vehicles assigned.</p>}<Pagination meta={meta} onPageChange={value => { setLoading(true); setPage(value); setAction(null); }} />
         {action && <form onSubmit={submit} className="space-y-3 rounded-lg border p-4" aria-label={USE_ACTION_LABELS[action.type]}>
             <h3 className="font-semibold">{USE_ACTION_LABELS[action.type]} · {action.row.vehicle.label}</h3>
             <p className="text-sm">{action.type === VehicleUseAction.Cancel ? 'Cancel the planned use and retain its history.' : `Record the actual event in ${operationalTimeZone()}. An expected return alone never releases a vehicle.`}</p>
