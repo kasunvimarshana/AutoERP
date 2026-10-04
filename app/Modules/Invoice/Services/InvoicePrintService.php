@@ -10,6 +10,7 @@ use DateTimeInterface;
 use DateTimeZone;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Modules\Configuration\Constants\ConfigurationKey;
 use Modules\Configuration\Contracts\ConfigurationResolverInterface;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
 use Modules\Core\Services\DecimalMath;
@@ -30,7 +31,6 @@ final class InvoicePrintService
 {
     private const DEFAULT_TAX_LABEL = 'Tax';
 
-    private const TIMEZONE_CONFIGURATION_KEY = 'localization.timezone';
 
     public const SIGNED_URL_TTL_MINUTES = 15;
 
@@ -514,7 +514,7 @@ final class InvoicePrintService
             return null;
         }
 
-        $timezone = (string) $this->configurationValue($invoice, self::TIMEZONE_CONFIGURATION_KEY);
+        $timezone = (string) $this->configurationValue($invoice, ConfigurationKey::WORKSPACE_TIMEZONE);
         $printedAt = DateTimeImmutable::createFromInterface($context->printedAt)
             ->setTimezone(new DateTimeZone($timezone));
 
