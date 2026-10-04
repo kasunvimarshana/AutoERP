@@ -67,6 +67,14 @@ export function businessDateTimeInputValue(
     ].join('-') + `T${pad(adjusted.getUTCHours())}:${pad(adjusted.getUTCMinutes())}`;
 }
 
+export function businessDateTimeInputValueWithSeconds(
+    date = new Date(),
+    timeZone = configuredTimeZone,
+): string {
+    const parts = dateTimeParts(date, timeZone);
+    return localTimestamp(parts);
+}
+
 export function businessTimestampWithOffset(value: string, timeZone = configuredTimeZone): string {
     const parts = parseLocalDateTime(value);
     if (!parts) throw new Error('Select a valid business date and time.');
