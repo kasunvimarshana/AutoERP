@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import type { ItemLookupResource } from '@/shared/api/lookupApi';
-import { Button } from '@/shared/components/Button';
 import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
 import { FormDrawer } from '@/shared/components/Drawer';
@@ -297,7 +296,7 @@ function removeLineFromList(lines: VehicleServiceJobLine[], lineId: number): Veh
         .map((line, index) => ({ ...line, line_number: index + 1 }));
 }
 
-function VehicleServiceLineTable({
+export function VehicleServiceLineTable({
     lines,
     loading,
     canManageLines,
@@ -740,6 +739,28 @@ function ComboDisclosure({
     const itemName = lineItemName(row.line);
     const itemMetadata = lineItemMetadata(row.line);
     const childLabel = `${row.childCount} included item${row.childCount === 1 ? '' : 's'}`;
+    const content = (
+        <span className="min-w-0 space-y-1">
+            <span className="flex flex-wrap items-center gap-2">
+                <span className="font-semibold text-slate-900">{itemName}</span>
+                <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-sky-700">
+                    Combo pack
+                </span>
+            </span>
+            {itemMetadata && (
+                <span className="block text-xs font-normal text-slate-500">{itemMetadata}</span>
+            )}
+            {showDescription && row.childCount > 0 && (
+                <span className="block text-xs font-normal text-slate-500">
+                    Bundle price covers {childLabel}.
+                </span>
+            )}
+        </span>
+    );
+
+    if (row.childCount === 0) {
+        return <div className="space-y-1">{content}</div>;
+    }
 
     return (
         <button
@@ -759,22 +780,7 @@ function ComboDisclosure({
             >
                 <path strokeLinecap="round" strokeLinejoin="round" d="m7.5 5 5 5-5 5" />
             </svg>
-            <span className="min-w-0 space-y-1">
-                <span className="flex flex-wrap items-center gap-2">
-                    <span className="font-semibold text-slate-900">{itemName}</span>
-                    <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-sky-700">
-                        Combo pack
-                    </span>
-                </span>
-                {itemMetadata && (
-                    <span className="block text-xs font-normal text-slate-500">{itemMetadata}</span>
-                )}
-                {showDescription && (
-                    <span className="block text-xs font-normal text-slate-500">
-                        Bundle price covers {childLabel}.
-                    </span>
-                )}
-            </span>
+            {content}
         </button>
     );
 }

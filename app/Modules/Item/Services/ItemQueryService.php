@@ -23,20 +23,44 @@ final class ItemQueryService
         private readonly DecimalMath $math,
     ) {}
 
-    public function paginate(array $criteria, int $tenantId, ?int $organizationUnitId, int $perPage): LengthAwarePaginator
+    public function paginate(
+        array $criteria,
+        int $tenantId,
+        ?int $organizationUnitId,
+        int $perPage,
+        ?string $relevanceSearch = null,
+        ?int $page = null,
+    ): LengthAwarePaginator
     {
         $query = $this->baseQuery($tenantId, $organizationUnitId)->with($this->summaryRelations());
         $this->applyCriteria($query, $criteria);
+
+        if ($relevanceSearch !== null && trim($relevanceSearch) !== '') {
+            $this->applySearchRelevance($query, $relevanceSearch);
+        }
 
         $sort = in_array(($criteria['sort'] ?? null), ['code', 'name', 'item_type', 'created_at'], true)
             ? (string) $criteria['sort']
             : 'name';
         $direction = ($criteria['direction'] ?? null) === 'desc' ? 'desc' : 'asc';
 
-        return $query->orderBy($sort, $direction)->paginate($perPage);
+        $query->orderBy($sort, $direction);
+        if ($relevanceSearch !== null && trim($relevanceSearch) !== '') {
+            $query->orderBy('id');
+        }
+
+        return $query->paginate($perPage, ['*'], 'page', $page);
     }
 
-    public function lookup(array $criteria, int $tenantId, ?int $organizationUnitId, int $perPage, string $kind): LengthAwarePaginator
+    public function lookup(
+        array $criteria,
+        int $tenantId,
+        ?int $organizationUnitId,
+        int $perPage,
+        string $kind,
+        bool $prioritizeSearch = false,
+        ?int $page = null,
+    ): LengthAwarePaginator
     {
         $criteria['is_active'] = true;
         match ($kind) {
@@ -47,7 +71,14 @@ final class ItemQueryService
             default => null,
         };
 
-        $paginator = $this->paginate($criteria, $tenantId, $organizationUnitId, min($perPage, 50));
+        $paginator = $this->paginate(
+            $criteria,
+            $tenantId,
+            $organizationUnitId,
+            min($perPage, 50),
+            $prioritizeSearch ? (string) ($criteria['search'] ?? '') : null,
+            $page,
+        );
         $duplicateNames = $this->duplicateNames($paginator->getCollection(), $tenantId, $organizationUnitId);
 
         $paginator->getCollection()->each(function (Item $item) use ($duplicateNames): void {
@@ -180,6 +211,18 @@ final class ItemQueryService
                 ->where('module_code', (string) $criteria['module_code'])
                 ->where('is_enabled', true));
         }
+    }
+
+    private function applySearchRelevance(Builder $query, string $search): void
+    {
+        $term = mb_strtolower(trim($search));
+        $prefix = $term.'%';
+        $query->orderByRaw(
+            'CASE WHEN LOWER(name) = ? OR LOWER(code) = ? OR LOWER(sku) = ? OR LOWER(barcode) = ? THEN 0 '
+            .'WHEN LOWER(name) LIKE ? OR LOWER(code) LIKE ? OR LOWER(sku) LIKE ? OR LOWER(barcode) LIKE ? THEN 1 '
+            .'ELSE 2 END',
+            [$term, $term, $term, $term, $prefix, $prefix, $prefix, $prefix],
+        );
     }
 
     private function resolveLookupServicePrices(

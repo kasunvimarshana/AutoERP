@@ -67,6 +67,7 @@ use Modules\VehicleService\Services\VehicleServiceInvoiceIntegrationService;
 use Modules\VehicleService\Services\VehicleServiceJobDiscountService;
 use Modules\VehicleService\Services\VehicleServiceJobService;
 use Modules\VehicleService\Services\VehicleServiceLineService;
+use Modules\VehicleService\Services\VehicleServiceLineItemLookupService;
 use Modules\VehicleService\Services\VehicleServicePaymentIntegrationService;
 use Modules\VehicleService\Services\VehicleServiceStatusService;
 use Tests\Support\CurrencyFixture;
@@ -84,6 +85,33 @@ final class VehicleServiceEngineTest extends TestCase
     {
         parent::setUp();
         $this->trustTenantScopedRequestContextFromPayload();
+    }
+
+    public function test_line_item_search_prioritizes_name_prefixes_across_item_types(): void
+    {
+        $context = $this->context();
+        $this->withTenantExecutionContext((int) $context['tenant_id'], function () use ($context): void {
+            $context['stock']->forceFill(['name' => 'ACURA WIPER WASH'])->save();
+            $context['service']->forceFill(['name' => 'WASH & VACUUM'])->save();
+            $context['labour']->forceFill(['name' => 'WASH LABOUR'])->save();
+        });
+
+        $result = $this->withTenantExecutionContext(
+            (int) $context['tenant_id'],
+            fn (): array => app(VehicleServiceLineItemLookupService::class)->search(
+                tenantId: (int) $context['tenant_id'],
+                organizationUnitId: null,
+                search: 'wash',
+                page: 1,
+                perPage: 20,
+                includeBatchOptions: false,
+            ),
+        );
+
+        $this->assertSame(
+            ['WASH & VACUUM', 'WASH LABOUR', 'ACURA WIPER WASH'],
+            array_map(fn (array $option): string => (string) $option['model']->name, $result['options']),
+        );
     }
 
     public function test_create_service_job_inspection_and_mixed_lines_use_decimal_totals(): void

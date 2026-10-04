@@ -280,6 +280,7 @@ export interface VehicleServiceJobPayload {
     priority?: string;
     notes?: string;
     customer_complaint?: string;
+    lines?: VehicleServiceLinePayload[];
 }
 
 export interface VehicleServiceLinePayload {

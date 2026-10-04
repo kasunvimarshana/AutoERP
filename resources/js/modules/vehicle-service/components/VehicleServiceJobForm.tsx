@@ -1,15 +1,21 @@
 import { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
-import { lookupApi, type VehicleLookupResource } from '@/shared/api/lookupApi';
+import { lookupApi, type ItemLookupResource, type VehicleLookupResource } from '@/shared/api/lookupApi';
 import { Button } from '@/shared/components/Button';
+import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { DecimalInput } from '@/shared/components/DecimalInput';
+import { FormDrawer } from '@/shared/components/Drawer';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { GenericLookupSelect } from '@/shared/components/GenericLookupSelect';
 import { Input } from '@/shared/components/Input';
 import { Panel } from '@/shared/components/Panel';
 import { Select } from '@/shared/components/Select';
 import { Textarea } from '@/shared/components/Textarea';
+import { lineValueWithItem, VehicleServiceLineItemLookup } from './line-editor/LineItemFields';
+import { VehicleServiceLineForm } from './line-editor/VehicleServiceLineForm';
+import { calculateLinePreview, emptyLineForm, lineFormToPayload, type VehicleServiceLineFormValue } from './line-editor/lineForm';
+import { VehicleServiceLineTable } from './VehicleServiceLineEditor';
 import { useMutationFormGuard } from '@/shared/hooks/useMutationFormGuard';
 import type { NamedResource } from '@/shared/types/common';
 import type { LookupLoadParams } from '@/shared/types/lookup';
@@ -19,7 +25,7 @@ import {
     createVehicleServiceJob,
     updateVehicleServiceJob,
 } from '../vehicleServiceApi';
-import type { CommissionType, VehicleServiceJob, VehicleServiceJobPayload, VehicleServiceJobType } from '../vehicleServiceTypes';
+import type { CommissionType, VehicleServiceJob, VehicleServiceJobLine, VehicleServiceJobPayload, VehicleServiceJobType } from '../vehicleServiceTypes';
 import { VehicleServiceQuickVehicleModal } from './VehicleServiceQuickVehicleModal';
 
 const ZERO_AMOUNT = '0.000000';
@@ -66,6 +72,13 @@ const currentCustomerOwner = (vehicle: VehicleLookupResource | null, fallback: N
 const vehicleLookupLabel = (vehicle: VehicleLookupResource): string =>
     vehicle.registration_number?.trim() || vehicle.name?.trim() || vehicle.code?.trim() || '';
 
+interface DraftJobLine {
+    key: number;
+    value: VehicleServiceLineFormValue;
+}
+
+let nextDraftLineKey = -1;
+
 export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
     const supervisorRequiredMessage = 'Select a valid supervisor from the list.';
     const navigate = useNavigate();
@@ -93,6 +106,11 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
     const [attemptedSubmit, setAttemptedSubmit] = useState(false);
+    const [activeTab, setActiveTab] = useState<'details' | 'lines'>('details');
+    const [selectedItem, setSelectedItem] = useState<ItemLookupResource | null>(null);
+    const [draftLines, setDraftLines] = useState<DraftJobLine[]>([]);
+    const [editingDraftLine, setEditingDraftLine] = useState<DraftJobLine | null>(null);
+    const [removeDraftLineId, setRemoveDraftLineId] = useState<number | null>(null);
     const formGuard = useMutationFormGuard(submitting);
     const updateForm = useCallback((next: Parameters<typeof setForm>[0]) => {
         formGuard.markDirty();
@@ -141,6 +159,7 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
         priority: form.priority || undefined,
         customer_complaint: form.customer_complaint,
         notes: form.notes || undefined,
+        ...(isCreating ? { lines: draftLines.map(({ value }) => lineFormToPayload(value)) } : {}),
     });
 
     const applyVehicle = useCallback((value: VehicleLookupResource | null) => {
@@ -197,6 +216,15 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
                 }
             }}>
                 <ErrorAlert error={error} />
+                {isCreating && (
+                    <div className="border-b border-slate-200">
+                        <div className="flex gap-6" role="tablist" aria-label="Service job details">
+                            <button type="button" role="tab" aria-selected={activeTab === 'details'} className={`border-b-2 px-2 py-3 text-sm font-medium ${activeTab === 'details' ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-600 hover:text-slate-900'}`} onClick={() => setActiveTab('details')}>Job details</button>
+                            <button type="button" role="tab" aria-selected={activeTab === 'lines'} className={`border-b-2 px-2 py-3 text-sm font-medium ${activeTab === 'lines' ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-600 hover:text-slate-900'}`} onClick={() => setActiveTab('lines')}>Job lines{draftLines.length > 0 ? ` (${draftLines.length})` : ''}</button>
+                        </div>
+                    </div>
+                )}
+                {(!isCreating || activeTab === 'details') && (
                 <Panel title="Service job">
                     <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
                         <div>
@@ -298,6 +326,43 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
                         <Textarea label="Notes" value={form.notes} error={errorFor('notes')} onChange={(event) => updateForm({ ...form, notes: event.target.value })} />
                     </div>
                 </Panel>
+                )}
+                {isCreating && activeTab === 'lines' && (
+                    <Panel title="Job lines">
+                        <p className="mb-4 text-sm text-slate-600">Add items to the draft and review their service prices. Lines are saved when you save the job.</p>
+                        <VehicleServiceLineItemLookup
+                            value={selectedItem}
+                            required={false}
+                            onChange={(item) => {
+                                setSelectedItem(null);
+                                if (item) {
+                                    const value = lineValueWithItem(emptyLineForm(), item);
+                                    setDraftLines((current) => [...current, { key: nextDraftLineKey--, value }]);
+                                    formGuard.markDirty();
+                                }
+                            }}
+                        />
+                        <VehicleServiceLineTable
+                            lines={draftLines.map(toDraftLinePreview)}
+                            loading={false}
+                            canManageLines
+                            canViewInventory={false}
+                            inventoryOnly={false}
+                            mutationDisabled={submitting}
+                            onEdit={(line) => {
+                                const draftLine = draftLines.find((entry) => entry.key === line.id);
+                                if (draftLine) setEditingDraftLine(draftLine);
+                            }}
+                            onQuantityChange={(line, quantity) => {
+                                formGuard.markDirty();
+                                setDraftLines((current) => current.map((entry) => entry.key === line.id
+                                    ? { ...entry, value: { ...entry.value, quantity } }
+                                    : entry));
+                            }}
+                            onRemove={(line) => setRemoveDraftLineId(line.id)}
+                        />
+                    </Panel>
+                )}
                 <div className="flex justify-end gap-2">
                     <Button type="button" variant="secondary" onClick={() => navigate(-1)}>Cancel</Button>
                     <Button type="submit" loading={submitting}>{job ? 'Save job' : 'Save draft'}</Button>
@@ -314,8 +379,91 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
                     setCustomer(nextCustomer);
                 }}
             />
+            <FormDrawer
+                open={editingDraftLine !== null}
+                title="Edit line"
+                onClose={() => !submitting && setEditingDraftLine(null)}
+                closeDisabled={submitting}
+            >
+                {editingDraftLine && (
+                    <VehicleServiceLineForm
+                        key={editingDraftLine.key}
+                        value={editingDraftLine.value}
+                        error={null}
+                        saving={submitting}
+                        onCancel={() => setEditingDraftLine(null)}
+                        onSave={(value) => {
+                            formGuard.markDirty();
+                            setDraftLines((current) => current.map((line) => line.key === editingDraftLine.key
+                                ? { ...line, value }
+                                : line));
+                            setEditingDraftLine(null);
+                        }}
+                    />
+                )}
+            </FormDrawer>
+            <ConfirmDialog
+                open={removeDraftLineId !== null}
+                title="Remove line"
+                message="This service line will be removed from the draft."
+                confirmLabel="Remove line"
+                onCancel={() => setRemoveDraftLineId(null)}
+                onConfirm={() => {
+                    if (removeDraftLineId === null) return;
+                    formGuard.markDirty();
+                    setDraftLines((current) => current.filter((line) => line.key !== removeDraftLineId));
+                    setRemoveDraftLineId(null);
+                }}
+            />
         </>
     );
+}
+
+function toDraftLinePreview(draft: DraftJobLine, index: number): VehicleServiceJobLine {
+    const payload = lineFormToPayload(draft.value);
+    const preview = calculateLinePreview(draft.value);
+
+    return {
+        id: draft.key,
+        line_number: index + 1,
+        line_source_type: payload.line_source_type,
+        item_id: payload.item_id ?? null,
+        item: draft.value.item ? {
+            id: draft.value.item.item_id ?? draft.value.item.id,
+            code: draft.value.item.code,
+            name: draft.value.item.name,
+        } : null,
+        item_variant_id: payload.item_variant_id ?? null,
+        batch_id: payload.batch_id ?? null,
+        batch: draft.value.item?.batch ?? null,
+        batch_price_revision_id: payload.batch_price_revision_id ?? null,
+        uom_id: draft.value.uom?.id,
+        uom: draft.value.uom,
+        description: payload.description,
+        quantity: draft.value.quantity,
+        unit_cost: draft.value.unit_cost,
+        unit_price: draft.value.unit_price,
+        discount_calculation_type: draft.value.discount_type,
+        discount_rate: draft.value.discount_type === 'percentage' ? draft.value.discount_value : ZERO_AMOUNT,
+        discount_amount: preview.discount,
+        tax_calculation_type: draft.value.tax_type,
+        tax_rate: draft.value.tax_type === 'percentage' ? draft.value.tax_value : ZERO_AMOUNT,
+        tax_amount: preview.tax,
+        charge_calculation_type: draft.value.charge_type,
+        charge_rate: draft.value.charge_type === 'percentage' ? draft.value.charge_value : ZERO_AMOUNT,
+        charge_amount: preview.charge,
+        line_total: preview.total,
+        is_inventory_tracked: Boolean(draft.value.item?.is_stockable),
+        is_customer_supplied: draft.value.customer_supplied,
+        is_external: draft.value.source === 'external_item',
+        is_billable: draft.value.billable,
+        is_employee_assignable: draft.value.source === 'labour_item',
+        available_stock_quantity: draft.value.item?.available_stock_quantity,
+        reserved_stock_quantity: draft.value.item?.reserved_stock_quantity,
+        reorder_level: draft.value.item?.reorder_level,
+        status: 'pending',
+        children: [],
+    };
 }
 
 function VehicleContext({ label, value }: { label: string; value: string }) {

@@ -9,6 +9,7 @@ use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\VehicleService\DTOs\VehicleServiceInspectionData;
 use Modules\VehicleService\DTOs\VehicleServiceJobData;
+use Modules\VehicleService\DTOs\VehicleServiceLineData;
 use Modules\VehicleService\Enums\VehicleServiceCommissionType;
 use Modules\VehicleService\Enums\VehicleServiceJobStatus;
 use Modules\VehicleService\Models\VehicleServiceInspection;
@@ -29,11 +30,13 @@ final class VehicleServiceJobService
         private readonly VehicleServiceCommissionPolicyService $commissionPolicies,
         private readonly VehicleServiceStatusService $statuses,
         private readonly VehicleServiceInspectionService $inspections,
+        private readonly VehicleServiceLineService $lines,
     ) {}
 
-    public function create(VehicleServiceJobData $data): VehicleServiceJob
+    /** @param list<VehicleServiceLineData> $lines */
+    public function create(VehicleServiceJobData $data, array $lines = []): VehicleServiceJob
     {
-        return DB::transaction(function () use ($data): VehicleServiceJob {
+        return DB::transaction(function () use ($data, $lines): VehicleServiceJob {
             $this->validator->customer($data->tenantId, $data->organizationUnitId, $data->customerId);
             $this->validator->customer($data->tenantId, $data->organizationUnitId, $this->billToCustomerId($data));
             $this->validator->vehicle($data->tenantId, $data->organizationUnitId, $data->vehicleId, $data->customerId);
@@ -53,7 +56,11 @@ final class VehicleServiceJobService
                 ));
             }
 
-            return $job->load($this->relations());
+            foreach ($lines as $line) {
+                $this->lines->create($job, $line, actorId: $data->createdBy);
+            }
+
+            return $job->refresh()->load($this->relations());
         });
     }
 
