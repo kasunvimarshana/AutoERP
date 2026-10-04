@@ -13,7 +13,7 @@ import { toApiError, type ApiError } from '@/shared/api/apiError';
 import type { PaginationMeta } from '@/shared/types/pagination';
 import { listChartRegister } from './runningChartApi';
 import { AC_LABELS, CHART_LABELS, COUNT_LABELS, DISTANCE_LABELS, RunningChartStatus, type ChartRegisterFilters, type ChartRegisterRow } from './runningCharts';
-import { operationalTimeZone, OPERATIONAL_TIME_STEP_SECONDS, timestampWithOffset } from './vehicleUse';
+import { formatOperationalDateTime, operationalTimeZone, OPERATIONAL_TIME_STEP_SECONDS, timestampWithOffset } from './vehicleUse';
 import { UsageChargePanel } from './UsageChargePanel';
 import { RunningChartHistoryPanel } from './RunningChartHistoryPanel';
 
@@ -28,7 +28,7 @@ export default function RunningChartRegisterPage() {
         const controller = new AbortController();
         listChartRegister(filters, page, controller.signal).then(result => {
             if (!controller.signal.aborted) { setRows(result.data); setMeta(result.meta); setError(null); }
-        }).catch(failure => { if (!controller.signal.aborted) setError(toApiError(failure)); })
+        }).catch(failure => { if (!controller.signal.aborted) { setRows([]); setMeta(undefined); setError(toApiError(failure)); } })
             .finally(() => { if (!controller.signal.aborted) setLoading(false); });
         return () => controller.abort();
     }, [filters, page]);
@@ -52,7 +52,7 @@ export default function RunningChartRegisterPage() {
             <Select label="Chart status" placeholder="All states" options={statusOptions} value={status} onChange={event => setStatus(event.target.value as RunningChartStatus | '')} />
             <Input label="Period start (optional)" type="datetime-local" step={OPERATIONAL_TIME_STEP_SECONDS} value={from} onChange={event => setFrom(event.target.value)} error={error?.fields.from?.[0]} />
             <Input label="Period end (optional)" type="datetime-local" step={OPERATIONAL_TIME_STEP_SECONDS} value={until} onChange={event => setUntil(event.target.value)} error={error?.fields.until?.[0]} />
-            <p className="text-sm text-slate-600 md:col-span-2">Times use {operationalTimeZone}. Results include charts overlapping the period and show their full recorded quantities. No quantities are prorated.</p>
+            <p className="text-sm text-slate-600 md:col-span-2">Times use {operationalTimeZone()}. Results include charts overlapping the period and show their full recorded quantities. No quantities are prorated.</p>
             <div className="flex flex-wrap gap-2 md:col-span-2"><Button type="submit" loading={loading}>Apply filters</Button><Button type="button" variant="secondary" onClick={clearFilters}>Clear filters</Button></div>
         </form></Panel>
         <ErrorAlert error={error} inline />
@@ -63,7 +63,7 @@ export default function RunningChartRegisterPage() {
                 <p>Customer: {row.customer_agreement.party_name} · {row.customer_agreement.reference}</p>
                 <p>{row.owner_agreement ? `Owner: ${row.owner_agreement.party_name} · ${row.owner_agreement.reference}` : 'Company supply'}</p>
                 <p>Driver: {row.driver ? `${row.driver.name} · ${row.driver.reference}` : 'Not recorded'}</p>
-                <p>{row.starts_at} — {row.ends_at}</p><p>Total distance: {row.total_km === null ? 'Not recorded' : <><QuantityDisplay value={row.total_km} /> km</>}</p>
+                <p>{formatOperationalDateTime(row.starts_at)} — {formatOperationalDateTime(row.ends_at)}</p><p>Total distance: {row.total_km === null ? 'Not recorded' : <><QuantityDisplay value={row.total_km} /> km</>}</p>
                 {row.replaces_vehicle && <p>Replaces vehicle {row.replaces_vehicle}</p>}{row.corrects_chart && <p>Corrects chart {row.corrects_chart.reference}</p>}
                 <Button type="button" variant="secondary" aria-expanded={selected === row.id} onClick={() => setSelected(selected === row.id ? null : row.id)}>{selected === row.id ? 'Hide details' : 'Review ' + row.reference}</Button>
                 {selected === row.id && <div className="space-y-3 border-t pt-3">
