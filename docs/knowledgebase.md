@@ -2,7 +2,7 @@
 
 **Status:** Canonical Vehicle Rental business/domain and production-policy reference for AutoERP.
 
-**Knowledge refresh date:** 2026-10-02
+**Knowledge refresh date:** 2026-10-04
 
 **Primary business source / conflict tie-breaker:** TACGL legacy application/data corpus
 
@@ -14,7 +14,7 @@
 
 **Live authoritative branch head:** resolve from Git/release records; it is intentionally not embedded here because documentation-only release commits would otherwise make this document self-stale.
 
-**Latest current-head re-verification:** [`changes/2026-10-02-vehicle-rental-production-reverification.md`](changes/2026-10-02-vehicle-rental-production-reverification.md)
+**Latest current-head re-verification:** [`changes/2026-10-04-vehicle-rental-business-timezone-ui-finalization.md`](changes/2026-10-04-vehicle-rental-business-timezone-ui-finalization.md)
 
 **Architecture policy:** root `RULES.md` / `AGENTS.md`
 
@@ -709,11 +709,13 @@ Principles:
 - failed reloads must not leave stale rows visible as though they are current;
 - server validation remains authoritative, but actionable field errors are shown beside the exact operator input that must be corrected;
 - narrative business evidence such as notes, revisions, reversals, replacements and void reasons uses a multiline control rather than a narrow code/value input;
+- operational timestamp entry, edit-value conversion and display use the Configuration-owned organization/tenant business timezone; Rental must not maintain a browser-timezone copy of that setting;
+- read-only operational/audit timestamps use the shared business-time formatter rather than exposing raw API ISO values;
 - no unnecessary approval ceremony;
 - technical allocation/history data visible only where it helps the user understand or resolve a real business issue;
 - destructive-looking actions must reflect true domain lifecycle, not generic CRUD.
 
-The 2026-10-02 UI/UX finalization and its second end-to-end completion audit apply this contract without changing any commercial rule, calculation, relationship or module ownership. See [Vehicle Rental UI/UX finalization](changes/2026-10-02-vehicle-rental-ui-ux-finalization.md) and [Vehicle Rental end-to-end UI/UX audit completion](changes/2026-10-02-vehicle-rental-ui-ux-end-to-end-audit-completion.md).
+The 2026-10-02 UI/UX finalization, its second end-to-end completion audit, and the 2026-10-04 business-timezone finalization apply this contract without changing any commercial rule, calculation, relationship or module ownership. See [Vehicle Rental UI/UX finalization](changes/2026-10-02-vehicle-rental-ui-ux-finalization.md), [Vehicle Rental end-to-end UI/UX audit completion](changes/2026-10-02-vehicle-rental-ui-ux-end-to-end-audit-completion.md), and [Vehicle Rental business-timezone UI finalization](changes/2026-10-04-vehicle-rental-business-timezone-ui-finalization.md).
 
 ---
 
@@ -816,7 +818,7 @@ The latest dependency-backed local verification supplied on 2026-10-02, immediat
 
 That backend run includes the Vehicle Rental agreement, successor/cutover, authenticated journey, base-rent, mileage, OT/night-out, deposit, Running Chart, driver, odometer, commercial-coverage, Vehicle Use and replacement test families.
 
-The 2026-10-02 UI/UX finalization and the subsequent end-to-end UI/UX completion audit are frontend/shared-presentation/test/documentation deltas on top of that executed baseline. Focused regression tests were added for their interaction, immutable-history, stale-data, validation-feedback and presentation changes. In the audit environment, a post-change dependency-backed rerun could not be executed because no repository dependency tree is mounted and hosted GitHub Actions remain excluded by the free-tools-only instruction. Therefore the earlier green run must not be described as a post-change execution result.
+The 2026-10-02 UI/UX deltas and the 2026-10-04 business-timezone finalization are frontend/shared-presentation/test/documentation deltas on top of that executed baseline. Focused regression tests cover interaction, immutable-history, stale-data, validation-feedback, configured business-time conversion/display and period-entry guards. The 2026-10-04 shared business-time algorithm also passed an isolated strict TypeScript compile plus runtime assertions for Asia/Colombo, New York standard/DST offsets, seconds-preserving round-trip and rejection of a nonexistent DST wall time. A complete post-change dependency-backed application rerun still cannot be claimed because the audit environment has no full repository dependency tree and hosted GitHub Actions remain excluded by the free-tools-only instruction.
 
 The exact Vehicle Rental runtime and migration lineage are unchanged from the earlier integrated cross-engine verification, which additionally recorded:
 

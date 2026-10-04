@@ -1,6 +1,8 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@/shared/api/apiError';
+import { configureBusinessTimeZone, formatBusinessDateTime } from '@/shared/utils/businessDate';
+import { configureBusinessTimeZone, formatBusinessDateTime } from '@/shared/utils/businessDate';
 import { RunningChartsPanel } from './RunningChartsPanel';
 import { listCharts, transitionChart } from './runningChartApi';
 import { RunningChartAction, RunningChartStatus, CHART_PERMISSION, type RunningChart } from './runningCharts';
@@ -10,10 +12,11 @@ vi.mock('@/modules/auth/AuthProvider', () => ({ useAuth: () => session }));
 vi.mock('./runningChartApi', () => ({ listCharts: vi.fn(), transitionChart: vi.fn(), chartHistory: vi.fn(), createChart: vi.fn(), updateChart: vi.fn() }));
 const use = { id: 3, row_version: 2, status: VehicleUseStatus.InCustody, vehicle: { id: 9, label: 'CAR-1234' } } as VehicleUse;
 const chart = { id: 5, row_version: 2, reference: 'CHART-A', status: RunningChartStatus.Finalized, starts_at: '2026-09-07T09:00:15+05:30', ends_at: '2026-09-07T17:00:30+05:30', total_km: null, corrects_chart: null } as RunningChart;
-beforeEach(() => { vi.clearAllMocks(); session.permissions = [CHART_PERMISSION.view]; vi.mocked(listCharts).mockResolvedValue({ data: [chart] }); });
+beforeEach(() => { configureBusinessTimeZone('Asia/Colombo'); vi.clearAllMocks(); session.permissions = [CHART_PERMISSION.view]; vi.mocked(listCharts).mockResolvedValue({ data: [chart] }); });
+afterEach(() => configureBusinessTimeZone(null));
 describe('Running Chart review', () => {
  it('preserves unknown distance and hides unauthorized actions', async () => {
-  render(<RunningChartsPanel use={use} />); expect(await screen.findByText('CHART-A')).toBeInTheDocument(); expect(screen.getByText('Finalized')).toBeInTheDocument(); expect(screen.getByText('Total distance: Not recorded')).toBeInTheDocument(); expect(screen.queryByRole('button', { name: 'Reverse usage' })).not.toBeInTheDocument(); expect(screen.queryByRole('button', { name: 'Record usage' })).not.toBeInTheDocument();
+  render(<RunningChartsPanel use={use} />); expect(await screen.findByText('CHART-A')).toBeInTheDocument(); expect(screen.getByText('Finalized')).toBeInTheDocument(); expect(screen.getByText('Total distance: Not recorded')).toBeInTheDocument(); expect(screen.getByText(`${formatBusinessDateTime(chart.starts_at)} — ${formatBusinessDateTime(chart.ends_at)}`)).toBeInTheDocument(); expect(screen.getByText(`${formatBusinessDateTime(chart.starts_at)} — ${formatBusinessDateTime(chart.ends_at)}`)).toBeInTheDocument(); expect(screen.queryByRole('button', { name: 'Reverse usage' })).not.toBeInTheDocument(); expect(screen.queryByRole('button', { name: 'Record usage' })).not.toBeInTheDocument();
  });
  it('requires a reason and preserves stale revision errors', async () => {
   session.permissions.push(CHART_PERMISSION.reverse); vi.mocked(transitionChart).mockRejectedValue(new ApiError('This record changed. Reload before continuing.', 409));

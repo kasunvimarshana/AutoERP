@@ -20,6 +20,7 @@ it('uses the planned period for owner lookup and clears its selection when dates
     expect(screen.queryByRole('combobox', { name: 'Owner agreement' })).not.toBeInTheDocument();
     const start = '2026-09-07T09:00'; const end = '2026-09-08T09:00';
     fireEvent.change(screen.getByLabelText('Planned handover'), { target: { value: start } });
+    expect(screen.getByLabelText('Planned return (optional)')).toHaveAttribute('min', start);
     fireEvent.change(screen.getByLabelText('Planned return (optional)'), { target: { value: end } });
     fireEvent.change(screen.getByRole('combobox', { name: 'Owner agreement' }), { target: { value: 'OWNER' } });
     fireEvent.click(await screen.findByRole('option', { name: 'OWNER-A · Example Owner' }));

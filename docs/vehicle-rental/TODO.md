@@ -274,6 +274,9 @@ This file is no longer an open list of speculative business questions. Historica
 
 - [x] Human-readable Customer/Supplier/Vehicle selectors.
 - [x] Owner-source selector and backend Vehicle Use eligibility apply the same tenant/org commercial-calendar coverage rule.
+- [x] Vehicle Use and Running Chart datetime entry/edit/display consume the shared configured organization/tenant business timezone; Rental does not maintain a separate browser-timezone source.
+- [x] Read-only Rental operational/audit timestamps use the shared business-time formatter instead of raw API ISO strings.
+- [x] Frontend Agreement/Vehicle Use/Running Chart period controls mirror existing backend ordering constraints without replacing backend validation.
 - [x] Employee driver lookup uses a Rental-scoped least-privilege façade over the HR-owned employee query; HR contact data is not exposed to the selector.
 - [x] No raw database IDs in normal workflow.
 - [x] Agreement review separates Draft edit from lifecycle transitions.
