@@ -7,6 +7,7 @@ import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { Textarea } from '@/shared/components/Textarea';
 import { Pagination } from '@/shared/components/Pagination';
+import { formatBusinessDateTime } from '@/shared/utils/businessDate';
 import { QuantityDisplay } from '@/shared/components/QuantityDisplay';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
@@ -29,7 +30,7 @@ export function RunningChartsPanel({ use }: { use: VehicleUse }) {
     function choose(chart: RunningChart, type: RunningChartAction) { setAction({ chart, type }); setReason(''); setError(null); }
     return <section aria-label="Running Charts" className="space-y-3 border-t pt-3"><div className="flex flex-wrap items-center gap-2"><h4 className="grow font-semibold">Running Charts · {use.vehicle.label}</h4><Button variant="secondary" disabled={saving || !!editor} onClick={reload}>Reload charts</Button>{canManage && [VehicleUseStatus.InCustody, VehicleUseStatus.Returned].includes(use.status) && <Button disabled={saving || !!editor || !!action} onClick={() => setEditor({})}>Record usage</Button>}</div>
         <ErrorAlert error={error} inline />{editor && <RunningChartEditor use={use} chart={editor.chart} correction={editor.correction} onSaved={reload} onCancel={() => setEditor(null)} />}
-        {loading ? <LoadingState label="Loading Running Charts…" /> : error ? null : rows.map(chart => <article key={chart.id} className="space-y-2 rounded border p-3"><div className="flex flex-wrap items-center gap-2"><p className="font-medium">{chart.reference}</p><StatusBadge status={chart.status} /></div><p>{chart.starts_at} — {chart.ends_at}</p><p>Total distance: {chart.total_km === null ? 'Not recorded' : <><QuantityDisplay value={chart.total_km} /> km</>}</p>{chart.corrects_chart && <p>Corrects {chart.corrects_chart.reference}</p>}
+        {loading ? <LoadingState label="Loading Running Charts…" /> : error ? null : rows.map(chart => <article key={chart.id} className="space-y-2 rounded border p-3"><div className="flex flex-wrap items-center gap-2"><p className="font-medium">{chart.reference}</p><StatusBadge status={chart.status} /></div><p>{formatBusinessDateTime(chart.starts_at)} — {formatBusinessDateTime(chart.ends_at)}</p><p>Total distance: {chart.total_km === null ? 'Not recorded' : <><QuantityDisplay value={chart.total_km} /> km</>}</p>{chart.corrects_chart && <p>Corrects {chart.corrects_chart.reference}</p>}
             <div className="flex flex-wrap gap-2"><Button type="button" variant="secondary" aria-expanded={history === chart.id} onClick={() => setHistory(history === chart.id ? null : chart.id)}>{history === chart.id ? 'Hide chart history' : 'Chart history'}</Button>{!editor && !action && <>
                 {canManage && chart.status === RunningChartStatus.Draft && <Button onClick={() => setEditor({ chart })}>Edit draft</Button>}
                 {hasPermission(auth, CHART_PERMISSION.finalize) && chart.status === RunningChartStatus.Draft && <Button onClick={() => choose(chart, RunningChartAction.Finalize)}>Finalize usage</Button>}

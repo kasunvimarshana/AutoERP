@@ -60,7 +60,7 @@ export function AgreementEditor({ kind, record, onSaved, onCancel }: { kind: Agr
             <Input label="Agreement date" type="date" value={agreedOn} onChange={e => setAgreedOn(e.target.value)} required error={fieldError('agreed_on')} />
             <Input label="Agreement executing date" type="date" value={executingOn} onChange={e => setExecutingOn(e.target.value)} error={fieldError('executing_on')} hint="Record the date stated in the agreement; leave blank if unknown." />
             <Input label="Start date" type="date" value={startsOn} onChange={e => setStartsOn(e.target.value)} required error={fieldError('starts_on')} />
-            <Input label="End date" type="date" value={endsOn} onChange={e => setEndsOn(e.target.value)} error={fieldError('ends_on')} hint="Leave blank if no end date has been agreed." />
+            <Input label="End date" type="date" min={startsOn || undefined} value={endsOn} onChange={e => setEndsOn(e.target.value)} error={fieldError('ends_on')} hint="Leave blank if no end date has been agreed." />
             <Select label="Rental basis" options={basisOptions} value={basis} onChange={e => setBasis(e.target.value as RentalBasis)} required error={fieldError('basis')} />
             <Select label="Driver arrangement" options={driverOptions} value={driver} onChange={e => setDriver(e.target.value as DriverMode)} required error={fieldError('driver_mode')} />
         </fieldset>

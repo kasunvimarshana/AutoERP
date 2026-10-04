@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { Pagination } from '@/shared/components/Pagination';
+import { formatBusinessDateTime } from '@/shared/utils/businessDate';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { useApi } from '@/shared/hooks/useApi';
 import { humanize } from '@/shared/utils/object';
@@ -22,7 +23,7 @@ export function AgreementHistoryPanel({ kind, id }: { kind: AgreementKind; id: n
                 {history.data.data.map((row) => (
                     <details key={row.version} className="rounded-lg border border-slate-200 p-3">
                         <summary className="cursor-pointer font-medium">
-                            Revision {row.version} · {humanize(row.action)} · {row.actor.name} · {row.recorded_at}
+                            Revision {row.version} · {humanize(row.action)} · {row.actor.name} · {formatBusinessDateTime(row.recorded_at)}
                         </summary>
                         <div className="mt-3 space-y-3">
                             <div className="flex flex-wrap items-center gap-2">

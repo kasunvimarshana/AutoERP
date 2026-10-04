@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { Pagination } from '@/shared/components/Pagination';
+import { formatBusinessDateTime } from '@/shared/utils/businessDate';
 import { QuantityDisplay } from '@/shared/components/QuantityDisplay';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { useApi } from '@/shared/hooks/useApi';
@@ -24,11 +25,11 @@ export function VehicleUseHistoryPanel({ id }: { id: number }) {
                             <p className="font-medium">Revision {row.version} · {humanize(row.action)}</p>
                             <StatusBadge status={row.status} label={USE_LABELS[row.status]} />
                         </div>
-                        <p className="text-sm text-slate-600">{row.actor.name} · {row.recorded_at}</p>
-                        <p>{row.vehicle_label} · {row.starts_at} — {row.ends_at ?? 'Open-ended'}</p>
+                        <p className="text-sm text-slate-600">{row.actor.name} · {formatBusinessDateTime(row.recorded_at)}</p>
+                        <p>{row.vehicle_label} · {formatBusinessDateTime(row.starts_at)} — {row.ends_at ? formatBusinessDateTime(row.ends_at) : 'Open-ended'}</p>
                         {row.reason && <p><span className="font-medium">Reason:</span> {row.reason}</p>}
-                        {row.handed_over_at && <p>Handed over: {row.handed_over_at} · Odometer: {row.handover_odometer === null ? 'Not recorded' : <QuantityDisplay value={row.handover_odometer} />}</p>}
-                        {row.returned_at && <p>Returned: {row.returned_at} · Odometer: {row.return_odometer === null ? 'Not recorded' : <QuantityDisplay value={row.return_odometer} />}</p>}
+                        {row.handed_over_at && <p>Handed over: {formatBusinessDateTime(row.handed_over_at)} · Odometer: {row.handover_odometer === null ? 'Not recorded' : <QuantityDisplay value={row.handover_odometer} />}</p>}
+                        {row.returned_at && <p>Returned: {formatBusinessDateTime(row.returned_at)} · Odometer: {row.return_odometer === null ? 'Not recorded' : <QuantityDisplay value={row.return_odometer} />}</p>}
                     </article>
                 ))}
                 <Pagination meta={history.data.meta} onPageChange={setPage} />
