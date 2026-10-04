@@ -1,9 +1,10 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@/shared/api/apiError';
+import { configureBusinessTimeZone } from '@/shared/utils/businessDate';
 import VehicleUseRegisterPage from './VehicleUseRegisterPage';
 import { listVehicleUseRegister, vehicleUseHistory } from './vehicleUseApi';
-import { timestampWithOffset, VehicleUseStatus, type VehicleUse } from './vehicleUse';
+import { formatOperationalDateTime, timestampWithOffset, VehicleUseStatus, type VehicleUse } from './vehicleUse';
 vi.mock('./vehicleUseApi', () => ({ listVehicleUseRegister: vi.fn(), vehicleUseHistory: vi.fn() }));
 const row: VehicleUse = {
     id: 12, row_version: 2, status: VehicleUseStatus.InCustody,
@@ -12,14 +13,15 @@ const row: VehicleUse = {
     handed_over_at: '2026-09-07T03:30:00+00:00', returned_at: null, handover_odometer: '0.000000', return_odometer: null, notes: null,
     replaces_use: { id: 11, vehicle_label: 'CAR-OLD' },
 };
-beforeEach(() => { vi.clearAllMocks(); vi.mocked(listVehicleUseRegister).mockResolvedValue({ data: [row] }); vi.mocked(vehicleUseHistory).mockResolvedValue({ data: [] }); });
+beforeEach(() => { configureBusinessTimeZone('Asia/Colombo'); vi.clearAllMocks(); vi.mocked(listVehicleUseRegister).mockResolvedValue({ data: [row] }); vi.mocked(vehicleUseHistory).mockResolvedValue({ data: [] }); });
+afterEach(() => configureBusinessTimeZone(null));
 describe('Vehicle Use register', () => {
     it('shows planned and actual dates separately, replacement context and expandable custody evidence', async () => {
         render(<VehicleUseRegisterPage />);
         expect(await screen.findByText('CAR-1234 · CUSTOMER-A')).toBeInTheDocument();
         expect(screen.getByText('Customer: Example Customer')).toBeInTheDocument();
-        expect(screen.getByText(`Planned: ${row.starts_at} — Open-ended`)).toBeInTheDocument();
-        expect(screen.getByText(`Handed over: ${row.handed_over_at}`)).toBeInTheDocument();
+        expect(screen.getByText(`Planned: ${formatOperationalDateTime(row.starts_at)} — Open-ended`)).toBeInTheDocument();
+        expect(screen.getByText(`Handed over: ${formatOperationalDateTime(row.handed_over_at)}`)).toBeInTheDocument();
         expect(screen.getByText('Replaces vehicle CAR-OLD')).toBeInTheDocument();
         expect(vehicleUseHistory).not.toHaveBeenCalled();
         fireEvent.click(screen.getByRole('button', { name: 'Review CAR-1234' }));
