@@ -6,6 +6,7 @@ import { QuantityDisplay } from '@/shared/components/QuantityDisplay';
 import { useApi } from '@/shared/hooks/useApi';
 import { humanize } from '@/shared/utils/object';
 import { chartHistory } from './runningChartApi';
+import { formatOperationalDateTime } from './vehicleUse';
 import { AC_LABELS, COUNT_LABELS, DISTANCE_LABELS, DriverIdentitySource } from './runningCharts';
 
 export function RunningChartHistoryPanel({ id }: { id: number }) {
@@ -21,10 +22,10 @@ export function RunningChartHistoryPanel({ id }: { id: number }) {
                     <article key={row.version} className="space-y-3 rounded-lg border border-slate-200 p-3">
                         <div>
                             <p className="font-medium">Revision {row.version} · {humanize(row.action)}</p>
-                            <p className="text-sm text-slate-600">{row.actor.name} · {row.recorded_at}</p>
+                            <p className="text-sm text-slate-600">{row.actor.name} · {formatOperationalDateTime(row.recorded_at)}</p>
                         </div>
                         {row.reason && <p><span className="font-medium">Reason:</span> {row.reason}</p>}
-                        <p>{row.facts.reference} · {row.facts.starts_at} — {row.facts.ends_at}</p>
+                        <p>{row.facts.reference} · {formatOperationalDateTime(row.facts.starts_at)} — {formatOperationalDateTime(row.facts.ends_at)}</p>
                         <dl className="grid gap-3 sm:grid-cols-2">
                             {Object.entries(DISTANCE_LABELS).map(([key, label]) => {
                                 const value = row.facts[key as keyof typeof DISTANCE_LABELS];
