@@ -14,7 +14,7 @@
 
 **Live authoritative branch head:** resolve from Git/release records; it is intentionally not embedded here because documentation-only release commits would otherwise make this document self-stale.
 
-**Latest current-head re-verification:** [`changes/2026-10-04-vehicle-rental-business-timezone-ui-finalization.md`](changes/2026-10-04-vehicle-rental-business-timezone-ui-finalization.md)
+**Latest current-head re-verification:** [`changes/2026-10-04-vehicle-rental-business-timezone-verification-correction.md`](changes/2026-10-04-vehicle-rental-business-timezone-verification-correction.md)
 
 **Architecture policy:** root `RULES.md` / `AGENTS.md`
 
@@ -707,6 +707,7 @@ Principles:
 - register filters are explicitly resettable without mutating business data;
 - immutable Agreement, Vehicle Use and Running Chart history must present the business evidence already supplied by the backend using the same labels/formatters as current-state screens;
 - failed reloads must not leave stale rows visible as though they are current;
+- configured business-local wall times must resolve to exactly one instant; nonexistent or ambiguous DST wall times are rejected rather than guessed;
 - server validation remains authoritative, but actionable field errors are shown beside the exact operator input that must be corrected;
 - narrative business evidence such as notes, revisions, reversals, replacements and void reasons uses a multiline control rather than a narrow code/value input;
 - operational timestamp entry, edit-value conversion and display use the Configuration-owned organization/tenant business timezone; Rental must not maintain a browser-timezone copy of that setting;
@@ -818,7 +819,7 @@ The latest dependency-backed local verification supplied on 2026-10-02, immediat
 
 That backend run includes the Vehicle Rental agreement, successor/cutover, authenticated journey, base-rent, mileage, OT/night-out, deposit, Running Chart, driver, odometer, commercial-coverage, Vehicle Use and replacement test families.
 
-The 2026-10-02 UI/UX deltas and the 2026-10-04 business-timezone finalization are frontend/shared-presentation/test/documentation deltas on top of that executed baseline. Focused regression tests cover interaction, immutable-history, stale-data, validation-feedback, configured business-time conversion/display and period-entry guards. The 2026-10-04 shared business-time algorithm also passed an isolated strict TypeScript compile plus runtime assertions for Asia/Colombo, New York standard/DST offsets, seconds-preserving round-trip and rejection of a nonexistent DST wall time. A complete post-change dependency-backed application rerun still cannot be claimed because the audit environment has no full repository dependency tree and hosted GitHub Actions remain excluded by the free-tools-only instruction.
+The 2026-10-02 UI/UX deltas and the 2026-10-04 business-timezone finalization are frontend/shared-presentation/test/documentation deltas on top of that executed baseline. Focused regression tests cover interaction, immutable-history, stale-data, validation-feedback, configured business-time conversion/display and period-entry guards. The 2026-10-04 shared business-time algorithm also passed isolated runtime verification for Asia/Colombo, New York standard/DST offsets, seconds-preserving round-trip, rejection of a nonexistent DST wall time, and rejection of an ambiguous DST fall-back wall time. The follow-up verification correction also removed a duplicated focused-test import that would otherwise trigger TypeScript `TS2300 Duplicate identifier`. A complete post-change dependency-backed application rerun still cannot be claimed because the audit environment has no full repository dependency tree and hosted GitHub Actions remain excluded by the free-tools-only instruction.
 
 The exact Vehicle Rental runtime and migration lineage are unchanged from the earlier integrated cross-engine verification, which additionally recorded:
 

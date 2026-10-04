@@ -14,8 +14,11 @@ interface DateTimeParts extends DateParts {
 
 const LOCAL_DATE_TIME_PATTERN = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/;
 const MINUTES_PER_HOUR = 60;
+const HOURS_PER_DAY = 24;
 const MILLISECONDS_PER_MINUTE = 60_000;
+const MILLISECONDS_PER_DAY = HOURS_PER_DAY * MINUTES_PER_HOUR * MILLISECONDS_PER_MINUTE;
 const MAX_TIME_ZONE_RESOLUTION_PASSES = 4;
+const TIME_ZONE_TRANSITION_PROBE_DAYS = 1;
 
 export function configureBusinessTimeZone(timeZone?: string | null): void {
     configuredTimeZone = isValidTimeZone(timeZone) ? timeZone : null;
@@ -89,17 +92,19 @@ export function businessTimestampWithOffset(value: string, timeZone = configured
             parts.second,
         );
         if (!sameLocalParts(localDate, parts)) throw new Error('Select a valid business date and time.');
+
+        const browserTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        if (isValidTimeZone(browserTimeZone)) {
+            const desiredUtc = utcTimestamp(parts);
+            if (matchingTimeZoneInstants(parts, browserTimeZone, desiredUtc, localDate).length !== 1) {
+                throw new Error('Select a valid business date and time.');
+            }
+        }
+
         return `${localTimestamp(parts)}${offsetText(-localDate.getTimezoneOffset())}`;
     }
 
-    const desiredUtc = Date.UTC(
-        parts.year,
-        parts.month - 1,
-        parts.day,
-        parts.hour,
-        parts.minute,
-        parts.second,
-    );
+    const desiredUtc = utcTimestamp(parts);
     let candidate = desiredUtc;
 
     for (let pass = 0; pass < MAX_TIME_ZONE_RESOLUTION_PASSES; pass += 1) {
@@ -111,6 +116,9 @@ export function businessTimestampWithOffset(value: string, timeZone = configured
 
     const instant = new Date(candidate);
     if (!sameDateTimeParts(dateTimeParts(instant, timeZone), parts)) {
+        throw new Error('Select a valid business date and time.');
+    }
+    if (matchingTimeZoneInstants(parts, timeZone, desiredUtc, instant).length !== 1) {
         throw new Error('Select a valid business date and time.');
     }
 
@@ -209,6 +217,41 @@ function timeZoneOffsetMinutes(date: Date, timeZone: string): number {
         parts.second,
     );
     return Math.round((representedAsUtc - date.getTime()) / MILLISECONDS_PER_MINUTE);
+}
+
+function matchingTimeZoneInstants(
+    parts: DateTimeParts,
+    timeZone: string,
+    desiredUtc: number,
+    resolvedInstant: Date,
+): Date[] {
+    const probeDistance = TIME_ZONE_TRANSITION_PROBE_DAYS * MILLISECONDS_PER_DAY;
+    const offsets = new Set<number>([
+        timeZoneOffsetMinutes(resolvedInstant, timeZone),
+        timeZoneOffsetMinutes(new Date(resolvedInstant.getTime() - probeDistance), timeZone),
+        timeZoneOffsetMinutes(new Date(resolvedInstant.getTime() + probeDistance), timeZone),
+    ]);
+
+    const matches = new Map<number, Date>();
+    for (const offset of offsets) {
+        const instant = new Date(desiredUtc - offset * MILLISECONDS_PER_MINUTE);
+        if (sameDateTimeParts(dateTimeParts(instant, timeZone), parts)) {
+            matches.set(instant.getTime(), instant);
+        }
+    }
+
+    return [...matches.values()];
+}
+
+function utcTimestamp(parts: DateTimeParts): number {
+    return Date.UTC(
+        parts.year,
+        parts.month - 1,
+        parts.day,
+        parts.hour,
+        parts.minute,
+        parts.second,
+    );
 }
 
 function sameLocalParts(date: Date, parts: DateTimeParts): boolean {
