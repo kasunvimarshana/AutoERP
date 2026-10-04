@@ -63,6 +63,7 @@ export function BaseRentBillingPanel({ kind, agreement }: { kind: AgreementKind;
             <p className="text-sm">Enter the verified accounting exchange rate; use one when both currencies are the same.</p></>}
             <label className="flex gap-2"><input type="checkbox" checked={accepted} disabled={busy} onChange={e => setAccepted(e.target.checked)} />{selected ? (action === ChargeAction.Void ? 'Void this charge after releasing its invoices; retain its calculation history.' : 'Reissue this unchanged base charge using the document details above.') : 'Apply the stated actual-calendar policy to this base charge.'}</label>
             <ErrorAlert error={error ?? chargeRequest.error} inline />
+            {chargeRequest.error && <Button type="button" variant="secondary" disabled={busy} onClick={() => { setError(null); chargeRequest.reload(); }}>Retry recorded charges</Button>}
             <Button type="submit" loading={busy} disabled={chargeRequest.loading || !!chargeRequest.error || !accepted || (selected && action === ChargeAction.Void ? !reason.trim() : (!invoiceDate || !exchangeRate || (!selected && (!from || !until))))}>{selected && action === ChargeAction.Void ? 'Void charge' : 'Create invoice draft'}</Button>
         </form>
         {created && <p role="status" className="mt-3">Created <Link className="underline" to={`/invoices/${created.id}`}>{created.invoice_number}</Link> · total <MoneyDisplay value={created.grand_total} currency={agreement.currency.code} /></p>}
