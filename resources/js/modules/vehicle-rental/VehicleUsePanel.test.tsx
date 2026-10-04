@@ -60,3 +60,17 @@ it('removes stale rows when a vehicle-use reload fails', async () => {
     expect(await screen.findByText('Vehicle uses could not be loaded.')).toBeInTheDocument();
     expect(screen.queryByText('CAR-1234')).not.toBeInTheDocument();
 });
+
+it('enters loading state immediately when paging assigned vehicles', async () => {
+    vi.mocked(listVehicleUses)
+        .mockResolvedValueOnce({
+            data: [row],
+            meta: { current_page: 1, from: 1, last_page: 2, per_page: 20, to: 1, total: 2 },
+        })
+        .mockReturnValueOnce(new Promise<never>(() => undefined));
+    render(<VehicleUsePanel agreement={agreement} canManage={false} />);
+    expect(await screen.findByText('CAR-1234')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Go to page 2' }));
+    expect(screen.getByRole('status')).toHaveTextContent('Loading assigned vehicles…');
+    expect(screen.queryByText('CAR-1234')).not.toBeInTheDocument();
+});
