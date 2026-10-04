@@ -76,3 +76,13 @@ it('formats the server rate and maps usage billing validation to its field', asy
     fireEvent.click(screen.getByRole('button', { name: 'Create invoice draft' }));
     expect(await screen.findByText('Enter a positive exchange rate.')).toBeInTheDocument();
 });
+
+it('lets the operator retry usage charges after a load failure', async () => {
+    vi.mocked(loadUsageCharges)
+        .mockRejectedValueOnce(new ApiError('Usage charges unavailable.', 500))
+        .mockResolvedValueOnce(list);
+    render(<MemoryRouter><UsageChargeForm kind={AgreementKind.Customer} chart={chart} /></MemoryRouter>);
+    expect(await screen.findByText('Usage charges unavailable.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry charges' }));
+    expect(await screen.findByLabelText('Component')).toBeInTheDocument();
+});
