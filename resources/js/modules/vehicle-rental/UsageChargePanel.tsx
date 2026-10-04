@@ -60,6 +60,7 @@ export function UsageChargeForm({ kind, chart }: { kind: AgreementKind; chart: R
         <p className="font-medium">{kind === AgreementKind.Customer ? 'Customer charges' : 'Owner payables'} · {chart.reference}</p>
         <p className="text-sm">Bill a recorded OT or night-out component using this side’s assigned agreement. OT uses minutes × the category’s hourly rate ÷ 60, without another multiplier. Night-outs use count × agreed rate. Blank values cannot be billed. Review and post the draft in Invoice.</p>
         <ErrorAlert error={error ?? charges.error} inline />
+        {charges.error && <Button type="button" variant="secondary" disabled={busy} onClick={() => { setError(null); charges.reload(); }}>Retry charges</Button>}
         {charges.loading ? <LoadingState label={kind === AgreementKind.Customer ? 'Loading customer charges…' : 'Loading owner payables…'} /> : result && <><p className="text-sm text-slate-600">Agreement {result.agreement.reference}</p>
         {chart.status === RunningChartStatus.Finalized && <Button variant="secondary" disabled={busy} onClick={() => { setMileage(!mileage); setSelected(null); setAction(ChargeAction.Create); setAccepted(false); setError(null); }}>{mileage ? 'OT and night-outs' : 'Assess mileage'}</Button>}
         {mileage && <MileageAssessmentPanel kind={kind} chart={chart} onSaved={() => setRevision(value => value + 1)} />}
