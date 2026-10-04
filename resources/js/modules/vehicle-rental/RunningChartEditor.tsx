@@ -11,7 +11,7 @@ import type { NamedResource } from '@/shared/types/common';
 import type { LookupLoadParams } from '@/shared/types/lookup';
 import { createChart, updateChart } from './runningChartApi';
 import { AirConditioningMode, COUNT_LABELS, DISTANCE_LABELS, DRIVER_EMPLOYEE_API, DriverIdentitySource, type ChartFacts, type RunningChart } from './runningCharts';
-import { localTimestampValue, operationalTimeZone, OPERATIONAL_TIME_STEP_SECONDS, timestampWithOffset, type VehicleUse } from './vehicleUse';
+import { localTimestampValue, operationalTimeZoneLabel, OPERATIONAL_TIME_STEP_SECONDS, timestampWithOffset, type VehicleUse } from './vehicleUse';
 
 const employees = (params: LookupLoadParams) => requestLookup<Record<string, unknown>>(DRIVER_EMPLOYEE_API, params)
     .then(result => ({ ...result, data: result.data.map(row => ({ id: Number(row.id), name: String(row.display_name ?? row.name ?? row.employee_number ?? ''), code: String(row.employee_number ?? row.code ?? '') })) }));
@@ -58,7 +58,7 @@ export function RunningChartEditor({ use, chart, correction, onSaved, onCancel }
     const count = (key: string, label: string) => <Input key={key} label={label} type="number" min={0} step={1} inputMode="numeric" value={values[key]} onChange={e => setValues(v => ({ ...v, [key]: e.target.value }))} error={error?.fields[key]?.[0]} />;
     return <form aria-label="Running Chart" onSubmit={submit} className="space-y-3 rounded border p-4">
         <h4 className="font-semibold">{correction ? `Correct ${chart?.reference}` : chart ? 'Edit draft Running Chart' : 'Record Running Chart'}</h4>
-        <p>Record actual usage in {operationalTimeZone}. Leave unknown observations blank; enter zero only when verified.</p><ErrorAlert error={error} inline />
+        <p>Record actual usage in {operationalTimeZoneLabel()}. Leave unknown observations blank; enter zero only when verified.</p><ErrorAlert error={error} inline />
         <fieldset disabled={saving} className="space-y-3">
             <Input label="Chart reference" required value={reference} onChange={e => setReference(e.target.value)} error={error?.fields.reference?.[0]} />
             <Input label="Usage start" type="datetime-local" step={OPERATIONAL_TIME_STEP_SECONDS} required value={start} onChange={e => setStart(e.target.value)} error={error?.fields.starts_at?.[0]} />
