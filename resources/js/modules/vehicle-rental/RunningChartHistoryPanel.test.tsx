@@ -1,5 +1,6 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, expect, it, vi } from 'vitest';
+import { ApiError } from '@/shared/api/apiError';
 import { RunningChartHistoryPanel } from './RunningChartHistoryPanel';
 import { chartHistory } from './runningChartApi';
 import { AirConditioningMode, DriverIdentitySource } from './runningCharts';
@@ -83,4 +84,12 @@ it('shows immutable employee driver snapshots when the chart used an employee dr
     });
     render(<RunningChartHistoryPanel id={10} />);
     expect(await screen.findByText(/Employee driver · Rental Driver One · DRV-001/)).toBeInTheDocument();
+});
+
+it('lets the operator retry a failed Running Chart history request', async () => {
+    vi.mocked(chartHistory).mockRejectedValueOnce(new ApiError('Running Chart history unavailable.', 500));
+    render(<RunningChartHistoryPanel id={9} />);
+    expect(await screen.findByText('Running Chart history unavailable.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry Running Chart history' }));
+    expect(await screen.findByText(/Revision 2 · Reverse/)).toBeInTheDocument();
 });
