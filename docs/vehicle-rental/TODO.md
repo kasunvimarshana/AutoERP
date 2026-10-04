@@ -366,5 +366,6 @@ Vehicle Rental is considered functionally complete when the following remain tru
 15. future-effective agreement activation uses the configured tenant/org commercial calendar rather than a process-global timezone;
 16. recorded historical closure boundaries are persisted as immutable civil dates and are not reinterpreted after timezone configuration changes;
 17. future changes preserve this ledger and record actual verification evidence rather than assuming it.
+18. operational business-local timestamps must resolve to exactly one instant; nonexistent and ambiguous DST wall times are rejected rather than silently coerced.
 
 There are no remaining open product-policy TODO items in this ledger. Source-access limitations and environment-specific execution evidence are documented separately and must not be converted into speculative runtime behavior.

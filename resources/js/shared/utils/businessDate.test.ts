@@ -51,6 +51,10 @@ describe('business date utilities', () => {
         expect(() => businessTimestampWithOffset('2026-03-08T02:30', 'America/New_York')).toThrow('Select a valid business date and time.');
     });
 
+    it('rejects ambiguous local times during a daylight-saving fall-back instead of guessing an instant', () => {
+        expect(() => businessTimestampWithOffset('2026-11-01T01:30', 'America/New_York')).toThrow('Select a valid business date and time.');
+    });
+
     it('round trips configured-zone timestamps back to business-local inputs', () => {
         configureBusinessTimeZone('Asia/Colombo');
         const timestamp = businessTimestampWithOffset('2026-09-07T09:00:15');

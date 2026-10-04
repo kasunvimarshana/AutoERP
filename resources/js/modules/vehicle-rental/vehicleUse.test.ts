@@ -17,4 +17,10 @@ describe('Vehicle Rental business-time helpers', () => {
 
         expect(localTimestampValue('2026-09-07T03:30:15Z')).toBe('2026-09-07T09:00:15');
     });
+
+    it('refuses ambiguous configured business times instead of choosing one DST occurrence', () => {
+        configureBusinessTimeZone('America/New_York');
+
+        expect(() => timestampWithOffset('2026-11-01T01:30')).toThrow('Select a valid business date and time.');
+    });
 });
