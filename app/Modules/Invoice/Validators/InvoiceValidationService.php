@@ -14,6 +14,8 @@ use Modules\Invoice\DTOs\InvoiceSourceData;
 use Modules\Invoice\DTOs\InvoiceSourceLineData;
 use Modules\Invoice\Enums\AdjustmentEffect;
 use Modules\Invoice\Enums\AdjustmentType;
+use Modules\ReferenceData\Models\CurrencyModel;
+use Modules\Tenant\Models\TenantModel;
 
 final class InvoiceValidationService
 {
@@ -48,11 +50,34 @@ final class InvoiceValidationService
         }
 
         $this->assertPositive($data->exchangeRate, 'Invoice exchange rate');
+        $this->validateCurrency($data->tenantId, $data->currencyId, $data->exchangeRate);
     }
 
     /**
      * @return array<string, true>
      */
+    private function validateCurrency(int $tenantId, ?int $currencyId, string $exchangeRate): void
+    {
+        $tenant = TenantModel::query()->findOrFail($tenantId);
+        $baseCurrencyId = $tenant->base_currency_id === null ? null : (int) $tenant->base_currency_id;
+
+        if ($currencyId === null) {
+            if ($this->math->compare($exchangeRate, '1.000000') !== 0) {
+                throw new InvalidArgumentException('An invoice without an explicit currency must use an exchange rate of 1.000000.');
+            }
+
+            return;
+        }
+
+        $currency = CurrencyModel::query()->find($currencyId);
+        if (! $currency instanceof CurrencyModel || ! (bool) $currency->is_active) {
+            throw new InvalidArgumentException('Invoice currency must be active.');
+        }
+        if ($baseCurrencyId !== null && $currencyId === $baseCurrencyId && $this->math->compare($exchangeRate, '1.000000') !== 0) {
+            throw new InvalidArgumentException('Tenant base currency invoices must use an exchange rate of 1.000000.');
+        }
+    }
+
     private function validateLines(CreateInvoiceData $data): array
     {
         $lineNumbers = [];
