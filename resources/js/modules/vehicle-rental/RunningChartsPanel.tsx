@@ -13,7 +13,7 @@ import { StatusBadge } from '@/shared/components/StatusBadge';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import type { PaginationMeta } from '@/shared/types/pagination';
 import { VehicleUseStatus, type VehicleUse } from './vehicleUse';
-import { CHART_PERMISSION, RunningChartAction, RunningChartStatus, type RunningChart } from './runningCharts';
+import { CHART_ACTION_CONFIRM_LABELS, CHART_PERMISSION, RunningChartAction, RunningChartStatus, type RunningChart } from './runningCharts';
 import { listCharts, transitionChart } from './runningChartApi';
 import { UsageChargePanel } from './UsageChargePanel';
 import { RunningChartEditor } from './RunningChartEditor';
@@ -34,10 +34,10 @@ export function RunningChartsPanel({ use }: { use: VehicleUse }) {
             <div className="flex flex-wrap gap-2"><Button type="button" variant="secondary" aria-expanded={history === chart.id} onClick={() => setHistory(history === chart.id ? null : chart.id)}>{history === chart.id ? 'Hide chart history' : 'Chart history'}</Button>{!editor && !action && <>
                 {canManage && chart.status === RunningChartStatus.Draft && <Button onClick={() => setEditor({ chart })}>Edit draft</Button>}
                 {hasPermission(auth, CHART_PERMISSION.finalize) && chart.status === RunningChartStatus.Draft && <Button onClick={() => choose(chart, RunningChartAction.Finalize)}>Finalize usage</Button>}
-                {hasPermission(auth, CHART_PERMISSION.reverse) && chart.status === RunningChartStatus.Finalized && <Button onClick={() => choose(chart, RunningChartAction.Reverse)}>Reverse usage</Button>}
+                {hasPermission(auth, CHART_PERMISSION.reverse) && chart.status === RunningChartStatus.Finalized && <Button variant="danger" onClick={() => choose(chart, RunningChartAction.Reverse)}>Reverse usage</Button>}
                 {canManage && chart.status === RunningChartStatus.Reversed && <Button onClick={() => setEditor({ chart, correction: true })}>Create correction</Button>}
             </>}</div>{history === chart.id && <RunningChartHistoryPanel key={chart.id} id={chart.id} />}<UsageChargePanel chart={chart} hasOwner={use.owner_agreement !== null} /></article>)}
         {!loading && !error && !rows.length && <p className="text-sm text-slate-500">No Running Charts recorded.</p>}<Pagination meta={meta} onPageChange={value => { setLoading(true); setPage(value); setAction(null); }} />
-        {action && <form onSubmit={submit} aria-label="Confirm chart action" className="space-y-3 rounded border p-3"><p>{action.type === RunningChartAction.Finalize ? 'Finalize physical evidence. This does not create charges.' : 'Reverse physical evidence and retain its original history.'} · {action.chart.reference}</p>{action.type === RunningChartAction.Reverse && <Textarea label="Reversal reason" required value={reason} onChange={e => setReason(e.target.value)} error={error?.fields.reason?.[0]} />}<div className="flex flex-wrap gap-2"><Button type="submit" loading={saving} disabled={action.type === RunningChartAction.Reverse && !reason.trim()}>Confirm</Button><Button variant="secondary" disabled={saving} onClick={() => setAction(null)}>Cancel</Button></div></form>}
+        {action && <form onSubmit={submit} aria-label="Confirm chart action" className="space-y-3 rounded border p-3"><p>{action.type === RunningChartAction.Finalize ? 'Finalize physical evidence. This does not create charges.' : 'Reverse physical evidence and retain its original history.'} · {action.chart.reference}</p>{action.type === RunningChartAction.Reverse && <Textarea label="Reversal reason" required value={reason} onChange={e => setReason(e.target.value)} error={error?.fields.reason?.[0]} />}<div className="flex flex-wrap gap-2"><Button type="submit" variant={action.type === RunningChartAction.Reverse ? 'danger' : 'primary'} loading={saving} disabled={action.type === RunningChartAction.Reverse && !reason.trim()}>{CHART_ACTION_CONFIRM_LABELS[action.type]}</Button><Button variant="secondary" disabled={saving} onClick={() => setAction(null)}>Cancel</Button></div></form>}
     </section>;
 }
