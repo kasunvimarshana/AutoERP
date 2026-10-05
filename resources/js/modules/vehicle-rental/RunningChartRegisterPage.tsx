@@ -29,7 +29,7 @@ export default function RunningChartRegisterPage() {
         const controller = new AbortController();
         listChartRegister(filters, page, controller.signal).then(result => {
             if (!controller.signal.aborted) { setRows(result.data); setMeta(result.meta); setError(null); }
-        }).catch(failure => { if (!controller.signal.aborted) setError(toApiError(failure)); })
+        }).catch(failure => { if (!controller.signal.aborted) { setRows([]); setMeta(undefined); setError(toApiError(failure)); } })
             .finally(() => { if (!controller.signal.aborted) setLoading(false); });
         return () => controller.abort();
     }, [filters, page]);
@@ -41,12 +41,12 @@ export default function RunningChartRegisterPage() {
         } catch (failure) { setError(toApiError(failure)); }
     }
     function clearFilters() {
-        const needsReload = page !== 1 || Object.values(filters).some(value => value !== undefined);
+        const needsReload = error !== null || page !== 1 || Object.values(filters).some(value => value !== undefined);
         setSearch(''); setStatus(''); setFrom(''); setUntil(''); setSelected(null); setHistory(null); setError(null);
         if (needsReload) { setLoading(true); setFilters({}); setPage(1); }
     }
     const statusOptions = Object.values(RunningChartStatus).map(value => ({ value, label: CHART_LABELS[value] }));
-    return <main className="space-y-5 p-4">
+    return <div className="space-y-5">
         <ContentHeader title="Running Chart register" description="Review recorded usage, driver identity, agreement context and correction lineage." />
         <Panel title="Filters"><form aria-label="Filter Running Charts" onSubmit={apply} className="grid gap-3 md:grid-cols-2">
             <Input label="Chart, vehicle, driver, agreement or party" value={search} onChange={event => setSearch(event.target.value)} error={error?.fields.search?.[0]} />
@@ -81,5 +81,5 @@ export default function RunningChartRegisterPage() {
             </article>)}
             <Pagination meta={meta} onPageChange={next => { setLoading(true); setSelected(null); setHistory(null); setPage(next); }} />
         </>}
-    </main>;
+    </div>;
 }
