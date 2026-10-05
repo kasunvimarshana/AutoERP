@@ -75,7 +75,7 @@ export function BaseRentBillingPanel({ kind, agreement }: { kind: AgreementKind;
                 {charge.voided_at && <p>Voided: {charge.void_reason}</p>}
                 {!charge.voided_at && charge.invoices.length > 0 && charge.invoices.every(invoice => RELEASED_INVOICE_STATES.has(invoice.status)) && <div className="flex flex-wrap gap-2"><Button type="button" variant="secondary" disabled={busy} onClick={() => { setSelected(charge); setAction(ChargeAction.Reissue); setAccepted(false); setCreated(null); setError(null); }}>Reissue charge</Button><Button type="button" variant="danger" disabled={busy} onClick={() => { setSelected(charge); setAction(ChargeAction.Void); setReason(''); setAccepted(false); setCreated(null); setError(null); }}>Void charge</Button></div>}
             </div>)}
-            <Pagination meta={chargeRequest.data} onPageChange={setPage} />
+            <Pagination meta={chargeRequest.data} disabled={busy || chargeRequest.loading} onPageChange={setPage} />
         </section>
     </details>;
 }
