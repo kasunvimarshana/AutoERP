@@ -10,12 +10,16 @@ return new class extends Migration
 {
     public function up(): void
     {
-        $this->rebuild(useBaseAmounts: true);
+        DB::transaction(function (): void {
+            $this->rebuild(useBaseAmounts: true);
+        });
     }
 
     public function down(): void
     {
-        $this->rebuild(useBaseAmounts: false);
+        DB::transaction(function (): void {
+            $this->rebuild(useBaseAmounts: false);
+        });
     }
 
     private function rebuild(bool $useBaseAmounts): void
