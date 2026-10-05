@@ -42,7 +42,7 @@ beforeEach(() => {
 it('shows complete formatted chart revision evidence without raw storage precision', async () => {
     render(<RunningChartHistoryPanel id={9} />);
     expect(await screen.findByText(/Revision 2 · Reverse/)).toBeInTheDocument();
-    expect(screen.getByText('Front AC')).toBeInTheDocument();
+    expect(screen.getByText(/Air conditioning:/)).toHaveTextContent('Front AC');
     expect(screen.getByText(/External driver · External Driver · DRV-X/)).toBeInTheDocument();
     expect(screen.getByText('Garage distance (km)').parentElement).toHaveTextContent('0');
     expect(screen.getByText('Commercial distance (km)').parentElement).toHaveTextContent('50');
