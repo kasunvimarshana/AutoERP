@@ -86,7 +86,7 @@ export default function DashboardPage() {
                         <KpiCard title="Today revenue" value={formatMoney(data.kpis.today_revenue, currency)} note="Finalized invoices today" url="/invoices" tone="emerald" />
                         <KpiCard title="Period revenue" value={formatMoney(data.kpis.period_revenue, currency)} note={`${shortDate(data.period.date_from)} – ${shortDate(data.period.date_to)}`} url="/reports/summary" tone="blue" />
                         <KpiCard title="Receivables" value={formatMoney(data.kpis.receivables, currency)} note="Current customer balance" url="/invoices" tone="amber" />
-                        <KpiCard title="Supplier payables" value={formatMoney(data.kpis.payables, currency)} note="Current supplier balance" url="/reports/purchase/grn-payables" tone="rose" />
+                        <KpiCard title="Supplier payables" value={formatMoney(data.kpis.payables, currency)} note="Current supplier balance" url="/invoices?direction=inbound&settlement_eligible=true" tone="rose" />
                         <KpiCard title="Active service jobs" value={String(data.kpis.active_service_jobs)} note="Draft, inspected, in progress" url="/vehicle-service/jobs" tone="violet" />
                         <KpiCard title="Inventory value" value={formatMoney(data.kpis.inventory_value, currency)} note="Current stock valuation" url="/inventory?tab=costing" tone="slate" />
                     </section>
@@ -103,7 +103,7 @@ export default function DashboardPage() {
 
                     <section className="grid gap-5 lg:grid-cols-2">
                         <AgingChart title="Receivable aging" rows={data.aging.receivables} currency={currency} url="/invoices" />
-                        <AgingChart title="Payable aging" rows={data.aging.payables} currency={currency} url="/reports/purchase/grn-payables" />
+                        <AgingChart title="Payable aging" rows={data.aging.payables} currency={currency} url="/invoices?direction=inbound&settlement_eligible=true" />
                     </section>
 
                     <section className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">

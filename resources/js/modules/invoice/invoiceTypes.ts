@@ -159,6 +159,7 @@ export interface Invoice extends Record<string, unknown> {
     party_type?: string | null;
     party?: InvoicePartySnapshot | null;
     currency?: InvoiceCurrencySnapshot | null;
+    exchange_rate?: string;
     grand_total?: string;
     paid_total?: string;
     credit_total?: string;

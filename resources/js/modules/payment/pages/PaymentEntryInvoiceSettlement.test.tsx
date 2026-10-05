@@ -10,7 +10,7 @@ const invoiceApiMocks = vi.hoisted(() => ({
 }));
 const paymentApiMocks = vi.hoisted(() => ({
     createPayment: vi.fn(),
-    listPaymentMethods: vi.fn(),
+    listUsablePaymentMethods: vi.fn(),
 }));
 
 vi.mock('@/modules/invoice/invoiceApi', () => invoiceApiMocks);
@@ -68,7 +68,7 @@ const settlementCases = [
 describe('Payment invoice settlement entry', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        paymentApiMocks.listPaymentMethods.mockResolvedValue({
+        paymentApiMocks.listUsablePaymentMethods.mockResolvedValue({
             data: [{
                 id: 9,
                 name: 'Cash',
@@ -123,6 +123,7 @@ describe('Payment invoice settlement entry', () => {
                 expect(screen.getAllByText(partyName).length).toBeGreaterThanOrEqual(2);
             });
 
+            await userEvent.type(screen.getByLabelText(/Exchange rate/), '1');
             await userEvent.click(screen.getByRole('button', { name: 'Select cash method' }));
             const submitButton = screen.getByRole('button', { name: buttonName });
             await waitFor(() => expect(submitButton).toBeEnabled());
@@ -135,6 +136,7 @@ describe('Payment invoice settlement entry', () => {
                     party_type: partyType,
                     party_id: 71,
                     currency_id: 3,
+                    exchange_rate: '1',
                     lines: [expect.objectContaining({
                         payment_method_id: 9,
                         amount: '25000.000000',

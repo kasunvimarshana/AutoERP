@@ -195,27 +195,28 @@ final class SummaryReportService
                 InvoiceType::Debit->value,
             ]);
 
-        $summary = $query
-            ->selectRaw(
-                'COUNT(*) as document_count, '
-                .'COALESCE(SUM(subtotal), 0) as subtotal, '
-                .'COALESCE(SUM(discount_total), 0) as discount_total, '
-                .'COALESCE(SUM(tax_total), 0) as tax_total, '
-                .'COALESCE(SUM(charge_total), 0) as charge_total, '
-                .'COALESCE(SUM(grand_total), 0) as grand_total, '
-                .'COALESCE(SUM(paid_total), 0) as paid_total'
-            )
-            ->first();
-
-        return [
-            'document_count' => (int) ($summary->document_count ?? 0),
-            'subtotal' => $this->decimal($summary->subtotal ?? 0),
-            'discount_total' => $this->decimal($summary->discount_total ?? 0),
-            'tax_total' => $this->decimal($summary->tax_total ?? 0),
-            'charge_total' => $this->decimal($summary->charge_total ?? 0),
-            'grand_total' => $this->decimal($summary->grand_total ?? 0),
-            'paid_total' => $this->decimal($summary->paid_total ?? 0),
+        $summary = [
+            'document_count' => 0,
+            'subtotal' => '0.000000',
+            'discount_total' => '0.000000',
+            'tax_total' => '0.000000',
+            'charge_total' => '0.000000',
+            'grand_total' => '0.000000',
+            'paid_total' => '0.000000',
         ];
+
+        foreach ($query->get(['subtotal', 'discount_total', 'tax_total', 'charge_total', 'grand_total', 'paid_total', 'exchange_rate']) as $invoice) {
+            $rate = (string) $invoice->exchange_rate;
+            $summary['document_count']++;
+            $summary['subtotal'] = $this->math->add($summary['subtotal'], $this->math->mul((string) $invoice->subtotal, $rate));
+            $summary['discount_total'] = $this->math->add($summary['discount_total'], $this->math->mul((string) $invoice->discount_total, $rate));
+            $summary['tax_total'] = $this->math->add($summary['tax_total'], $this->math->mul((string) $invoice->tax_total, $rate));
+            $summary['charge_total'] = $this->math->add($summary['charge_total'], $this->math->mul((string) $invoice->charge_total, $rate));
+            $summary['grand_total'] = $this->math->add($summary['grand_total'], $this->math->mul((string) $invoice->grand_total, $rate));
+            $summary['paid_total'] = $this->math->add($summary['paid_total'], $this->math->mul((string) $invoice->paid_total, $rate));
+        }
+
+        return $summary;
     }
 
     /**
@@ -275,33 +276,44 @@ final class SummaryReportService
         $this->organizationScope($query, 'payments.organization_unit_id', $organizationUnitId);
         $this->organizationScope($query, 'lines.organization_unit_id', $organizationUnitId);
 
-        $totals = (clone $query)
-            ->selectRaw('COUNT(DISTINCT payments.id) as transaction_count, COALESCE(SUM(lines.amount), 0) as amount')
-            ->first();
-        $methods = $query
-            ->select([
-                'lines.payment_method_type_snapshot as type',
-                'lines.payment_method_name_snapshot as name',
-            ])
-            ->selectRaw('COUNT(DISTINCT payments.id) as transaction_count, COALESCE(SUM(lines.amount), 0) as amount')
-            ->groupBy([
-                'lines.payment_method_type_snapshot',
-                'lines.payment_method_name_snapshot',
-            ])
-            ->orderByDesc('amount')
-            ->get()
-            ->map(fn (object $row): array => [
+        $rows = $query->get([
+            'payments.id as payment_id',
+            'payments.exchange_rate',
+            'lines.amount',
+            'lines.payment_method_type_snapshot as type',
+            'lines.payment_method_name_snapshot as name',
+        ]);
+
+        $amount = '0.000000';
+        $paymentIds = [];
+        $methodTotals = [];
+        foreach ($rows as $row) {
+            $baseAmount = $this->math->mul((string) $row->amount, (string) $row->exchange_rate);
+            $amount = $this->math->add($amount, $baseAmount);
+            $paymentIds[(int) $row->payment_id] = true;
+
+            $methodKey = (string) $row->type."\0".(string) $row->name;
+            $methodTotals[$methodKey] ??= [
                 'type' => (string) $row->type,
                 'name' => (string) $row->name,
-                'transaction_count' => (int) $row->transaction_count,
-                'amount' => $this->decimal($row->amount),
-            ])
-            ->values()
-            ->all();
+                'transaction_ids' => [],
+                'amount' => '0.000000',
+            ];
+            $methodTotals[$methodKey]['transaction_ids'][(int) $row->payment_id] = true;
+            $methodTotals[$methodKey]['amount'] = $this->math->add($methodTotals[$methodKey]['amount'], $baseAmount);
+        }
+
+        $methods = array_values(array_map(static fn (array $method): array => [
+            'type' => $method['type'],
+            'name' => $method['name'],
+            'transaction_count' => count($method['transaction_ids']),
+            'amount' => $method['amount'],
+        ], $methodTotals));
+        usort($methods, fn (array $left, array $right): int => $this->math->compare($right['amount'], $left['amount']));
 
         return [
-            'amount' => $this->decimal($totals->amount ?? 0),
-            'transaction_count' => (int) ($totals->transaction_count ?? 0),
+            'amount' => $amount,
+            'transaction_count' => count($paymentIds),
             'methods' => $methods,
         ];
     }

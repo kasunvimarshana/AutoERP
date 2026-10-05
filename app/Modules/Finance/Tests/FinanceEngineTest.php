@@ -19,11 +19,14 @@ use Modules\Finance\Models\FinanceAccount;
 use Modules\Finance\Models\FinanceAccountType;
 use Modules\Finance\Models\FinanceJournalEntry;
 use Modules\Finance\Services\AccountBalanceService;
+use Modules\Finance\Services\BudgetService;
+use Modules\Finance\Services\CashFlowReportService;
 use Modules\Finance\Services\ChartOfAccountsService;
 use Modules\Finance\Services\JournalEntryCreationService;
 use Modules\Finance\Services\JournalPostingService;
 use Modules\Finance\Services\JournalReversalService;
 use Modules\Finance\Services\TrialBalanceService;
+use Tests\Support\CurrencyFixture;
 use Tests\TestCase;
 
 final class FinanceEngineTest extends TestCase
@@ -102,6 +105,101 @@ final class FinanceEngineTest extends TestCase
             $this->assertSame('100000.000000', $trialBalance->totalDebit);
             $this->assertSame('100000.000000', $trialBalance->totalCredit);
         });
+    }
+
+    public function test_foreign_currency_journal_preserves_transaction_amounts_and_posts_base_currency_balances(): void
+    {
+        [$tenantId, $cash, $capital] = $this->chart();
+        $baseCurrencyId = CurrencyFixture::create(['name' => 'Finance Base Currency', 'symbol' => 'B']);
+        $foreignCurrencyId = CurrencyFixture::create(['name' => 'Finance Foreign Currency', 'symbol' => 'F']);
+        DB::table('tenants')->where('id', $tenantId)->update(['base_currency_id' => $baseCurrencyId]);
+
+        $this->withTenantExecutionContext($tenantId, function () use ($tenantId, $cash, $capital, $foreignCurrencyId): void {
+            $journal = app(JournalEntryCreationService::class)->create(new CreateJournalEntryData(
+                tenantId: $tenantId,
+                journalDate: '2026-06-06',
+                journalType: JournalType::General,
+                journalNumber: 'JE-FX',
+                currencyId: $foreignCurrencyId,
+                exchangeRate: '2.500000',
+                lines: [
+                    new JournalLineData(accountId: (int) $cash->getKey(), lineNumber: 1, debit: '100.000000'),
+                    new JournalLineData(accountId: (int) $capital->getKey(), lineNumber: 2, credit: '100.000000'),
+                ],
+            ));
+
+            app(JournalPostingService::class)->post($journal);
+
+            $cashLedger = $cash->ledgerEntries()->firstOrFail();
+            $capitalLedger = $capital->ledgerEntries()->firstOrFail();
+            $this->assertSame('100.000000', (string) $cashLedger->debit);
+            $this->assertSame('250.000000', (string) $cashLedger->base_debit);
+            $this->assertSame('250.000000', (string) $cashLedger->balance_after);
+            $this->assertSame('100.000000', (string) $capitalLedger->credit);
+            $this->assertSame('250.000000', (string) $capitalLedger->base_credit);
+            $this->assertSame('250.000000', (string) $capitalLedger->balance_after);
+
+            $cashBalance = $cash->balances()->firstOrFail();
+            $capitalBalance = $capital->balances()->firstOrFail();
+            $this->assertSame('250.000000', (string) $cashBalance->period_debit);
+            $this->assertSame('250.000000', (string) $cashBalance->closing_debit);
+            $this->assertSame('250.000000', (string) $capitalBalance->period_credit);
+            $this->assertSame('250.000000', (string) $capitalBalance->closing_credit);
+
+            $trialBalance = app(TrialBalanceService::class)->calculate(
+                tenantId: $tenantId,
+                dateFrom: '2026-06-01',
+                dateTo: '2026-06-30',
+            );
+            $this->assertTrue($trialBalance->isBalanced);
+            $this->assertSame('250.000000', $trialBalance->totalDebit);
+            $this->assertSame('250.000000', $trialBalance->totalCredit);
+
+            $cashFlow = app(CashFlowReportService::class)->calculate(
+                tenantId: $tenantId,
+                organizationUnitId: null,
+                dateFrom: '2026-06-01',
+                dateTo: '2026-06-30',
+            );
+            $this->assertSame('250.000000', $cashFlow['total_inflow']);
+            $this->assertSame('250.000000', $cashFlow['net_cash_flow']);
+
+            $budget = app(BudgetService::class)->save(
+                tenantId: $tenantId,
+                organizationUnitId: null,
+                budgetYear: 2026,
+                name: 'FX Budget',
+                lines: [[
+                    'account_id' => $cash->getKey(),
+                    'budget_month' => 6,
+                    'amount' => '300.000000',
+                ]],
+            );
+            $actuals = app(BudgetService::class)->actualVsBudget($budget);
+            $this->assertSame('250.000000', $actuals['total_actual']);
+            $this->assertSame('-50.000000', $actuals['variance']);
+        });
+    }
+
+    public function test_base_currency_journal_rejects_non_unit_exchange_rate(): void
+    {
+        [$tenantId, $cash, $capital] = $this->chart();
+        $baseCurrencyId = CurrencyFixture::create(['name' => 'Finance Base Currency Guard', 'symbol' => 'BG']);
+        DB::table('tenants')->where('id', $tenantId)->update(['base_currency_id' => $baseCurrencyId]);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Tenant base currency journals must use an exchange rate of 1.000000.');
+
+        $this->withTenantExecutionContext($tenantId, fn () => app(JournalEntryCreationService::class)->create(new CreateJournalEntryData(
+            tenantId: $tenantId,
+            journalDate: '2026-06-06',
+            currencyId: $baseCurrencyId,
+            exchangeRate: '2.000000',
+            lines: [
+                new JournalLineData(accountId: (int) $cash->getKey(), lineNumber: 1, debit: '100.000000'),
+                new JournalLineData(accountId: (int) $capital->getKey(), lineNumber: 2, credit: '100.000000'),
+            ],
+        )));
     }
 
     public function test_it_rejects_unbalanced_journals(): void

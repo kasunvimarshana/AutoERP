@@ -29,6 +29,10 @@ Route::prefix('api/v1/payments')->middleware($middleware)->name('api.v1.payments
     Route::put('cheque-templates/{id}', [ChequeTemplateController::class, 'update'])->whereNumber('id')->middleware($requires(PaymentPermission::TEMPLATES_UPDATE))->name('cheque-templates.update');
     Route::delete('cheque-templates/{id}', [ChequeTemplateController::class, 'destroy'])->whereNumber('id')->middleware($requires(PaymentPermission::TEMPLATES_DELETE))->name('cheque-templates.destroy');
 
+    Route::get('usable-methods', [PaymentMethodController::class, 'usable'])
+        ->middleware($requires(PaymentPermission::PAYMENTS_CREATE))
+        ->name('usable-methods.index');
+
     Route::middleware($requires(PaymentPermission::METHODS_VIEW))->group(function (): void {
         Route::get('methods', [PaymentMethodController::class, 'index'])->name('methods.index');
         Route::get('methods/{id}', [PaymentMethodController::class, 'show'])->whereNumber('id')->name('methods.show');

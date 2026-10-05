@@ -22,6 +22,7 @@ use Modules\Payment\Services\PaymentMethodService;
 use Modules\Payment\Services\PaymentRefundPolicyService;
 use Modules\ReferenceData\Models\CurrencyModel;
 use Modules\Supplier\Models\Supplier;
+use Modules\Tenant\Models\TenantModel;
 
 final class PaymentValidationService
 {
@@ -45,7 +46,7 @@ final class PaymentValidationService
 
         $this->validateTypeDirectionParty($data);
         $this->validateSemanticPostingContract($data);
-        $this->validateCurrency($data->currencyId, $data->exchangeRate);
+        $this->validateCurrency($data->tenantId, $data->currencyId, $data->exchangeRate);
 
         if ($data->lines === []) {
             throw new InvalidArgumentException('Payment requires at least one payment line.');
@@ -210,18 +211,28 @@ final class PaymentValidationService
         }
     }
 
-    private function validateCurrency(?int $currencyId, string $exchangeRate): void
+    private function validateCurrency(int $tenantId, ?int $currencyId, string $exchangeRate): void
     {
         if ($this->math->isNegative($exchangeRate) || $this->math->isZero($exchangeRate)) {
             throw new InvalidArgumentException('Payment exchange rate must be greater than zero.');
         }
+
+        $tenant = TenantModel::query()->findOrFail($tenantId);
+        $baseCurrencyId = $tenant->base_currency_id === null ? null : (int) $tenant->base_currency_id;
         if ($currencyId === null) {
+            if ($this->math->compare($exchangeRate, '1.000000') !== 0) {
+                throw new InvalidArgumentException('A payment without an explicit currency must use an exchange rate of 1.000000.');
+            }
+
             return;
         }
 
         $currency = CurrencyModel::query()->find($currencyId);
         if (! $currency instanceof CurrencyModel || ! (bool) $currency->is_active) {
             throw new InvalidArgumentException('Payment currency must be active.');
+        }
+        if ($baseCurrencyId !== null && $currencyId === $baseCurrencyId && $this->math->compare($exchangeRate, '1.000000') !== 0) {
+            throw new InvalidArgumentException('Tenant base currency payments must use an exchange rate of 1.000000.');
         }
     }
 

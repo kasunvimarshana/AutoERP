@@ -13,6 +13,7 @@ final class PaymentResource extends JsonResource
     public function toArray(Request $request): array
     {
         $capabilities = app(PaymentCapabilityService::class);
+        $settlements = app(\Modules\Payment\Services\PaymentSettlementService::class);
 
         return [
             'id' => (int) $this->getKey(),
@@ -91,6 +92,7 @@ final class PaymentResource extends JsonResource
                 'bounced_date' => $line->bounced_date?->toDateString(),
                 'returned_date' => $line->returned_date?->toDateString(),
                 'notes' => $line->notes,
+                'allowed_settlement_statuses' => $settlements->allowedTransitionsForLine($this->resource, $line),
             ])->values()->all()),
             'allocations' => $this->whenLoaded('allocations'),
             'unapplied_balance' => $this->whenLoaded('unappliedBalance'),

@@ -53,6 +53,7 @@ export interface PaymentLine {
     bounced_date?: string | null;
     returned_date?: string | null;
     notes?: string | null;
+    allowed_settlement_statuses?: string[];
 }
 
 export interface Payment extends Record<string, unknown> {
@@ -68,6 +69,7 @@ export interface Payment extends Record<string, unknown> {
     instrument_status?: string | null;
     party?: PaymentPartySummary | null;
     currency?: PaymentCurrencySummary | null;
+    exchange_rate?: string | null;
     total_amount?: string | null;
     allocated_amount?: string | null;
     unapplied_amount?: string | null;
@@ -189,6 +191,11 @@ export async function listPaymentMethods(params: ListParams & { direction?: stri
     return response.data;
 }
 
+export async function listUsablePaymentMethods(params: ListParams & { direction?: string; method_type?: string }, signal?: AbortSignal) {
+    const response = await apiClient.get<ApiCollection<PaymentMethod>>(`${endpoints.payments}/usable-methods`, { params, signal });
+    return response.data;
+}
+
 export async function getPaymentAllocations(id: number, signal?: AbortSignal) {
     const response = await apiClient.get<ApiResource<Record<string, unknown>[]>>(`${endpoints.payments}/${id}/allocations`, { signal });
     return response.data.data;
@@ -224,6 +231,7 @@ export async function settlePaymentLine(
         expected_payment_version: number;
         expected_line_version: number;
         status: string;
+        event_date: string;
         reason?: string;
     },
 ) {

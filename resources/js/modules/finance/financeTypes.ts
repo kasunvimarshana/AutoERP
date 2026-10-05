@@ -148,6 +148,8 @@ export interface LedgerEntry extends Record<string, unknown> {
     entry_date: string;
     debit: string;
     credit: string;
+    base_debit: string;
+    base_credit: string;
     balance_after: string;
     source_module?: string | null;
     source_type?: string | null;

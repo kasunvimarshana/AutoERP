@@ -51,6 +51,9 @@ final class LedgerPostingService
                 throw new InvalidArgumentException('Journal contains an unavailable Finance account.');
             }
 
+            $baseDebit = $this->math->mul((string) $line->debit, (string) $journal->exchange_rate);
+            $baseCredit = $this->math->mul((string) $line->credit, (string) $journal->exchange_rate);
+
             FinanceLedgerEntry::query()->create([
                 'tenant_id' => $journal->tenant_id,
                 'organization_unit_id' => $journal->organization_unit_id,
@@ -61,6 +64,8 @@ final class LedgerPostingService
                 'entry_date' => $journal->journal_date,
                 'debit' => $this->math->normalize((string) $line->debit),
                 'credit' => $this->math->normalize((string) $line->credit),
+                'base_debit' => $baseDebit,
+                'base_credit' => $baseCredit,
                 'balance_after' => '0.000000',
                 'source_module' => $journal->source_module,
                 'source_type' => $journal->source_type,

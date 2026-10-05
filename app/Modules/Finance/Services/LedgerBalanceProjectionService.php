@@ -52,11 +52,11 @@ final class LedgerBalanceProjectionService
                 ->orderBy('entry_date')
                 ->orderBy('id')
                 ->lockForUpdate()
-                ->get(['id', 'debit', 'credit']);
+                ->get(['id', 'base_debit', 'base_credit']);
 
             foreach ($entries as $entry) {
-                $debit = $this->math->normalize((string) $entry->debit);
-                $credit = $this->math->normalize((string) $entry->credit);
+                $debit = $this->math->normalize((string) $entry->base_debit);
+                $credit = $this->math->normalize((string) $entry->base_credit);
                 $runningBalance = $normalBalance === NormalBalance::Debit
                     ? $this->math->sub($this->math->add($runningBalance, $debit), $credit)
                     : $this->math->sub($this->math->add($runningBalance, $credit), $debit);

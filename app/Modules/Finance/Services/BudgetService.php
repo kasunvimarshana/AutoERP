@@ -152,9 +152,9 @@ final class BudgetService
 
         $debit = '0.000000';
         $credit = '0.000000';
-        foreach ($query->get(['debit', 'credit']) as $entry) {
-            $debit = $this->math->add($debit, (string) $entry->debit);
-            $credit = $this->math->add($credit, (string) $entry->credit);
+        foreach ($query->get(['base_debit', 'base_credit']) as $entry) {
+            $debit = $this->math->add($debit, (string) $entry->base_debit);
+            $credit = $this->math->add($credit, (string) $entry->base_credit);
         }
 
         $normal = $account->normal_balance instanceof NormalBalance

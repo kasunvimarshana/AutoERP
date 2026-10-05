@@ -48,22 +48,26 @@ export function InvoiceListWorkspace({ viewKey: forcedViewKey, renderHeader, row
     const [searchParams] = useSearchParams();
     const viewKey = forcedViewKey ?? (searchParams.get('view') as InvoiceViewKey | null);
     const view = viewKey ? invoiceViews[viewKey] : undefined;
+    const directionFilter = view ? undefined : searchParams.get('direction') ?? undefined;
+    const settlementEligible = view ? undefined : searchParams.get('settlement_eligible') === 'true' ? true : undefined;
     const [search, setSearch] = useState('');
     const [page, setPage] = useState(1);
     const debounced = useDebounce(search);
     const result = useApi((signal) => listInvoices({
         search: debounced || undefined,
         ...view?.params,
+        direction: directionFilter ?? view?.params.direction,
+        settlement_eligible: settlementEligible,
         page,
         per_page: 25,
-    }, signal), [debounced, page, viewKey]);
+    }, signal), [debounced, page, viewKey, directionFilter, settlementEligible]);
     const columns: DataColumn<Invoice>[] = [
         { key: 'invoice', header: 'Invoice', render: (row) => <Link className="font-semibold text-sky-700 hover:underline" to={rowHref ? rowHref(row) : `/invoices/${row.id}`}>{row.invoice_number ?? 'Invoice'}</Link> },
         { key: 'date', header: 'Date', render: (row) => formatDate(row.invoice_date) },
         { key: 'party', header: 'Party', render: (row) => readableRelation(row.party) },
         { key: 'type', header: 'Type', render: (row) => `${row.invoice_type ?? '-'} / ${row.direction ?? '-'}` },
-        { key: 'total', header: 'Total', render: (row) => <MoneyDisplay value={row.grand_total} /> },
-        { key: 'balance', header: 'Balance', render: (row) => <MoneyDisplay value={row.balance_due ?? (row.balance?.remaining_amount as string)} /> },
+        { key: 'total', header: 'Total', render: (row) => <MoneyDisplay value={row.grand_total} currency={row.currency?.code ?? undefined} /> },
+        { key: 'balance', header: 'Balance', render: (row) => <MoneyDisplay value={row.balance_due ?? (row.balance?.remaining_amount as string)} currency={row.currency?.code ?? undefined} /> },
         { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.status} /> },
     ];
     return (

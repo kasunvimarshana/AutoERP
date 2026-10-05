@@ -16,6 +16,8 @@ use Modules\Finance\Models\FinanceAccountType;
 use Modules\Finance\Models\FinanceDimension;
 use Modules\Finance\Models\FinanceJournalEntry;
 use Modules\Finance\Models\FinancePostingProfile;
+use Modules\ReferenceData\Models\CurrencyModel;
+use Modules\Tenant\Models\TenantModel;
 
 final class FinanceValidationService
 {
@@ -79,6 +81,7 @@ final class FinanceValidationService
         if ($this->math->isNegative($data->exchangeRate) || $this->math->isZero($data->exchangeRate)) {
             throw new InvalidArgumentException('Journal exchange rate must be greater than zero.');
         }
+        $this->validateJournalCurrency($data->tenantId, $data->currencyId, $data->exchangeRate);
 
         foreach ($data->lines as $line) {
             if (! $line instanceof JournalLineData) {
@@ -194,6 +197,28 @@ final class FinanceValidationService
         }
 
         return [$totalDebit, $totalCredit];
+    }
+
+    private function validateJournalCurrency(int $tenantId, ?int $currencyId, string $exchangeRate): void
+    {
+        $tenant = TenantModel::query()->findOrFail($tenantId);
+        $baseCurrencyId = $tenant->base_currency_id === null ? null : (int) $tenant->base_currency_id;
+
+        if ($currencyId === null) {
+            if ($this->math->compare($exchangeRate, '1.000000') !== 0) {
+                throw new InvalidArgumentException('A journal without an explicit currency must use an exchange rate of 1.000000.');
+            }
+
+            return;
+        }
+
+        $currency = CurrencyModel::query()->find($currencyId);
+        if (! $currency instanceof CurrencyModel || ! (bool) $currency->is_active) {
+            throw new InvalidArgumentException('Journal currency must be active.');
+        }
+        if ($baseCurrencyId !== null && $currencyId === $baseCurrencyId && $this->math->compare($exchangeRate, '1.000000') !== 0) {
+            throw new InvalidArgumentException('Tenant base currency journals must use an exchange rate of 1.000000.');
+        }
     }
 
     private function validateJournalLine(JournalLineData $line): void

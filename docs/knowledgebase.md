@@ -14,7 +14,7 @@
 
 **Live authoritative branch head:** resolve from Git/release records; it is intentionally not embedded here because documentation-only release commits would otherwise make this document self-stale.
 
-**Latest current-head re-verification:** [`changes/2026-10-05-vehicle-rental-usage-supply-period-correction.md`](changes/2026-10-05-vehicle-rental-usage-supply-period-correction.md)
+**Latest current-head re-verification:** [`changes/2026-10-05-vehicle-rental-financial-foundation-production-release.md`](changes/2026-10-05-vehicle-rental-financial-foundation-production-release.md)
 
 **Architecture policy:** root `RULES.md` / `AGENTS.md`
 
@@ -759,6 +759,12 @@ These are implementation policies, not claims that TACGL universally proves them
 - same-side source consumption is duplicate-safe;
 - customer and owner calculations remain independent;
 - posted financial records remain owned and immutable under Invoice/Payment/Finance rules;
+- Invoice, Payment and Finance freeze an explicit accounting exchange rate for foreign-currency transaction evidence; no market rate is guessed;
+- an explicit tenant-base-currency document/journal, or a financial record with no explicit currency, uses exchange rate `1.000000`;
+- Finance preserves transaction-currency debit/credit separately from frozen-rate base-currency debit/credit; consolidated accounting projections use the base amounts;
+- a Payment created to settle an Invoice requires the Payment-date accounting exchange rate to be entered/verified independently; the Invoice's earlier exchange rate is not silently reused;
+- Payment owns unapplied-balance allocation and instrument settlement; instrument transitions remain server-authoritative and use the real business event date;
+- consolidated management reporting uses source-owned frozen exchange rates before aggregation, while transaction registers retain their own currency/rate and do not publish invalid mixed-currency totals;
 - undefined historical tariffs create no automatic financial effect.
 
 ---
@@ -822,6 +828,21 @@ The correction keeps responsibility inside Vehicle Rental:
 
 No schema, relationship, API shape, tax/withholding rule, account mapping or commercial formula changed. See [the append-only correction record](changes/2026-10-05-vehicle-rental-usage-supply-period-correction.md).
 
+### 2026-10-05 financial-owner production completion
+
+A continuation end-to-end review found that the fresh Rental module's financial handoff exposed owner-module gaps in Finance, Payment and Reporting rather than a missing Rental relationship or duplicated Rental ledger.
+
+The production completion release therefore fixes the responsibilities at their sources:
+
+- Finance keeps immutable transaction-currency journal/ledger evidence and explicit frozen-rate base-currency ledger amounts; account balances, trial balance, statements, Finance cash flow, budget actuals and bank reconciliation consume base-currency facts.
+- Invoice, Payment and Finance reject invalid tenant-base-currency exchange rates instead of allowing a bad document to survive until a later posting step.
+- Payment exposes a least-privilege usable-method lookup, explicit Payment-date FX entry for Invoice settlement, governed allocation of posted unapplied balances, and server-authoritative instrument settlement with an explicit business event date.
+- Rental deposit entry remains a thin Payment consumer; Rental does not gain a payment-method master, allocation table or instrument state machine.
+- Reporting converts source-owned Invoice/Payment amounts with exact decimal arithmetic before consolidated aggregation, keeps transaction registers currency-aware, uses Configuration-owned business time for dashboard/generic aging, and sends supplier-payables drilldown to the canonical inbound Invoice population.
+- No Rental schema or relationship change was justified after reviewing ownership, dependencies, history, and data-integrity impact.
+
+This is a clean owner-module foundation change, not a compatibility patch. No old Rental runtime was restored and no unsupported tax, tariff, FX market rate, GL account or protected-backup rule was invented. See [the append-only financial foundation release record](changes/2026-10-05-vehicle-rental-financial-foundation-production-release.md).
+
 ---
 
 ## 28. Testing and verification policy
@@ -849,6 +870,8 @@ The earlier integrated cross-engine verification additionally recorded:
 - foreign-key/integrity and final source/conflict review passed.
 
 The 2026-10-05 usage-supply-period correction is a narrow Vehicle Rental runtime/test delta: RentalCalendar owns exclusive-end to inclusive-civil-period conversion, OT/night-out charges freeze that resolved timezone/period, and the Invoice handoff reuses the same policy. It changes no migration/schema, relationship, API shape, tax/withholding rule, account mapping or commercial formula. Focused regression source coverage was added for exact-midnight supply end and timezone-stable reissue. A fresh dependency-backed run of that new test is not claimed because the current container cannot obtain the repository dependency tree. The repository's automatic CI attempts on this head and earlier known-green heads terminate before any job step executes, so they do not provide application-test results.
+
+The 2026-10-05 financial-foundation release adds focused regression source coverage for frozen-rate base-currency ledger conversion, base-currency exchange-rate guards, foreign-currency bank reconciliation, dated Payment instrument settlement, distinct Invoice-versus-Payment FX ownership in settlement reporting, explicit settlement FX entry, and least-privilege Rental deposit payment-method lookup. Both new Finance upgrade migration files passed local PHP syntax lint, and the new Payment allocation/settlement TSX components passed focused TypeScript transpile syntax checks. A fresh full dependency-backed Laravel/Vitest/typecheck/ESLint/Vite/migration run is not claimed because normal repository checkout remains blocked by environment DNS and no complete dependency tree is locally available. No GitHub Actions or paid verification service was used.
 
 Future runtime changes must verify, as applicable:
 
@@ -910,7 +933,11 @@ Vehicle Rental remains functionally complete only while all of the following sta
 15. future-effective agreement activation uses the configured tenant/org commercial calendar;
 16. recorded historical commercial boundaries are not reinterpreted after timezone configuration changes;
 17. user-facing workflow remains simple enough to reflect the videos' practical operation;
-18. future changes preserve this knowledge base and record actual verification evidence rather than assumptions.
+18. future changes preserve this knowledge base and record actual verification evidence rather than assumptions;
+19. transaction-currency evidence and base-currency accounting amounts remain explicit separate facts, with the frozen exchange rate applied exactly once;
+20. Invoice settlement never guesses or silently reuses an earlier Invoice exchange rate as the Payment-date rate;
+21. Payment remains the single owner of receipt/payment allocation and instrument settlement, including optimistic version checks and explicit business event dates;
+22. consolidated financial/reporting totals never add unlike transaction currencies without converting through the source-owned frozen rate.
 
 ---
 

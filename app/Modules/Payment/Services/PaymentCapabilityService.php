@@ -73,7 +73,10 @@ final class PaymentCapabilityService
                 $payment->reversals()->exists() ? 'Payment already has a reversal.' : null,
                 $hasActiveRefunds ? 'Reverse active refund payments before reversing the original payment.' : null,
             ])),
-            'can_settle' => $this->reasons($terminal, 'Terminal payment documents cannot be settled.'),
+            'can_settle' => array_values(array_filter([
+                ! $posted ? 'Only approved and posted payments can be settled.' : null,
+                $terminal ? 'Terminal payment documents cannot be settled.' : null,
+            ])), 
             'can_preview_cheque' => array_values(array_filter([
                 ! $hasChequeLine ? 'Payment has no cheque-capable line.' : null,
                 $document !== PaymentDocumentStatus::Approved ? 'Only approved payments can be previewed.' : null,

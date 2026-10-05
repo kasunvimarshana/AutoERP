@@ -37,7 +37,7 @@ final class StorePaymentRequest extends TenantScopedRequest
             'party_type' => ['nullable', 'string', 'max:150'],
             'party_id' => ['nullable', 'integer', 'min:1'],
             'currency_id' => ['nullable', 'integer', 'min:1'],
-            'exchange_rate' => ['nullable', 'decimal:0,6', 'gt:0'],
+            'exchange_rate' => ['required_with:currency_id', 'nullable', 'decimal:0,6', 'gt:0'],
             'reference_number' => ['nullable', 'string', 'max:150'],
             'cheque_number' => ['nullable', 'string', 'max:100'],
             'cheque_date' => ['nullable', 'date'],

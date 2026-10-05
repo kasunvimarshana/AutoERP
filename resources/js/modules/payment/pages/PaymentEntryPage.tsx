@@ -20,7 +20,7 @@ import { readableRelation } from '@/shared/utils/object';
 import { parsePositiveInteger } from '@/shared/utils/routeParams';
 import { CustomerLookupSelect } from '@/modules/customer/components/CustomerLookupSelect';
 import { SupplierLookupSelect } from '@/modules/supplier/components/SupplierLookupSelect';
-import { createPayment, listPaymentMethods } from '../paymentApi';
+import { createPayment, listUsablePaymentMethods } from '../paymentApi';
 import { linePayload, lineIsValid } from '../paymentLineInput';
 import { PaymentLineTable, type PaymentLineDraft } from '../components/PaymentLineTable';
 
@@ -35,8 +35,6 @@ const typeOptions = [
     { value: PAYMENT_TYPE_CUSTOMER_RECEIPT, label: 'Customer receipt' },
     { value: PAYMENT_TYPE_SUPPLIER_PAYMENT, label: 'Supplier payment' },
     { value: 'advance', label: 'Advance / deposit' },
-    { value: 'refund', label: 'Refund' },
-    { value: 'manual', label: 'Manual payment' },
 ];
 
 const directionOptions = [
@@ -92,6 +90,7 @@ export default function PaymentEntryPage() {
     const [direction, setDirection] = useState(PAYMENT_DIRECTION_INBOUND);
     const [paymentDate, setPaymentDate] = useState(today());
     const [reference, setReference] = useState('');
+    const [exchangeRate, setExchangeRate] = useState('1.000000');
     const [party, setParty] = useState<NamedResource | null>(null);
     const [lines, setLines] = useState<PaymentLineDraft[]>([emptyLine(1)]);
     const [nextKey, setNextKey] = useState(2);
@@ -121,11 +120,12 @@ export default function PaymentEntryPage() {
         setDirection(nextDirection);
         setParty(invoiceParty(invoice));
         setReference(`Settlement for ${invoice.invoice_number ?? 'invoice'}`);
+        setExchangeRate('');
         setLines([{ ...emptyLine(1), amount: balance }]);
         setNextKey(2);
     }, [invoiceIssue, settlementInvoice.data]);
 
-    const methods = useApi((signal) => listPaymentMethods({ direction, per_page: 100 }, signal), [direction]);
+    const methods = useApi((signal) => listUsablePaymentMethods({ direction, per_page: 100 }, signal), [direction]);
     const methodRows = methods.data?.data ?? [];
     const total = useMemo(() => sumDecimals(lines.map((line) => line.amount || '0.000000')), [lines]);
     const partyType = settlementInvoice.data?.party_type
@@ -136,6 +136,7 @@ export default function PaymentEntryPage() {
         && invoiceIssue === null
         && invoiceAmountValid
         && (invoiceId === null || party !== null)
+        && (!settlementInvoice.data?.currency?.id || isPositiveDecimal(exchangeRate))
         && lines.every((line) => lineIsValid(
             line,
             methodRows.find((method) => String(method.id) === line.paymentMethodId),
@@ -169,6 +170,7 @@ export default function PaymentEntryPage() {
                 party_type: party ? partyType : undefined,
                 party_id: party?.id,
                 currency_id: settlementInvoice.data?.currency?.id ?? undefined,
+                exchange_rate: settlementInvoice.data?.currency?.id ? exchangeRate : undefined,
                 reference_number: reference.trim() || undefined,
                 notes: settlementInvoice.data
                     ? `Settlement initiated from invoice ${settlementInvoice.data.invoice_number ?? settlementInvoice.data.id}.`
@@ -256,6 +258,7 @@ export default function PaymentEntryPage() {
                         <Select label="Direction" value={direction} options={directionOptions} disabled={invoiceId !== null} onChange={(event) => setDirection(event.target.value)} />
                         <Input label="Payment date" type="date" value={paymentDate} onChange={(event) => setPaymentDate(event.target.value)} />
                         <Input label="Reference" value={reference} onChange={(event) => setReference(event.target.value)} />
+                        {settlementInvoice.data?.currency?.id ? <Input label={`Exchange rate · ${settlementInvoice.data.currency.code ?? 'currency'} to base`} inputMode="decimal" value={exchangeRate} onChange={(event) => setExchangeRate(event.target.value)} required /> : null}
                         {invoiceId !== null ? (
                             <div>
                                 <div className="mb-1.5 block text-sm font-medium text-slate-700">Settlement party</div>

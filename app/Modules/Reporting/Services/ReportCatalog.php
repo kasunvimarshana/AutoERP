@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace Modules\Reporting\Services;
 
+use Carbon\CarbonImmutable;
 use InvalidArgumentException;
+use Modules\Configuration\Constants\ConfigurationKey;
+use Modules\Configuration\Contracts\ConfigurationResolverInterface;
 use Modules\Core\Services\DecimalMath;
 use Modules\Customer\Models\Customer;
 use Modules\Finance\Models\FinanceAccount;
@@ -59,6 +62,7 @@ final class ReportCatalog
     public function __construct(
         private readonly VehicleServiceProfitabilityCalculator $profitability,
         private readonly DecimalMath $math,
+        private readonly ConfigurationResolverInterface $configuration,
         private readonly VehicleServiceHistoryReportService $vehicleServiceHistory,
     ) {}
 
@@ -327,7 +331,7 @@ final class ReportCatalog
             $this->definition('finance.ledger', 'Ledger', 'Finance', FinanceLedgerEntry::class, [
                 $this->col('entry_date', 'Date', format: 'date', sort: 'entry_date'), $this->col('account', 'Account', 'account.code'), $this->col('account_name', 'Account Name', 'account.name'),
                 $this->col('journal', 'Journal', 'journalEntry.journal_number'), $this->col('source_module', 'Source Module', sort: 'source_module'),
-                $this->col('source_number', 'Source Number', sort: 'source_number'), $this->money('debit', 'Debit'), $this->money('credit', 'Credit'), $this->money('balance_after', 'Balance'),
+                $this->col('source_number', 'Source Number', sort: 'source_number'), $this->money('debit', 'Transaction Debit', false), $this->money('credit', 'Transaction Credit', false), $this->money('base_debit', 'Base Debit'), $this->money('base_credit', 'Base Credit'), $this->money('balance_after', 'Base Balance', false),
             ], ['account.code', 'account.name', 'journalEntry.journal_number'], ['account', 'journalEntry'], 'entry_date'),
             $this->definition('finance.trial-balance', 'Trial Balance', 'Finance', FinanceAccountBalance::class, [
                 $this->col('account', 'Account', 'account.code'), $this->col('account_name', 'Account Name', 'account.name'), $this->money('closing_debit', 'Debit'), $this->money('closing_credit', 'Credit'),
@@ -518,7 +522,8 @@ final class ReportCatalog
     {
         return $this->definition($key, $title, 'Invoice & Payment', $model, [
             $this->col($dateColumn, 'Date', format: 'date', sort: $dateColumn), $this->col($numberColumn, 'Number', sort: $numberColumn), $this->col('party_name', 'Party', sort: 'party_name'),
-            $this->money($amountColumn, 'Amount'), $this->money('paid_total', 'Paid'), $this->money('balance_due', 'Balance'), $this->col('status', 'Status', format: 'enum', sort: 'status'),
+            $this->col('currency', 'Currency', 'currency_code_snapshot'), $this->col('exchange_rate', 'Exchange Rate', format: 'decimal', sort: 'exchange_rate'),
+            $this->money($amountColumn, 'Amount', false), $this->money('paid_total', 'Paid', false), $this->money('balance_due', 'Balance', false), $this->col('status', 'Status', format: 'enum', sort: 'status'),
         ], [$numberColumn, 'party_name'], [], $dateColumn);
     }
 
@@ -534,9 +539,11 @@ final class ReportCatalog
                 $this->col($numberColumn, 'Number', sort: $numberColumn),
                 $this->col('party_type', 'Party Type', format: 'enum', sort: 'party_type'),
                 $this->col('party_id', 'Party ID', sort: 'party_id'),
-                $this->money($amountColumn, 'Amount'),
-                $this->money('allocated_amount', 'Allocated'),
-                $this->money('unapplied_amount', 'Unapplied'),
+                $this->col('currency', 'Currency', 'currency_code_snapshot'),
+                $this->col('exchange_rate', 'Exchange Rate', format: 'decimal', sort: 'exchange_rate'),
+                $this->money($amountColumn, 'Amount', false),
+                $this->money('allocated_amount', 'Allocated', false),
+                $this->money('unapplied_amount', 'Unapplied', false),
                 $this->col('status', 'Status', format: 'enum', sort: 'status'),
             ],
             search: [$numberColumn, 'reference_number', 'party_type'],
@@ -566,9 +573,11 @@ final class ReportCatalog
                 $this->col('payee_name', 'Payer / Payee', sort: 'payee_name'),
                 $this->col('party_type', 'Party Type', format: 'enum', sort: 'party_type'),
                 $this->col('source_type', 'Source', format: 'enum', sort: 'source_type'),
-                $this->money('total_amount', 'Amount'),
-                $this->money('allocated_amount', 'Allocated'),
-                $this->money('unapplied_amount', 'Unallocated'),
+                $this->col('currency', 'Currency', 'currency_code_snapshot'),
+                $this->col('exchange_rate', 'Exchange Rate', format: 'decimal', sort: 'exchange_rate'),
+                $this->money('total_amount', 'Amount', false),
+                $this->money('allocated_amount', 'Allocated', false),
+                $this->money('unapplied_amount', 'Unallocated', false),
                 $this->col('document_status', 'Document', format: 'enum', sort: 'document_status'),
                 $this->col('allocation_status', 'Allocation', format: 'enum', sort: 'allocation_status'),
                 $this->col('posting_status', 'Posting', format: 'enum', sort: 'posting_status'),
@@ -601,8 +610,9 @@ final class ReportCatalog
                 $this->col('reversal_date', 'Date', format: 'date', sort: 'reversal_date'),
                 $this->col('reversal_number', 'Voucher', sort: 'reversal_number'),
                 $this->col('payment', 'Original Payment', 'payment.payment_number'),
-                $this->money('original_amount', 'Original'),
-                $this->money('reversed_amount', 'Reversed'),
+                $this->col('currency', 'Currency', 'payment.currency_code_snapshot'),
+                $this->money('original_amount', 'Original', false),
+                $this->money('reversed_amount', 'Reversed', false),
                 $this->col('reason', 'Reason', sort: 'reason'),
                 $this->col('status', 'Status', format: 'enum', sort: 'status'),
             ],
@@ -630,8 +640,9 @@ final class ReportCatalog
                 $this->col('source_module', 'Source Module', sort: 'source_module'),
                 $this->col('source_number', 'Source Number', sort: 'source_number'),
                 $this->col('description', 'Narration', sort: 'description'),
-                $this->money('total_debit', 'Debit'),
-                $this->money('total_credit', 'Credit'),
+                $this->col('exchange_rate', 'Exchange Rate', format: 'decimal', sort: 'exchange_rate'),
+                $this->money('total_debit', 'Transaction Debit', false),
+                $this->money('total_credit', 'Transaction Credit', false),
                 $this->col('status', 'Status', format: 'enum', sort: 'status'),
             ],
             search: ['journal_number', 'source_number', 'description'],
@@ -657,10 +668,12 @@ final class ReportCatalog
                 $this->col('payment', 'Payment', 'payment.payment_number'),
                 $this->col('party_id', 'Party ID', sort: 'party_id'),
                 $this->col('balance_type', 'Type', format: 'enum', sort: 'balance_type'),
-                $this->money('original_amount', 'Original'),
-                $this->money('allocated_amount', 'Allocated'),
-                $this->money('refunded_amount', 'Refunded'),
-                $this->money('remaining_amount', 'Credit'),
+                $this->col('currency', 'Currency', 'payment.currency_code_snapshot'),
+                $this->col('exchange_rate', 'Exchange Rate', 'payment.exchange_rate', 'decimal'),
+                $this->money('original_amount', 'Original', false),
+                $this->money('allocated_amount', 'Allocated', false),
+                $this->money('refunded_amount', 'Refunded', false),
+                $this->money('remaining_amount', 'Credit', false),
                 $this->col('status', 'Status', format: 'enum', sort: 'status'),
             ],
             search: ['payment.payment_number', 'balance_type'],
@@ -693,8 +706,10 @@ final class ReportCatalog
                 $this->col('method', 'Method', 'paymentMethod.name'),
                 $this->col('method_type', 'Type', 'paymentMethod.method_type', 'enum'),
                 $this->col('reference_number', 'Reference', sort: 'reference_number'),
-                $this->money('amount', 'Amount'),
-                $this->money('cleared_amount', 'Cleared'),
+                $this->col('currency', 'Currency', 'payment.currency_code_snapshot'),
+                $this->col('exchange_rate', 'Exchange Rate', 'payment.exchange_rate', 'decimal'),
+                $this->money('amount', 'Amount', false),
+                $this->money('cleared_amount', 'Cleared', false),
                 $this->col('status', 'Status', format: 'enum', sort: 'status'),
             ],
             search: ['payment.payment_number', 'reference_number', 'paymentMethod.name'],
@@ -734,27 +749,16 @@ final class ReportCatalog
                 new ReportColumn(
                     key: 'days_overdue',
                     label: 'Days Overdue',
-                    value: static function (InvoiceBalance $balance): int {
-                        $dueDate = $balance->invoice?->due_date ?? $balance->invoice?->invoice_date;
-                        if ($dueDate === null || $dueDate->isFuture()) {
-                            return 0;
-                        }
-
-                        return (int) $dueDate->startOfDay()->diffInDays(now()->startOfDay());
-                    },
+                    value: fn (InvoiceBalance $balance): int => $this->agingDays($balance),
                 ),
                 new ReportColumn(
                     key: 'aging_bucket',
                     label: 'Aging Bucket',
-                    value: static function (InvoiceBalance $balance): string {
-                        $dueDate = $balance->invoice?->due_date ?? $balance->invoice?->invoice_date;
-                        if ($dueDate === null || $dueDate->isFuture()) {
-                            return 'Current';
-                        }
-
-                        $days = (int) $dueDate->startOfDay()->diffInDays(now()->startOfDay());
+                    value: function (InvoiceBalance $balance): string {
+                        $days = $this->agingDays($balance);
 
                         return match (true) {
+                            $days <= 0 => 'Current',
                             $days <= 30 => '1-30',
                             $days <= 60 => '31-60',
                             $days <= 90 => '61-90',
@@ -762,8 +766,10 @@ final class ReportCatalog
                         };
                     },
                 ),
-                $this->money('invoice_total', 'Invoice Total'),
-                $this->money('remaining_amount', 'Outstanding'),
+                $this->col('currency', 'Currency', 'invoice.currency_code_snapshot'),
+                $this->col('exchange_rate', 'Exchange Rate', 'invoice.exchange_rate', 'decimal'),
+                $this->money('invoice_total', 'Invoice Total', false),
+                $this->money('remaining_amount', 'Outstanding', false),
                 $this->col('status', 'Status', format: 'enum', sort: 'status'),
             ],
             search: ['invoice.invoice_number'],
@@ -777,6 +783,29 @@ final class ReportCatalog
                     ->whereNotIn('status', ['cancelled', 'void'])),
             description: 'Outstanding invoice balances grouped by age from the Invoice source of truth.',
         );
+    }
+
+    private function agingDays(InvoiceBalance $balance): int
+    {
+        $dueDate = $balance->invoice?->due_date ?? $balance->invoice?->invoice_date;
+        if ($dueDate === null) {
+            return 0;
+        }
+
+        $tenantId = (int) $balance->tenant_id;
+        $organizationUnitId = $balance->organization_unit_id === null ? null : (int) $balance->organization_unit_id;
+        $timezone = (string) $this->configuration->value(
+            ConfigurationKey::WORKSPACE_TIMEZONE,
+            $tenantId,
+            $organizationUnitId,
+        );
+        $today = CarbonImmutable::now($timezone)->startOfDay();
+        $due = CarbonImmutable::parse($dueDate->toDateString(), $timezone)->startOfDay();
+        if ($due->greaterThanOrEqualTo($today)) {
+            return 0;
+        }
+
+        return (int) $due->diffInDays($today);
     }
 
     private function chartOfAccounts(): ReportDefinition
@@ -816,8 +845,8 @@ final class ReportCatalog
                 $this->col('account_name', 'Account Name', 'account.name'),
                 $this->col('source_module', 'Source Module', sort: 'source_module'),
                 $this->col('source_number', 'Source Number', sort: 'source_number'),
-                $this->money('debit', 'Inflow'),
-                $this->money('credit', 'Outflow'),
+                $this->money('base_debit', 'Inflow'),
+                $this->money('base_credit', 'Outflow'),
             ],
             search: ['account.code', 'account.name', 'source_number'],
             relations: ['account'],

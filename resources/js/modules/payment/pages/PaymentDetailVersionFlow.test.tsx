@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import PaymentDetailPage from './PaymentDetailPage';
 
 const paymentApiMocks = vi.hoisted(() => ({
+    allocatePayment: vi.fn(),
     approvePayment: vi.fn(),
     getPayment: vi.fn(),
     getPaymentAllocations: vi.fn(),
@@ -13,6 +14,7 @@ const paymentApiMocks = vi.hoisted(() => ({
     postPayment: vi.fn(),
     refundPayment: vi.fn(),
     reversePayment: vi.fn(),
+    settlePaymentLine: vi.fn(),
     submitPayment: vi.fn(),
     voidPayment: vi.fn(),
 }));
@@ -28,6 +30,8 @@ vi.mock('../paymentPermissions', () => ({
         approve: 'payments.approve',
         post: 'payments.post',
         void: 'payments.void',
+        allocate: 'payments.allocate',
+        settle: 'payments.settle',
         refund: 'payments.refund',
         reverse: 'payments.reverse',
         chequesPrint: 'cheques.print',
