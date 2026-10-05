@@ -362,6 +362,18 @@ export interface VehicleServicePaymentMethod {
 export interface VehicleServicePaymentOptions {
     job_version: number;
     methods: VehicleServicePaymentMethod[];
+    credit_allowed: boolean;
+    credit_assessment: VehicleServiceCreditAssessment;
+}
+
+export interface VehicleServiceCreditAssessment {
+    available: boolean;
+    can_keep_on_credit: boolean;
+    currency_code: string | null;
+    credit_limit: string;
+    open_exposure: string;
+    remaining_credit: string;
+    warning: string | null;
 }
 
 export interface VehicleServicePaymentPayload {
@@ -371,6 +383,7 @@ export interface VehicleServicePaymentPayload {
     lines: Array<{
         amount: string;
         payment_method_id: number;
+        card_brand?: 'visa' | 'master' | 'amex';
         reference_number?: string;
         external_bank_name?: string;
         external_bank_branch?: string;

@@ -91,6 +91,7 @@ final class PaymentResource extends JsonResource
                 'bounced_date' => $line->bounced_date?->toDateString(),
                 'returned_date' => $line->returned_date?->toDateString(),
                 'notes' => $line->notes,
+                'card_brand' => ($line->metadata ?? [])['card_brand'] ?? null,
             ])->values()->all()),
             'allocations' => $this->whenLoaded('allocations'),
             'unapplied_balance' => $this->whenLoaded('unappliedBalance'),

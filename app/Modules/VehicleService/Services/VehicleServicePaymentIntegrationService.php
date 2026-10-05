@@ -15,10 +15,13 @@ use Modules\Payment\DTOs\PaymentAllocationData;
 use Modules\Payment\DTOs\PaymentLineData;
 use Modules\Payment\Enums\AllocationStatus;
 use Modules\Payment\Enums\PaymentDirection;
+use Modules\Payment\Enums\PaymentMethodType;
 use Modules\Payment\Enums\PaymentType;
 use Modules\Payment\Models\Payment;
+use Modules\Payment\Models\PaymentMethod;
 use Modules\Payment\Services\PaymentCreationService;
 use Modules\Payment\Services\PaymentDocumentLifecycleService;
+use Modules\Payment\Services\PaymentMethodService;
 use Modules\Payment\Services\PaymentPostingService;
 use Modules\VehicleService\DTOs\VehicleServicePaymentData;
 use Modules\VehicleService\DTOs\VehicleServicePaymentLineData;
@@ -36,6 +39,7 @@ final class VehicleServicePaymentIntegrationService
         private readonly InvoiceBalanceProviderInterface $invoiceBalances,
         private readonly PaymentCreationService $payments,
         private readonly PaymentDocumentLifecycleService $paymentLifecycle,
+        private readonly PaymentMethodService $paymentMethods,
         private readonly PaymentPostingService $paymentPosting,
         private readonly VehicleServiceStatusService $statuses,
     ) {}
@@ -46,6 +50,24 @@ final class VehicleServicePaymentIntegrationService
         $billToCustomerId = $this->billToCustomerId($job);
         if ($data->lines === []) {
             throw new InvalidArgumentException('At least one payment method is required.');
+        }
+
+        $cardBrandLines = array_filter($data->lines, static fn (VehicleServicePaymentLineData $line): bool => $line->cardBrand !== null);
+        if ($cardBrandLines !== []) {
+            $methodsById = $this->paymentMethods
+                ->effectiveActiveForDirection((int) $job->tenant_id, $job->organization_unit_id, PaymentDirection::Inbound)
+                ->keyBy(fn (PaymentMethod $method): int => (int) $method->getKey());
+
+            foreach ($cardBrandLines as $line) {
+                $method = $methodsById->get($line->paymentMethodId);
+                $methodType = $method?->method_type instanceof \BackedEnum
+                    ? $method->method_type->value
+                    : (string) $method?->method_type;
+
+                if ($method === null || $methodType !== PaymentMethodType::Card->value) {
+                    throw new InvalidArgumentException('Card brand can only be used with an active inbound card payment method.');
+                }
+            }
         }
 
         $amount = $this->math->sum(array_map(
@@ -113,10 +135,11 @@ final class VehicleServicePaymentIntegrationService
                     externalBankBranch: $line->externalBankBranch,
                     instrumentNumber: $line->instrumentNumber,
                     instrumentDate: $line->instrumentDate,
-                    metadata: [
+                    metadata: array_filter([
                         'vehicle_service_job_id' => (int) $job->getKey(),
                         'invoice_id' => $data->invoiceId,
-                    ],
+                        'card_brand' => $line->cardBrand,
+                    ], static fn (mixed $value): bool => $value !== null),
                 ),
                 $data->lines,
             ),

@@ -99,6 +99,7 @@ Route::prefix('api/v1/vehicle-service')->middleware($middleware)->name('api.v1.v
 
     Route::middleware($requires(VehicleServicePermission::PAYMENTS_VIEW))->group(function (): void {
         Route::get('jobs/{job}/payments/options', [VehicleServicePaymentController::class, 'options'])->whereNumber('job')->name('payments.options');
+        Route::post('jobs/{job}/payments/credit-check', [VehicleServicePaymentController::class, 'checkCredit'])->whereNumber('job')->name('payments.credit-check');
         Route::post('jobs/{job}/payments/prepare', [VehicleServicePaymentController::class, 'prepare'])->whereNumber('job')->name('payments.prepare');
     });
     Route::post('jobs/{job}/payments', [VehicleServicePaymentController::class, 'store'])->whereNumber('job')->middleware($requires(VehicleServicePermission::PAYMENTS_CREATE))->name('payments.store');

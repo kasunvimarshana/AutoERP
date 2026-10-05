@@ -3,6 +3,7 @@ import type { ApiResource } from '@/shared/types/api';
 import type {
     PreparedVehicleServicePayment,
     VehicleServicePaymentCreated,
+    VehicleServiceCreditAssessment,
     VehicleServicePaymentOptions,
     VehicleServicePaymentPayload,
 } from '../vehicleServiceTypes';
@@ -15,6 +16,11 @@ export const getVehicleServicePaymentOptions = (
     apiClient.get<ApiResource<VehicleServicePaymentOptions>>(
         `${jobs}/${jobId}/payments/options`,
         { signal },
+    ).then((response) => response.data.data);
+
+export const checkVehicleServiceCredit = (jobId: number) =>
+    apiClient.post<ApiResource<VehicleServiceCreditAssessment>>(
+        `${jobs}/${jobId}/payments/credit-check`,
     ).then((response) => response.data.data);
 
 export const prepareVehicleServicePayment = (

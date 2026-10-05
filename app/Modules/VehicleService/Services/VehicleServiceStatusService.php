@@ -29,6 +29,8 @@ final class VehicleServiceStatusService
 
     private const WORKFORCE_REQUIRED_MESSAGE = 'Assign at least one labour employee before marking this job as inspected.';
 
+    private const JOB_LINE_REQUIRED_MESSAGE = 'Add at least one active job line before starting this service job.';
+
     private const INVENTORY_ISSUE_REQUIRED_MESSAGE = 'Issue all required stock items before completing this job.';
 
     private const TRANSACTION_ATTEMPTS = 3;
@@ -100,6 +102,7 @@ final class VehicleServiceStatusService
             }
 
             if ($status === VehicleServiceJobStatus::InProgress) {
+                $this->assertHasActiveJobLine($job);
                 $this->assertVehicleCanEnterService($vehicle);
                 $this->inventory->issueReservedOnStart($job, $changedBy);
             }
@@ -212,6 +215,17 @@ final class VehicleServiceStatusService
     {
         if (! in_array($vehicle->status, [VehicleStatus::Active, VehicleStatus::UnderService], true)) {
             throw new InvalidArgumentException('Only an active vehicle can enter an in-progress service job.');
+        }
+    }
+
+    private function assertHasActiveJobLine(VehicleServiceJob $job): void
+    {
+        $hasActiveJobLine = $job->lines()
+            ->where('status', '!=', VehicleServiceLineStatus::Cancelled->value)
+            ->exists();
+
+        if (! $hasActiveJobLine) {
+            throw new InvalidArgumentException(self::JOB_LINE_REQUIRED_MESSAGE);
         }
     }
 

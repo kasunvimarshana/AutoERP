@@ -14,5 +14,6 @@ final readonly class VehicleServicePaymentLineData
         public ?string $externalBankBranch = null,
         public ?string $instrumentNumber = null,
         public ?string $instrumentDate = null,
+        public ?string $cardBrand = null,
     ) {}
 }
