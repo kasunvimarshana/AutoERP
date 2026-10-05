@@ -32,17 +32,26 @@ it('requires explicit policy acceptance and sends dates with verified document i
     await setup();
     fireEvent.change(screen.getByLabelText('Charge through'), { target: { value: '2026-02-27' } });
     documentFields();
-    expect(screen.getByRole('button', { name: 'Create invoice draft' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Create customer invoice draft' })).toBeDisabled();
     fireEvent.click(screen.getByRole('checkbox'));
-    fireEvent.click(screen.getByRole('button', { name: 'Create invoice draft' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create customer invoice draft' }));
     expect(await screen.findByRole('link', { name: 'INV-21' })).toHaveAttribute('href', '/invoices/21');
     expect(billBaseRent).toHaveBeenCalledWith(AgreementKind.Customer, agreement, { from: '2026-01-31', until: '2026-02-27' }, { invoice_date: '2026-02-27', due_date: null, exchange_rate: '1' });
+});
+it('uses Owner Payable Voucher terminology for owner-side billing', async () => {
+    render(<MemoryRouter><BaseRentBillingPanel kind={AgreementKind.Owner} agreement={agreement} /></MemoryRouter>);
+    fireEvent.click(screen.getByText('Bill base rent'));
+    await waitFor(() => expect(screen.queryByText('Loading recorded base charges…')).not.toBeInTheDocument());
+    expect(screen.getByLabelText('Owner Payable Voucher date')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Create Owner Payable Voucher draft' })).toBeInTheDocument();
+    expect(screen.getByText(/owner payable voucher draft/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Create customer invoice draft' })).not.toBeInTheDocument();
 });
 it('surfaces conflicting billing without a success message', async () => {
     vi.mocked(billBaseRent).mockRejectedValue(new ApiError('Period already charged.', 409));
     await setup(); documentFields();
     fireEvent.change(screen.getByLabelText('Charge through'), { target: { value: '2026-02-27' } });
-    fireEvent.click(screen.getByRole('checkbox')); fireEvent.click(screen.getByRole('button', { name: 'Create invoice draft' }));
+    fireEvent.click(screen.getByRole('checkbox')); fireEvent.click(screen.getByRole('button', { name: 'Create customer invoice draft' }));
     expect(await screen.findByText('Period already charged.')).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'INV-21' })).not.toBeInTheDocument();
 });
@@ -50,7 +59,7 @@ it('reissues a released charge without sending replacement amounts or periods', 
     vi.mocked(loadBaseCharges).mockResolvedValue({ data: [charge], current_page: 1, last_page: 1 });
     vi.mocked(reissueBaseRent).mockResolvedValue({ id: 22, invoice_number: 'INV-22', grand_total: '3100.000000' });
     await setup(); fireEvent.click(await screen.findByRole('button', { name: 'Reissue charge' })); documentFields();
-    fireEvent.click(screen.getByRole('checkbox')); fireEvent.click(screen.getByRole('button', { name: 'Create invoice draft' }));
+    fireEvent.click(screen.getByRole('checkbox')); fireEvent.click(screen.getByRole('button', { name: 'Create customer invoice draft' }));
     await waitFor(() => expect(reissueBaseRent).toHaveBeenCalledWith(AgreementKind.Customer, agreement, charge, { invoice_date: '2026-02-27', due_date: null, exchange_rate: '1' }));
     expect(billBaseRent).not.toHaveBeenCalled();
 });
@@ -80,7 +89,7 @@ it('maps billing validation errors back to document fields', async () => {
     fireEvent.change(screen.getByLabelText('Charge through'), { target: { value: '2026-02-27' } });
     documentFields();
     fireEvent.click(screen.getByRole('checkbox'));
-    fireEvent.click(screen.getByRole('button', { name: 'Create invoice draft' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create customer invoice draft' }));
     expect(await screen.findByText('Choose a valid invoice date.')).toBeInTheDocument();
     expect(screen.getByText('Enter a positive exchange rate.')).toBeInTheDocument();
 });
@@ -91,5 +100,5 @@ it('does not present a false empty charge history when the list request fails', 
     fireEvent.click(screen.getByText('Bill base rent'));
     expect(await screen.findByText('Recorded charges could not be loaded.')).toBeInTheDocument();
     expect(screen.queryByText('No base-rent charges have been recorded.')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Create invoice draft' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Create customer invoice draft' })).toBeDisabled();
 });
