@@ -276,33 +276,44 @@ final class SummaryReportService
         $this->organizationScope($query, 'payments.organization_unit_id', $organizationUnitId);
         $this->organizationScope($query, 'lines.organization_unit_id', $organizationUnitId);
 
-        $totals = (clone $query)
-            ->selectRaw('COUNT(DISTINCT payments.id) as transaction_count, COALESCE(SUM(lines.amount * payments.exchange_rate), 0) as amount')
-            ->first();
-        $methods = $query
-            ->select([
-                'lines.payment_method_type_snapshot as type',
-                'lines.payment_method_name_snapshot as name',
-            ])
-            ->selectRaw('COUNT(DISTINCT payments.id) as transaction_count, COALESCE(SUM(lines.amount * payments.exchange_rate), 0) as amount')
-            ->groupBy([
-                'lines.payment_method_type_snapshot',
-                'lines.payment_method_name_snapshot',
-            ])
-            ->orderByDesc('amount')
-            ->get()
-            ->map(fn (object $row): array => [
+        $rows = $query->get([
+            'payments.id as payment_id',
+            'payments.exchange_rate',
+            'lines.amount',
+            'lines.payment_method_type_snapshot as type',
+            'lines.payment_method_name_snapshot as name',
+        ]);
+
+        $amount = '0.000000';
+        $paymentIds = [];
+        $methodTotals = [];
+        foreach ($rows as $row) {
+            $baseAmount = $this->math->mul((string) $row->amount, (string) $row->exchange_rate);
+            $amount = $this->math->add($amount, $baseAmount);
+            $paymentIds[(int) $row->payment_id] = true;
+
+            $methodKey = (string) $row->type."\0".(string) $row->name;
+            $methodTotals[$methodKey] ??= [
                 'type' => (string) $row->type,
                 'name' => (string) $row->name,
-                'transaction_count' => (int) $row->transaction_count,
-                'amount' => $this->decimal($row->amount),
-            ])
-            ->values()
-            ->all();
+                'transaction_ids' => [],
+                'amount' => '0.000000',
+            ];
+            $methodTotals[$methodKey]['transaction_ids'][(int) $row->payment_id] = true;
+            $methodTotals[$methodKey]['amount'] = $this->math->add($methodTotals[$methodKey]['amount'], $baseAmount);
+        }
+
+        $methods = array_values(array_map(static fn (array $method): array => [
+            'type' => $method['type'],
+            'name' => $method['name'],
+            'transaction_count' => count($method['transaction_ids']),
+            'amount' => $method['amount'],
+        ], $methodTotals));
+        usort($methods, fn (array $left, array $right): int => $this->math->compare($right['amount'], $left['amount']));
 
         return [
-            'amount' => $this->decimal($totals->amount ?? 0),
-            'transaction_count' => (int) ($totals->transaction_count ?? 0),
+            'amount' => $amount,
+            'transaction_count' => count($paymentIds),
             'methods' => $methods,
         ];
     }
