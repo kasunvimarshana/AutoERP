@@ -33,19 +33,6 @@ final class VehicleServicePaymentController extends VehicleServiceController
         ]);
     }
 
-    public function prepare(
-        PrepareVehicleServicePaymentRequest $request,
-        int $job,
-        VehicleServicePaymentIntegrationService $service,
-    ): JsonResponse {
-        return response()->json([
-            'data' => $service->prepare(
-                $this->job($request, $job),
-                $request->toData(),
-            ),
-        ]);
-    }
-
     public function store(
         PrepareVehicleServicePaymentRequest $request,
         int $job,

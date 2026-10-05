@@ -1,7 +1,6 @@
 import { apiClient } from '@/shared/api/apiClient';
 import type { ApiResource } from '@/shared/types/api';
 import type {
-    PreparedVehicleServicePayment,
     VehicleServicePaymentCreated,
     VehicleServiceCreditAssessment,
     VehicleServicePaymentOptions,
@@ -21,15 +20,6 @@ export const getVehicleServicePaymentOptions = (
 export const checkVehicleServiceCredit = (jobId: number) =>
     apiClient.post<ApiResource<VehicleServiceCreditAssessment>>(
         `${jobs}/${jobId}/payments/credit-check`,
-    ).then((response) => response.data.data);
-
-export const prepareVehicleServicePayment = (
-    jobId: number,
-    payload: VehicleServicePaymentPayload,
-) =>
-    apiClient.post<ApiResource<PreparedVehicleServicePayment>>(
-        `${jobs}/${jobId}/payments/prepare`,
-        payload,
     ).then((response) => response.data.data);
 
 export const createVehicleServicePayment = (

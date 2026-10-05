@@ -406,22 +406,6 @@ export interface VehicleServicePaymentCreated {
     allocated_amount?: string | null;
 }
 
-export interface PreparedVehicleServicePayment {
-    paymentType: string;
-    direction: string;
-    paymentDate: string;
-    referenceNumber?: string | null;
-    lines: Array<{
-        amount: string;
-        paymentMethodId?: number | null;
-        externalBankName?: string | null;
-        externalBankBranch?: string | null;
-        instrumentNumber?: string | null;
-        instrumentDate?: string | null;
-    }>;
-    allocations: Array<{ invoiceId: number; allocatedAmount: string }>;
-}
-
 export interface VehicleServiceStatusHistory {
     id: number;
     old_status?: VehicleServiceJobStatus | null;

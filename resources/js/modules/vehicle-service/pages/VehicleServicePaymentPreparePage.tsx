@@ -22,10 +22,8 @@ import {
     checkVehicleServiceCredit,
     getVehicleServiceJob,
     getVehicleServicePaymentOptions,
-    prepareVehicleServicePayment,
 } from '../vehicleServiceApi';
 import type {
-    PreparedVehicleServicePayment,
     VehicleServiceInvoiceLink,
     VehicleServicePaymentCreated,
     VehicleServicePaymentMethod,
@@ -173,7 +171,6 @@ export default function VehicleServicePaymentPreparePage() {
         reference: '',
         details: {},
     })));
-    const [prepared, setPrepared] = useState<PreparedVehicleServicePayment | null>(null);
     const [createdPayment, setCreatedPayment] = useState<VehicleServicePaymentCreated | null>(null);
     const [settledInvoice, setSettledInvoice] = useState<VehicleServiceInvoiceLink | null>(null);
     const [busy, setBusy] = useState(false);
@@ -216,14 +213,8 @@ export default function VehicleServicePaymentPreparePage() {
     const paymentTotal = sumDecimals(appliedAmounts);
     const remainingAfterPayment = nonNegativeDecimal(subtractDecimal(outstanding, paymentTotal));
 
-    const clearPrepared = () => {
-        setPrepared(null);
-        setCreatedPayment(null);
-        setSettledInvoice(null);
-    };
     const updateRow = (kind: DirectPaymentKind, update: Partial<PaymentRow>) => {
         setRows((current) => current.map((row) => row.kind === kind ? { ...row, ...update } : row));
-        clearPrepared();
     };
     const payload = (): VehicleServicePaymentPayload => ({
         expected_version: options.data?.job_version ?? 0,
@@ -260,7 +251,7 @@ export default function VehicleServicePaymentPreparePage() {
             && (!method.requires_reference || Boolean(methodReference(row.reference, kind, row.details)))
             && (!method.requires_instrument_details || hasInstrumentDetails(instrument));
     });
-    const canPrepare = Boolean(
+    const canFinalize = Boolean(
         options.data?.job_version
         && invoice
         && paymentMode === 'direct'
@@ -284,11 +275,15 @@ export default function VehicleServicePaymentPreparePage() {
             <ErrorAlert error={error ?? options.error} />
             <form onSubmit={async (event) => {
                 event.preventDefault();
-                if (!canPrepare) return;
+                if (!canFinalize || !invoice) return;
                 setBusy(true);
                 setError(null);
                 try {
-                    setPrepared(await prepareVehicleServicePayment(jobId, payload()));
+                    const payment = await createVehicleServicePayment(jobId, payload());
+                    setSettledInvoice(invoice);
+                    setCreatedPayment(payment);
+                    options.reload();
+                    job.reload();
                 } catch (requestError) {
                     setError(toApiError(requestError));
                 } finally {
@@ -317,7 +312,6 @@ export default function VehicleServicePaymentPreparePage() {
                                     })));
                                     setCreditCheckFeedback(null);
                                     setAcknowledgedCreditWarning(null);
-                                    clearPrepared();
                                 }}
                             />
                             <Input
@@ -326,7 +320,7 @@ export default function VehicleServicePaymentPreparePage() {
                                 value={date}
                                 error={fieldError(error, 'payment_date')}
                                 disabled={Boolean(createdPayment)}
-                                onChange={(event) => { setDate(event.target.value); clearPrepared(); }}
+                                onChange={(event) => { setDate(event.target.value); }}
                             />
                         </div>
 
@@ -340,7 +334,7 @@ export default function VehicleServicePaymentPreparePage() {
                                         value="direct"
                                         checked={paymentMode === 'direct'}
                                         disabled={Boolean(createdPayment)}
-                                        onChange={() => { setPaymentMode('direct'); setCreditCheckFeedback(null); setAcknowledgedCreditWarning(null); clearPrepared(); }}
+                                        onChange={() => { setPaymentMode('direct'); setCreditCheckFeedback(null); setAcknowledgedCreditWarning(null); }}
                                     />
                                     Direct Payment
                                 </label>
@@ -352,7 +346,7 @@ export default function VehicleServicePaymentPreparePage() {
                                             value="credit"
                                             checked={paymentMode === 'credit'}
                                             disabled={Boolean(createdPayment)}
-                                            onChange={() => { setPaymentMode('credit'); setCreditCheckFeedback(null); setAcknowledgedCreditWarning(null); clearPrepared(); }}
+                                            onChange={() => { setPaymentMode('credit'); setCreditCheckFeedback(null); setAcknowledgedCreditWarning(null); }}
                                         />
                                         Credit Payment
                                     </label>
@@ -516,13 +510,6 @@ export default function VehicleServicePaymentPreparePage() {
                             </div>
                         )}
 
-                        {prepared && (
-                            <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
-                                <p className="text-sm font-semibold text-emerald-900">Payment is ready to finalize</p>
-                                <p className="mt-1 text-sm text-emerald-800">Review the method amounts and remaining invoice balance before finalizing.</p>
-                            </div>
-                        )}
-
                         {createdPayment && settledInvoice && (
                             <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
                                 <p className="text-sm font-semibold text-emerald-900">Payment created and allocated successfully</p>
@@ -573,11 +560,8 @@ export default function VehicleServicePaymentPreparePage() {
                             </p>
                         )}
                         <div className="mt-6 flex flex-col gap-2">
-                            {paymentMode === 'direct' ? <>
-                                <Button type="submit" variant="secondary" loading={busy} disabled={!canPrepare || Boolean(prepared)}>
-                                    Review payment
-                                </Button>
-                                {createdPayment && settledInvoice ? (
+                            {paymentMode === 'direct' ? (
+                                createdPayment && settledInvoice ? (
                                     <Button type="button" onClick={async () => {
                                         try {
                                             const json = await getInvoiceSignedPrintLink(settledInvoice.invoice_id);
@@ -593,26 +577,11 @@ export default function VehicleServicePaymentPreparePage() {
                                         Print bill
                                     </Button>
                                 ) : (
-                                    <Button type="button" loading={busy} disabled={!prepared || busy} onClick={async () => {
-                                        if (!prepared || !invoice) return;
-                                        setBusy(true);
-                                        setError(null);
-                                        try {
-                                            const payment = await createVehicleServicePayment(jobId, payload());
-                                            setSettledInvoice(invoice);
-                                            setCreatedPayment(payment);
-                                            options.reload();
-                                            job.reload();
-                                        } catch (requestError) {
-                                            setError(toApiError(requestError));
-                                        } finally {
-                                            setBusy(false);
-                                        }
-                                    }}>
+                                    <Button type="submit" loading={busy} disabled={!canFinalize}>
                                         Finalize payment
                                     </Button>
-                                )}
-                            </> : (
+                                )
+                            ) : (
                                 <Button type="button" loading={busy} disabled={!invoice || busy} onClick={async () => {
                                     setBusy(true);
                                     setCreditCheckFeedback(null);
