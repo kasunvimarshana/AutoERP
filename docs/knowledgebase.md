@@ -755,6 +755,7 @@ These are implementation policies, not claims that TACGL universally proves them
 - tenant/org localization timezone is the commercial civil-day source of truth;
 - Vehicle Use planning may use explicit civil-date eligibility while actual handover/replacement uses exact timestamps;
 - Running Chart lifecycle is Draft → Finalized → Reversed/Corrected without extra unproven approval stages;
+- finalized chart-based financial source periods are resolved in tenant/org business time, store an inclusive last covered civil date from the exclusive chart end, and are frozen in the immutable charge calculation;
 - same-side source consumption is duplicate-safe;
 - customer and owner calculations remain independent;
 - posted financial records remain owned and immutable under Invoice/Payment/Finance rules;
