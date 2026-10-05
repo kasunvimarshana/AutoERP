@@ -35,8 +35,6 @@ const typeOptions = [
     { value: PAYMENT_TYPE_CUSTOMER_RECEIPT, label: 'Customer receipt' },
     { value: PAYMENT_TYPE_SUPPLIER_PAYMENT, label: 'Supplier payment' },
     { value: 'advance', label: 'Advance / deposit' },
-    { value: 'refund', label: 'Refund' },
-    { value: 'manual', label: 'Manual payment' },
 ];
 
 const directionOptions = [
