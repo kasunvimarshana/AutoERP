@@ -327,7 +327,7 @@ final class ReportCatalog
             $this->definition('finance.ledger', 'Ledger', 'Finance', FinanceLedgerEntry::class, [
                 $this->col('entry_date', 'Date', format: 'date', sort: 'entry_date'), $this->col('account', 'Account', 'account.code'), $this->col('account_name', 'Account Name', 'account.name'),
                 $this->col('journal', 'Journal', 'journalEntry.journal_number'), $this->col('source_module', 'Source Module', sort: 'source_module'),
-                $this->col('source_number', 'Source Number', sort: 'source_number'), $this->money('debit', 'Debit'), $this->money('credit', 'Credit'), $this->money('balance_after', 'Balance'),
+                $this->col('source_number', 'Source Number', sort: 'source_number'), $this->money('debit', 'Transaction Debit', false), $this->money('credit', 'Transaction Credit', false), $this->money('base_debit', 'Base Debit'), $this->money('base_credit', 'Base Credit'), $this->money('balance_after', 'Base Balance', false),
             ], ['account.code', 'account.name', 'journalEntry.journal_number'], ['account', 'journalEntry'], 'entry_date'),
             $this->definition('finance.trial-balance', 'Trial Balance', 'Finance', FinanceAccountBalance::class, [
                 $this->col('account', 'Account', 'account.code'), $this->col('account_name', 'Account Name', 'account.name'), $this->money('closing_debit', 'Debit'), $this->money('closing_credit', 'Credit'),
@@ -816,8 +816,8 @@ final class ReportCatalog
                 $this->col('account_name', 'Account Name', 'account.name'),
                 $this->col('source_module', 'Source Module', sort: 'source_module'),
                 $this->col('source_number', 'Source Number', sort: 'source_number'),
-                $this->money('debit', 'Inflow'),
-                $this->money('credit', 'Outflow'),
+                $this->money('base_debit', 'Inflow'),
+                $this->money('base_credit', 'Outflow'),
             ],
             search: ['account.code', 'account.name', 'source_number'],
             relations: ['account'],
