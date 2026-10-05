@@ -44,7 +44,7 @@ it('uses Owner Payable Voucher terminology for owner-side billing', async () => 
     await waitFor(() => expect(screen.queryByText('Loading recorded base charges…')).not.toBeInTheDocument());
     expect(screen.getByLabelText('Owner Payable Voucher date')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Create Owner Payable Voucher draft' })).toBeInTheDocument();
-    expect(screen.getByText(/owner payable voucher draft/i)).toBeInTheDocument();
+    expect(screen.getByText(/Create an Owner Payable Voucher draft from the recorded base rate/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Create customer invoice draft' })).not.toBeInTheDocument();
 });
 it('surfaces conflicting billing without a success message', async () => {
