@@ -23,9 +23,9 @@ describe('Rental vehicle use', () => {
         vi.mocked(transitionVehicleUse).mockRejectedValue(new ApiError('This record changed. Reload before continuing.', 409));
         render(<VehicleUsePanel agreement={agreement} canManage />);
         fireEvent.click(await screen.findByRole('button', { name: 'Cancel plan' }));
-        expect(screen.getByRole('button', { name: 'Confirm action' })).toBeDisabled();
+        expect(screen.getByRole('button', { name: 'Confirm cancellation' })).toBeDisabled();
         fireEvent.change(screen.getByLabelText('Action reason'), { target: { value: 'Booking withdrawn' } });
-        fireEvent.click(screen.getByRole('button', { name: 'Confirm action' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Confirm cancellation' }));
         expect(await screen.findByText('This record changed. Reload before continuing.')).toBeInTheDocument();
         expect(transitionVehicleUse).toHaveBeenCalledWith(row, VehicleUseAction.Cancel, { reason: 'Booking withdrawn' });
         fireEvent.click(screen.getByRole('button', { name: 'Reload vehicles' }));
@@ -45,9 +45,9 @@ it('requires the actual event time before a handover can be confirmed', async ()
     render(<VehicleUsePanel agreement={agreement} canManage />);
     fireEvent.click(await screen.findByRole('button', { name: 'Hand over vehicle' }));
     fireEvent.change(screen.getByLabelText('Action reason'), { target: { value: 'Vehicle collected' } });
-    expect(screen.getByRole('button', { name: 'Confirm action' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Confirm handover' })).toBeDisabled();
     fireEvent.change(screen.getByLabelText('Actual event time'), { target: { value: '2026-09-07T09:00' } });
-    expect(screen.getByRole('button', { name: 'Confirm action' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Confirm handover' })).toBeEnabled();
 });
 
 it('removes stale rows when a vehicle-use reload fails', async () => {
