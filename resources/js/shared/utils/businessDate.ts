@@ -12,6 +12,7 @@ interface DateTimeParts extends DateParts {
     second: number;
 }
 
+const LOCAL_DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
 const LOCAL_DATE_TIME_PATTERN = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/;
 const MINUTES_PER_HOUR = 60;
 const HOURS_PER_DAY = 24;
@@ -31,6 +32,29 @@ export function businessTimeZoneLabel(timeZone = configuredTimeZone): string {
 export function businessDateInputValue(date = new Date(), timeZone = configuredTimeZone): string {
     const parts = dateParts(date, timeZone);
     return `${parts.year}-${pad(parts.month)}-${pad(parts.day)}`;
+}
+
+export function formatBusinessDate(
+    value: string | null | undefined,
+    fallback = '-',
+): string {
+    if (value === null || value === undefined || value === '') return fallback;
+    const match = LOCAL_DATE_PATTERN.exec(value);
+    if (!match) return fallback;
+
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+    const date = new Date(Date.UTC(year, month - 1, day));
+
+    if (date.getUTCFullYear() !== year || date.getUTCMonth() + 1 !== month || date.getUTCDate() !== day) {
+        return fallback;
+    }
+
+    return new Intl.DateTimeFormat(undefined, {
+        timeZone: 'UTC',
+        dateStyle: 'medium',
+    }).format(date);
 }
 
 export function formatBusinessDateTime(
