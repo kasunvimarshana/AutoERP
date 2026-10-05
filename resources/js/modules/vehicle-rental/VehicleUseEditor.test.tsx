@@ -10,8 +10,12 @@ vi.mock('./vehicleUseApi', () => ({ planVehicleUse: vi.fn(), replaceVehicleUse: 
 const agreement = { id: 3, reference: 'CUSTOMER-A', row_version: 2 } as Agreement;
 beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(requestLookup).mockResolvedValueOnce({ data: [{ id: 11, registration_number: 'CAR-123', vehicle_number: 'CAR' }] })
-        .mockResolvedValueOnce({ data: [{ id: 21, name: 'OWNER-A · Example Owner' }] });
+    vi.mocked(requestLookup).mockReset();
+    vi.mocked(requestLookup).mockImplementation((url) => Promise.resolve(
+        url.includes('/lookup/active')
+            ? { data: [{ id: 11, registration_number: 'CAR-123', vehicle_number: 'CAR' }] }
+            : { data: [{ id: 21, name: 'OWNER-A · Example Owner' }] },
+    ));
 });
 it('uses the planned period for owner lookup and clears its selection when dates change', async () => {
     render(<VehicleUseEditor agreement={agreement} onSaved={vi.fn()} onCancel={vi.fn()} />);
