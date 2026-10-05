@@ -28,7 +28,7 @@ export default function VehicleUseRegisterPage() {
         const controller = new AbortController();
         listVehicleUseRegister(filters, page, controller.signal).then(result => {
             if (!controller.signal.aborted) { setRows(result.data); setMeta(result.meta); setError(null); }
-        }).catch(failure => { if (!controller.signal.aborted) setError(toApiError(failure)); })
+        }).catch(failure => { if (!controller.signal.aborted) { setRows([]); setMeta(undefined); setError(toApiError(failure)); } })
             .finally(() => { if (!controller.signal.aborted) setLoading(false); });
         return () => controller.abort();
     }, [filters, page]);
@@ -40,12 +40,12 @@ export default function VehicleUseRegisterPage() {
         } catch (failure) { setError(toApiError(failure)); }
     }
     function clearFilters() {
-        const needsReload = page !== 1 || Object.values(filters).some(value => value !== undefined);
+        const needsReload = error !== null || page !== 1 || Object.values(filters).some(value => value !== undefined);
         setSearch(''); setStatus(''); setFrom(''); setUntil(''); setSelected(null); setError(null);
         if (needsReload) { setLoading(true); setFilters({}); setPage(1); }
     }
     const statusOptions = Object.values(VehicleUseStatus).map(value => ({ value, label: USE_LABELS[value] }));
-    return <main className="space-y-5 p-4">
+    return <div className="space-y-5">
         <ContentHeader title="Vehicle Use register" description="Find assignments and review planned periods, actual custody, replacements and history." />
         <Panel title="Filters"><form aria-label="Filter vehicle use" onSubmit={apply} className="grid gap-3 md:grid-cols-2">
             <Input label="Vehicle, agreement or party" value={search} onChange={event => setSearch(event.target.value)} error={error?.fields.search?.[0]} />
@@ -74,5 +74,5 @@ export default function VehicleUseRegisterPage() {
             </article>)}
             <Pagination meta={meta} onPageChange={next => { setLoading(true); setSelected(null); setPage(next); }} />
         </>}
-    </main>;
+    </div>;
 }
