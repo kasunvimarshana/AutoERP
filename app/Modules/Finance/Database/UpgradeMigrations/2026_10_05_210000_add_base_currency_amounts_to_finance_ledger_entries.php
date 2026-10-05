@@ -26,13 +26,15 @@ return new class extends Migration
             });
         }
 
-        $this->backfillBaseAmounts();
-        $this->rebuildBalances(useBaseAmounts: true);
+        DB::transaction(function (): void {
+            $this->backfillBaseAmounts();
+            $this->rebuildBalances(useBaseAmounts: true);
+        });
     }
 
     public function down(): void
     {
-        $this->rebuildBalances(useBaseAmounts: false);
+        DB::transaction(fn (): null => $this->rebuildBalances(useBaseAmounts: false));
 
         Schema::table(self::TABLE, function (Blueprint $table): void {
             if (Schema::hasColumn(self::TABLE, 'base_credit')) {
