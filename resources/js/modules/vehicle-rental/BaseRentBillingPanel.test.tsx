@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { ApiError } from '@/shared/api/apiError';
+import { formatBusinessDate } from '@/shared/utils/businessDate';
 import { BaseRentBillingPanel } from './BaseRentBillingPanel';
 import { billBaseRent, loadBaseCharges, reissueBaseRent, voidBaseCharge } from './baseRentBillingApi';
 import { AgreementKind, AgreementStatus, DriverMode, RentalBasis, TERM_LABELS, type Agreement, type TermKey } from './agreements';
@@ -14,9 +15,10 @@ const agreement: Agreement = {
 };
 
 const charge = { id: 12, row_version: 1, voided_at: null, void_reason: null, from: '2026-01-31', until: '2026-02-27', amount: '3100.000000', currency: 'LKR', invoices: [{ id: 20, number: 'INV-20', status: 'cancelled' }] };
+const chargePage = (data: typeof charge[]) => ({ data, current_page: 1, last_page: 1, from: data.length ? 1 : null, to: data.length ? data.length : null, per_page: 15, total: data.length });
 beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(loadBaseCharges).mockResolvedValue({ data: [], current_page: 1, last_page: 1 });
+    vi.mocked(loadBaseCharges).mockResolvedValue(chargePage([]));
     vi.mocked(billBaseRent).mockResolvedValue({ id: 21, invoice_number: 'INV-21', grand_total: '3100.000000' });
 });
 async function setup() {
@@ -56,15 +58,17 @@ it('surfaces conflicting billing without a success message', async () => {
     expect(screen.queryByRole('link', { name: 'INV-21' })).not.toBeInTheDocument();
 });
 it('reissues a released charge without sending replacement amounts or periods', async () => {
-    vi.mocked(loadBaseCharges).mockResolvedValue({ data: [charge], current_page: 1, last_page: 1 });
+    vi.mocked(loadBaseCharges).mockResolvedValue(chargePage([charge]));
     vi.mocked(reissueBaseRent).mockResolvedValue({ id: 22, invoice_number: 'INV-22', grand_total: '3100.000000' });
-    await setup(); fireEvent.click(await screen.findByRole('button', { name: 'Reissue charge' })); documentFields();
+    await setup();
+    expect(screen.getByText(`${formatBusinessDate(charge.from)} – ${formatBusinessDate(charge.until)} ·`, { exact: false })).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('button', { name: 'Reissue charge' })); documentFields();
     fireEvent.click(screen.getByRole('checkbox')); fireEvent.click(screen.getByRole('button', { name: 'Create customer invoice draft' }));
     await waitFor(() => expect(reissueBaseRent).toHaveBeenCalledWith(AgreementKind.Customer, agreement, charge, { invoice_date: '2026-02-27', due_date: null, exchange_rate: '1' }));
     expect(billBaseRent).not.toHaveBeenCalled();
 });
 it('voids with a reason and charge revision without requiring new invoice fields', async () => {
-    vi.mocked(loadBaseCharges).mockResolvedValue({ data: [charge], current_page: 1, last_page: 1 });
+    vi.mocked(loadBaseCharges).mockResolvedValue(chargePage([charge]));
     vi.mocked(voidBaseCharge).mockResolvedValue({} as never);
     await setup(); fireEvent.click(await screen.findByRole('button', { name: 'Void charge' }));
     fireEvent.change(screen.getByLabelText('Void reason'), { target: { value: 'Correct period' } });
@@ -74,7 +78,7 @@ it('voids with a reason and charge revision without requiring new invoice fields
     expect(billBaseRent).not.toHaveBeenCalled();
 });
 it('does not offer reissue or void for a live invoice', async () => {
-    vi.mocked(loadBaseCharges).mockResolvedValue({ data: [{ ...charge, invoices: [{ id: 20, number: 'INV-20', status: 'draft' }] }], current_page: 1, last_page: 1 });
+    vi.mocked(loadBaseCharges).mockResolvedValue(chargePage([{ ...charge, invoices: [{ id: 20, number: 'INV-20', status: 'draft' }] }]));
     await setup(); await screen.findByRole('link', { name: 'INV-20' });
     expect(screen.queryByRole('button', { name: 'Reissue charge' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Void charge' })).not.toBeInTheDocument();
