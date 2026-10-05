@@ -33,6 +33,8 @@ import { Input } from '@/shared/components/Input';
 import { DecimalInput } from '@/shared/components/DecimalInput';
 import { isPositiveDecimal } from '@/shared/utils/decimal';
 import { useDetailResourceStore } from '@/shared/state/useDetailResourceStore';
+import { PaymentAllocationPanel } from '../components/PaymentAllocationPanel';
+import { PaymentSettlementPanel } from '../components/PaymentSettlementPanel';
 
 type Tab = 'summary' | 'lines' | 'allocations' | 'unapplied' | 'refunds' | 'reversals' | 'history';
 const tabs = [
@@ -72,6 +74,8 @@ export default function PaymentDetailPage() {
     const fromPurchase = location.pathname.startsWith('/purchase/payments/');
     const chequeLine = value.lines?.find((line) => line.payment_method?.method_type === 'cheque') ?? null;
     const capabilities = value.capabilities ?? {};
+    const canAllocate = Boolean(capabilities.can_allocate) && hasPaymentPermission(auth, paymentPermissions.allocate);
+    const canSettle = Boolean(capabilities.can_settle) && hasPaymentPermission(auth, paymentPermissions.settle);
     const canRefund = Boolean(capabilities.can_refund) && hasPaymentPermission(auth, paymentPermissions.refund);
     const canReverse = Boolean(capabilities.can_reverse) && hasPaymentPermission(auth, paymentPermissions.reverse);
     const canSubmit = Boolean(capabilities.can_submit) && hasPaymentPermission(auth, paymentPermissions.submit);
@@ -182,15 +186,23 @@ export default function PaymentDetailPage() {
                     { label: 'Party', value: readableRelation(value.party) },
                     { label: 'Type', value: humanize(value.payment_type) },
                     { label: 'Direction', value: humanize(value.direction) },
-                    { label: 'Total', value: <MoneyDisplay value={value.total_amount} /> },
-                    { label: 'Allocated', value: <MoneyDisplay value={value.allocated_amount} /> },
-                    { label: 'Unapplied', value: <MoneyDisplay value={value.unapplied_amount} /> },
-                    { label: 'Refunded', value: <MoneyDisplay value={value.refunded_amount} /> },
+                    { label: 'Currency', value: value.currency?.code ?? '-' },
+                    { label: 'Exchange rate', value: value.exchange_rate ?? '-' },
+                    { label: 'Total', value: <MoneyDisplay value={value.total_amount} currency={value.currency?.code ?? undefined} /> },
+                    { label: 'Allocated', value: <MoneyDisplay value={value.allocated_amount} currency={value.currency?.code ?? undefined} /> },
+                    { label: 'Unapplied', value: <MoneyDisplay value={value.unapplied_amount} currency={value.currency?.code ?? undefined} /> },
+                    { label: 'Refunded', value: <MoneyDisplay value={value.refunded_amount} currency={value.currency?.code ?? undefined} /> },
                     { label: 'Finance posting', value: value.finance_posting_reference ?? '-' },
                     { label: 'Source', value: humanize(value.source_type) },
                 ]} />}
-                {tabState.activeTab === 'lines' && <RecordTable rows={(value.lines ?? []) as unknown as Record<string, unknown>[]} fields={['payment_method', 'amount', 'cleared_amount', 'reference_number', 'status', 'instrument_number', 'instrument_date', 'external_bank_name']} rowKey={(row, index) => String(row.id ?? row.reference_number ?? row.instrument_number ?? `payment-line-${index}`)} />}
-                {tabState.activeTab === 'allocations' && (allocations.loading ? <LoadingState /> : allocations.error ? <ErrorAlert error={allocations.error} /> : <RecordTable rows={allocations.data ?? []} fields={['invoice', 'allocation_date', 'allocated_amount', 'invoice_balance_after', 'allocation_method', 'status']} rowKey={(row, index) => String(row.id ?? `${String(row.invoice ?? 'invoice')}-${String(row.allocation_date ?? index)}`)} />)}
+                {tabState.activeTab === 'lines' && <div>
+                    <RecordTable rows={(value.lines ?? []) as unknown as Record<string, unknown>[]} fields={['payment_method', 'amount', 'cleared_amount', 'reference_number', 'status', 'instrument_number', 'instrument_date', 'deposit_date', 'clearing_date', 'bounced_date', 'external_bank_name']} rowKey={(row, index) => String(row.id ?? row.reference_number ?? row.instrument_number ?? `payment-line-${index}`)} />
+                    <PaymentSettlementPanel payment={value} enabled={canSettle} onChanged={refreshPaymentState} />
+                </div>}
+                {tabState.activeTab === 'allocations' && <div>
+                    {allocations.loading ? <LoadingState /> : allocations.error ? <ErrorAlert error={allocations.error} /> : <RecordTable rows={allocations.data ?? []} fields={['invoice', 'allocation_date', 'allocated_amount', 'invoice_balance_after', 'allocation_method', 'status']} rowKey={(row, index) => String(row.id ?? `${String(row.invoice ?? 'invoice')}-${String(row.allocation_date ?? index)}`)} />}
+                    <PaymentAllocationPanel payment={value} enabled={canAllocate} onChanged={refreshPaymentState} />
+                </div>}
                 {tabState.activeTab === 'unapplied' && (unapplied.loading ? <LoadingState /> : unapplied.error ? <ErrorAlert error={unapplied.error} /> : <RecordTable rows={unapplied.data ? [unapplied.data] : []} fields={['balance_type', 'original_amount', 'allocated_amount', 'refunded_amount', 'remaining_amount', 'allocation_status', 'status']} rowKey={() => 'unapplied-balance'} />)}
                 {tabState.activeTab === 'refunds' && <div className="space-y-5">
                     <RecordTable rows={(value.refunds ?? []) as Record<string, unknown>[]} fields={['refund_number', 'refund_date', 'amount', 'refund_payment', 'reason', 'status']} rowKey={(row, index) => String(row.id ?? row.refund_number ?? `refund-${index}`)} />
