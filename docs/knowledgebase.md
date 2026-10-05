@@ -622,6 +622,7 @@ Financial lifecycle is owned by Invoice/Payment/Finance. Rental must not duplica
 ### Financial boundaries
 
 - no automatic Rental financial handoff may create customer or owner money outside effective agreement coverage;
+- chart-based OT/night-out charges freeze the configured tenant/org business timezone and inclusive source supply dates at first creation; a Running Chart end instant is exclusive, and later timezone changes cannot reinterpret reissues;
 - physical evidence outside commercial coverage may remain auditable without becoming billable/payable;
 - same-side source consumption is idempotent and duplicate-safe.
 
