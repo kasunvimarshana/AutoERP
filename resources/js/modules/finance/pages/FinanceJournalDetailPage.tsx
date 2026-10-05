@@ -97,7 +97,7 @@ export default function FinanceJournalDetailPage() {
     return <>
         <ContentHeader
             title={journal.journal_number}
-            description="Journal entry and immutable ledger impact. Balance after is a rebuildable chronological projection."
+            description="Journal entry preserves transaction-currency evidence; ledger base amounts and balance after are the functional-currency projection."
             actions={actions}
         />
         <ErrorAlert error={error} />
@@ -110,6 +110,7 @@ export default function FinanceJournalDetailPage() {
                 { label: 'Description', value: journal.description ?? '-' },
                 { label: 'Total debit', value: <MoneyDisplay value={journal.total_debit} /> },
                 { label: 'Total credit', value: <MoneyDisplay value={journal.total_credit} /> },
+                { label: 'Exchange rate', value: journal.exchange_rate },
                 { label: 'Reversal reason', value: journal.reversal_reason ?? '-' },
             ]} />
         </Panel>
@@ -126,9 +127,11 @@ export default function FinanceJournalDetailPage() {
             <DataTable rows={journal.ledger_entries ?? []} rowKey={(row) => row.id} columns={[
                 { key: 'date', header: 'Date', render: (row) => formatDate(row.entry_date) },
                 { key: 'account', header: 'Account', render: (row) => row.account ? `${row.account.code} - ${row.account.name}` : '-' },
-                { key: 'debit', header: 'Debit', render: (row) => <MoneyDisplay value={row.debit} /> },
-                { key: 'credit', header: 'Credit', render: (row) => <MoneyDisplay value={row.credit} /> },
-                { key: 'balance', header: 'Balance after', render: (row) => <MoneyDisplay value={row.balance_after} /> },
+                { key: 'debit', header: 'Transaction debit', render: (row) => <MoneyDisplay value={row.debit} /> },
+                { key: 'credit', header: 'Transaction credit', render: (row) => <MoneyDisplay value={row.credit} /> },
+                { key: 'base_debit', header: 'Base debit', render: (row) => <MoneyDisplay value={row.base_debit} /> },
+                { key: 'base_credit', header: 'Base credit', render: (row) => <MoneyDisplay value={row.base_credit} /> },
+                { key: 'balance', header: 'Base balance after', render: (row) => <MoneyDisplay value={row.balance_after} /> },
             ]} />
         </Panel>
 
