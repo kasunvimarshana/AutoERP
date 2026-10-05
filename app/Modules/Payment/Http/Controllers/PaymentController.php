@@ -163,6 +163,7 @@ final class PaymentController
                 $this->find($request, $payment),
                 $line,
                 $request->settlementStatus(),
+                $request->eventDate(),
                 $request->expectedPaymentVersion(),
                 $request->expectedLineVersion(),
                 $request->currentUserId(),
