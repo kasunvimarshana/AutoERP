@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace Modules\Reporting\Services;
 
+use Carbon\CarbonImmutable;
 use InvalidArgumentException;
+use Modules\Configuration\Constants\ConfigurationKey;
+use Modules\Configuration\Contracts\ConfigurationResolverInterface;
 use Modules\Core\Services\DecimalMath;
 use Modules\Customer\Models\Customer;
 use Modules\Finance\Models\FinanceAccount;
@@ -59,6 +62,7 @@ final class ReportCatalog
     public function __construct(
         private readonly VehicleServiceProfitabilityCalculator $profitability,
         private readonly DecimalMath $math,
+        private readonly ConfigurationResolverInterface $configuration,
         private readonly VehicleServiceHistoryReportService $vehicleServiceHistory,
     ) {}
 
