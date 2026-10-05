@@ -105,6 +105,56 @@ final class FinanceEngineTest extends TestCase
         });
     }
 
+    public function test_foreign_currency_journal_preserves_transaction_amounts_and_posts_base_currency_balances(): void
+    {
+        [$tenantId, $cash, $capital] = $this->chart();
+        $baseCurrencyId = CurrencyFixture::create(['name' => 'Finance Base Currency', 'symbol' => 'B']);
+        $foreignCurrencyId = CurrencyFixture::create(['name' => 'Finance Foreign Currency', 'symbol' => 'F']);
+        DB::table('tenants')->where('id', $tenantId)->update(['base_currency_id' => $baseCurrencyId]);
+
+        $this->withTenantExecutionContext($tenantId, function () use ($tenantId, $cash, $capital, $foreignCurrencyId): void {
+            $journal = app(JournalEntryCreationService::class)->create(new CreateJournalEntryData(
+                tenantId: $tenantId,
+                journalDate: '2026-06-06',
+                journalType: JournalType::General,
+                journalNumber: 'JE-FX',
+                currencyId: $foreignCurrencyId,
+                exchangeRate: '2.500000',
+                lines: [
+                    new JournalLineData(accountId: (int) $cash->getKey(), lineNumber: 1, debit: '100.000000'),
+                    new JournalLineData(accountId: (int) $capital->getKey(), lineNumber: 2, credit: '100.000000'),
+                ],
+            ));
+
+            app(JournalPostingService::class)->post($journal);
+
+            $cashLedger = $cash->ledgerEntries()->firstOrFail();
+            $capitalLedger = $capital->ledgerEntries()->firstOrFail();
+            $this->assertSame('100.000000', (string) $cashLedger->debit);
+            $this->assertSame('250.000000', (string) $cashLedger->base_debit);
+            $this->assertSame('250.000000', (string) $cashLedger->balance_after);
+            $this->assertSame('100.000000', (string) $capitalLedger->credit);
+            $this->assertSame('250.000000', (string) $capitalLedger->base_credit);
+            $this->assertSame('250.000000', (string) $capitalLedger->balance_after);
+
+            $cashBalance = $cash->balances()->firstOrFail();
+            $capitalBalance = $capital->balances()->firstOrFail();
+            $this->assertSame('250.000000', (string) $cashBalance->period_debit);
+            $this->assertSame('250.000000', (string) $cashBalance->closing_debit);
+            $this->assertSame('250.000000', (string) $capitalBalance->period_credit);
+            $this->assertSame('250.000000', (string) $capitalBalance->closing_credit);
+
+            $trialBalance = app(TrialBalanceService::class)->calculate(
+                tenantId: $tenantId,
+                dateFrom: '2026-06-01',
+                dateTo: '2026-06-30',
+            );
+            $this->assertTrue($trialBalance->isBalanced);
+            $this->assertSame('250.000000', $trialBalance->totalDebit);
+            $this->assertSame('250.000000', $trialBalance->totalCredit);
+        });
+    }
+
     public function test_it_rejects_unbalanced_journals(): void
     {
         [$tenantId, $cash, $capital] = $this->chart();
