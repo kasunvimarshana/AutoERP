@@ -24,6 +24,7 @@ use Modules\Finance\Services\BankReconciliationService;
 use Modules\Finance\Services\BudgetService;
 use Modules\Finance\Services\ChartOfAccountsService;
 use Modules\Finance\Services\CurrencyRevaluationService;
+use Tests\Support\CurrencyFixture;
 use Tests\TestCase;
 
 final class FinanceEnterpriseCoreTest extends TestCase
@@ -93,7 +94,8 @@ final class FinanceEnterpriseCoreTest extends TestCase
     public function test_bank_reconciliation_matches_statement_lines_to_existing_ledger_only(): void
     {
         [$tenantId, $bank, $capital] = $this->context();
-        $this->withTenantExecutionContext($tenantId, function () use ($tenantId, $bank, $capital): void {
+        $foreignCurrencyId = CurrencyFixture::create(['name' => 'Bank Reconciliation FX', 'symbol' => 'FX']);
+        $this->withTenantExecutionContext($tenantId, function () use ($tenantId, $bank, $capital, $foreignCurrencyId): void {
             $profile = $this->profile($tenantId, 'bank_deposit', [
                 'bank' => $bank,
                 'capital' => $capital,
@@ -101,6 +103,8 @@ final class FinanceEnterpriseCoreTest extends TestCase
             $posted = app(FinancePostingInterface::class)->post(new FinancePostingRequest(
                 source: new PostingSourceData('bank_deposit', 10, $tenantId, sourceModule: 'payment', sourceNumber: 'PAY-10', sourceDate: '2026-06-18'),
                 postingDate: '2026-06-18',
+                currencyId: $foreignCurrencyId,
+                exchangeRate: '2.000000',
                 lines: [
                     new FinancePostingLine(null, (string) $bank->name, debit: '100.000000', profileKey: 'bank'),
                     new FinancePostingLine(null, (string) $capital->name, credit: '100.000000', profileKey: 'capital'),
@@ -112,6 +116,9 @@ final class FinanceEnterpriseCoreTest extends TestCase
                 ->where('account_id', $bank->getKey())
                 ->firstOrFail();
 
+            $this->assertSame('100.000000', (string) $ledger->debit);
+            $this->assertSame('200.000000', (string) $ledger->base_debit);
+
             $service = app(BankReconciliationService::class);
             $reconciliation = $service->create(
                 tenantId: $tenantId,
@@ -120,11 +127,11 @@ final class FinanceEnterpriseCoreTest extends TestCase
                 statementReference: 'STM-001',
                 statementDate: '2026-06-30',
                 openingBalance: '0.000000',
-                closingBalance: '100.000000',
+                closingBalance: '200.000000',
                 statementLines: [[
                     'statement_date' => '2026-06-18',
                     'reference' => 'PAY-10',
-                    'debit' => '100.000000',
+                    'debit' => '200.000000',
                     'credit' => '0.000000',
                 ]],
             );
