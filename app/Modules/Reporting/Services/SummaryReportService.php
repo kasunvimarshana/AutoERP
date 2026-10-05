@@ -283,7 +283,7 @@ final class SummaryReportService
                 'lines.payment_method_type_snapshot as type',
                 'lines.payment_method_name_snapshot as name',
             ])
-            ->selectRaw('COUNT(DISTINCT payments.id) as transaction_count, COALESCE(SUM(lines.amount), 0) as amount')
+            ->selectRaw('COUNT(DISTINCT payments.id) as transaction_count, COALESCE(SUM(lines.amount * payments.exchange_rate), 0) as amount')
             ->groupBy([
                 'lines.payment_method_type_snapshot',
                 'lines.payment_method_name_snapshot',
