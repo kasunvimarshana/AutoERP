@@ -124,9 +124,9 @@ final class BankReconciliationService
                 ->exists()) {
                 throw new InvalidArgumentException('Ledger entry is already reconciled.');
             }
-            if ($this->math->compare((string) $statementLine->debit, (string) $ledger->debit) !== 0
-                || $this->math->compare((string) $statementLine->credit, (string) $ledger->credit) !== 0) {
-                throw new InvalidArgumentException('Bank statement line amount does not match ledger entry amount.');
+            if ($this->math->compare((string) $statementLine->debit, (string) $ledger->base_debit) !== 0
+                || $this->math->compare((string) $statementLine->credit, (string) $ledger->base_credit) !== 0) {
+                throw new InvalidArgumentException('Bank statement line amount does not match the base-currency ledger amount.');
             }
 
             $statementLine->forceFill([
