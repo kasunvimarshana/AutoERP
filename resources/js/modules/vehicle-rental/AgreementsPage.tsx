@@ -72,7 +72,7 @@ export default function AgreementsPage({ kind }: { kind: AgreementKind }) {
                 <tbody>{rows.map(row => <tr key={row.id} className="border-t border-slate-100"><td className="p-3">{row.reference}</td><td className="p-3">{row.party.name}</td><td className="p-3">{formatBusinessDate(row.starts_on)} – {formatBusinessDate(row.ends_on, 'Open-ended')}</td><td className="p-3">{row.basis === RentalBasis.Daily ? 'Daily' : 'Monthly'}</td><td className="p-3"><StatusBadge status={row.status} /></td><td className="p-3"><Button variant="secondary" disabled={saving || editing !== null} onClick={() => { setSelected(row); setAction(null); setReason(''); setShowHistory(false); setShowVehicles(false); setShowDeposits(false); setShowSuccessor(false); }}>Review {row.reference}</Button></td></tr>)}</tbody>
             </table>{rows.length === 0 && <p className="p-5 text-slate-500">No agreements have been recorded.</p>}
         </div>}
-        <Pagination meta={meta} onPageChange={value => { setLoading(true); setPage(value); setSelected(null); }} />
+        <Pagination meta={meta} disabled={loading || saving} onPageChange={value => { setLoading(true); setPage(value); setSelected(null); }} />
         {selected && <section className="mt-5 space-y-4 rounded-xl border border-slate-200 bg-white p-5" aria-label="Agreement review">
             <div className="flex flex-wrap items-center gap-3"><h2 className="text-xl font-semibold">{selected.reference} · {selected.party.name}</h2><StatusBadge status={selected.status} /></div>
             <p>{selected.currency.code} · {selected.driver_mode === DriverMode.SelfDrive ? 'Self-drive' : 'With driver'}{selected.vehicle ? ` · ${selected.vehicle.registration_number ?? selected.vehicle.vehicle_number}` : ''}</p>
