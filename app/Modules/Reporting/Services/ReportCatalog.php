@@ -785,6 +785,29 @@ final class ReportCatalog
         );
     }
 
+    private function agingDays(InvoiceBalance $balance): int
+    {
+        $dueDate = $balance->invoice?->due_date ?? $balance->invoice?->invoice_date;
+        if ($dueDate === null) {
+            return 0;
+        }
+
+        $tenantId = (int) $balance->tenant_id;
+        $organizationUnitId = $balance->organization_unit_id === null ? null : (int) $balance->organization_unit_id;
+        $timezone = (string) $this->configuration->value(
+            ConfigurationKey::WORKSPACE_TIMEZONE,
+            $tenantId,
+            $organizationUnitId,
+        );
+        $today = CarbonImmutable::now($timezone)->startOfDay();
+        $due = CarbonImmutable::parse($dueDate->toDateString(), $timezone)->startOfDay();
+        if ($due->greaterThanOrEqualTo($today)) {
+            return 0;
+        }
+
+        return (int) $due->diffInDays($today);
+    }
+
     private function chartOfAccounts(): ReportDefinition
     {
         return new ReportDefinition(
