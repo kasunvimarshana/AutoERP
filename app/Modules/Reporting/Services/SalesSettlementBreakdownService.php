@@ -43,13 +43,18 @@ final class SalesSettlementBreakdownService
         string $dateTo,
     ): array {
         $invoiceQuery = $this->salesInvoiceQuery($tenantId, $organizationUnitId, $dateFrom, $dateTo);
-        $invoiceTotals = (clone $invoiceQuery)
-            ->selectRaw(
-                'COALESCE(SUM(balance_due * exchange_rate), 0) as credit_amount, '
-                .'COUNT(CASE WHEN balance_due > 0 THEN 1 END) as credit_document_count, '
-                .'COALESCE(SUM(credit_total * exchange_rate), 0) as credits_applied'
-            )
-            ->first();
+        $creditAmount = '0.000000';
+        $creditsApplied = '0.000000';
+        $creditDocumentCount = 0;
+        foreach ((clone $invoiceQuery)->get(['balance_due', 'credit_total', 'exchange_rate']) as $invoice) {
+            $rate = (string) $invoice->exchange_rate;
+            $balanceDue = (string) $invoice->balance_due;
+            $creditAmount = $this->math->add($creditAmount, $this->math->mul($balanceDue, $rate));
+            $creditsApplied = $this->math->add($creditsApplied, $this->math->mul((string) $invoice->credit_total, $rate));
+            if ($this->math->compare($balanceDue, '0') > 0) {
+                $creditDocumentCount++;
+            }
+        }
 
         $breakdown = [
             self::CASH => $this->emptyMetric(),
@@ -74,11 +79,11 @@ final class SalesSettlementBreakdownService
             'cash' => $breakdown[self::CASH],
             'card' => $breakdown[self::CARD],
             'credit' => [
-                'amount' => $this->decimal($invoiceTotals->credit_amount ?? 0),
-                'document_count' => (int) ($invoiceTotals->credit_document_count ?? 0),
+                'amount' => $creditAmount,
+                'document_count' => $creditDocumentCount,
             ],
             'other_paid' => $breakdown[self::OTHER_PAID],
-            'credits_applied' => $this->decimal($invoiceTotals->credits_applied ?? 0),
+            'credits_applied' => $creditsApplied,
             'source_note' => 'Cash and card show active receipt allocations to these sales. Split-method receipts are apportioned using their persisted payment-line amounts. On credit is the current invoice balance.',
         ];
     }
