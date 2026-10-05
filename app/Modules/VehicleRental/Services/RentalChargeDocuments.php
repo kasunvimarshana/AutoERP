@@ -135,11 +135,13 @@ final class RentalChargeDocuments
             return [(string) $calculation['from'], (string) $calculation['until']];
         }
         if (isset($calculation['chart']['starts_at'], $calculation['chart']['ends_at'])) {
-            $timezone = $this->calendar->timezone($context);
-            $start = OperationalTime::parse($calculation['chart']['starts_at'], 'starts_at')->setTimezone($timezone);
-            $end = OperationalTime::parse($calculation['chart']['ends_at'], 'ends_at')->setTimezone($timezone);
+            $period = $this->calendar->coveredCivilPeriod(
+                $context,
+                OperationalTime::parse($calculation['chart']['starts_at'], 'starts_at'),
+                OperationalTime::parse($calculation['chart']['ends_at'], 'ends_at'),
+            );
 
-            return [$start->toDateString(), $end->subMicrosecond()->toDateString()];
+            return [$period['from'], $period['until']];
         }
 
         return [(string) $charge->period_from, (string) $charge->period_until];

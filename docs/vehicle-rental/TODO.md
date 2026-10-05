@@ -172,6 +172,7 @@ This file is no longer an open list of speculative business questions. Historica
 - [x] Owner handoff uses Invoice/AP Purchase/Inbound semantics.
 - [x] Human-facing owner terminology is Owner Payable Voucher / Owner Settlement.
 - [x] Financial handoff validates the immutable source supply period against effective agreement coverage before creating customer or owner money.
+- [x] Chart-based OT/night-out charges freeze configured tenant/org timezone plus inclusive supply dates at first creation; exclusive end instants and later timezone changes cannot reinterpret reissues.
 - [x] Physical overrun outside commercial coverage rolls back the attempted Rental charge/invoice while retaining finalized operational evidence.
 - [x] Invoice source allocation preserves Rental source lineage.
 - [x] Posted/live Invoice state is owned by Invoice rather than copied as Rental truth.
