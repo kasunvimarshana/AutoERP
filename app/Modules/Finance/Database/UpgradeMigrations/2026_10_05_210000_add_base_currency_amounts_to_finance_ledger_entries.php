@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Modules\Core\Services\DecimalMath;
 use Modules\Finance\Enums\NormalBalance;
+use Modules\Core\Support\TenantExecutionContext;
 
 return new class extends Migration
 {
@@ -71,45 +72,49 @@ return new class extends Migration
 
     private function rebuildBalances(bool $useBaseAmounts): void
     {
-        $math = new DecimalMath();
-        $debitColumn = $useBaseAmounts ? 'base_debit' : 'debit';
-        $creditColumn = $useBaseAmounts ? 'base_credit' : 'credit';
+        app(TenantExecutionContext::class)->runAsControlPlane(function () use ($useBaseAmounts): void {
+            $math = new DecimalMath();
+            $debitColumn = $useBaseAmounts ? 'base_debit' : 'debit';
+            $creditColumn = $useBaseAmounts ? 'base_credit' : 'credit';
 
-        $accountIds = DB::table(self::TABLE)
-            ->distinct()
-            ->orderBy('account_id')
-            ->pluck('account_id');
+            $accountIds = DB::table(self::TABLE)
+                ->distinct()
+                ->orderBy('account_id')
+                ->pluck('account_id');
 
-        foreach ($accountIds as $accountId) {
-            $account = DB::table('finance_accounts')
-                ->where('id', (int) $accountId)
-                ->first(['normal_balance']);
-            if ($account === null) {
-                continue;
-            }
+            foreach ($accountIds as $accountId) {
+                $account = DB::table('finance_accounts')
+                    ->where('id', (int) $accountId)
+                    ->first(['normal_balance']);
+                if ($account === null) {
+                    continue;
+                }
 
-            $normalBalance = NormalBalance::from((string) $account->normal_balance);
-            $runningBalance = '0.000000';
-            $entries = DB::table(self::TABLE)
-                ->where('account_id', (int) $accountId)
-                ->orderBy('entry_date')
-                ->orderBy('id')
-                ->get(['id', $debitColumn, $creditColumn]);
+                $normalBalance = NormalBalance::from((string) $account->normal_balance);
+                $runningBalance = '0.000000';
+                $entries = DB::table(self::TABLE)
+                    ->where('account_id', (int) $accountId)
+                    ->orderBy('entry_date')
+                    ->orderBy('id')
+                    ->get(['id', $debitColumn, $creditColumn]);
 
-            foreach ($entries as $entry) {
-                $debit = $math->normalize((string) $entry->{$debitColumn});
-                $credit = $math->normalize((string) $entry->{$creditColumn});
-                $runningBalance = $normalBalance === NormalBalance::Debit
-                    ? $math->sub($math->add($runningBalance, $debit), $credit)
-                    : $math->sub($math->add($runningBalance, $credit), $debit);
+                foreach ($entries as $entry) {
+                    $debit = $math->normalize((string) $entry->{$debitColumn});
+                    $credit = $math->normalize((string) $entry->{$creditColumn});
+                    $runningBalance = $normalBalance === NormalBalance::Debit
+                        ? $math->sub($math->add($runningBalance, $debit), $credit)
+                        : $math->sub($math->add($runningBalance, $credit), $debit);
 
-                DB::table(self::TABLE)
-                    ->where('id', (int) $entry->id)
-                    ->update([
-                        'balance_after' => $runningBalance,
-                        'updated_at' => now(),
-                    ]);
+                    DB::table(self::TABLE)
+                        ->where('id', (int) $entry->id)
+                        ->update([
+                            'balance_after' => $runningBalance,
+                            'updated_at' => now(),
+                        ]);
+                }
             }
         }
+        });
     }
+
 };
