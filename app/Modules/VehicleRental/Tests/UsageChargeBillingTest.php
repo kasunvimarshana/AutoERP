@@ -296,8 +296,8 @@ final class UsageChargeBillingTest extends TestCase
             $invoice = $service->create(AgreementKind::Customer, $ctx, $chart->id, $input);
             $charge = CustomerUsageCharge::query()->sole();
 
-            $this->assertSame('2026-09-08', $charge->period_from->toDateString());
-            $this->assertSame('2026-09-08', $charge->period_until->toDateString());
+            $this->assertSame('2026-09-08', $charge->period_from);
+            $this->assertSame('2026-09-08', $charge->period_until);
             $this->assertSame('Asia/Colombo', $charge->calculation['timezone']);
             $this->assertSame('2026-09-08', $charge->calculation['supply_from']);
             $this->assertSame('2026-09-08', $charge->calculation['supply_until']);
