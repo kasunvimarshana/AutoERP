@@ -31,8 +31,8 @@ final class CashFlowReportService
                 'finance_ledger_entries.source_module',
                 'finance_ledger_entries.source_type',
                 'finance_ledger_entries.source_number',
-                'finance_ledger_entries.debit',
-                'finance_ledger_entries.credit',
+                'finance_ledger_entries.base_debit',
+                'finance_ledger_entries.base_credit',
                 'finance_accounts.id as account_id',
                 'finance_accounts.code as account_code',
                 'finance_accounts.name as account_name',
@@ -55,8 +55,8 @@ final class CashFlowReportService
         $rows = [];
 
         foreach ($query->get() as $entry) {
-            $debit = $this->math->normalize((string) $entry->debit);
-            $credit = $this->math->normalize((string) $entry->credit);
+            $debit = $this->math->normalize((string) $entry->base_debit);
+            $credit = $this->math->normalize((string) $entry->base_credit);
             $inflow = $this->math->add($inflow, $debit);
             $outflow = $this->math->add($outflow, $credit);
             $rows[] = [
