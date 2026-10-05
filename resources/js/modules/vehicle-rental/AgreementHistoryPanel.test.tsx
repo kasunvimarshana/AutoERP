@@ -47,7 +47,7 @@ it('shows complete owner history with owner labels and hides customer-only depos
     expect(screen.getByText('Owner included distance (km)')).toBeInTheDocument();
     expect(screen.queryByText('Agreed security deposit')).not.toBeInTheDocument();
     expect(screen.getByText(formatMoney('3100.000000', 'LKR'))).toBeInTheDocument();
-    expect(screen.getByText('100 km')).toBeInTheDocument();
+    expect(screen.getByText('Owner included distance (km)').parentElement).toHaveTextContent('100 km');
     expect(screen.getByText(/Signed owner agreement/)).toBeInTheDocument();
     expect(screen.queryByText(/3100\.000000/)).not.toBeInTheDocument();
 });
