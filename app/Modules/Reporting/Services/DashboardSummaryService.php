@@ -8,6 +8,8 @@ use Carbon\CarbonImmutable;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Database\Query\JoinClause;
 use Illuminate\Support\Facades\DB;
+use Modules\Configuration\Constants\ConfigurationKey;
+use Modules\Configuration\Contracts\ConfigurationResolverInterface;
 use Modules\Core\Services\DecimalMath;
 use Modules\Invoice\Enums\InvoiceDirection;
 use Modules\Invoice\Enums\InvoiceStatus;
@@ -37,6 +39,7 @@ final class DashboardSummaryService
 
     public function __construct(
         private readonly DecimalMath $math,
+        private readonly ConfigurationResolverInterface $configuration,
         private readonly ReportBrandingResolver $branding,
         private readonly SummaryReportService $summaryReports,
         private readonly EmployeeCommissionReportService $commissions,
@@ -45,7 +48,8 @@ final class DashboardSummaryService
     /** @return array<string, mixed> */
     public function run(int $tenantId, ?int $organizationUnitId, string $dateFrom, string $dateTo): array
     {
-        $today = CarbonImmutable::today();
+        $timezone = (string) $this->configuration->value(ConfigurationKey::WORKSPACE_TIMEZONE, $tenantId, $organizationUnitId);
+        $today = CarbonImmutable::now($timezone)->startOfDay();
         $inventory = $this->inventoryHealth($tenantId, $organizationUnitId, $today);
         $receivables = $this->aging($tenantId, $organizationUnitId, InvoiceDirection::Outbound, $today);
         $payables = $this->aging($tenantId, $organizationUnitId, InvoiceDirection::Inbound, $today);
