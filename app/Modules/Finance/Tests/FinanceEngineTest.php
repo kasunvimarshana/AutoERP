@@ -19,6 +19,8 @@ use Modules\Finance\Models\FinanceAccount;
 use Modules\Finance\Models\FinanceAccountType;
 use Modules\Finance\Models\FinanceJournalEntry;
 use Modules\Finance\Services\AccountBalanceService;
+use Modules\Finance\Services\BudgetService;
+use Modules\Finance\Services\CashFlowReportService;
 use Modules\Finance\Services\ChartOfAccountsService;
 use Modules\Finance\Services\JournalEntryCreationService;
 use Modules\Finance\Services\JournalPostingService;
@@ -152,6 +154,30 @@ final class FinanceEngineTest extends TestCase
             $this->assertTrue($trialBalance->isBalanced);
             $this->assertSame('250.000000', $trialBalance->totalDebit);
             $this->assertSame('250.000000', $trialBalance->totalCredit);
+
+            $cashFlow = app(CashFlowReportService::class)->calculate(
+                tenantId: $tenantId,
+                organizationUnitId: null,
+                dateFrom: '2026-06-01',
+                dateTo: '2026-06-30',
+            );
+            $this->assertSame('250.000000', $cashFlow['total_inflow']);
+            $this->assertSame('250.000000', $cashFlow['net_cash_flow']);
+
+            $budget = app(BudgetService::class)->save(
+                tenantId: $tenantId,
+                organizationUnitId: null,
+                budgetYear: 2026,
+                name: 'FX Budget',
+                lines: [[
+                    'account_id' => $cash->getKey(),
+                    'budget_month' => 6,
+                    'amount' => '300.000000',
+                ]],
+            );
+            $actuals = app(BudgetService::class)->actualVsBudget($budget);
+            $this->assertSame('250.000000', $actuals['total_actual']);
+            $this->assertSame('-50.000000', $actuals['variance']);
         });
     }
 
