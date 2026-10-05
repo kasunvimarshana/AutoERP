@@ -24,6 +24,7 @@ use Modules\Invoice\Services\InvoicePostingPlanFactory;
 use Modules\Invoice\Services\InvoiceReversalService;
 use Modules\Invoice\Services\InvoiceStatusService;
 use Modules\Invoice\Services\ManualInvoiceService;
+use Tests\Support\CurrencyFixture;
 use Tests\Support\FinancePostingFixture;
 use Tests\TestCase;
 
@@ -44,6 +45,31 @@ final class ManualInvoiceServiceTest extends TestCase
 
         $this->assertSame($first->getKey(), $second->getKey());
         $this->assertSame(1, $this->withTenantExecutionContext($tenantId, fn () => Invoice::query()->where('tenant_id', $tenantId)->count()));
+    }
+
+    public function test_base_currency_invoice_rejects_non_unit_exchange_rate(): void
+    {
+        $tenantId = $this->createTenant();
+        $currencyId = CurrencyFixture::create(['name' => 'Invoice Base Currency', 'symbol' => 'IB']);
+        DB::table('tenants')->where('id', $tenantId)->update(['base_currency_id' => $currencyId]);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Tenant base currency invoices must use an exchange rate of 1.000000.');
+
+        $this->withTenantExecutionContext($tenantId, fn () => app(InvoiceCreationService::class)->create(new CreateInvoiceData(
+            tenantId: $tenantId,
+            invoiceType: InvoiceType::Manual,
+            direction: InvoiceDirection::Outbound,
+            invoiceDate: '2026-06-29',
+            currencyId: $currencyId,
+            exchangeRate: '2.000000',
+            lines: [new InvoiceLineData(
+                lineNumber: 1,
+                description: 'Invalid base-currency rate',
+                quantity: '1.000000',
+                unitPrice: '100.000000',
+            )],
+        )));
     }
 
     public function test_invoice_status_actions_reject_stale_versions(): void
