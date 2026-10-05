@@ -8,12 +8,12 @@ export function Pagination({ meta, onPageChange }: {
     if (!meta || meta.last_page <= 1) return null;
 
     return (
-        <nav className="mt-4 flex items-center justify-between gap-3 text-sm text-slate-600" aria-label="Pagination">
+        <nav className="mt-4 flex flex-col gap-3 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between" aria-label="Pagination">
             <span>
                 {meta.from ?? 0}-{meta.to ?? 0} of {meta.total}
                 <span className="sr-only">. Page {meta.current_page} of {meta.last_page}.</span>
             </span>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
                 <Button
                     variant="secondary"
                     disabled={meta.current_page <= 1}
