@@ -105,7 +105,12 @@ final class DashboardSummaryService
             ->whereBetween('invoice_date', [$dateFrom, $dateTo])
             ->whereNotIn('invoice_type', [InvoiceType::Credit->value, InvoiceType::Debit->value]);
 
-        return $this->decimal($query->sum('grand_total'));
+        $total = '0.000000';
+        foreach ($query->get(['grand_total', 'exchange_rate']) as $invoice) {
+            $total = $this->math->add($total, $this->math->mul((string) $invoice->grand_total, (string) $invoice->exchange_rate));
+        }
+
+        return $this->decimal($total);
     }
 
     /** @return list<array{key:string,label:string,value:string}> */
@@ -115,16 +120,13 @@ final class DashboardSummaryService
         $rows = $this->invoiceQuery($tenantId, $organizationUnitId, InvoiceDirection::Outbound)
             ->whereBetween('invoice_date', [$dateFrom, $dateTo])
             ->whereNotIn('invoice_type', [InvoiceType::Credit->value, InvoiceType::Debit->value])
-            ->select('invoice_date')
-            ->selectRaw('COALESCE(SUM(grand_total), 0) as amount')
-            ->groupBy('invoice_date')
-            ->orderBy('invoice_date')
-            ->get();
+            ->get(['invoice_date', 'grand_total', 'exchange_rate']);
 
         foreach ($rows as $row) {
             $key = CarbonImmutable::parse((string) $row->invoice_date)->format('Y-m');
             if (isset($buckets[$key])) {
-                $buckets[$key]['value'] = $this->math->add($buckets[$key]['value'], (string) $row->amount);
+                $baseAmount = $this->math->mul((string) $row->grand_total, (string) $row->exchange_rate);
+                $buckets[$key]['value'] = $this->math->add($buckets[$key]['value'], $baseAmount);
             }
         }
 
@@ -275,11 +277,11 @@ final class DashboardSummaryService
         $rows = $this->invoiceQuery($tenantId, $organizationUnitId, $direction)
             ->where('invoice_type', '!=', InvoiceType::Credit->value)
             ->where('balance_due', '>', 0)
-            ->get(['due_date', 'balance_due']);
+            ->get(['due_date', 'balance_due', 'exchange_rate']);
         $total = '0.000000';
         $overdueCount = 0;
         foreach ($rows as $row) {
-            $amount = (string) $row->balance_due;
+            $amount = $this->math->mul((string) $row->balance_due, (string) $row->exchange_rate);
             $total = $this->math->add($total, $amount);
             $days = $row->due_date === null ? 0 : CarbonImmutable::parse((string) $row->due_date)->diffInDays($today, false);
             $key = $days <= 0 ? 'current' : ($days <= 30 ? '1_30' : ($days <= 60 ? '31_60' : ($days <= 90 ? '61_90' : 'over_90')));
