@@ -2,7 +2,7 @@
 
 **Status:** Canonical Vehicle Rental business/domain and production-policy reference for AutoERP.
 
-**Knowledge refresh date:** 2026-10-05
+**Knowledge refresh date:** 2026-10-06
 
 **Primary business source / conflict tie-breaker:** TACGL legacy application/data corpus
 
@@ -997,3 +997,78 @@ This is an execution-evidence limitation, not an identified unfinished Vehicle R
 ### Final decision
 
 The Vehicle Rental implementation remains functionally complete under the Definition of Done above. No additional business feature, schema relationship or financial rule is introduced by this final audit. Future changes must continue to be evidence-backed, owner-module scoped and accompanied by real executable verification.
+
+---
+
+## 33. Vehicle Rental final UI/UX production audit — 2026-10-06
+
+A fresh end-to-end UI/UX audit was performed against the latest `worktree-0.0.8` Rental operator surfaces and the shared UI primitives they depend on.
+
+The audit rechecked:
+
+- Rental navigation and direct-route permission parity;
+- Customer and Owner Agreement lists, review, edit, successor, activation, closure and history;
+- Vehicle assignment, handover, return, replacement and history;
+- Running Chart entry, lifecycle, register, correction and history;
+- base-rent preview and billing;
+- mileage assessment, OT/night-out billing and charge history;
+- security-deposit presentation;
+- responsive page/table/pagination behavior;
+- loading, empty, error, stale-data and in-flight interaction states;
+- form labels, validation attachment, status semantics and destructive-action affordances;
+- configured business-time presentation and date-only commercial-calendar presentation.
+
+### Corrections made
+
+1. **Date-only business presentation**
+   - added one shared `formatBusinessDate()` utility for civil `YYYY-MM-DD` values;
+   - civil dates are formatted without converting through the configured/browser timezone, so a contractual calendar date cannot shift to a neighboring day;
+   - Agreement lists/review/history, base-rent calculation periods, recorded base-charge periods and mileage cycles now use the same readable presentation instead of raw storage dates.
+
+2. **Pagination consistency and mobile resilience**
+   - base-charge and usage-charge histories now reuse the shared `Pagination` component instead of maintaining duplicate local Previous/Next controls;
+   - the API types now reflect the full Laravel paginator metadata already returned by the backend;
+   - shared pagination stacks safely on narrow widths, wraps controls, and can be disabled while the owning request is in flight.
+
+3. **Period-entry guardrails**
+   - Vehicle Use Register and Running Chart Register start/end filters now mirror the backend ordering contract through reciprocal `min`/`max` constraints;
+   - the backend remains authoritative; the frontend only prevents obviously invalid operator input earlier.
+
+4. **In-flight interaction safety**
+   - agreement reload/new actions, vehicle-use reload/assignment actions, Running Chart reload/create actions and related pagination are disabled while their current request is loading/saving;
+   - this reduces duplicate requests and confusing overlapping UI state without altering backend concurrency controls.
+
+### Verified unchanged
+
+- no Rental business formula, tariff, proration rule, tax rule, deposit rule or financial posting rule changed;
+- no backend controller/service/model/migration/schema/permission file is part of this UI delta;
+- no legacy Rental code was restored or referenced;
+- Customer, Supplier, Vehicle, HR, Invoice, Payment, Tax and Finance ownership boundaries remain unchanged;
+- customer and owner terminology remains distinct;
+- direct routes remain permission guarded;
+- no nested page `<main>` landmark was reintroduced;
+- no raw browser-timezone source was added;
+- no `window.alert`, `window.confirm` or `window.prompt` shortcut was introduced;
+- no TODO/FIXME/HACK/XXX marker was introduced in the changed production source.
+
+### Regression assets
+
+Focused frontend tests now cover:
+
+- civil-date formatting and invalid/fallback behavior;
+- formatted Agreement/history/proration/mileage dates;
+- full paginator metadata for Rental charge histories;
+- shared pagination navigation and disabled in-flight state;
+- reciprocal register period constraints;
+- existing financial, stale-data and workflow assertions remain retained.
+
+### Executable verification boundary
+
+A real checkout of the exact audit branch was attempted with free local tooling, but the shell environment still cannot resolve `github.com`. The environment therefore cannot obtain the Composer/npm dependency tree and cannot honestly execute the complete TypeScript/ESLint/Vitest/Vite/Laravel release gate here. GitHub Actions and paid runners remain excluded by instruction.
+
+This is not converted into a fabricated pass. Source-level diff review and focused regression assets are complete; actual deployment promotion must still rely on a dependency-backed execution of the exact merged head when such an environment is available.
+
+### UI/UX conclusion
+
+Within the available source-verification boundary, the Vehicle Rental UI is now consistent with the shared AutoERP UI foundation and the TACGL/video workflow: simple operator flow, readable business dates, consistent pagination, explicit lifecycle actions, responsive controls, clear validation/error states and hidden backend complexity.
+
