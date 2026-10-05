@@ -271,16 +271,18 @@ export default function InvoiceDetailPage() {
                         { label: 'Type', value: humanize(value.invoice_type) },
                         { label: 'Direction', value: humanize(value.direction) },
                         { label: 'Due date', value: formatDate(value.due_date) },
-                        { label: 'Total', value: <MoneyDisplay value={value.grand_total} /> },
-                        { label: 'Paid', value: <MoneyDisplay value={value.paid_total} /> },
-                        { label: 'Credits', value: <MoneyDisplay value={value.credit_total} /> },
-                        { label: 'Balance due', value: <MoneyDisplay value={value.balance_due} /> },
+                        { label: 'Currency', value: value.currency?.code ?? '-' },
+                        { label: 'Exchange rate', value: value.exchange_rate ?? '-' },
+                        { label: 'Total', value: <MoneyDisplay value={value.grand_total} currency={value.currency?.code ?? undefined} /> },
+                        { label: 'Paid', value: <MoneyDisplay value={value.paid_total} currency={value.currency?.code ?? undefined} /> },
+                        { label: 'Credits', value: <MoneyDisplay value={value.credit_total} currency={value.currency?.code ?? undefined} /> },
+                        { label: 'Balance due', value: <MoneyDisplay value={value.balance_due} currency={value.currency?.code ?? undefined} /> },
                         { label: 'Finance profile', value: humanize(value.posting_plan?.posting_profile_code) },
                         { label: 'Finance posting', value: value.posting_plan?.finance_posting_reference ?? '-' },
                         { label: 'Finance reversal', value: value.posting_plan?.finance_reversal_reference ?? '-' },
                     ]} />}
                     {tabState.activeTab === 'lines' && <RecordTable rows={value.lines ?? []} fields={['line_number', 'item', 'description', 'quantity', 'unit_price', 'discount_amount', 'tax_amount', 'charge_amount', 'line_total']} rowKey={(row, index) => String(row.id ?? row.line_number ?? `invoice-line-${index}`)} />}
-                    {canViewBalance && tabState.activeTab === 'balance' && <BalanceSummary loading={balance.loading} error={balance.error} balance={balance.data} />}
+                    {canViewBalance && tabState.activeTab === 'balance' && <BalanceSummary loading={balance.loading} error={balance.error} balance={balance.data} currency={value.currency?.code ?? undefined} />}
                     {canViewSources && tabState.activeTab === 'adjustments' && <AdjustmentRecords loading={adjustments.loading} error={adjustments.error} rows={adjustments.data ?? []} />}
                     {canViewSources && tabState.activeTab === 'sources' && <SourceRecords loading={sources.loading} error={sources.error} data={sources.data} />}
                 </div>
@@ -297,21 +299,22 @@ export default function InvoiceDetailPage() {
     );
 }
 
-function BalanceSummary({ loading, error, balance }: {
+function BalanceSummary({ loading, error, balance, currency }: {
     loading: boolean;
     error: import('@/shared/api/apiError').ApiError | null;
     balance: import('../invoiceTypes').InvoiceBalanceResult | null;
+    currency?: string;
 }) {
     if (loading) return <LoadingState />;
     if (error) return <ErrorAlert error={error} />;
     if (!balance) return null;
     return <DetailGrid items={[
-        { label: 'Invoice total', value: <MoneyDisplay value={balance.invoiceTotal} /> },
-        { label: 'Payments', value: <MoneyDisplay value={balance.paidAmount} /> },
-        { label: 'Credits and debit notes', value: <MoneyDisplay value={balance.creditAmount} /> },
-        { label: 'Debit adjustments', value: <MoneyDisplay value={balance.debitAmount} /> },
-        { label: 'Refunded', value: <MoneyDisplay value={balance.refundedAmount} /> },
-        { label: 'Remaining', value: <MoneyDisplay value={balance.remainingAmount} /> },
+        { label: 'Invoice total', value: <MoneyDisplay value={balance.invoiceTotal} currency={currency} /> },
+        { label: 'Payments', value: <MoneyDisplay value={balance.paidAmount} currency={currency} /> },
+        { label: 'Credits and debit notes', value: <MoneyDisplay value={balance.creditAmount} currency={currency} /> },
+        { label: 'Debit adjustments', value: <MoneyDisplay value={balance.debitAmount} currency={currency} /> },
+        { label: 'Refunded', value: <MoneyDisplay value={balance.refundedAmount} currency={currency} /> },
+        { label: 'Remaining', value: <MoneyDisplay value={balance.remainingAmount} currency={currency} /> },
         { label: 'Balance status', value: <StatusBadge status={balance.status} /> },
     ]} />;
 }
