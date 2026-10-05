@@ -754,15 +754,11 @@ final class ReportCatalog
                 new ReportColumn(
                     key: 'aging_bucket',
                     label: 'Aging Bucket',
-                    value: static function (InvoiceBalance $balance): string {
-                        $dueDate = $balance->invoice?->due_date ?? $balance->invoice?->invoice_date;
-                        if ($dueDate === null || $dueDate->isFuture()) {
-                            return 'Current';
-                        }
-
-                        $days = (int) $dueDate->startOfDay()->diffInDays(now()->startOfDay());
+                    value: function (InvoiceBalance $balance): string {
+                        $days = $this->agingDays($balance);
 
                         return match (true) {
+                            $days <= 0 => 'Current',
                             $days <= 30 => '1-30',
                             $days <= 60 => '31-60',
                             $days <= 90 => '61-90',
