@@ -276,7 +276,7 @@ final class SummaryReportService
         $this->organizationScope($query, 'lines.organization_unit_id', $organizationUnitId);
 
         $totals = (clone $query)
-            ->selectRaw('COUNT(DISTINCT payments.id) as transaction_count, COALESCE(SUM(lines.amount), 0) as amount')
+            ->selectRaw('COUNT(DISTINCT payments.id) as transaction_count, COALESCE(SUM(lines.amount * payments.exchange_rate), 0) as amount')
             ->first();
         $methods = $query
             ->select([
