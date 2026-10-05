@@ -14,7 +14,7 @@
 
 **Live authoritative branch head:** resolve from Git/release records; it is intentionally not embedded here because documentation-only release commits would otherwise make this document self-stale.
 
-**Latest current-head re-verification:** [`changes/2026-10-05-vehicle-rental-source-reconciliation.md`](changes/2026-10-05-vehicle-rental-source-reconciliation.md)
+**Latest current-head re-verification:** [`changes/2026-10-05-vehicle-rental-production-release.md`](changes/2026-10-05-vehicle-rental-production-release.md)
 
 **Architecture policy:** root `RULES.md` / `AGENTS.md`
 
