@@ -19,7 +19,7 @@ describe('Running Chart review', () => {
  });
  it('requires a reason and preserves stale revision errors', async () => {
   session.permissions.push(CHART_PERMISSION.reverse); vi.mocked(transitionChart).mockRejectedValue(new ApiError('This record changed. Reload before continuing.', 409));
-  render(<RunningChartsPanel use={use} />); fireEvent.click(await screen.findByRole('button', { name: 'Reverse usage' })); expect(screen.getByRole('button', { name: 'Confirm' })).toBeDisabled(); fireEvent.change(screen.getByLabelText('Reversal reason'), { target: { value: 'Correct signed usage' } }); fireEvent.click(screen.getByRole('button', { name: 'Confirm' })); expect(await screen.findByText('This record changed. Reload before continuing.')).toBeInTheDocument(); expect(transitionChart).toHaveBeenCalledWith(chart, RunningChartAction.Reverse, 'Correct signed usage');
+  render(<RunningChartsPanel use={use} />); fireEvent.click(await screen.findByRole('button', { name: 'Reverse usage' })); expect(screen.getByRole('button', { name: 'Confirm reversal' })).toBeDisabled(); fireEvent.change(screen.getByLabelText('Reversal reason'), { target: { value: 'Correct signed usage' } }); fireEvent.click(screen.getByRole('button', { name: 'Confirm reversal' })); expect(await screen.findByText('This record changed. Reload before continuing.')).toBeInTheDocument(); expect(transitionChart).toHaveBeenCalledWith(chart, RunningChartAction.Reverse, 'Correct signed usage');
  });
  it('round trips seconds without corrupting the offset timestamp', () => {
   const original = '2026-09-07T09:00:15+05:30'; expect(new Date(timestampWithOffset(localTimestampValue(original))).getTime()).toBe(new Date(original).getTime());

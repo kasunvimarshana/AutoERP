@@ -2,7 +2,6 @@ import { hasPermission } from '@/modules/auth/accessControl';
 import { useEffect, useState, type FormEvent } from 'react';
 import { useAuth } from '@/modules/auth/AuthProvider';
 import { Button } from '@/shared/components/Button';
-import { Input } from '@/shared/components/Input';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { Textarea } from '@/shared/components/Textarea';

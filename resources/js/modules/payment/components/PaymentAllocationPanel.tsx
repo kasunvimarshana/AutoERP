@@ -47,7 +47,8 @@ export function PaymentAllocationPanel({
         [invoiceDirection, partyId, currencyId, search],
         enabled && partyId !== null && currencyId !== null,
     );
-    const rows = invoices.data?.data ?? [];
+    const invoiceRows = invoices.data?.data;
+    const rows = useMemo(() => invoiceRows ?? [], [invoiceRows]);
     const selected = useMemo(
         () => rows.find((invoice) => String(invoice.id) === invoiceId) ?? null,
         [invoiceId, rows],
