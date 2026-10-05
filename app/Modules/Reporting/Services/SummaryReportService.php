@@ -195,27 +195,28 @@ final class SummaryReportService
                 InvoiceType::Debit->value,
             ]);
 
-        $summary = $query
-            ->selectRaw(
-                'COUNT(*) as document_count, '
-                .'COALESCE(SUM(subtotal * exchange_rate), 0) as subtotal, '
-                .'COALESCE(SUM(discount_total * exchange_rate), 0) as discount_total, '
-                .'COALESCE(SUM(tax_total * exchange_rate), 0) as tax_total, '
-                .'COALESCE(SUM(charge_total * exchange_rate), 0) as charge_total, '
-                .'COALESCE(SUM(grand_total * exchange_rate), 0) as grand_total, '
-                .'COALESCE(SUM(paid_total * exchange_rate), 0) as paid_total'
-            )
-            ->first();
-
-        return [
-            'document_count' => (int) ($summary->document_count ?? 0),
-            'subtotal' => $this->decimal($summary->subtotal ?? 0),
-            'discount_total' => $this->decimal($summary->discount_total ?? 0),
-            'tax_total' => $this->decimal($summary->tax_total ?? 0),
-            'charge_total' => $this->decimal($summary->charge_total ?? 0),
-            'grand_total' => $this->decimal($summary->grand_total ?? 0),
-            'paid_total' => $this->decimal($summary->paid_total ?? 0),
+        $summary = [
+            'document_count' => 0,
+            'subtotal' => '0.000000',
+            'discount_total' => '0.000000',
+            'tax_total' => '0.000000',
+            'charge_total' => '0.000000',
+            'grand_total' => '0.000000',
+            'paid_total' => '0.000000',
         ];
+
+        foreach ($query->get(['subtotal', 'discount_total', 'tax_total', 'charge_total', 'grand_total', 'paid_total', 'exchange_rate']) as $invoice) {
+            $rate = (string) $invoice->exchange_rate;
+            $summary['document_count']++;
+            $summary['subtotal'] = $this->math->add($summary['subtotal'], $this->math->mul((string) $invoice->subtotal, $rate));
+            $summary['discount_total'] = $this->math->add($summary['discount_total'], $this->math->mul((string) $invoice->discount_total, $rate));
+            $summary['tax_total'] = $this->math->add($summary['tax_total'], $this->math->mul((string) $invoice->tax_total, $rate));
+            $summary['charge_total'] = $this->math->add($summary['charge_total'], $this->math->mul((string) $invoice->charge_total, $rate));
+            $summary['grand_total'] = $this->math->add($summary['grand_total'], $this->math->mul((string) $invoice->grand_total, $rate));
+            $summary['paid_total'] = $this->math->add($summary['paid_total'], $this->math->mul((string) $invoice->paid_total, $rate));
+        }
+
+        return $summary;
     }
 
     /**
