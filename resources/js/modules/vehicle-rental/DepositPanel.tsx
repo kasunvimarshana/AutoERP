@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { listPaymentMethods } from '@/modules/payment/paymentApi';
+import { listUsablePaymentMethods } from '@/modules/payment/paymentApi';
 import { PaymentLineTable, type PaymentLineDraft } from '@/modules/payment/components/PaymentLineTable';
 import { linePayload, lineIsValid } from '@/modules/payment/paymentLineInput';
 import { useApi } from '@/shared/hooks/useApi';
@@ -29,7 +29,7 @@ export function DepositPanel({ agreement, canCreate }: { agreement: Agreement; c
     const nextLine = useRef(FIRST_LINE + 1);
     const inFlight = useRef(false);
     const requests = useRef(new Map<string, string>());
-    const methods = useApi(signal => listPaymentMethods({ direction: DIRECTION, per_page: METHOD_PAGE_SIZE }, signal), [], canCreate);
+    const methods = useApi(signal => listUsablePaymentMethods({ direction: DIRECTION, per_page: METHOD_PAGE_SIZE }, signal), [], canCreate);
     const summaryRequest = useApi(signal => getDepositSummary(agreement.id, signal), [agreement.id, revision]);
     const summary = summaryRequest.data;
     const rows = methods.data?.data ?? [];
