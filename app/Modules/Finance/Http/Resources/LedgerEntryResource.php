@@ -16,6 +16,8 @@ final class LedgerEntryResource extends JsonResource
             'entry_date' => $this->entry_date?->toDateString(),
             'debit' => (string) $this->debit,
             'credit' => (string) $this->credit,
+            'base_debit' => (string) $this->base_debit,
+            'base_credit' => (string) $this->base_credit,
             'balance_after' => (string) $this->balance_after,
             'source_module' => $this->source_module,
             'source_type' => $this->source_type,
