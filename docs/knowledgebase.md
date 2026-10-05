@@ -2,7 +2,7 @@
 
 **Status:** Canonical Vehicle Rental business/domain and production-policy reference for AutoERP.
 
-**Knowledge refresh date:** 2026-10-04
+**Knowledge refresh date:** 2026-10-05
 
 **Primary business source / conflict tie-breaker:** TACGL legacy application/data corpus
 
@@ -14,7 +14,7 @@
 
 **Live authoritative branch head:** resolve from Git/release records; it is intentionally not embedded here because documentation-only release commits would otherwise make this document self-stale.
 
-**Latest current-head re-verification:** [`changes/2026-10-04-vehicle-rental-business-timezone-verification-correction.md`](changes/2026-10-04-vehicle-rental-business-timezone-verification-correction.md)
+**Latest current-head re-verification:** [`changes/2026-10-05-vehicle-rental-production-release.md`](changes/2026-10-05-vehicle-rental-production-release.md)
 
 **Architecture policy:** root `RULES.md` / `AGENTS.md`
 
@@ -58,11 +58,11 @@ Canonical upload:
 
 Dated upload supplied in this audit:
 
-- `TACGL(20261001-005122).zip`
+- `TACGL(20261005-130217).zip`
 - SHA-256: `79c240494943437978754169c3360bb7c6e35d911ef8263c4b2d6b6246384d77`
 - 452 non-directory business files.
 
-The canonical and dated ZIPs contain the same normalized business payload. After removing the canonical archive's outer `TACGL/` wrapper, every relative path and every per-file SHA-256 matches. The dated package therefore adds no conflicting business evidence.
+The canonical and dated ZIPs contain the same normalized business payload. After removing the canonical archive's outer `TACGL/` wrapper, every relative path and every per-file SHA-256 matches. The 2026-10-05 dated package therefore adds no conflicting business evidence and does not change any Vehicle Rental business rule.
 
 Corroborating package:
 
