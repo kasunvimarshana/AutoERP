@@ -24,6 +24,7 @@ use Modules\Finance\Services\JournalEntryCreationService;
 use Modules\Finance\Services\JournalPostingService;
 use Modules\Finance\Services\JournalReversalService;
 use Modules\Finance\Services\TrialBalanceService;
+use Tests\Support\CurrencyFixture;
 use Tests\TestCase;
 
 final class FinanceEngineTest extends TestCase
