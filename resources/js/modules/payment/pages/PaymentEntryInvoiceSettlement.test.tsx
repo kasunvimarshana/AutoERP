@@ -10,7 +10,7 @@ const invoiceApiMocks = vi.hoisted(() => ({
 }));
 const paymentApiMocks = vi.hoisted(() => ({
     createPayment: vi.fn(),
-    listPaymentMethods: vi.fn(),
+    listUsablePaymentMethods: vi.fn(),
 }));
 
 vi.mock('@/modules/invoice/invoiceApi', () => invoiceApiMocks);
@@ -68,7 +68,7 @@ const settlementCases = [
 describe('Payment invoice settlement entry', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        paymentApiMocks.listPaymentMethods.mockResolvedValue({
+        paymentApiMocks.listUsablePaymentMethods.mockResolvedValue({
             data: [{
                 id: 9,
                 name: 'Cash',
@@ -109,6 +109,7 @@ describe('Payment invoice settlement entry', () => {
                 party_type: partyType,
                 party: { id: 71, code: 'PTY-071', name: partyName },
                 currency: { id: 3, code: 'LKR', name: 'Sri Lankan Rupee' },
+                exchange_rate: '1.000000',
                 balance_due: '25000.000000',
             });
 
@@ -135,6 +136,7 @@ describe('Payment invoice settlement entry', () => {
                     party_type: partyType,
                     party_id: 71,
                     currency_id: 3,
+                    exchange_rate: '1.000000',
                     lines: [expect.objectContaining({
                         payment_method_id: 9,
                         amount: '25000.000000',
