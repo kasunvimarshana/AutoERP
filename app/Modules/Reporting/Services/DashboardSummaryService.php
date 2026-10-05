@@ -170,9 +170,9 @@ final class DashboardSummaryService
         $this->organizationScope($query, 'payments.organization_unit_id', $organizationUnitId);
         $this->organizationScope($query, 'lines.organization_unit_id', $organizationUnitId);
         $rows = $query
-            ->select(['payments.payment_date', 'payments.direction'])
+            ->select(['payments.payment_date', 'payments.direction', 'payments.exchange_rate'])
             ->selectRaw('COALESCE(SUM(lines.amount), 0) as amount')
-            ->groupBy(['payments.payment_date', 'payments.direction'])
+            ->groupBy(['payments.payment_date', 'payments.direction', 'payments.exchange_rate'])
             ->orderBy('payments.payment_date')
             ->get();
 
@@ -182,7 +182,8 @@ final class DashboardSummaryService
             if (! isset($buckets[$key]) || ! in_array($direction, [PaymentDirection::Inbound->value, PaymentDirection::Outbound->value], true)) {
                 continue;
             }
-            $buckets[$key][$direction] = $this->math->add($buckets[$key][$direction], (string) $row->amount);
+            $baseAmount = $this->math->mul((string) $row->amount, (string) $row->exchange_rate);
+            $buckets[$key][$direction] = $this->math->add($buckets[$key][$direction], $baseAmount);
         }
         foreach ($buckets as &$bucket) {
             $bucket['net'] = $this->math->sub($bucket['inbound'], $bucket['outbound']);
@@ -335,7 +336,7 @@ final class DashboardSummaryService
         return array_values(array_filter([
             ['key' => 'failed_payments', 'label' => 'Failed payment postings', 'count' => $failedPayments, 'url' => '/payments?posting_status=failed', 'tone' => 'critical'],
             ['key' => 'overdue_receivables', 'label' => 'Overdue customer invoices', 'count' => $overdueReceivables, 'url' => '/invoices', 'tone' => 'warning'],
-            ['key' => 'overdue_payables', 'label' => 'Overdue supplier invoices', 'count' => $overduePayables, 'url' => '/reports/purchase/grn-payables', 'tone' => 'warning'],
+            ['key' => 'overdue_payables', 'label' => 'Overdue supplier invoices', 'count' => $overduePayables, 'url' => '/invoices?direction=inbound&settlement_eligible=true', 'tone' => 'warning'],
             ['key' => 'overdue_jobs', 'label' => 'Overdue active service jobs', 'count' => $overdueJobs, 'url' => '/vehicle-service/jobs', 'tone' => 'warning'],
             ['key' => 'low_stock', 'label' => 'Items below reorder level', 'count' => $lowStock, 'url' => '/inventory?tab=availability', 'tone' => 'info'],
             ['key' => 'expiring_batches', 'label' => 'Batches expiring within 30 days', 'count' => $expiringBatches, 'url' => '/inventory?tab=tracking', 'tone' => 'info'],
