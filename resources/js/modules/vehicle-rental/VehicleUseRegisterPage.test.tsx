@@ -27,7 +27,7 @@ describe('Vehicle Use register', () => {
         expect(screen.getByText('Replaces vehicle CAR-OLD')).toBeInTheDocument();
         expect(vehicleUseHistory).not.toHaveBeenCalled();
         fireEvent.click(screen.getByRole('button', { name: 'Review CAR-1234' }));
-        expect(screen.getByText('Handover odometer: 0')).toBeInTheDocument();
+        expect(screen.getByText(/Handover odometer:/)).toHaveTextContent('0');
         expect(screen.getByText('Return odometer: Not recorded')).toBeInTheDocument();
         await waitFor(() => expect(vehicleUseHistory).toHaveBeenCalledWith(row.id, 1, expect.any(AbortSignal)));
     });
