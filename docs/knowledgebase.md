@@ -825,7 +825,7 @@ That backend run includes the Vehicle Rental agreement, successor/cutover, authe
 
 The 2026-10-02 UI/UX deltas and the 2026-10-04 business-timezone finalization are frontend/shared-presentation/test/documentation deltas on top of that executed baseline. Focused regression tests cover interaction, immutable-history, stale-data, validation-feedback, configured business-time conversion/display and period-entry guards. The 2026-10-04 shared business-time algorithm also passed isolated runtime verification for Asia/Colombo, New York standard/DST offsets, seconds-preserving round-trip, rejection of a nonexistent DST wall time, and rejection of an ambiguous DST fall-back wall time. The follow-up verification correction also removed a duplicated focused-test import that would otherwise trigger TypeScript `TS2300 Duplicate identifier`. A complete post-change dependency-backed application rerun still cannot be claimed because the audit environment has no full repository dependency tree and hosted GitHub Actions remain excluded by the free-tools-only instruction.
 
-The exact Vehicle Rental runtime and migration lineage are unchanged from the earlier integrated cross-engine verification, which additionally recorded:
+The earlier integrated cross-engine verification additionally recorded:
 
 - SQLite backend verification passed;
 - MariaDB 10.11.7 / InnoDB backend verification passed;
@@ -833,7 +833,7 @@ The exact Vehicle Rental runtime and migration lineage are unchanged from the ea
 - 238-table fresh/upgrade/rollback schema metadata parity passed on both engines;
 - foreign-key/integrity and final source/conflict review passed.
 
-No migration file changed after that executed Vehicle Rental baseline, so this continuation introduces no new schema behavior to qualify.
+The 2026-10-05 usage-supply-period correction is a narrow Vehicle Rental runtime/test delta: RentalCalendar owns exclusive-end to inclusive-civil-period conversion, OT/night-out charges freeze that resolved timezone/period, and the Invoice handoff reuses the same policy. It changes no migration/schema, relationship, API shape, tax/withholding rule, account mapping or commercial formula. Focused regression source coverage was added for exact-midnight supply end and timezone-stable reissue. A fresh dependency-backed run of that new test is not claimed because the current container cannot obtain the repository dependency tree. The repository's automatic CI attempts on this head and earlier known-green heads terminate before any job step executes, so they do not provide application-test results.
 
 Future runtime changes must verify, as applicable:
 
