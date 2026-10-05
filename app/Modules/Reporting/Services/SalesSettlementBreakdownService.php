@@ -133,6 +133,7 @@ final class SalesSettlementBreakdownService
                 'allocations.invoice_id',
                 'allocations.allocated_amount',
                 'payments.total_amount as payment_total',
+                'payments.exchange_rate',
                 'lines.line_number',
                 'lines.amount as line_amount',
                 'lines.payment_method_type_snapshot as method_type',
@@ -181,7 +182,8 @@ final class SalesSettlementBreakdownService
             }
 
             $category = $this->category((string) $row->method_type);
-            $breakdown[$category]['amount'] = $this->math->add($breakdown[$category]['amount'], $share);
+            $baseShare = $this->math->mul($share, (string) $row->exchange_rate);
+            $breakdown[$category]['amount'] = $this->math->add($breakdown[$category]['amount'], $baseShare);
             if ($this->math->compare($share, '0') > 0) {
                 $invoiceIds[$category][(int) $row->invoice_id] = true;
             }
