@@ -38,6 +38,18 @@ final class RentalCalendar
             ->toDateString();
     }
 
+    /** @return array{timezone: string, from: string, until: string} */
+    public function coveredCivilPeriod(AgreementContext $context, DateTimeInterface $start, DateTimeInterface $exclusiveEnd): array
+    {
+        $timezone = $this->timezone($context);
+
+        return [
+            'timezone' => $timezone,
+            'from' => CarbonImmutable::instance($start)->setTimezone($timezone)->toDateString(),
+            'until' => CarbonImmutable::instance($exclusiveEnd)->setTimezone($timezone)->subMicrosecond()->toDateString(),
+        ];
+    }
+
     public function coverageEnd(Agreement $agreement, AgreementContext $context): ?string
     {
         $contractEnd = $agreement->ends_on?->toDateString();
