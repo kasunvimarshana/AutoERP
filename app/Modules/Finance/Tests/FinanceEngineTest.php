@@ -155,6 +155,27 @@ final class FinanceEngineTest extends TestCase
         });
     }
 
+    public function test_base_currency_journal_rejects_non_unit_exchange_rate(): void
+    {
+        [$tenantId, $cash, $capital] = $this->chart();
+        $baseCurrencyId = CurrencyFixture::create(['name' => 'Finance Base Currency Guard', 'symbol' => 'BG']);
+        DB::table('tenants')->where('id', $tenantId)->update(['base_currency_id' => $baseCurrencyId]);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Tenant base currency journals must use an exchange rate of 1.000000.');
+
+        $this->withTenantExecutionContext($tenantId, fn () => app(JournalEntryCreationService::class)->create(new CreateJournalEntryData(
+            tenantId: $tenantId,
+            journalDate: '2026-06-06',
+            currencyId: $baseCurrencyId,
+            exchangeRate: '2.000000',
+            lines: [
+                new JournalLineData(accountId: (int) $cash->getKey(), lineNumber: 1, debit: '100.000000'),
+                new JournalLineData(accountId: (int) $capital->getKey(), lineNumber: 2, credit: '100.000000'),
+            ],
+        )));
+    }
+
     public function test_it_rejects_unbalanced_journals(): void
     {
         [$tenantId, $cash, $capital] = $this->chart();
