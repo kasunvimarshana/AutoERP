@@ -34,7 +34,9 @@ return new class extends Migration
 
     public function down(): void
     {
-        DB::transaction(fn (): null => $this->rebuildBalances(useBaseAmounts: false));
+        DB::transaction(function (): void {
+            $this->rebuildBalances(useBaseAmounts: false);
+        });
 
         Schema::table(self::TABLE, function (Blueprint $table): void {
             if (Schema::hasColumn(self::TABLE, 'base_credit')) {
