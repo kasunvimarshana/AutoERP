@@ -7,8 +7,8 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Modules\Core\Services\DecimalMath;
-use Modules\Finance\Enums\NormalBalance;
 use Modules\Core\Support\TenantExecutionContext;
+use Modules\Finance\Enums\NormalBalance;
 
 return new class extends Migration
 {
@@ -45,7 +45,8 @@ return new class extends Migration
             }
             if (Schema::hasColumn(self::TABLE, 'base_debit')) {
                 $table->dropColumn('base_debit');
-            });
+            }
+        });
     }
 
     private function backfillBaseAmounts(): void
@@ -116,5 +117,4 @@ return new class extends Migration
             }
         });
     }
-
 };
