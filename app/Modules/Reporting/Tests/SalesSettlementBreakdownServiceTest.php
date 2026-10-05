@@ -62,6 +62,40 @@ final class SalesSettlementBreakdownServiceTest extends TestCase
         self::assertSame('0.000000', $result['credits_applied']);
     }
 
+
+    public function test_it_uses_invoice_fx_for_open_credit_and_payment_fx_for_realized_receipts(): void
+    {
+        $tenantId = $this->tenant();
+        $cashMethodId = $this->paymentMethod($tenantId, 'FX-CASH', PaymentMethodType::Cash);
+
+        $invoiceId = $this->invoice(
+            $tenantId,
+            'INV-FX',
+            '100.000000',
+            '40.000000',
+            '60.000000',
+            exchangeRate: '2.000000',
+        );
+        $paymentId = $this->payment(
+            $tenantId,
+            'PAY-FX',
+            '40.000000',
+            exchangeRate: '2.500000',
+        );
+        $this->paymentLine($tenantId, $paymentId, $cashMethodId, 1, '40.000000', PaymentMethodType::Cash);
+        $this->allocation($tenantId, $paymentId, $invoiceId, '40.000000');
+
+        $result = app(SalesSettlementBreakdownService::class)->run(
+            $tenantId,
+            null,
+            '2026-07-01',
+            '2026-07-31',
+        );
+
+        self::assertSame(['amount' => '100.000000', 'document_count' => 1], $result['cash']);
+        self::assertSame(['amount' => '120.000000', 'document_count' => 1], $result['credit']);
+    }
+
     private function tenant(): int
     {
         $suffix = Str::lower(Str::random(6));
@@ -85,6 +119,7 @@ final class SalesSettlementBreakdownServiceTest extends TestCase
         string $paid,
         string $balance,
         string $date = '2026-07-15',
+        string $exchangeRate = '1.000000',
     ): int {
         return (int) DB::table('invoices')->insertGetId([
             'tenant_id' => $tenantId,
@@ -98,6 +133,7 @@ final class SalesSettlementBreakdownServiceTest extends TestCase
             'paid_total' => $paid,
             'credit_total' => '0',
             'balance_due' => $balance,
+            'exchange_rate' => $exchangeRate,
             'created_at' => now(),
             'updated_at' => now(),
         ]);
@@ -119,7 +155,12 @@ final class SalesSettlementBreakdownServiceTest extends TestCase
         ]);
     }
 
-    private function payment(int $tenantId, string $number, string $amount): int
+    private function payment(
+        int $tenantId,
+        string $number,
+        string $amount,
+        string $exchangeRate = '1.000000',
+    ): int
     {
         return (int) DB::table('payments')->insertGetId([
             'tenant_id' => $tenantId,
@@ -131,6 +172,7 @@ final class SalesSettlementBreakdownServiceTest extends TestCase
             'allocation_status' => 'fully_allocated',
             'posting_status' => PaymentPostingStatus::Posted->value,
             'payment_date' => '2026-07-20',
+            'exchange_rate' => $exchangeRate,
             'total_amount' => $amount,
             'allocated_amount' => $amount,
             'unapplied_amount' => '0',
