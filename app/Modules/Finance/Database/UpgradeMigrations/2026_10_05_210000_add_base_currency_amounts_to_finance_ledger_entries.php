@@ -45,29 +45,30 @@ return new class extends Migration
             }
             if (Schema::hasColumn(self::TABLE, 'base_debit')) {
                 $table->dropColumn('base_debit');
-            }
-        });
+            });
     }
 
     private function backfillBaseAmounts(): void
     {
-        $math = new DecimalMath();
+        app(TenantExecutionContext::class)->runAsControlPlane(function (): void {
+            $math = new DecimalMath();
 
-        DB::table(self::TABLE.' as ledger')
-            ->join('finance_journal_entries as journal', 'journal.id', '=', 'ledger.journal_entry_id')
-            ->orderBy('ledger.id')
-            ->select(['ledger.id', 'ledger.debit', 'ledger.credit', 'journal.exchange_rate'])
-            ->chunkById(250, function ($rows) use ($math): void {
-                foreach ($rows as $row) {
-                    DB::table(self::TABLE)
-                        ->where('id', (int) $row->id)
-                        ->update([
-                            'base_debit' => $math->mul((string) $row->debit, (string) $row->exchange_rate),
-                            'base_credit' => $math->mul((string) $row->credit, (string) $row->exchange_rate),
-                            'updated_at' => now(),
-                        ]);
-                }
-            }, 'ledger.id', 'id');
+            DB::table(self::TABLE.' as ledger')
+                ->join('finance_journal_entries as journal', 'journal.id', '=', 'ledger.journal_entry_id')
+                ->orderBy('ledger.id')
+                ->select(['ledger.id', 'ledger.debit', 'ledger.credit', 'journal.exchange_rate'])
+                ->chunkById(250, function ($rows) use ($math): void {
+                    foreach ($rows as $row) {
+                        DB::table(self::TABLE)
+                            ->where('id', (int) $row->id)
+                            ->update([
+                                'base_debit' => $math->mul((string) $row->debit, (string) $row->exchange_rate),
+                                'base_credit' => $math->mul((string) $row->credit, (string) $row->exchange_rate),
+                                'updated_at' => now(),
+                            ]);
+                    }
+                }, 'ledger.id', 'id');
+        });
     }
 
     private function rebuildBalances(bool $useBaseAmounts): void
@@ -113,7 +114,6 @@ return new class extends Migration
                         ]);
                 }
             }
-        }
         });
     }
 
