@@ -807,6 +807,21 @@ No legacy Rental code was restored or reused. No compatibility patch was introdu
 
 Current authoritative external guidance was also rechecked only for ownership/integrity boundaries: IFRS 16 remains accounting guidance rather than an operational tariff source; Sri Lanka IRD VAT/WHT rules remain effective-dated Tax/Invoice/Payment concerns; and MySQL/InnoDB locking guidance remains consistent with the module's transactional lock discipline.
 
+### 2026-10-05 final source-period correction
+
+A later end-to-end review found one narrow runtime defect after the 2026-10-02 re-verification: OT/night-out usage charges stored the Running Chart's exclusive end date directly as an inclusive charge `period_until`. Exact-midnight chart boundaries could therefore extend the Invoice supply period by one civil day, and reissue did not have a frozen business-time supply period in the immutable calculation snapshot.
+
+The correction keeps responsibility inside Vehicle Rental:
+
+- `RentalCalendar` is the single conversion boundary for exact chart interval → configured business-calendar inclusive supply dates;
+- first charge creation freezes `timezone`, `supply_from` and `supply_until` in the immutable calculation;
+- charge `period_from` / `period_until` use the same resolved dates;
+- `RentalChargeDocuments` reuses the same calendar rule for chart-period fallback;
+- reissue uses the frozen source period, so later workspace-timezone changes cannot reinterpret it;
+- mileage is unchanged because its named calendar-cycle policy already freezes its own timezone and supply period.
+
+No schema, relationship, API shape, tax/withholding rule, account mapping or commercial formula changed. See [the append-only correction record](changes/2026-10-05-vehicle-rental-usage-supply-period-correction.md).
+
 ---
 
 ## 28. Testing and verification policy
