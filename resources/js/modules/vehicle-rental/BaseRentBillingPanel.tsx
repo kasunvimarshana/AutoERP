@@ -52,7 +52,7 @@ export function BaseRentBillingPanel({ kind, agreement }: { kind: AgreementKind;
         finally { inFlight.current = false; setBusy(false); }
     }
     return <details className="rounded border p-3"><summary className="cursor-pointer font-medium">Bill base rent</summary>
-        <p className="my-3 text-sm">Create a {billing.documentNameLower} draft from the recorded base rate and actual-calendar policy. Monthly partial periods use actual anniversary-cycle days. This bills base rent only; mileage, extras and deductions are separate. Tax uses the configured Tax rules. {billing.reviewDraftText}</p>
+        <p className="my-3 text-sm">{billing.createDraftDescription} from the recorded base rate and actual-calendar policy. Monthly partial periods use actual anniversary-cycle days. This bills base rent only; mileage, extras and deductions are separate. Tax uses the configured Tax rules. {billing.reviewDraftText}</p>
         <form onSubmit={submit} className="space-y-3">
             {selected ? <p>{action === ChargeAction.Void ? 'Void original charge:' : 'Reissue original charge:'} {selected.from} – {selected.until} · <MoneyDisplay value={selected.amount} currency={selected.currency} /> <Button type="button" variant="secondary" disabled={busy} onClick={() => { setSelected(null); setAccepted(false); }}>Cancel selection</Button></p> : <>
                 <Input label="Charge from" type="date" required min={agreement.starts_on} value={from} disabled={busy} onChange={e => { setFrom(e.target.value); setAccepted(false); }} error={error?.fields.from?.[0]} />
