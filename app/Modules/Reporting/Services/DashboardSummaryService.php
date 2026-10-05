@@ -170,11 +170,8 @@ final class DashboardSummaryService
         $this->organizationScope($query, 'payments.organization_unit_id', $organizationUnitId);
         $this->organizationScope($query, 'lines.organization_unit_id', $organizationUnitId);
         $rows = $query
-            ->select(['payments.payment_date', 'payments.direction', 'payments.exchange_rate'])
-            ->selectRaw('COALESCE(SUM(lines.amount), 0) as amount')
-            ->groupBy(['payments.payment_date', 'payments.direction', 'payments.exchange_rate'])
             ->orderBy('payments.payment_date')
-            ->get();
+            ->get(['payments.payment_date', 'payments.direction', 'payments.exchange_rate', 'lines.amount']);
 
         foreach ($rows as $row) {
             $key = CarbonImmutable::parse((string) $row->payment_date)->format('Y-m');
