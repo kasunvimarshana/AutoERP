@@ -41,12 +41,15 @@ final class AccountBalanceService
             ]);
         }
 
+        $baseDebit = $this->math->mul((string) $line->debit, (string) $journal->exchange_rate);
+        $baseCredit = $this->math->mul((string) $line->credit, (string) $journal->exchange_rate);
+
         if ($this->isOpeningJournal($journal)) {
-            $balance->opening_debit = $this->math->add((string) $balance->opening_debit, (string) $line->debit);
-            $balance->opening_credit = $this->math->add((string) $balance->opening_credit, (string) $line->credit);
+            $balance->opening_debit = $this->math->add((string) $balance->opening_debit, $baseDebit);
+            $balance->opening_credit = $this->math->add((string) $balance->opening_credit, $baseCredit);
         } else {
-            $balance->period_debit = $this->math->add((string) $balance->period_debit, (string) $line->debit);
-            $balance->period_credit = $this->math->add((string) $balance->period_credit, (string) $line->credit);
+            $balance->period_debit = $this->math->add((string) $balance->period_debit, $baseDebit);
+            $balance->period_credit = $this->math->add((string) $balance->period_credit, $baseCredit);
         }
 
         $this->syncClosing($balance, $account);
@@ -111,7 +114,7 @@ final class AccountBalanceService
             $query->whereDate('entry_date', '<=', $dateTo);
         }
 
-        $entries = $query->get(['account_id', 'entry_date', 'debit', 'credit'])->groupBy('account_id');
+        $entries = $query->get(['account_id', 'entry_date', 'base_debit', 'base_credit'])->groupBy('account_id');
         $results = [];
 
         foreach ($accounts as $account) {
@@ -126,14 +129,14 @@ final class AccountBalanceService
             foreach ($entries->get($account->getKey(), collect()) as $entry) {
                 $entryDate = $entry->entry_date->toDateString();
                 if ($dateFrom !== null && $entryDate < $dateFrom) {
-                    $openingDebit = $this->math->add($openingDebit, (string) $entry->debit);
-                    $openingCredit = $this->math->add($openingCredit, (string) $entry->credit);
+                    $openingDebit = $this->math->add($openingDebit, (string) $entry->base_debit);
+                    $openingCredit = $this->math->add($openingCredit, (string) $entry->base_credit);
 
                     continue;
                 }
 
-                $periodDebit = $this->math->add($periodDebit, (string) $entry->debit);
-                $periodCredit = $this->math->add($periodCredit, (string) $entry->credit);
+                $periodDebit = $this->math->add($periodDebit, (string) $entry->base_debit);
+                $periodCredit = $this->math->add($periodCredit, (string) $entry->base_credit);
             }
 
             [$openingDebit, $openingCredit] = $this->splitDebitCredit($openingDebit, $openingCredit);
