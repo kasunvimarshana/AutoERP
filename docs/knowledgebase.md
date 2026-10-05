@@ -14,7 +14,7 @@
 
 **Live authoritative branch head:** resolve from Git/release records; it is intentionally not embedded here because documentation-only release commits would otherwise make this document self-stale.
 
-**Latest current-head re-verification:** [`changes/2026-10-05-vehicle-rental-financial-foundation-production-release.md`](changes/2026-10-05-vehicle-rental-financial-foundation-production-release.md)
+**Latest current-head re-verification:** [`changes/2026-10-05-vehicle-rental-release-verification-fixes.md`](changes/2026-10-05-vehicle-rental-release-verification-fixes.md)
 
 **Architecture policy:** root `RULES.md` / `AGENTS.md`
 
@@ -872,6 +872,8 @@ The earlier integrated cross-engine verification additionally recorded:
 The 2026-10-05 usage-supply-period correction is a narrow Vehicle Rental runtime/test delta: RentalCalendar owns exclusive-end to inclusive-civil-period conversion, OT/night-out charges freeze that resolved timezone/period, and the Invoice handoff reuses the same policy. It changes no migration/schema, relationship, API shape, tax/withholding rule, account mapping or commercial formula. Focused regression source coverage was added for exact-midnight supply end and timezone-stable reissue. A fresh dependency-backed run of that new test is not claimed because the current container cannot obtain the repository dependency tree. The repository's automatic CI attempts on this head and earlier known-green heads terminate before any job step executes, so they do not provide application-test results.
 
 The 2026-10-05 financial-foundation release adds focused regression source coverage for frozen-rate base-currency ledger conversion, base-currency exchange-rate guards, foreign-currency bank reconciliation, dated Payment instrument settlement, distinct Invoice-versus-Payment FX ownership in settlement reporting, explicit settlement FX entry, and least-privilege Rental deposit payment-method lookup. Both new Finance upgrade migration files passed local PHP syntax lint, and the new Payment allocation/settlement TSX components passed focused TypeScript transpile syntax checks. A fresh full dependency-backed Laravel/Vitest/typecheck/ESLint/Vite/migration run is not claimed because normal repository checkout remains blocked by environment DNS and no complete dependency tree is locally available. No GitHub Actions or paid verification service was used.
+
+A later dependency-backed local verification of release head `ed0c85da38ea83bf64b654b75ae3579ce6ebe5e1` supplied on 2026-10-05 established concrete release regressions: Laravel **884 passed / 4 failed / 9,723 assertions**, TypeScript typecheck failed with **9** Vehicle Rental type errors, ESLint reported **1 error and 1 warning**, the Vite production build **passed with 697 transformed modules**, and Vitest recorded **405 passed / 8 failed** across **102 passing / 7 failing test files**. The failures were traced to Finance upgrade-migration tenant-boundary declarations, misplaced database-backed Invoice currency validation, one stale report-orientation assertion, a weaker-than-API Agreement currency type, one mileage 422 form-retention defect, lint drift, and stale frontend test assertions/mocks. The correction is recorded in `changes/2026-10-05-vehicle-rental-release-verification-fixes.md`. A fresh post-correction dependency-backed full run is still required before this exact correction head may be described as fully green for deployment; no unexecuted pass is inferred from the source fixes.
 
 Future runtime changes must verify, as applicable:
 
