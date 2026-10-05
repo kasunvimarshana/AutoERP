@@ -8,6 +8,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 use LogicException;
+use Modules\Configuration\Contracts\ConfigurationResolverInterface;
 use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Services\InvoiceReversalService;
 use Modules\Invoice\Services\InvoiceStatusService;
@@ -19,6 +20,7 @@ use Modules\VehicleRental\Enums\RentalBasis;
 use Modules\VehicleRental\Enums\RunningChartAction;
 use Modules\VehicleRental\Enums\UsageChargeComponent;
 use Modules\VehicleRental\Enums\UsageChargePolicy;
+use Modules\VehicleRental\Constants\RentalConfiguration;
 use Modules\VehicleRental\Enums\VehicleUseAction;
 use Modules\VehicleRental\Models\CustomerUsageCharge;
 use Modules\VehicleRental\Models\OwnerUsageCharge;
@@ -265,6 +267,7 @@ final class UsageChargeBillingTest extends TestCase
                 $this->assertSame($amount, $invoice->grand_total);
                 $this->assertSame('1.000000', $invoice->sourceLines->sole()->invoiced_quantity);
                 $this->assertSame('2026-09-07', $invoice->documentSnapshot->supply_period_start->toDateString());
+                $this->assertSame('2026-09-08', $invoice->documentSnapshot->supply_period_end->toDateString());
                 $this->assertSame(InvoiceStatus::Draft, $invoice->status);
             }
             $this->assertDatabaseCount('vehicle_rental_customer_usage_charges', 4);
@@ -279,6 +282,47 @@ final class UsageChargeBillingTest extends TestCase
             $this->expectException(ConflictHttpException::class);
             $service->create(AgreementKind::Customer, $ctx, $chart->id, $this->input($c, $chart));
         });
+    }
+
+    public function test_usage_charge_freezes_business_calendar_supply_period_for_reissue(): void
+    {
+        $this->mock(ConfigurationResolverInterface::class, fn ($mock) => $mock->shouldReceive('value')
+            ->with(RentalConfiguration::WORKSPACE_TIMEZONE, \Mockery::type('int'), \Mockery::type('int'))
+            ->zeroOrMoreTimes()->andReturn('Asia/Colombo'));
+
+        $this->billable(function ($ctx, $c, $o, $chart): void {
+            $service = app(UsageChargeBilling::class);
+            $input = $this->input($c, $chart);
+            $invoice = $service->create(AgreementKind::Customer, $ctx, $chart->id, $input);
+            $charge = CustomerUsageCharge::query()->sole();
+
+            $this->assertSame('2026-09-08', $charge->period_from);
+            $this->assertSame('2026-09-08', $charge->period_until);
+            $this->assertSame('Asia/Colombo', $charge->calculation['timezone']);
+            $this->assertSame('2026-09-08', $charge->calculation['supply_from']);
+            $this->assertSame('2026-09-08', $charge->calculation['supply_until']);
+            $this->assertSame('2026-09-08', $invoice->documentSnapshot->supply_period_start->toDateString());
+            $this->assertSame('2026-09-08', $invoice->documentSnapshot->supply_period_end->toDateString());
+
+            app(InvoiceStatusService::class)->transitionIfVersion(
+                $invoice,
+                InvoiceStatus::Cancelled,
+                $invoice->row_version,
+                $ctx->actorId,
+                'Reissue after workspace timezone change',
+            );
+
+            $this->mock(ConfigurationResolverInterface::class, fn ($mock) => $mock->shouldReceive('value')
+                ->with(RentalConfiguration::WORKSPACE_TIMEZONE, \Mockery::type('int'), \Mockery::type('int'))
+                ->zeroOrMoreTimes()->andReturn('UTC'));
+
+            $reissued = app(UsageChargeBilling::class)->reissue(AgreementKind::Customer, $ctx, $chart->id, $charge->id, $input);
+            $this->assertSame('2026-09-08', $reissued->documentSnapshot->supply_period_start->toDateString());
+            $this->assertSame('2026-09-08', $reissued->documentSnapshot->supply_period_end->toDateString());
+        }, [
+            'starts_at' => '2026-09-07T18:30:00+00:00',
+            'ends_at' => '2026-09-08T18:30:00+00:00',
+        ]);
     }
 
     public function test_minutes_are_multiplied_before_division_and_client_amount_is_ignored(): void

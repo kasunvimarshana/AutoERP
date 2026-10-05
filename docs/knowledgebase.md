@@ -14,7 +14,7 @@
 
 **Live authoritative branch head:** resolve from Git/release records; it is intentionally not embedded here because documentation-only release commits would otherwise make this document self-stale.
 
-**Latest current-head re-verification:** [`changes/2026-10-05-vehicle-rental-ui-ux-production-finalization.md`](changes/2026-10-05-vehicle-rental-ui-ux-production-finalization.md)
+**Latest current-head re-verification:** [`changes/2026-10-05-vehicle-rental-usage-supply-period-correction.md`](changes/2026-10-05-vehicle-rental-usage-supply-period-correction.md)
 
 **Architecture policy:** root `RULES.md` / `AGENTS.md`
 
@@ -622,6 +622,7 @@ Financial lifecycle is owned by Invoice/Payment/Finance. Rental must not duplica
 ### Financial boundaries
 
 - no automatic Rental financial handoff may create customer or owner money outside effective agreement coverage;
+- chart-based OT/night-out charges freeze the configured tenant/org business timezone and inclusive source supply dates at first creation; a Running Chart end instant is exclusive, and later timezone changes cannot reinterpret reissues;
 - physical evidence outside commercial coverage may remain auditable without becoming billable/payable;
 - same-side source consumption is idempotent and duplicate-safe.
 
@@ -754,6 +755,7 @@ These are implementation policies, not claims that TACGL universally proves them
 - tenant/org localization timezone is the commercial civil-day source of truth;
 - Vehicle Use planning may use explicit civil-date eligibility while actual handover/replacement uses exact timestamps;
 - Running Chart lifecycle is Draft → Finalized → Reversed/Corrected without extra unproven approval stages;
+- finalized chart-based financial source periods are resolved in tenant/org business time, store an inclusive last covered civil date from the exclusive chart end, and are frozen in the immutable charge calculation;
 - same-side source consumption is duplicate-safe;
 - customer and owner calculations remain independent;
 - posted financial records remain owned and immutable under Invoice/Payment/Finance rules;
@@ -805,6 +807,21 @@ No legacy Rental code was restored or reused. No compatibility patch was introdu
 
 Current authoritative external guidance was also rechecked only for ownership/integrity boundaries: IFRS 16 remains accounting guidance rather than an operational tariff source; Sri Lanka IRD VAT/WHT rules remain effective-dated Tax/Invoice/Payment concerns; and MySQL/InnoDB locking guidance remains consistent with the module's transactional lock discipline.
 
+### 2026-10-05 final source-period correction
+
+A later end-to-end review found one narrow runtime defect after the 2026-10-02 re-verification: OT/night-out usage charges stored the Running Chart's exclusive end date directly as an inclusive charge `period_until`. Exact-midnight chart boundaries could therefore extend the Invoice supply period by one civil day, and reissue did not have a frozen business-time supply period in the immutable calculation snapshot.
+
+The correction keeps responsibility inside Vehicle Rental:
+
+- `RentalCalendar` is the single conversion boundary for exact chart interval → configured business-calendar inclusive supply dates;
+- first charge creation freezes `timezone`, `supply_from` and `supply_until` in the immutable calculation;
+- charge `period_from` / `period_until` use the same resolved dates;
+- `RentalChargeDocuments` reuses the same calendar rule for chart-period fallback;
+- reissue uses the frozen source period, so later workspace-timezone changes cannot reinterpret it;
+- mileage is unchanged because its named calendar-cycle policy already freezes its own timezone and supply period.
+
+No schema, relationship, API shape, tax/withholding rule, account mapping or commercial formula changed. See [the append-only correction record](changes/2026-10-05-vehicle-rental-usage-supply-period-correction.md).
+
 ---
 
 ## 28. Testing and verification policy
@@ -823,7 +840,7 @@ That backend run includes the Vehicle Rental agreement, successor/cutover, authe
 
 The 2026-10-02 UI/UX deltas and the 2026-10-04 business-timezone finalization are frontend/shared-presentation/test/documentation deltas on top of that executed baseline. Focused regression tests cover interaction, immutable-history, stale-data, validation-feedback, configured business-time conversion/display and period-entry guards. The 2026-10-04 shared business-time algorithm also passed isolated runtime verification for Asia/Colombo, New York standard/DST offsets, seconds-preserving round-trip, rejection of a nonexistent DST wall time, and rejection of an ambiguous DST fall-back wall time. The follow-up verification correction also removed a duplicated focused-test import that would otherwise trigger TypeScript `TS2300 Duplicate identifier`. A complete post-change dependency-backed application rerun still cannot be claimed because the audit environment has no full repository dependency tree and hosted GitHub Actions remain excluded by the free-tools-only instruction.
 
-The exact Vehicle Rental runtime and migration lineage are unchanged from the earlier integrated cross-engine verification, which additionally recorded:
+The earlier integrated cross-engine verification additionally recorded:
 
 - SQLite backend verification passed;
 - MariaDB 10.11.7 / InnoDB backend verification passed;
@@ -831,7 +848,7 @@ The exact Vehicle Rental runtime and migration lineage are unchanged from the ea
 - 238-table fresh/upgrade/rollback schema metadata parity passed on both engines;
 - foreign-key/integrity and final source/conflict review passed.
 
-No migration file changed after that executed Vehicle Rental baseline, so this continuation introduces no new schema behavior to qualify.
+The 2026-10-05 usage-supply-period correction is a narrow Vehicle Rental runtime/test delta: RentalCalendar owns exclusive-end to inclusive-civil-period conversion, OT/night-out charges freeze that resolved timezone/period, and the Invoice handoff reuses the same policy. It changes no migration/schema, relationship, API shape, tax/withholding rule, account mapping or commercial formula. Focused regression source coverage was added for exact-midnight supply end and timezone-stable reissue. A fresh dependency-backed run of that new test is not claimed because the current container cannot obtain the repository dependency tree. The repository's automatic CI attempts on this head and earlier known-green heads terminate before any job step executes, so they do not provide application-test results.
 
 Future runtime changes must verify, as applicable:
 
