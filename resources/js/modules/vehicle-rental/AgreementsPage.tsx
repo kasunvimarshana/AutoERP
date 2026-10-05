@@ -89,13 +89,13 @@ export default function AgreementsPage({ kind }: { kind: AgreementKind }) {
             {showHistory && <AgreementHistoryPanel key={selected.id} kind={kind} id={selected.id} />}
             {canManage && !action && !showSuccessor && <div className="flex flex-wrap gap-2">
                 {selected.status === AgreementStatus.Draft && <><Button variant="secondary" onClick={() => { setEditing(selected); setSelected(null); }}>Edit draft</Button><Button onClick={() => setAction(AgreementAction.Activate)}>Activate</Button></>}
-                {selected.status === AgreementStatus.Active && <><Button variant="secondary" onClick={() => setShowSuccessor(true)}>Create successor</Button><Button variant="secondary" onClick={() => setAction(AgreementAction.Close)}>Close agreement</Button></>}
+                {selected.status === AgreementStatus.Active && <><Button variant="secondary" onClick={() => setShowSuccessor(true)}>Create successor</Button><Button variant="danger" onClick={() => setAction(AgreementAction.Close)}>Close agreement</Button></>}
             </div>}
             {showSuccessor && selected.status === AgreementStatus.Active && <AgreementSuccessorForm kind={kind} agreement={selected} onSaved={reload} onCancel={() => setShowSuccessor(false)} />}
             {action && <div className="space-y-3 border-t pt-4">
                 <p>{action === AgreementAction.Activate ? 'Activation freezes these terms. Confirm that the recorded details match the agreement. This does not reserve the vehicle or create a financial document.' : 'Close this agreement while preserving its original terms and history.'}</p>
                 {action === AgreementAction.Close && <Textarea label="Closure reason" value={reason} onChange={event => setReason(event.target.value)} required disabled={saving} error={error?.fields.reason?.[0]} />}
-                <Button onClick={confirm} loading={saving} disabled={action === AgreementAction.Close && !reason.trim()}>Confirm {action === AgreementAction.Activate ? 'activation' : 'closure'}</Button>
+                <Button variant={action === AgreementAction.Close ? 'danger' : 'primary'} onClick={confirm} loading={saving} disabled={action === AgreementAction.Close && !reason.trim()}>Confirm {action === AgreementAction.Activate ? 'activation' : 'closure'}</Button>
                 <Button type="button" variant="secondary" disabled={saving} onClick={() => setAction(null)}>Cancel</Button>
             </div>}
         </section>}

@@ -16,15 +16,23 @@ async function setup() { render(<MemoryRouter><UsageChargeForm kind={AgreementKi
 function documentFields() { fireEvent.change(screen.getByLabelText('Invoice date'), { target: { value: '2026-09-12' } }); fireEvent.change(screen.getByLabelText('Exchange rate to base currency'), { target: { value: '1' } }); }
 it('requires policy acceptance and submits only component, revisions and document inputs', async () => {
     await setup(); documentFields(); fireEvent.change(screen.getByLabelText('Component'), { target: { value: UsageChargeComponent.NormalOvertime } });
-    expect(screen.getByRole('button', { name: 'Create invoice draft' })).toBeDisabled();
-    fireEvent.click(screen.getByRole('checkbox')); fireEvent.click(screen.getByRole('button', { name: 'Create invoice draft' }));
+    expect(screen.getByRole('button', { name: 'Create customer invoice draft' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('checkbox')); fireEvent.click(screen.getByRole('button', { name: 'Create customer invoice draft' }));
     expect(await screen.findByRole('link', { name: 'INV-8' })).toHaveAttribute('href', '/invoices/8');
     expect(billUsage).toHaveBeenCalledWith(AgreementKind.Customer, chart, 2, UsageChargeComponent.NormalOvertime, { invoice_date: '2026-09-12', due_date: null, exchange_rate: '1' });
+});
+it('uses Owner Payable Voucher terminology for owner-side usage billing', async () => {
+    render(<MemoryRouter><UsageChargeForm kind={AgreementKind.Owner} chart={chart} /></MemoryRouter>);
+    await screen.findByLabelText('Component');
+    expect(screen.getByText('Owner payables · CHART-A')).toBeInTheDocument();
+    expect(screen.getByLabelText('Owner Payable Voucher date')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Create Owner Payable Voucher draft' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Create customer invoice draft' })).not.toBeInTheDocument();
 });
 it('shows conflicts without a success message', async () => {
     vi.mocked(billUsage).mockRejectedValue(new ApiError('Chart changed. Reload.', 409));
     await setup(); documentFields(); fireEvent.change(screen.getByLabelText('Component'), { target: { value: UsageChargeComponent.NormalOvertime } });
-    fireEvent.click(screen.getByRole('checkbox')); fireEvent.click(screen.getByRole('button', { name: 'Create invoice draft' }));
+    fireEvent.click(screen.getByRole('checkbox')); fireEvent.click(screen.getByRole('button', { name: 'Create customer invoice draft' }));
     expect(await screen.findByText('Chart changed. Reload.')).toBeInTheDocument(); expect(screen.queryByRole('link', { name: 'INV-8' })).not.toBeInTheDocument();
 });
 it('voids a released charge with a reason and no invoice form requirements', async () => {
@@ -39,7 +47,7 @@ it('reissues the stored charge rather than calculating another component', async
     vi.mocked(loadUsageCharges).mockResolvedValue({ ...list, charges: { ...list.charges, data: [charge] } });
     vi.mocked(reissueUsage).mockResolvedValue({ id: 8, invoice_number: 'INV-8', grand_total: '750.000000' });
     await setup(); fireEvent.click(screen.getByRole('button', { name: 'Reissue charge' })); documentFields();
-    fireEvent.click(screen.getByRole('checkbox')); fireEvent.click(screen.getByRole('button', { name: 'Create invoice draft' }));
+    fireEvent.click(screen.getByRole('checkbox')); fireEvent.click(screen.getByRole('button', { name: 'Create customer invoice draft' }));
     await waitFor(() => expect(reissueUsage).toHaveBeenCalledWith(AgreementKind.Customer, chart, 2, charge, { invoice_date: '2026-09-12', due_date: null, exchange_rate: '1' }));
     expect(billUsage).not.toHaveBeenCalled();
 });
@@ -52,7 +60,7 @@ it('shows server pricing and prevents billing an unknown component', async () =>
     await setup(); documentFields(); fireEvent.change(screen.getByLabelText('Component'), { target: { value: UsageChargeComponent.NormalOvertime } });
     fireEvent.click(screen.getByRole('checkbox'));
     expect(screen.getByText(/The agreed rate is not known/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Create invoice draft' })).toBeDisabled(); expect(billUsage).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Create customer invoice draft' })).toBeDisabled(); expect(billUsage).not.toHaveBeenCalled();
 });
 
 it('shows an explicit loading state without an incomplete agreement reference', () => {
@@ -73,6 +81,6 @@ it('formats the server rate and maps usage billing validation to its field', asy
     expect(screen.getByRole('status')).toHaveTextContent(formatMoney('500.000000', 'LKR'));
     expect(screen.getByRole('status')).not.toHaveTextContent('500.000000');
     fireEvent.click(screen.getByRole('checkbox'));
-    fireEvent.click(screen.getByRole('button', { name: 'Create invoice draft' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create customer invoice draft' }));
     expect(await screen.findByText('Enter a positive exchange rate.')).toBeInTheDocument();
 });

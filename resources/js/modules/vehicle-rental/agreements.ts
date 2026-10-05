@@ -21,6 +21,7 @@ export type TermKey = keyof typeof TERM_LABELS;
 export const CUSTOMER_ONLY_TERM_KEYS = new Set<TermKey>(['deposit_requirement']);
 const OWNER_TERM_LABEL_OVERRIDES: Partial<Record<TermKey, string>> = {
     base_rate: 'Owner base rental payable',
+    included_km: 'Owner included distance (km)',
     excess_km_rate: 'Owner excess distance payable per km',
     non_ac_rate: 'Owner Non-AC rate',
     front_ac_rate: 'Owner Front AC rate',

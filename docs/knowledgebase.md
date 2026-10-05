@@ -14,7 +14,7 @@
 
 **Live authoritative branch head:** resolve from Git/release records; it is intentionally not embedded here because documentation-only release commits would otherwise make this document self-stale.
 
-**Latest current-head re-verification:** [`changes/2026-10-05-vehicle-rental-production-release.md`](changes/2026-10-05-vehicle-rental-production-release.md)
+**Latest current-head re-verification:** [`changes/2026-10-05-vehicle-rental-ui-ux-production-finalization.md`](changes/2026-10-05-vehicle-rental-ui-ux-production-finalization.md)
 
 **Architecture policy:** root `RULES.md` / `AGENTS.md`
 
@@ -699,7 +699,9 @@ Principles:
 - agreement-first workflow and navigation: Owner Agreements where external supply is needed, Customer Agreements, Vehicle Use, then Running Charts;
 - compact forms, not giant technical wizards;
 - Running Chart as a fast operational entry/review surface;
-- customer and owner financial panels clearly separated;
+- customer and owner financial panels clearly separated, with Customer Invoice terminology on the customer side and Owner Payable Voucher / Owner Settlement terminology on the owner side;
+- frontend direct routes enforce the same view permissions that govern Rental navigation visibility;
+- destructive or corrective lifecycle actions use explicit action wording and a danger treatment distinct from ordinary workflow actions;
 - human-readable labels instead of raw IDs/codes;
 - shared status, loading, empty-state and disclosure patterns so operators can distinguish data state from financial state;
 - operator-facing money and quantity values use shared presentation formatters; storage/calculation precision must not leak into the UI while exact backend values remain unchanged;
@@ -716,7 +718,7 @@ Principles:
 - technical allocation/history data visible only where it helps the user understand or resolve a real business issue;
 - destructive-looking actions must reflect true domain lifecycle, not generic CRUD.
 
-The 2026-10-02 UI/UX finalization, its second end-to-end completion audit, and the 2026-10-04 business-timezone finalization apply this contract without changing any commercial rule, calculation, relationship or module ownership. See [Vehicle Rental UI/UX finalization](changes/2026-10-02-vehicle-rental-ui-ux-finalization.md), [Vehicle Rental end-to-end UI/UX audit completion](changes/2026-10-02-vehicle-rental-ui-ux-end-to-end-audit-completion.md), and [Vehicle Rental business-timezone UI finalization](changes/2026-10-04-vehicle-rental-business-timezone-ui-finalization.md).
+The 2026-10-02 UI/UX finalization, its second end-to-end completion audit, the 2026-10-04 business-timezone finalization, and the 2026-10-05 production UI/UX finalization apply this contract without changing any commercial rule, calculation, relationship or module ownership. See [Vehicle Rental UI/UX finalization](changes/2026-10-02-vehicle-rental-ui-ux-finalization.md), [Vehicle Rental end-to-end UI/UX audit completion](changes/2026-10-02-vehicle-rental-ui-ux-end-to-end-audit-completion.md), [Vehicle Rental business-timezone UI finalization](changes/2026-10-04-vehicle-rental-business-timezone-ui-finalization.md), and [Vehicle Rental UI/UX production finalization](changes/2026-10-05-vehicle-rental-ui-ux-production-finalization.md).
 
 ---
 
