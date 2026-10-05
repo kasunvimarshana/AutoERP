@@ -1,9 +1,10 @@
 import type { PaginationMeta } from '@/shared/types/pagination';
 import { Button } from './Button';
 
-export function Pagination({ meta, onPageChange }: {
+export function Pagination({ meta, onPageChange, disabled = false }: {
     meta?: PaginationMeta;
     onPageChange: (page: number) => void;
+    disabled?: boolean;
 }) {
     if (!meta || meta.last_page <= 1) return null;
 
@@ -16,7 +17,7 @@ export function Pagination({ meta, onPageChange }: {
             <div className="flex flex-wrap items-center gap-2">
                 <Button
                     variant="secondary"
-                    disabled={meta.current_page <= 1}
+                    disabled={disabled || meta.current_page <= 1}
                     aria-label={`Go to page ${Math.max(1, meta.current_page - 1)}`}
                     onClick={() => onPageChange(meta.current_page - 1)}
                 >
@@ -27,7 +28,7 @@ export function Pagination({ meta, onPageChange }: {
                 </span>
                 <Button
                     variant="secondary"
-                    disabled={meta.current_page >= meta.last_page}
+                    disabled={disabled || meta.current_page >= meta.last_page}
                     aria-label={`Go to page ${Math.min(meta.last_page, meta.current_page + 1)}`}
                     onClick={() => onPageChange(meta.current_page + 1)}
                 >
