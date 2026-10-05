@@ -175,7 +175,7 @@ final class ReportingFrameworkTest extends TestCase
         $templates = $this->app->make(ReportTemplateResolver::class);
         $exporter = $this->app->make(PdfExporter::class);
         $reports = [
-            'invoice.register' => ['reports.finance.report', 'portrait'],
+            'invoice.register' => ['reports.finance.report', 'landscape'],
             'payment.register' => ['reports.finance.report', 'landscape'],
             'finance.ledger' => ['reports.finance.report', 'landscape'],
             'inventory.stock-balance' => ['reports.inventory.report', 'landscape'],
