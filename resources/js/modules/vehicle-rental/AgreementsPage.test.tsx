@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@/shared/api/apiError';
 import { formatMoney } from '@/shared/utils/formatMoney';
 import { formatQuantity } from '@/shared/utils/formatQuantity';
+import { formatBusinessDate } from '@/shared/utils/businessDate';
 import AgreementsPage from './AgreementsPage';
 import { AgreementKind, AgreementStatus, RentalBasis, DriverMode, TERM_LABELS, type Agreement, type TermKey } from './agreements';
 import { createAgreementSuccessor, listAgreements, transitionAgreement, saveAgreement } from './agreementApi';
@@ -49,7 +50,7 @@ describe('Rental agreement review', () => {
         session.permissions.push('vehicle-rental.customer-agreements.manage');
         render(<AgreementsPage kind={AgreementKind.Customer} />);
         fireEvent.click(await screen.findByRole('button', { name: 'Review LESSEE-AGREEMENT' }));
-        expect(screen.getByText('Agreement date: 2026-09-01 · Executing date: Not recorded')).toBeInTheDocument();
+        expect(screen.getByText(`Agreement date: ${formatBusinessDate('2026-09-01')} · Executing date: Not recorded`)).toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: 'Edit draft' }));
         fireEvent.change(screen.getByLabelText('Agreement executing date'), { target: { value: '2026-09-03' } });
         fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
