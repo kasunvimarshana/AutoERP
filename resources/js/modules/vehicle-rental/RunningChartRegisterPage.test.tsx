@@ -41,6 +41,14 @@ describe('Running Chart register', () => {
         vi.mocked(listChartRegister).mockResolvedValue({ data: [] });
         fireEvent.change(screen.getByLabelText('Chart, vehicle, driver, agreement or party'), { target: { value: ' SEARCH ' } });
         fireEvent.change(screen.getByLabelText('Chart status'), { target: { value: RunningChartStatus.Reversed } });
+        const startInput = screen.getByLabelText('Period start (optional)');
+        const endInput = screen.getByLabelText('Period end (optional)');
+        fireEvent.change(startInput, { target: { value: '2026-09-07T09:00' } });
+        expect(endInput).toHaveAttribute('min', '2026-09-07T09:00');
+        fireEvent.change(endInput, { target: { value: '2026-09-08T09:00' } });
+        expect(startInput).toHaveAttribute('max', '2026-09-08T09:00');
+        fireEvent.change(startInput, { target: { value: '' } });
+        fireEvent.change(endInput, { target: { value: '' } });
         fireEvent.click(screen.getByRole('button', { name: 'Apply filters' }));
         expect(await screen.findByText('No Running Charts match these filters.')).toBeInTheDocument();
         await waitFor(() => expect(listChartRegister).toHaveBeenLastCalledWith({ search: 'SEARCH', chart_status: RunningChartStatus.Reversed, from: undefined, until: undefined }, 1, expect.any(AbortSignal)));

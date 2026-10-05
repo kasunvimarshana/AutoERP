@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { Pagination } from '@/shared/components/Pagination';
-import { formatBusinessDateTime } from '@/shared/utils/businessDate';
+import { formatBusinessDate, formatBusinessDateTime } from '@/shared/utils/businessDate';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { useApi } from '@/shared/hooks/useApi';
 import { humanize } from '@/shared/utils/object';
@@ -34,10 +34,10 @@ export function AgreementHistoryPanel({ kind, id }: { kind: AgreementKind; id: n
                                 {row.currency_code} · {row.basis === RentalBasis.Daily ? 'Daily' : 'Monthly'} · {row.driver_mode === DriverMode.SelfDrive ? 'Self-drive' : 'With driver'}
                             </p>
                             <p className="text-sm text-slate-700">
-                                Agreement date: {row.agreed_on} · Executing date: {row.executing_on ?? 'Not recorded'}
+                                Agreement date: {formatBusinessDate(row.agreed_on)} · Executing date: {formatBusinessDate(row.executing_on, 'Not recorded')}
                             </p>
                             <p className="text-sm text-slate-700">
-                                Effective period: {row.starts_on} – {row.ends_on ?? 'Open-ended'}
+                                Effective period: {formatBusinessDate(row.starts_on)} – {formatBusinessDate(row.ends_on, 'Open-ended')}
                             </p>
                             {row.reason && <p className="text-sm"><span className="font-medium">Reason:</span> {row.reason}</p>}
                             {row.notes && <p className="text-sm"><span className="font-medium">Notes:</span> {row.notes}</p>}

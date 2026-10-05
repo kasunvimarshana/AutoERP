@@ -17,6 +17,7 @@ import { ContentHeader } from '@/shared/components/ContentHeader';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { Pagination } from '@/shared/components/Pagination';
+import { formatBusinessDate } from '@/shared/utils/businessDate';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { Textarea } from '@/shared/components/Textarea';
 import type { PaginationMeta } from '@/shared/types/pagination';
@@ -63,19 +64,19 @@ export default function AgreementsPage({ kind }: { kind: AgreementKind }) {
     }
     return <div>
         <ContentHeader title={kind === AgreementKind.Customer ? 'Customer Rental Agreements' : 'Owner Rental Agreements'} description={kind === AgreementKind.Customer ? 'Record customer commercial terms, vehicle use, billing and deposit context while preserving history.' : 'Record owner/lessor payable terms and supplied vehicle context independently from customer billing.'}
-            actions={<><Button variant="secondary" onClick={reload} disabled={saving || editing !== null}>Reload</Button>{canManage && <Button onClick={() => { setEditing('new'); setSelected(null); }} disabled={saving || editing !== null}>New agreement</Button>}</>} />
+            actions={<><Button variant="secondary" onClick={reload} disabled={loading || saving || editing !== null}>Reload</Button>{canManage && <Button onClick={() => { setEditing('new'); setSelected(null); }} disabled={loading || saving || editing !== null}>New agreement</Button>}</>} />
         <ErrorAlert error={error} inline />
         {editing !== null && <AgreementEditor key={editing === 'new' ? 'new' : editing.id} kind={kind} record={editing === 'new' ? undefined : editing} onSaved={reload} onCancel={() => setEditing(null)} />}
         {loading ? <LoadingState label="Loading agreements…" /> : error ? null : <div className="mt-5 overflow-x-auto rounded-xl border border-slate-200 bg-white">
             <table className="w-full text-left text-sm"><caption className="sr-only">Rental agreements</caption><thead><tr>{['Reference', 'Party', 'Period', 'Basis', 'Status', 'Details'].map(label => <th className="p-3" key={label}>{label}</th>)}</tr></thead>
-                <tbody>{rows.map(row => <tr key={row.id} className="border-t border-slate-100"><td className="p-3">{row.reference}</td><td className="p-3">{row.party.name}</td><td className="p-3">{row.starts_on} – {row.ends_on ?? 'Open-ended'}</td><td className="p-3">{row.basis === RentalBasis.Daily ? 'Daily' : 'Monthly'}</td><td className="p-3"><StatusBadge status={row.status} /></td><td className="p-3"><Button variant="secondary" disabled={saving || editing !== null} onClick={() => { setSelected(row); setAction(null); setReason(''); setShowHistory(false); setShowVehicles(false); setShowDeposits(false); setShowSuccessor(false); }}>Review {row.reference}</Button></td></tr>)}</tbody>
+                <tbody>{rows.map(row => <tr key={row.id} className="border-t border-slate-100"><td className="p-3">{row.reference}</td><td className="p-3">{row.party.name}</td><td className="p-3">{formatBusinessDate(row.starts_on)} – {formatBusinessDate(row.ends_on, 'Open-ended')}</td><td className="p-3">{row.basis === RentalBasis.Daily ? 'Daily' : 'Monthly'}</td><td className="p-3"><StatusBadge status={row.status} /></td><td className="p-3"><Button variant="secondary" disabled={saving || editing !== null} onClick={() => { setSelected(row); setAction(null); setReason(''); setShowHistory(false); setShowVehicles(false); setShowDeposits(false); setShowSuccessor(false); }}>Review {row.reference}</Button></td></tr>)}</tbody>
             </table>{rows.length === 0 && <p className="p-5 text-slate-500">No agreements have been recorded.</p>}
         </div>}
-        <Pagination meta={meta} onPageChange={value => { setLoading(true); setPage(value); setSelected(null); }} />
+        <Pagination meta={meta} disabled={loading || saving} onPageChange={value => { setLoading(true); setPage(value); setSelected(null); }} />
         {selected && <section className="mt-5 space-y-4 rounded-xl border border-slate-200 bg-white p-5" aria-label="Agreement review">
             <div className="flex flex-wrap items-center gap-3"><h2 className="text-xl font-semibold">{selected.reference} · {selected.party.name}</h2><StatusBadge status={selected.status} /></div>
             <p>{selected.currency.code} · {selected.driver_mode === DriverMode.SelfDrive ? 'Self-drive' : 'With driver'}{selected.vehicle ? ` · ${selected.vehicle.registration_number ?? selected.vehicle.vehicle_number}` : ''}</p>
-            <p>Agreement date: {selected.agreed_on} · Executing date: {selected.executing_on ?? 'Not recorded'}</p>
+            <p>Agreement date: {formatBusinessDate(selected.agreed_on)} · Executing date: {formatBusinessDate(selected.executing_on, 'Not recorded')}</p>
             {selected.supersedes_agreement && <p className="text-sm text-slate-600">Successor of {selected.supersedes_agreement.reference}</p>}
             <AgreementTermsGrid kind={kind} currency={selected.currency.code} terms={selected.terms} />
             {selected.notes && <p><span className="font-medium">Notes:</span> {selected.notes}</p>}

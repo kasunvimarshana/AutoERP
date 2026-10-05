@@ -6,6 +6,8 @@ import { Input } from '@/shared/components/Input';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { MoneyDisplay } from '@/shared/components/MoneyDisplay';
+import { Pagination } from '@/shared/components/Pagination';
+import { formatBusinessDate } from '@/shared/utils/businessDate';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { Textarea } from '@/shared/components/Textarea';
 import { useApi } from '@/shared/hooks/useApi';
@@ -35,7 +37,6 @@ export function BaseRentBillingPanel({ kind, agreement }: { kind: AgreementKind;
     const inFlight = useRef(false);
     const chargeRequest = useApi(signal => loadBaseCharges(kind, agreement, page, signal), [kind, agreement.id, agreement.row_version, page, revision]);
     const charges = chargeRequest.data?.data ?? [];
-    const lastPage = chargeRequest.data?.last_page ?? 1;
     async function submit(event: FormEvent) {
         event.preventDefault();
         if (inFlight.current || !accepted) return;
@@ -54,7 +55,7 @@ export function BaseRentBillingPanel({ kind, agreement }: { kind: AgreementKind;
     return <details className="rounded border p-3"><summary className="cursor-pointer font-medium">Bill base rent</summary>
         <p className="my-3 text-sm">{billing.createDraftDescription} from the recorded base rate and actual-calendar policy. Monthly partial periods use actual anniversary-cycle days. This bills base rent only; mileage, extras and deductions are separate. Tax uses the configured Tax rules. {billing.reviewDraftText}</p>
         <form onSubmit={submit} className="space-y-3">
-            {selected ? <p>{action === ChargeAction.Void ? 'Void original charge:' : 'Reissue original charge:'} {selected.from} – {selected.until} · <MoneyDisplay value={selected.amount} currency={selected.currency} /> <Button type="button" variant="secondary" disabled={busy} onClick={() => { setSelected(null); setAccepted(false); }}>Cancel selection</Button></p> : <>
+            {selected ? <p>{action === ChargeAction.Void ? 'Void original charge:' : 'Reissue original charge:'} {formatBusinessDate(selected.from)} – {formatBusinessDate(selected.until)} · <MoneyDisplay value={selected.amount} currency={selected.currency} /> <Button type="button" variant="secondary" disabled={busy} onClick={() => { setSelected(null); setAccepted(false); }}>Cancel selection</Button></p> : <>
                 <Input label="Charge from" type="date" required min={agreement.starts_on} value={from} disabled={busy} onChange={e => { setFrom(e.target.value); setAccepted(false); }} error={error?.fields.from?.[0]} />
                 <Input label="Charge through" type="date" required min={from} max={agreement.ends_on ?? undefined} value={until} disabled={busy} onChange={e => { setUntil(e.target.value); setAccepted(false); }} error={error?.fields.until?.[0]} />
             </>}
@@ -69,12 +70,12 @@ export function BaseRentBillingPanel({ kind, agreement }: { kind: AgreementKind;
         </form>
         {created && <p role="status" className="mt-3">Created {billing.documentName} <Link className="underline" to={`/invoices/${created.id}`}>{created.invoice_number}</Link> · total <MoneyDisplay value={created.grand_total} currency={agreement.currency.code} /></p>}
         <section aria-label="Recorded base charges" className="mt-4"><h3 className="font-medium">Recorded base charges</h3>
-            {chargeRequest.loading ? <LoadingState label="Loading recorded base charges…" /> : chargeRequest.error ? null : charges.length === 0 ? <p className="mt-2 text-sm text-slate-500">No base-rent charges have been recorded.</p> : charges.map(charge => <div key={charge.id} className="my-2 border-t py-2"><p>{charge.from} – {charge.until} · <MoneyDisplay value={charge.amount} currency={charge.currency} /></p>
+            {chargeRequest.loading ? <LoadingState label="Loading recorded base charges…" /> : chargeRequest.error ? null : charges.length === 0 ? <p className="mt-2 text-sm text-slate-500">No base-rent charges have been recorded.</p> : charges.map(charge => <div key={charge.id} className="my-2 border-t py-2"><p>{formatBusinessDate(charge.from)} – {formatBusinessDate(charge.until)} · <MoneyDisplay value={charge.amount} currency={charge.currency} /></p>
                 {charge.invoices.map(invoice => <p key={invoice.id} className="flex flex-wrap items-center gap-2"><Link className="underline" to={`/invoices/${invoice.id}`}>{invoice.number}</Link><StatusBadge status={invoice.status} /></p>)}
                 {charge.voided_at && <p>Voided: {charge.void_reason}</p>}
                 {!charge.voided_at && charge.invoices.length > 0 && charge.invoices.every(invoice => RELEASED_INVOICE_STATES.has(invoice.status)) && <div className="flex flex-wrap gap-2"><Button type="button" variant="secondary" disabled={busy} onClick={() => { setSelected(charge); setAction(ChargeAction.Reissue); setAccepted(false); setCreated(null); setError(null); }}>Reissue charge</Button><Button type="button" variant="danger" disabled={busy} onClick={() => { setSelected(charge); setAction(ChargeAction.Void); setReason(''); setAccepted(false); setCreated(null); setError(null); }}>Void charge</Button></div>}
             </div>)}
-            {lastPage > 1 && <div className="flex flex-wrap items-center gap-2"><Button type="button" variant="secondary" disabled={busy || page === 1} onClick={() => setPage(page - 1)}>Previous</Button><span className="text-sm text-slate-600">Page {page} of {lastPage}</span><Button type="button" variant="secondary" disabled={busy || page === lastPage} onClick={() => setPage(page + 1)}>Next</Button></div>}
+            <Pagination meta={chargeRequest.data} disabled={busy || chargeRequest.loading} onPageChange={setPage} />
         </section>
     </details>;
 }

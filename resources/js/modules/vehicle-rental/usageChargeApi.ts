@@ -1,5 +1,6 @@
 import { apiClient } from '@/shared/api/apiClient';
 import type { ApiResource } from '@/shared/types/api';
+import type { PaginationMeta } from '@/shared/types/pagination';
 import type { AgreementKind } from './agreements';
 import { CHART_API, type RunningChart } from './runningCharts';
 import type { BillingDocumentInput, CreatedRentalInvoice } from './baseRentBillingApi';
@@ -10,7 +11,7 @@ export const USAGE_COMPONENT_LABELS = { [UsageChargeComponent.NormalOvertime]: '
 export const MILEAGE_COMPONENT = 'excess_distance';
 export interface UsageCharge { id: number; row_version: number; component: UsageChargeComponent | typeof MILEAGE_COMPONENT; amount: string; voided_at: string | null; void_reason: string | null; calculation: { description: string; currency: string }; invoices: { id: number; number: string; status: string }[] }
 export interface UsageComponentQuote { component: UsageChargeComponent; label: string; quantity: number | null; rate: string | null; denominator: number; amount: string | null; error: string | null }
-export interface UsageChargePage { currency: string; components: UsageComponentQuote[]; agreement: { reference: string; version: number }; charges: { data: UsageCharge[]; current_page: number; last_page: number } }
+export interface UsageChargePage { currency: string; components: UsageComponentQuote[]; agreement: { reference: string; version: number }; charges: PaginationMeta & { data: UsageCharge[] } }
 const path = (kind: AgreementKind, chart: RunningChart) => `${CHART_API}/${chart.id}/${kind}/charges`;
 export const loadUsageCharges = (kind: AgreementKind, chart: RunningChart, page: number, signal?: AbortSignal) => apiClient.get<UsageChargePage>(path(kind, chart), { params: { page }, signal }).then(r => r.data);
 export const billUsage = (kind: AgreementKind, chart: RunningChart, agreementVersion: number, component: UsageChargeComponent, document: BillingDocumentInput) =>

@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { formatMoney } from '@/shared/utils/formatMoney';
+import { formatBusinessDate } from '@/shared/utils/businessDate';
 import { agreementHistory } from './agreementApi';
 import { AgreementHistoryPanel } from './AgreementHistoryPanel';
 import { AgreementKind, AgreementStatus, DriverMode, RentalBasis, TERM_LABELS, type TermKey } from './agreements';
@@ -48,6 +49,8 @@ it('shows complete owner history with owner labels and hides customer-only depos
     expect(screen.queryByText('Agreed security deposit')).not.toBeInTheDocument();
     expect(screen.getByText(formatMoney('3100.000000', 'LKR'))).toBeInTheDocument();
     expect(screen.getByText('Owner included distance (km)').parentElement).toHaveTextContent('100 km');
+    expect(screen.getByText(`Agreement date: ${formatBusinessDate('2026-09-01')} · Executing date: Not recorded`)).toBeInTheDocument();
+    expect(screen.getByText(`Effective period: ${formatBusinessDate('2026-09-07')} – Open-ended`)).toBeInTheDocument();
     expect(screen.getByText(/Signed owner agreement/)).toBeInTheDocument();
     expect(screen.queryByText(/3100\.000000/)).not.toBeInTheDocument();
 });

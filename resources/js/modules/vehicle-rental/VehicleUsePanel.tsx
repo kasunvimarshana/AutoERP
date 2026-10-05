@@ -34,7 +34,7 @@ export function VehicleUsePanel({ agreement, canManage }: { agreement: Agreement
         catch (failure) { setError(toApiError(failure)); } finally { setSaving(false); }
     }
     return <section aria-label="Assigned vehicles" className="space-y-4 border-t pt-4">
-        <div className="flex flex-wrap items-center gap-2"><h3 className="grow text-lg font-semibold">Assigned vehicles</h3><Button variant="secondary" disabled={saving || adding || !!replacement} onClick={reload}>Reload vehicles</Button>{canManage && agreement.status === AgreementStatus.Active && <Button disabled={saving || adding || !!replacement || action !== null} onClick={() => setAdding(true)}>Assign vehicle</Button>}</div>
+        <div className="flex flex-wrap items-center gap-2"><h3 className="grow text-lg font-semibold">Assigned vehicles</h3><Button variant="secondary" disabled={loading || saving || adding || !!replacement} onClick={reload}>Reload vehicles</Button>{canManage && agreement.status === AgreementStatus.Active && <Button disabled={loading || saving || adding || !!replacement || action !== null} onClick={() => setAdding(true)}>Assign vehicle</Button>}</div>
         <ErrorAlert error={error} inline />
         {(adding || replacement) && <VehicleUseEditor replacement={replacement ?? undefined} agreement={agreement} onSaved={reload} onCancel={() => { setAdding(false); setReplacement(null); }} />}
         {loading ? <LoadingState label="Loading assigned vehicles…" /> : error ? null : rows.map(row => <article key={row.id} className="space-y-2 rounded-lg border p-4">
@@ -44,7 +44,7 @@ export function VehicleUsePanel({ agreement, canManage }: { agreement: Agreement
             {hasPermission(auth, CHART_PERMISSION.view) && <Button type="button" variant="secondary" aria-expanded={charts === row.id} onClick={() => setCharts(charts === row.id ? null : row.id)}>{charts === row.id ? 'Hide Running Charts' : 'Running Charts'}</Button>}{charts === row.id && <RunningChartsPanel key={row.id} use={row} />}
             {history === row.id && <VehicleUseHistoryPanel key={row.id} id={row.id} />}
         </article>)}
-        {!loading && !error && rows.length === 0 && <p className="text-sm text-slate-500">No vehicles assigned.</p>}<Pagination meta={meta} onPageChange={value => { setPage(value); setAction(null); }} />
+        {!loading && !error && rows.length === 0 && <p className="text-sm text-slate-500">No vehicles assigned.</p>}<Pagination meta={meta} disabled={loading || saving} onPageChange={value => { setLoading(true); setPage(value); setAction(null); }} />
         {action && <form onSubmit={submit} className="space-y-3 rounded-lg border p-4" aria-label={USE_ACTION_LABELS[action.type]}>
             <h3 className="font-semibold">{USE_ACTION_LABELS[action.type]} · {action.row.vehicle.label}</h3>
             <p className="text-sm">{action.type === VehicleUseAction.Cancel ? 'Cancel the planned use and retain its history.' : `Record the actual event in ${operationalTimeZoneLabel()}. An expected return alone never releases a vehicle.`}</p>

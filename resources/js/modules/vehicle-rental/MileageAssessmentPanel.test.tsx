@@ -3,6 +3,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { ApiError } from '@/shared/api/apiError';
 import { formatMoney } from '@/shared/utils/formatMoney';
+import { formatBusinessDate } from '@/shared/utils/businessDate';
 import { MileageAssessmentPanel } from './MileageAssessmentPanel';
 import { AgreementKind } from './agreements';
 import { RunningChartStatus, type RunningChart } from './runningCharts';
@@ -14,6 +15,7 @@ beforeEach(() => { vi.clearAllMocks(); vi.mocked(quoteMileage).mockResolvedValue
 async function setup() {
     const saved = vi.fn(); render(<MemoryRouter><MileageAssessmentPanel kind={AgreementKind.Customer} chart={chart} onSaved={saved} /></MemoryRouter>);
     await screen.findByText(formatMoney('0.000000', 'LKR'));
+    expect(screen.getByText(`AG-A · ${formatBusinessDate(quote.cycle_from)} — ${formatBusinessDate(quote.cycle_until)} · Asia/Colombo`)).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Invoice date'), { target: { value: '2026-09-15' } });
     fireEvent.change(screen.getByLabelText('Exchange rate to base currency'), { target: { value: '1' } });
     return saved;

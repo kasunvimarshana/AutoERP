@@ -37,7 +37,14 @@ describe('Vehicle Use register', () => {
         fireEvent.change(screen.getByLabelText('Vehicle, agreement or party'), { target: { value: ' SEARCH ' } });
         fireEvent.change(screen.getByLabelText('Use status'), { target: { value: VehicleUseStatus.Returned } });
         const start = '2026-09-07T10:00';
-        fireEvent.change(screen.getByLabelText('Planned period start (optional)'), { target: { value: start } });
+        const end = '2026-09-08T10:00';
+        const startInput = screen.getByLabelText('Planned period start (optional)');
+        const endInput = screen.getByLabelText('Planned period end (optional)');
+        fireEvent.change(startInput, { target: { value: start } });
+        expect(endInput).toHaveAttribute('min', start);
+        fireEvent.change(endInput, { target: { value: end } });
+        expect(startInput).toHaveAttribute('max', end);
+        fireEvent.change(endInput, { target: { value: '' } });
         fireEvent.click(screen.getByRole('button', { name: 'Apply filters' }));
         expect(await screen.findByText('No vehicle uses match these filters.')).toBeInTheDocument();
         expect(listVehicleUseRegister).toHaveBeenLastCalledWith({ search: 'SEARCH', use_status: VehicleUseStatus.Returned, from: timestampWithOffset(start), until: undefined }, 1, expect.any(AbortSignal));

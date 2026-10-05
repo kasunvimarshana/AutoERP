@@ -9,6 +9,7 @@ import { Select } from '@/shared/components/Select';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { MoneyDisplay } from '@/shared/components/MoneyDisplay';
+import { Pagination } from '@/shared/components/Pagination';
 import { StatusBadge } from '@/shared/components/StatusBadge';
 import { Textarea } from '@/shared/components/Textarea';
 import { useApi } from '@/shared/hooks/useApi';
@@ -82,7 +83,7 @@ export function UsageChargeForm({ kind, chart }: { kind: AgreementKind; chart: R
             {charge.invoices.map(invoice => <p key={invoice.id} className="flex flex-wrap items-center gap-2"><Link to={`/invoices/${invoice.id}`} className="underline">{invoice.number}</Link><StatusBadge status={invoice.status} /></p>)}
             {charge.voided_at ? <p>Voided: {charge.void_reason}</p> : chart.status === RunningChartStatus.Finalized && charge.invoices.every(invoice => RELEASED.has(invoice.status)) && <div className="flex flex-wrap gap-2">{charge.invoices.length > 0 && <Button variant="secondary" disabled={busy} onClick={() => choose(charge, ChargeAction.Reissue)}>Reissue charge</Button>}<Button variant="danger" disabled={busy} onClick={() => choose(charge, ChargeAction.Void)}>Void charge</Button></div>}
         </article>)}
-        {result.charges.last_page > 1 && <div className="flex flex-wrap items-center gap-2"><Button variant="secondary" disabled={busy || page === 1} onClick={() => setPage(page - 1)}>Previous</Button><span className="text-sm text-slate-600">Page {page} of {result.charges.last_page}</span><Button variant="secondary" disabled={busy || page === result.charges.last_page} onClick={() => setPage(page + 1)}>Next</Button></div>}
+        <Pagination meta={result.charges} disabled={busy || charges.loading} onPageChange={setPage} />
         <Button variant="secondary" disabled={busy} onClick={() => { setSelected(null); setAction(ChargeAction.Create); setAccepted(false); setError(null); setRevision(value => value + 1); }}>Reload charges</Button>
         </>}
     </div>;

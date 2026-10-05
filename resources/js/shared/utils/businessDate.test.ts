@@ -6,6 +6,7 @@ import {
     businessTimeZoneLabel,
     businessTimestampWithOffset,
     configureBusinessTimeZone,
+    formatBusinessDate,
     formatBusinessDateTime,
 } from './businessDate';
 
@@ -19,6 +20,13 @@ describe('business date utilities', () => {
         expect(businessDateInputValue(instant)).toBe('2026-06-16');
         expect(businessDateTimeInputValue(instant)).toBe('2026-06-16T01:30');
         expect(businessTimeZoneLabel()).toBe('Asia/Colombo');
+    });
+
+    it('formats civil dates without shifting them through a timezone', () => {
+        expect(formatBusinessDate('2026-09-07')).toContain('Sep');
+        expect(formatBusinessDate('2026-09-07')).toContain('7');
+        expect(formatBusinessDate('2026-02-30')).toBe('-');
+        expect(formatBusinessDate(null, 'Not recorded')).toBe('Not recorded');
     });
 
     it('formats timestamps in the configured business timezone and handles invalid input', () => {

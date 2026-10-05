@@ -6,6 +6,7 @@ import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { MoneyDisplay } from '@/shared/components/MoneyDisplay';
 import { QuantityDisplay } from '@/shared/components/QuantityDisplay';
+import { formatBusinessDate } from '@/shared/utils/businessDate';
 import { useApi } from '@/shared/hooks/useApi';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { AgreementKind } from './agreements';
@@ -31,7 +32,7 @@ export function MileageAssessmentPanel({ kind, chart, onSaved }: { kind: Agreeme
         <p>{kind === AgreementKind.Customer ? 'Customer commercial KM uses one allowance per agreement calendar day or monthly anniversary cycle. Replacement vehicles under the same customer agreement share that allowance.' : 'Owner commercial KM uses the allowance defined by the assigned Owner Agreement. Owner allowance is independent from the customer allowance and from every other Owner Agreement.'} Unused KM does not carry into another cycle. A partial final month receives an actual-days allowance. Zero-cost assessments still record used allowance.</p>
         <ErrorAlert error={error ?? quoteRequest.error} inline />
         {quoteRequest.loading ? <LoadingState label="Loading mileage quote…" /> : quote && <form aria-label="Assess commercial mileage" onSubmit={submit} className="space-y-3">
-            <p>{quote.agreement.reference} · {quote.cycle_from} — {quote.cycle_until} · {quote.timezone}</p>
+            <p>{quote.agreement.reference} · {formatBusinessDate(quote.cycle_from)} — {formatBusinessDate(quote.cycle_until)} · {quote.timezone}</p>
             <dl className="grid gap-3 sm:grid-cols-2">
                 <div><dt className="text-sm text-slate-500">Cycle allowance</dt><dd><QuantityDisplay value={quote.allowance} /> km</dd></div>
                 <div><dt className="text-sm text-slate-500">Recorded commercial distance</dt><dd><QuantityDisplay value={quote.distance} /> km</dd></div>
