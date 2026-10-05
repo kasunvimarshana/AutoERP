@@ -1,5 +1,6 @@
 import { apiClient } from '@/shared/api/apiClient';
 import type { ApiResource } from '@/shared/types/api';
+import type { PaginationMeta } from '@/shared/types/pagination';
 import { AGREEMENT_API, AgreementKind, type Agreement } from './agreements';
 import { BaseRentPolicy } from './baseRentPreviewApi';
 
@@ -7,7 +8,7 @@ export const BILLING_PERMISSION = { [AgreementKind.Customer]: 'vehicle-rental.cu
 export interface BaseCharge { id: number; row_version: number; voided_at: string | null; void_reason: string | null; from: string; until: string; amount: string; currency: string; invoices: { id: number; number: string; status: string }[] }
 export interface BillingDocumentInput { invoice_date: string; due_date: string | null; exchange_rate: string }
 export interface CreatedRentalInvoice { id: number; invoice_number: string; grand_total: string }
-export interface ChargePage { data: BaseCharge[]; current_page: number; last_page: number }
+export interface ChargePage extends PaginationMeta { data: BaseCharge[] }
 const path = (kind: AgreementKind, agreement: Agreement) => `${AGREEMENT_API}/${kind}/agreements/${agreement.id}/base-charges`;
 export const loadBaseCharges = (kind: AgreementKind, agreement: Agreement, page: number, signal?: AbortSignal) =>
     apiClient.get<ChargePage>(path(kind, agreement), { params: { page }, signal }).then(response => response.data);
