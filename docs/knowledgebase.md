@@ -952,3 +952,48 @@ TACGL and the supplied videos define the Vehicle Rental **business meaning**.
 `RULES.md` / `AGENTS.md` define the **engineering constraints**.
 
 This document reconciles those authorities without copying legacy design defects, without inventing unsupported business rules, and without moving responsibilities into modules that do not own them.
+
+---
+## 32. Final independent source, standards and release audit — 2026-10-06
+
+This pass re-audited the latest authoritative `worktree-0.0.8` source after the October 5 release-verification correction and the latest TACGL source-identity reconciliation.
+
+### Source and implementation result
+
+- The latest supplied TACGL dated ZIP is byte-for-byte equivalent at normalized business-file level to the canonical 452-file TACGL business corpus already audited.
+- The four supplied video hashes remain unchanged from the registered evidence set.
+- The fresh Vehicle Rental runtime remains the implementation under `app/Modules/VehicleRental`; no removed/legacy Rental runtime was restored, copied or used as a compatibility source.
+- The closed acceptance ledger contains no open checklist item.
+- Core Rental services/models reviewed in this pass contain no unresolved TODO/FIXME/HACK marker.
+- Relationship review found no new circular aggregate or redundant bidirectional business relationship. Successor/correction/replacement lineage remains one-way, while history remains append-only. Cross-module references remain references to canonical master/financial owners rather than duplicated Rental-owned masters or ledgers.
+- No evidence-backed runtime, schema, API, relationship, permission, calculation or UI defect was found that justifies creating a production-code delta merely for activity.
+
+### External authoritative corroboration
+
+External research is corroborating context only; it does not override TACGL/video business evidence.
+
+- Current Sri Lanka Inland Revenue material continues to publish effective-dated VAT/WHT/AIT rules and thresholds. Therefore Rental must not hardcode a universal tax or withholding percentage; applicability, effective dates, thresholds and rates remain Tax-owned configuration/policy.
+- IFRS 15 requires consideration expected to be refunded, or consideration for which the entity is not yet entitled, to remain a liability rather than revenue. That supports the existing AutoERP policy that Rental security-deposit cash and unapplied customer money remain Payment/Finance-owned liabilities until governed application/refund/forfeiture treatment exists.
+- Neither source proves a TACGL-specific replacement-day charge, downtime credit, damage priority, deposit priority, mileage-pool exception or other historical tariff. Those remain governed by the named AutoERP policies already documented here; otherwise no automatic monetary effect is created.
+
+### Protected backup recovery result
+
+The accessible TACGL corpus was re-inspected with free local tooling.
+
+- `tacdata/password.DBF` is readable and contains historical application user/password fields.
+- The protected nested backup `DATABACKUP/!   CTACGLDATABACKUP202503271759.rar` contains 86 encrypted entries and no archive comment.
+- Only source-derived credential evidence was inspected. No brute force, dictionary attack, arbitrary candidate mutation or unsupported password guessing was performed.
+- The available archive backend reports that RAR encryption support is unavailable, so the source-derived historical application password fields cannot be safely validated against the nested archive in this execution environment.
+- Backup access is not required by the completed runtime and remains non-evidence for any business rule.
+
+### Verification boundary
+
+The exact application-code head before the documentation-only source reconciliation is `07735be7f253cbcf55de0598cc19f477d41628c8`. Its October 5 correction repaired the concrete failures found by the previous dependency-backed local run at their owning boundaries.
+
+This execution environment still cannot resolve `github.com` from its shell and has no complete Composer/npm dependency tree for AutoERP. GitHub Actions and paid runners are excluded by project instruction. Therefore a fresh full dependency-backed post-correction Laravel/MySQL/Vitest/typecheck/ESLint/build/migration run is **not** falsely claimed here.
+
+This is an execution-evidence limitation, not an identified unfinished Vehicle Rental product requirement. Production promotion must continue to require actual executed release-gate evidence for the exact code head rather than converting static source review into a fabricated green test result.
+
+### Final decision
+
+The Vehicle Rental implementation remains functionally complete under the Definition of Done above. No additional business feature, schema relationship or financial rule is introduced by this final audit. Future changes must continue to be evidence-backed, owner-module scoped and accompanied by real executable verification.
