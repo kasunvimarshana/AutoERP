@@ -122,7 +122,7 @@ export default function PaymentEntryPage() {
         setDirection(nextDirection);
         setParty(invoiceParty(invoice));
         setReference(`Settlement for ${invoice.invoice_number ?? 'invoice'}`);
-        setExchangeRate(invoice.exchange_rate ?? '');
+        setExchangeRate('');
         setLines([{ ...emptyLine(1), amount: balance }]);
         setNextKey(2);
     }, [invoiceIssue, settlementInvoice.data]);
