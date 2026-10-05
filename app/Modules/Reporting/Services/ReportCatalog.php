@@ -749,14 +749,7 @@ final class ReportCatalog
                 new ReportColumn(
                     key: 'days_overdue',
                     label: 'Days Overdue',
-                    value: static function (InvoiceBalance $balance): int {
-                        $dueDate = $balance->invoice?->due_date ?? $balance->invoice?->invoice_date;
-                        if ($dueDate === null || $dueDate->isFuture()) {
-                            return 0;
-                        }
-
-                        return (int) $dueDate->startOfDay()->diffInDays(now()->startOfDay());
-                    },
+                    value: fn (InvoiceBalance $balance): int => $this->agingDays($balance),
                 ),
                 new ReportColumn(
                     key: 'aging_bucket',
