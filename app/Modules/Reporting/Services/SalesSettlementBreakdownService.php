@@ -45,9 +45,9 @@ final class SalesSettlementBreakdownService
         $invoiceQuery = $this->salesInvoiceQuery($tenantId, $organizationUnitId, $dateFrom, $dateTo);
         $invoiceTotals = (clone $invoiceQuery)
             ->selectRaw(
-                'COALESCE(SUM(balance_due), 0) as credit_amount, '
+                'COALESCE(SUM(balance_due * exchange_rate), 0) as credit_amount, '
                 .'COUNT(CASE WHEN balance_due > 0 THEN 1 END) as credit_document_count, '
-                .'COALESCE(SUM(credit_total), 0) as credits_applied'
+                .'COALESCE(SUM(credit_total * exchange_rate), 0) as credits_applied'
             )
             ->first();
 
