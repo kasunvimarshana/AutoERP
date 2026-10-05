@@ -109,7 +109,6 @@ describe('Payment invoice settlement entry', () => {
                 party_type: partyType,
                 party: { id: 71, code: 'PTY-071', name: partyName },
                 currency: { id: 3, code: 'LKR', name: 'Sri Lankan Rupee' },
-                exchange_rate: '1.000000',
                 balance_due: '25000.000000',
             });
 
@@ -124,6 +123,7 @@ describe('Payment invoice settlement entry', () => {
                 expect(screen.getAllByText(partyName).length).toBeGreaterThanOrEqual(2);
             });
 
+            await userEvent.type(screen.getByLabelText(/Exchange rate/), '1');
             await userEvent.click(screen.getByRole('button', { name: 'Select cash method' }));
             const submitButton = screen.getByRole('button', { name: buttonName });
             await waitFor(() => expect(submitButton).toBeEnabled());
@@ -136,7 +136,7 @@ describe('Payment invoice settlement entry', () => {
                     party_type: partyType,
                     party_id: 71,
                     currency_id: 3,
-                    exchange_rate: '1.000000',
+                    exchange_rate: '1',
                     lines: [expect.objectContaining({
                         payment_method_id: 9,
                         amount: '25000.000000',
