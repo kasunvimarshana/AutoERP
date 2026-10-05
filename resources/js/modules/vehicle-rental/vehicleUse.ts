@@ -11,6 +11,7 @@ export const USE_PERMISSION = { view: 'vehicle-rental.vehicle-use.view', manage:
 export const USE_API = `${AGREEMENT_API}/vehicle-uses`;
 export const USE_LABELS = { [VehicleUseStatus.Planned]: 'Planned', [VehicleUseStatus.InCustody]: 'With customer', [VehicleUseStatus.Returned]: 'Returned', [VehicleUseStatus.Cancelled]: 'Cancelled' };
 export const USE_ACTION_LABELS = { [VehicleUseAction.Handover]: 'Hand over vehicle', [VehicleUseAction.Return]: 'Record return', [VehicleUseAction.Cancel]: 'Cancel plan' };
+export const USE_ACTION_CONFIRM_LABELS = { [VehicleUseAction.Handover]: 'Confirm handover', [VehicleUseAction.Return]: 'Confirm return', [VehicleUseAction.Cancel]: 'Confirm cancellation' };
 interface AgreementReference { id: number; reference: string; party_name: string; version: number }
 export interface VehicleUse {
     id: number; row_version: number; status: VehicleUseStatus;

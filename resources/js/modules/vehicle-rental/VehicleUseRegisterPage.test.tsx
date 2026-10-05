@@ -18,6 +18,7 @@ afterEach(() => configureBusinessTimeZone(null));
 describe('Vehicle Use register', () => {
     it('shows planned and actual dates separately, replacement context and expandable custody evidence', async () => {
         render(<VehicleUseRegisterPage />);
+        expect(screen.queryByRole('main')).not.toBeInTheDocument();
         expect(await screen.findByText('CAR-1234 · CUSTOMER-A')).toBeInTheDocument();
         expect(screen.getByText('Customer: Example Customer')).toBeInTheDocument();
         expect(screen.getByText(`Planned: ${formatBusinessDateTime(row.starts_at)} — Open-ended`)).toBeInTheDocument();
@@ -40,6 +41,16 @@ describe('Vehicle Use register', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Apply filters' }));
         expect(await screen.findByText('No vehicle uses match these filters.')).toBeInTheDocument();
         expect(listVehicleUseRegister).toHaveBeenLastCalledWith({ search: 'SEARCH', use_status: VehicleUseStatus.Returned, from: timestampWithOffset(start), until: undefined }, 1, expect.any(AbortSignal));
+    });
+    it('retries an unfiltered request when Clear filters follows an error', async () => {
+        render(<VehicleUseRegisterPage />); await screen.findByText('CAR-1234 · CUSTOMER-A');
+        vi.mocked(listVehicleUseRegister).mockRejectedValueOnce(new ApiError('Vehicle use could not be loaded.', 500));
+        fireEvent.click(screen.getByRole('button', { name: 'Apply filters' }));
+        expect(await screen.findByText('Vehicle use could not be loaded.')).toBeInTheDocument();
+        vi.mocked(listVehicleUseRegister).mockResolvedValueOnce({ data: [row] });
+        fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
+        await waitFor(() => expect(listVehicleUseRegister).toHaveBeenCalledTimes(3));
+        expect(await screen.findByText('CAR-1234 · CUSTOMER-A')).toBeInTheDocument();
     });
     it('hides old results after a failed filter request', async () => {
         render(<VehicleUseRegisterPage />); await screen.findByText('CAR-1234 · CUSTOMER-A');

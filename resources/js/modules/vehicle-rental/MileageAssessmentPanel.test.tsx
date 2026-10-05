@@ -21,8 +21,16 @@ async function setup() {
 it('preserves a zero assessment after explicit policy acceptance without claiming an invoice exists', async () => {
     const saved = await setup(); expect(screen.getByRole('button', { name: 'Record mileage assessment' })).toBeDisabled();
     fireEvent.click(screen.getByRole('checkbox')); fireEvent.click(screen.getByRole('button', { name: 'Record mileage assessment' }));
-    expect(await screen.findByText(/No invoice is due/)).toBeInTheDocument(); expect(saved).toHaveBeenCalledOnce();
+    expect(await screen.findByText(/No customer invoice is due/)).toBeInTheDocument(); expect(saved).toHaveBeenCalledOnce();
     expect(assessMileage).toHaveBeenCalledWith(AgreementKind.Customer, chart, quote, { invoice_date: '2026-09-15', due_date: null, exchange_rate: '1' });
+});
+it('explains the independent owner allowance and Owner Payable Voucher document context', async () => {
+    render(<MemoryRouter><MileageAssessmentPanel kind={AgreementKind.Owner} chart={chart} onSaved={vi.fn()} /></MemoryRouter>);
+    await screen.findByText(formatMoney('0.000000', 'LKR'));
+    expect(screen.getByText(/Owner commercial KM uses the allowance defined by the assigned Owner Agreement/)).toBeInTheDocument();
+    expect(screen.getByText(/independent from the customer allowance/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Owner Payable Voucher date')).toBeInTheDocument();
+    expect(screen.queryByText(/Replacement vehicles share the same customer agreement allowance/)).not.toBeInTheDocument();
 });
 it('clears stale pricing after a conflicting allowance change', async () => {
     vi.mocked(assessMileage).mockRejectedValue(new ApiError('Allowance changed. Review a new quote.', 409));

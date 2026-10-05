@@ -22,6 +22,7 @@ afterEach(() => configureBusinessTimeZone(null));
 describe('Running Chart register', () => {
     it('shows readable context, driver identity, correction lineage and preserved unknown measurements', async () => {
         render(<RunningChartRegisterPage />);
+        expect(screen.queryByRole('main')).not.toBeInTheDocument();
         expect(await screen.findByText('CHART-A · CAR-1234')).toBeInTheDocument();
         expect(screen.getByText('Customer: Example Customer · CUSTOMER-A')).toBeInTheDocument();
         expect(screen.getByText('Driver: Nimal Perera · DRV-027')).toBeInTheDocument();
@@ -43,6 +44,16 @@ describe('Running Chart register', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Apply filters' }));
         expect(await screen.findByText('No Running Charts match these filters.')).toBeInTheDocument();
         await waitFor(() => expect(listChartRegister).toHaveBeenLastCalledWith({ search: 'SEARCH', chart_status: RunningChartStatus.Reversed, from: undefined, until: undefined }, 1, expect.any(AbortSignal)));
+    });
+    it('retries an unfiltered request when Clear filters follows an error', async () => {
+        render(<RunningChartRegisterPage />); await screen.findByText('CHART-A · CAR-1234');
+        vi.mocked(listChartRegister).mockRejectedValueOnce(new ApiError('Running Charts could not be loaded.', 500));
+        fireEvent.click(screen.getByRole('button', { name: 'Apply filters' }));
+        expect(await screen.findByText('Running Charts could not be loaded.')).toBeInTheDocument();
+        vi.mocked(listChartRegister).mockResolvedValueOnce({ data: [row] });
+        fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
+        await waitFor(() => expect(listChartRegister).toHaveBeenCalledTimes(3));
+        expect(await screen.findByText('CHART-A · CAR-1234')).toBeInTheDocument();
     });
     it('does not display old results as matching after a failed filter request', async () => {
         render(<RunningChartRegisterPage />); await screen.findByText('CHART-A · CAR-1234');

@@ -44,6 +44,7 @@ it('shows complete owner history with owner labels and hides customer-only depos
     expect(await screen.findByText(/Revision 2 · Activate · Rental Admin/)).toBeInTheDocument();
     expect(screen.getByText('Active')).toBeInTheDocument();
     expect(screen.getByText('Owner base rental payable')).toBeInTheDocument();
+    expect(screen.getByText('Owner included distance (km)')).toBeInTheDocument();
     expect(screen.queryByText('Agreed security deposit')).not.toBeInTheDocument();
     expect(screen.getByText(formatMoney('3100.000000', 'LKR'))).toBeInTheDocument();
     expect(screen.getByText('100 km')).toBeInTheDocument();

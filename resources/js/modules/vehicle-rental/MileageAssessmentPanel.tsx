@@ -8,11 +8,13 @@ import { MoneyDisplay } from '@/shared/components/MoneyDisplay';
 import { QuantityDisplay } from '@/shared/components/QuantityDisplay';
 import { useApi } from '@/shared/hooks/useApi';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
-import type { AgreementKind } from './agreements';
+import { AgreementKind } from './agreements';
+import { rentalBillingPresentation } from './billingPresentation';
 import type { RunningChart } from './runningCharts';
 import { assessMileage, quoteMileage, type MileageAssessment } from './mileageApi';
 
 export function MileageAssessmentPanel({ kind, chart, onSaved }: { kind: AgreementKind; chart: RunningChart; onSaved: () => void }) {
+    const billing = rentalBillingPresentation(kind);
     const quoteRequest = useApi(signal => quoteMileage(kind, chart, signal), [kind, chart.id, chart.row_version]);
     const quote = quoteRequest.data;
     const [date, setDate] = useState(''); const [exchange, setExchange] = useState(''); const [due, setDue] = useState('');
@@ -26,7 +28,7 @@ export function MileageAssessmentPanel({ kind, chart, onSaved }: { kind: Agreeme
         finally { inFlight.current = false; setBusy(false); }
     }
     return <section aria-label="Mileage assessment" className="space-y-3">
-        <p>Commercial KM uses one allowance per agreement calendar day or monthly anniversary cycle. Replacement vehicles share the same customer agreement allowance. Unused KM does not carry into another cycle. A partial final month receives an actual-days allowance. Zero-cost assessments still record used allowance.</p>
+        <p>{kind === AgreementKind.Customer ? 'Customer commercial KM uses one allowance per agreement calendar day or monthly anniversary cycle. Replacement vehicles under the same customer agreement share that allowance.' : 'Owner commercial KM uses the allowance defined by the assigned Owner Agreement. Owner allowance is independent from the customer allowance and from every other Owner Agreement.'} Unused KM does not carry into another cycle. A partial final month receives an actual-days allowance. Zero-cost assessments still record used allowance.</p>
         <ErrorAlert error={error ?? quoteRequest.error} inline />
         {quoteRequest.loading ? <LoadingState label="Loading mileage quote…" /> : quote && <form aria-label="Assess commercial mileage" onSubmit={submit} className="space-y-3">
             <p>{quote.agreement.reference} · {quote.cycle_from} — {quote.cycle_until} · {quote.timezone}</p>
@@ -38,14 +40,14 @@ export function MileageAssessmentPanel({ kind, chart, onSaved }: { kind: Agreeme
                 <div><dt className="text-sm text-slate-500">Agreed rate per KM</dt><dd><MoneyDisplay value={quote.rate} currency={quote.currency} /></dd></div>
                 <div><dt className="text-sm text-slate-500">Amount before tax</dt><dd><MoneyDisplay value={quote.amount} currency={quote.currency} /></dd></div>
             </dl>
-            <Input label="Invoice date" type="date" required value={date} disabled={busy} onChange={e => setDate(e.target.value)} error={error?.fields.invoice_date?.[0]} />
+            <Input label={billing.documentDateLabel} type="date" required value={date} disabled={busy} onChange={e => setDate(e.target.value)} error={error?.fields.invoice_date?.[0]} />
             <Input label="Due date (optional)" type="date" min={date} value={due} disabled={busy} onChange={e => setDue(e.target.value)} error={error?.fields.due_date?.[0]} />
             <Input label="Exchange rate to base currency" required inputMode="decimal" value={exchange} disabled={busy} onChange={e => setExchange(e.target.value)} error={error?.fields.exchange_rate?.[0]} />
-            <p>Document inputs are validated for every assessment. A zero assessment records allowance usage but creates no invoice.</p>
-            <label className="flex gap-2"><input type="checkbox" checked={accepted} disabled={busy} onChange={e => setAccepted(e.target.checked)} />Apply this calendar-cycle policy and the displayed allowance allocation.</label>
+            <p>Document inputs are validated for every assessment. A zero assessment records allowance usage but creates no {billing.documentNameLower}.</p>
+            <label className="flex items-start gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700"><input className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-blue-600 focus:ring-blue-500" type="checkbox" checked={accepted} disabled={busy} onChange={e => setAccepted(e.target.checked)} /><span>Apply this calendar-cycle policy and the displayed allowance allocation.</span></label>
             <Button type="submit" loading={busy} disabled={!accepted || !date || !exchange}>Record mileage assessment</Button>
         </form>}
-        {recorded && <p role="status">Mileage assessment recorded. {recorded.invoice ? <Link to={`/invoices/${recorded.invoice.id}`} className="underline">{recorded.invoice.invoice_number}</Link> : 'No invoice is due.'}</p>}
+        {recorded && <p role="status">Mileage assessment recorded. {recorded.invoice ? <>{billing.documentName} <Link to={`/invoices/${recorded.invoice.id}`} className="underline">{recorded.invoice.invoice_number}</Link></> : billing.noDocumentDueLabel}</p>}
         {!recorded && <Button variant="secondary" disabled={busy || quoteRequest.loading} onClick={() => { setError(null); setAccepted(false); quoteRequest.reload(); }}>Reload mileage quote</Button>}
     </section>;
 }
