@@ -198,12 +198,12 @@ final class SummaryReportService
         $summary = $query
             ->selectRaw(
                 'COUNT(*) as document_count, '
-                .'COALESCE(SUM(subtotal), 0) as subtotal, '
-                .'COALESCE(SUM(discount_total), 0) as discount_total, '
-                .'COALESCE(SUM(tax_total), 0) as tax_total, '
-                .'COALESCE(SUM(charge_total), 0) as charge_total, '
-                .'COALESCE(SUM(grand_total), 0) as grand_total, '
-                .'COALESCE(SUM(paid_total), 0) as paid_total'
+                .'COALESCE(SUM(subtotal * exchange_rate), 0) as subtotal, '
+                .'COALESCE(SUM(discount_total * exchange_rate), 0) as discount_total, '
+                .'COALESCE(SUM(tax_total * exchange_rate), 0) as tax_total, '
+                .'COALESCE(SUM(charge_total * exchange_rate), 0) as charge_total, '
+                .'COALESCE(SUM(grand_total * exchange_rate), 0) as grand_total, '
+                .'COALESCE(SUM(paid_total * exchange_rate), 0) as paid_total'
             )
             ->first();
 
