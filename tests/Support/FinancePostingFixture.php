@@ -47,6 +47,8 @@ final class FinancePostingFixture
 
     private const SERVICE_REVENUE_ACCOUNT = '4200';
 
+    private const REALIZED_FX_GAIN_ACCOUNT = '4300';
+
     private const PURCHASE_EXPENSE_ACCOUNT = '5100';
 
     private const COST_OF_GOODS_SOLD_ACCOUNT = '5200';
@@ -78,10 +80,14 @@ final class FinancePostingFixture
             FinanceAccountRoleCode::Bank->value => $accounts[FinanceAccountRoleCode::Bank->value],
             FinanceAccountRoleCode::Receivable->value => $accounts[FinanceAccountRoleCode::Receivable->value],
             FinanceAccountRoleCode::CustomerDeposit->value => $deposit,
+            FinanceAccountRoleCode::RealizedFxGain->value => $accounts[FinanceAccountRoleCode::RealizedFxGain->value],
+            FinanceAccountRoleCode::RealizedFxLoss->value => $accounts[FinanceAccountRoleCode::RealizedFxLoss->value],
         ]);
     }
 
     private const OPERATING_EXPENSE_ACCOUNT = '5400';
+
+    private const REALIZED_FX_LOSS_ACCOUNT = '5500';
 
     public static function seedExpensePaymentProfile(int $tenantId, ?int $organizationUnitId = null): void
     {
@@ -103,6 +109,8 @@ final class FinancePostingFixture
             FinanceAccountRoleCode::Bank->value => $accounts[FinanceAccountRoleCode::Bank->value],
             FinanceAccountRoleCode::Receivable->value => $accounts[FinanceAccountRoleCode::Receivable->value],
             FinanceAccountRoleCode::CustomerAdvance->value => $accounts[FinanceAccountRoleCode::CustomerAdvance->value],
+            FinanceAccountRoleCode::RealizedFxGain->value => $accounts[FinanceAccountRoleCode::RealizedFxGain->value],
+            FinanceAccountRoleCode::RealizedFxLoss->value => $accounts[FinanceAccountRoleCode::RealizedFxLoss->value],
         ]);
         self::profile($tenantId, $organizationUnitId, FinancePostingProfileCode::CustomerAdvance->value, [
             FinanceAccountRoleCode::Cash->value => $accounts[FinanceAccountRoleCode::Cash->value],
@@ -122,6 +130,8 @@ final class FinancePostingFixture
             FinanceAccountRoleCode::Bank->value => $accounts[FinanceAccountRoleCode::Bank->value],
             FinanceAccountRoleCode::Payable->value => $accounts[FinanceAccountRoleCode::Payable->value],
             FinanceAccountRoleCode::SupplierAdvance->value => $accounts[FinanceAccountRoleCode::SupplierAdvance->value],
+            FinanceAccountRoleCode::RealizedFxGain->value => $accounts[FinanceAccountRoleCode::RealizedFxGain->value],
+            FinanceAccountRoleCode::RealizedFxLoss->value => $accounts[FinanceAccountRoleCode::RealizedFxLoss->value],
         ]);
         self::profile($tenantId, $organizationUnitId, FinancePostingProfileCode::SupplierAdvance->value, [
             FinanceAccountRoleCode::Cash->value => $accounts[FinanceAccountRoleCode::Cash->value],
@@ -233,6 +243,8 @@ final class FinancePostingFixture
             FinanceAccountRoleCode::Expense->value => self::account($tenantId, $organizationUnitId, $expenseTypeId, self::PURCHASE_EXPENSE_ACCOUNT, 'Purchase Expense', 'debit'),
             FinanceAccountRoleCode::CostOfGoodsSold->value => self::account($tenantId, $organizationUnitId, $expenseTypeId, self::COST_OF_GOODS_SOLD_ACCOUNT, 'Cost of Goods Sold', 'debit'),
             FinanceAccountRoleCode::OperatingExpense->value => self::account($tenantId, $organizationUnitId, $expenseTypeId, self::OPERATING_EXPENSE_ACCOUNT, 'Operating Expense', 'debit'),
+            FinanceAccountRoleCode::RealizedFxGain->value => self::account($tenantId, $organizationUnitId, $revenueTypeId, self::REALIZED_FX_GAIN_ACCOUNT, 'Realized FX Gain', 'credit'),
+            FinanceAccountRoleCode::RealizedFxLoss->value => self::account($tenantId, $organizationUnitId, $expenseTypeId, self::REALIZED_FX_LOSS_ACCOUNT, 'Realized FX Loss', 'debit'),
         ];
     }
 
