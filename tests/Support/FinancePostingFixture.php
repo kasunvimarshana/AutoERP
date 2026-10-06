@@ -117,6 +117,8 @@ final class FinancePostingFixture
             FinanceAccountRoleCode::Bank->value => $accounts[FinanceAccountRoleCode::Bank->value],
             FinanceAccountRoleCode::Receivable->value => $accounts[FinanceAccountRoleCode::Receivable->value],
             FinanceAccountRoleCode::CustomerAdvance->value => $accounts[FinanceAccountRoleCode::CustomerAdvance->value],
+            FinanceAccountRoleCode::RealizedFxGain->value => $accounts[FinanceAccountRoleCode::RealizedFxGain->value],
+            FinanceAccountRoleCode::RealizedFxLoss->value => $accounts[FinanceAccountRoleCode::RealizedFxLoss->value],
         ]);
     }
 
@@ -138,6 +140,8 @@ final class FinancePostingFixture
             FinanceAccountRoleCode::Bank->value => $accounts[FinanceAccountRoleCode::Bank->value],
             FinanceAccountRoleCode::Payable->value => $accounts[FinanceAccountRoleCode::Payable->value],
             FinanceAccountRoleCode::SupplierAdvance->value => $accounts[FinanceAccountRoleCode::SupplierAdvance->value],
+            FinanceAccountRoleCode::RealizedFxGain->value => $accounts[FinanceAccountRoleCode::RealizedFxGain->value],
+            FinanceAccountRoleCode::RealizedFxLoss->value => $accounts[FinanceAccountRoleCode::RealizedFxLoss->value],
         ]);
     }
 
