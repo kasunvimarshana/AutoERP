@@ -104,6 +104,16 @@ final class PaymentRefundPolicyService
             throw new InvalidArgumentException('A refund payment cannot be refunded again.');
         }
 
+        $documentStatus = $original->document_status instanceof PaymentDocumentStatus
+            ? $original->document_status
+            : PaymentDocumentStatus::from((string) $original->document_status);
+        $postingStatus = $original->posting_status instanceof PaymentPostingStatus
+            ? $original->posting_status
+            : PaymentPostingStatus::from((string) $original->posting_status);
+        if ($documentStatus !== PaymentDocumentStatus::Approved || $postingStatus !== PaymentPostingStatus::Posted) {
+            throw new InvalidArgumentException('The original payment must be approved and posted before it can be refunded.');
+        }
+
         if ((int) $original->tenant_id !== $tenantId
             || $this->nullableInt($original->organization_unit_id) !== $organizationUnitId
             || $this->nullableString($original->party_type) !== $partyType
