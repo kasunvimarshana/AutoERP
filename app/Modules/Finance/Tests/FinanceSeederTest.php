@@ -67,12 +67,8 @@ final class FinanceSeederTest extends TestCase
 
         $this->assertActiveAssignment($tenantId, $organizationUnitId, FinanceAccountRoleCode::Inventory->value, self::ACCOUNT_INVENTORY);
         $this->assertActiveAssignment($tenantId, $organizationUnitId, FinanceAccountRoleCode::Payable->value, self::ACCOUNT_PAYABLE);
-        $this->assertActiveAssignment($tenantId, $organizationUnitId, FinanceAccountRoleCode::SupplierAdvance->value,
-                FinanceAccountRoleCode::RealizedFxGain->value,
-                FinanceAccountRoleCode::RealizedFxLoss->value, self::ACCOUNT_SUPPLIER_ADVANCE);
-        $this->assertActiveAssignment($tenantId, $organizationUnitId, FinanceAccountRoleCode::CustomerAdvance->value,
-                FinanceAccountRoleCode::RealizedFxGain->value,
-                FinanceAccountRoleCode::RealizedFxLoss->value, self::ACCOUNT_CUSTOMER_ADVANCE);
+        $this->assertActiveAssignment($tenantId, $organizationUnitId, FinanceAccountRoleCode::SupplierAdvance->value, self::ACCOUNT_SUPPLIER_ADVANCE);
+        $this->assertActiveAssignment($tenantId, $organizationUnitId, FinanceAccountRoleCode::CustomerAdvance->value, self::ACCOUNT_CUSTOMER_ADVANCE);
         $this->assertActiveAssignment($tenantId, $organizationUnitId, FinanceAccountRoleCode::RealizedFxGain->value, self::ACCOUNT_REALIZED_FX_GAIN);
         $this->assertActiveAssignment($tenantId, $organizationUnitId, FinanceAccountRoleCode::RealizedFxLoss->value, self::ACCOUNT_REALIZED_FX_LOSS);
         $this->assertSame(0, DB::table('finance_account_assignments')->whereNull('organization_unit_id')->count());
@@ -92,13 +88,15 @@ final class FinanceSeederTest extends TestCase
                 FinanceAccountRoleCode::Cash->value,
                 FinanceAccountRoleCode::Bank->value,
                 FinanceAccountRoleCode::Receivable->value,
-                FinanceAccountRoleCode::CustomerAdvance->value,
+                FinanceAccountRoleCode::CustomerAdvance->value,                FinanceAccountRoleCode::RealizedFxGain->value,
+                FinanceAccountRoleCode::RealizedFxLoss->value,
             ],
             FinancePostingProfileCode::SupplierPayment->value => [
                 FinanceAccountRoleCode::Cash->value,
                 FinanceAccountRoleCode::Bank->value,
                 FinanceAccountRoleCode::Payable->value,
-                FinanceAccountRoleCode::SupplierAdvance->value,
+                FinanceAccountRoleCode::SupplierAdvance->value,                FinanceAccountRoleCode::RealizedFxGain->value,
+                FinanceAccountRoleCode::RealizedFxLoss->value,
             ],
             FinancePostingProfileCode::CustomerAdvance->value => [
                 FinanceAccountRoleCode::Cash->value,
