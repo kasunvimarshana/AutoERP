@@ -228,7 +228,11 @@ final class FinanceSeeder extends Seeder
         foreach ($accounts as [$code, $name, $typeCode, $categoryCode, $isCash, $isBank, $isTax]) {
             $accountOrganizationUnitId = in_array(
                 $code,
-                [FinanceSystemAccountCode::REALIZED_FX_GAIN, FinanceSystemAccountCode::REALIZED_FX_LOSS],
+                [
+                    FinanceSystemAccountCode::CUSTOMER_SECURITY_DEPOSIT,
+                    FinanceSystemAccountCode::REALIZED_FX_GAIN,
+                    FinanceSystemAccountCode::REALIZED_FX_LOSS,
+                ],
                 true,
             ) ? null : $organizationUnitId;
 
@@ -238,7 +242,7 @@ final class FinanceSeeder extends Seeder
                     'organization_unit_id' => $accountOrganizationUnitId,
                     'account_type_id' => $types[$typeCode]->getKey(),
                     'account_category_id' => $categories[$categoryCode]->getKey(),
-                    'parent_id' => $roots[$typeCode]->getKey(),
+                    'parent_id' => $accountOrganizationUnitId === null ? null : $roots[$typeCode]->getKey(),
                     'name' => $name,
                     'normal_balance' => $types[$typeCode]->normal_balance->value,
                     'is_control_account' => in_array($categoryCode, $controlCategories, true),
@@ -416,7 +420,11 @@ final class FinanceSeeder extends Seeder
 
                 $assignmentOrganizationUnitId = in_array(
                     $lineKey,
-                    [FinanceAccountRoleCode::RealizedFxGain->value, FinanceAccountRoleCode::RealizedFxLoss->value],
+                    [
+                        FinanceAccountRoleCode::CustomerDeposit->value,
+                        FinanceAccountRoleCode::RealizedFxGain->value,
+                        FinanceAccountRoleCode::RealizedFxLoss->value,
+                    ],
                     true,
                 ) ? null : $organizationUnitId;
                 $this->seedAccountAssignment($tenantId, $assignmentOrganizationUnitId, $role, $account);
