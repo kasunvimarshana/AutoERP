@@ -211,6 +211,7 @@ final class PaymentAllocationService
         }
         $this->assertNoExistingPaymentInvoiceAllocation($payment, $allocation->invoiceId);
         $snapshot = $this->invoiceSnapshot($allocation->invoiceId);
+        $this->assertAllocationDate($payment, $allocation, $snapshot['invoice_date_snapshot']);
 
         return $this->createAllocation([
             'tenant_id' => $payment->tenant_id,
@@ -250,6 +251,7 @@ final class PaymentAllocationService
         }
         $this->assertNoExistingPaymentInvoiceAllocation($payment, $allocation->invoiceId);
         $snapshot = $this->invoiceSnapshot($allocation->invoiceId);
+        $this->assertAllocationDate($payment, $allocation, $snapshot['invoice_date_snapshot']);
         $settlement = $this->invoiceSettlements->applyPaymentAllocation(
             $allocation->invoiceId,
             $allocation->allocatedAmount,
@@ -323,6 +325,20 @@ final class PaymentAllocationService
         );
     }
 
+    private function assertAllocationDate(
+        Payment $payment,
+        PaymentAllocationData $allocation,
+        ?string $invoiceDate,
+    ): void {
+        $paymentDate = $payment->payment_date?->toDateString();
+        if ($paymentDate !== null && $allocation->allocationDate < $paymentDate) {
+            throw new InvalidArgumentException('Payment allocation date cannot be before the payment date.');
+        }
+        if ($invoiceDate !== null && $allocation->allocationDate < $invoiceDate) {
+            throw new InvalidArgumentException('Payment allocation date cannot be before the invoice date.');
+        }
+    }
+
     private function availableAmount(Payment $payment): string
     {
         return $this->refundPolicy->availableUnappliedAmount($payment);
@@ -356,6 +372,7 @@ final class PaymentAllocationService
             organizationUnitId: $payment->organization_unit_id,
             partyType: $payment->party_type,
             partyId: (int) $payment->party_id,
+            currencyId: $payment->currency_id === null ? null : (int) $payment->currency_id,
         ) as $invoiceBalance) {
             if ($this->math->isZero($remaining)) {
                 break;
