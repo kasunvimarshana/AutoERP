@@ -208,6 +208,11 @@ export async function listUsablePaymentMethods(params: ListParams & { direction?
     return response.data;
 }
 
+export async function listUsableRefundPaymentMethods(params: ListParams & { direction?: string; method_type?: string }, signal?: AbortSignal) {
+    const response = await apiClient.get<ApiCollection<PaymentMethod>>(`${endpoints.payments}/refund-methods`, { params, signal });
+    return response.data;
+}
+
 export async function getPaymentAllocations(id: number, signal?: AbortSignal) {
     const response = await apiClient.get<ApiResource<PaymentAllocation[]>>(`${endpoints.payments}/${id}/allocations`, { signal });
     return response.data.data;
