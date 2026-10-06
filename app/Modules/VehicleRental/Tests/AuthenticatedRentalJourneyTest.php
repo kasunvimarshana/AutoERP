@@ -8,10 +8,12 @@ use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Modules\Core\Tenancy\TenantFeature;
+use Modules\Finance\Constants\FinanceSystemAccountCode;
 use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Models\Invoice;
 use Modules\Invoice\Services\InvoiceStatusService;
 use Modules\Payment\Constants\PaymentPermission;
+use Modules\Payment\Enums\PaymentSourceType;
 use Modules\User\Constants\UserGuard;
 use Modules\User\Constants\UserOrganizationUnitStatus;
 use Modules\Vehicle\Enums\VehicleOwnershipType;
@@ -21,6 +23,7 @@ use Modules\VehicleRental\Enums\BaseRentPolicy;
 use Modules\VehicleRental\Enums\MileagePolicy;
 use Modules\VehicleRental\Services\RentalAuthorization;
 use Tests\Support\ActiveTenantSubscriptionFixture;
+use Tests\Support\CurrencyFixture;
 use Tests\Support\FinancePostingFixture;
 use Tests\Support\OrganizationUnitFixture;
 use Tests\Support\TenantAuthenticationFixture;
@@ -215,6 +218,162 @@ final class AuthenticatedRentalJourneyTest extends TestCase
         $this->getJson($url)->assertForbidden();
     }
 
+    public function test_foreign_currency_deposit_allocation_refund_and_reversals_preserve_realized_fx(): void
+    {
+        $permissions = array_keys(RentalAuthorization::descriptions() + PaymentPermission::descriptions());
+        [$context, $input] = $this->loginFixture(
+            $permissions,
+            [TenantFeature::VEHICLE_RENTAL, TenantFeature::PAYMENT, TenantFeature::INVOICE],
+        );
+        $foreignCurrencyId = (int) $input['currency_id'];
+        $baseCurrencyId = CurrencyFixture::create(['name' => 'Base currency for Rental FX']);
+        DB::table('tenants')->where('id', $context->tenantId)->update(['base_currency_id' => $baseCurrencyId]);
+
+        $input['terms']['deposit_requirement'] = '1000';
+        $input['terms']['base_rate'] = '300';
+        $agreement = $this->activate('customer', $input);
+        $method = (int) DB::table('payment_methods')->insertGetId([
+            'tenant_id' => $context->tenantId,
+            'scope_key' => 'tenant:'.$context->tenantId,
+            'code' => 'FX-DEPOSIT-CASH',
+            'name' => 'FX deposit cash',
+            'method_type' => 'cash',
+            'direction_allowed' => 'both',
+            'is_active' => true,
+        ]);
+        FinancePostingFixture::seedRentalDepositProfile($context->tenantId, $context->organizationUnitId);
+        FinancePostingFixture::seedRentalInvoiceProfiles($context->tenantId, $context->organizationUnitId);
+
+        $depositUrl = self::ROOT.'/customer/agreements/'.$agreement['id'].'/deposits';
+        $this->withHeader('Idempotency-Key', 'foreign-deposit');
+        $payment = $this->postJson($depositUrl, [
+            'expected_version' => $agreement['row_version'],
+            'payment_date' => '2026-09-09',
+            'exchange_rate' => '2',
+            'lines' => [['payment_method_id' => $method, 'amount' => '1000']],
+        ])->assertCreated()->assertJsonPath('data.currency.id', $foreignCurrencyId)->json('data');
+
+        $paymentPath = '/api/v1/payments/'.$payment['id'];
+        foreach (['submit-approval', 'approve', 'post'] as $action) {
+            $payment = $this->postJson($paymentPath.'/'.$action, ['expected_version' => $payment['row_version']])
+                ->assertOk()
+                ->json('data');
+        }
+
+        $invoice = $this->postJson(self::ROOT.'/customer/agreements/'.$agreement['id'].'/base-charges', [
+            'policy' => BaseRentPolicy::ActualCalendarDays->value,
+            'expected_version' => $agreement['row_version'],
+            'from' => '2026-09-07',
+            'until' => '2026-10-06',
+            'invoice_date' => '2026-09-09',
+            'exchange_rate' => '1.5',
+        ])->assertCreated()->assertJsonPath('data.grand_total', '300.000000')->json('data');
+        $this->withTenantExecutionContext($context->tenantId, function () use ($invoice, $context): void {
+            $row = Invoice::query()->findOrFail($invoice['id']);
+            $statuses = app(InvoiceStatusService::class);
+            $row = $statuses->transitionIfVersion($row, InvoiceStatus::Approved, $row->row_version, $context->actorId);
+            $statuses->transitionIfVersion($row, InvoiceStatus::Posted, $row->row_version, $context->actorId);
+        });
+
+        $payment = $this->postJson($paymentPath.'/allocations', [
+            'expected_version' => $payment['row_version'],
+            'allocations' => [[
+                'invoice_id' => $invoice['id'],
+                'allocated_amount' => '300',
+                'allocation_date' => '2026-09-09',
+                'allocation_method' => 'specific_invoice',
+            ]],
+        ])->assertOk()->assertJsonPath('data.allocated_amount', '300.000000')->json('data');
+
+        $allocation = $this->getJson($paymentPath.'/allocations')
+            ->assertOk()
+            ->assertJsonPath('data.0.invoice_exchange_rate_snapshot', '1.500000')
+            ->json('data.0');
+        $allocationFxJournalId = (int) DB::table('finance_journal_entries')
+            ->where('tenant_id', $context->tenantId)
+            ->where('source_type', PaymentSourceType::PaymentAllocationFx->value)
+            ->where('source_id', $allocation['id'])
+            ->where('status', 'posted')
+            ->value('id');
+        $this->assertGreaterThan(0, $allocationFxJournalId);
+        $this->assertFinanceLine(
+            $allocationFxJournalId,
+            FinanceSystemAccountCode::REALIZED_FX_GAIN,
+            '0.000000',
+            '150.000000',
+        );
+
+        $refund = $this->postJson($paymentPath.'/refunds', [
+            'expected_version' => $payment['row_version'],
+            'refund_date' => '2026-09-10',
+            'amount' => '400',
+            'payment_method_id' => $method,
+            'exchange_rate' => '3',
+            'reason' => 'Return foreign-currency surplus security',
+        ])->assertCreated()->json('data');
+        $refundId = (int) $refund['refund_payment_id'];
+        $refundPath = '/api/v1/payments/'.$refundId;
+        $refundPayment = $this->getJson($refundPath)->assertOk()->json('data');
+        foreach (['submit-approval', 'approve', 'post'] as $action) {
+            $refundPayment = $this->postJson($refundPath.'/'.$action, ['expected_version' => $refundPayment['row_version']])
+                ->assertOk()
+                ->json('data');
+        }
+
+        $refundFxJournalId = (int) DB::table('finance_journal_entries')
+            ->where('tenant_id', $context->tenantId)
+            ->where('source_type', PaymentSourceType::PaymentRefundFx->value)
+            ->where('source_id', $refundId)
+            ->where('status', 'posted')
+            ->value('id');
+        $this->assertGreaterThan(0, $refundFxJournalId);
+        $this->assertFinanceLine(
+            $refundFxJournalId,
+            FinanceSystemAccountCode::REALIZED_FX_LOSS,
+            '400.000000',
+            '0.000000',
+        );
+        $this->getJson($depositUrl)->assertOk()
+            ->assertJsonPath('data.payments.0.refunded_amount', '400.000000')
+            ->assertJsonPath('data.payments.0.unapplied_amount', '300.000000');
+
+        $this->postJson($refundPath.'/reverse', [
+            'expected_version' => $refundPayment['row_version'],
+            'reversal_date' => '2026-09-10',
+            'reason' => 'Refund FX correction',
+        ])->assertOk();
+        $this->assertDatabaseHas('finance_journal_entries', [
+            'id' => $refundFxJournalId,
+            'status' => 'reversed',
+        ]);
+
+        $payment = $this->getJson($paymentPath)->assertOk()->json('data');
+        $allocation = $this->getJson($paymentPath.'/allocations')->assertOk()->json('data.0');
+        $payment = $this->postJson($paymentPath.'/allocations/'.$allocation['id'].'/reverse', [
+            'expected_payment_version' => $payment['row_version'],
+            'expected_allocation_version' => $allocation['row_version'],
+            'reversal_date' => '2026-09-10',
+            'reason' => 'Allocation FX correction',
+        ])->assertOk()->assertJsonPath('data.allocated_amount', '0.000000')->json('data');
+        $this->assertDatabaseHas('finance_journal_entries', [
+            'id' => $allocationFxJournalId,
+            'status' => 'reversed',
+        ]);
+        $this->assertDatabaseHas('invoices', [
+            'id' => $invoice['id'],
+            'balance_due' => '300.000000',
+        ]);
+
+        $this->postJson($paymentPath.'/reverse', [
+            'expected_version' => $payment['row_version'],
+            'reversal_date' => '2026-09-10',
+            'reason' => 'Deposit receipt FX correction',
+        ])->assertOk();
+        $this->getJson($depositUrl)->assertOk()
+            ->assertJsonPath('data.remaining_to_receive', '1000.000000')
+            ->assertJsonPath('data.payments.0.document_status', 'reversed');
+    }
+
     public function test_deposit_requires_active_positive_terms_and_void_releases_collection_capacity(): void
     {
         [$context, $input] = $this->loginFixture(array_keys(RentalAuthorization::descriptions() + PaymentPermission::descriptions()), [TenantFeature::VEHICLE_RENTAL, TenantFeature::PAYMENT]);
@@ -381,6 +540,20 @@ final class AuthenticatedRentalJourneyTest extends TestCase
         $this->assertDatabaseHas('vehicle_rental_customer_agreements', ['id' => $created['id'], 'organization_unit_id' => $branch]);
         DB::table('user_organization_units')->where('user_id', $context->actorId)->where('organization_unit_id', $branch)->update(['status' => UserOrganizationUnitStatus::INACTIVE]);
         $this->getJson(self::ROOT.'/customer/agreements')->assertForbidden();
+    }
+
+    private function assertFinanceLine(
+        int $journalId,
+        string $accountCode,
+        string $debit,
+        string $credit,
+    ): void {
+        $this->assertDatabaseHas('finance_journal_lines', [
+            'journal_entry_id' => $journalId,
+            'account_id' => DB::table('finance_accounts')->where('code', $accountCode)->value('id'),
+            'debit' => $debit,
+            'credit' => $credit,
+        ]);
     }
 
     private function activate(string $kind, array $input): array
