@@ -305,6 +305,8 @@ final class FinanceSeeder extends Seeder
                     FinanceAccountRoleCode::Bank->value => self::ACCOUNT_BANK,
                     FinanceAccountRoleCode::Receivable->value => self::ACCOUNT_RECEIVABLE,
                     FinanceAccountRoleCode::CustomerAdvance->value => self::ACCOUNT_CUSTOMER_ADVANCE,
+                    FinanceAccountRoleCode::RealizedFxGain->value => self::ACCOUNT_REALIZED_FX_GAIN,
+                    FinanceAccountRoleCode::RealizedFxLoss->value => self::ACCOUNT_REALIZED_FX_LOSS,
                 ],
             ],
             FinancePostingProfileCode::SupplierAdvance->value => [
@@ -314,6 +316,8 @@ final class FinanceSeeder extends Seeder
                     FinanceAccountRoleCode::Bank->value => self::ACCOUNT_BANK,
                     FinanceAccountRoleCode::Payable->value => self::ACCOUNT_PAYABLE,
                     FinanceAccountRoleCode::SupplierAdvance->value => self::ACCOUNT_SUPPLIER_ADVANCE,
+                    FinanceAccountRoleCode::RealizedFxGain->value => self::ACCOUNT_REALIZED_FX_GAIN,
+                    FinanceAccountRoleCode::RealizedFxLoss->value => self::ACCOUNT_REALIZED_FX_LOSS,
                 ],
             ],
             FinancePostingProfileCode::ExpensePayment->value => [
