@@ -59,7 +59,6 @@ final class FinanceSeederTest extends TestCase
             self::ACCOUNT_SUPPLIER_ADVANCE,
             self::ACCOUNT_PAYABLE,
             self::ACCOUNT_CUSTOMER_ADVANCE,
-            FinanceSystemAccountCode::CUSTOMER_SECURITY_DEPOSIT,
         ] as $accountCode) {
             $this->assertGreaterThan(0, $this->accountId($tenantId, $organizationUnitId, $accountCode));
         }
@@ -68,9 +67,9 @@ final class FinanceSeederTest extends TestCase
         $this->assertActiveAssignment($tenantId, $organizationUnitId, FinanceAccountRoleCode::Payable->value, self::ACCOUNT_PAYABLE);
         $this->assertActiveAssignment($tenantId, $organizationUnitId, FinanceAccountRoleCode::SupplierAdvance->value, self::ACCOUNT_SUPPLIER_ADVANCE);
         $this->assertActiveAssignment($tenantId, $organizationUnitId, FinanceAccountRoleCode::CustomerAdvance->value, self::ACCOUNT_CUSTOMER_ADVANCE);
-        $this->assertActiveAssignment($tenantId, $organizationUnitId, FinanceAccountRoleCode::CustomerDeposit->value, FinanceSystemAccountCode::CUSTOMER_SECURITY_DEPOSIT);
 
         foreach ([
+            FinanceAccountRoleCode::CustomerDeposit->value => FinanceSystemAccountCode::CUSTOMER_SECURITY_DEPOSIT,
             FinanceAccountRoleCode::RealizedFxGain->value => FinanceSystemAccountCode::REALIZED_FX_GAIN,
             FinanceAccountRoleCode::RealizedFxLoss->value => FinanceSystemAccountCode::REALIZED_FX_LOSS,
         ] as $roleCode => $accountCode) {
