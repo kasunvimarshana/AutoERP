@@ -13,7 +13,10 @@ use Modules\Finance\Models\FinanceJournalEntry;
 
 final class ReversalService implements FinancePaymentReversalInterface, FinanceSourceReversalInterface
 {
-    public function __construct(private readonly FinancePostingInterface $postings) {}
+    public function __construct(
+        private readonly FinancePostingInterface $postings,
+        private readonly JournalReversalService $journalReversals,
+    ) {}
 
     public function reverseJournal(
         int $journalId,
@@ -50,7 +53,22 @@ final class ReversalService implements FinancePaymentReversalInterface, FinanceS
             throw new InvalidArgumentException('No posted journal exists for the requested source document.');
         }
 
-        return $this->reverseJournal((int) $journal->getKey(), $reversalDate, $reversedBy, $reason);
+        $reversal = $this->journalReversals->reverse(
+            $journal,
+            $reversalDate,
+            $reversedBy,
+            $reason,
+            true,
+        );
+
+        return new PostingResultData(
+            journalId: (int) $reversal->getKey(),
+            journalNumber: (string) $reversal->journal_number,
+            status: (string) ($reversal->status instanceof \BackedEnum ? $reversal->status->value : $reversal->status),
+            totalDebit: (string) $reversal->total_debit,
+            totalCredit: (string) $reversal->total_credit,
+            ledgerEntryCount: $reversal->ledgerEntries()->count(),
+        );
     }
 
     public function reverseInvoice(
