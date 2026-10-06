@@ -59,8 +59,6 @@ final class FinanceSeederTest extends TestCase
             self::ACCOUNT_SUPPLIER_ADVANCE,
             self::ACCOUNT_PAYABLE,
             self::ACCOUNT_CUSTOMER_ADVANCE,
-            self::ACCOUNT_REALIZED_FX_GAIN,
-            self::ACCOUNT_REALIZED_FX_LOSS,
         ] as $accountCode) {
             $this->assertGreaterThan(0, $this->accountId($tenantId, $organizationUnitId, $accountCode));
         }
@@ -69,9 +67,14 @@ final class FinanceSeederTest extends TestCase
         $this->assertActiveAssignment($tenantId, $organizationUnitId, FinanceAccountRoleCode::Payable->value, self::ACCOUNT_PAYABLE);
         $this->assertActiveAssignment($tenantId, $organizationUnitId, FinanceAccountRoleCode::SupplierAdvance->value, self::ACCOUNT_SUPPLIER_ADVANCE);
         $this->assertActiveAssignment($tenantId, $organizationUnitId, FinanceAccountRoleCode::CustomerAdvance->value, self::ACCOUNT_CUSTOMER_ADVANCE);
-        $this->assertActiveAssignment($tenantId, $organizationUnitId, FinanceAccountRoleCode::RealizedFxGain->value, self::ACCOUNT_REALIZED_FX_GAIN);
-        $this->assertActiveAssignment($tenantId, $organizationUnitId, FinanceAccountRoleCode::RealizedFxLoss->value, self::ACCOUNT_REALIZED_FX_LOSS);
-        $this->assertSame(0, DB::table('finance_account_assignments')->whereNull('organization_unit_id')->count());
+
+        foreach ([
+            FinanceAccountRoleCode::RealizedFxGain->value => self::ACCOUNT_REALIZED_FX_GAIN,
+            FinanceAccountRoleCode::RealizedFxLoss->value => self::ACCOUNT_REALIZED_FX_LOSS,
+        ] as $roleCode => $accountCode) {
+            $this->assertGreaterThan(0, $this->accountId($tenantId, null, $accountCode));
+            $this->assertActiveAssignment($tenantId, null, $roleCode, $accountCode);
+        }
     }
 
     public function test_semantic_payment_and_withholding_profiles_have_complete_role_mappings(): void
@@ -193,7 +196,7 @@ final class FinanceSeederTest extends TestCase
 
     private function assertActiveAssignment(
         int $tenantId,
-        int $organizationUnitId,
+        ?int $organizationUnitId,
         string $roleCode,
         string $accountCode,
     ): void {
@@ -228,13 +231,16 @@ final class FinanceSeederTest extends TestCase
             ->value('id');
     }
 
-    private function accountId(int $tenantId, int $organizationUnitId, string $code): int
+    private function accountId(int $tenantId, ?int $organizationUnitId, string $code): int
     {
-        return (int) DB::table('finance_accounts')
+        $query = DB::table('finance_accounts')
             ->where('tenant_id', $tenantId)
-            ->where('organization_unit_id', $organizationUnitId)
-            ->where('code', $code)
-            ->value('id');
+            ->where('code', $code);
+        $organizationUnitId === null
+            ? $query->whereNull('organization_unit_id')
+            : $query->where('organization_unit_id', $organizationUnitId);
+
+        return (int) $query->value('id');
     }
 
     private function roleId(int $tenantId, string $code): int
