@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Modules\Invoice\Constants\InvoicePermission;
 use Modules\Invoice\Http\Controllers\InvoiceController;
 use Modules\Purchase\Http\Controllers\PurchaseOrderController;
 
@@ -14,6 +15,7 @@ $__printMiddleware = [
     (string) config('core.current_tenant.middleware_alias', 'current.tenant'),
     (string) config('core.current_organization_unit.middleware_alias', 'current.organization-unit').':required',
     'tenant.feature:invoice',
+    (string) config('user.tenant.permission_middleware_alias', 'tenant.permission').':'.InvoicePermission::VIEW,
 ];
 
 Route::middleware($__printMiddleware)->group(function () {
