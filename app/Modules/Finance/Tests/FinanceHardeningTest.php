@@ -18,11 +18,13 @@ use Modules\Finance\Enums\NormalBalance;
 use Modules\Finance\Enums\StatementType;
 use Modules\Finance\Models\FinanceAccount;
 use Modules\Finance\Models\FinanceAccountType;
+use Modules\Finance\Models\FinanceJournalEntry;
 use Modules\Finance\Models\FinanceLedgerEntry;
 use Modules\Finance\Models\FinancePostingProfile;
 use Modules\Finance\Models\FinancePostingProfileRule;
 use Modules\Finance\Services\ChartOfAccountsService;
 use Modules\Finance\Services\FinanceStatementService;
+use Modules\Finance\Services\JournalReversalService;
 use Modules\Finance\Services\TrialBalanceService;
 use Tests\TestCase;
 
@@ -156,6 +158,30 @@ final class FinanceHardeningTest extends TestCase
         });
     }
 
+    public function test_source_owned_journal_cannot_be_reversed_directly_from_finance(): void
+    {
+        [$tenantId] = $this->context();
+
+        $this->withTenantExecutionContext($tenantId, function () use ($tenantId): void {
+            $posting = app(FinancePostingInterface::class);
+            $posted = $posting->post(new FinancePostingRequest(
+                source: new PostingSourceData('invoice', 77, $tenantId, sourceModule: 'invoice'),
+                postingDate: '2026-06-30',
+                lines: [
+                    new FinancePostingLine(null, 'Cash', debit: '100.000000', profileKey: 'cash'),
+                    new FinancePostingLine(null, 'Capital', credit: '100.000000', profileKey: 'capital'),
+                ],
+                postingProfileCode: 'direct_test',
+            ));
+            $journal = FinanceJournalEntry::query()->findOrFail($posted->journalId);
+
+            $this->expectException(InvalidArgumentException::class);
+            $this->expectExceptionMessage('Source-owned journals must be reversed through the module that owns the source document.');
+
+            app(JournalReversalService::class)->reverse($journal, '2026-07-01');
+        });
+    }
+
     public function test_trial_balance_and_financial_statements_are_ledger_balanced(): void
     {
         [$tenantId, $cash] = $this->context(withIncomeAccounts: true);
@@ -250,7 +276,7 @@ final class FinanceHardeningTest extends TestCase
     private function directRequest(int $tenantId, string $date): FinancePostingRequest
     {
         return new FinancePostingRequest(
-            source: new PostingSourceData('test_source', 1, $tenantId, sourceModule: 'test'),
+            source: new PostingSourceData('test_source', 1, $tenantId, sourceModule: FinanceJournalEntry::SOURCE_MODULE),
             postingDate: $date,
             lines: [
                 new FinancePostingLine(null, 'Cash', debit: '100.000000', profileKey: 'cash'),
