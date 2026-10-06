@@ -88,8 +88,9 @@ final class PaymentValidationService
         if ($payment->party_type !== $invoiceBalance->partyType || (int) $payment->party_id !== (int) $invoiceBalance->partyId) {
             throw new InvalidArgumentException('Payment invoice party must match payment party.');
         }
-        if ($payment->currency_id !== null && $invoiceBalance->currencyId !== null && (int) $payment->currency_id !== $invoiceBalance->currencyId) {
-            throw new InvalidArgumentException('Cross-currency payment allocation is not supported.');
+        $paymentCurrencyId = $payment->currency_id === null ? null : (int) $payment->currency_id;
+        if ($paymentCurrencyId !== $invoiceBalance->currencyId) {
+            throw new InvalidArgumentException('Payment invoice currency must match payment currency exactly.');
         }
 
         $this->assertPositive($allocation->allocatedAmount, 'Payment allocation amount');
