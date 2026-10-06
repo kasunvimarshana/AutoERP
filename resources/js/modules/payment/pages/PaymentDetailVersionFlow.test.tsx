@@ -11,9 +11,11 @@ const paymentApiMocks = vi.hoisted(() => ({
     getPayment: vi.fn(),
     getPaymentAllocations: vi.fn(),
     getPaymentUnappliedBalance: vi.fn(),
+    listUsablePaymentMethods: vi.fn(),
     postPayment: vi.fn(),
     refundPayment: vi.fn(),
     reversePayment: vi.fn(),
+    reversePaymentAllocation: vi.fn(),
     settlePaymentLine: vi.fn(),
     submitPayment: vi.fn(),
     voidPayment: vi.fn(),
@@ -77,6 +79,7 @@ describe('Payment detail optimistic version flow', () => {
         paymentApiMocks.getPayment.mockResolvedValue(payment(1, 'can_submit'));
         paymentApiMocks.getPaymentAllocations.mockResolvedValue([]);
         paymentApiMocks.getPaymentUnappliedBalance.mockResolvedValue(null);
+        paymentApiMocks.listUsablePaymentMethods.mockResolvedValue({ data: [] });
         paymentApiMocks.submitPayment.mockResolvedValue(payment(2, 'can_approve'));
         paymentApiMocks.approvePayment.mockResolvedValue(payment(3, 'can_post'));
     });
