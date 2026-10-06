@@ -47,7 +47,7 @@ final class FinancePostingFixture
 
     private const SERVICE_REVENUE_ACCOUNT = '4200';
 
-    private const REALIZED_FX_GAIN_ACCOUNT = '4300';
+    private const REALIZED_FX_GAIN_ACCOUNT = 'FX-REALIZED-GAIN';
 
     private const PURCHASE_EXPENSE_ACCOUNT = '5100';
 
@@ -87,7 +87,7 @@ final class FinancePostingFixture
 
     private const OPERATING_EXPENSE_ACCOUNT = '5400';
 
-    private const REALIZED_FX_LOSS_ACCOUNT = '5500';
+    private const REALIZED_FX_LOSS_ACCOUNT = 'FX-REALIZED-LOSS';
 
     public static function seedExpensePaymentProfile(int $tenantId, ?int $organizationUnitId = null): void
     {
