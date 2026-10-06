@@ -4,14 +4,20 @@ declare(strict_types=1);
 
 namespace Modules\Payment\Services;
 
+use Illuminate\Database\Eloquent\Builder;
 use InvalidArgumentException;
+use Modules\Core\Services\DecimalMath;
 use Modules\Payment\DTOs\CreatePaymentData;
 use Modules\Payment\Enums\PaymentDirection;
+use Modules\Payment\Enums\PaymentDocumentStatus;
+use Modules\Payment\Enums\PaymentPostingStatus;
 use Modules\Payment\Enums\PaymentType;
 use Modules\Payment\Models\Payment;
 
 final class PaymentRefundPolicyService
 {
+    public function __construct(private readonly DecimalMath $math) {}
+
     public function originalForCreation(CreatePaymentData $data): Payment
     {
         if ($data->originalPaymentId === null) {
@@ -46,6 +52,35 @@ final class PaymentRefundPolicyService
             currencyId: $payment->currency_id === null ? null : (int) $payment->currency_id,
             refundDirection: $this->direction($payment),
         );
+    }
+
+    public function reservedUnpostedAmount(Payment $payment): string
+    {
+        $amount = (string) $payment->refunds()
+            ->whereHas('refundPayment', function (Builder $query): void {
+                $query
+                    ->whereNotIn('document_status', [
+                        PaymentDocumentStatus::Voided->value,
+                        PaymentDocumentStatus::Reversed->value,
+                    ])
+                    ->where('posting_status', '!=', PaymentPostingStatus::Posted->value);
+            })
+            ->sum('amount');
+
+        return $this->math->normalize($amount);
+    }
+
+    public function availableUnappliedAmount(Payment $payment): string
+    {
+        $available = $this->math->sub(
+            (string) $payment->unapplied_amount,
+            $this->reservedUnpostedAmount($payment),
+        );
+        if ($this->math->isNegative($available)) {
+            throw new InvalidArgumentException('Payment refund reservations exceed the unapplied payment amount.');
+        }
+
+        return $this->math->normalize($available);
     }
 
     private function resolveOriginal(
