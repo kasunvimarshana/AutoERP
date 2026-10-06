@@ -36,6 +36,18 @@ final class StorePaymentRequestIdempotencyTest extends TestCase
         }
     }
 
+    public function test_request_rejects_refund_type_outside_the_refund_workflow(): void
+    {
+        $request = $this->request(self::VALID_KEY, PaymentType::Refund->value);
+
+        try {
+            $request->validateResolved();
+            self::fail('Expected refund type to be rejected by generic payment creation.');
+        } catch (ValidationException $exception) {
+            self::assertArrayHasKey('payment_type', $exception->errors());
+        }
+    }
+
     public function test_request_rejects_the_retired_rental_receipt_type(): void
     {
         $request = $this->request(self::VALID_KEY, PaymentType::RentalReceipt->value);
