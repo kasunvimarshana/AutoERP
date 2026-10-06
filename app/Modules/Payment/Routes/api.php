@@ -33,6 +33,10 @@ Route::prefix('api/v1/payments')->middleware($middleware)->name('api.v1.payments
         ->middleware($requires(PaymentPermission::PAYMENTS_CREATE))
         ->name('usable-methods.index');
 
+    Route::get('refund-methods', [PaymentMethodController::class, 'usableForRefund'])
+        ->middleware($requires(PaymentPermission::PAYMENTS_REFUND))
+        ->name('refund-methods.index');
+
     Route::middleware($requires(PaymentPermission::METHODS_VIEW))->group(function (): void {
         Route::get('methods', [PaymentMethodController::class, 'index'])->name('methods.index');
         Route::get('methods/{id}', [PaymentMethodController::class, 'show'])->whereNumber('id')->name('methods.show');
