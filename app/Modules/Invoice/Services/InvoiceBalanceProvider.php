@@ -132,7 +132,11 @@ final class InvoiceBalanceProvider implements InvoiceBalanceProviderInterface
             ->where('invoices.party_type', $partyType)
             ->where('invoices.party_id', $partyId)
             ->where('invoice_balances.remaining_amount', '>', '0')
-            ->whereNotIn('invoices.status', ['draft', 'cancelled', 'void'])
+            ->whereNotIn('invoices.status', [
+                InvoiceStatus::Draft->value,
+                InvoiceStatus::Cancelled->value,
+                InvoiceStatus::Void->value,
+            ])
             ->orderBy('invoices.invoice_date')
             ->orderBy('invoices.id');
 
