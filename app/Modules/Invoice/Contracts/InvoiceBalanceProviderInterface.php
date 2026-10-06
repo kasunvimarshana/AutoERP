@@ -16,6 +16,7 @@ interface InvoiceBalanceProviderInterface
      *     invoice_number: string|null,
      *     invoice_date: string|null,
      *     currency_code: string|null,
+     *     exchange_rate: string,
      *     name: string
      * }>
      */
