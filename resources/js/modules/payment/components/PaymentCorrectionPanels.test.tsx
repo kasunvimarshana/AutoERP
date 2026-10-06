@@ -7,7 +7,7 @@ import { PaymentAllocationReversalPanel } from './PaymentAllocationReversalPanel
 import { PaymentRefundPanel } from './PaymentRefundPanel';
 
 const api = vi.hoisted(() => ({
-    listUsablePaymentMethods: vi.fn(),
+    listUsableRefundPaymentMethods: vi.fn(),
     refundPayment: vi.fn(),
     reversePaymentAllocation: vi.fn(),
 }));
@@ -41,7 +41,7 @@ function payment(): Payment {
 describe('Payment correction panels', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        api.listUsablePaymentMethods.mockResolvedValue({
+        api.listUsableRefundPaymentMethods.mockResolvedValue({
             data: [{
                 id: 9,
                 name: 'Cash',
