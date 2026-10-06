@@ -26,6 +26,8 @@ enum FinanceAccountRoleCode: string
     case CustomerAdvance = 'customer_advance';
     case SupplierAdvance = 'supplier_advance';
     case CustomerDeposit = 'customer_deposit';
+    case RealizedFxGain = 'realized_fx_gain';
+    case RealizedFxLoss = 'realized_fx_loss';
     case SalesRevenue = 'sales_revenue';
     case PurchaseExpense = 'purchase_expense';
 }
