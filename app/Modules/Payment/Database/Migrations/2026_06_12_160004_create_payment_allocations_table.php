@@ -10,6 +10,10 @@ return new class extends Migration
 {
     private const ACTIVE_IDENTITY_SLOT = 1;
 
+    private const DEFAULT_ALLOCATION_METHOD = 'specific_invoice';
+
+    private const DEFAULT_STATUS = 'pending';
+
     public function up(): void
     {
         Schema::create('payment_allocations', function (Blueprint $table): void {
@@ -32,8 +36,8 @@ return new class extends Migration
             $table->decimal('allocated_amount', 20, 6);
             $table->decimal('invoice_balance_after', 20, 6);
             $table->date('allocation_date');
-            $table->string('allocation_method', 50)->default('specific_invoice');
-            $table->string('status', 40)->default('pending');
+            $table->string('allocation_method', 50)->default(self::DEFAULT_ALLOCATION_METHOD);
+            $table->string('status', 40)->default(self::DEFAULT_STATUS);
             $table->timestamp('realized_at')->nullable();
             $table->unsignedBigInteger('realized_by')->nullable();
             $table->json('metadata')->nullable();
