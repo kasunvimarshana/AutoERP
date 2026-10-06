@@ -1072,3 +1072,98 @@ This is not converted into a fabricated pass. Source-level diff review and focus
 
 Within the available source-verification boundary, the Vehicle Rental UI is now consistent with the shared AutoERP UI foundation and the TACGL/video workflow: simple operator flow, readable business dates, consistent pagination, explicit lifecycle actions, responsive controls, clear validation/error states and hidden backend complexity.
 
+
+
+---
+
+## 34. Production financial lifecycle hardening — 2026-10-06
+
+A final customer/owner financial-flow audit traced Rental Agreement → Rental charge/Owner settlement → Invoice → Payment → Finance end-to-end. The review found no missing Rental aggregate or business formula; the remaining production risks were owner-module lifecycle and accounting gaps in Payment/Finance. They are corrected at those boundaries without restoring legacy Rental code or duplicating a Rental ledger.
+
+### Payment allocation and correction policy
+
+- Payment is the single owner of customer-receipt, owner-payment and security-deposit allocation state.
+- Every posted Payment first records its cash/bank movement against the appropriate unapplied/advance/deposit control role.
+- Every active invoice allocation then receives its own independent Finance reclassification journal. Initial allocations created with the Payment and allocations added later therefore have the same ledger shape and correction semantics.
+- Each allocation freezes the Invoice transaction-currency exchange rate in `invoice_exchange_rate_snapshot`; fresh schema requires it and the upgrade migration backfills it tenant-safely before enforcing non-null.
+- A single allocation can be reversed by allocation identity with both Payment and allocation optimistic versions, an explicit reversal civil date, and a reason. Only that allocation's Finance reclassification/realized-FX journals and Invoice settlement effect are reversed; the Payment remains posted and the amount returns to unapplied balance.
+- Payment allocation methods are a defined option set (`manual`, `specific_invoice`, `fifo`) owned by a Payment enum rather than repeated ad-hoc strings.
+
+### Foreign-currency settlement policy
+
+The implementation distinguishes immutable transaction-currency facts from functional/base-currency accounting effects.
+
+- Invoice owns its frozen transaction-date exchange rate.
+- Payment owns the actual receipt/payment-date exchange rate.
+- When an allocation settles a monetary receivable/payable at a different rate, Payment creates a separate base-currency realized-FX journal linked to that allocation.
+- Customer settlement: a higher Payment rate than the Invoice rate clears the receivable carrying value and records the difference as realized gain; the opposite movement records realized loss.
+- Owner/supplier settlement: a higher Payment rate than the Invoice rate clears the payable carrying value and records the difference as realized loss; the opposite movement records realized gain.
+- Allocation reversal reverses the realized-FX journal together with the allocation reclassification.
+- IAS 21 paragraphs 28–29 are corroborating accounting context: exchange differences arising on settlement of foreign-currency monetary items at rates different from initial recognition are recognized in profit or loss when they arise. This corroborates the AutoERP separation of transaction-currency settlement and explicit realized-FX posting; it does not introduce a Rental tariff or market-rate source.
+
+### Refund and security-deposit policy
+
+- A refund cannot be created through generic Payment creation. Refunds must enter through the dedicated Payment refund workflow so the original Payment link, reservation and audit trail cannot be bypassed.
+- The original Payment must remain Approved and Posted when the refund is created/posted.
+- Refund creation produces a linked **draft** refund Payment. It reserves refundable unapplied balance but has no financial effect until normal Payment submit → approve → post completes.
+- Refund input requires the actual refund method and refund-date exchange rate; the system never silently reuses the original Payment method or rate.
+- Foreign-currency refunds release the original advance/security-deposit carrying value at the original Payment rate and recognize the difference between original and refund-date rates in a separate Payment-owned realized-FX journal.
+- Refund reversal reverses both the main refund journal and its realized-FX journal.
+- Rental security deposits remain Payment/Finance-owned liabilities. Finance now provisions a semantic tenant-default Customer Security Deposit account/role and a `rental_deposit` posting profile for fresh installs and upgrades.
+- There is still no automatic forfeiture, damage priority or deposit-application rule without explicit governed evidence.
+
+### Finance configuration and ownership
+
+- Realized FX gain/loss and Customer Security Deposit use semantic system account codes and Finance account roles, not legacy TACGL GL numbers or arbitrary numeric account codes.
+- These system roles use tenant-global fallback assignments; exact organization-unit assignments may override them through existing Finance resolution rules.
+- Finance validation now consistently accepts the same tenant-default profile/account fallback that Finance configuration and profile resolution already promise, while still rejecting cross-tenant or foreign-organization targets.
+- Existing deployed databases receive an idempotent forward upgrade for Customer Deposit, realized FX roles/accounts, Payment-profile FX mappings and Rental Deposit profile configuration. Existing tenant-owned role/rule configuration is preserved rather than overwritten.
+- Direct Finance UI reversal remains limited to Finance-owned journals. Invoice/Payment source-owned journals must be reversed through the module that owns the source document.
+
+### Permission and UI contract
+
+- Single-allocation reversal is exposed only when Payment reports `can_reverse_allocation` and the operator has `payments.allocate`, matching the API authorization boundary.
+- Refund operators use a dedicated usable-payment-method lookup protected by `payments.refund`; refund capability no longer accidentally depends on `payments.create`.
+- The Payment detail UI clearly presents refund creation as a draft workflow and requires refund date, amount, exchange rate, method, method-specific instrument evidence where applicable, and reason.
+- The final known Vehicle Rental TypeScript pagination contract error in `BaseRentBillingPanel` is corrected without changing business behavior.
+
+### Relationship review
+
+No Vehicle Rental relationship change is justified by this hardening pass.
+
+- Customer Agreement and Owner Agreement remain independent aggregates.
+- Vehicle Use and Running Chart relationships remain directional and unchanged.
+- Finance reversal lineage remains explicit because accounting reversal history is a required audit relationship.
+- The obsolete `PaymentMethod -> PaymentRefund` inverse relation is removed: the method belongs to the refund Payment line, while `PaymentRefund` owns only the immutable original/refund Payment link. This removes a misleading cross-aggregate relationship instead of preserving it for compatibility.
+
+### Tax and statutory boundary
+
+Current Sri Lanka Inland Revenue material continues to publish effective-dated VAT and withholding rules. Rental therefore continues to pass semantic financial/tax context to Tax/Invoice rather than hardcoding current percentages or thresholds. No statutory rate was introduced by this hardening release.
+
+### Regression assets and verification boundary
+
+Focused source tests now cover:
+
+- Rental security-deposit draft refund lifecycle through real APIs;
+- foreign-currency Rental deposit → customer Invoice allocation → realized gain;
+- foreign-currency Rental deposit refund → realized loss and reversal;
+- owner/supplier foreign-currency Invoice settlement → realized loss;
+- independent allocation reversal and corrected reallocation history;
+- Finance tenant-default profile/account fallback;
+- fresh Finance Rental Deposit/FX semantic mappings;
+- generic refund-creation bypass rejection;
+- original Payment lifecycle guard for refunds;
+- refund-method least-privilege authorization;
+- Payment refund/allocation frontend payload and optimistic-version behavior.
+
+The branch remains free of legacy Rental runtime reuse, new circular Rental dependencies, TODO/FIXME/HACK markers in the changed production paths, and unsupported automatic Rental monetary rules.
+
+The available shell still cannot resolve `github.com` and cannot materialize the complete Composer/npm dependency tree, while GitHub Actions and paid runners are excluded by instruction. Therefore this record does **not** claim an unexecuted full Laravel/MySQL/Vitest/typecheck/ESLint/Vite/migration pass for this exact hardening head. The later real dependency-backed run remains historical evidence: 888 Laravel tests passed, ESLint passed, 416 Vitest tests passed and the Vite build passed, with one Vehicle Rental TypeScript error that is corrected in this branch. Exact-head executable verification must always be reported separately from static/source verification.
+
+### Final architecture decision
+
+The clean production foundation is:
+
+`Rental evidence/calculation → Invoice/AP document → Payment allocation/refund/instrument lifecycle → Finance journals/base-currency FX → Reporting`.
+
+Rental does not gain a second payment engine, deposit ledger, FX calculator, tax engine or journal reversal subsystem. Customer and owner economics stay independent, and all new correction/FX behavior remains inside the module that owns the responsibility.
