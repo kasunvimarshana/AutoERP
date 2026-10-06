@@ -10,6 +10,7 @@ enum PaymentSourceType: string
     case RentalAgreementDeposit = 'vehicle_rental_customer_agreement_deposit';
     case PaymentRefund = 'payment_refund';
     case PaymentAllocation = 'payment_allocation';
+    case PaymentAllocationFx = 'payment_allocation_fx';
 
     public function isRentalDeposit(): bool
     {
