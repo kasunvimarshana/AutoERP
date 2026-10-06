@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
+use Modules\Payment\Constants\PaymentRefundFinanceMetadata;
 use Modules\Finance\Contracts\FinancePaymentReversalInterface;
 use Modules\Invoice\Contracts\InvoiceSettlementServiceInterface;
 use Modules\Payment\DTOs\PaymentReversalData;
@@ -32,6 +33,7 @@ final class PaymentReversalService
         private readonly PaymentLifecycleEventRecorder $events,
         private readonly PaymentBalanceSynchronizer $balances,
         private readonly PaymentAllocationFinanceService $allocationFinance,
+        private readonly PaymentRefundFinanceService $refundFinance,
     ) {}
 
     public function reverse(PaymentReversalData $data): PaymentReversal
@@ -66,6 +68,16 @@ final class PaymentReversalService
                 $data->reversedBy,
                 $data->reason,
             );
+            $metadata = is_array($payment->metadata) ? $payment->metadata : [];
+            $refundFxReversal = $this->refundFinance->reverse(
+                $payment,
+                $data->reversalDate,
+                $data->reversedBy,
+                $data->reason,
+            );
+            if ($refundFxReversal !== null) {
+                $metadata[PaymentRefundFinanceMetadata::FX_REVERSAL_REFERENCE] = $refundFxReversal;
+            }
 
             foreach ($payment->allocations()
                 ->where('status', AllocationStatus::Active->value)
@@ -122,6 +134,7 @@ final class PaymentReversalService
                 'reversed_by' => $data->reversedBy,
                 'reversed_at' => now(),
                 'reversal_reason' => $data->reason,
+                'metadata' => $metadata,
                 'row_version' => (int) $payment->row_version + 1,
             ])->save();
             $payment = $payment->refresh();
