@@ -167,7 +167,7 @@ final class FinanceValidationService
         }
     }
 
-    public function assertReversible(FinanceJournalEntry $journal): void
+    public function assertReversible(FinanceJournalEntry $journal, bool $allowSourceOwned = false): void
     {
         $status = $journal->status instanceof JournalStatus
             ? $journal->status
@@ -177,7 +177,7 @@ final class FinanceValidationService
             throw new InvalidArgumentException('Only posted journals can be reversed.');
         }
 
-        if (! $journal->isFinanceOwned()) {
+        if (! $allowSourceOwned && ! $journal->isFinanceOwned()) {
             throw new InvalidArgumentException(
                 'Source-owned journals must be reversed through the module that owns the source document.',
             );
