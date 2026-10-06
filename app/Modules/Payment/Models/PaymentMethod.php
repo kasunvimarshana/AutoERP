@@ -69,8 +69,4 @@ final class PaymentMethod extends TenantOwnedModel
         return $this->hasMany(PaymentLine::class, 'payment_method_id');
     }
 
-    public function refunds(): HasMany
-    {
-        return $this->hasMany(PaymentRefund::class, 'payment_method_id');
-    }
 }
