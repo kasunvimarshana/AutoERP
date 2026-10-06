@@ -23,6 +23,8 @@ final class FinanceSeederTest extends TestCase
     private const ACCOUNT_SUPPLIER_ADVANCE = '1400';
     private const ACCOUNT_PAYABLE = '2100';
     private const ACCOUNT_CUSTOMER_ADVANCE = '2300';
+    private const ACCOUNT_REALIZED_FX_GAIN = '4300';
+    private const ACCOUNT_REALIZED_FX_LOSS = '5500';
 
     public function test_default_posting_profiles_are_seeded_for_the_protected_root_organization_unit(): void
     {
@@ -57,14 +59,22 @@ final class FinanceSeederTest extends TestCase
             self::ACCOUNT_SUPPLIER_ADVANCE,
             self::ACCOUNT_PAYABLE,
             self::ACCOUNT_CUSTOMER_ADVANCE,
+            self::ACCOUNT_REALIZED_FX_GAIN,
+            self::ACCOUNT_REALIZED_FX_LOSS,
         ] as $accountCode) {
             $this->assertGreaterThan(0, $this->accountId($tenantId, $organizationUnitId, $accountCode));
         }
 
         $this->assertActiveAssignment($tenantId, $organizationUnitId, FinanceAccountRoleCode::Inventory->value, self::ACCOUNT_INVENTORY);
         $this->assertActiveAssignment($tenantId, $organizationUnitId, FinanceAccountRoleCode::Payable->value, self::ACCOUNT_PAYABLE);
-        $this->assertActiveAssignment($tenantId, $organizationUnitId, FinanceAccountRoleCode::SupplierAdvance->value, self::ACCOUNT_SUPPLIER_ADVANCE);
-        $this->assertActiveAssignment($tenantId, $organizationUnitId, FinanceAccountRoleCode::CustomerAdvance->value, self::ACCOUNT_CUSTOMER_ADVANCE);
+        $this->assertActiveAssignment($tenantId, $organizationUnitId, FinanceAccountRoleCode::SupplierAdvance->value,
+                FinanceAccountRoleCode::RealizedFxGain->value,
+                FinanceAccountRoleCode::RealizedFxLoss->value, self::ACCOUNT_SUPPLIER_ADVANCE);
+        $this->assertActiveAssignment($tenantId, $organizationUnitId, FinanceAccountRoleCode::CustomerAdvance->value,
+                FinanceAccountRoleCode::RealizedFxGain->value,
+                FinanceAccountRoleCode::RealizedFxLoss->value, self::ACCOUNT_CUSTOMER_ADVANCE);
+        $this->assertActiveAssignment($tenantId, $organizationUnitId, FinanceAccountRoleCode::RealizedFxGain->value, self::ACCOUNT_REALIZED_FX_GAIN);
+        $this->assertActiveAssignment($tenantId, $organizationUnitId, FinanceAccountRoleCode::RealizedFxLoss->value, self::ACCOUNT_REALIZED_FX_LOSS);
         $this->assertSame(0, DB::table('finance_account_assignments')->whereNull('organization_unit_id')->count());
     }
 
