@@ -90,11 +90,16 @@ final class FinanceValidationService
 
             $this->validateJournalLine($line);
             $account = FinanceAccount::query()->findOrFail($line->accountId);
-            $this->assertSameScope($data->tenantId, $data->organizationUnitId, (int) $account->tenant_id, $account->organization_unit_id);
+            $this->assertPostingScope(
+                $data->tenantId,
+                $data->organizationUnitId,
+                (int) $account->tenant_id,
+                $account->organization_unit_id,
+            );
 
             if ($line->dimensionId !== null) {
                 $dimension = FinanceDimension::query()->findOrFail($line->dimensionId);
-                $this->assertSameScope(
+                $this->assertPostingScope(
                     $data->tenantId,
                     $data->organizationUnitId,
                     (int) $dimension->tenant_id,
@@ -118,7 +123,7 @@ final class FinanceValidationService
 
         if ($data->postingProfileId !== null) {
             $profile = FinancePostingProfile::query()->findOrFail($data->postingProfileId);
-            $this->assertSameScope(
+            $this->assertPostingScope(
                 $data->tenantId,
                 $data->organizationUnitId,
                 (int) $profile->tenant_id,
@@ -163,7 +168,12 @@ final class FinanceValidationService
                 throw new InvalidArgumentException('Cannot post to non-posting account.');
             }
 
-            $this->assertSameScope((int) $journal->tenant_id, $journal->organization_unit_id, (int) $account->tenant_id, $account->organization_unit_id);
+            $this->assertPostingScope(
+                (int) $journal->tenant_id,
+                $journal->organization_unit_id,
+                (int) $account->tenant_id,
+                $account->organization_unit_id,
+            );
         }
     }
 
@@ -255,6 +265,29 @@ final class FinanceValidationService
         }
 
         if ($organizationUnitId !== $targetOrganizationUnitId) {
+            throw new InvalidArgumentException('Finance posting organization unit scope mismatch.');
+        }
+    }
+
+    private function assertPostingScope(
+        int $tenantId,
+        ?int $organizationUnitId,
+        int $targetTenantId,
+        ?int $targetOrganizationUnitId,
+    ): void {
+        if ($tenantId !== $targetTenantId) {
+            throw new InvalidArgumentException('Finance posting tenant scope mismatch.');
+        }
+
+        if ($organizationUnitId === null) {
+            if ($targetOrganizationUnitId !== null) {
+                throw new InvalidArgumentException('Finance posting organization unit scope mismatch.');
+            }
+
+            return;
+        }
+
+        if ($targetOrganizationUnitId !== null && $targetOrganizationUnitId !== $organizationUnitId) {
             throw new InvalidArgumentException('Finance posting organization unit scope mismatch.');
         }
     }
