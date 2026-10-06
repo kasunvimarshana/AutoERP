@@ -175,17 +175,34 @@ final class AuthenticatedRentalJourneyTest extends TestCase
             'allocations' => [['invoice_id' => $invoice['id'], 'allocated_amount' => '300', 'allocation_date' => '2026-09-09', 'allocation_method' => 'specific_invoice']],
         ])->assertOk()->assertJsonPath('data.allocated_amount', '300.000000')->json('data');
         $this->getJson($url)->assertOk()->assertJsonPath('data.remaining_to_receive', '0.000000');
-        $refund = ['expected_version' => $payment['row_version'], 'refund_date' => '2026-09-09', 'amount' => '400', 'reason' => 'Return surplus security'];
+        $refund = [
+            'expected_version' => $payment['row_version'],
+            'refund_date' => '2026-09-09',
+            'amount' => '400',
+            'payment_method_id' => $method,
+            'exchange_rate' => '1',
+            'reason' => 'Return surplus security',
+        ];
         $refundId = $this->postJson($path.'/refunds', $refund)->assertCreated()->json('data.refund_payment_id');
+        $this->getJson($url)->assertOk()->assertJsonPath('data.remaining_to_receive', '0.000000')
+            ->assertJsonPath('data.payments.0.refunded_amount', '0.000000')->assertJsonPath('data.payments.0.unapplied_amount', '700.000000');
+        $payment = $this->getJson($path)->assertOk()->json('data');
+        $this->postJson($path.'/refunds', array_replace($refund, ['expected_version' => $payment['row_version']]))->assertUnprocessable();
+
+        $refundPath = '/api/v1/payments/'.$refundId;
+        $refundPayment = $this->getJson($refundPath)->assertOk()->assertJsonPath('data.document_status', 'draft')->json('data');
+        foreach (['submit-approval', 'approve', 'post'] as $action) {
+            $refundPayment = $this->postJson($refundPath.'/'.$action, ['expected_version' => $refundPayment['row_version']])
+                ->assertOk()
+                ->json('data');
+        }
         $this->getJson($url)->assertOk()->assertJsonPath('data.remaining_to_receive', '400.000000')
             ->assertJsonPath('data.payments.0.refunded_amount', '400.000000')->assertJsonPath('data.payments.0.unapplied_amount', '300.000000');
-        $this->postJson($path.'/refunds', $refund)->assertStatus(422);
         $this->assertDatabaseCount('finance_journal_entries', 4);
         $this->assertDatabaseCount('invoices', 1);
         $payment = $this->getJson($path)->assertOk()->json('data');
         $this->postJson($path.'/reverse', ['expected_version' => $payment['row_version'], 'reversal_date' => '2026-09-09', 'reason' => 'Cannot reverse active refund'])->assertUnprocessable();
-        $refundPayment = $this->getJson('/api/v1/payments/'.$refundId)->assertOk()->json('data');
-        $this->postJson('/api/v1/payments/'.$refundId.'/reverse', ['expected_version' => $refundPayment['row_version'], 'reversal_date' => '2026-09-09', 'reason' => 'Refund correction'])->assertOk();
+        $this->postJson($refundPath.'/reverse', ['expected_version' => $refundPayment['row_version'], 'reversal_date' => '2026-09-09', 'reason' => 'Refund correction'])->assertOk();
         $this->getJson($url)->assertOk()->assertJsonPath('data.remaining_to_receive', '0.000000')->assertJsonPath('data.payments.0.refunded_amount', '0.000000');
         $payment = $this->getJson($path)->assertOk()->json('data');
         $this->postJson($path.'/reverse', ['expected_version' => $payment['row_version'], 'reversal_date' => '2026-09-09', 'reason' => 'Receipt correction'])->assertOk();
