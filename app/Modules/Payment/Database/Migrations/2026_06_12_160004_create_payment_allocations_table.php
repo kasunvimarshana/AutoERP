@@ -25,6 +25,7 @@ return new class extends Migration
             $table->string('invoice_number_snapshot', 100);
             $table->date('invoice_date_snapshot')->nullable();
             $table->string('invoice_currency_code_snapshot', 20)->nullable();
+            $table->decimal('invoice_exchange_rate_snapshot', 20, 6);
             $table->decimal('invoice_total', 20, 6);
             $table->decimal('invoice_balance_before', 20, 6);
             $table->decimal('previously_allocated_amount', 20, 6)->default('0');
