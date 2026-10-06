@@ -9,7 +9,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\Finance\Enums\FinanceAccountRoleCode;
 use Modules\Finance\Enums\FinancePostingProfileCode;
-use Modules\Invoice\Contracts\InvoiceSettlementServiceInterface;
 use Modules\Invoice\DTOs\CreateInvoiceData;
 use Modules\Invoice\DTOs\InvoiceLineData;
 use Modules\Invoice\Enums\InvoiceDirection;
@@ -18,20 +17,21 @@ use Modules\Invoice\Enums\InvoiceType;
 use Modules\Invoice\Services\InvoiceCreationService;
 use Modules\Invoice\Services\InvoicePostingPlanFactory;
 use Modules\Invoice\Services\InvoiceStatusService;
+use Modules\Payment\DTOs\CreatePaymentData;
 use Modules\Payment\DTOs\PaymentAllocationData;
+use Modules\Payment\DTOs\PaymentLineData;
 use Modules\Payment\Enums\AllocationStatus;
-use Modules\Payment\Enums\PaymentAllocationState;
 use Modules\Payment\Enums\PaymentDirection;
-use Modules\Payment\Enums\PaymentDocumentStatus;
-use Modules\Payment\Enums\PaymentInstrumentStatus;
 use Modules\Payment\Enums\PaymentMethodDirection;
 use Modules\Payment\Enums\PaymentMethodType;
-use Modules\Payment\Enums\PaymentPostingStatus;
 use Modules\Payment\Enums\PaymentType;
 use Modules\Payment\Models\Payment;
 use Modules\Payment\Models\PaymentAllocation;
 use Modules\Payment\Services\PaymentAllocationReversalService;
 use Modules\Payment\Services\PaymentAllocationService;
+use Modules\Payment\Services\PaymentCreationService;
+use Modules\Payment\Services\PaymentDocumentLifecycleService;
+use Modules\Payment\Services\PaymentPostingService;
 use Modules\Tenant\Constants\TenantStatus;
 use Tests\Support\FinancePostingFixture;
 use Tests\TestCase;
@@ -89,8 +89,6 @@ final class PaymentAllocationReversalServiceTest extends TestCase
             return $statuses->transition($invoice, InvoiceStatus::Posted);
         });
 
-        $this->withTenantExecutionContext($tenantId, fn () => app(InvoiceSettlementServiceInterface::class)
-            ->applyPaymentAllocation((int) $invoice->getKey(), '400.000000'));
         $paymentMethodId = (int) DB::table('payment_methods')->insertGetId([
             'tenant_id' => $tenantId,
             'scope_key' => 'tenant:'.$tenantId,
@@ -102,66 +100,57 @@ final class PaymentAllocationReversalServiceTest extends TestCase
             'created_at' => now(),
             'updated_at' => now(),
         ]);
-        $paymentId = (int) DB::table('payments')->insertGetId([
-            'tenant_id' => $tenantId,
-            'payment_number' => 'PAY-ALLOC-REVERSAL',
-            'payment_type' => PaymentType::Advance->value,
-            'direction' => PaymentDirection::Inbound->value,
-            'party_type' => 'customer',
-            'party_id' => $customerId,
-            'document_status' => PaymentDocumentStatus::Approved->value,
-            'allocation_status' => PaymentAllocationState::FullyAllocated->value,
-            'posting_status' => PaymentPostingStatus::Posted->value,
-            'payment_date' => self::PAYMENT_DATE,
-            'exchange_rate' => '1.000000',
-            'total_amount' => '400.000000',
-            'allocated_amount' => '400.000000',
-            'unapplied_amount' => '0.000000',
-            'refunded_amount' => '0.000000',
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-        DB::table('payment_lines')->insert([
-            'tenant_id' => $tenantId,
-            'payment_id' => $paymentId,
-            'line_number' => 1,
-            'payment_method_id' => $paymentMethodId,
-            'payment_method_code_snapshot' => self::PAYMENT_METHOD_CODE,
-            'payment_method_name_snapshot' => self::PAYMENT_METHOD_NAME,
-            'payment_method_type_snapshot' => PaymentMethodType::Cash->value,
-            'amount' => '400.000000',
-            'status' => PaymentInstrumentStatus::Cleared->value,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-        DB::table('payment_allocations')->insert([
-            'tenant_id' => $tenantId,
-            'payment_id' => $paymentId,
-            'invoice_id' => $invoice->getKey(),
-            'invoice_number_snapshot' => $invoice->invoice_number,
-            'invoice_date_snapshot' => $invoice->invoice_date?->toDateString(),
-            'invoice_total' => '1000.000000',
-            'invoice_balance_before' => '1000.000000',
-            'previously_allocated_amount' => '0.000000',
-            'allocated_amount' => '400.000000',
-            'invoice_balance_after' => '600.000000',
-            'allocation_date' => self::PAYMENT_DATE,
-            'allocation_method' => self::ALLOCATION_METHOD,
-            'status' => AllocationStatus::Active->value,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+
+        $payment = $this->withTenantExecutionContext($tenantId, function () use ($tenantId, $customerId, $paymentMethodId): Payment {
+            $payment = app(PaymentCreationService::class)->create(new CreatePaymentData(
+                tenantId: $tenantId,
+                paymentType: PaymentType::Advance,
+                direction: PaymentDirection::Inbound,
+                paymentDate: self::PAYMENT_DATE,
+                partyType: 'customer',
+                partyId: $customerId,
+                lines: [new PaymentLineData(
+                    amount: '400.000000',
+                    paymentMethodId: $paymentMethodId,
+                )],
+            ));
+            $lifecycle = app(PaymentDocumentLifecycleService::class);
+            $payment = $lifecycle->submit($payment, (int) $payment->row_version);
+            $payment = $lifecycle->approve($payment, (int) $payment->row_version);
+
+            return app(PaymentPostingService::class)->post($payment, (int) $payment->row_version);
+        });
 
         $payment = $this->withTenantExecutionContext(
             $tenantId,
-            fn (): Payment => Payment::query()->findOrFail($paymentId),
+            fn (): Payment => app(PaymentAllocationService::class)->allocate(
+                $payment,
+                [new PaymentAllocationData(
+                    invoiceId: (int) $invoice->getKey(),
+                    allocatedAmount: '400.000000',
+                    allocationDate: self::PAYMENT_DATE,
+                    allocationMethod: self::ALLOCATION_METHOD,
+                )],
+                (int) $payment->row_version,
+            ),
         );
+        $allocation = $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): PaymentAllocation => PaymentAllocation::query()
+                ->where('payment_id', $payment->getKey())
+                ->where('invoice_id', $invoice->getKey())
+                ->where('status', AllocationStatus::Active->value)
+                ->sole(),
+        );
+
         $reversed = $this->withTenantExecutionContext(
             $tenantId,
-            fn (): Payment => app(PaymentAllocationReversalService::class)->reverseForInvoice(
+            fn (): Payment => app(PaymentAllocationReversalService::class)->reverse(
                 $payment,
-                (int) $invoice->getKey(),
+                (int) $allocation->getKey(),
                 (int) $payment->row_version,
+                (int) $allocation->row_version,
+                self::PAYMENT_DATE,
                 'Deposit application corrected',
             ),
         );
