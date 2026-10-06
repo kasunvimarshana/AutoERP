@@ -23,6 +23,7 @@ final class FinanceSeederTest extends TestCase
     private const ACCOUNT_SUPPLIER_ADVANCE = '1400';
     private const ACCOUNT_PAYABLE = '2100';
     private const ACCOUNT_CUSTOMER_ADVANCE = '2300';
+    private const ACCOUNT_CUSTOMER_DEPOSIT = 'CUSTOMER-SECURITY-DEPOSIT';
     private const ACCOUNT_REALIZED_FX_GAIN = 'FX-REALIZED-GAIN';
     private const ACCOUNT_REALIZED_FX_LOSS = 'FX-REALIZED-LOSS';
 
@@ -44,6 +45,7 @@ final class FinanceSeederTest extends TestCase
             FinancePostingProfileCode::SupplierPayment->value,
             FinancePostingProfileCode::CustomerAdvance->value,
             FinancePostingProfileCode::SupplierAdvance->value,
+            FinancePostingProfileCode::RentalDeposit->value,
         ] as $profileCode) {
             $this->assertDatabaseHas('finance_posting_profiles', [
                 'tenant_id' => $tenantId,
@@ -59,6 +61,7 @@ final class FinanceSeederTest extends TestCase
             self::ACCOUNT_SUPPLIER_ADVANCE,
             self::ACCOUNT_PAYABLE,
             self::ACCOUNT_CUSTOMER_ADVANCE,
+            self::ACCOUNT_CUSTOMER_DEPOSIT,
         ] as $accountCode) {
             $this->assertGreaterThan(0, $this->accountId($tenantId, $organizationUnitId, $accountCode));
         }
@@ -67,6 +70,7 @@ final class FinanceSeederTest extends TestCase
         $this->assertActiveAssignment($tenantId, $organizationUnitId, FinanceAccountRoleCode::Payable->value, self::ACCOUNT_PAYABLE);
         $this->assertActiveAssignment($tenantId, $organizationUnitId, FinanceAccountRoleCode::SupplierAdvance->value, self::ACCOUNT_SUPPLIER_ADVANCE);
         $this->assertActiveAssignment($tenantId, $organizationUnitId, FinanceAccountRoleCode::CustomerAdvance->value, self::ACCOUNT_CUSTOMER_ADVANCE);
+        $this->assertActiveAssignment($tenantId, $organizationUnitId, FinanceAccountRoleCode::CustomerDeposit->value, self::ACCOUNT_CUSTOMER_DEPOSIT);
 
         foreach ([
             FinanceAccountRoleCode::RealizedFxGain->value => self::ACCOUNT_REALIZED_FX_GAIN,
@@ -116,6 +120,14 @@ final class FinanceSeederTest extends TestCase
                 FinanceAccountRoleCode::Bank->value,
                 FinanceAccountRoleCode::Payable->value,
                 FinanceAccountRoleCode::SupplierAdvance->value,
+                FinanceAccountRoleCode::RealizedFxGain->value,
+                FinanceAccountRoleCode::RealizedFxLoss->value,
+            ],
+            FinancePostingProfileCode::RentalDeposit->value => [
+                FinanceAccountRoleCode::Cash->value,
+                FinanceAccountRoleCode::Bank->value,
+                FinanceAccountRoleCode::Receivable->value,
+                FinanceAccountRoleCode::CustomerDeposit->value,
                 FinanceAccountRoleCode::RealizedFxGain->value,
                 FinanceAccountRoleCode::RealizedFxLoss->value,
             ],
