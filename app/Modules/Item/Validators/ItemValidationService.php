@@ -18,7 +18,9 @@ use Modules\Item\DTOs\ItemUsageRuleData;
 use Modules\Item\DTOs\ItemVariantData;
 use Modules\Item\DTOs\UpdateItemData;
 use Modules\Item\Enums\CostingMethod;
+use Modules\Item\Enums\ItemPriceType;
 use Modules\Item\Enums\ItemType;
+use Modules\Item\Enums\ItemUnitRole;
 use Modules\Item\Enums\TrackingType;
 use Modules\Item\Models\Item;
 use Modules\Item\Models\ItemBrand;
@@ -41,6 +43,7 @@ final class ItemValidationService
 
     private const BUNDLE_CHILD_TYPES = [
         ItemType::Stock->value,
+        ItemType::Consumable->value,
         ItemType::Service->value,
         ItemType::Labour->value,
         ItemType::NonStock->value,
@@ -140,7 +143,11 @@ final class ItemValidationService
         $this->assertPositiveDecimal($data->conversionFactor, 'Item unit conversion factor must be greater than zero.');
         $organizationUnitId = $item->organization_unit_id === null ? null : (int) $item->organization_unit_id;
         $this->assertUomIsUsable((int) $item->tenant_id, $organizationUnitId, $data->uomId);
-        $this->assertUomCompatibleWithItemBase($item, $data->uomId);
+        $this->assertUomCompatibleWithItemBase(
+            $item,
+            $data->uomId,
+            $data->unitRole === ItemUnitRole::Purchase,
+        );
 
         $duplicate = $item->units()
             ->where('uom_id', $data->uomId)
@@ -213,6 +220,12 @@ final class ItemValidationService
             throw new InvalidArgumentException('Item bundle child type is not supported.');
         }
 
+        if ($child->is_stockable && $data->lineType !== ItemType::Stock->value) {
+            throw ValidationException::withMessages([
+                'line_type' => ['Stockable bundle items must use the stock line type.'],
+            ]);
+        }
+
         if ($data->childVariantId !== null) {
             $variant = ItemVariant::query()->findOrFail($data->childVariantId);
             if ((int) $variant->item_id !== $data->childItemId) {
@@ -235,7 +248,12 @@ final class ItemValidationService
             $item->organization_unit_id === null ? null : (int) $item->organization_unit_id,
         );
         $this->assertUomIsUsable((int) $item->tenant_id, $data->organizationUnitId, $data->uomId);
-        $this->assertItemUomIsActive($item, $data->uomId, 'Price UOM must be an active unit for the selected item.');
+        $this->assertItemUomIsActive(
+            $item,
+            $data->uomId,
+            'Price UOM must be an active unit for the selected item.',
+            $data->priceType === ItemPriceType::Purchase,
+        );
         $this->assertCurrencyIsUsable((int) $item->tenant_id, $data->currencyId);
 
         $effectiveFrom = $this->parseDate($data->effectiveFrom, 'Item price effective from date is invalid.');
@@ -534,9 +552,10 @@ final class ItemValidationService
         }
     }
 
-    private function assertUomCompatibleWithItemBase(Item $item, int $uomId): void
+    private function assertUomCompatibleWithItemBase(Item $item, int $uomId, bool $allowPurchasePack = false): void
     {
-        if ($item->base_uom_id === null || (int) $item->base_uom_id === $uomId) {
+        // A purchase pack may represent contents measured in a different physical UOM category.
+        if ($allowPurchasePack || $item->base_uom_id === null || (int) $item->base_uom_id === $uomId) {
             return;
         }
 
@@ -567,24 +586,32 @@ final class ItemValidationService
         }
     }
 
-    private function assertItemUomIsActive(Item $item, ?int $uomId, string $message): void
+    private function assertItemUomIsActive(
+        Item $item,
+        ?int $uomId,
+        string $message,
+        bool $allowPurchasePack = false,
+    ): void
     {
         if ($uomId === null) {
             return;
         }
 
-        $this->assertUomCompatibleWithItemBase($item, $uomId);
-        $exists = ItemUnit::query()
+        $unit = ItemUnit::query()
             ->where('item_id', $item->getKey())
             ->where('uom_id', $uomId)
             ->where('is_active', true)
-            ->exists();
+            ->first();
 
-        if (! $exists) {
+        if (! $unit instanceof ItemUnit) {
             throw ValidationException::withMessages([
                 'uom_id' => [$message],
             ]);
         }
+
+        $isPurchasePack = $allowPurchasePack
+            && $unit->unit_role === ItemUnitRole::Purchase;
+        $this->assertUomCompatibleWithItemBase($item, $uomId, $isPurchasePack);
     }
 
     private function assertPositiveDecimal(string $value, string $message): void

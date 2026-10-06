@@ -19,7 +19,7 @@
             || bccomp((string) $amounts['balance_due']['raw'], (string) $amounts['grand_total']['raw'], 6) !== 0;
     @endphp
     <style>
-        @page { size: {{ $print_layout['paper_size'] }} {{ $print_layout['orientation'] }}; margin: {{ $isCompact ? '6mm' : '10mm' }}; }
+        @page { size: {{ $print_layout['css_page_size'] }}; margin: {{ $print_layout['css_page_margin'] }}; }
         * { box-sizing: border-box; }
         body {
             margin: 0;
@@ -112,35 +112,66 @@
         .layout-a4 .warning,
         .layout-a4 .muted { font-size: 12px; }
         .layout-a4 .print-trace { font-size: 10px; }
-        .layout-a5 { font-family: Arial, Helvetica, sans-serif; font-size: 8px; line-height: 1.15; }
+        .layout-a5,
+        .layout-continuous { font-family: Arial, Helvetica, sans-serif; font-size: 10px; line-height: 1.2; }
         .layout-a5 .controls { width: 148mm; }
+        .layout-continuous .controls { width: {{ $print_layout['continuous_width'] }}; }
         .layout-a5 .sheet { width: 148mm; min-height: 210mm; padding: 6mm; }
-        .layout-a5 .field-table { margin-bottom: 3px; }
-        .layout-a5 .field-table td { padding: 3px 5px; }
-        .layout-a5 .field-table .gap { width: 6px; }
-        .layout-a5 .party-cell { height: 22mm; }
-        .layout-a5 .party-line { min-height: 10px; }
-        .layout-a5 .party-address { min-height: 18px; }
+        .layout-continuous .sheet {
+            width: {{ $print_layout['continuous_width'] }};
+            min-height: {{ $print_layout['continuous_height'] }};
+            padding: {{ $print_layout['continuous_vertical_margin'] }} {{ $print_layout['continuous_horizontal_margin'] }};
+        }
+        .layout-continuous .compact-company-name { font-size: 15px; }
+        .layout-continuous .compact-title { font-size: 15px; }
+        .layout-a5 .field-table,
+        .layout-continuous .field-table { margin-bottom: 3px; }
+        .layout-a5 .field-table td,
+        .layout-continuous .field-table td { padding: 3px 5px; }
+        .layout-a5 .field-table .gap,
+        .layout-continuous .field-table .gap { width: 6px; }
+        .layout-a5 .party-cell,
+        .layout-continuous .party-cell { height: 22mm; }
+        .layout-a5 .party-line,
+        .layout-continuous .party-line { min-height: 10px; }
+        .layout-a5 .party-address,
+        .layout-continuous .party-address { min-height: 18px; }
         .layout-a5 .party-phone,
-        .layout-a5 .purchaser-reference-fields { margin-top: 3px; }
-        .layout-a5 .additional-field { min-height: 6mm; }
-        .layout-a5 .additional-content { margin-top: 2px; }
-        .layout-a5 .invoice-lines { margin-top: 4px; }
+        .layout-a5 .purchaser-reference-fields,
+        .layout-continuous .party-phone,
+        .layout-continuous .purchaser-reference-fields { margin-top: 3px; }
+        .layout-a5 .additional-field,
+        .layout-continuous .additional-field { min-height: 6mm; }
+        .layout-a5 .additional-content,
+        .layout-continuous .additional-content { margin-top: 2px; }
+        .layout-a5 .invoice-lines,
+        .layout-continuous .invoice-lines { margin-top: 4px; }
         .layout-a5 .invoice-lines th,
-        .layout-a5 .invoice-lines td { padding: 3px 4px; }
-        .layout-a5 .invoice-lines th { height: 7mm; }
-        .layout-a5 .invoice-lines tbody td { height: 4.5mm; }
-        .layout-a5 .muted { font-size: 7px; }
-        .layout-a5 .footer-fields { margin-top: 4px; }
-        .layout-a5 .footer-fields td { min-height: 5mm; padding: 3px 5px; }
-        .layout-a5 .signature-table { margin-top: 16px; }
-        .layout-a5 .signature-table td { padding-top: 7px; }
+        .layout-a5 .invoice-lines td,
+        .layout-continuous .invoice-lines th,
+        .layout-continuous .invoice-lines td { padding: 3px 4px; }
+        .layout-a5 .invoice-lines th,
+        .layout-continuous .invoice-lines th { height: 7mm; }
+        .layout-a5 .invoice-lines tbody td,
+        .layout-continuous .invoice-lines tbody td { height: 4.5mm; }
+        .layout-a5 .muted,
+        .layout-continuous .muted { font-size: 9px; }
+        .layout-a5 .footer-fields,
+        .layout-continuous .footer-fields { margin-top: 4px; }
+        .layout-a5 .footer-fields td,
+        .layout-continuous .footer-fields td { min-height: 5mm; padding: 3px 5px; }
+        .layout-a5 .signature-table,
+        .layout-continuous .signature-table { margin-top: 8px; }
+        .layout-a5 .signature-table td,
+        .layout-continuous .signature-table td { padding-top: 7px; }
         .pdf-output.layout-a5 .sheet { width: auto; min-height: 0; margin: 0; padding: 0; }
+        .pdf-output.layout-continuous .sheet { width: auto; min-height: 0; margin: 0; padding: 0; }
         @media print {
             body { background: #fff; }
             .controls { display: none !important; }
             .sheet,
-            .layout-a5 .sheet { width: auto; min-height: 0; margin: 0; padding: 0; }
+            .layout-a5 .sheet,
+            .layout-continuous .sheet { width: auto; min-height: 0; margin: 0; padding: 0; }
         }
     </style>
 </head>

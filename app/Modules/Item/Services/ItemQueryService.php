@@ -67,6 +67,7 @@ final class ItemQueryService
             'stockable' => $criteria['is_stockable'] = true,
             'untracked-stockable' => [$criteria['is_stockable'] = true, $criteria['tracking_type'] = TrackingType::None->value],
             'batch-tracked-stockable' => [$criteria['is_stockable'] = true, $criteria['tracking_types'] = [TrackingType::Batch->value, TrackingType::Lot->value]],
+            'bundle-child' => $criteria['bundle_child'] = true,
             'service', 'labour', 'combo', 'package' => $criteria['item_type'] = $kind,
             default => null,
         };
@@ -196,6 +197,15 @@ final class ItemQueryService
             if (array_key_exists($filter, $criteria) && $criteria[$filter] !== null && $criteria[$filter] !== '') {
                 $query->where($filter, $criteria[$filter]);
             }
+        }
+        if (! empty($criteria['bundle_child'])) {
+            $query->where(function (Builder $items): void {
+                $items->where(function (Builder $stockItems): void {
+                    $stockItems->where('is_stockable', true)
+                        ->whereIn('item_type', ['stock', 'consumable']);
+                })
+                    ->orWhereIn('item_type', ['service', 'labour', 'non_stock']);
+            });
         }
         if (! empty($criteria['tracking_types'])) {
             $query->whereIn('tracking_type', $criteria['tracking_types']);

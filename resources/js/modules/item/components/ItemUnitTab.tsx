@@ -23,7 +23,7 @@ export default function ItemUnitTab({ itemId, readOnly = false }: { itemId: numb
     const columns: DataColumn<ItemUnit>[] = [
         { key: 'uom', header: 'UOM', render: (row) => row.uom ? `${row.uom.code} - ${row.uom.name}${row.uom.symbol ? ` (${row.uom.symbol})` : ''}` : '-' },
         { key: 'role', header: 'Role', render: (row) => row.unit_role },
-        { key: 'factor', header: 'Factor', render: (row) => row.conversion_factor },
+        { key: 'factor', header: 'Base units per unit', render: (row) => row.conversion_factor },
         { key: 'default', header: 'Default', render: (row) => row.is_default ? 'Yes' : 'No' },
         { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.is_active ? 'active' : 'inactive'} /> },
     ];
@@ -67,7 +67,10 @@ function UnitForm({ row, error, submitting, onCancel, onSubmit }: {
             <ErrorAlert error={error} />
             <ItemUomSelect value={uom} onChange={setUom} error={fieldError(error, 'uom_id')} />
             <Select label="Unit role" value={role} onChange={(event) => setRole(event.target.value)} options={itemUnitRoles.filter((value) => value !== 'base').map((value) => ({ value, label: value }))} error={fieldError(error, 'unit_role')} />
-            <Input label="Conversion factor" value={factor} onChange={(event) => setFactor(event.target.value)} error={fieldError(error, 'conversion_factor')} required />
+            <Input label="Base units per 1 selected UOM" value={factor} onChange={(event) => setFactor(event.target.value)} error={fieldError(error, 'conversion_factor')} required />
+            <p className="text-sm text-slate-600">
+                The factor converts one selected unit into the item’s Base UOM. For example, if the Base UOM is Liter and one purchased PCS bottle contains 5 L, choose Purchase and enter 5.
+            </p>
             <label className="block text-sm"><input className="mr-2" type="checkbox" checked={isDefault} onChange={(event) => setDefault(event.target.checked)} />Default Unit</label>
             <label className="block text-sm"><input className="mr-2" type="checkbox" checked={isActive} onChange={(event) => setActive(event.target.checked)} />Active</label>
             <div className="flex justify-end gap-2"><Button type="button" variant="secondary" onClick={onCancel}>Cancel</Button><Button type="submit" loading={submitting} disabled={!uom}>Save</Button></div>

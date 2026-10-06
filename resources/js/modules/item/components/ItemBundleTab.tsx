@@ -8,7 +8,6 @@ import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
 import { LoadingState } from '@/shared/components/LoadingState';
 import { Pagination } from '@/shared/components/Pagination';
-import { Select } from '@/shared/components/Select';
 import type { NamedResource } from '@/shared/types/common';
 import { createItemBundle, deleteItemBundle, listItemBundles, updateItemBundle } from '../itemApi';
 import { bundleLineTypes, type ItemBundle, type ItemBundlePayload, type ItemSummary } from '../itemTypes';
@@ -24,9 +23,10 @@ export default function ItemBundleTab({ itemId, canBundle, readOnly = false }: {
     const crud = useItemRelationCrud({ itemId, list, create: createItemBundle, update: updateItemBundle, remove: deleteItemBundle });
     const columns: DataColumn<ItemBundle>[] = [
         { key: 'child', header: 'Item', render: (row) => row.child_item ? `${row.child_item.code} - ${row.child_item.name}` : '-' },
+        { key: 'type', header: 'Type', render: (row) => bundleLineLabel(row.line_type) },
         { key: 'quantity', header: 'Quantity', render: (row) => row.quantity },
         { key: 'uom', header: 'UOM', render: (row) => row.uom ? `${row.uom.code} - ${row.uom.name}` : '-' },
-        { key: 'supervisor', header: 'Assignment', render: (row) => row.uses_job_supervisor ? 'Job supervisor' : 'Select employee' },
+        { key: 'supervisor', header: 'Assignment', render: (row) => row.line_type !== 'labour' ? '-' : (row.uses_job_supervisor ? 'Job supervisor' : 'Select employee') },
         { key: 'cost', header: 'Commission cost', render: (row) => row.line_type === 'labour' ? row.unit_cost : '-' },
     ];
     if (!readOnly) {
@@ -93,8 +93,13 @@ function BundleForm({ row, itemId, error, submitting, onCancel, onSubmit }: {
             }}
             excludeId={itemId}
             error={fieldError(error, 'child_item_id')}
-            lookupKind="labour"
+            lookupKind="bundle-child"
         />
+        {child?.is_stockable && (
+            <p className="rounded-lg bg-sky-50 p-3 text-sm text-sky-800">
+                This quantity is consumed from inventory when the service job starts. Its cost comes from the item’s inventory valuation.
+            </p>
+        )}
         <div className="grid gap-4 sm:grid-cols-2">
             <DecimalInput label="Quantity" value={quantity} onChange={(event) => setQuantity(event.target.value)} error={fieldError(error, 'quantity')} required />
             <ItemUomSelect value={uom} onChange={setUom} error={fieldError(error, 'uom_id')} />
@@ -122,7 +127,6 @@ function BundleForm({ row, itemId, error, submitting, onCancel, onSubmit }: {
         <details className="rounded-lg border border-slate-200 bg-slate-50 p-4">
             <summary className="cursor-pointer font-semibold text-slate-800">Advanced</summary>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                <Select label="Line type" value={lineType} onChange={(event) => setLineType(event.target.value as BundleLineType)} options={bundleLineTypes.map((value) => ({ value, label: value.replaceAll('_', ' ') }))} error={fieldError(error, 'line_type')} />
                 <Input label="Sort order" type="number" min="0" value={sortOrder} onChange={(event) => setSortOrder(Number(event.target.value))} />
             </div>
             <label className="mt-4 block text-sm"><input className="mr-2" type="checkbox" checked={required} onChange={(event) => setRequired(event.target.checked)} />Required line</label>
@@ -136,6 +140,8 @@ function Actions({ edit, remove }: { edit: () => void; remove: () => void }) {
 }
 
 function resolveBundleLineType(item: ItemSummary): BundleLineType {
+    if (item.is_stockable) return 'stock';
+
     switch (item.item_type) {
     case 'stock':
     case 'service':
@@ -145,6 +151,10 @@ function resolveBundleLineType(item: ItemSummary): BundleLineType {
     default:
         return 'service';
     }
+}
+
+function bundleLineLabel(lineType: string): string {
+    return lineType === 'stock' ? 'Stock item' : lineType.replaceAll('_', ' ');
 }
 
 function defaultBundleQuantity(): string {
