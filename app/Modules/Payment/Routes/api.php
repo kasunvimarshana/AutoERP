@@ -53,6 +53,10 @@ Route::prefix('api/v1/payments')->middleware($middleware)->name('api.v1.payments
     Route::post('{payment}/reverse', [PaymentController::class, 'reverse'])->whereNumber('payment')->middleware($requires(PaymentPermission::PAYMENTS_REVERSE))->name('reverse');
     Route::post('{payment}/allocations', [PaymentController::class, 'allocate'])->whereNumber('payment')->middleware($requires(PaymentPermission::PAYMENTS_ALLOCATE))->name('allocations.store');
     Route::get('{payment}/allocations', [PaymentController::class, 'allocations'])->whereNumber('payment')->middleware($requires(PaymentPermission::PAYMENTS_VIEW))->name('allocations.index');
+    Route::post('{payment}/allocations/{allocation}/reverse', [PaymentController::class, 'reverseAllocation'])
+        ->whereNumber(['payment', 'allocation'])
+        ->middleware($requires(PaymentPermission::PAYMENTS_ALLOCATE))
+        ->name('allocations.reverse');
     Route::get('{payment}/unapplied-balance', [PaymentController::class, 'unappliedBalance'])->whereNumber('payment')->middleware($requires(PaymentPermission::PAYMENTS_VIEW))->name('unapplied-balance');
     Route::post('{payment}/lines/{line}/settlement', [PaymentController::class, 'settleLine'])
         ->whereNumber(['payment', 'line'])
