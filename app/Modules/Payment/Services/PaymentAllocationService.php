@@ -12,6 +12,7 @@ use Modules\Invoice\Contracts\InvoiceSettlementServiceInterface;
 use Modules\Invoice\DTOs\BalanceResultData;
 use Modules\Payment\DTOs\PaymentAllocationData;
 use Modules\Payment\Enums\AllocationStatus;
+use Modules\Payment\Enums\PaymentAllocationMethod;
 use Modules\Payment\Models\Payment;
 use Modules\Payment\Models\PaymentAllocation;
 use Modules\Payment\Validators\PaymentValidationService;
@@ -167,8 +168,11 @@ final class PaymentAllocationService
         ?string $amount = null,
         ?int $actorId = null,
     ): Payment {
-        $method = strtolower(trim($method));
-        if (in_array($method, ['manual', 'specific_invoice'], true)) {
+        $allocationMethod = PaymentAllocationMethod::tryFrom(strtolower(trim($method)));
+        if (! $allocationMethod instanceof PaymentAllocationMethod) {
+            throw new InvalidArgumentException('Unsupported payment allocation method.');
+        }
+        if (in_array($allocationMethod, [PaymentAllocationMethod::Manual, PaymentAllocationMethod::SpecificInvoice], true)) {
             return $this->allocate(
                 $payment,
                 array_map(
@@ -176,7 +180,7 @@ final class PaymentAllocationService
                         invoiceId: $allocation->invoiceId,
                         allocatedAmount: $allocation->allocatedAmount,
                         allocationDate: $allocation->allocationDate,
-                        allocationMethod: $method,
+                        allocationMethod: $allocationMethod->value,
                         metadata: $allocation->metadata,
                     ),
                     $allocations,
@@ -185,7 +189,7 @@ final class PaymentAllocationService
                 $actorId,
             );
         }
-        if ($method !== 'fifo') {
+        if ($allocationMethod !== PaymentAllocationMethod::Fifo) {
             throw new InvalidArgumentException('Unsupported payment allocation method.');
         }
 
@@ -390,7 +394,7 @@ final class PaymentAllocationService
                 invoiceId: $invoiceBalance->sourceId,
                 allocatedAmount: $allocatedAmount,
                 allocationDate: $allocationDate,
-                allocationMethod: 'fifo',
+                allocationMethod: PaymentAllocationMethod::Fifo->value,
             );
             $remaining = $this->math->sub($remaining, $allocatedAmount);
         }
