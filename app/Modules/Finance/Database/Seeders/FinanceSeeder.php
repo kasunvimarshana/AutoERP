@@ -59,11 +59,15 @@ final class FinanceSeeder extends Seeder
 
     private const ACCOUNT_SERVICE_REVENUE = '4200';
 
+    private const ACCOUNT_REALIZED_FX_GAIN = '4300';
+
     private const ACCOUNT_PURCHASE_EXPENSE = '5100';
 
     private const ACCOUNT_COST_OF_GOODS_SOLD = '5200';
 
     private const ACCOUNT_OPERATING_EXPENSE = '5400';
+
+    private const ACCOUNT_REALIZED_FX_LOSS = '5500';
 
     public function run(): void
     {
@@ -135,9 +139,11 @@ final class FinanceSeeder extends Seeder
             'CUSTOMER_ADVANCE' => ['Customer Advances', self::TYPE_LIABILITY],
             'SALES' => ['Sales Revenue', self::TYPE_REVENUE],
             'SERVICE' => ['Service Revenue', self::TYPE_REVENUE],
+            'FX_GAIN' => ['Realized FX Gain', self::TYPE_REVENUE],
             'PURCHASE' => ['Purchase Expense', self::TYPE_EXPENSE],
             'COGS' => ['Cost of Goods Sold', self::TYPE_EXPENSE],
             'OPERATING_EXPENSE' => ['Operating Expense', self::TYPE_EXPENSE],
+            'FX_LOSS' => ['Realized FX Loss', self::TYPE_EXPENSE],
         ];
 
         $categories = [];
@@ -204,9 +210,11 @@ final class FinanceSeeder extends Seeder
             [self::ACCOUNT_CUSTOMER_ADVANCE, 'Customer Advances', self::TYPE_LIABILITY, 'CUSTOMER_ADVANCE', false, false, false],
             [self::ACCOUNT_SALES_REVENUE, 'Sales Revenue', self::TYPE_REVENUE, 'SALES', false, false, false],
             [self::ACCOUNT_SERVICE_REVENUE, 'Service Revenue', self::TYPE_REVENUE, 'SERVICE', false, false, false],
+            [self::ACCOUNT_REALIZED_FX_GAIN, 'Realized FX Gain', self::TYPE_REVENUE, 'FX_GAIN', false, false, false],
             [self::ACCOUNT_PURCHASE_EXPENSE, 'Purchase Expense', self::TYPE_EXPENSE, 'PURCHASE', false, false, false],
             [self::ACCOUNT_COST_OF_GOODS_SOLD, 'Cost of Goods Sold', self::TYPE_EXPENSE, 'COGS', false, false, false],
             [self::ACCOUNT_OPERATING_EXPENSE, 'Operating Expense', self::TYPE_EXPENSE, 'OPERATING_EXPENSE', false, false, false],
+            [self::ACCOUNT_REALIZED_FX_LOSS, 'Realized FX Loss', self::TYPE_EXPENSE, 'FX_LOSS', false, false, false],
         ];
         $controlCategories = [
             'AR',
@@ -275,6 +283,8 @@ final class FinanceSeeder extends Seeder
                     FinanceAccountRoleCode::Bank->value => self::ACCOUNT_BANK,
                     FinanceAccountRoleCode::Receivable->value => self::ACCOUNT_RECEIVABLE,
                     FinanceAccountRoleCode::CustomerAdvance->value => self::ACCOUNT_CUSTOMER_ADVANCE,
+                    FinanceAccountRoleCode::RealizedFxGain->value => self::ACCOUNT_REALIZED_FX_GAIN,
+                    FinanceAccountRoleCode::RealizedFxLoss->value => self::ACCOUNT_REALIZED_FX_LOSS,
                 ],
             ],
             FinancePostingProfileCode::SupplierPayment->value => [
@@ -284,6 +294,8 @@ final class FinanceSeeder extends Seeder
                     FinanceAccountRoleCode::Bank->value => self::ACCOUNT_BANK,
                     FinanceAccountRoleCode::Payable->value => self::ACCOUNT_PAYABLE,
                     FinanceAccountRoleCode::SupplierAdvance->value => self::ACCOUNT_SUPPLIER_ADVANCE,
+                    FinanceAccountRoleCode::RealizedFxGain->value => self::ACCOUNT_REALIZED_FX_GAIN,
+                    FinanceAccountRoleCode::RealizedFxLoss->value => self::ACCOUNT_REALIZED_FX_LOSS,
                 ],
             ],
             FinancePostingProfileCode::CustomerAdvance->value => [
