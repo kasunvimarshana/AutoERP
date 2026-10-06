@@ -22,6 +22,8 @@ enum InvoicePrintLayout: string
 
     private const CONTINUOUS_SIDE_MARGIN_MM = 13;
 
+    private const CONTINUOUS_LEFT_PRINT_MARGIN_MM = 12;
+
     private const CONTINUOUS_END_MARGIN_MM = 4.2;
 
     public function paperSize(): string
@@ -56,7 +58,10 @@ enum InvoicePrintLayout: string
         return match ($this) {
             self::StandardA4 => '10mm',
             self::CompactA5 => '6mm',
-            self::Continuous85By55 => self::CONTINUOUS_END_MARGIN_MM.'mm '.self::CONTINUOUS_SIDE_MARGIN_MM.'mm',
+            self::Continuous85By55 => self::CONTINUOUS_END_MARGIN_MM.'mm '
+                .self::CONTINUOUS_SIDE_MARGIN_MM.'mm '
+                .self::CONTINUOUS_END_MARGIN_MM.'mm '
+                .self::CONTINUOUS_LEFT_PRINT_MARGIN_MM.'mm',
         };
     }
 
