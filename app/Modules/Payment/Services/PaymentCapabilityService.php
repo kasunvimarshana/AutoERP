@@ -65,6 +65,10 @@ final class PaymentCapabilityService
                 ! $posted ? 'Only posted payments can be allocated to invoices.' : null,
                 $this->math->compare($availableUnapplied, '0.000000') <= 0 ? 'Payment has no unreserved unapplied amount.' : null,
             ])),
+            'can_reverse_allocation' => array_values(array_filter([
+                ! $posted ? 'Only posted payments can reverse allocations.' : null,
+                ! $hasActiveAllocations ? 'Payment has no active allocation to reverse.' : null,
+            ])),
             'can_refund' => array_values(array_filter([
                 ! $posted ? 'Only posted payments can be refunded.' : null,
                 $paymentType === PaymentType::Refund ? 'Refund payments cannot be refunded again.' : null,
