@@ -182,7 +182,7 @@ final class FinanceSeeder extends Seeder
             $roots[$typeCode] = FinanceAccount::query()->updateOrCreate(
                 ['tenant_id' => $tenantId, 'code' => $code],
                 [
-                    'organization_unit_id' => $accountOrganizationUnitId,
+                    'organization_unit_id' => $organizationUnitId,
                     'account_type_id' => $types[$typeCode]->getKey(),
                     'account_category_id' => null,
                     'parent_id' => null,
@@ -235,7 +235,7 @@ final class FinanceSeeder extends Seeder
             FinanceAccount::query()->updateOrCreate(
                 ['tenant_id' => $tenantId, 'code' => $code],
                 [
-                    'organization_unit_id' => $organizationUnitId,
+                    'organization_unit_id' => $accountOrganizationUnitId,
                     'account_type_id' => $types[$typeCode]->getKey(),
                     'account_category_id' => $categories[$categoryCode]->getKey(),
                     'parent_id' => $roots[$typeCode]->getKey(),
