@@ -28,6 +28,7 @@ export function PaymentAllocationReversalPanel({
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
     const selected = active.find((allocation) => String(allocation.id) === allocationId) ?? null;
+    const minimumReversalDate = (selected?.allocation_date ?? payment.payment_date ?? '').slice(0, 10) || undefined;
     const valid = enabled && selected !== null && reversalDate !== '' && reason.trim() !== '';
 
     async function reverse() {
@@ -75,7 +76,7 @@ export function PaymentAllocationReversalPanel({
                 <Input
                     label="Reversal date"
                     type="date"
-                    min={selected?.allocation_date ?? payment.payment_date ?? undefined}
+                    min={minimumReversalDate}
                     value={reversalDate}
                     disabled={busy}
                     onChange={(event) => setReversalDate(event.target.value)}
