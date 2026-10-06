@@ -17,6 +17,7 @@ use Modules\Payment\Enums\PaymentLifecycleDimension;
 use Modules\Payment\Enums\PaymentMethodType;
 use Modules\Payment\Enums\PaymentPostingRole;
 use Modules\Payment\Enums\PaymentPostingStatus;
+use Modules\Payment\Enums\PaymentType;
 use Modules\Payment\Models\Payment;
 use Modules\Payment\Models\PaymentLine;
 use Modules\Payment\Validators\PaymentValidationService;
@@ -30,6 +31,7 @@ final class PaymentPostingService
         private readonly PaymentLifecycleEventRecorder $events,
         private readonly PaymentAllocationService $allocations,
         private readonly PaymentPostingPolicyService $postingPolicy,
+        private readonly PaymentBalanceSynchronizer $balances,
     ) {}
 
     public function post(Payment $payment, int $expectedVersion, ?int $postedBy = null): Payment
@@ -96,6 +98,7 @@ final class PaymentPostingService
                 $postedBy,
                 'Payment posted to Finance as '.$result->journalNumber.'.',
             );
+            $this->synchronizeOriginalAfterRefundPosting($locked, $postedBy);
 
             return $locked->refresh()->load(['lines', 'allocations', 'unappliedBalance', 'lifecycleEvents']);
         });
@@ -231,6 +234,30 @@ final class PaymentPostingService
         return (string) $line->payment_method_type_snapshot === PaymentMethodType::Cash->value
             ? PaymentPostingRole::Cash->value
             : PaymentPostingRole::Bank->value;
+    }
+
+    private function synchronizeOriginalAfterRefundPosting(Payment $payment, ?int $actorId): void
+    {
+        $type = $payment->payment_type instanceof PaymentType
+            ? $payment->payment_type
+            : PaymentType::from((string) $payment->payment_type);
+        if ($type !== PaymentType::Refund || $payment->original_payment_id === null) {
+            return;
+        }
+
+        $query = Payment::query()
+            ->where('tenant_id', $payment->tenant_id)
+            ->whereKey((int) $payment->original_payment_id)
+            ->lockForUpdate();
+        $payment->organization_unit_id === null
+            ? $query->whereNull('organization_unit_id')
+            : $query->where('organization_unit_id', $payment->organization_unit_id);
+        $original = $query->firstOrFail();
+
+        $original = $this->balances->sync($original, 'Refund payment posted.', $actorId);
+        $original->forceFill([
+            'row_version' => (int) $original->row_version + 1,
+        ])->save();
     }
 
     private function assertVersion(Payment $payment, int $expectedVersion): void
