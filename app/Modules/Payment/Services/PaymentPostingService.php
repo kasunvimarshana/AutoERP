@@ -30,6 +30,7 @@ final class PaymentPostingService
         private readonly PaymentValidationService $validator,
         private readonly PaymentLifecycleEventRecorder $events,
         private readonly PaymentAllocationService $allocations,
+        private readonly PaymentAllocationFinanceService $allocationFinance,
         private readonly PaymentPostingPolicyService $postingPolicy,
         private readonly PaymentBalanceSynchronizer $balances,
     ) {}
@@ -89,6 +90,14 @@ final class PaymentPostingService
                 'posted_at' => now(),
                 'row_version' => (int) $locked->row_version + 1,
             ])->save();
+            $locked = $locked->refresh()->load('allocations');
+            foreach ($locked->allocations as $allocation) {
+                if ((string) ($allocation->status instanceof \BackedEnum ? $allocation->status->value : $allocation->status) !== 'active') {
+                    continue;
+                }
+
+                $this->allocationFinance->post($locked, $allocation, $postedBy);
+            }
             $locked = $locked->refresh();
             $this->events->record(
                 $locked,
@@ -121,7 +130,7 @@ final class PaymentPostingService
             postingDate: $payment->payment_date?->toDateString() ?? now()->toDateString(),
             currencyId: $payment->currency_id,
             exchangeRate: (string) $payment->exchange_rate,
-            lines: $this->postingLines($payment, $policy->allocatedRole, $policy->unappliedRole),
+            lines: $this->postingLines($payment, $policy->unappliedRole),
             description: 'Payment '.$payment->payment_number,
             postingProfileCode: $policy->postingProfileCode,
         );
@@ -130,7 +139,6 @@ final class PaymentPostingService
     /** @return list<PostingLine> */
     private function postingLines(
         Payment $payment,
-        PaymentPostingRole $allocatedRole,
         PaymentPostingRole $unappliedRole,
     ): array {
         $direction = $payment->direction instanceof PaymentDirection
@@ -148,14 +156,12 @@ final class PaymentPostingService
             foreach ($payment->lines as $line) {
                 $lines[] = $this->cashPostingLine($payment, $line, (string) $line->amount, '0.000000');
             }
-            $this->appendCounterpartyLine($lines, $payment, $allocatedAmount, '0.000000', $allocatedRole);
-            $this->appendCounterpartyLine($lines, $payment, $unappliedAmount, '0.000000', $unappliedRole);
+            $this->appendCounterpartyLine($lines, $payment, $totalAmount, '0.000000', $unappliedRole);
 
             return $this->creditCounterpartyLines($lines);
         }
 
-        $this->appendCounterpartyLine($lines, $payment, $allocatedAmount, '0.000000', $allocatedRole);
-        $this->appendCounterpartyLine($lines, $payment, $unappliedAmount, '0.000000', $unappliedRole);
+        $this->appendCounterpartyLine($lines, $payment, $totalAmount, '0.000000', $unappliedRole);
         foreach ($payment->lines as $line) {
             $lines[] = $this->cashPostingLine($payment, $line, '0.000000', (string) $line->amount);
         }
