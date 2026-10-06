@@ -8,6 +8,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
+use Modules\Finance\Constants\FinanceSystemAccountCode;
 use Modules\Finance\Database\Seeders\FinanceSeeder;
 use Modules\Finance\Enums\FinanceAccountRoleCode;
 use Modules\Finance\Enums\FinancePostingProfileCode;
@@ -23,9 +24,6 @@ final class FinanceSeederTest extends TestCase
     private const ACCOUNT_SUPPLIER_ADVANCE = '1400';
     private const ACCOUNT_PAYABLE = '2100';
     private const ACCOUNT_CUSTOMER_ADVANCE = '2300';
-    private const ACCOUNT_CUSTOMER_DEPOSIT = 'CUSTOMER-SECURITY-DEPOSIT';
-    private const ACCOUNT_REALIZED_FX_GAIN = 'FX-REALIZED-GAIN';
-    private const ACCOUNT_REALIZED_FX_LOSS = 'FX-REALIZED-LOSS';
 
     public function test_default_posting_profiles_are_seeded_for_the_protected_root_organization_unit(): void
     {
@@ -61,7 +59,7 @@ final class FinanceSeederTest extends TestCase
             self::ACCOUNT_SUPPLIER_ADVANCE,
             self::ACCOUNT_PAYABLE,
             self::ACCOUNT_CUSTOMER_ADVANCE,
-            self::ACCOUNT_CUSTOMER_DEPOSIT,
+            FinanceSystemAccountCode::CUSTOMER_SECURITY_DEPOSIT,
         ] as $accountCode) {
             $this->assertGreaterThan(0, $this->accountId($tenantId, $organizationUnitId, $accountCode));
         }
@@ -70,11 +68,11 @@ final class FinanceSeederTest extends TestCase
         $this->assertActiveAssignment($tenantId, $organizationUnitId, FinanceAccountRoleCode::Payable->value, self::ACCOUNT_PAYABLE);
         $this->assertActiveAssignment($tenantId, $organizationUnitId, FinanceAccountRoleCode::SupplierAdvance->value, self::ACCOUNT_SUPPLIER_ADVANCE);
         $this->assertActiveAssignment($tenantId, $organizationUnitId, FinanceAccountRoleCode::CustomerAdvance->value, self::ACCOUNT_CUSTOMER_ADVANCE);
-        $this->assertActiveAssignment($tenantId, $organizationUnitId, FinanceAccountRoleCode::CustomerDeposit->value, self::ACCOUNT_CUSTOMER_DEPOSIT);
+        $this->assertActiveAssignment($tenantId, $organizationUnitId, FinanceAccountRoleCode::CustomerDeposit->value, FinanceSystemAccountCode::CUSTOMER_SECURITY_DEPOSIT);
 
         foreach ([
-            FinanceAccountRoleCode::RealizedFxGain->value => self::ACCOUNT_REALIZED_FX_GAIN,
-            FinanceAccountRoleCode::RealizedFxLoss->value => self::ACCOUNT_REALIZED_FX_LOSS,
+            FinanceAccountRoleCode::RealizedFxGain->value => FinanceSystemAccountCode::REALIZED_FX_GAIN,
+            FinanceAccountRoleCode::RealizedFxLoss->value => FinanceSystemAccountCode::REALIZED_FX_LOSS,
         ] as $roleCode => $accountCode) {
             $this->assertGreaterThan(0, $this->accountId($tenantId, null, $accountCode));
             $this->assertActiveAssignment($tenantId, null, $roleCode, $accountCode);
