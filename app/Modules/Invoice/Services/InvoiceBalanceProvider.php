@@ -123,6 +123,7 @@ final class InvoiceBalanceProvider implements InvoiceBalanceProviderInterface
         ?int $organizationUnitId,
         string $partyType,
         int $partyId,
+        ?int $currencyId,
     ): array {
         $invoiceQuery = Invoice::query()
             ->join('invoice_balances', 'invoice_balances.invoice_id', '=', 'invoices.id')
@@ -137,6 +138,9 @@ final class InvoiceBalanceProvider implements InvoiceBalanceProviderInterface
         $organizationUnitId === null
             ? $invoiceQuery->whereNull('invoices.organization_unit_id')
             : $invoiceQuery->where('invoices.organization_unit_id', $organizationUnitId);
+        $currencyId === null
+            ? $invoiceQuery->whereNull('invoices.currency_id')
+            : $invoiceQuery->where('invoices.currency_id', $currencyId);
 
         return $invoiceQuery
             ->pluck('invoices.id')
@@ -163,12 +167,9 @@ final class InvoiceBalanceProvider implements InvoiceBalanceProviderInterface
             ? $query->whereNull('organization_unit_id')
             : $query->where('organization_unit_id', $organizationUnitId);
 
-        if ($currencyId !== null) {
-            $query->where(function ($scope) use ($currencyId): void {
-                $scope->whereNull('currency_id')
-                    ->orWhere('currency_id', $currencyId);
-            });
-        }
+        $currencyId === null
+            ? $query->whereNull('currency_id')
+            : $query->where('currency_id', $currencyId);
 
         $invoice = $query->firstOrFail();
         $this->statuses->assertCanSettle($invoice);
