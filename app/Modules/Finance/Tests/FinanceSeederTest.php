@@ -23,8 +23,8 @@ final class FinanceSeederTest extends TestCase
     private const ACCOUNT_SUPPLIER_ADVANCE = '1400';
     private const ACCOUNT_PAYABLE = '2100';
     private const ACCOUNT_CUSTOMER_ADVANCE = '2300';
-    private const ACCOUNT_REALIZED_FX_GAIN = '4300';
-    private const ACCOUNT_REALIZED_FX_LOSS = '5500';
+    private const ACCOUNT_REALIZED_FX_GAIN = 'FX-REALIZED-GAIN';
+    private const ACCOUNT_REALIZED_FX_LOSS = 'FX-REALIZED-LOSS';
 
     public function test_default_posting_profiles_are_seeded_for_the_protected_root_organization_unit(): void
     {
