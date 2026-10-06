@@ -298,14 +298,19 @@ final class PaymentAllocationService
         }
 
         $invoiceNumber = trim((string) ($reference['invoice_number'] ?? ''));
+        $invoiceExchangeRate = trim((string) ($reference['exchange_rate'] ?? ''));
         if ($invoiceNumber === '') {
             throw new InvalidArgumentException('Invoice number is required for payment allocation history.');
+        }
+        if ($invoiceExchangeRate === '' || $this->math->compare($invoiceExchangeRate, '0') <= 0) {
+            throw new InvalidArgumentException('Invoice exchange rate is required for payment allocation history.');
         }
 
         return [
             'invoice_number_snapshot' => $invoiceNumber,
             'invoice_date_snapshot' => $reference['invoice_date'] ?? null,
             'invoice_currency_code_snapshot' => $reference['currency_code'] ?? null,
+            'invoice_exchange_rate_snapshot' => $reference['exchange_rate'] ?? null,
         ];
     }
 
