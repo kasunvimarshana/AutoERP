@@ -179,7 +179,7 @@ final class PaymentAllocationReversalServiceTest extends TestCase
         $allocations = $this->withTenantExecutionContext(
             $tenantId,
             fn () => PaymentAllocation::query()
-                ->where('payment_id', $paymentId)
+                ->where('payment_id', $payment->getKey())
                 ->where('invoice_id', $invoice->getKey())
                 ->orderBy('id')
                 ->get(),
