@@ -52,6 +52,123 @@ final class FinancePostingProfileScopeTest extends TestCase
         $this->assertSame([$organizationProfileId, $tenantProfileId], array_column($lookups, 'id'));
     }
 
+    public function test_organization_posting_uses_tenant_default_profile_and_global_accounts(): void
+    {
+        [$tenantId, $organizationUnitId] = $this->scope();
+
+        $this->withTenantExecutionContext($tenantId, function () use ($tenantId, $organizationUnitId): void {
+            $assetTypeId = (int) DB::table('finance_account_types')->insertGetId([
+                'tenant_id' => $tenantId,
+                'code' => 'ASSET-FALLBACK',
+                'name' => 'Fallback Asset',
+                'normal_balance' => 'debit',
+                'statement_type' => 'balance_sheet',
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $equityTypeId = (int) DB::table('finance_account_types')->insertGetId([
+                'tenant_id' => $tenantId,
+                'code' => 'EQUITY-FALLBACK',
+                'name' => 'Fallback Equity',
+                'normal_balance' => 'credit',
+                'statement_type' => 'balance_sheet',
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $cashId = (int) DB::table('finance_accounts')->insertGetId([
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => null,
+                'account_type_id' => $assetTypeId,
+                'code' => 'FALLBACK-CASH',
+                'name' => 'Fallback Cash',
+                'normal_balance' => 'debit',
+                'is_posting_account' => true,
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $capitalId = (int) DB::table('finance_accounts')->insertGetId([
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => null,
+                'account_type_id' => $equityTypeId,
+                'code' => 'FALLBACK-CAPITAL',
+                'name' => 'Fallback Capital',
+                'normal_balance' => 'credit',
+                'is_posting_account' => true,
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $cashRoleId = (int) DB::table('finance_account_roles')->insertGetId([
+                'tenant_id' => $tenantId,
+                'code' => 'fallback_cash',
+                'name' => 'Fallback Cash',
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $capitalRoleId = (int) DB::table('finance_account_roles')->insertGetId([
+                'tenant_id' => $tenantId,
+                'code' => 'fallback_capital',
+                'name' => 'Fallback Capital',
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+            foreach ([[$cashRoleId, $cashId], [$capitalRoleId, $capitalId]] as [$roleId, $accountId]) {
+                DB::table('finance_account_assignments')->insert([
+                    'tenant_id' => $tenantId,
+                    'organization_unit_id' => null,
+                    'account_role_id' => $roleId,
+                    'account_id' => $accountId,
+                    'effective_from' => '1900-01-01',
+                    'is_active' => true,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+            $profileId = $this->profile($tenantId, null, 'tenant_fallback_posting', 'Tenant Fallback Posting');
+            foreach ([['fallback_cash', $cashRoleId], ['fallback_capital', $capitalRoleId]] as [$lineKey, $roleId]) {
+                DB::table('finance_posting_profile_rules')->insert([
+                    'tenant_id' => $tenantId,
+                    'posting_profile_id' => $profileId,
+                    'line_key' => $lineKey,
+                    'account_role_id' => $roleId,
+                    'effective_from' => '1900-01-01',
+                    'is_active' => true,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+
+            $result = app(FinancePostingInterface::class)->post(new PostingContext(
+                source: new PostingSourceData(
+                    sourceType: 'tenant_fallback_test',
+                    sourceId: 1,
+                    tenantId: $tenantId,
+                    organizationUnitId: $organizationUnitId,
+                    sourceModule: 'finance',
+                ),
+                postingDate: '2026-10-06',
+                lines: [
+                    new PostingLine(debit: '100.000000', profileKey: 'fallback_cash'),
+                    new PostingLine(credit: '100.000000', profileKey: 'fallback_capital'),
+                ],
+                postingProfileCode: 'tenant_fallback_posting',
+            ));
+
+            self::assertSame('posted', $result->status);
+            $this->assertDatabaseHas('finance_journal_entries', [
+                'id' => $result->journalId,
+                'tenant_id' => $tenantId,
+                'organization_unit_id' => $organizationUnitId,
+                'posting_profile_id' => $profileId,
+            ]);
+        });
+    }
+
     public function test_tenant_context_lists_only_tenant_default_profiles(): void
     {
         [$tenantId, $organizationUnitId] = $this->scope();
