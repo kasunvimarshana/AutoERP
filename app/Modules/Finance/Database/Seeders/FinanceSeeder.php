@@ -182,7 +182,7 @@ final class FinanceSeeder extends Seeder
             $roots[$typeCode] = FinanceAccount::query()->updateOrCreate(
                 ['tenant_id' => $tenantId, 'code' => $code],
                 [
-                    'organization_unit_id' => $organizationUnitId,
+                    'organization_unit_id' => $accountOrganizationUnitId,
                     'account_type_id' => $types[$typeCode]->getKey(),
                     'account_category_id' => null,
                     'parent_id' => null,
@@ -226,6 +226,12 @@ final class FinanceSeeder extends Seeder
         ];
 
         foreach ($accounts as [$code, $name, $typeCode, $categoryCode, $isCash, $isBank, $isTax]) {
+            $accountOrganizationUnitId = in_array(
+                $code,
+                [self::ACCOUNT_REALIZED_FX_GAIN, self::ACCOUNT_REALIZED_FX_LOSS],
+                true,
+            ) ? null : $organizationUnitId;
+
             FinanceAccount::query()->updateOrCreate(
                 ['tenant_id' => $tenantId, 'code' => $code],
                 [
@@ -397,7 +403,12 @@ final class FinanceSeeder extends Seeder
                     ],
                 );
 
-                $this->seedAccountAssignment($tenantId, $organizationUnitId, $role, $account);
+                $assignmentOrganizationUnitId = in_array(
+                    $lineKey,
+                    [FinanceAccountRoleCode::RealizedFxGain->value, FinanceAccountRoleCode::RealizedFxLoss->value],
+                    true,
+                ) ? null : $organizationUnitId;
+                $this->seedAccountAssignment($tenantId, $assignmentOrganizationUnitId, $role, $account);
                 FinancePostingProfileRule::query()->updateOrCreate(
                     [
                         'tenant_id' => $tenantId,
