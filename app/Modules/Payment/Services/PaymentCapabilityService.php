@@ -11,11 +11,15 @@ use Modules\Payment\Enums\PaymentAllocationState;
 use Modules\Payment\Enums\PaymentDocumentStatus;
 use Modules\Payment\Enums\PaymentMethodType;
 use Modules\Payment\Enums\PaymentPostingStatus;
+use Modules\Payment\Enums\PaymentType;
 use Modules\Payment\Models\Payment;
 
 final class PaymentCapabilityService
 {
-    public function __construct(private readonly DecimalMath $math) {}
+    public function __construct(
+        private readonly DecimalMath $math,
+        private readonly PaymentRefundPolicyService $refundPolicy,
+    ) {}
 
     public function capabilities(Payment $payment): array
     {
@@ -40,6 +44,10 @@ final class PaymentCapabilityService
                 ->where('document_status', PaymentDocumentStatus::Approved->value)
                 ->where('posting_status', PaymentPostingStatus::Posted->value))
             ->exists();
+        $availableUnapplied = $this->refundPolicy->availableUnappliedAmount($payment);
+        $paymentType = $payment->payment_type instanceof PaymentType
+            ? $payment->payment_type
+            : PaymentType::from((string) $payment->payment_type);
         $hasChequeLine = $payment->relationLoaded('lines')
             ? $payment->lines->contains(fn ($line): bool => (string) $line->payment_method_type_snapshot === PaymentMethodType::Cheque->value)
             : $payment->lines()->where('payment_method_type_snapshot', PaymentMethodType::Cheque->value)->exists();
@@ -55,11 +63,12 @@ final class PaymentCapabilityService
             ])),
             'can_allocate' => array_values(array_filter([
                 ! $posted ? 'Only posted payments can be allocated to invoices.' : null,
-                $this->math->compare((string) $payment->unapplied_amount, '0.000000') <= 0 ? 'Payment has no unapplied amount.' : null,
+                $this->math->compare($availableUnapplied, '0.000000') <= 0 ? 'Payment has no unreserved unapplied amount.' : null,
             ])),
             'can_refund' => array_values(array_filter([
                 ! $posted ? 'Only posted payments can be refunded.' : null,
-                $this->math->compare((string) $payment->unapplied_amount, '0.000000') <= 0 ? 'Payment has no refundable unapplied amount.' : null,
+                $paymentType === PaymentType::Refund ? 'Refund payments cannot be refunded again.' : null,
+                $this->math->compare($availableUnapplied, '0.000000') <= 0 ? 'Payment has no refundable unreserved amount.' : null,
             ])),
             'can_void' => array_values(array_filter([
                 ! in_array($document, [PaymentDocumentStatus::Draft, PaymentDocumentStatus::Submitted, PaymentDocumentStatus::Approved], true)
