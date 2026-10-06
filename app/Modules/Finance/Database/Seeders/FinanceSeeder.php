@@ -55,6 +55,8 @@ final class FinanceSeeder extends Seeder
 
     private const ACCOUNT_CUSTOMER_ADVANCE = '2300';
 
+    private const ACCOUNT_CUSTOMER_DEPOSIT = 'CUSTOMER-SECURITY-DEPOSIT';
+
     private const ACCOUNT_SALES_REVENUE = '4100';
 
     private const ACCOUNT_SERVICE_REVENUE = '4200';
@@ -137,6 +139,7 @@ final class FinanceSeeder extends Seeder
             'GRNI' => ['Goods Received Not Invoiced', self::TYPE_LIABILITY],
             'TAX_PAYABLE' => ['Tax Payable', self::TYPE_LIABILITY],
             'CUSTOMER_ADVANCE' => ['Customer Advances', self::TYPE_LIABILITY],
+            'CUSTOMER_DEPOSIT' => ['Customer Security Deposits', self::TYPE_LIABILITY],
             'SALES' => ['Sales Revenue', self::TYPE_REVENUE],
             'SERVICE' => ['Service Revenue', self::TYPE_REVENUE],
             'FX_GAIN' => ['Realized FX Gain', self::TYPE_REVENUE],
@@ -208,6 +211,7 @@ final class FinanceSeeder extends Seeder
             [self::ACCOUNT_GRNI, 'Goods Received Not Invoiced', self::TYPE_LIABILITY, 'GRNI', false, false, false],
             [self::ACCOUNT_TAX_PAYABLE, 'Tax Payable', self::TYPE_LIABILITY, 'TAX_PAYABLE', false, false, true],
             [self::ACCOUNT_CUSTOMER_ADVANCE, 'Customer Advances', self::TYPE_LIABILITY, 'CUSTOMER_ADVANCE', false, false, false],
+            [self::ACCOUNT_CUSTOMER_DEPOSIT, 'Customer Security Deposits', self::TYPE_LIABILITY, 'CUSTOMER_DEPOSIT', false, false, false],
             [self::ACCOUNT_SALES_REVENUE, 'Sales Revenue', self::TYPE_REVENUE, 'SALES', false, false, false],
             [self::ACCOUNT_SERVICE_REVENUE, 'Service Revenue', self::TYPE_REVENUE, 'SERVICE', false, false, false],
             [self::ACCOUNT_REALIZED_FX_GAIN, 'Realized FX Gain', self::TYPE_REVENUE, 'FX_GAIN', false, false, false],
@@ -223,6 +227,7 @@ final class FinanceSeeder extends Seeder
             'INVENTORY',
             'SUPPLIER_ADVANCE',
             'CUSTOMER_ADVANCE',
+            'CUSTOMER_DEPOSIT',
         ];
 
         foreach ($accounts as [$code, $name, $typeCode, $categoryCode, $isCash, $isBank, $isTax]) {
@@ -322,6 +327,17 @@ final class FinanceSeeder extends Seeder
                     FinanceAccountRoleCode::Bank->value => self::ACCOUNT_BANK,
                     FinanceAccountRoleCode::Payable->value => self::ACCOUNT_PAYABLE,
                     FinanceAccountRoleCode::SupplierAdvance->value => self::ACCOUNT_SUPPLIER_ADVANCE,
+                    FinanceAccountRoleCode::RealizedFxGain->value => self::ACCOUNT_REALIZED_FX_GAIN,
+                    FinanceAccountRoleCode::RealizedFxLoss->value => self::ACCOUNT_REALIZED_FX_LOSS,
+                ],
+            ],
+            FinancePostingProfileCode::RentalDeposit->value => [
+                'name' => 'Rental Security Deposit',
+                'rules' => [
+                    FinanceAccountRoleCode::Cash->value => self::ACCOUNT_CASH,
+                    FinanceAccountRoleCode::Bank->value => self::ACCOUNT_BANK,
+                    FinanceAccountRoleCode::Receivable->value => self::ACCOUNT_RECEIVABLE,
+                    FinanceAccountRoleCode::CustomerDeposit->value => self::ACCOUNT_CUSTOMER_DEPOSIT,
                     FinanceAccountRoleCode::RealizedFxGain->value => self::ACCOUNT_REALIZED_FX_GAIN,
                     FinanceAccountRoleCode::RealizedFxLoss->value => self::ACCOUNT_REALIZED_FX_LOSS,
                 ],
