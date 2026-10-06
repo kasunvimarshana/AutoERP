@@ -10,7 +10,7 @@ import { useApi } from '@/shared/hooks/useApi';
 import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { isPositiveDecimal } from '@/shared/utils/decimal';
 import {
-    listUsablePaymentMethods,
+    listUsableRefundPaymentMethods,
     refundPayment,
     type Payment,
 } from '../paymentApi';
@@ -54,7 +54,7 @@ export function PaymentRefundPanel({
     const [error, setError] = useState<ApiError | null>(null);
 
     const methods = useApi(
-        (signal) => listUsablePaymentMethods({ direction, per_page: PAGE_SIZE }, signal),
+        (signal) => listUsableRefundPaymentMethods({ direction, per_page: PAGE_SIZE }, signal),
         [direction],
         enabled,
     );
