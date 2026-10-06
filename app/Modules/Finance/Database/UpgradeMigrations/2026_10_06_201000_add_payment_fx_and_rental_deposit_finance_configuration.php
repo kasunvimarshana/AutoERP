@@ -296,15 +296,9 @@ return new class extends Migration
             ->whereNull('organization_unit_id')
             ->where('account_role_id', $roleId)
             ->where('is_active', true)
-            ->whereDate('effective_from', '<=', self::OPENING_EFFECTIVE_DATE)
-            ->where(function ($query): void {
-                $query->whereNull('effective_to')
-                    ->orWhereDate('effective_to', '>=', self::OPENING_EFFECTIVE_DATE);
-            })
-            ->orderByDesc('effective_from')
-            ->first(['id', 'account_id']);
+            ->exists();
 
-        if ($existing !== null) {
+        if ($existing) {
             return;
         }
 
