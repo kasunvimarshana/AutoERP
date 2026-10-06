@@ -3,7 +3,7 @@ import type { PaymentLineDraft } from './components/PaymentLineTable';
 import { isPositiveDecimal } from '@/shared/utils/decimal';
 const PAYMENT_DIRECTION_OUTBOUND = 'outbound';
 
-function methodKind(method?: PaymentMethod): string {
+export function paymentMethodKind(method?: PaymentMethod): string {
     const type = method?.method_type ?? '';
     if (['bank_transfer', 'direct_debit'].includes(type)) return 'bank_transfer';
     if (['digital_wallet', 'mobile_wallet'].includes(type)) return 'wallet';
@@ -11,7 +11,7 @@ function methodKind(method?: PaymentMethod): string {
 }
 
 export function linePayload(line: PaymentLineDraft, method: PaymentMethod, direction: string): PaymentLinePayload {
-    const kind = methodKind(method);
+    const kind = paymentMethodKind(method);
     const payload: PaymentLinePayload = {
         payment_method_id: method.id,
         amount: line.amount,
