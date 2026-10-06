@@ -6,6 +6,7 @@ namespace Tests\Support;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Modules\Finance\Constants\FinanceSystemAccountCode;
 use Modules\Finance\Enums\FinanceAccountRoleCode;
 use Modules\Finance\Enums\FinancePostingProfileCode;
 
@@ -41,13 +42,11 @@ final class FinancePostingFixture
 
     private const CUSTOMER_ADVANCE_ACCOUNT = '2300';
 
-    private const CUSTOMER_DEPOSIT_ACCOUNT = '2310';
 
     private const SALES_REVENUE_ACCOUNT = '4100';
 
     private const SERVICE_REVENUE_ACCOUNT = '4200';
 
-    private const REALIZED_FX_GAIN_ACCOUNT = 'FX-REALIZED-GAIN';
 
     private const PURCHASE_EXPENSE_ACCOUNT = '5100';
 
@@ -74,7 +73,7 @@ final class FinancePostingFixture
     {
         $accounts = self::accounts($tenantId, $organizationUnitId);
         $liability = self::accountType($tenantId, self::LIABILITY_TYPE, 'credit', 'balance_sheet');
-        $deposit = self::account($tenantId, $organizationUnitId, $liability, self::CUSTOMER_DEPOSIT_ACCOUNT, 'Customer Security Deposits', 'credit');
+        $deposit = self::account($tenantId, $organizationUnitId, $liability, FinanceSystemAccountCode::CUSTOMER_SECURITY_DEPOSIT, 'Customer Security Deposits', 'credit');
         self::profile($tenantId, $organizationUnitId, FinancePostingProfileCode::RentalDeposit->value, [
             FinanceAccountRoleCode::Cash->value => $accounts[FinanceAccountRoleCode::Cash->value],
             FinanceAccountRoleCode::Bank->value => $accounts[FinanceAccountRoleCode::Bank->value],
@@ -87,7 +86,6 @@ final class FinancePostingFixture
 
     private const OPERATING_EXPENSE_ACCOUNT = '5400';
 
-    private const REALIZED_FX_LOSS_ACCOUNT = 'FX-REALIZED-LOSS';
 
     public static function seedExpensePaymentProfile(int $tenantId, ?int $organizationUnitId = null): void
     {
@@ -247,8 +245,8 @@ final class FinancePostingFixture
             FinanceAccountRoleCode::Expense->value => self::account($tenantId, $organizationUnitId, $expenseTypeId, self::PURCHASE_EXPENSE_ACCOUNT, 'Purchase Expense', 'debit'),
             FinanceAccountRoleCode::CostOfGoodsSold->value => self::account($tenantId, $organizationUnitId, $expenseTypeId, self::COST_OF_GOODS_SOLD_ACCOUNT, 'Cost of Goods Sold', 'debit'),
             FinanceAccountRoleCode::OperatingExpense->value => self::account($tenantId, $organizationUnitId, $expenseTypeId, self::OPERATING_EXPENSE_ACCOUNT, 'Operating Expense', 'debit'),
-            FinanceAccountRoleCode::RealizedFxGain->value => self::account($tenantId, $organizationUnitId, $revenueTypeId, self::REALIZED_FX_GAIN_ACCOUNT, 'Realized FX Gain', 'credit'),
-            FinanceAccountRoleCode::RealizedFxLoss->value => self::account($tenantId, $organizationUnitId, $expenseTypeId, self::REALIZED_FX_LOSS_ACCOUNT, 'Realized FX Loss', 'debit'),
+            FinanceAccountRoleCode::RealizedFxGain->value => self::account($tenantId, $organizationUnitId, $revenueTypeId, FinanceSystemAccountCode::REALIZED_FX_GAIN, 'Realized FX Gain', 'credit'),
+            FinanceAccountRoleCode::RealizedFxLoss->value => self::account($tenantId, $organizationUnitId, $expenseTypeId, FinanceSystemAccountCode::REALIZED_FX_LOSS, 'Realized FX Loss', 'debit'),
         ];
     }
 
