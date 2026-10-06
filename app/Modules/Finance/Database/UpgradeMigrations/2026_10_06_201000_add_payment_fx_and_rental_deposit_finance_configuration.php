@@ -420,7 +420,6 @@ return new class extends Migration
             ->where('tenant_id', $tenantId)
             ->where('posting_profile_id', $profileId)
             ->where('line_key', $lineKey)
-            ->where('is_active', true)
             ->exists()) {
             return;
         }
