@@ -9,6 +9,7 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use Modules\Finance\Constants\FinanceSystemAccountCode;
 use Modules\Finance\Enums\FinanceAccountRoleCode;
 use Modules\Finance\Enums\FinancePostingProfileCode;
 use Modules\Finance\Models\FinanceAccount;
@@ -55,21 +56,15 @@ final class FinanceSeeder extends Seeder
 
     private const ACCOUNT_CUSTOMER_ADVANCE = '2300';
 
-    private const ACCOUNT_CUSTOMER_DEPOSIT = 'CUSTOMER-SECURITY-DEPOSIT';
-
     private const ACCOUNT_SALES_REVENUE = '4100';
 
     private const ACCOUNT_SERVICE_REVENUE = '4200';
-
-    private const ACCOUNT_REALIZED_FX_GAIN = 'FX-REALIZED-GAIN';
 
     private const ACCOUNT_PURCHASE_EXPENSE = '5100';
 
     private const ACCOUNT_COST_OF_GOODS_SOLD = '5200';
 
     private const ACCOUNT_OPERATING_EXPENSE = '5400';
-
-    private const ACCOUNT_REALIZED_FX_LOSS = 'FX-REALIZED-LOSS';
 
     public function run(): void
     {
@@ -211,14 +206,14 @@ final class FinanceSeeder extends Seeder
             [self::ACCOUNT_GRNI, 'Goods Received Not Invoiced', self::TYPE_LIABILITY, 'GRNI', false, false, false],
             [self::ACCOUNT_TAX_PAYABLE, 'Tax Payable', self::TYPE_LIABILITY, 'TAX_PAYABLE', false, false, true],
             [self::ACCOUNT_CUSTOMER_ADVANCE, 'Customer Advances', self::TYPE_LIABILITY, 'CUSTOMER_ADVANCE', false, false, false],
-            [self::ACCOUNT_CUSTOMER_DEPOSIT, 'Customer Security Deposits', self::TYPE_LIABILITY, 'CUSTOMER_DEPOSIT', false, false, false],
+            [FinanceSystemAccountCode::CUSTOMER_SECURITY_DEPOSIT, 'Customer Security Deposits', self::TYPE_LIABILITY, 'CUSTOMER_DEPOSIT', false, false, false],
             [self::ACCOUNT_SALES_REVENUE, 'Sales Revenue', self::TYPE_REVENUE, 'SALES', false, false, false],
             [self::ACCOUNT_SERVICE_REVENUE, 'Service Revenue', self::TYPE_REVENUE, 'SERVICE', false, false, false],
-            [self::ACCOUNT_REALIZED_FX_GAIN, 'Realized FX Gain', self::TYPE_REVENUE, 'FX_GAIN', false, false, false],
+            [FinanceSystemAccountCode::REALIZED_FX_GAIN, 'Realized FX Gain', self::TYPE_REVENUE, 'FX_GAIN', false, false, false],
             [self::ACCOUNT_PURCHASE_EXPENSE, 'Purchase Expense', self::TYPE_EXPENSE, 'PURCHASE', false, false, false],
             [self::ACCOUNT_COST_OF_GOODS_SOLD, 'Cost of Goods Sold', self::TYPE_EXPENSE, 'COGS', false, false, false],
             [self::ACCOUNT_OPERATING_EXPENSE, 'Operating Expense', self::TYPE_EXPENSE, 'OPERATING_EXPENSE', false, false, false],
-            [self::ACCOUNT_REALIZED_FX_LOSS, 'Realized FX Loss', self::TYPE_EXPENSE, 'FX_LOSS', false, false, false],
+            [FinanceSystemAccountCode::REALIZED_FX_LOSS, 'Realized FX Loss', self::TYPE_EXPENSE, 'FX_LOSS', false, false, false],
         ];
         $controlCategories = [
             'AR',
@@ -233,7 +228,7 @@ final class FinanceSeeder extends Seeder
         foreach ($accounts as [$code, $name, $typeCode, $categoryCode, $isCash, $isBank, $isTax]) {
             $accountOrganizationUnitId = in_array(
                 $code,
-                [self::ACCOUNT_REALIZED_FX_GAIN, self::ACCOUNT_REALIZED_FX_LOSS],
+                [FinanceSystemAccountCode::REALIZED_FX_GAIN, FinanceSystemAccountCode::REALIZED_FX_LOSS],
                 true,
             ) ? null : $organizationUnitId;
 
@@ -294,8 +289,8 @@ final class FinanceSeeder extends Seeder
                     FinanceAccountRoleCode::Bank->value => self::ACCOUNT_BANK,
                     FinanceAccountRoleCode::Receivable->value => self::ACCOUNT_RECEIVABLE,
                     FinanceAccountRoleCode::CustomerAdvance->value => self::ACCOUNT_CUSTOMER_ADVANCE,
-                    FinanceAccountRoleCode::RealizedFxGain->value => self::ACCOUNT_REALIZED_FX_GAIN,
-                    FinanceAccountRoleCode::RealizedFxLoss->value => self::ACCOUNT_REALIZED_FX_LOSS,
+                    FinanceAccountRoleCode::RealizedFxGain->value => FinanceSystemAccountCode::REALIZED_FX_GAIN,
+                    FinanceAccountRoleCode::RealizedFxLoss->value => FinanceSystemAccountCode::REALIZED_FX_LOSS,
                 ],
             ],
             FinancePostingProfileCode::SupplierPayment->value => [
@@ -305,8 +300,8 @@ final class FinanceSeeder extends Seeder
                     FinanceAccountRoleCode::Bank->value => self::ACCOUNT_BANK,
                     FinanceAccountRoleCode::Payable->value => self::ACCOUNT_PAYABLE,
                     FinanceAccountRoleCode::SupplierAdvance->value => self::ACCOUNT_SUPPLIER_ADVANCE,
-                    FinanceAccountRoleCode::RealizedFxGain->value => self::ACCOUNT_REALIZED_FX_GAIN,
-                    FinanceAccountRoleCode::RealizedFxLoss->value => self::ACCOUNT_REALIZED_FX_LOSS,
+                    FinanceAccountRoleCode::RealizedFxGain->value => FinanceSystemAccountCode::REALIZED_FX_GAIN,
+                    FinanceAccountRoleCode::RealizedFxLoss->value => FinanceSystemAccountCode::REALIZED_FX_LOSS,
                 ],
             ],
             FinancePostingProfileCode::CustomerAdvance->value => [
@@ -316,8 +311,8 @@ final class FinanceSeeder extends Seeder
                     FinanceAccountRoleCode::Bank->value => self::ACCOUNT_BANK,
                     FinanceAccountRoleCode::Receivable->value => self::ACCOUNT_RECEIVABLE,
                     FinanceAccountRoleCode::CustomerAdvance->value => self::ACCOUNT_CUSTOMER_ADVANCE,
-                    FinanceAccountRoleCode::RealizedFxGain->value => self::ACCOUNT_REALIZED_FX_GAIN,
-                    FinanceAccountRoleCode::RealizedFxLoss->value => self::ACCOUNT_REALIZED_FX_LOSS,
+                    FinanceAccountRoleCode::RealizedFxGain->value => FinanceSystemAccountCode::REALIZED_FX_GAIN,
+                    FinanceAccountRoleCode::RealizedFxLoss->value => FinanceSystemAccountCode::REALIZED_FX_LOSS,
                 ],
             ],
             FinancePostingProfileCode::SupplierAdvance->value => [
@@ -327,8 +322,8 @@ final class FinanceSeeder extends Seeder
                     FinanceAccountRoleCode::Bank->value => self::ACCOUNT_BANK,
                     FinanceAccountRoleCode::Payable->value => self::ACCOUNT_PAYABLE,
                     FinanceAccountRoleCode::SupplierAdvance->value => self::ACCOUNT_SUPPLIER_ADVANCE,
-                    FinanceAccountRoleCode::RealizedFxGain->value => self::ACCOUNT_REALIZED_FX_GAIN,
-                    FinanceAccountRoleCode::RealizedFxLoss->value => self::ACCOUNT_REALIZED_FX_LOSS,
+                    FinanceAccountRoleCode::RealizedFxGain->value => FinanceSystemAccountCode::REALIZED_FX_GAIN,
+                    FinanceAccountRoleCode::RealizedFxLoss->value => FinanceSystemAccountCode::REALIZED_FX_LOSS,
                 ],
             ],
             FinancePostingProfileCode::RentalDeposit->value => [
@@ -337,9 +332,9 @@ final class FinanceSeeder extends Seeder
                     FinanceAccountRoleCode::Cash->value => self::ACCOUNT_CASH,
                     FinanceAccountRoleCode::Bank->value => self::ACCOUNT_BANK,
                     FinanceAccountRoleCode::Receivable->value => self::ACCOUNT_RECEIVABLE,
-                    FinanceAccountRoleCode::CustomerDeposit->value => self::ACCOUNT_CUSTOMER_DEPOSIT,
-                    FinanceAccountRoleCode::RealizedFxGain->value => self::ACCOUNT_REALIZED_FX_GAIN,
-                    FinanceAccountRoleCode::RealizedFxLoss->value => self::ACCOUNT_REALIZED_FX_LOSS,
+                    FinanceAccountRoleCode::CustomerDeposit->value => FinanceSystemAccountCode::CUSTOMER_SECURITY_DEPOSIT,
+                    FinanceAccountRoleCode::RealizedFxGain->value => FinanceSystemAccountCode::REALIZED_FX_GAIN,
+                    FinanceAccountRoleCode::RealizedFxLoss->value => FinanceSystemAccountCode::REALIZED_FX_LOSS,
                 ],
             ],
             FinancePostingProfileCode::ExpensePayment->value => [
