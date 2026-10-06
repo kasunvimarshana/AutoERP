@@ -11,6 +11,7 @@ use Modules\Finance\Contracts\FinancePostingInterface;
 use Modules\Finance\DTOs\PostingContext;
 use Modules\Finance\DTOs\PostingLine;
 use Modules\Finance\DTOs\PostingSourceData;
+use Modules\Payment\Constants\PaymentRefundFinanceMetadata;
 use Modules\Payment\Enums\PaymentDirection;
 use Modules\Payment\Enums\PaymentDocumentStatus;
 use Modules\Payment\Enums\PaymentLifecycleDimension;
@@ -32,6 +33,7 @@ final class PaymentPostingService
         private readonly PaymentAllocationService $allocations,
         private readonly PaymentAllocationFinanceService $allocationFinance,
         private readonly PaymentPostingPolicyService $postingPolicy,
+        private readonly PaymentRefundFinanceService $refundFinance,
         private readonly PaymentBalanceSynchronizer $balances,
     ) {}
 
@@ -82,8 +84,15 @@ final class PaymentPostingService
             );
 
             $result = $this->postings->post($this->postingContext($locked), $postedBy);
+            $metadata = is_array($locked->metadata) ? $locked->metadata : [];
+            $refundFxReference = $this->refundFinance->post($locked, $postedBy);
+            if ($refundFxReference !== null) {
+                $metadata[PaymentRefundFinanceMetadata::FX_POSTING_REFERENCE] = $refundFxReference;
+            }
+
             $locked->forceFill([
                 'finance_posting_reference' => $result->journalNumber,
+                'metadata' => $metadata,
                 'posting_correlation_key' => 'payment:'.$locked->getKey().':post',
                 'posting_status' => PaymentPostingStatus::Posted->value,
                 'posted_by' => $postedBy,
