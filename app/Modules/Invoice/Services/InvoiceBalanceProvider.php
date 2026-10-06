@@ -23,13 +23,14 @@ final class InvoiceBalanceProvider implements InvoiceBalanceProviderInterface
     {
         return Invoice::query()
             ->whereIn('id', array_values(array_unique($invoiceIds)))
-            ->get(['id', 'invoice_number', 'invoice_date', 'currency_code_snapshot'])
+            ->get(['id', 'invoice_number', 'invoice_date', 'currency_code_snapshot', 'exchange_rate'])
             ->mapWithKeys(fn (Invoice $invoice): array => [
                 (int) $invoice->getKey() => [
                     'id' => (int) $invoice->getKey(),
                     'invoice_number' => $invoice->invoice_number,
                     'invoice_date' => $invoice->invoice_date?->toDateString(),
                     'currency_code' => $invoice->currency_code_snapshot,
+                    'exchange_rate' => (string) $invoice->exchange_rate,
                     'name' => $invoice->invoice_number ?? 'Invoice',
                 ],
             ])
