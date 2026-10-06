@@ -13,6 +13,7 @@ use Modules\Payment\Enums\PaymentDocumentStatus;
 use Modules\Payment\Enums\PaymentPostingStatus;
 use Modules\Payment\Enums\PaymentType;
 use Modules\Payment\Models\Payment;
+use Modules\Payment\Models\PaymentRefund;
 
 final class PaymentRefundPolicyService
 {
@@ -52,6 +53,25 @@ final class PaymentRefundPolicyService
             currencyId: $payment->currency_id === null ? null : (int) $payment->currency_id,
             refundDirection: $this->direction($payment),
         );
+    }
+
+    public function originalForPosting(Payment $payment): Payment
+    {
+        if (! $payment->exists || $payment->getKey() === null) {
+            throw new InvalidArgumentException('Refund payment must be persisted before posting.');
+        }
+
+        $original = $this->originalForPayment($payment);
+        $linked = PaymentRefund::query()
+            ->where('tenant_id', (int) $payment->tenant_id)
+            ->where('payment_id', (int) $original->getKey())
+            ->where('refund_payment_id', (int) $payment->getKey())
+            ->exists();
+        if (! $linked) {
+            throw new InvalidArgumentException('Refund payment is missing its governed refund workflow link.');
+        }
+
+        return $original;
     }
 
     public function reservedUnpostedAmount(Payment $payment): string
