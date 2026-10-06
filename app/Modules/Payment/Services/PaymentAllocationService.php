@@ -23,6 +23,7 @@ final class PaymentAllocationService
         private readonly PaymentValidationService $validator,
         private readonly PaymentAllocationStateService $allocationStates,
         private readonly PaymentBalanceSynchronizer $balances,
+        private readonly PaymentRefundPolicyService $refundPolicy,
         private readonly InvoiceBalanceProviderInterface $invoiceBalances,
         private readonly InvoiceSettlementServiceInterface $invoiceSettlements,
         private readonly PaymentAllocationFinanceService $allocationFinance,
@@ -324,7 +325,7 @@ final class PaymentAllocationService
 
     private function availableAmount(Payment $payment): string
     {
-        return $this->math->normalize((string) $payment->unapplied_amount);
+        return $this->refundPolicy->availableUnappliedAmount($payment);
     }
 
     private function assertNoExistingPaymentInvoiceAllocation(Payment $payment, int $invoiceId): void
