@@ -59,7 +59,7 @@ final class FinanceSeeder extends Seeder
 
     private const ACCOUNT_SERVICE_REVENUE = '4200';
 
-    private const ACCOUNT_REALIZED_FX_GAIN = '4300';
+    private const ACCOUNT_REALIZED_FX_GAIN = 'FX-REALIZED-GAIN';
 
     private const ACCOUNT_PURCHASE_EXPENSE = '5100';
 
@@ -67,7 +67,7 @@ final class FinanceSeeder extends Seeder
 
     private const ACCOUNT_OPERATING_EXPENSE = '5400';
 
-    private const ACCOUNT_REALIZED_FX_LOSS = '5500';
+    private const ACCOUNT_REALIZED_FX_LOSS = 'FX-REALIZED-LOSS';
 
     public function run(): void
     {
