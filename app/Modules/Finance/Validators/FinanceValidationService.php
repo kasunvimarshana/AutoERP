@@ -177,6 +177,12 @@ final class FinanceValidationService
             throw new InvalidArgumentException('Only posted journals can be reversed.');
         }
 
+        if (! $journal->isFinanceOwned()) {
+            throw new InvalidArgumentException(
+                'Source-owned journals must be reversed through the module that owns the source document.',
+            );
+        }
+
         if ($journal->reversals()->exists()) {
             throw new InvalidArgumentException('Journal has already been reversed.');
         }
