@@ -186,6 +186,9 @@ This file is no longer an open list of speculative business questions. Historica
 - [x] Customer deposit receipt uses Payment ownership.
 - [x] Applied/refunded/unapplied balance comes from Payment source of truth.
 - [x] Duplicate balance spend prevented through Payment controls.
+- [x] Refund creation is Payment-owned, creates a governed draft, reserves unapplied balance, and requires the actual refund method/rate before normal submit → approve → post.
+- [x] Generic Payment creation cannot bypass the governed refund workflow or immutable original/refund link.
+- [x] A single active Payment allocation can be reversed independently with Payment/allocation optimistic versions, explicit date/reason, and Finance/Invoice effects reversed atomically.
 - [x] No automatic deposit forfeiture.
 - [x] Customer Receipt remains Payment-owned.
 - [x] Owner Payment remains Payment/AP-owned.
@@ -214,6 +217,9 @@ This file is no longer an open list of speculative business questions. Historica
 - [x] Owner withholding remains Tax/Payment-owned and effective-dated.
 - [x] Rental does not evaluate statutory aggregate thresholds per vehicle/branch/invoice independently.
 - [x] Finance semantic posting profiles used; legacy TACGL GL account numbers are not hardcoded.
+- [x] Invoice allocations freeze the Invoice exchange rate; Payment-date settlement differences are recognized through Payment-owned realized-FX journals and reversed with the allocation.
+- [x] Foreign-currency security-deposit refunds release the original carrying value and recognize refund-date realized FX through Payment/Finance rather than Rental.
+- [x] Fresh and upgraded Finance configuration provides semantic Customer Deposit and realized-FX roles/accounts plus the Rental Deposit posting profile without arbitrary numeric GL codes.
 - [x] Customer revenue and owner cost use independent semantic posting directions.
 - [x] Accounting period, journal and reversal controls remain Finance-owned.
 - [x] 2026 official IRD material was rechecked as legal-context evidence only; no current statutory percentage or threshold was copied into Rental.
@@ -228,6 +234,7 @@ This file is no longer an open list of speculative business questions. Historica
 - [x] Running Chart view/manage/finalize/reverse permissions.
 - [x] Customer/Owner billing authorization separated by commercial side.
 - [x] Deposit/Payment authorization delegated to owner module.
+- [x] Refund method lookup is least-privilege and uses `payments.refund`; authorized refund operators do not implicitly require `payments.create`.
 - [x] Tenant feature entitlement enforced.
 - [x] Trusted current tenant/org/user context used; client fields cannot override it.
 - [x] Human-readable validation/conflict messages.
@@ -263,6 +270,8 @@ This file is no longer an open list of speculative business questions. Historica
 - [x] Existing cross-module composite tenant FKs continue to rely on their established scoped unique keys.
 - [x] Financial document state is not duplicated into mutable Rental columns.
 - [x] No new circular module dependency introduced.
+- [x] Obsolete `PaymentMethod -> PaymentRefund` inverse relationship removed because method identity belongs to the refund Payment line; the immutable `PaymentRefund` link owns only original/refund Payment lineage.
+- [x] No Vehicle Rental relationship change was justified by the final Payment/Finance hardening audit.
 - [x] Closure/calendar correction adds only nullable date `closed_on` to each Rental agreement as an immutable historical snapshot; no inverse pointer or duplicate ledger is introduced.
 - [x] Upgrade migration backfills pre-existing closed rows once from the effective Configuration-owned workspace timezone and then freezes the recorded date.
 - [x] Successor-lineage schema correction is additive and Rental-owned; it persists the already-defined relationship rather than introducing a compatibility workaround in another module.
@@ -321,6 +330,13 @@ The completion delta adds focused regression tests for:
 - [x] finalized physical overrun remains auditable while both customer and owner automatic usage billing outside agreement coverage roll back atomically;
 - [x] Vehicle Use planning/handover uses tenant/org commercial dates rather than submitted client-offset dates;
 - [x] Owner-source lookup returns the same tenant-calendar eligibility as Vehicle Use enforcement across offset boundaries.
+- [x] Rental deposit refund is reserved as a draft and changes receipt balances only after Payment posting.
+- [x] Foreign-currency Rental deposit allocation records realized FX from frozen Invoice and Payment rates.
+- [x] Foreign-currency Rental deposit refund records and reverses realized FX.
+- [x] Owner/supplier foreign-currency settlement records realized FX at the shared Invoice/Payment boundary.
+- [x] Single allocation reversal restores Invoice balance/unapplied Payment balance and reverses allocation/FX journals.
+- [x] Tenant-default Finance profile/account fallback posts correctly from an organization-scoped source.
+- [x] Refund-method lookup authorization matches the `payments.refund` route/controller boundary.
 
 ### Verification evidence rule
 
