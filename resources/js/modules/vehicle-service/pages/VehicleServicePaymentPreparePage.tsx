@@ -209,9 +209,19 @@ export default function VehicleServicePaymentPreparePage() {
     }, [eligibleInvoices, invoiceId, paymentMethods]);
     const invoice = eligibleInvoices.find((link) => link.invoice_id === Number(invoiceId));
     const outstanding = invoice?.balance_due ?? ZERO_AMOUNT;
-    const appliedAmounts = calculateAppliedAmounts(rows, paymentMethods, outstanding);
+    const paymentEntryDisabled = Boolean(createdPayment) || !invoice;
+    const appliedAmounts = invoice
+        ? calculateAppliedAmounts(rows, paymentMethods, outstanding)
+        : rows.map(() => ZERO_AMOUNT);
     const paymentTotal = sumDecimals(appliedAmounts);
     const remainingAfterPayment = nonNegativeDecimal(subtractDecimal(outstanding, paymentTotal));
+    const displayedPaymentTotal = createdPayment?.allocated_amount ?? paymentTotal;
+    const postedBalanceAfterPayment = createdPayment && settledInvoice
+        ? nonNegativeDecimal(subtractDecimal(
+            settledInvoice.balance_due ?? settledInvoice.invoice_total,
+            createdPayment.allocated_amount ?? paymentTotal,
+        ))
+        : null;
 
     const updateRow = (kind: DirectPaymentKind, update: Partial<PaymentRow>) => {
         setRows((current) => current.map((row) => row.kind === kind ? { ...row, ...update } : row));
@@ -293,27 +303,36 @@ export default function VehicleServicePaymentPreparePage() {
                 <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_18rem]">
                     <Panel className="space-y-5">
                         <div className="grid gap-4 md:grid-cols-2">
-                            <Select
-                                label="Invoice"
-                                value={invoiceId}
-                                error={fieldError(error, 'invoice_id')}
-                                options={eligibleInvoices.map((link) => ({
-                                    value: link.invoice_id,
-                                    label: `${link.invoice_number ?? 'Invoice'} · balance ${formatMoney(link.balance_due ?? link.invoice_total)}`,
-                                }))}
-                                placeholder={eligibleInvoices.length > 0 ? 'Select posted invoice' : 'No payable posted invoices'}
-                                disabled={Boolean(createdPayment)}
-                                onChange={(event) => {
-                                    setInvoiceId(event.target.value);
-                                    setRows((current) => current.map((row) => ({
-                                        ...row,
-                                        amount: ZERO_AMOUNT,
-                                        cashReceivedAmount: '',
-                                    })));
-                                    setCreditCheckFeedback(null);
-                                    setAcknowledgedCreditWarning(null);
-                                }}
-                            />
+                            <div className="space-y-1">
+                                <Select
+                                    label="Invoice"
+                                    value={invoiceId}
+                                    error={fieldError(error, 'invoice_id')}
+                                    options={eligibleInvoices.map((link) => ({
+                                        value: link.invoice_id,
+                                        label: `${link.invoice_number ?? 'Invoice'} · balance ${formatMoney(link.balance_due ?? link.invoice_total)}`,
+                                    }))}
+                                    placeholder={eligibleInvoices.length > 0 ? 'Select posted invoice' : 'No payable posted invoices'}
+                                    disabled={Boolean(createdPayment)}
+                                    onChange={(event) => {
+                                        setInvoiceId(event.target.value);
+                                        setRows((current) => current.map((row) => ({
+                                            ...row,
+                                            amount: ZERO_AMOUNT,
+                                            cashReceivedAmount: '',
+                                        })));
+                                        setCreditCheckFeedback(null);
+                                        setAcknowledgedCreditWarning(null);
+                                    }}
+                                />
+                                {eligibleInvoices.length === 0 && (
+                                    <p className="text-sm text-amber-700">
+                                        {job.data.invoice_links?.some((link) => link.status === 'active')
+                                            ? 'No linked invoice has an outstanding balance. A payment cannot be recorded.'
+                                            : 'There are no active posted invoices to receive a payment.'}
+                                    </p>
+                                )}
+                            </div>
                             <Input
                                 label="Payment date"
                                 type="date"
@@ -381,7 +400,7 @@ export default function VehicleServicePaymentPreparePage() {
                                                             label={`${label} method`}
                                                             value={row.paymentMethodId}
                                                             error={lineIndex >= 0 ? fieldError(error, `lines.${lineIndex}.payment_method_id`) : undefined}
-                                                            disabled={Boolean(createdPayment)}
+                                                            disabled={paymentEntryDisabled}
                                                             options={availableMethods.map((method) => ({
                                                                 value: method.id ?? '',
                                                                 label: method.name,
@@ -404,7 +423,7 @@ export default function VehicleServicePaymentPreparePage() {
                                                     label={row.kind === 'cash' ? 'Cash received' : `${label} amount`}
                                                     value={amountValue}
                                                     error={lineIndex >= 0 ? fieldError(error, `lines.${lineIndex}.amount`) : undefined}
-                                                    disabled={Boolean(createdPayment) || availableMethods.length === 0}
+                                                    disabled={paymentEntryDisabled || availableMethods.length === 0}
                                                     onChange={(event) => updateRow(row.kind, row.kind === 'cash'
                                                         ? { cashReceivedAmount: event.target.value }
                                                         : { amount: event.target.value })}
@@ -422,7 +441,7 @@ export default function VehicleServicePaymentPreparePage() {
                                                                     name="card-brand"
                                                                     value={brand.value}
                                                                     checked={row.details.card_brand === brand.value}
-                                                                    disabled={Boolean(createdPayment) || availableMethods.length === 0}
+                                                                    disabled={paymentEntryDisabled || availableMethods.length === 0}
                                                                     onChange={() => updateRow(row.kind, {
                                                                         details: { ...row.details, card_brand: brand.value },
                                                                     })}
@@ -441,7 +460,7 @@ export default function VehicleServicePaymentPreparePage() {
                                                         maxLength={150}
                                                         value={row.reference}
                                                         error={lineIndex >= 0 ? fieldError(error, `lines.${lineIndex}.reference_number`) : undefined}
-                                                        disabled={Boolean(createdPayment) || availableMethods.length === 0}
+                                                        disabled={paymentEntryDisabled || availableMethods.length === 0}
                                                         onChange={(event) => updateRow(row.kind, { reference: event.target.value })}
                                                     />
                                                 </div>
@@ -453,7 +472,7 @@ export default function VehicleServicePaymentPreparePage() {
                                                     <PaymentMethodFields
                                                         kind={kind}
                                                         metadata={row.details}
-                                                        disabled={Boolean(createdPayment)}
+                                                        disabled={paymentEntryDisabled}
                                                         hideReferenceFields
                                                         onChange={(field, value) => updateRow(row.kind, {
                                                             details: { ...row.details, [field]: value },
@@ -474,7 +493,7 @@ export default function VehicleServicePaymentPreparePage() {
                                                     </div>
                                                     <div>
                                                         <p className="text-xs text-slate-500">Change to return</p>
-                                                        <p className="mt-1 font-semibold tabular-nums text-emerald-700">{formatMoney(nonNegativeDecimal(subtractDecimal(row.cashReceivedAmount || ZERO_AMOUNT, appliedAmount)))}</p>
+                                                        <p className="mt-1 font-semibold tabular-nums text-emerald-700">{formatMoney(invoice ? nonNegativeDecimal(subtractDecimal(row.cashReceivedAmount || ZERO_AMOUNT, appliedAmount)) : ZERO_AMOUNT)}</p>
                                                     </div>
                                                 </div>
                                             )}
@@ -532,7 +551,7 @@ export default function VehicleServicePaymentPreparePage() {
                         <p className="mt-1 text-2xl font-semibold tabular-nums text-slate-950">{formatMoney(outstanding)}</p>
                         <div className="my-5 border-t border-blue-200" />
                         <p className="text-sm font-medium text-slate-700">Payment total</p>
-                        <p className="mt-1 text-xl font-semibold tabular-nums text-slate-950">{formatMoney(paymentMode === 'direct' ? paymentTotal : ZERO_AMOUNT)}</p>
+                        <p className="mt-1 text-xl font-semibold tabular-nums text-slate-950">{formatMoney(paymentMode === 'direct' ? displayedPaymentTotal : ZERO_AMOUNT)}</p>
                         {paymentMode === 'direct' && (
                             <p className="mt-1 text-xs text-slate-600">Across {activeRows.length} {activeRows.length === 1 ? 'method' : 'methods'}</p>
                         )}
@@ -541,11 +560,9 @@ export default function VehicleServicePaymentPreparePage() {
                         <p className="mt-1 text-xl font-semibold tabular-nums text-slate-950">
                             {formatMoney(paymentMode === 'credit'
                                 ? outstanding
-                                : compareDecimalStrings(paymentTotal, outstanding) > 0
-                                    ? subtractDecimal(paymentTotal, outstanding)
-                                    : remainingAfterPayment)}
+                                : postedBalanceAfterPayment ?? remainingAfterPayment)}
                         </p>
-                        {paymentMode === 'direct' && compareDecimalStrings(paymentTotal, outstanding) > 0 && (
+                        {paymentMode === 'direct' && invoice && !createdPayment && compareDecimalStrings(paymentTotal, outstanding) > 0 && (
                             <p className="mt-2 text-sm text-red-700">Payment total exceeds the outstanding balance.</p>
                         )}
                         {paymentMode === 'credit' && creditCheckFeedback && (

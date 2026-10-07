@@ -113,7 +113,7 @@
         .layout-a4 .muted { font-size: 12px; }
         .layout-a4 .print-trace { font-size: 10px; }
         .layout-a5,
-        .layout-continuous { font-family: Arial, Helvetica, sans-serif; font-size: 10px; line-height: 1.2; }
+        .layout-continuous { font-family: Arial, Helvetica, sans-serif; font-size: 12px; line-height: 1.2; }
         .layout-a5 .controls { width: 148mm; }
         .layout-continuous .controls { width: {{ $print_layout['continuous_width'] }}; }
         .layout-a5 .sheet { width: 148mm; min-height: 210mm; padding: 6mm; }
@@ -155,15 +155,17 @@
         .layout-a5 .invoice-lines tbody td,
         .layout-continuous .invoice-lines tbody td { height: 4.5mm; }
         .layout-a5 .muted,
-        .layout-continuous .muted { font-size: 9px; }
+        .layout-continuous .muted { font-size: 10px; }
         .layout-a5 .footer-fields,
         .layout-continuous .footer-fields { margin-top: 4px; }
         .layout-a5 .footer-fields td,
         .layout-continuous .footer-fields td { min-height: 5mm; padding: 3px 5px; }
+        .layout-a5 .print-trace,
+        .layout-continuous .print-trace { margin-top: 2px; font-size: 7px; white-space: nowrap; }
         .layout-a5 .signature-table,
-        .layout-continuous .signature-table { margin-top: 8px; }
+        .layout-continuous .signature-table { margin-top: 16px; }
         .layout-a5 .signature-table td,
-        .layout-continuous .signature-table td { padding-top: 7px; }
+        .layout-continuous .signature-table td { padding-top: 5px; font-size: 10px; }
         .pdf-output.layout-a5 .sheet { width: auto; min-height: 0; margin: 0; padding: 0; }
         .pdf-output.layout-continuous .sheet { width: auto; min-height: 0; margin: 0; padding: 0; }
         @media print {
