@@ -25,6 +25,18 @@ export interface VehicleServiceSalesSummaryComboComponent {
     cost: string;
 }
 
+export interface VehicleServiceSalesSummaryRankedItem {
+    item: VehicleServiceSalesSummaryItem;
+    quantity: string;
+    job_count: number;
+    sales_amount: string;
+    cost: string;
+    stock_cost?: string;
+    profit: string;
+    margin: string;
+    components?: VehicleServiceSalesSummaryComboComponent[];
+}
+
 export interface VehicleServiceSalesSummaryCombo {
     line_id: number;
     item: VehicleServiceSalesSummaryItem;
@@ -73,15 +85,18 @@ export interface VehicleServiceSalesSummaryResult {
             revenue: string;
             cost: string;
             profit: string;
+            items: VehicleServiceSalesSummaryRankedItem[];
         };
         combo: {
             combo_count: number;
+            item_count: number;
             quantity: string;
             component_stock_quantity: string;
             revenue: string;
             stock_cost: string;
             component_cost: string;
             profit: string;
+            items: VehicleServiceSalesSummaryRankedItem[];
         };
         other_service_revenue: string;
     };

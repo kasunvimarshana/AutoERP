@@ -477,11 +477,12 @@ final class VehicleServiceSalesSummaryReportService
             'commission' => self::ZERO,
             'profit' => self::ZERO,
             'margin' => self::ZERO,
-            'stock' => ['item_count' => 0, 'quantity' => self::ZERO, 'revenue' => self::ZERO, 'cost' => self::ZERO, 'profit' => self::ZERO],
-            'combo' => ['combo_count' => 0, 'quantity' => self::ZERO, 'component_stock_quantity' => self::ZERO, 'revenue' => self::ZERO, 'stock_cost' => self::ZERO, 'component_cost' => self::ZERO, 'profit' => self::ZERO],
+            'stock' => ['item_count' => 0, 'quantity' => self::ZERO, 'revenue' => self::ZERO, 'cost' => self::ZERO, 'profit' => self::ZERO, 'items' => []],
+            'combo' => ['combo_count' => 0, 'item_count' => 0, 'quantity' => self::ZERO, 'component_stock_quantity' => self::ZERO, 'revenue' => self::ZERO, 'stock_cost' => self::ZERO, 'component_cost' => self::ZERO, 'profit' => self::ZERO, 'items' => []],
             'other_service_revenue' => self::ZERO,
         ];
         $stockItems = [];
+        $comboItems = [];
 
         foreach ($jobs as &$job) {
             foreach (['stock_items', 'combos', 'other_items'] as $key) {
@@ -497,13 +498,32 @@ final class VehicleServiceSalesSummaryReportService
                 $summary['combo']['component_stock_quantity'] = $this->math->add($summary['combo']['component_stock_quantity'], $combo['stock_quantity']);
                 $summary['combo']['component_cost'] = $this->math->add($summary['combo']['component_cost'], $combo['component_cost']);
                 $summary['combo']['profit'] = $this->math->add($summary['combo']['profit'], $combo['profit']);
+                $this->accumulateRankedItem(
+                    $comboItems,
+                    $combo['item'],
+                    $combo['quantity'],
+                    $combo['sales_amount'],
+                    $combo['component_cost'],
+                    (int) $job['id'],
+                    $combo['stock_cost'],
+                );
+                foreach ($combo['components'] as $component) {
+                    $this->accumulateComboComponent($comboItems, $combo['item'], $component);
+                }
             }
             unset($combo);
             foreach ($job['stock_items'] as $item) {
-                $stockItems[(string) $item['item']['id']] = true;
                 $summary['stock']['quantity'] = $this->math->add($summary['stock']['quantity'], $item['quantity']);
                 $summary['stock']['revenue'] = $this->math->add($summary['stock']['revenue'], $item['sales_amount']);
                 $summary['stock']['cost'] = $this->math->add($summary['stock']['cost'], $item['cost']);
+                $this->accumulateRankedItem(
+                    $stockItems,
+                    $item['item'],
+                    $item['quantity'],
+                    $item['sales_amount'],
+                    $item['cost'],
+                    (int) $job['id'],
+                );
             }
             $summary['stock']['profit'] = $this->math->sub($summary['stock']['revenue'], $summary['stock']['cost']);
             $summary['stock']['item_count'] = count($stockItems);
@@ -518,7 +538,10 @@ final class VehicleServiceSalesSummaryReportService
         }
         unset($job);
 
-        $summary['stock']['item_count'] = count($stockItems);
+        $summary['stock']['items'] = $this->finalizeRankedItems($stockItems);
+        $summary['stock']['item_count'] = count($summary['stock']['items']);
+        $summary['combo']['items'] = $this->finalizeRankedItems($comboItems, true);
+        $summary['combo']['item_count'] = count($summary['combo']['items']);
         $summary['margin'] = $this->math->compare($summary['revenue'], self::ZERO) > 0
             ? $this->math->mul($this->math->div($summary['profit'], $summary['revenue']), '100')
             : self::ZERO;
@@ -530,5 +553,100 @@ final class VehicleServiceSalesSummaryReportService
             'summary' => $summary,
             'date_basis' => ['sales' => 'invoice_date', 'collected' => 'payment_date'],
         ];
+    }
+
+    /** @param array<string, mixed> $items @param array{id: int|null, code: string, name: string} $item */
+    private function accumulateRankedItem(
+        array &$items,
+        array $item,
+        string $quantity,
+        string $sales,
+        string $cost,
+        int $jobId,
+        ?string $stockCost = null,
+    ): void {
+        $key = $this->itemKey($item);
+        if (! isset($items[$key])) {
+            $items[$key] = [
+                'item' => $item,
+                'quantity' => self::ZERO,
+                'sales_amount' => self::ZERO,
+                'cost' => self::ZERO,
+                'stock_cost' => self::ZERO,
+                'job_ids' => [],
+                'components' => [],
+            ];
+        }
+        $items[$key]['quantity'] = $this->math->add($items[$key]['quantity'], $quantity);
+        $items[$key]['sales_amount'] = $this->math->add($items[$key]['sales_amount'], $sales);
+        $items[$key]['cost'] = $this->math->add($items[$key]['cost'], $cost);
+        $items[$key]['stock_cost'] = $this->math->add($items[$key]['stock_cost'], $stockCost ?? self::ZERO);
+        $items[$key]['job_ids'][$jobId] = true;
+    }
+
+    /** @param array<string, mixed> $items @param array{id: int|null, code: string, name: string} $comboItem @param array<string, mixed> $component */
+    private function accumulateComboComponent(array &$items, array $comboItem, array $component): void
+    {
+        $comboKey = $this->itemKey($comboItem);
+        $componentKey = $this->itemKey($component['item']).':'.$component['kind'];
+        if (! isset($items[$comboKey]['components'][$componentKey])) {
+            $items[$comboKey]['components'][$componentKey] = [
+                'item' => $component['item'],
+                'kind' => $component['kind'],
+                'quantity' => self::ZERO,
+                'cost' => self::ZERO,
+            ];
+        }
+        $items[$comboKey]['components'][$componentKey]['quantity'] = $this->math->add(
+            $items[$comboKey]['components'][$componentKey]['quantity'],
+            (string) $component['quantity'],
+        );
+        $items[$comboKey]['components'][$componentKey]['cost'] = $this->math->add(
+            $items[$comboKey]['components'][$componentKey]['cost'],
+            (string) $component['cost'],
+        );
+    }
+
+    /** @param array{id: int|null, code: string, name: string} $item */
+    private function itemKey(array $item): string
+    {
+        if ($item['id'] !== null) {
+            return 'id:'.$item['id'];
+        }
+
+        return 'code:'.$item['code'];
+    }
+
+    /** @param array<string, mixed> $items @return list<array<string, mixed>> */
+    private function finalizeRankedItems(array $items, bool $includeComponents = false): array
+    {
+        foreach ($items as &$item) {
+            $item['job_count'] = count($item['job_ids']);
+            $item['profit'] = $this->math->sub($item['sales_amount'], $item['cost']);
+            $item['margin'] = $this->math->compare($item['sales_amount'], self::ZERO) > 0
+                ? $this->math->mul($this->math->div($item['profit'], $item['sales_amount']), '100')
+                : self::ZERO;
+            if ($includeComponents) {
+                $item['components'] = array_values($item['components']);
+            } else {
+                unset($item['stock_cost'], $item['components']);
+            }
+            unset($item['job_ids']);
+        }
+        unset($item);
+
+        $items = array_values($items);
+        usort($items, function (array $left, array $right): int {
+            $quantityOrder = $this->math->compare((string) $right['quantity'], (string) $left['quantity']);
+            if ($quantityOrder !== 0) {
+                return $quantityOrder;
+            }
+
+            $salesOrder = $this->math->compare((string) $right['sales_amount'], (string) $left['sales_amount']);
+
+            return $salesOrder !== 0 ? $salesOrder : strcmp((string) $left['item']['name'], (string) $right['item']['name']);
+        });
+
+        return $items;
     }
 }

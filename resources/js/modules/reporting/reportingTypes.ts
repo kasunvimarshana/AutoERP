@@ -62,6 +62,7 @@ export type {
     VehicleServiceSalesSummaryItem,
     VehicleServiceSalesSummaryJob,
     VehicleServiceSalesSummaryParams,
+    VehicleServiceSalesSummaryRankedItem,
     VehicleServiceSalesSummaryResult,
 } from './vehicleServiceSalesSummaryTypes';
 export type {

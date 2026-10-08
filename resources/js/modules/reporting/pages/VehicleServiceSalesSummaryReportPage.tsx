@@ -16,6 +16,7 @@ import type {
     VehicleServiceSalesSummaryCostLine,
     VehicleServiceSalesSummaryJob,
     VehicleServiceSalesSummaryParams,
+    VehicleServiceSalesSummaryRankedItem,
     VehicleServiceSalesSummaryResult,
 } from '../reportingTypes';
 
@@ -108,16 +109,8 @@ export default function VehicleServiceSalesSummaryReportPage() {
                     </div>
 
                     <section className="grid gap-4 lg:grid-cols-2" aria-label="Stock and combo performance">
-                        <CategoryPanel
-                            title="Stock items"
-                            tone="stock"
-                            count={`${formatQuantity(result.summary.stock.item_count)} item types`}
-                            quantity={`${formatQuantity(result.summary.stock.quantity)} units used`}
-                            revenue={result.summary.stock.revenue}
-                            cost={result.summary.stock.cost}
-                            profit={result.summary.stock.profit}
-                        />
-                        <ComboPanel result={result} />
+                        <StockItemsPanel result={result} />
+                        <ComboItemsPanel result={result} />
                     </section>
                     {Number(result.summary.other_service_revenue) !== 0 && (
                         <p className="text-sm text-slate-500">Other service and labour sales included in total revenue: <strong className="font-semibold text-slate-700">{formatMoney(result.summary.other_service_revenue)}</strong></p>
@@ -163,44 +156,105 @@ function Metric({ label, value, tone, detail }: { label: string; value: string; 
     );
 }
 
-function CategoryPanel({ title, tone, count, quantity, revenue, cost, profit }: {
-    title: string;
-    tone: 'stock' | 'combo';
-    count: string;
-    quantity: string;
-    revenue: string;
-    cost: string;
-    profit: string;
-}) {
-    const accent = tone === 'stock' ? 'border-l-blue-600' : 'border-l-violet-600';
+function StockItemsPanel({ result }: { result: VehicleServiceSalesSummaryResult }) {
+    const stock = result.summary.stock;
     return (
-        <Panel className={`border-l-4 ${accent}`} title={title}>
-            <div className="mb-4 flex flex-wrap gap-x-5 gap-y-1 text-sm text-slate-500"><span>{count}</span><span>{quantity}</span></div>
-            <div className="grid grid-cols-3 gap-3 border-t border-slate-100 pt-3">
-                <Amount label="Sales" value={revenue} />
-                <Amount label="Cost" value={cost} />
-                <Amount label="Profit before commission" value={profit} emphasized />
+        <Panel className="border-l-4 border-l-blue-600" title="Stock item performance">
+            <p className="-mt-2 mb-3 text-sm text-slate-500">Ranked by quantity sold. Profit is sales less stock cost, before commission.</p>
+            <div className="mb-3 flex flex-wrap gap-x-5 gap-y-1 text-sm text-slate-600">
+                <span>{formatQuantity(stock.item_count)} item types</span>
+                <span>{formatQuantity(stock.quantity)} units sold</span>
+                <span>Profit {formatMoney(stock.profit)}</span>
             </div>
+            <RankedItemsTable items={stock.items} kind="stock" />
         </Panel>
     );
 }
 
-function ComboPanel({ result }: { result: VehicleServiceSalesSummaryResult }) {
+function ComboItemsPanel({ result }: { result: VehicleServiceSalesSummaryResult }) {
     const combo = result.summary.combo;
     return (
-        <Panel className="border-l-4 border-l-violet-600" title="Combo items">
-            <div className="mb-4 flex flex-wrap gap-x-5 gap-y-1 text-sm text-slate-500">
-                <span>{formatQuantity(combo.combo_count)} combo lines</span>
-                <span>{formatQuantity(combo.quantity)} combos used</span>
+        <Panel className="border-l-4 border-l-violet-600" title="Combo item performance">
+            <p className="-mt-2 mb-3 text-sm text-slate-500">Ranked by quantity sold. Profit is combo sales less all component costs, before commission.</p>
+            <div className="mb-3 flex flex-wrap gap-x-5 gap-y-1 text-sm text-slate-600">
+                <span>{formatQuantity(combo.item_count)} combo types</span>
+                <span>{formatQuantity(combo.quantity)} combos sold</span>
                 <span>{formatQuantity(combo.component_stock_quantity)} component stock units</span>
+                <span>Profit {formatMoney(combo.profit)}</span>
             </div>
-            <div className="grid grid-cols-2 gap-3 border-t border-slate-100 pt-3 sm:grid-cols-4">
-                <Amount label="Combo sales" value={combo.revenue} />
-                <Amount label="Stock component cost" value={combo.stock_cost} />
-                <Amount label="All component cost" value={combo.component_cost} />
-                <Amount label="Profit before commission" value={combo.profit} emphasized />
-            </div>
+            <RankedItemsTable items={combo.items} kind="combo" />
         </Panel>
+    );
+}
+
+function RankedItemsTable({ items, kind }: { items: VehicleServiceSalesSummaryRankedItem[]; kind: 'stock' | 'combo' }) {
+    const costLabel = kind === 'combo' ? 'Component cost' : 'Stock cost';
+    return (
+        <div className="overflow-x-auto rounded-md border border-slate-200">
+            <table className="min-w-full divide-y divide-slate-200 text-sm">
+                <thead className="bg-slate-50">
+                    <tr className="text-left text-xs font-semibold text-slate-500">
+                        <th scope="col" className="py-2 pl-3 pr-2">#</th>
+                        <th scope="col" className="px-2 py-2">Item</th>
+                        <th scope="col" className="px-2 py-2 text-right">Qty sold</th>
+                        <th scope="col" className="px-2 py-2 text-right">Jobs</th>
+                        <th scope="col" className="px-2 py-2 text-right">Sales</th>
+                        <th scope="col" className="px-2 py-2 text-right">{costLabel}</th>
+                        <th scope="col" className="py-2 pl-2 pr-3 text-right">Profit</th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 bg-white">
+                    {items.map((item, index) => <RankedItemRow key={`${item.item.id ?? item.item.code}-${index}`} item={item} rank={index + 1} kind={kind} />)}
+                    {items.length === 0 && <tr><td colSpan={7} className="px-3 py-8 text-center text-slate-500">No {kind === 'combo' ? 'combo' : 'stock'} item sales in this period.</td></tr>}
+                </tbody>
+            </table>
+        </div>
+    );
+}
+
+function RankedItemRow({ item, rank, kind }: { item: VehicleServiceSalesSummaryRankedItem; rank: number; kind: 'stock' | 'combo' }) {
+    const [expanded, setExpanded] = useState(false);
+    const hasComponents = kind === 'combo' && (item.components?.length ?? 0) > 0;
+    const loss = item.profit.startsWith('-');
+    return (
+        <>
+            <tr className="align-middle">
+                <td className="py-2 pl-3 pr-2 tabular-nums text-slate-400">{rank}</td>
+                <td className="min-w-40 px-2 py-2">
+                    <div className="flex items-center gap-1">
+                        {hasComponents && <button type="button" className="rounded px-1 text-violet-700 hover:bg-violet-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-violet-600" aria-label={`${expanded ? 'Hide' : 'Show'} components for ${item.item.name}`} aria-expanded={expanded} onClick={() => setExpanded((value) => !value)}>{expanded ? '−' : '+'}</button>}
+                        <span className="font-medium text-slate-900">{item.item.name}</span>
+                    </div>
+                    <div className={hasComponents ? 'pl-6 text-xs text-slate-500' : 'text-xs text-slate-500'}>{item.item.code}</div>
+                </td>
+                <td className="px-2 py-2 text-right font-semibold tabular-nums text-slate-800">{formatQuantity(item.quantity)}</td>
+                <td className="px-2 py-2 text-right tabular-nums text-slate-600">{formatQuantity(item.job_count)}</td>
+                <td className="px-2 py-2 text-right tabular-nums text-slate-700">{formatMoney(item.sales_amount)}</td>
+                <td className="px-2 py-2 text-right tabular-nums text-slate-700">
+                    {formatMoney(item.cost)}
+                    {kind === 'combo' && <div className="text-xs text-slate-500">Stock {formatMoney(item.stock_cost)}</div>}
+                </td>
+                <td className={`py-2 pl-2 pr-3 text-right font-semibold tabular-nums ${loss ? 'text-rose-700' : 'text-emerald-800'}`}>
+                    {formatMoney(item.profit)}<div className="text-xs font-normal text-slate-500">{formatQuantity(item.margin)}%</div>
+                </td>
+            </tr>
+            {expanded && hasComponents && <tr><td colSpan={7} className="bg-violet-50/50 px-4 py-3 sm:px-8"><ComboItemComponents components={item.components ?? []} /></td></tr>}
+        </>
+    );
+}
+
+function ComboItemComponents({ components }: { components: NonNullable<VehicleServiceSalesSummaryRankedItem['components']> }) {
+    return (
+        <div>
+            <h3 className="mb-2 text-sm font-semibold text-slate-800">Components used across this date range</h3>
+            <div className="divide-y divide-slate-200 rounded-md border border-slate-200 bg-white">
+                {components.map((component, index) => <div key={`${component.item.id ?? component.item.code}-${index}`} className="grid gap-1 px-3 py-2 text-sm sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center">
+                    <ItemName item={component.item} />
+                    <span className="text-xs text-slate-500">{component.kind === 'stock' ? 'Stock' : 'Labour / service'} · {formatQuantity(component.quantity)} used</span>
+                    <span className="tabular-nums text-slate-700">Cost {formatMoney(component.cost)}</span>
+                </div>)}
+            </div>
+        </div>
     );
 }
 
