@@ -91,6 +91,17 @@ final class PurchaseOrderController
         return PurchaseOrderResource::collection($orders);
     }
 
+    public function pendingApprovalCount(ListPurchaseDocumentRequest $request): JsonResponse
+    {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PurchaseAuthorizationService::ORDERS_APPROVE);
+
+        $count = $this->scope(PurchaseOrder::query(), $request)
+            ->where('status', PurchaseOrderStatus::PendingApproval->value)
+            ->count();
+
+        return response()->json(['data' => ['count' => $count]]);
+    }
+
     public function store(StorePurchaseOrderRequest $request, PurchaseOrderService $service): JsonResponse
     {
         $this->authorization->assert($request->currentUserId(), $request->tenantId(), PurchaseAuthorizationService::ORDERS_CREATE);

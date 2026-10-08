@@ -542,7 +542,7 @@ export const tenantNavigationSections: NavigationSection[] = [
                     {
                         id: "purchase-orders",
                         type: "link",
-                        label: "Purchase Orders",
+                        label: "Purchase Orders List",
                         to: "/purchase/orders",
                         match: ["/purchase/orders"],
                         access: {
@@ -551,6 +551,16 @@ export const tenantNavigationSections: NavigationSection[] = [
                                 purchasePermissions.ordersView,
                                 purchasePermissions.ordersCreate,
                             ],
+                        },
+                    },
+                    {
+                        id: "purchase-order-create",
+                        type: "link",
+                        label: "Create Purchase Order",
+                        to: "/purchase/orders/create",
+                        access: {
+                            ...operationalAccess(["purchase"]),
+                            permissions: [purchasePermissions.ordersCreate],
                         },
                     },
                     {

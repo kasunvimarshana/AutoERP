@@ -7,6 +7,8 @@ import { useDialogAccessibility } from '@/shared/hooks/useDialogAccessibility';
 
 export function Sidebar({
     sections,
+    badges,
+    badgeErrorIds,
     activeItemId,
     activeParentId,
     expandedModuleId,
@@ -22,6 +24,8 @@ export function Sidebar({
     onToggleModule,
 }: {
     sections: NavigationSection[];
+    badges?: Record<string, number | undefined>;
+    badgeErrorIds?: string[];
     activeItemId: string | null;
     activeParentId: string | null;
     expandedModuleId: string | null;
@@ -98,6 +102,8 @@ export function Sidebar({
                                             <SidebarLink
                                                 key={item.id}
                                                 item={item}
+                                                badgeCount={badges?.[item.id]}
+                                                badgeError={badgeErrorIds?.includes(item.id)}
                                                 active={activeItemId === item.id}
                                                 collapsed={collapsed}
                                                 onNavigate={onCloseMobile}
@@ -130,6 +136,8 @@ export function Sidebar({
                                                         <SidebarLink
                                                             key={child.id}
                                                             item={child}
+                                                            badgeCount={badges?.[child.id]}
+                                                            badgeError={badgeErrorIds?.includes(child.id)}
                                                             active={activeItemId === child.id}
                                                             child
                                                             onNavigate={onCloseMobile}
@@ -163,12 +171,16 @@ export function Sidebar({
 
 function SidebarLink({
     item,
+    badgeCount,
+    badgeError,
     active,
     collapsed = false,
     child = false,
     onNavigate,
 }: {
     item: NavigationLinkItem;
+    badgeCount?: number;
+    badgeError?: boolean;
     active: boolean;
     collapsed?: boolean;
     child?: boolean;
@@ -180,6 +192,7 @@ function SidebarLink({
             onClick={onNavigate}
             className={`group flex min-h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-400 ${active ? 'bg-blue-600 text-white shadow-sm shadow-blue-950/30' : 'text-slate-300 hover:bg-slate-900 hover:text-white'} ${child ? 'relative pl-7' : ''}`}
             aria-current={active ? 'page' : undefined}
+            aria-label={badgeError ? `${item.label}, pending approval count unavailable` : badgeCount !== undefined && badgeCount > 0 ? `${item.label}, ${badgeCount} pending approvals` : undefined}
             title={collapsed ? item.label : undefined}
         >
             {child ? (
@@ -190,6 +203,12 @@ function SidebarLink({
                 <NavigationIcon name="list" className="h-5 w-5 shrink-0 text-slate-400 group-hover:text-white" />
             )}
             <span className={`truncate ${collapsed ? 'lg:hidden' : ''}`}>{item.label}</span>
+            {badgeCount !== undefined && badgeCount > 0 && (
+                <span className="inline-flex min-w-6 shrink-0 items-center justify-center rounded-full bg-amber-300 px-1.5 py-0.5 text-xs font-semibold leading-none text-slate-950" aria-hidden="true">
+                    {badgeCount}
+                </span>
+            )}
+            {badgeError && <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-rose-500 text-xs font-bold text-white" aria-hidden="true">!</span>}
         </Link>
     );
 }

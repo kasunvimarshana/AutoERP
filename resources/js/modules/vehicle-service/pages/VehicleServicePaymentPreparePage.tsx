@@ -50,6 +50,12 @@ const DIRECT_PAYMENT_KINDS: Array<{ kind: DirectPaymentKind; label: string }> = 
     { kind: 'bank_transfer', label: 'Bank transfer' },
 ];
 
+const PAYMENT_METHOD_STYLES: Record<DirectPaymentKind, { section: string; label: string }> = {
+    cash: { section: 'border-emerald-200 border-l-emerald-500 bg-emerald-50/30', label: 'bg-emerald-100 text-emerald-900' },
+    card: { section: 'border-blue-200 border-l-blue-500 bg-blue-50/30', label: 'bg-blue-100 text-blue-900' },
+    bank_transfer: { section: 'border-violet-200 border-l-violet-500 bg-violet-50/30', label: 'bg-violet-100 text-violet-900' },
+};
+
 type PaymentMode = 'direct' | 'credit';
 
 const CARD_BRANDS = [
@@ -153,6 +159,16 @@ function selectedMethodForRow(row: PaymentRow, methods: VehicleServicePaymentMet
 
 function hasInstrumentDetails(payload: ReturnType<typeof methodPayload>): boolean {
     return Boolean(payload.instrument_number || payload.instrument_date || payload.external_bank_name);
+}
+
+function focusNextPaymentField(form: HTMLFormElement | null, current: HTMLElement): void {
+    if (!form) return;
+
+    const controls = Array.from(form.querySelectorAll<HTMLElement>(
+        'input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), summary',
+    )).filter((control) => control.getClientRects().length > 0);
+    const currentIndex = controls.indexOf(current);
+    controls[currentIndex + 1]?.focus();
 }
 
 export default function VehicleServicePaymentPreparePage() {
@@ -376,7 +392,7 @@ export default function VehicleServicePaymentPreparePage() {
                         {paymentMode === 'direct' ? <>
                             <div>
                                 <h2 className="text-base font-semibold text-slate-900">Payment amounts</h2>
-                                <p className="mt-1 text-sm text-slate-600">Enter the amount received through each method.</p>
+                                <p className="mt-1 text-sm text-slate-600">Enter amounts for the methods you use. Press Enter or Tab to move through the fields.</p>
                             </div>
 
                             <div className="space-y-3">
@@ -391,10 +407,10 @@ export default function VehicleServicePaymentPreparePage() {
                                     const amountValue = row.kind === 'cash' ? row.cashReceivedAmount : row.amount;
 
                                     return (
-                                        <section key={row.kind} className="rounded-lg border border-slate-200 bg-white p-4">
+                                        <section key={row.kind} className={`rounded-lg border-l-4 p-3 sm:p-4 ${PAYMENT_METHOD_STYLES[row.kind].section}`}>
                                             <div className="grid gap-4 md:grid-cols-[minmax(10rem,0.7fr)_minmax(12rem,1.3fr)]">
                                                 <div>
-                                                    <h3 className="font-medium text-slate-900">{label}</h3>
+                                                    <h3 className={`inline-flex rounded-md px-2 py-1 text-sm font-semibold ${PAYMENT_METHOD_STYLES[row.kind].label}`}>{label}</h3>
                                                     {availableMethods.length > 1 ? (
                                                         <Select
                                                             label={`${label} method`}
@@ -424,6 +440,12 @@ export default function VehicleServicePaymentPreparePage() {
                                                     value={amountValue}
                                                     error={lineIndex >= 0 ? fieldError(error, `lines.${lineIndex}.amount`) : undefined}
                                                     disabled={paymentEntryDisabled || availableMethods.length === 0}
+                                                    onFocus={(event) => event.currentTarget.select()}
+                                                    onKeyDown={(event) => {
+                                                        if (event.key !== 'Enter' || event.nativeEvent.isComposing) return;
+                                                        event.preventDefault();
+                                                        focusNextPaymentField(event.currentTarget.form, event.currentTarget);
+                                                    }}
                                                     onChange={(event) => updateRow(row.kind, row.kind === 'cash'
                                                         ? { cashReceivedAmount: event.target.value }
                                                         : { amount: event.target.value })}
@@ -481,7 +503,9 @@ export default function VehicleServicePaymentPreparePage() {
                                                 </details>
                                             )}
 
-                                            {selectedMethod?.requires_instrument_details && !hasInstrumentDetails(instrument) && (
+                                            {compareDecimalStrings(appliedAmount, ZERO_AMOUNT) > 0
+                                                && selectedMethod?.requires_instrument_details
+                                                && !hasInstrumentDetails(instrument) && (
                                                 <p className="mt-3 text-sm text-amber-700">Enter transaction details for this method.</p>
                                             )}
 

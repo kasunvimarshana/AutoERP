@@ -70,8 +70,8 @@ export function EmployeePickerPanel({ lineLabel, selectedEmployeeIds, excludeIds
     };
 
     return (
-        <aside aria-label="Employee contacts" className="flex max-h-[calc(100vh-8rem)] min-h-[32rem] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg lg:sticky lg:top-4">
-            <header className="flex items-start justify-between gap-3 border-b border-slate-200 px-4 py-4">
+        <aside aria-label="Employee contacts" className="flex max-h-[calc(100vh-8rem)] min-h-[32rem] flex-col overflow-hidden rounded-xl border border-sky-300 bg-white shadow-lg lg:sticky lg:top-4">
+            <header className="flex items-start justify-between gap-3 border-b border-sky-100 bg-sky-50/70 px-4 py-4">
                 <div className="min-w-0">
                     <h3 className="font-semibold text-slate-900">Employees</h3>
                     <p className="truncate text-xs text-slate-500">Select for {lineLabel}</p>
