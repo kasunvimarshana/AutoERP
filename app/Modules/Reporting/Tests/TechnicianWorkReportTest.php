@@ -376,6 +376,38 @@ final class TechnicianWorkReportTest extends TestCase
             ]);
 
         $this->cancelCommissionJob($context, $job);
+
+        $this->reportGetJson($context, '/api/v1/reports/vehicle-service/technician-work?'.http_build_query($this->scope($context)))
+            ->assertOk()
+            ->assertJsonPath('data.0.commission_amount', '0.000000')
+            ->assertJsonPath('data.0.supervisor_commission_amount', '0.000000')
+            ->assertJsonPath('summary.total_technician_commission', '0.000000')
+            ->assertJsonPath('summary.total_supervisor_commission', '0.000000')
+            ->assertJsonPath('summary.total_payable_commission', '0.000000');
+
+        $this->reportGetJson($context, '/api/v1/reports/vehicle-service/detailed?'.http_build_query($this->scope($context)))
+            ->assertOk()
+            ->assertJsonPath('data.0.employee_incentive', '0.000000')
+            ->assertJsonPath('data.0.job_supervisor_incentive', '0.000000')
+            ->assertJsonPath('summary.employee_incentive', '0.000000')
+            ->assertJsonPath('summary.supervisor_incentive', '0.000000');
+
+        $genericRows = $this->withTenantExecutionContext((int) $context['tenant_id'], function () use ($context): array {
+            $catalog = app(\Modules\Reporting\Services\ReportCatalog::class);
+            $queries = app(\Modules\Reporting\Services\ReportQueryBuilder::class);
+            $definition = $catalog->get('vehicle-service.technician-work');
+            $query = $queries->query(
+                $definition,
+                (int) $context['tenant_id'],
+                (int) $context['organization_unit_id'],
+                [],
+            );
+
+            return $queries->rows($definition, $query->get());
+        });
+        $this->assertSame('cancelled', $genericRows[0]['job_status']);
+        $this->assertSame('0.000000', $genericRows[0]['commission_amount']);
+
         $this->reportGetJson($context, '/api/v1/reports/vehicle-service/employee-commissions?'.http_build_query($this->scope($context)))
             ->assertOk()->assertJsonPath('meta.total', 0)->assertJsonPath('summary.total_commission', '0.000000');
         $this->reportGetJson($context, '/api/v1/reports/vehicle-service/employee-commissions?'.http_build_query([
@@ -479,6 +511,11 @@ final class TechnicianWorkReportTest extends TestCase
                 'id' => 'supervisor-'.$job->getKey(),
                 'commission_status' => 'cancelled',
             ]);
+
+        $this->withTenantExecutionContext((int) $context['tenant_id'], function () use ($assignment, $job): void {
+            $this->assertSame('20.000000', (string) $assignment->fresh()->commission_amount);
+            $this->assertSame('50.000000', (string) $job->fresh()->supervisor_commission_amount);
+        });
     }
 
     public function test_existing_generic_and_specialized_pdf_export_endpoints_keep_working(): void

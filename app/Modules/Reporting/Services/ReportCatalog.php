@@ -45,6 +45,7 @@ use Modules\Supplier\Models\SupplierItemMapping;
 use Modules\Tax\Models\TaxTransaction;
 use Modules\UOM\Models\UnitOfMeasureModel;
 use Modules\Vehicle\Models\Vehicle;
+use Modules\VehicleService\Enums\VehicleServiceJobStatus;
 use Modules\VehicleService\Models\VehicleServiceJob;
 use Modules\VehicleService\Models\VehicleServiceJobLine;
 use Modules\VehicleService\Models\VehicleServiceLineEmployee;
@@ -509,8 +510,20 @@ final class ReportCatalog
     private function labour(string $key, string $title): ReportDefinition
     {
         return $this->definition($key, $title, 'Vehicle Service', VehicleServiceLineEmployee::class, [
-            $this->col('assigned_at', 'Assigned', format: 'datetime', sort: 'assigned_at'), $this->col('job', 'Job', 'job.job_number'), $this->col('employee', 'Employee', 'employee.display_name'),
-            $this->qty('assigned_hours', 'Hours'), $this->money('rate', 'Rate', false), $this->money('commission_amount', 'Commission'), $this->col('completed_at', 'Completed', format: 'datetime', sort: 'completed_at'),
+            $this->col('assigned_at', 'Assigned', format: 'datetime', sort: 'assigned_at'), $this->col('job', 'Job', 'job.job_number'),
+            $this->col('job_status', 'Job status', 'job.status', 'enum'), $this->col('employee', 'Employee', 'employee.display_name'),
+            $this->qty('assigned_hours', 'Hours'), $this->money('rate', 'Rate', false),
+            new ReportColumn(
+                key: 'commission_amount',
+                label: 'Commission',
+                sortBy: 'commission_amount',
+                format: 'money',
+                summarize: true,
+                value: static fn (VehicleServiceLineEmployee $assignment): string => $assignment->job?->status === VehicleServiceJobStatus::Cancelled
+                    ? '0.000000'
+                    : (string) $assignment->commission_amount,
+            ),
+            $this->col('completed_at', 'Completed', format: 'datetime', sort: 'completed_at'),
         ], ['job.job_number', 'employee.display_name'], ['job', 'employee'], 'assigned_at');
     }
 
