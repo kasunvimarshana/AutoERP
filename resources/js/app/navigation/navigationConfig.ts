@@ -517,14 +517,36 @@ export const tenantNavigationSections: NavigationSection[] = [
                 },
                 children: [
                     {
-                        id: "sales-workspace",
+                        id: "selling-create",
                         type: "link",
-                        label: "Sales",
-                        to: "/selling",
-                        match: ["/selling"],
+                        label: "Create Selling",
+                        to: "/selling/create",
+                        match: ["/selling/create"],
                         access: {
                             ...operationalAccess(["selling", "customer", "item", "inventory", "invoice", "warehouse"]),
-                            permissions: [sellingPermissions.salesView, sellingPermissions.salesCreate, sellingPermissions.returnsView, sellingPermissions.returnsCreate],
+                            permissions: [sellingPermissions.salesCreate],
+                        },
+                    },
+                    {
+                        id: "selling-list",
+                        type: "link",
+                        label: "Selling List",
+                        to: "/selling",
+                        match: ["/selling", "/selling/sales"],
+                        access: {
+                            ...operationalAccess(["selling", "customer", "item", "inventory", "invoice", "warehouse"]),
+                            permissions: [sellingPermissions.salesView],
+                        },
+                    },
+                    {
+                        id: "selling-returns",
+                        type: "link",
+                        label: "Selling Return",
+                        to: "/selling/returns",
+                        match: ["/selling/returns"],
+                        access: {
+                            ...operationalAccess(["selling", "customer", "item", "inventory", "invoice", "warehouse"]),
+                            permissions: [sellingPermissions.returnsView],
                         },
                     },
                 ],

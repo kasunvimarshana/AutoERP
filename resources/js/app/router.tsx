@@ -659,6 +659,18 @@ const appRouter = createBrowserRouter(
                             element={<SellingWorkspacePage />}
                         />
                         <Route
+                            path="/selling/create"
+                            element={<SellingWorkspacePage />}
+                        />
+                        <Route
+                            path="/selling/returns"
+                            element={<SellingWorkspacePage />}
+                        />
+                        <Route
+                            path="/selling/sales"
+                            element={<SellingWorkspacePage />}
+                        />
+                        <Route
                             path="/selling/sales/:id"
                             element={<SellingWorkspacePage />}
                         />

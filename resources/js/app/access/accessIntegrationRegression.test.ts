@@ -59,7 +59,7 @@ describe('tenant access integration regressions', () => {
         const modules = ['selling', 'customer', 'item', 'inventory', 'invoice', 'warehouse'];
 
         expect(visibleItemLabels([sellingPermissions.salesView], modules)).toContain('Selling');
-        expect(visibleItemLabels([sellingPermissions.salesView], modules)).toContain('Sales');
+        expect(visibleItemLabels([sellingPermissions.salesView], modules)).toContain('Selling List');
         expect(visibleItemLabels([sellingPermissions.salesView], modules.filter((module) => module !== 'invoice'))).not.toContain('Selling');
         expect(visibleItemLabels([], modules)).not.toContain('Selling');
     });

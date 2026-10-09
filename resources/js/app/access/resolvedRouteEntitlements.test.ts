@@ -70,18 +70,14 @@ describe('resolved tenant route entitlements', () => {
     });
 
     it('resolves Selling workspace routes with their module and permission requirements', () => {
-        for (const path of ['/selling', '/selling/sales/42']) {
-            const entitlement = resolveTenantRouteEntitlement(path);
+        const list = resolveTenantRouteEntitlement('/selling');
+        expect(list?.modules).toEqual(['selling', 'customer', 'item', 'inventory', 'invoice', 'warehouse']);
+        expect(list?.requiresOrganizationUnit).toBe(true);
+        expect(list?.permissions).toEqual([sellingPermissions.salesView]);
 
-            expect(entitlement?.modules).toEqual(['selling', 'customer', 'item', 'inventory', 'invoice', 'warehouse']);
-            expect(entitlement?.requiresOrganizationUnit).toBe(true);
-            expect(entitlement?.permissions).toEqual([
-                sellingPermissions.salesView,
-                sellingPermissions.salesCreate,
-                sellingPermissions.returnsView,
-                sellingPermissions.returnsCreate,
-            ]);
-        }
+        expect(resolveTenantRouteEntitlement('/selling/create')?.permissions).toEqual([sellingPermissions.salesCreate]);
+        expect(resolveTenantRouteEntitlement('/selling/returns')?.permissions).toEqual([sellingPermissions.returnsView]);
+        expect(resolveTenantRouteEntitlement('/selling/sales/42')?.permissions).toEqual([sellingPermissions.salesView]);
     });
 
     it('returns no entitlement for an unregistered route', () => {
