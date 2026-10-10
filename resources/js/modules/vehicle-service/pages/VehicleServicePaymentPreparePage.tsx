@@ -42,18 +42,24 @@ interface PaymentRow {
     details: Record<string, string>;
 }
 
-type DirectPaymentKind = 'cash' | 'card' | 'bank_transfer';
+type DirectPaymentKind = 'cash' | 'card' | 'bank_transfer' | 'cheque' | 'wallet' | 'other';
 
 const DIRECT_PAYMENT_KINDS: Array<{ kind: DirectPaymentKind; label: string }> = [
     { kind: 'cash', label: 'Cash' },
     { kind: 'card', label: 'Card' },
     { kind: 'bank_transfer', label: 'Bank transfer' },
+    { kind: 'cheque', label: 'Cheque' },
+    { kind: 'wallet', label: 'Wallet' },
+    { kind: 'other', label: 'Other method' },
 ];
 
 const PAYMENT_METHOD_STYLES: Record<DirectPaymentKind, { section: string; label: string }> = {
     cash: { section: 'border-emerald-200 border-l-emerald-500 bg-emerald-50/30', label: 'bg-emerald-100 text-emerald-900' },
     card: { section: 'border-blue-200 border-l-blue-500 bg-blue-50/30', label: 'bg-blue-100 text-blue-900' },
     bank_transfer: { section: 'border-violet-200 border-l-violet-500 bg-violet-50/30', label: 'bg-violet-100 text-violet-900' },
+    cheque: { section: 'border-amber-200 border-l-amber-500 bg-amber-50/30', label: 'bg-amber-100 text-amber-900' },
+    wallet: { section: 'border-indigo-200 border-l-indigo-500 bg-indigo-50/30', label: 'bg-indigo-100 text-indigo-900' },
+    other: { section: 'border-slate-200 border-l-slate-500 bg-slate-50/30', label: 'bg-slate-100 text-slate-900' },
 };
 
 type PaymentMode = 'direct' | 'credit';
@@ -405,6 +411,7 @@ export default function VehicleServicePaymentPreparePage() {
                             <div className="space-y-3">
                                 {rows.map((row, index) => {
                                     const availableMethods = methodsForKind(paymentMethods, row.kind);
+                                    if (availableMethods.length === 0) return null;
                                     const selectedMethod = selectedMethodForRow(row, paymentMethods);
                                     const kind = selectedMethod ? paymentMethodKind(selectedMethod) : row.kind;
                                     const label = DIRECT_PAYMENT_KINDS.find((paymentKind) => paymentKind.kind === row.kind)?.label ?? row.kind;
@@ -495,7 +502,7 @@ export default function VehicleServicePaymentPreparePage() {
                                                 </div>
                                             )}
 
-                                            {selectedMethod && (kind === 'card' || kind === 'bank_transfer') && (
+                                            {selectedMethod && (kind === 'card' || kind === 'bank_transfer' || kind === 'cheque' || kind === 'wallet') && (
                                                 <details className="mt-3 rounded-md bg-slate-50 px-3 py-2">
                                                     <summary className="cursor-pointer text-sm font-medium text-slate-700">Additional transaction details</summary>
                                                     <PaymentMethodFields
