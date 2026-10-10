@@ -44,6 +44,13 @@ export interface RentalIncident {
     reviewed_at: string | null;
 }
 
+export interface IncidentVehicleUseOption {
+    id: number;
+    vehicle_label: string;
+    customer_agreement_reference: string | null;
+    customer_party_name: string | null;
+}
+
 export interface IncidentFormData {
     vehicle_use_id: number;
     incident_type: IncidentType;
