@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Route;
 use Modules\Core\Tenancy\TenantFeature;
 use Modules\VehicleRental\Enums\AgreementAction;
 use Modules\VehicleRental\Enums\AgreementKind;
+use Modules\VehicleRental\Enums\IncidentReviewAction;
 use Modules\VehicleRental\Enums\RunningChartAction;
 use Modules\VehicleRental\Enums\VehicleUseAction;
 use Modules\VehicleRental\Http\Controllers\AgreementController;
@@ -13,6 +14,7 @@ use Modules\VehicleRental\Http\Controllers\BaseRentBillingController;
 use Modules\VehicleRental\Http\Controllers\DepositReceiptController;
 use Modules\VehicleRental\Http\Controllers\DriverDirectoryController;
 use Modules\VehicleRental\Http\Controllers\RunningChartController;
+use Modules\VehicleRental\Http\Controllers\RentalIncidentController;
 use Modules\VehicleRental\Http\Controllers\UsageChargeBillingController;
 use Modules\VehicleRental\Http\Controllers\VehicleUseController;
 
@@ -22,6 +24,15 @@ Route::prefix('api/v1/vehicle-rental')->middleware([
     config('core.current_organization_unit.middleware_alias', 'current.organization-unit').':required', 'tenant.feature:'.TenantFeature::VEHICLE_RENTAL,
 ])->group(function (): void {
     Route::get('driver-employees', [DriverDirectoryController::class, 'index']);
+    Route::prefix('incidents')->group(function (): void {
+        Route::get('/', [RentalIncidentController::class, 'index']);
+        Route::post('/', [RentalIncidentController::class, 'store']);
+        Route::get('{incident}', [RentalIncidentController::class, 'show'])->whereNumber('incident');
+        Route::get('{incident}/history', [RentalIncidentController::class, 'history'])->whereNumber('incident');
+        Route::post('{incident}/{action}', [RentalIncidentController::class, 'review'])
+            ->whereNumber('incident')
+            ->whereIn('action', array_column(IncidentReviewAction::cases(), 'value'));
+    });
     Route::prefix('{kind}/agreements')->whereIn('kind', array_column(AgreementKind::cases(), 'value'))->group(function (): void {
         Route::get('/', [AgreementController::class, 'index']);
         Route::post('/', [AgreementController::class, 'store']);
