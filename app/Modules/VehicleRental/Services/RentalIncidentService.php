@@ -28,6 +28,23 @@ final class RentalIncidentService
         private readonly AgreementValidation $contextValidation,
     ) {}
 
+    public function vehicleUseOptions(AgreementContext $context, ?string $search, int $perPage): LengthAwarePaginator
+    {
+        $this->authorization->assertIncident($context, IncidentPermission::Record);
+        $search = trim($search ?? '');
+        $pattern = '%'.$search.'%';
+
+        return VehicleUse::query()->forContext($context->tenantId, $context->organizationUnitId)
+            ->with('customerAgreement')
+            ->when($search !== '', fn ($query) => $query->where(function ($match) use ($pattern): void {
+                $match->where('vehicle_label_snapshot', 'like', $pattern)
+                    ->orWhereHas('customerAgreement', fn ($agreement) => $agreement
+                        ->where('reference', 'like', $pattern)
+                        ->orWhere('party_name_snapshot', 'like', $pattern));
+            }))
+            ->orderByDesc('id')->paginate($perPage);
+    }
+
     public function list(AgreementContext $context, int $perPage): LengthAwarePaginator
     {
         $this->authorization->assertIncident($context, IncidentPermission::View);
