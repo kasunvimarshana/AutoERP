@@ -21,6 +21,7 @@ final class RentalIncident extends TenantOwnedModel
             'tenant_id' => 'integer',
             'organization_unit_id' => 'integer',
             'vehicle_use_id' => 'integer',
+            'vehicle_use_version' => 'integer',
             'running_chart_id' => 'integer',
             'created_by' => 'integer',
             'reviewed_by' => 'integer',
