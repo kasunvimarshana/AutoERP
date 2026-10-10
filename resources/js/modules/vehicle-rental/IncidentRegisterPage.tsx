@@ -17,6 +17,7 @@ import { formatBusinessDate } from '@/shared/utils/businessDate';
 import type { IncidentVehicleUseOption } from './incidentEvidence';
 import { IncidentReviewAction, IncidentStatus, IncidentType, INCIDENT_PERMISSION, INCIDENT_TYPE_LABELS, type RentalIncident } from './incidentEvidence';
 import { listIncidentVehicleUseOptions, listRentalIncidents, recordRentalIncident, reviewRentalIncident } from './incidentEvidenceApi';
+import { IncidentHistoryPanel } from './IncidentHistoryPanel';
 
 export default function IncidentRegisterPage() {
     const auth = useAuth();
@@ -41,6 +42,7 @@ export default function IncidentRegisterPage() {
     const [evidenceReference, setEvidenceReference] = useState('');
     const [description, setDescription] = useState('');
     const [reviewing, setReviewing] = useState<RentalIncident | null>(null);
+    const [historyId, setHistoryId] = useState<number | null>(null);
     const [reviewReason, setReviewReason] = useState('');
 
     useEffect(() => {
@@ -88,7 +90,7 @@ export default function IncidentRegisterPage() {
         setBusy(true); setError(null);
         try {
             await reviewRentalIncident(reviewing, action, reviewReason);
-            setReviewing(null); setReviewReason(''); reload();
+            setReviewing(null); setReviewReason(''); setHistoryId(null); reload();
         } catch (failure) { setError(toApiError(failure)); }
         finally { setBusy(false); }
     }
@@ -134,6 +136,11 @@ export default function IncidentRegisterPage() {
                     <p>{incident.description}</p>
                     {canReview && incident.status === IncidentStatus.Recorded &&
                         <Button type="button" variant="secondary" disabled={busy} onClick={() => { setReviewing(incident); setReviewReason(''); }}>Review evidence</Button>}
+                    <Button type="button" variant="secondary" aria-expanded={historyId === incident.id}
+                        onClick={() => setHistoryId(historyId === incident.id ? null : incident.id)}>
+                        {historyId === incident.id ? 'Hide evidence history' : 'View evidence history'}
+                    </Button>
+                    {historyId === incident.id && <IncidentHistoryPanel key={incident.id} id={incident.id} />}
                     {reviewing?.id === incident.id && <div className="space-y-2 rounded-lg border bg-slate-50 p-3">
                         <Textarea label="Review reason (required)" required value={reviewReason} onChange={event => setReviewReason(event.target.value)} error={error?.fields.reason?.[0]} />
                         <p className="text-sm">Confirming factual evidence does not approve a customer charge or owner deduction.</p>
