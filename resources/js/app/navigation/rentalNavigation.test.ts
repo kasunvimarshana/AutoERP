@@ -8,6 +8,7 @@ describe('Vehicle Rental navigation', () => {
             'Customer Agreements',
             'Vehicle Use Register',
             'Running Chart Register',
+            'Incident Evidence',
         ]);
     });
 });
