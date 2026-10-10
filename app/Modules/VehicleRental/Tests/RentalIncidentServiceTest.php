@@ -73,6 +73,30 @@ final class RentalIncidentServiceTest extends TestCase
         });
     }
 
+    public function test_record_rejects_stale_vehicle_assignment_before_writing_evidence(): void
+    {
+        $this->custodyFixture(function ($context, $use): void {
+            try {
+                app(RentalIncidentService::class)->create($context, [
+                    'vehicle_use_id' => $use->id,
+                    'expected_use_version' => $use->row_version + 1,
+                    'incident_type' => 'fuel',
+                    'occurred_on' => '2026-09-07',
+                    'evidence_reference' => 'Stale receipt',
+                    'description' => 'Must not attach evidence to a changed vehicle assignment.',
+                ]);
+                self::fail('Accepted an outdated vehicle assignment revision.');
+            } catch (ConflictHttpException $conflict) {
+                self::assertStringContainsString('vehicle assignment changed', $conflict->getMessage());
+            }
+
+            self::assertSame(0, \Illuminate\Support\Facades\DB::table('vehicle_rental_incidents')
+                ->where('tenant_id', $context->tenantId)->count());
+            self::assertSame(0, \Illuminate\Support\Facades\DB::table('vehicle_rental_incident_events')
+                ->where('tenant_id', $context->tenantId)->count());
+        });
+    }
+
     public function test_chart_must_belong_to_selected_vehicle_use(): void
     {
         $this->custodyFixture(function ($context, $use): void {
