@@ -8,12 +8,20 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Modules\VehicleRental\Enums\IncidentReviewAction;
 use Modules\VehicleRental\Http\Requests\AgreementRequest;
 use Modules\VehicleRental\Http\Resources\RentalIncidentResource;
+use Modules\VehicleRental\Http\Resources\IncidentVehicleUseOptionResource;
 use Modules\VehicleRental\Services\RentalIncidentService;
 use Symfony\Component\HttpFoundation\Response;
 
 final class RentalIncidentController
 {
     public function __construct(private readonly RentalIncidentService $incidents) {}
+
+    public function vehicleUseOptions(AgreementRequest $request): AnonymousResourceCollection
+    {
+        return IncidentVehicleUseOptionResource::collection($this->incidents->vehicleUseOptions(
+            $request->context(), $request->validated('search'), $request->perPage(),
+        ));
+    }
 
     public function index(AgreementRequest $request): AnonymousResourceCollection
     {
