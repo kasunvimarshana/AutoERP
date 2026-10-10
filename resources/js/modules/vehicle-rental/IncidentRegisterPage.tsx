@@ -68,11 +68,14 @@ export default function IncidentRegisterPage() {
     function reload() { setLoading(true); setRevision(value => value + 1); }
     async function create(event: FormEvent) {
         event.preventDefault();
-        if (busy || !selectedUse || !type) return;
+        const selectedAssignment = uses.find(use => String(use.id) === selectedUse);
+        if (busy || !selectedAssignment || !type) return;
         setBusy(true); setError(null);
         try {
             await recordRentalIncident({
-                vehicle_use_id: Number(selectedUse), incident_type: type, occurred_on: occurredOn,
+                vehicle_use_id: selectedAssignment.id,
+                expected_use_version: selectedAssignment.row_version,
+                incident_type: type, occurred_on: occurredOn,
                 evidence_reference: evidenceReference.trim(), description: description.trim(),
             });
             setSelectedUse(''); setType(''); setOccurredOn(''); setEvidenceReference(''); setDescription('');
