@@ -550,6 +550,14 @@ Therefore:
 
 ---
 
+### 17.1 Incident evidence registration — additive fresh implementation (2026-10-10)
+
+The fresh Vehicle Rental module now includes a **non-monetary incident evidence register** backed by `vehicle_rental_incidents` and append-only `vehicle_rental_incident_events`. Operators select an actual Vehicle Use, optionally associate a Running Chart belonging to that use, record the local business date, evidence reference, description and typed nature (fuel, toll, parking, repair, maintenance, accident/damage, penalty, cleaning or other). The register saves stable Vehicle Use lineage **and the locked Vehicle Use's existing immutable history revision**, rather than duplicating customer/owner master details; the revision is constrained by the existing Rental history table. The record operation requires the exact `expected_use_version` delivered by the permission-scoped Vehicle Use selector and compares it against the locked current Use revision. A stale selection fails with HTTP 409 and leaves no incident or event; the server—not the caller—captures `vehicle_use_version` as a constrained immutable history reference. The case is immutable after recording, apart from a version-checked, permissioned factual confirmation or rejection; each transition adds an event snapshot. Viewing and recording are scoped by tenant and organization unit. Recorded events have an operator-facing expandable timeline served as typed historical resources with human-readable actor names, the action, timestamp and review reason; raw actor foreign keys and JSON snapshots are not the end-user UI contract.
+
+**Critical semantic boundary:** `confirmed` means **evidence was reviewed**, not that a customer or owner is liable. The register deliberately has no rental charge amount, tax estimate, note posting, owner deduction, GL or payment side effect. The financial incident allocation and Invoice-owned debit/credit note issuance described below remain a **separate, unimplemented release gate** until they can be posted and reconciled correctly. No generic schedule or guessed recovery rate is implied by the new incident type enum.
+
+---
+
 ## 18. Tax, withholding and Finance
 
 - Tax percentages are not hardcoded in Rental.

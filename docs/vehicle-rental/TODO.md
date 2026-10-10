@@ -377,7 +377,8 @@ The prior checklist has no open items **within its originally accepted base-rent
 
 The October 10 deep financial review extends, rather than invalidates, the original narrow acceptance scope. These are **release gates**, not undisclosed automatic tariff assumptions.
 
-- [ ] Implement a Rental-owned evidence/incident source for fuel, toll/parking, cleaning, repair, accident/damage, penalty and other charges, including files/references, policy/contract revision, vehicle/use/chart lineage and immutable decision history.
+- [x] Add a Rental-owned **non-monetary incident evidence register** for fuel/toll/repair/maintenance/damage/penalties/cleaning, linked to Vehicle Use/optional Running Chart, with immutable facts, versioned review and audit events.
+- [ ] Extend incident evidence with governed attachments/file proofs, versioned commercial liability decisions and accountable customer/owner/company allocation. The factual review does not authorize a financial adjustment.
 - [ ] Implement explicit approved party responsibility (customer, owner, company), split amounts and dispute handling; reject duplicate recovery and avoid creating money while liability remains unproved.
 - [ ] Complete Invoice-owned linked customer debit/credit and owner payable/recovery note lifecycles, immutable tax/document snapshots, reissue/reversal and partial/fully-settled handling without repurposing Purchase/Selling return notes.
 - [ ] Reconcile **all** note and credit-allocation paths (Purchase/Selling/Rental) with Finance-owned balanced journals, source-specific posting profiles, accounting-period/FX/tax logic and atomic reversals.

@@ -1,5 +1,6 @@
 import { USE_PERMISSION, USE_REGISTER_PATH } from '@/modules/vehicle-rental/vehicleUse';
 import { CHART_PERMISSION, CHART_REGISTER_PATH } from '@/modules/vehicle-rental/runningCharts';
+import { INCIDENT_PERMISSION, INCIDENT_REGISTER_PATH } from '@/modules/vehicle-rental/incidentEvidence';
 import { AgreementKind, agreementPermissions } from '@/modules/vehicle-rental/agreements';
 import { lazy } from "react";
 import { Route, RouterProvider, createBrowserRouter, createRoutesFromElements } from "react-router-dom";
@@ -95,6 +96,7 @@ const CustomerVehicleFormPage = lazy(
 const VehicleUseRegisterPage = lazy(() => import("@/modules/vehicle-rental/VehicleUseRegisterPage"));
 const RunningChartRegisterPage = lazy(() => import("@/modules/vehicle-rental/RunningChartRegisterPage"));
 const RentalAgreementsPage = lazy(() => import("@/modules/vehicle-rental/AgreementsPage"));
+const IncidentRegisterPage = lazy(() => import("@/modules/vehicle-rental/IncidentRegisterPage"));
 const VehicleListPage = lazy(() => import("@/modules/vehicle/VehicleListPage"));
 const VehicleCreatePage = lazy(
     () => import("@/modules/vehicle/VehicleCreatePage"),
@@ -974,6 +976,7 @@ const appRouter = createBrowserRouter(
                         />
                         <Route path={USE_REGISTER_PATH} element={<PermissionRoute permission={USE_PERMISSION.view}><VehicleUseRegisterPage /></PermissionRoute>} />
                         <Route path={CHART_REGISTER_PATH} element={<PermissionRoute permission={CHART_PERMISSION.view}><RunningChartRegisterPage /></PermissionRoute>} />
+                        <Route path={INCIDENT_REGISTER_PATH} element={<PermissionRoute permission={INCIDENT_PERMISSION.view}><IncidentRegisterPage /></PermissionRoute>} />
                         <Route path="/vehicle-rental/customer/agreements" element={<PermissionRoute permission={agreementPermissions.customer.view}><RentalAgreementsPage key={AgreementKind.Customer} kind={AgreementKind.Customer} /></PermissionRoute>} />
                         <Route path="/vehicle-rental/owner/agreements" element={<PermissionRoute permission={agreementPermissions.owner.view}><RentalAgreementsPage key={AgreementKind.Owner} kind={AgreementKind.Owner} /></PermissionRoute>} />
                         <Route
