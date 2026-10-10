@@ -7,6 +7,7 @@ namespace Modules\Purchase\Services;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
+use Modules\Invoice\Enums\InvoiceDirection;
 use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Models\Invoice;
 use Modules\Invoice\Services\InvoiceBalanceService;
@@ -206,6 +207,10 @@ final class PurchaseDebitNoteService
             || (string) $invoice->party_type !== 'supplier'
         ) {
             throw new InvalidArgumentException('Purchase debit note and invoice supplier does not match.');
+        }
+
+        if ($invoice->direction !== InvoiceDirection::Inbound) {
+            throw new InvalidArgumentException('Purchase debit notes can only be allocated to inbound supplier invoices.');
         }
 
         if (! in_array($invoiceStatus, [InvoiceStatus::Posted, InvoiceStatus::PartiallyPaid], true)) {
