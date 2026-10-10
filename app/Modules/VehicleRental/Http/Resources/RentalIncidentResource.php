@@ -20,6 +20,7 @@ final class RentalIncidentResource extends JsonResource
             'evidence_reference' => $this->evidence_reference,
             'description' => $this->description,
             'vehicle_use_id' => (int) $this->vehicle_use_id,
+            'vehicle_use_version' => (int) $this->vehicle_use_version,
             'running_chart_id' => $this->running_chart_id === null ? null : (int) $this->running_chart_id,
             'vehicle' => $this->whenLoaded('vehicleUse', fn () => [
                 'label' => $this->vehicleUse->vehicle_label_snapshot,
