@@ -39,6 +39,7 @@ final class RentalIncidentServiceTest extends TestCase
             $service = app(RentalIncidentService::class);
             $incident = $service->create($context, [
                 'vehicle_use_id' => $use->id,
+                'expected_use_version' => $use->row_version,
                 'running_chart_id' => $chart->id,
                 'incident_type' => 'fuel',
                 'occurred_on' => '2026-09-07',
@@ -78,6 +79,7 @@ final class RentalIncidentServiceTest extends TestCase
             $this->expectException(ValidationException::class);
             app(RentalIncidentService::class)->create($context, [
                 'vehicle_use_id' => $use->id,
+                'expected_use_version' => $use->row_version,
                 'running_chart_id' => 9999999,
                 'incident_type' => 'repair',
                 'occurred_on' => '2026-09-07',
@@ -93,6 +95,7 @@ final class RentalIncidentServiceTest extends TestCase
             $service = app(RentalIncidentService::class);
             $incident = $service->create($context, [
                 'vehicle_use_id' => $use->id,
+                'expected_use_version' => $use->row_version,
                 'incident_type' => 'toll',
                 'occurred_on' => '2026-09-07',
                 'evidence_reference' => 'Ticket',
@@ -115,6 +118,7 @@ final class RentalIncidentServiceTest extends TestCase
             $this->expectException(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
             $service->create($other, [
                 'vehicle_use_id' => $use->id,
+                'expected_use_version' => $use->row_version,
                 'incident_type' => 'fuel',
                 'occurred_on' => '2026-09-07',
                 'evidence_reference' => 'Inaccessible use',
