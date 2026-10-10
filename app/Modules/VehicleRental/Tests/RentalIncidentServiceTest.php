@@ -102,6 +102,8 @@ final class RentalIncidentServiceTest extends TestCase
                 'code' => 'OTHER-INCIDENT', 'name' => 'Other Rental branch',
             ]);
             $other = new \Modules\VehicleRental\Data\AgreementContext($context->tenantId, $otherId, $context->actorId);
+            self::assertSame(1, $service->vehicleUseOptions($context, $use->vehicle_label_snapshot, 10)->total());
+            self::assertSame(0, $service->vehicleUseOptions($other, $use->vehicle_label_snapshot, 10)->total());
             self::assertSame(0, $service->list($other, 10)->total());
             try {
                 $service->find($other, $incident->id);
