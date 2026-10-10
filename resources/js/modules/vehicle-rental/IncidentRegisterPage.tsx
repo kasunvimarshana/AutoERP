@@ -28,6 +28,7 @@ export default function IncidentRegisterPage() {
     const [rows, setRows] = useState<RentalIncident[]>([]);
     const [meta, setMeta] = useState<PaginationMeta>();
     const [loading, setLoading] = useState(true);
+    const [listFailed, setListFailed] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
     const [busy, setBusy] = useState(false);
     const [vehicleSearch, setVehicleSearch] = useState('');
@@ -49,11 +50,11 @@ export default function IncidentRegisterPage() {
         const controller = new AbortController();
         listRentalIncidents(page, controller.signal)
             .then(result => {
-                if (!controller.signal.aborted) { setRows(result.data); setMeta(result.meta); setError(null); }
+                if (!controller.signal.aborted) { setRows(result.data); setMeta(result.meta); setListFailed(false); setError(null); }
             })
             .catch(failure => {
                 if (!controller.signal.aborted) {
-                    setRows([]); setMeta(undefined); setError(toApiError(failure));
+                    setRows([]); setMeta(undefined); setListFailed(true); setError(toApiError(failure));
                 }
             })
             .finally(() => { if (!controller.signal.aborted) setLoading(false); });
@@ -128,7 +129,7 @@ export default function IncidentRegisterPage() {
             </form>
         </Panel>}
         <Panel title="Recorded incidents">
-            {loading ? <LoadingState label="Loading rental incidents…" /> : rows.length === 0 ? <p>No incident evidence recorded.</p> : <div className="space-y-3">
+            {loading ? <LoadingState label="Loading rental incidents…" /> : listFailed ? null : rows.length === 0 ? <p>No incident evidence recorded.</p> : <div className="space-y-3">
                 {rows.map(incident => <article key={incident.id} className="space-y-2 border-t pt-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                         <h2 className="font-medium">{incident.vehicle.label} · {INCIDENT_TYPE_LABELS[incident.incident_type]}</h2>
