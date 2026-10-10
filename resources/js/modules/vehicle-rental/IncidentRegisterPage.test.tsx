@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ApiError } from '@/shared/api/apiError';
 import IncidentRegisterPage from './IncidentRegisterPage';
 import { IncidentStatus, IncidentType, IncidentReviewAction, type RentalIncident } from './incidentEvidence';
 import { incidentHistory, listIncidentVehicleUseOptions, listRentalIncidents, recordRentalIncident, reviewRentalIncident } from './incidentEvidenceApi';
@@ -85,6 +86,15 @@ describe('Rental incident evidence register', () => {
         fireEvent.click(screen.getByRole('button', { name: 'View evidence history' }));
         expect(await screen.findByText(/Test Operator/)).toBeInTheDocument();
         expect(incidentHistory).toHaveBeenCalledWith(incident.id, 1, expect.any(AbortSignal));
+    });
+
+    it('hides stale results when a later register load fails', async () => {
+        render(<IncidentRegisterPage />);
+        expect(await screen.findByText('CAR-101 · Fuel')).toBeInTheDocument();
+        vi.mocked(listRentalIncidents).mockRejectedValueOnce(new ApiError('Could not load incident evidence.', 503));
+        fireEvent.click(screen.getByRole('button', { name: 'Reload incidents' }));
+        expect(await screen.findByText('Could not load incident evidence.')).toBeInTheDocument();
+        expect(screen.queryByText('CAR-101 · Fuel')).not.toBeInTheDocument();
     });
 
     it('confirms reviewed evidence without issuing a monetary adjustment', async () => {
