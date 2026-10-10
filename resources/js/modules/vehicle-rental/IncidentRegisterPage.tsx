@@ -14,10 +14,9 @@ import { Textarea } from '@/shared/components/Textarea';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import type { PaginationMeta } from '@/shared/types/pagination';
 import { formatBusinessDate } from '@/shared/utils/businessDate';
-import { listVehicleUseRegister } from './vehicleUseApi';
-import type { VehicleUse } from './vehicleUse';
+import type { IncidentVehicleUseOption } from './incidentEvidence';
 import { IncidentReviewAction, IncidentStatus, IncidentType, INCIDENT_PERMISSION, INCIDENT_TYPE_LABELS, type RentalIncident } from './incidentEvidence';
-import { listRentalIncidents, recordRentalIncident, reviewRentalIncident } from './incidentEvidenceApi';
+import { listIncidentVehicleUseOptions, listRentalIncidents, recordRentalIncident, reviewRentalIncident } from './incidentEvidenceApi';
 
 export default function IncidentRegisterPage() {
     const auth = useAuth();
@@ -33,7 +32,7 @@ export default function IncidentRegisterPage() {
     const [vehicleSearch, setVehicleSearch] = useState('');
     const [query, setQuery] = useState('');
     const [vehiclePage, setVehiclePage] = useState(1);
-    const [uses, setUses] = useState<VehicleUse[]>([]);
+    const [uses, setUses] = useState<IncidentVehicleUseOption[]>([]);
     const [useMeta, setUseMeta] = useState<PaginationMeta>();
     const [selectedUse, setSelectedUse] = useState('');
     const [type, setType] = useState<IncidentType | ''>('');
@@ -57,7 +56,7 @@ export default function IncidentRegisterPage() {
     useEffect(() => {
         if (!canRecord) return;
         const controller = new AbortController();
-        listVehicleUseRegister({ search: query || undefined }, vehiclePage, controller.signal)
+        listIncidentVehicleUseOptions(query, vehiclePage, controller.signal)
             .then(result => { if (!controller.signal.aborted) { setUses(result.data); setUseMeta(result.meta); } })
             .catch(failure => { if (!controller.signal.aborted) setError(toApiError(failure)); });
         return () => controller.abort();
@@ -98,7 +97,7 @@ export default function IncidentRegisterPage() {
                     <Button type="button" variant="secondary" onClick={() => { setSelectedUse(''); setVehiclePage(1); setQuery(vehicleSearch.trim()); }}>Find assignments</Button>
                 </div>
                 <Select label="Vehicle assignment" required placeholder="Select a vehicle and customer agreement"
-                    options={uses.map(use => ({ value: String(use.id), label: `${use.vehicle.label} — ${use.customer_agreement.reference} — ${use.customer_agreement.party_name}` }))}
+                    options={uses.map(use => ({ value: String(use.id), label: `${use.vehicle_label} — ${use.customer_agreement_reference ?? 'No agreement'} — ${use.customer_party_name ?? 'Unnamed party'}` }))}
                     value={selectedUse} onChange={event => setSelectedUse(event.target.value)} error={error?.fields.vehicle_use_id?.[0]} />
                 <Pagination meta={useMeta} disabled={busy} onPageChange={setVehiclePage} />
                 <div className="grid gap-3 md:grid-cols-2">
