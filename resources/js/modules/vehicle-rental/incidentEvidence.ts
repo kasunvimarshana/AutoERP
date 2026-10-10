@@ -28,6 +28,13 @@ export const INCIDENT_TYPE_LABELS: Record<IncidentType, string> = {
     [IncidentType.Other]: 'Other',
 };
 
+export interface IncidentHistoryEvent {
+    action: string;
+    reason: string | null;
+    recorded_at: string;
+    actor: { name: string };
+}
+
 export interface RentalIncident {
     id: number;
     reference: string;
