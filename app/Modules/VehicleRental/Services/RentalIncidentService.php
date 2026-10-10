@@ -102,6 +102,7 @@ final class RentalIncidentService
                 'tenant_id' => $context->tenantId,
                 'organization_unit_id' => $context->organizationUnitId,
                 'vehicle_use_id' => $use->getKey(),
+                'vehicle_use_version' => $use->row_version,
                 'running_chart_id' => $chartId,
                 'reference' => IncidentFields::REFERENCE_PREFIX.Str::ulid(),
                 'incident_type' => IncidentType::from($data['incident_type']),
