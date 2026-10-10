@@ -550,6 +550,14 @@ Therefore:
 
 ---
 
+### 17.1 Incident evidence registration — additive fresh implementation (2026-10-10)
+
+The fresh Vehicle Rental module now includes a **non-monetary incident evidence register** backed by `vehicle_rental_incidents` and append-only `vehicle_rental_incident_events`. Operators select an actual Vehicle Use, optionally associate a Running Chart belonging to that use, record the local business date, evidence reference, description and typed nature (fuel, toll, parking, repair, maintenance, accident/damage, penalty, cleaning or other). The register saves stable Vehicle Use lineage rather than duplicating customer/owner master details. The case is immutable after recording, apart from a version-checked, permissioned factual confirmation or rejection; each transition adds an event snapshot. Viewing and recording are scoped by tenant and organization unit.
+
+**Critical semantic boundary:** `confirmed` means **evidence was reviewed**, not that a customer or owner is liable. The register deliberately has no rental charge amount, tax estimate, note posting, owner deduction, GL or payment side effect. The financial incident allocation and Invoice-owned debit/credit note issuance described below remain a **separate, unimplemented release gate** until they can be posted and reconciled correctly. No generic schedule or guessed recovery rate is implied by the new incident type enum.
+
+---
+
 ## 18. Tax, withholding and Finance
 
 - Tax percentages are not hardcoded in Rental.
