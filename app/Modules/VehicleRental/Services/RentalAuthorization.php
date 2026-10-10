@@ -8,6 +8,7 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Modules\User\Services\UserAccessResolver;
 use Modules\VehicleRental\Data\AgreementContext;
 use Modules\VehicleRental\Enums\AgreementKind;
+use Modules\VehicleRental\Enums\IncidentPermission;
 use Modules\VehicleRental\Enums\RunningChartAction;
 
 class RentalAuthorization
@@ -40,7 +41,14 @@ class RentalAuthorization
 
     public static function descriptions(): array
     {
-        return [self::CUSTOMER_BILL => 'Create customer rental invoice drafts.', self::OWNER_BILL => 'Create owner rental payable drafts.', self::CHART_VIEW => 'View Running Chart evidence.', self::CHART_MANAGE => 'Create and edit draft Running Charts.', self::CHART_FINALIZE => 'Finalize physical usage evidence.', self::CHART_REVERSE => 'Reverse finalized physical usage evidence.', self::USE_VIEW => 'View assigned vehicles and custody history.', self::USE_MANAGE => 'Plan, hand over, return and cancel vehicle use.', self::CUSTOMER_VIEW => 'View customer rental agreements.', self::CUSTOMER_MANAGE => 'Create, edit drafts, activate and close customer rental agreements.', self::OWNER_VIEW => 'View owner rental agreements.', self::OWNER_MANAGE => 'Create, edit drafts, activate and close owner rental agreements.'];
+        return [IncidentPermission::View->value => 'View Rental incident evidence and history.', IncidentPermission::Record->value => 'Record immutable Rental incident evidence.', IncidentPermission::Review->value => 'Confirm or reject Rental incident evidence without creating charges.', self::CUSTOMER_BILL => 'Create customer rental invoice drafts.', self::OWNER_BILL => 'Create owner rental payable drafts.', self::CHART_VIEW => 'View Running Chart evidence.', self::CHART_MANAGE => 'Create and edit draft Running Charts.', self::CHART_FINALIZE => 'Finalize physical usage evidence.', self::CHART_REVERSE => 'Reverse finalized physical usage evidence.', self::USE_VIEW => 'View assigned vehicles and custody history.', self::USE_MANAGE => 'Plan, hand over, return and cancel vehicle use.', self::CUSTOMER_VIEW => 'View customer rental agreements.', self::CUSTOMER_MANAGE => 'Create, edit drafts, activate and close customer rental agreements.', self::OWNER_VIEW => 'View owner rental agreements.', self::OWNER_MANAGE => 'Create, edit drafts, activate and close owner rental agreements.'];
+    }
+
+    public function assertIncident(AgreementContext $context, IncidentPermission $permission): void
+    {
+        if (! $this->access->can($context->actorId, $context->tenantId, $permission->value)) {
+            throw new AuthorizationException('This Rental action requires permission: '.$permission->value);
+        }
     }
 
     public function assert(AgreementContext $context, AgreementKind $kind, bool $write): void
