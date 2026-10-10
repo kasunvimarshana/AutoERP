@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import IncidentRegisterPage from './IncidentRegisterPage';
 import { IncidentStatus, IncidentType, IncidentReviewAction, type RentalIncident } from './incidentEvidence';
-import { listIncidentVehicleUseOptions, listRentalIncidents, recordRentalIncident, reviewRentalIncident } from './incidentEvidenceApi';
+import { incidentHistory, listIncidentVehicleUseOptions, listRentalIncidents, recordRentalIncident, reviewRentalIncident } from './incidentEvidenceApi';
 
 vi.mock('@/modules/auth/AuthProvider', () => ({
     useAuth: () => ({
@@ -17,6 +17,7 @@ vi.mock('@/modules/auth/AuthProvider', () => ({
 }));
 vi.mock('./incidentEvidenceApi', () => ({
     listIncidentVehicleUseOptions: vi.fn(),
+    incidentHistory: vi.fn(),
     listRentalIncidents: vi.fn(),
     recordRentalIncident: vi.fn(),
     reviewRentalIncident: vi.fn(),
@@ -41,6 +42,9 @@ const incident: RentalIncident = {
 beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(listIncidentVehicleUseOptions).mockResolvedValue({ data: [assignment] });
+    vi.mocked(incidentHistory).mockResolvedValue({ data: [
+        { action: 'recorded', reason: null, recorded_at: '2026-09-07T10:00:00Z', actor: { name: 'Test Operator' } },
+    ] });
     vi.mocked(listRentalIncidents).mockResolvedValue({ data: [incident] });
     vi.mocked(recordRentalIncident).mockResolvedValue(incident);
     vi.mocked(reviewRentalIncident).mockResolvedValue({
@@ -72,6 +76,15 @@ describe('Rental incident evidence register', () => {
             description: 'Receipt supplied by driver',
         }));
         expect(screen.getByText(/Confirmation verifies the record only/)).toBeInTheDocument();
+    });
+
+    it('loads actor-labelled history only when requested', async () => {
+        render(<IncidentRegisterPage />);
+        await screen.findByText('CAR-101 · Fuel');
+        expect(incidentHistory).not.toHaveBeenCalled();
+        fireEvent.click(screen.getByRole('button', { name: 'View evidence history' }));
+        expect(await screen.findByText(/Test Operator/)).toBeInTheDocument();
+        expect(incidentHistory).toHaveBeenCalledWith(incident.id, 1, expect.any(AbortSignal));
     });
 
     it('confirms reviewed evidence without issuing a monetary adjustment', async () => {
