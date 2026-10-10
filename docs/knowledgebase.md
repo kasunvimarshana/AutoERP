@@ -546,6 +546,8 @@ Therefore:
 - original Rental agreement/rate/source snapshots are never rewritten to simulate a deduction or credit;
 - replacement and downtime must not double-apply the same incident automatically.
 
+**Financial adjustment implementation boundary (2026-10-10 extension):** The current fresh Rental routes cover base rent, mileage, OT/night-outs and deposits, **not** a fully governed customer/owner incident debit-note/credit-note lifecycle. In particular, Purchase-owned supplier debit notes and Selling-owned return credits are not substitutes for a Rental adjustment source. The new evidence-based fuel/toll/repair/damage/penalty/cleaning workflows must be linked to exact applicable agreements, responsibility decisions, approver, currency and supporting documents, and must use Invoice/Payment/Tax/Finance posting and settlement contracts. The existing Purchase invoice-direction guard only prevents one invalid allocation; it is **not** a complete GL, note-tax or cross-currency reconciliation solution. See [the dated owning-module guard record](changes/2026-10-10-purchase-debit-note-invoice-direction-guard.md) and the newly identified delivery gates in [the implementation ledger](vehicle-rental/TODO.md).
+
 ---
 
 ## 18. Tax, withholding and Finance
