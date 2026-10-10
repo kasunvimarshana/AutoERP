@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { Button, LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
@@ -18,7 +18,6 @@ import type {
     VehicleServiceSalesSummaryParams,
     VehicleServiceSalesSummaryRankedItem,
     VehicleServiceSalesSummaryResult,
-    VehicleServiceSalesSummaryRow,
 } from '../reportingTypes';
 
 type DatePreset = 'today' | 'week' | 'month' | 'custom';
