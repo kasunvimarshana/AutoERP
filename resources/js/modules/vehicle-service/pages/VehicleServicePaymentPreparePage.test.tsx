@@ -179,6 +179,74 @@ describe('VehicleServicePaymentPreparePage', () => {
         })));
     });
 
+    it('preserves cheque payment submission with instrument evidence', async () => {
+        apiMocks.getVehicleServicePaymentOptions.mockResolvedValue({
+            job_version: 7,
+            credit_allowed: false,
+            methods: [{
+                id: 14,
+                code: 'CHEQUE',
+                name: 'Cheque',
+                method_type: 'cheque',
+                requires_reference: true,
+                requires_instrument_details: true,
+            }],
+        });
+        const user = userEvent.setup();
+        renderPage();
+
+        expect(await screen.findByText('Payment for JOB-1')).toBeInTheDocument();
+        await user.selectOptions(screen.getByLabelText('Invoice'), '11');
+        expect(screen.getByLabelText('Cheque amount')).toBeInTheDocument();
+        await user.click(screen.getByText('Additional transaction details'));
+        await user.type(screen.getByLabelText('Cheque number'), 'CHQ-14');
+        await user.type(screen.getByLabelText('External bank'), 'Issuing bank');
+        await user.click(screen.getByRole('button', { name: 'Finalize payment' }));
+
+        await waitFor(() => expect(apiMocks.createVehicleServicePayment).toHaveBeenCalledWith(9, expect.objectContaining({
+            lines: [expect.objectContaining({
+                payment_method_id: 14,
+                reference_number: 'CHQ-14',
+                instrument_number: 'CHQ-14',
+                external_bank_name: 'Issuing bank',
+            })],
+        })));
+    });
+
+    it('preserves wallet payment and its source transaction reference', async () => {
+        apiMocks.getVehicleServicePaymentOptions.mockResolvedValue({
+            job_version: 7,
+            credit_allowed: false,
+            methods: [{
+                id: 15,
+                code: 'WALLET',
+                name: 'Mobile wallet',
+                method_type: 'mobile_wallet',
+                requires_reference: true,
+                requires_instrument_details: true,
+            }],
+        });
+        const user = userEvent.setup();
+        renderPage();
+
+        expect(await screen.findByText('Payment for JOB-1')).toBeInTheDocument();
+        await user.selectOptions(screen.getByLabelText('Invoice'), '11');
+        expect(screen.getByLabelText('Wallet amount')).toBeInTheDocument();
+        await user.click(screen.getByText('Additional transaction details'));
+        await user.type(screen.getByLabelText('Wallet reference'), 'WLT-15');
+        await user.type(screen.getByLabelText('Provider'), 'Wallet provider');
+        await user.click(screen.getByRole('button', { name: 'Finalize payment' }));
+
+        await waitFor(() => expect(apiMocks.createVehicleServicePayment).toHaveBeenCalledWith(9, expect.objectContaining({
+            lines: [expect.objectContaining({
+                payment_method_id: 15,
+                reference_number: 'WLT-15',
+                instrument_number: 'WLT-15',
+                external_bank_name: 'Wallet provider',
+            })],
+        })));
+    });
+
     it('offers Credit Payment only when the backend reports credit approval', async () => {
         apiMocks.getVehicleServicePaymentOptions.mockResolvedValue({
             job_version: 7,
