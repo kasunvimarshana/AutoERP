@@ -48,6 +48,7 @@ final class RentalIncidentServiceTest extends TestCase
 
             self::assertSame(IncidentStatus::Recorded, $incident->status);
             self::assertSame(1, $incident->row_version);
+            self::assertSame($use->row_version, $incident->vehicle_use_version);
             self::assertSame('Receipt 101', $incident->evidence_reference);
             self::assertSame($chart->id, $incident->running_chart_id);
             self::assertSame(1, $service->list($context, 10)->total());
