@@ -18,6 +18,12 @@ final class RentalIncident extends TenantOwnedModel
     protected function casts(): array
     {
         return array_merge(parent::casts(), [
+            'tenant_id' => 'integer',
+            'organization_unit_id' => 'integer',
+            'vehicle_use_id' => 'integer',
+            'running_chart_id' => 'integer',
+            'created_by' => 'integer',
+            'reviewed_by' => 'integer',
             'row_version' => 'integer',
             'incident_type' => IncidentType::class,
             'status' => IncidentStatus::class,
