@@ -369,4 +369,22 @@ Vehicle Rental is considered functionally complete when the following remain tru
 17. future changes preserve this ledger and record actual verification evidence rather than assuming it.
 18. operational business-local timestamps must resolve to exactly one instant; nonexistent and ambiguous DST wall times are rejected rather than silently coerced.
 
-There are no remaining open product-policy TODO items in this ledger. Source-access limitations and environment-specific execution evidence are documented separately and must not be converted into speculative runtime behavior.
+The prior checklist has no open items **within its originally accepted base-rent/usage/operational scope**. Its checked boxes must not be interpreted as completion of the newly requested customer/owner debit-note, credit-note and incident-cost workflows. Source-access limitations and environment-specific execution evidence are documented separately and must not be converted into speculative runtime behavior.
+
+---
+
+## R. Extended customer/owner financial-adjustment scope (requested 2026-10-10)
+
+The October 10 deep financial review extends, rather than invalidates, the original narrow acceptance scope. These are **release gates**, not undisclosed automatic tariff assumptions.
+
+- [ ] Implement a Rental-owned evidence/incident source for fuel, toll/parking, cleaning, repair, accident/damage, penalty and other charges, including files/references, policy/contract revision, vehicle/use/chart lineage and immutable decision history.
+- [ ] Implement explicit approved party responsibility (customer, owner, company), split amounts and dispute handling; reject duplicate recovery and avoid creating money while liability remains unproved.
+- [ ] Complete Invoice-owned linked customer debit/credit and owner payable/recovery note lifecycles, immutable tax/document snapshots, reissue/reversal and partial/fully-settled handling without repurposing Purchase/Selling return notes.
+- [ ] Reconcile **all** note and credit-allocation paths (Purchase/Selling/Rental) with Finance-owned balanced journals, source-specific posting profiles, accounting-period/FX/tax logic and atomic reversals.
+- [ ] Correct Purchase-note currency provenance and reject ambiguous or cross-currency allocation. The 2026-10-10 inbound-direction guard is an independent, narrower safety improvement and does not resolve currency/GL issues.
+- [ ] Complete Payment-owned cash receipt, owner disbursement, deposit application, refund, payment-instrument, partial allocation and excess-credit workflows for each approved scenario.
+- [ ] Add customer/owner vehicle-agreement source-to-document-to-settlement reporting, side-independent balances, incident allocation visibility and AR/AP/GL reconciliation without duplicating financial ledgers in Rental.
+- [ ] Add/execute unit, API, database, concurrency, migration/upgrade, tenant/authorization, frontend, audit-history and dual-side UAT tests on the exact intended release head.
+- [ ] Run and record the full backend test suite, frontend test suite, lint, typecheck, format/build, clean migration and upgrade/rollback, representative InnoDB contention, finance tie-out and deployment smoke checks before production promotion.
+
+No external provider's standard fee schedule, historic TACGL account ID or guessed tax percentage is a substitute for a documented contractual policy and the Tax/Finance source of truth.

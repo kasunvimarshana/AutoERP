@@ -20,6 +20,7 @@ use Modules\Inventory\Enums\AdjustmentType as InventoryAdjustmentType;
 use Modules\Inventory\Models\InventoryMovement;
 use Modules\Inventory\Services\StockAdjustmentService;
 use Modules\Inventory\Services\StockAvailabilityService;
+use Modules\Invoice\Enums\InvoiceDirection;
 use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Services\InvoiceStatusService;
 use Modules\Item\DTOs\CreateItemData;
@@ -803,6 +804,25 @@ final class PurchaseEngineTest extends TestCase
 
         $this->assertSame(PurchaseDebitNoteStatus::Posted, $note->status);
         $this->assertSame('12.000000', (string) $note->remaining_amount);
+        $this->assertSame('49192.000000', (string) $invoice->refresh()->balance_due);
+
+        // A supplier identifier is not sufficient: a purchase debit note must not
+        // reduce the balance of an outbound document, even if its party matches.
+        $this->withTenantExecutionContext($tenantId, function () use ($invoice, $note): void {
+            $invoice->forceFill(['direction' => InvoiceDirection::Outbound])->save();
+            try {
+                app(PurchaseDebitNoteService::class)->allocate($note, $invoice, '1.000000');
+                self::fail('Outbound supplier invoice unexpectedly accepted a purchase debit note.');
+            } catch (InvalidArgumentException $error) {
+                self::assertSame(
+                    'Purchase debit notes can only be allocated to inbound supplier invoices.',
+                    $error->getMessage(),
+                );
+            } finally {
+                $invoice->forceFill(['direction' => InvoiceDirection::Inbound])->save();
+            }
+        });
+        $this->assertSame('12.000000', (string) $note->refresh()->remaining_amount);
         $this->assertSame('49192.000000', (string) $invoice->refresh()->balance_due);
 
         $note = $this->withTenantExecutionContext(
