@@ -51,7 +51,11 @@ export default function IncidentRegisterPage() {
             .then(result => {
                 if (!controller.signal.aborted) { setRows(result.data); setMeta(result.meta); setError(null); }
             })
-            .catch(failure => { if (!controller.signal.aborted) setError(toApiError(failure)); })
+            .catch(failure => {
+                if (!controller.signal.aborted) {
+                    setRows([]); setMeta(undefined); setError(toApiError(failure));
+                }
+            })
             .finally(() => { if (!controller.signal.aborted) setLoading(false); });
         return () => controller.abort();
     }, [page, revision]);
