@@ -40,7 +40,6 @@ return new class extends Migration
             $table->foreign(['created_by', 'tenant_id'], 'vri_created_by_fk')->references(['id', 'tenant_id'])->on('users')->restrictOnDelete();
             $table->foreign(['reviewed_by', 'tenant_id'], 'vri_reviewed_by_fk')->references(['id', 'tenant_id'])->on('users')->restrictOnDelete();
         });
-
     }
 
     public function down(): void
