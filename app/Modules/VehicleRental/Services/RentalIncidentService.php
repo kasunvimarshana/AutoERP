@@ -63,9 +63,7 @@ final class RentalIncidentService
 
     public function history(AgreementContext $context, int $id, int $perPage): LengthAwarePaginator
     {
-        $this->find($context, $id);
-        return DB::table('vehicle_rental_incident_events')
-            ->where('tenant_id', $context->tenantId)->where('incident_id', $id)->orderBy('id')->paginate($perPage);
+        return $this->find($context, $id)->events()->with('actor')->paginate($perPage);
     }
 
     public function create(AgreementContext $context, array $input): RentalIncident
