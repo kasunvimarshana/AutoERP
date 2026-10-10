@@ -95,7 +95,7 @@ final class RentalIncidentService
                 'row_version' => AgreementFields::INITIAL_VERSION,
                 'created_by' => $context->actorId,
             ])->save();
-            $this->recordEvent($incident, $context, 'recorded', null);
+            $this->recordEvent($incident, $context, IncidentStatus::Recorded->value, null);
             return $this->load($incident);
         });
     }
