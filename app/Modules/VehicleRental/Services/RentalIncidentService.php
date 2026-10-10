@@ -79,6 +79,7 @@ final class RentalIncidentService
         }
         $data = Validator::make($input, [
             'vehicle_use_id' => ['required', 'integer', 'min:1'],
+            'expected_use_version' => ['required', 'integer', 'min:1'],
             'running_chart_id' => ['nullable', 'integer', 'min:1'],
             'incident_type' => ['required', Rule::enum(IncidentType::class)],
             'occurred_on' => ['required', 'date_format:'.AgreementFields::DATE_FORMAT],
@@ -89,6 +90,9 @@ final class RentalIncidentService
         return DB::transaction(function () use ($context, $data): RentalIncident {
             $use = VehicleUse::query()->forContext($context->tenantId, $context->organizationUnitId)
                 ->lockForUpdate()->findOrFail((int) $data['vehicle_use_id']);
+            if ((int) $use->row_version !== (int) $data['expected_use_version']) {
+                throw new ConflictHttpException('The vehicle assignment changed. Reload and select its current revision.');
+            }
             $chartId = isset($data['running_chart_id']) ? (int) $data['running_chart_id'] : null;
             if ($chartId !== null && RunningChart::query()->forContext($context->tenantId, $context->organizationUnitId)
                 ->where('vehicle_use_id', $use->getKey())->whereKey($chartId)->first() === null) {
