@@ -20,11 +20,11 @@ return new class extends Migration
             $table->foreignId('vehicle_use_id');
             $table->foreignId('running_chart_id')->nullable();
             $table->string('reference', AgreementFields::REFERENCE_LENGTH);
-            $table->string('incident_type', 40);
+            $table->string('incident_type', IncidentFields::TYPE_LENGTH);
             $table->date('occurred_on');
             $table->string('evidence_reference', IncidentFields::EVIDENCE_REFERENCE_LENGTH);
             $table->text('description');
-            $table->string('status', 30)->default(IncidentStatus::Recorded->value);
+            $table->string('status', IncidentFields::STATUS_LENGTH)->default(IncidentStatus::Recorded->value);
             $table->unsignedBigInteger('row_version')->default(AgreementFields::INITIAL_VERSION);
             $table->foreignId('created_by');
             $table->foreignId('reviewed_by')->nullable();
@@ -46,7 +46,7 @@ return new class extends Migration
             $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
             $table->foreignId('incident_id');
             $table->foreignId('actor_id');
-            $table->string('action', 40);
+            $table->string('action', IncidentFields::ACTION_LENGTH);
             $table->text('reason')->nullable();
             $table->json('snapshot');
             $table->timestamp('recorded_at');
