@@ -46,6 +46,7 @@ export interface PaymentLine {
     external_bank_name?: string | null;
     external_bank_branch?: string | null;
     instrument_number?: string | null;
+    card_brand?: 'visa' | 'master' | 'amex' | null;
     instrument_date?: string | null;
     deposit_date?: string | null;
     realized_date?: string | null;
