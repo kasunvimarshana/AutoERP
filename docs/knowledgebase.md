@@ -2,7 +2,7 @@
 
 **Status:** Canonical Vehicle Rental business/domain and production-policy reference for AutoERP.
 
-**Knowledge refresh date:** 2026-10-06
+**Knowledge refresh date:** 2026-10-10
 
 **Primary business source / conflict tie-breaker:** TACGL legacy application/data corpus
 
@@ -56,13 +56,16 @@ Canonical upload:
 - SHA-256: `0e0733fff720072af4c3aaa787995ff128bfa79060a37739d6d2ebbe18a25313`
 - 452 non-directory business files.
 
-Dated upload supplied in this audit:
+Dated upload names verified against the same payload:
 
-- `TACGL(20261005-182335).zip`
+- `TACGL(20261005-182335).zip` (previous review)
+- `TACGL(20261010-112139).zip` (current upload)
 - SHA-256: `79c240494943437978754169c3360bb7c6e35d911ef8263c4b2d6b6246384d77`
 - 452 non-directory business files.
 
 The canonical and dated ZIPs contain the same normalized business payload. After removing the canonical archive's outer `TACGL/` wrapper, every relative path and every per-file SHA-256 matches. The 2026-10-05 dated package therefore adds no conflicting business evidence and does not change any Vehicle Rental business rule.
+
+On **2026-10-10**, the newly attached `TACGL(20261010-112139).zip` independently matched the previously recorded dated-package SHA-256 (`79c240494943437978754169c3360bb7c6e35d911ef8263c4b2d6b6246384d77`). Its 452 normalized entries match the canonical package by path, uncompressed size and ZIP CRC-32; matching full-file SHA-256 confirms the new dated ZIP is byte-identical to the previously reviewed dated ZIP. All four newly attached videos likewise match their existing registered SHA-256 values. These are evidence-identity checks, **not** a fresh continuous video audit or a new runtime test. No new commercial rule follows from the duplicate source materials.
 
 Corroborating package:
 
