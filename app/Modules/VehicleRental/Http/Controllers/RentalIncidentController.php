@@ -8,6 +8,7 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Modules\VehicleRental\Enums\IncidentReviewAction;
 use Modules\VehicleRental\Http\Requests\AgreementRequest;
 use Modules\VehicleRental\Http\Resources\RentalIncidentResource;
+use Modules\VehicleRental\Http\Resources\RentalIncidentHistoryResource;
 use Modules\VehicleRental\Http\Resources\IncidentVehicleUseOptionResource;
 use Modules\VehicleRental\Services\RentalIncidentService;
 use Symfony\Component\HttpFoundation\Response;
@@ -43,9 +44,11 @@ final class RentalIncidentController
         return new RentalIncidentResource($this->incidents->find($request->context(), $incident));
     }
 
-    public function history(AgreementRequest $request, int $incident): JsonResponse
+    public function history(AgreementRequest $request, int $incident): AnonymousResourceCollection
     {
-        return response()->json($this->incidents->history($request->context(), $incident, $request->perPage()));
+        return RentalIncidentHistoryResource::collection($this->incidents->history(
+            $request->context(), $incident, $request->perPage(),
+        ));
     }
 
     public function review(AgreementRequest $request, int $incident, string $action): RentalIncidentResource
