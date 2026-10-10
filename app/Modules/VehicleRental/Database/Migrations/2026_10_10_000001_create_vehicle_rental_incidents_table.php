@@ -18,6 +18,7 @@ return new class extends Migration
             $table->foreignId('tenant_id')->constrained('tenants')->restrictOnDelete();
             $table->foreignId('organization_unit_id');
             $table->foreignId('vehicle_use_id');
+            $table->unsignedBigInteger('vehicle_use_version');
             $table->foreignId('running_chart_id')->nullable();
             $table->string('reference', AgreementFields::REFERENCE_LENGTH);
             $table->string('incident_type', IncidentFields::TYPE_LENGTH);
@@ -36,6 +37,7 @@ return new class extends Migration
             $table->index(['tenant_id', 'organization_unit_id', 'vehicle_use_id', 'occurred_on'], 'vri_use_date_ix');
             $table->foreign(['organization_unit_id', 'tenant_id'], 'vri_org_fk')->references(['id', 'tenant_id'])->on('organization_units')->restrictOnDelete();
             $table->foreign(['vehicle_use_id', 'tenant_id'], 'vri_use_fk')->references(['id', 'tenant_id'])->on('vehicle_rental_uses')->restrictOnDelete();
+            $table->foreign(['vehicle_use_id', 'vehicle_use_version'], 'vri_use_revision_fk')->references(['vehicle_use_id', 'row_version'])->on('vehicle_rental_use_history')->restrictOnDelete();
             $table->foreign(['running_chart_id', 'tenant_id'], 'vri_chart_fk')->references(['id', 'tenant_id'])->on('vehicle_rental_running_charts')->restrictOnDelete();
             $table->foreign(['created_by', 'tenant_id'], 'vri_created_by_fk')->references(['id', 'tenant_id'])->on('users')->restrictOnDelete();
             $table->foreign(['reviewed_by', 'tenant_id'], 'vri_reviewed_by_fk')->references(['id', 'tenant_id'])->on('users')->restrictOnDelete();
