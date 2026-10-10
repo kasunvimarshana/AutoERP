@@ -34,6 +34,7 @@ export default function IncidentRegisterPage() {
     const [vehiclePage, setVehiclePage] = useState(1);
     const [uses, setUses] = useState<IncidentVehicleUseOption[]>([]);
     const [useMeta, setUseMeta] = useState<PaginationMeta>();
+    const [usesLoading, setUsesLoading] = useState(false);
     const [selectedUse, setSelectedUse] = useState('');
     const [type, setType] = useState<IncidentType | ''>('');
     const [occurredOn, setOccurredOn] = useState('');
@@ -56,9 +57,11 @@ export default function IncidentRegisterPage() {
     useEffect(() => {
         if (!canRecord) return;
         const controller = new AbortController();
+        setUses([]); setUseMeta(undefined); setUsesLoading(true);
         listIncidentVehicleUseOptions(query, vehiclePage, controller.signal)
             .then(result => { if (!controller.signal.aborted) { setUses(result.data); setUseMeta(result.meta); } })
-            .catch(failure => { if (!controller.signal.aborted) setError(toApiError(failure)); });
+            .catch(failure => { if (!controller.signal.aborted) setError(toApiError(failure)); })
+            .finally(() => { if (!controller.signal.aborted) setUsesLoading(false); });
         return () => controller.abort();
     }, [canRecord, query, vehiclePage]);
 
@@ -98,8 +101,9 @@ export default function IncidentRegisterPage() {
                 </div>
                 <Select label="Vehicle assignment" required placeholder="Select a vehicle and customer agreement"
                     options={uses.map(use => ({ value: String(use.id), label: `${use.vehicle_label} — ${use.customer_agreement_reference ?? 'No agreement'} — ${use.customer_party_name ?? 'Unnamed party'}` }))}
-                    value={selectedUse} onChange={event => setSelectedUse(event.target.value)} error={error?.fields.vehicle_use_id?.[0]} />
-                <Pagination meta={useMeta} disabled={busy} onPageChange={setVehiclePage} />
+                    value={selectedUse} disabled={usesLoading || busy} onChange={event => setSelectedUse(event.target.value)} error={error?.fields.vehicle_use_id?.[0]} />
+                {usesLoading && <LoadingState label="Finding vehicle assignments…" />}
+                <Pagination meta={useMeta} disabled={busy || usesLoading} onPageChange={next => { setSelectedUse(''); setVehiclePage(next); }} />
                 <div className="grid gap-3 md:grid-cols-2">
                     <Select label="Incident category" required value={type}
                         options={Object.values(IncidentType).map(value => ({ value, label: INCIDENT_TYPE_LABELS[value] }))}
