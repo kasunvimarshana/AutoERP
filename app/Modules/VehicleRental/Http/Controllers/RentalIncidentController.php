@@ -31,7 +31,7 @@ final class RentalIncidentController
     public function store(AgreementRequest $request): JsonResponse
     {
         $data = $request->only([
-            'vehicle_use_id', 'running_chart_id', 'incident_type',
+            'vehicle_use_id', 'expected_use_version', 'running_chart_id', 'incident_type',
             'occurred_on', 'evidence_reference', 'description',
         ]);
         return (new RentalIncidentResource($this->incidents->create($request->context(), $data)))
