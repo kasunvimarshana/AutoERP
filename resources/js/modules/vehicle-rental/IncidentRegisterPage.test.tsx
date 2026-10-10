@@ -95,6 +95,7 @@ describe('Rental incident evidence register', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Reload incidents' }));
         expect(await screen.findByText('Could not load incident evidence.')).toBeInTheDocument();
         expect(screen.queryByText('CAR-101 · Fuel')).not.toBeInTheDocument();
+        expect(screen.queryByText('No incident evidence recorded.')).not.toBeInTheDocument();
     });
 
     it('confirms reviewed evidence without issuing a monetary adjustment', async () => {
