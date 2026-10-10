@@ -1,11 +1,12 @@
 import { fieldError, type ApiError } from '@/shared/api/apiError';
-import { lookupApi, type ItemLookupResource } from '@/shared/api/lookupApi';
+import type { ItemLookupResource } from '@/shared/api/lookupApi';
 import { Button } from '@/shared/components/Button';
 import { Input } from '@/shared/components/Input';
 import { LookupSelect } from '@/shared/components/LookupSelect';
 import { MoneyDisplay } from '@/shared/components/MoneyDisplay';
-import type { LookupLoadParams, LookupResult } from '@/shared/types/lookup';
 import type { VehicleServiceLineSourceType } from '../../vehicleServiceTypes';
+import { searchVehicleServiceLineItems } from '../../api/lineItems';
+export { searchVehicleServiceLineItems } from '../../api/lineItems';
 import {
     lineTypeLabel,
     type VehicleServiceLineFormValue,
@@ -61,18 +62,19 @@ export function LineItemFields({ value, error, autoFocus = false, onChange }: {
         </div>
     );
 }
-
 export function VehicleServiceLineItemLookup({
     value,
     error,
     disabled = false,
     autoFocus = false,
+    required = true,
     onChange,
 }: {
     value: ItemLookupResource | null;
     error?: string;
     disabled?: boolean;
     autoFocus?: boolean;
+    required?: boolean;
     onChange: (item: ItemLookupResource | null) => void;
 }) {
     return (
@@ -86,7 +88,7 @@ export function VehicleServiceLineItemLookup({
             renderOption={(item, state) => <ItemOption option={item} active={state.active} />}
             recentResultsKey="vehicle-service:job-line-items"
             placeholder="Search inventory, service, labour, or package items..."
-            required
+            required={required}
             disabled={disabled}
             autoFocus={autoFocus}
         />
@@ -97,32 +99,6 @@ function vehicleServiceItemLabel(item: ItemLookupResource): string {
     return item.has_duplicate_name && item.code
         ? `${item.name} (${item.code})`
         : item.name;
-}
-
-export async function searchVehicleServiceLineItems(
-    params: LookupLoadParams,
-): Promise<LookupResult<ItemLookupResource>> {
-    const results = await Promise.all([
-        lookupApi.untrackedStockableItems(params),
-        lookupApi.serviceBatchItems(params),
-        lookupApi.serviceItems(params),
-        lookupApi.labourItems(params),
-        lookupApi.comboItems(params),
-    ]);
-    const data = dedupeLineOptions(results.flatMap((result) => result.data).filter(isSupportedLineItem));
-    const metas = results.map((result) => result.meta).filter((meta) => meta !== undefined);
-
-    return {
-        data,
-        meta: metas.length === 0 ? undefined : {
-            current_page: params.page,
-            from: data.length === 0 ? null : ((params.page - 1) * params.perPage) + 1,
-            last_page: Math.max(...metas.map((meta) => meta.last_page)),
-            per_page: params.perPage,
-            to: data.length === 0 ? null : ((params.page - 1) * params.perPage) + data.length,
-            total: metas.reduce((total, meta) => total + meta.total, 0),
-        },
-    };
 }
 
 export function lineSourceTypeForItem(item: ItemLookupResource): VehicleServiceLineSourceType {
@@ -138,15 +114,6 @@ export function isInventoryLineItem(item: ItemLookupResource): boolean {
     return Boolean(item.is_stockable)
         && !item.is_combo
         && !['non_stock', 'service', 'labour', 'combo', 'package'].includes(item.item_type ?? '');
-}
-
-function isSupportedLineItem(item: ItemLookupResource): boolean {
-    return item.item_type === 'service'
-        || item.item_type === 'labour'
-        || item.item_type === 'combo'
-        || item.item_type === 'package'
-        || Boolean(item.is_combo)
-        || isInventoryLineItem(item);
 }
 
 export function lineValueWithItem(
@@ -258,16 +225,4 @@ function stockNoticeClass(option: ItemLookupResource): string {
     }
 
     return 'text-emerald-700';
-}
-
-function dedupeLineOptions<T extends ItemLookupResource>(options: T[]): T[] {
-    const seen = new Set<string>();
-
-    return options.filter((option) => {
-        const key = option.batch ? `batch:${option.batch.id}` : `item:${option.id}`;
-        if (seen.has(key)) return false;
-        seen.add(key);
-
-        return true;
-    });
 }

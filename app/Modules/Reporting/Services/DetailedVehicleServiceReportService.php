@@ -10,10 +10,13 @@ use Illuminate\Support\Facades\DB;
 use Modules\Core\Services\DecimalMath;
 use Modules\Reporting\DTOs\ReportColumn;
 use Modules\Reporting\DTOs\ReportDefinition;
+use Modules\VehicleService\Enums\VehicleServiceJobStatus;
 use Modules\VehicleService\Models\VehicleServiceJobLine;
 
 final class DetailedVehicleServiceReportService
 {
+    private const ZERO_AMOUNT = '0.000000';
+
     public function __construct(
         private readonly DecimalMath $math,
         private readonly OperationalReportResponseBuilder $responses,
@@ -104,13 +107,19 @@ final class DetailedVehicleServiceReportService
         $organizationUnitId = $params['organization_unit_id'] ?? null;
 
         $employeeTotals = DB::table('vehicle_service_line_employees')
-            ->where('tenant_id', $tenantId)
+            ->join('vehicle_service_jobs as assignment_jobs', function ($join): void {
+                $join->on('assignment_jobs.id', '=', 'vehicle_service_line_employees.vehicle_service_job_id')
+                    ->on('assignment_jobs.tenant_id', '=', 'vehicle_service_line_employees.tenant_id');
+            })
+            ->where('vehicle_service_line_employees.tenant_id', $tenantId)
             ->selectRaw(
                 'vehicle_service_job_line_id, COUNT(*) as assigned_employee_count, '
-                .'COALESCE(SUM(commission_amount), 0) as employee_incentive'
+                .'COALESCE(SUM(CASE WHEN assignment_jobs.status = ? THEN 0 ELSE commission_amount END), 0) as employee_incentive',
+                [VehicleServiceJobStatus::Cancelled->value],
             )
             ->groupBy('vehicle_service_job_line_id');
-        $this->organizationScope($employeeTotals, 'organization_unit_id', $organizationUnitId);
+        $this->organizationScope($employeeTotals, 'vehicle_service_line_employees.organization_unit_id', $organizationUnitId);
+        $this->organizationScope($employeeTotals, 'assignment_jobs.organization_unit_id', $organizationUnitId);
 
         $invoiceTotals = DB::table('vehicle_service_invoice_links as links')
             ->join('invoices', 'invoices.id', '=', 'links.invoice_id')
@@ -248,6 +257,7 @@ final class DetailedVehicleServiceReportService
         $supervisorIncentive = DB::query()
             ->fromSub($jobIds, 'filtered_jobs')
             ->join('vehicle_service_jobs as summary_jobs', 'summary_jobs.id', '=', 'filtered_jobs.id')
+            ->where('summary_jobs.status', '!=', VehicleServiceJobStatus::Cancelled->value)
             ->sum('summary_jobs.supervisor_commission_amount');
 
         $revenue = $this->decimal($totals->revenue ?? 0);
@@ -307,7 +317,8 @@ final class DetailedVehicleServiceReportService
     private function row(object $row): array
     {
         $directCost = $this->math->mul((string) $row->quantity, (string) $row->unit_cost);
-        $employeeIncentive = $this->decimal($row->employee_incentive);
+        $jobWasCancelled = $row->job_status === VehicleServiceJobStatus::Cancelled->value;
+        $employeeIncentive = $jobWasCancelled ? self::ZERO_AMOUNT : $this->decimal($row->employee_incentive);
         $estimatedContribution = $this->math->sub(
             $this->math->sub((string) $row->line_total, $directCost),
             $employeeIncentive,
@@ -338,7 +349,7 @@ final class DetailedVehicleServiceReportService
             'assigned_employee_count' => (int) $row->assigned_employee_count,
             'employee_incentive' => $employeeIncentive,
             'estimated_contribution' => $estimatedContribution,
-            'job_supervisor_incentive' => $this->decimal($row->supervisor_commission_amount),
+            'job_supervisor_incentive' => $jobWasCancelled ? self::ZERO_AMOUNT : $this->decimal($row->supervisor_commission_amount),
             'invoice_progress' => $this->invoiceProgress($row),
             'payment_progress' => $this->paymentProgress($row),
             'invoice_total' => $this->decimal($row->invoice_total),

@@ -14,9 +14,12 @@ use Modules\Selling\Http\Requests\SaleQueryRequest;
 use Modules\Selling\Http\Requests\StoreSaleRequest;
 use Modules\Selling\Http\Requests\StoreSaleReturnRequest;
 use Modules\Selling\Http\Resources\SaleResource;
+use Modules\Selling\Http\Resources\SaleReturnResource;
 use Modules\Selling\Http\Resources\SellingItemLookupResource;
 use Modules\Selling\Models\Sale;
+use Modules\Selling\Models\SaleReturn;
 use Modules\Selling\Services\SalePostingService;
+use Modules\Selling\Services\SellingAuthorizationService;
 
 final class SaleController
 {
@@ -73,22 +76,52 @@ final class SaleController
     public function index(SaleQueryRequest $request): AnonymousResourceCollection
     {
         $query = Sale::query()
-            ->with(['customer', 'warehouse', 'warehouseLocation', 'lines.item', 'lines.uom', 'lines.variant', 'lines.batch', 'lines.serialNumber', 'invoice.balance', 'returns.lines'])
+            ->with(['customer', 'warehouse', 'warehouseLocation', 'lines.item', 'lines.uom', 'lines.variant', 'lines.batch', 'lines.serialNumber', 'invoice.balance'])
             ->where('tenant_id', $request->tenantId())
             ->where('organization_unit_id', $request->organizationUnitId())
+            ->when($request->filled('search'), function ($query) use ($request): void {
+                $search = trim((string) $request->validated('search'));
+                $query->where(function ($query) use ($search): void {
+                    $query->where('sale_number', 'like', '%'.$search.'%')
+                        ->orWhereHas('customer', fn ($customerQuery) => $customerQuery->where('name', 'like', '%'.$search.'%')->orWhere('display_name', 'like', '%'.$search.'%'));
+                });
+            })
             ->latest('sale_date')
             ->latest('id');
 
-        return SaleResource::collection($query->paginate(25));
+        return SaleResource::collection($query->paginate((int) $request->validated('per_page', 25)));
     }
 
-    public function show(SaleQueryRequest $request, int $sale): SaleResource
+    public function returns(SaleQueryRequest $request): AnonymousResourceCollection
+    {
+        $query = SaleReturn::query()
+            ->with(['sale.customer', 'sale.invoice.balance', 'lines.saleLine.item'])
+            ->where('tenant_id', $request->tenantId())
+            ->where('organization_unit_id', $request->organizationUnitId())
+            ->when($request->filled('search'), function ($query) use ($request): void {
+                $search = trim((string) $request->validated('search'));
+                $query->where(function ($query) use ($search): void {
+                    $query->where('return_number', 'like', '%'.$search.'%')
+                        ->orWhereHas('sale', fn ($saleQuery) => $saleQuery->where('sale_number', 'like', '%'.$search.'%')->orWhereHas('customer', fn ($customerQuery) => $customerQuery->where('name', 'like', '%'.$search.'%')->orWhere('display_name', 'like', '%'.$search.'%')));
+                });
+            })
+            ->latest('return_date')
+            ->latest('id');
+
+        return SaleReturnResource::collection($query->paginate((int) $request->validated('per_page', 25)));
+    }
+
+    public function show(SaleQueryRequest $request, int $sale, SellingAuthorizationService $authorization): SaleResource
     {
         $model = Sale::query()
-            ->with(['customer', 'warehouse', 'warehouseLocation', 'lines.item', 'lines.variant', 'lines.uom', 'lines.batch', 'lines.serialNumber', 'invoice.balance', 'returns.lines'])
+            ->with(['customer', 'warehouse', 'warehouseLocation', 'lines.item', 'lines.variant', 'lines.uom', 'lines.batch', 'lines.serialNumber', 'invoice.balance'])
             ->where('tenant_id', $request->tenantId())
             ->where('organization_unit_id', $request->organizationUnitId())
             ->findOrFail($sale);
+
+        if ($authorization->can($request->currentUserId(), $request->tenantId(), SellingAuthorizationService::RETURNS_VIEW)) {
+            $model->load('returns.lines');
+        }
 
         return new SaleResource($model);
     }

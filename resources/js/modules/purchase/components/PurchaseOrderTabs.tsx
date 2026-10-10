@@ -12,6 +12,7 @@ import { formatDate } from '@/shared/utils/formatDate';
 import type { PurchaseHeaderAdjustment, PurchaseOrder, PurchaseOrderLine, PurchaseRelatedDocument } from '../purchaseApi';
 
 type Tab = 'overview' | 'lines' | 'related' | 'adjustments' | 'activity';
+const MOBILE_VIEWPORT_QUERY = '(max-width: 767px)';
 
 const LazyLines = lazy(async () => ({ default: ({ order }: { order: PurchaseOrder }) => <LinesTable order={order} /> }));
 const LazyAdjustments = lazy(async () => ({ default: ({ order }: { order: PurchaseOrder }) => <AdjustmentTable order={order} /> }));
@@ -25,7 +26,10 @@ const tabs = [
 ].map(([id, label]) => ({ id: id as Tab, label }));
 
 export function PurchaseOrderTabs({ order, summary }: { order: PurchaseOrder; summary: ReactNode }) {
-    const state = useOnDemandTab<Tab>('overview');
+    const isMobileViewport = typeof window !== 'undefined'
+        && typeof window.matchMedia === 'function'
+        && window.matchMedia(MOBILE_VIEWPORT_QUERY).matches;
+    const state = useOnDemandTab<Tab>(isMobileViewport ? 'lines' : 'overview');
 
     return (
         <>
@@ -64,7 +68,66 @@ function LinesTable({ order }: { order: PurchaseOrder }) {
         { key: 'status', header: 'Status', render: (line) => line.status ? <StatusBadge status={line.status} /> : '-' },
     ];
 
-    return <DataTable rows={order.lines ?? []} columns={columns} rowKey={(line) => line.id ?? line.line_number ?? line.description ?? 'line'} emptyMessage="No order lines were found for this purchase order." />;
+    return (
+        <DataTable
+            rows={order.lines ?? []}
+            columns={columns}
+            rowKey={(line) => line.id ?? line.line_number ?? line.description ?? 'line'}
+            emptyMessage="No order lines were found for this purchase order."
+            mobileSummary={(line) => (
+                <div className="min-w-0">
+                    <p className="break-words font-semibold text-slate-900">{line.item?.name ?? line.description ?? 'Purchase item'}</p>
+                    {line.item_variant && <p className="mt-1 break-words text-xs font-normal text-slate-500">{line.item_variant.name ?? line.item_variant.code}</p>}
+                </div>
+            )}
+            rowBadge={(line) => line.status ? <StatusBadge status={line.status} /> : null}
+            mobileDetails={(line) => (
+                <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                        <div>
+                            <p className="text-xs font-medium text-slate-500">Ordered quantity</p>
+                            <p className="font-semibold text-slate-900">
+                                <QuantityDisplay value={line.ordered_quantity} precision={6} />{' '}
+                                <span className="text-sm font-normal text-slate-600">{line.uom?.name ?? line.uom?.code ?? ''}</span>
+                            </p>
+                        </div>
+                        <div className="text-right">
+                            <p className="text-xs font-medium text-slate-500">Unit price</p>
+                            <p className="font-medium text-slate-900"><MoneyDisplay value={line.unit_price} currency={order.currency?.code ?? undefined} /></p>
+                        </div>
+                    </div>
+                    <div className="flex items-center justify-between rounded-lg bg-blue-50 px-3 py-2">
+                        <span className="text-sm font-medium text-slate-700">Line total</span>
+                        <strong className="text-slate-950"><MoneyDisplay value={line.line_total} currency={order.currency?.code ?? undefined} /></strong>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 text-center">
+                        <QuantityProgress label="Received" value={line.received_quantity} />
+                        <QuantityProgress label="Invoiced" value={line.invoiced_quantity} />
+                        <QuantityProgress label="Remaining" value={line.remaining_quantity} />
+                    </div>
+                    <details className="group rounded-lg bg-slate-50 px-3 py-2 text-sm">
+                        <summary className="cursor-pointer list-none font-medium text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
+                            More progress
+                            <span className="float-right text-slate-400 group-open:rotate-180" aria-hidden="true">⌄</span>
+                        </summary>
+                        <dl className="mt-3 grid grid-cols-2 gap-3 border-t border-slate-200 pt-3">
+                            <QuantityProgress label="Returned" value={line.returned_quantity} />
+                            <QuantityProgress label="Cancelled" value={line.cancelled_quantity} />
+                        </dl>
+                    </details>
+                </div>
+            )}
+        />
+    );
+}
+
+function QuantityProgress({ label, value }: { label: string; value?: string | number | null }) {
+    return (
+        <div className="min-w-0 rounded-lg bg-slate-50 px-2 py-2">
+            <p className="text-xs text-slate-500">{label}</p>
+            <p className="mt-1 break-words font-medium text-slate-800"><QuantityDisplay value={value} precision={6} /></p>
+        </div>
+    );
 }
 
 function AdjustmentTable({ order }: { order: PurchaseOrder }) {

@@ -133,10 +133,11 @@ export default function PurchaseOrderDetailPage() {
             <ContentHeader
                 title={order.purchase_order_number ?? 'Purchase order'}
                 description={formatDate(order.purchase_order_date)}
-                actions={<div className="flex flex-wrap justify-end gap-2">
-                    {capabilities.canReceive && hasPurchasePermission(auth, purchasePermissions.goodsReceiptsCreate) && <LinkButton to={`/purchase/goods-receipts/create?purchase_order_id=${order.id}`} variant="secondary">Create Goods Receipt</LinkButton>}
-                    {capabilities.canInvoice && hasPurchasePermission(auth, purchasePermissions.supplierInvoicesCreate) && <LinkButton to={`/purchase/invoices/create?purchase_order_id=${order.id}`} variant="secondary">Create Supplier Invoice</LinkButton>}
+                actions={<div className="grid w-full grid-cols-2 gap-2 md:flex md:w-auto md:flex-wrap md:justify-end">
+                    {capabilities.canReceive && hasPurchasePermission(auth, purchasePermissions.goodsReceiptsCreate) && <LinkButton className="w-full md:w-auto" to={`/purchase/goods-receipts/create?purchase_order_id=${order.id}`} variant="secondary">Create Goods Receipt</LinkButton>}
+                    {capabilities.canInvoice && hasPurchasePermission(auth, purchasePermissions.supplierInvoicesCreate) && <LinkButton className="w-full md:w-auto" to={`/purchase/invoices/create?purchase_order_id=${order.id}`} variant="secondary">Create Supplier Invoice</LinkButton>}
                     <PurchaseOrderActions
+                        className="col-span-2 md:col-span-1"
                         order={order}
                         busy={busy}
                         downloadingPdf={downloadingPdf}
@@ -152,6 +153,20 @@ export default function PurchaseOrderDetailPage() {
                     />
                 </div>}
             />
+            <section className="mb-4 grid grid-cols-2 gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-3 md:hidden">
+                <div>
+                    <p className="text-xs font-medium text-slate-500">Status</p>
+                    <div className="mt-1"><PurchaseOrderStatusBadge status={order.workflow_status ?? order.status} /></div>
+                </div>
+                <div className="min-w-0">
+                    <p className="text-xs font-medium text-slate-500">Supplier</p>
+                    <p className="mt-1 break-words text-sm font-semibold text-slate-900">{readableRelation(order.supplier)}</p>
+                </div>
+                <div>
+                    <p className="text-xs font-medium text-slate-500">Order total</p>
+                    <p className="mt-1 font-semibold text-slate-950"><MoneyDisplay value={order.grand_total} currency={order.currency?.code ?? undefined} /></p>
+                </div>
+            </section>
             <ErrorAlert error={actionError ?? result.error} />
             <Panel className="p-0">
                 <PurchaseOrderTabs order={order} summary={summary} />
