@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import {
     filterNavigation,
@@ -7,8 +7,15 @@ import {
 } from '@/app/navigation/navigationUtils';
 import type { NavigationModuleItem, NavigationSection } from '@/app/navigation/navigationTypes';
 import { useAuth } from '@/modules/auth/AuthProvider';
+import { isSuperAdmin } from '@/modules/auth/accessControl';
+import { useApi } from '@/shared/hooks/useApi';
+import { getPendingPurchaseOrderApprovalCount } from '@/modules/purchase/api/purchaseOrdersApi';
+import { hasPurchasePermission, purchasePermissions } from '@/modules/purchase/purchasePermissions';
+import { PURCHASE_ORDER_APPROVALS_CHANGED_EVENT } from '@/modules/purchase/purchaseOrderEvents';
 import { AppHeader } from './AppHeader';
 import { Sidebar } from './Sidebar';
+
+const PENDING_APPROVAL_COUNT_REFRESH_INTERVAL_MS = 60_000;
 
 interface WorkspaceLayoutProps {
     sections: NavigationSection[];
@@ -25,6 +32,18 @@ interface PreferredExpandedModule {
 export function WorkspaceLayout({ sections, homePath, workspaceLabel, mode }: WorkspaceLayoutProps) {
     const location = useLocation();
     const auth = useAuth();
+    const canViewPendingApprovalCount = mode === 'tenant'
+        && auth.permissionsLoaded
+        && isSuperAdmin(auth.roles)
+        && hasPurchasePermission(auth, purchasePermissions.ordersApprove)
+        && Boolean(auth.tenant?.id)
+        && Boolean(auth.organizationUnit?.id);
+    const pendingApprovalCount = useApi(
+        getPendingPurchaseOrderApprovalCount,
+        [auth.tenant?.id, auth.organizationUnit?.id, location.key],
+        canViewPendingApprovalCount,
+        false,
+    );
     const [mobileOpenLocationKey, setMobileOpenLocationKey] = useState<string | null>(null);
     const [collapsed, setCollapsed] = useState(
         () => window.localStorage.getItem(`autoerp.${mode}.sidebar.collapsed`) === 'true',
@@ -72,6 +91,17 @@ export function WorkspaceLayout({ sections, homePath, workspaceLabel, mode }: Wo
         : activeModuleId ?? moduleIds[0] ?? null;
     const mobileOpen = mobileOpenLocationKey === location.key;
 
+    useEffect(() => {
+        if (!canViewPendingApprovalCount) return undefined;
+        const refreshCount = () => pendingApprovalCount.reload();
+        window.addEventListener(PURCHASE_ORDER_APPROVALS_CHANGED_EVENT, refreshCount);
+        const intervalId = window.setInterval(refreshCount, PENDING_APPROVAL_COUNT_REFRESH_INTERVAL_MS);
+        return () => {
+            window.removeEventListener(PURCHASE_ORDER_APPROVALS_CHANGED_EVENT, refreshCount);
+            window.clearInterval(intervalId);
+        };
+    }, [canViewPendingApprovalCount, pendingApprovalCount.reload]);
+
     function updateCollapsed(next: boolean) {
         setCollapsed(next);
         window.localStorage.setItem(`autoerp.${mode}.sidebar.collapsed`, String(next));
@@ -81,6 +111,8 @@ export function WorkspaceLayout({ sections, homePath, workspaceLabel, mode }: Wo
         <div className="min-h-screen bg-slate-100 text-slate-900">
             <Sidebar
                 sections={visibleSections}
+                badges={{ 'purchase-orders': pendingApprovalCount.error ? undefined : pendingApprovalCount.data?.count }}
+                badgeErrorIds={pendingApprovalCount.error && canViewPendingApprovalCount ? ['purchase-orders'] : []}
                 activeItemId={match?.item.id ?? null}
                 activeParentId={match?.parent?.id ?? null}
                 expandedModuleId={expandedModuleId}

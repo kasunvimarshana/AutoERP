@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { DataTable } from '@/shared/components/DataTable';
@@ -8,16 +8,21 @@ import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
 import { LookupSelect } from '@/shared/components/LookupSelect';
 import { Panel } from '@/shared/components/Panel';
+import { StatusBadge } from '@/shared/components/StatusBadge';
 import { Textarea } from '@/shared/components/Textarea';
 import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
+import { hasPermission } from '@/modules/auth/accessControl';
+import { useAuth } from '@/modules/auth/AuthProvider';
 import { CustomerLookupSelect } from '@/modules/customer/components/CustomerLookupSelect';
 import { InventoryDimensionFields, emptyInventoryDimensions, type InventoryDimensionValue } from '@/modules/inventory/components/InventoryDimensionFields';
-import { multiplyDecimal } from '@/shared/utils/decimal';
+import { compareDecimalStrings, multiplyDecimal, subtractDecimal, sumDecimals } from '@/shared/utils/decimal';
 import type { ItemLookupResource } from '@/shared/api/lookupApi';
 import type { CustomerSummary } from '@/modules/customer/customerTypes';
 import type { NamedResource } from '@/shared/types/common';
-import { searchSellingWarehouses, searchSellingLocations, getSellingWarehouseSource, createSale, createSaleReturn, getSale, listSales, type SaleDocument, type SalePayload } from '../sellingApi';
+import { searchSellingWarehouses, searchSellingLocations, getSellingWarehouseSource, createSale, createSaleReturn, getSale, listSales, listSaleReturns, type SaleDocument, type SalePayload, type SaleReturnDocument } from '../sellingApi';
+import type { PaginationMeta } from '@/shared/types/pagination';
+import { sellingPermissions } from '../sellingPermissions';
 import { SellingItemLookup } from '../components/SellingItemLookup';
 
 interface SaleDraftLine {
@@ -31,7 +36,15 @@ const today = businessDateInputValue();
 
 export default function SellingWorkspacePage() {
     const { id } = useParams();
+    const location = useLocation();
     const navigate = useNavigate();
+    const auth = useAuth();
+    const canViewReturns = hasPermission(auth, sellingPermissions.returnsView);
+    const canCreateReturns = hasPermission(auth, sellingPermissions.returnsCreate);
+    const canProcessReturns = canViewReturns && canCreateReturns;
+    const canOpenSalesFromReturns = hasPermission(auth, sellingPermissions.salesView);
+    const isCreatePage = location.pathname === '/selling/create';
+    const isReturnsPage = location.pathname === '/selling/returns';
     const [customer, setCustomer] = useState<CustomerSummary | null>(null);
     const [warehouse, setWarehouse] = useState<NamedResource | null>(null);
     const [warehouseLocation, setWarehouseLocation] = useState<NamedResource | null>(null);
@@ -40,6 +53,10 @@ export default function SellingWorkspacePage() {
     const [dueDate, setDueDate] = useState('');
     const [lines, setLines] = useState<SaleDraftLine[]>([]);
     const [sales, setSales] = useState<SaleDocument[]>([]);
+    const [returns, setReturns] = useState<SaleReturnDocument[]>([]);
+    const [listMeta, setListMeta] = useState<PaginationMeta | null>(null);
+    const [search, setSearch] = useState('');
+    const [page, setPage] = useState(1);
     const [sale, setSale] = useState<SaleDocument | null>(null);
     const [returnQuantities, setReturnQuantities] = useState<Record<number, string>>({});
     const [returnReason, setReturnReason] = useState('');
@@ -49,16 +66,29 @@ export default function SellingWorkspacePage() {
 
     useEffect(() => {
         const controller = new AbortController();
+        setError(null);
         if (id) {
+            setSale(null);
+            setReturnQuantities({});
+            setReturnReason('');
             void getSale(Number(id), controller.signal).then(setSale).catch((failure: unknown) => setError(toApiError(failure)));
         } else {
-            void listSales(controller.signal).then(setSales).catch((failure: unknown) => setError(toApiError(failure)));
+            setSale(null);
+            if (isReturnsPage) {
+                void listSaleReturns({ page, search }, controller.signal)
+                    .then((response) => { setReturns(response.data); setListMeta(response.meta ?? null); })
+                    .catch((failure: unknown) => setError(toApiError(failure)));
+            } else if (!isCreatePage) {
+                void listSales({ page, search }, controller.signal)
+                    .then((response) => { setSales(response.data); setListMeta(response.meta ?? null); })
+                    .catch((failure: unknown) => setError(toApiError(failure)));
+            }
         }
         return () => controller.abort();
-    }, [id]);
+    }, [id, isCreatePage, isReturnsPage, page, search]);
 
     useEffect(() => {
-        if (id) return;
+        if (id || !isCreatePage) return;
 
         const controller = new AbortController();
         sourceRequest.current = controller;
@@ -76,9 +106,13 @@ export default function SellingWorkspacePage() {
             });
 
         return () => controller.abort();
-    }, [id]);
+    }, [id, isCreatePage]);
 
     const quantityTotal = useMemo(() => Object.values(returnQuantities).filter((value) => Number(value) > 0).length, [returnQuantities]);
+    const returnExceedsRemaining = sale?.lines.some((line) => {
+        const alreadyReturned = sumDecimals((sale.returns ?? []).flatMap((saleReturn) => saleReturn.lines.filter((returnLine) => returnLine.sale_line_id === line.id).map((returnLine) => returnLine.quantity)));
+        return compareDecimalStrings(returnQuantities[line.id] ?? '0', subtractDecimal(line.quantity, alreadyReturned)) > 0;
+    }) ?? false;
     const locationSearch = useCallback(
         (params: Parameters<typeof searchSellingLocations>[0]) => searchSellingLocations(params, warehouse?.id),
         [warehouse?.id],
@@ -152,7 +186,7 @@ export default function SellingWorkspacePage() {
 
     async function submitReturn(event: React.FormEvent<HTMLFormElement>) {
         event.preventDefault();
-        if (!sale || quantityTotal === 0 || returnReason.trim() === '') return;
+        if (!sale || quantityTotal === 0 || returnExceedsRemaining || returnReason.trim() === '') return;
         setBusy(true);
         setError(null);
         try {
@@ -180,7 +214,7 @@ export default function SellingWorkspacePage() {
     if (sale) {
         return (
             <>
-                <ContentHeader title={`Sale ${sale.sale_number}`} description="Posted sale and its linked customer invoice." actions={<Link className="text-sm font-medium text-sky-700" to="/selling">Back to Selling</Link>} />
+                <ContentHeader title={`Sale ${sale.sale_number}`} description="Posted sale and its linked customer invoice." actions={<Link className="text-sm font-medium text-sky-700" to="/selling">Back to Selling list</Link>} />
                 <ErrorAlert error={error} />
                 <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
                     <div className="space-y-5">
@@ -195,10 +229,13 @@ export default function SellingWorkspacePage() {
                             ]} />
                             {sale.invoice && <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-md bg-slate-50 px-4 py-3 text-sm">
                                 <div><span className="font-semibold">Invoice {sale.invoice.number}</span><span className="ml-3 text-slate-600">Balance due {sale.invoice.balance_due}</span></div>
-                                <Link className="font-semibold text-sky-700" to={`/invoices/${sale.invoice.id}`}>Open invoice</Link>
+                                <div className="flex gap-4">
+                                    {compareDecimalStrings(sale.invoice.balance_due, '0') > 0 && <Link className="font-semibold text-emerald-700" to={`/payments/create?invoice_id=${sale.invoice.id}`}>Receive payment</Link>}
+                                    <Link className="font-semibold text-sky-700" to={`/invoices/${sale.invoice.id}`}>Open invoice</Link>
+                                </div>
                             </div>}
                         </Panel>
-                        {sale.returns?.length ? <Panel title="Returns and credit notes">
+                        {canViewReturns && sale.returns?.length ? <Panel title="Returns and credit notes">
                             <DataTable rows={sale.returns} rowKey={(row) => row.id} columns={[
                                 { key: 'number', header: 'Credit note', render: (row) => row.number },
                                 { key: 'date', header: 'Date', render: (row) => row.date },
@@ -208,22 +245,83 @@ export default function SellingWorkspacePage() {
                             ]} />
                         </Panel> : null}
                     </div>
-                    <Panel title="Create a return">
+                    {canProcessReturns && <Panel title="Create a return">
                         <form className="space-y-4" onSubmit={(event) => void submitReturn(event)}>
                             <p className="text-sm leading-5 text-slate-600">Returned stock is received into this sale’s warehouse. The credit note is applied to the invoice balance where an amount remains.</p>
-                            {sale.lines.map((line) => <DecimalInput key={line.id} label={`${line.item.name} · max ${line.quantity} ${line.uom.code}`} value={returnQuantities[line.id] ?? ''} onChange={(event) => setReturnQuantities((current) => ({ ...current, [line.id]: event.target.value }))} />)}
+                            {sale.lines.map((line) => {
+                                const returnedQuantity = sumDecimals((sale.returns ?? []).flatMap((saleReturn) => saleReturn.lines.filter((returnLine) => returnLine.sale_line_id === line.id).map((returnLine) => returnLine.quantity)));
+                                const remainingQuantity = subtractDecimal(line.quantity, returnedQuantity);
+                                return <DecimalInput key={line.id} label={`${line.item.name} · remaining ${remainingQuantity} ${line.uom.code}`} hint={remainingQuantity === '0.000000' ? 'This sale line has already been fully returned.' : 'Return quantity cannot exceed the unreturned quantity.'} disabled={compareDecimalStrings(remainingQuantity, '0') <= 0} value={returnQuantities[line.id] ?? ''} onChange={(event) => setReturnQuantities((current) => ({ ...current, [line.id]: event.target.value }))} />;
+                            })}
                             <Textarea label="Return reason" required value={returnReason} onChange={(event) => setReturnReason(event.target.value)} />
-                            <Button type="submit" loading={busy} disabled={quantityTotal === 0 || !returnReason.trim()}>Post return and credit note</Button>
+                            <Button type="submit" loading={busy} disabled={quantityTotal === 0 || returnExceedsRemaining || !returnReason.trim()}>Post return and credit note</Button>
                         </form>
-                    </Panel>
+                    </Panel>}
                 </div>
             </>
         );
     }
 
+    if (!id && !isCreatePage && isReturnsPage) {
+        return <>
+            <ContentHeader title="Selling Returns" description="Review posted returns and open a sale to process another return." actions={canOpenSalesFromReturns && canCreateReturns ? <Link className="text-sm font-semibold text-sky-700" to="/selling">Find a sale to return</Link> : undefined} />
+            <ErrorAlert error={error} />
+            <Panel title="Return history">
+                <Input label="Search returns" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="Return number, sale number, or customer" />
+                <div className="mt-4">
+                    <DataTable rows={returns} rowKey={(row) => row.id} emptyMessage="No returns match this search." columns={[
+                        { key: 'number', header: 'Credit note', render: (row) => row.return_number },
+                        { key: 'date', header: 'Date', render: (row) => row.return_date },
+                        { key: 'sale', header: 'Sale', render: (row) => canOpenSalesFromReturns
+                            ? <Link className="font-medium text-sky-700" to={`/selling/sales/${row.sale.id}`}>{row.sale.sale_number}</Link>
+                            : row.sale.sale_number },
+                        { key: 'customer', header: 'Customer', render: (row) => row.sale.customer ?? 'Customer' },
+                        { key: 'reason', header: 'Reason', render: (row) => row.reason },
+                        { key: 'credit', header: 'Credit', render: (row) => row.credit_amount },
+                        { key: 'available', header: 'Available credit', render: (row) => row.credit_available_amount },
+                    ]} />
+                </div>
+                {listMeta && <div className="mt-4 flex items-center justify-between text-sm text-slate-600">
+                    <span>{listMeta.total} returns · Page {listMeta.current_page} of {listMeta.last_page}</span>
+                    <div className="flex gap-2">
+                        <Button type="button" variant="secondary" disabled={page <= 1} onClick={() => setPage((current) => current - 1)}>Previous</Button>
+                        <Button type="button" variant="secondary" disabled={page >= listMeta.last_page} onClick={() => setPage((current) => current + 1)}>Next</Button>
+                    </div>
+                </div>}
+            </Panel>
+        </>;
+    }
+
+    if (!id && !isCreatePage) {
+        return <>
+            <ContentHeader title="Selling List" description="Find posted sales, review invoices, or open a sale to process a return." actions={<Link className="rounded-md bg-sky-700 px-3 py-2 text-sm font-semibold text-white" to="/selling/create">Create selling</Link>} />
+            <ErrorAlert error={error} />
+            <Panel title="Sales">
+                <Input label="Search sales" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="Sale number or customer" />
+                <div className="mt-4">
+                    <DataTable rows={sales} rowKey={(row) => row.id} emptyMessage="No sales match this search." columns={[
+                        { key: 'sale', header: 'Sale', render: (row) => <Link className="font-medium text-sky-700" to={`/selling/sales/${row.id}`}>{row.sale_number}</Link> },
+                        { key: 'date', header: 'Date', render: (row) => row.sale_date },
+                        { key: 'customer', header: 'Customer', render: (row) => row.customer?.name ?? 'Customer' },
+                        { key: 'invoice', header: 'Invoice', render: (row) => row.invoice?.number ?? 'Pending' },
+                        { key: 'balance', header: 'Balance due', render: (row) => row.invoice?.balance_due ?? '—' },
+                        { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.status} /> },
+                    ]} />
+                </div>
+                {listMeta && <div className="mt-4 flex items-center justify-between text-sm text-slate-600">
+                    <span>{listMeta.total} sales · Page {listMeta.current_page} of {listMeta.last_page}</span>
+                    <div className="flex gap-2">
+                        <Button type="button" variant="secondary" disabled={page <= 1} onClick={() => setPage((current) => current - 1)}>Previous</Button>
+                        <Button type="button" variant="secondary" disabled={page >= listMeta.last_page} onClick={() => setPage((current) => current + 1)}>Next</Button>
+                    </div>
+                </div>}
+            </Panel>
+        </>;
+    }
+
     return (
         <>
-            <ContentHeader title="Selling" description="Sell stocked items, issue inventory, and post the customer invoice in one step." />
+            <ContentHeader title="Create Selling" description="Sell stocked items, issue inventory, and post the customer invoice in one step." actions={<Link className="text-sm font-semibold text-sky-700" to="/selling">Selling list</Link>} />
             <ErrorAlert error={error} />
             <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
                 <form className="space-y-5" onSubmit={(event) => void submitSale(event)}>
@@ -253,13 +351,7 @@ export default function SellingWorkspacePage() {
                     </Panel>
                     <Button type="submit" loading={busy} disabled={!customer || !warehouse || lines.length === 0 || lines.some((line) => !line.item.base_uom || Number(line.quantity) <= 0)}>Post sale and invoice</Button>
                 </form>
-                <Panel title="Recent sales">
-                    {sales.length === 0 ? <p className="text-sm text-slate-500">No sales have been recorded yet.</p> : <DataTable rows={sales} rowKey={(row) => row.id} columns={[
-                        { key: 'sale', header: 'Sale', render: (row) => <Link className="font-medium text-sky-700" to={`/selling/sales/${row.id}`}>{row.sale_number}</Link> },
-                        { key: 'customer', header: 'Customer', render: (row) => row.customer?.name ?? 'Customer' },
-                        { key: 'invoice', header: 'Invoice', render: (row) => row.invoice?.number ?? 'Pending' },
-                    ]} />}
-                </Panel>
+                <Panel title="Workflow guidance"><p className="text-sm text-slate-600">Choose the customer and warehouse, add available items, then post the sale. The customer invoice is created with the sale.</p></Panel>
             </div>
         </>
     );

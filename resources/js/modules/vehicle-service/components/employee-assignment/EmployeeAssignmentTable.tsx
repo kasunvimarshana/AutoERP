@@ -97,6 +97,7 @@ export function EmployeeAssignmentTable({
                                     selectedEmployees={line.uses_job_supervisor === true
                                         ? (jobSupervisor ? [jobSupervisor] : [])
                                         : (pendingEmployees[line.id] ?? [])}
+                                    isPickerOpen={pickerLineId === line.id}
                                     assigning={assigning}
                                     onOpenPicker={() => setPickerLineId(line.id)}
                                     onPendingRemove={(employee) => onPendingToggle(line.id, employee)}
@@ -126,6 +127,7 @@ function WorkforceLine({
     line,
     jobSupervisor,
     selectedEmployees,
+    isPickerOpen,
     assigning,
     onOpenPicker,
     onPendingRemove,
@@ -135,6 +137,7 @@ function WorkforceLine({
     line: VehicleServiceJobLine;
     jobSupervisor: NamedResource | null;
     selectedEmployees: NamedResource[];
+    isPickerOpen: boolean;
     assigning: boolean;
     onOpenPicker: () => void;
     onPendingRemove: (employee: NamedResource) => void;
@@ -147,44 +150,51 @@ function WorkforceLine({
     const commission = (line as CommissionAwareVehicleServiceJobLine).commission_default;
 
     return (
-        <div className="p-4 sm:p-5">
-            <div className="flex flex-wrap items-center gap-2">
-                <h4 className="font-semibold text-slate-900">{line.line_number}. {line.description}</h4>
-                {supervisorLine && (
-                    <span className="rounded-full bg-sky-100 px-2 py-1 text-xs font-semibold text-sky-800">Supervisor</span>
-                )}
+        <div className={`border-l-4 p-4 transition-colors sm:p-5 ${isPickerOpen ? 'border-l-sky-600 bg-sky-50/70' : 'border-l-sky-200 bg-sky-50/25'}`}>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                    <h4 className="break-words font-semibold text-slate-900">{line.line_number}. {line.description}</h4>
+                    {supervisorLine && (
+                        <span className="rounded-full bg-sky-100 px-2 py-1 text-xs font-semibold text-sky-800">Supervisor</span>
+                    )}
+                </div>
+                <div className="shrink-0 text-sm text-slate-600">
+                    <span className="text-slate-500">Commission</span>{' '}
+                    <span className="font-medium text-slate-800">{formatCommissionDefault(commission)}</span>
+                </div>
             </div>
-            <p className="mt-1 text-sm text-slate-500">Commission pool: {commission?.commission_value ?? '0.000000'}</p>
 
             {!supervisorAssigned && (
-                <div className="mt-4">
-                    <span className="mb-1 block text-sm font-medium text-slate-700">Employees</span>
+                <div className="mt-3">
                     {supervisorLine ? (
-                        <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                        <div className="rounded-lg border border-sky-200 bg-sky-50/70 px-3 py-2 text-sm text-slate-700">
                             {jobSupervisor ? formatNamedResource(jobSupervisor) : <span className="text-amber-700">Select a Job Card supervisor first.</span>}
                         </div>
                     ) : (
                         <button
                             type="button"
                             disabled={assigning}
-                            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-left text-sm hover:border-sky-500 disabled:bg-slate-50"
+                            className={`flex min-h-11 w-full items-center justify-between gap-3 rounded-lg border px-3 py-2 text-left text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 disabled:bg-slate-50 ${isPickerOpen ? 'border-sky-400 bg-white ring-1 ring-sky-200' : 'border-sky-200 bg-sky-50/70 hover:border-sky-400 hover:bg-sky-50'}`}
                             onClick={onOpenPicker}
                         >
-                            {selectedEmployees.length > 0
-                                ? `${selectedEmployees.length} employee${selectedEmployees.length === 1 ? '' : 's'} selected`
-                                : <span className="text-slate-400">Select one or more employees</span>}
+                            <span className={selectedEmployees.length > 0 ? 'font-medium text-slate-800' : 'text-slate-500'}>
+                                {selectedEmployees.length > 0
+                                    ? `${selectedEmployees.length} selected · Add employees`
+                                    : 'Select or add employees'}
+                            </span>
+                            <span className="shrink-0 font-semibold text-sky-700">Choose</span>
                         </button>
                     )}
 
                     {!supervisorLine && selectedEmployees.length > 0 && (
                         <div className="mt-2 flex flex-wrap gap-2" aria-label="Pending employees">
                             {selectedEmployees.map((employee) => (
-                                <span key={employee.id} className="inline-flex items-center gap-2 rounded-full bg-sky-50 px-3 py-1 text-xs font-medium text-sky-800">
+                                <span key={employee.id} className="inline-flex items-center gap-2 rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-900 ring-1 ring-inset ring-amber-200">
                                     {formatNamedResource(employee)}
                                     {!supervisorLine && (
                                         <button
                                             type="button"
-                                            className="font-bold text-sky-600 hover:text-rose-600"
+                                            className="font-bold text-amber-700 hover:text-rose-600"
                                             aria-label={`Remove ${formatNamedResource(employee)}`}
                                             onClick={() => onPendingRemove(employee)}
                                         >
@@ -195,34 +205,42 @@ function WorkforceLine({
                             ))}
                         </div>
                     )}
-                    {selectedEmployees.length > 0 && (
-                        <p className="mt-2 text-xs text-sky-700">
-                            {selectedEmployees.length} pending assignment{selectedEmployees.length === 1 ? '' : 's'}. Commission will be recalculated when saved.
+                    {!supervisorLine && selectedEmployees.length > 0 && (
+                        <p className="mt-2 text-xs font-medium text-amber-800">
+                            {selectedEmployees.length} employee{selectedEmployees.length === 1 ? '' : 's'} selected · Commission is split across assigned employees when you save.
                         </p>
                     )}
                 </div>
             )}
 
-            {assignments.length === 0 ? (
-                <p className="mt-4 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-500">Not assigned</p>
-            ) : (
-                <div className="mt-4 space-y-2">
+            <>
+                {assignments.length === 0 && selectedEmployees.length === 0 && (
+                    <p className="mt-2 text-xs text-slate-500">No employees assigned yet</p>
+                )}
+                {assignments.length > 0 && (
+                    <div className="mt-3 space-y-2">
+                    <p className="text-xs font-medium text-slate-500">Assigned employees · {assignments.length}</p>
                     {assignments.map((row) => (
-                        <div key={row.id} className="flex flex-col gap-3 rounded-lg border border-slate-200 p-3 sm:flex-row sm:items-center sm:justify-between">
-                            <div className="grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2 lg:grid-cols-4">
-                                <Summary label="Employee" value={row.employee ? formatNamedResource(row.employee) : 'Unavailable employee'} />
-                                <Summary label="Designation" value={humanize(row.role_type)} />
-                                <Summary label="Hours" value={row.assigned_hours} />
-                                <Summary label="Commission" value={formatCommissionSummary(row)} />
+                        <div key={row.id} className="grid gap-2 rounded-lg border border-slate-200 bg-white p-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+                            <div className="min-w-0">
+                                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                    <strong className="break-words text-sm font-semibold text-slate-900">{row.employee ? formatNamedResource(row.employee) : 'Unavailable employee'}</strong>
+                                    <span className="rounded-full bg-white px-2 py-0.5 text-xs text-slate-600">{humanize(row.role_type)}</span>
+                                </div>
+                                <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+                                    <span>Hours <strong className="font-medium text-slate-700">{row.assigned_hours}</strong></span>
+                                    <span>Commission <strong className="font-medium text-slate-700">{formatCommissionSummary(row)}</strong></span>
+                                </div>
                             </div>
-                            <div className="flex shrink-0 gap-3">
-                                <button type="button" className="font-semibold text-sky-700" onClick={() => onEdit(row)}>Edit</button>
-                                <button type="button" className="font-semibold text-rose-600" onClick={() => onRemove(row)}>Remove</button>
+                            <div className="flex items-center justify-end gap-1 border-t border-slate-200 pt-2 sm:border-0 sm:pt-0">
+                                <button type="button" className="min-h-9 rounded-md px-3 text-sm font-semibold text-sky-700 hover:bg-sky-50 focus:outline-none focus:ring-2 focus:ring-sky-500" onClick={() => onEdit(row)}>Edit</button>
+                                <button type="button" className="min-h-9 rounded-md px-3 text-sm font-semibold text-rose-600 hover:bg-rose-50 focus:outline-none focus:ring-2 focus:ring-rose-500" onClick={() => onRemove(row)}>Remove</button>
                             </div>
                         </div>
                     ))}
-                </div>
-            )}
+                    </div>
+                )}
+            </>
         </div>
     );
 }
@@ -259,11 +277,13 @@ function formatNamedResource(resource: NamedResource): string {
     return [resource.code, resource.name].filter(Boolean).join(' - ');
 }
 
-function Summary({ label, value }: { label: string; value: string }) {
-    return (
-        <div>
-            <span className="text-xs uppercase text-slate-500">{label}</span>
-            <strong className="block font-medium text-slate-900">{value}</strong>
-        </div>
-    );
+function formatCommissionDefault(commission: CommissionAwareVehicleServiceJobLine['commission_default']): string {
+    if (!commission || commission.commission_type === 'none') return 'Not set';
+
+    const value = Number(commission.commission_value);
+    const formattedValue = Number.isFinite(value)
+        ? new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(value)
+        : commission.commission_value;
+
+    return `${humanize(commission.commission_type)} ${formattedValue}${commission.commission_type === 'percentage' ? '%' : ''}`;
 }

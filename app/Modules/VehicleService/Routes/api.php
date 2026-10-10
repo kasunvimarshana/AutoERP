@@ -10,6 +10,7 @@ use Modules\VehicleService\Http\Controllers\VehicleServiceInventoryController;
 use Modules\VehicleService\Http\Controllers\VehicleServiceInvoiceController;
 use Modules\VehicleService\Http\Controllers\VehicleServiceJobController;
 use Modules\VehicleService\Http\Controllers\VehicleServiceJobDiscountController;
+use Modules\VehicleService\Http\Controllers\VehicleServiceLineItemLookupController;
 use Modules\VehicleService\Http\Controllers\VehicleServiceLineController;
 use Modules\VehicleService\Http\Controllers\VehicleServicePaymentController;
 use Modules\VehicleService\Http\Controllers\VehicleServiceWorkforceController;
@@ -40,6 +41,8 @@ Route::prefix('api/v1/vehicle-service')->middleware($middleware)->name('api.v1.v
     });
     Route::get('jobs/create-defaults', [VehicleServiceJobController::class, 'createDefaults'])
         ->middleware($requires(VehicleServicePermission::JOBS_CREATE))->name('jobs.create-defaults');
+    Route::get('job-line-items/lookup', VehicleServiceLineItemLookupController::class)
+        ->name('job-line-items.lookup');
     Route::post('jobs', [VehicleServiceJobController::class, 'store'])->middleware($requires(VehicleServicePermission::JOBS_CREATE))->name('jobs.store');
     Route::middleware($requires(VehicleServicePermission::JOBS_UPDATE))->group(function (): void {
         Route::put('jobs/{job}', [VehicleServiceJobController::class, 'update'])->whereNumber('job')->name('jobs.update');
@@ -96,7 +99,7 @@ Route::prefix('api/v1/vehicle-service')->middleware($middleware)->name('api.v1.v
 
     Route::middleware($requires(VehicleServicePermission::PAYMENTS_VIEW))->group(function (): void {
         Route::get('jobs/{job}/payments/options', [VehicleServicePaymentController::class, 'options'])->whereNumber('job')->name('payments.options');
-        Route::post('jobs/{job}/payments/prepare', [VehicleServicePaymentController::class, 'prepare'])->whereNumber('job')->name('payments.prepare');
+        Route::post('jobs/{job}/payments/credit-check', [VehicleServicePaymentController::class, 'checkCredit'])->whereNumber('job')->name('payments.credit-check');
     });
     Route::post('jobs/{job}/payments', [VehicleServicePaymentController::class, 'store'])->whereNumber('job')->middleware($requires(VehicleServicePermission::PAYMENTS_CREATE))->name('payments.store');
 

@@ -23,16 +23,13 @@ final class VehicleServicePaymentController extends VehicleServiceController
         ]);
     }
 
-    public function prepare(
-        PrepareVehicleServicePaymentRequest $request,
+    public function checkCredit(
+        ListVehicleServiceJobRequest $request,
         int $job,
-        VehicleServicePaymentIntegrationService $service,
+        VehicleServicePaymentOptionService $service,
     ): JsonResponse {
         return response()->json([
-            'data' => $service->prepare(
-                $this->job($request, $job),
-                $request->toData(),
-            ),
+            'data' => $service->creditAssessmentForConfirmation($this->job($request, $job)),
         ]);
     }
 

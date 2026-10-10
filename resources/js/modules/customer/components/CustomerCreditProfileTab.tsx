@@ -9,23 +9,34 @@ import { getCustomerCreditProfile, updateCustomerCreditProfile } from '../custom
 import type { CustomerCreditProfile } from '../customerTypes';
 import { CustomerRelationHeader } from './CustomerRelationHeader';
 
-const empty: CustomerCreditProfile = { row_version: 1, credit_limit: '0.000000', credit_period_days: null, warning_threshold_percent: '80.000000', credit_allowed: true, advance_allowed: true, allow_over_credit: false, allow_partial_payment: true, is_active: true };
+const empty: CustomerCreditProfile = { credit_limit: '0.000000', credit_period_days: null, warning_threshold_percent: '80.000000', credit_allowed: false, advance_allowed: true, allow_over_credit: false, allow_partial_payment: true, is_active: true };
 export default function CustomerCreditProfileTab({ customerId, canManage }: { customerId: number; canManage: boolean }) {
     const [form, setForm] = useState<CustomerCreditProfile>(empty);
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<ApiError | null>(null);
+    const [profileExists, setProfileExists] = useState(false);
     useEffect(() => {
         const controller = new AbortController();
-        getCustomerCreditProfile(customerId, controller.signal).then((profile) => { if (!controller.signal.aborted && profile) setForm(profile); }).catch((requestError) => !controller.signal.aborted && setError(toApiError(requestError))).finally(() => !controller.signal.aborted && setLoading(false));
+        setLoading(true);
+        setError(null);
+        setForm(empty);
+        setProfileExists(false);
+        getCustomerCreditProfile(customerId, controller.signal).then((profile) => {
+            if (controller.signal.aborted) return;
+            if (profile) {
+                setForm(profile);
+                setProfileExists(true);
+            }
+        }).catch((requestError) => !controller.signal.aborted && setError(toApiError(requestError))).finally(() => !controller.signal.aborted && setLoading(false));
         return () => controller.abort();
     }, [customerId]);
     const set = <K extends keyof CustomerCreditProfile>(key: K, value: CustomerCreditProfile[K]) => setForm((current) => ({ ...current, [key]: value }));
     if (loading) return <LoadingState />;
-    return <><CustomerRelationHeader title="Credit profile" description="Authoritative customer credit and advance policy. Balances remain owned by Invoice, Payment, and Finance." /><ErrorAlert error={error} /><form className="max-w-3xl space-y-4" onSubmit={(event) => { event.preventDefault(); if (canManage) void save(); }}><div className="grid gap-4 sm:grid-cols-2">
+    return <><CustomerRelationHeader title="Credit profile" description="Set this customer’s credit policy. Existing invoice balances are managed by Finance." /><ErrorAlert error={error} />{!profileExists && <p className="text-sm text-slate-600">No credit profile is saved yet. Saving creates one for this customer.</p>}<form className="max-w-3xl space-y-4" onSubmit={(event) => { event.preventDefault(); if (canManage) void save(); }}><div className="grid gap-4 sm:grid-cols-2">
         <DecimalInput label="Credit limit" value={form.credit_limit} disabled={!canManage} onChange={(event) => set('credit_limit', event.target.value)} error={fieldError(error, 'credit_limit')} />
         <Input label="Credit period days" type="number" min="0" disabled={!canManage} value={form.credit_period_days ?? ''} onChange={(event) => set('credit_period_days', event.target.value ? Number(event.target.value) : null)} />
         <DecimalInput label="Warning threshold percent" value={form.warning_threshold_percent} disabled={!canManage} onChange={(event) => set('warning_threshold_percent', event.target.value)} error={fieldError(error, 'warning_threshold_percent')} /></div>
         <div className="flex flex-wrap gap-6 text-sm"><label><input className="mr-2" type="checkbox" disabled={!canManage} checked={form.credit_allowed} onChange={(event) => set('credit_allowed', event.target.checked)} />Credit allowed</label><label><input className="mr-2" type="checkbox" disabled={!canManage} checked={form.advance_allowed} onChange={(event) => set('advance_allowed', event.target.checked)} />Advance allowed</label><label><input className="mr-2" type="checkbox" disabled={!canManage || !form.credit_allowed} checked={form.allow_over_credit} onChange={(event) => set('allow_over_credit', event.target.checked)} />Allow over credit</label><label><input className="mr-2" type="checkbox" disabled={!canManage} checked={form.allow_partial_payment} onChange={(event) => set('allow_partial_payment', event.target.checked)} />Allow partial payment</label><label><input className="mr-2" type="checkbox" disabled={!canManage} checked={form.is_active} onChange={(event) => set('is_active', event.target.checked)} />Active</label></div>{canManage && <Button type="submit" loading={submitting}>Save credit profile</Button>}</form></>;
-    async function save() { setSubmitting(true); setError(null); try { setForm(await updateCustomerCreditProfile(customerId, form)); } catch (requestError) { setError(toApiError(requestError)); } finally { setSubmitting(false); } }
+    async function save() { setSubmitting(true); setError(null); try { const saved = await updateCustomerCreditProfile(customerId, form); setForm(saved); setProfileExists(true); } catch (requestError) { setError(toApiError(requestError)); } finally { setSubmitting(false); } }
 }

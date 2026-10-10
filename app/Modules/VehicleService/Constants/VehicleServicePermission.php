@@ -56,7 +56,7 @@ final class VehicleServicePermission
             self::JOBS_UPDATE => 'Update draft or active vehicle service jobs.',
             self::JOBS_TRANSITION => 'Inspect, start, or complete vehicle service jobs.',
             self::JOBS_CANCEL => 'Cancel draft or inspected vehicle service jobs.',
-            self::JOBS_CANCEL_AFTER_START => 'Additionally cancel in-progress or completed vehicle service jobs and reverse their issued stock and commissions.',
+            self::JOBS_CANCEL_AFTER_START => 'Additionally cancel in-progress or completed vehicle service jobs, reverse their issued stock, and remove their commissions from payable reports while preserving commission history.',
             self::DISCOUNTS_MANAGE => 'Add, change, or remove whole-job Vehicle Service discounts.',
             self::LINES_VIEW => 'View service job lines.',
             self::LINES_MANAGE => 'Create, update, and remove service job lines.',

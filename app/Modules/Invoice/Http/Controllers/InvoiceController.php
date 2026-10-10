@@ -353,7 +353,7 @@ final class InvoiceController
         $layout = $this->prints->layout($invoice);
         $dompdf = new Dompdf;
         $dompdf->loadHtml($html);
-        $dompdf->setPaper($layout->paperSize(), $layout->orientation());
+        $dompdf->setPaper($layout->pdfPaper(), $layout->orientation());
         $dompdf->render();
 
         return response($dompdf->output(), 200)

@@ -196,7 +196,7 @@ export default function PaymentDetailPage() {
                     { label: 'Source', value: humanize(value.source_type) },
                 ]} />}
                 {tabState.activeTab === 'lines' && <div>
-                    <RecordTable rows={(value.lines ?? []) as unknown as Record<string, unknown>[]} fields={['payment_method', 'amount', 'cleared_amount', 'reference_number', 'status', 'instrument_number', 'instrument_date', 'deposit_date', 'clearing_date', 'bounced_date', 'external_bank_name']} rowKey={(row, index) => String(row.id ?? row.reference_number ?? row.instrument_number ?? `payment-line-${index}`)} />
+                    <RecordTable rows={(value.lines ?? []) as unknown as Record<string, unknown>[]} fields={['payment_method', 'amount', 'cleared_amount', 'reference_number', 'card_brand', 'status', 'instrument_number', 'instrument_date', 'deposit_date', 'clearing_date', 'bounced_date', 'external_bank_name']} rowKey={(row, index) => String(row.id ?? row.reference_number ?? row.instrument_number ?? `payment-line-${index}`)} />
                     <PaymentSettlementPanel payment={value} enabled={canSettle} onChanged={refreshPaymentState} />
                 </div>}
                 {tabState.activeTab === 'allocations' && <div>

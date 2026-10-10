@@ -21,6 +21,7 @@ import type { OrganizationUnitSummary } from '../organizationUnitApi';
 const INVOICE_PRINT_LAYOUT_KEY = 'invoice.default_print_layout';
 const STANDARD_A4 = 'standard_a4';
 const COMPACT_A5 = 'compact_a5';
+const CONTINUOUS_85_BY_55 = 'continuous_8_5_by_5_5';
 
 interface DocumentSettingsData {
     resolved: ResolvedConfiguration;
@@ -122,8 +123,9 @@ function DocumentSettingsEditor({
                 options={[
                     { value: STANDARD_A4, label: 'A4 Standard - Portrait' },
                     { value: COMPACT_A5, label: 'A5 Compact - Portrait' },
+                    { value: CONTINUOUS_85_BY_55, label: 'Continuous paper - 8.5 × 5.5 in' },
                 ]}
-                hint="This changes the paper layout only. Issued invoice values and legal snapshots remain unchanged."
+                hint="Match this layout to the paper size selected in the printer dialog. Continuous stock requires a matching 8.5 × 5.5 in custom form."
                 onChange={(event) => setValue(event.target.value)}
                 disabled={!canManage || data === null}
             />
@@ -137,5 +139,7 @@ function DocumentSettingsEditor({
 }
 
 function printLayoutValue(value: unknown): string {
-    return value === COMPACT_A5 ? COMPACT_A5 : STANDARD_A4;
+    if (value === COMPACT_A5 || value === CONTINUOUS_85_BY_55) return value;
+
+    return STANDARD_A4;
 }

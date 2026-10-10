@@ -31,6 +31,14 @@ export async function listPurchaseOrders(params: ListParams, signal?: AbortSigna
     return response.data;
 }
 
+export async function getPendingPurchaseOrderApprovalCount(signal?: AbortSignal) {
+    const response = await apiClient.get<ApiResource<{ count: number }>>(
+        `${endpoints.purchase}/orders/pending-approval-count`,
+        { signal },
+    );
+    return response.data.data;
+}
+
 export async function listReceivablePurchaseOrders(params: ListParams, signal?: AbortSignal) {
     const response = await apiClient.get<ApiCollection<PurchaseOrder>>(
         `${endpoints.purchase}/eligible/receivable-purchase-orders`,
