@@ -6,6 +6,7 @@ namespace Modules\VehicleRental\Models;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use LogicException;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\VehicleRental\Enums\IncidentStatus;
@@ -46,6 +47,11 @@ final class RentalIncident extends TenantOwnedModel
     public function runningChart(): BelongsTo
     {
         return $this->belongsTo(RunningChart::class, 'running_chart_id');
+    }
+
+    public function events(): HasMany
+    {
+        return $this->hasMany(RentalIncidentEvent::class, 'incident_id')->orderBy('id');
     }
 
     protected static function booted(): void
