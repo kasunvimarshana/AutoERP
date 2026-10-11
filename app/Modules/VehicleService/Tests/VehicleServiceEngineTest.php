@@ -901,6 +901,16 @@ final class VehicleServiceEngineTest extends TestCase
         $this->assertStringNotContainsString('199,000 mi', $html);
     }
 
+    public function test_job_cannot_start_without_an_active_service_line(): void
+    {
+        $context = $this->context();
+        $job = $this->createJob($context);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Add at least one active job line before starting this service job.');
+        $this->changeStatus($job, VehicleServiceJobStatus::InProgress);
+    }
+
     public function test_status_workflow_rejects_invalid_transitions_and_records_history(): void
     {
         $context = $this->context();
