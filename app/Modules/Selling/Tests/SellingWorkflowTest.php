@@ -184,6 +184,13 @@ final class SellingWorkflowTest extends TestCase
             $duplicateSale = app(SalePostingService::class)->create($salePayload, $saleKey);
 
             $this->assertSame($sale->getKey(), $duplicateSale->getKey());
+            foreach ([$sale, $duplicateSale] as $responseSale) {
+                $this->assertTrue($responseSale->relationLoaded('warehouseLocation'));
+                $this->assertTrue($responseSale->invoice->relationLoaded('balance'));
+                $this->assertTrue($responseSale->lines->first()->relationLoaded('variant'));
+                $this->assertTrue($responseSale->lines->first()->relationLoaded('batch'));
+                $this->assertTrue($responseSale->lines->first()->relationLoaded('serialNumber'));
+            }
             $this->assertSame('posted', $sale->status);
             $this->assertSame(InvoiceStatus::Posted, $sale->invoice->status);
             $this->assertSame('200.000000', (string) $sale->invoice->grand_total);
@@ -245,6 +252,14 @@ final class SellingWorkflowTest extends TestCase
             $duplicateReturn = app(SaleReturnPostingService::class)->create($returnPayload, $returnKey);
 
             $this->assertSame($sale->getKey(), $duplicateReturn->getKey());
+            foreach ([$sale, $duplicateReturn] as $responseSale) {
+                $this->assertTrue($responseSale->relationLoaded('warehouseLocation'));
+                $this->assertTrue($responseSale->invoice->relationLoaded('balance'));
+                $this->assertTrue($responseSale->relationLoaded('returns'));
+                $this->assertTrue($responseSale->lines->first()->relationLoaded('variant'));
+                $this->assertTrue($responseSale->lines->first()->relationLoaded('batch'));
+                $this->assertTrue($responseSale->lines->first()->relationLoaded('serialNumber'));
+            }
             $this->assertSame(1, $sale->returns->count());
             $this->assertSame('CRN-', substr((string) $sale->returns->first()->return_number, 0, 4));
             $this->assertSame('100.000000', (string) $sale->returns->first()->credit_amount);

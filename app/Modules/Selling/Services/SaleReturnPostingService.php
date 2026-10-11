@@ -69,7 +69,7 @@ final class SaleReturnPostingService
                 isset($payload['current_user_id']) ? (int) $payload['current_user_id'] : null,
             );
             if ($idempotency->status === IdempotencyStatus::Completed) {
-                return $sale->refresh()->load(['customer', 'warehouse', 'lines.item', 'lines.uom', 'invoice.balance', 'returns.lines']);
+                return $sale->refresh()->load(['customer', 'warehouse', 'warehouseLocation', 'lines.item', 'lines.variant', 'lines.uom', 'lines.batch', 'lines.serialNumber', 'invoice.balance', 'returns.lines']);
             }
             if (! $idempotency->wasRecentlyCreated || $idempotency->status !== IdempotencyStatus::InProgress) {
                 throw new InvalidArgumentException('Return request is already being processed.');
@@ -175,7 +175,7 @@ final class SaleReturnPostingService
                 ['sale_id' => (int) $sale->getKey(), 'return_id' => (int) $return->getKey()],
             );
 
-            return $sale->refresh()->load(['customer', 'warehouse', 'lines.item', 'lines.uom', 'invoice.balance', 'returns.lines']);
+            return $sale->refresh()->load(['customer', 'warehouse', 'warehouseLocation', 'lines.item', 'lines.variant', 'lines.uom', 'lines.batch', 'lines.serialNumber', 'invoice.balance', 'returns.lines']);
         }, 3);
     }
 }
