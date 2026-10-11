@@ -46,16 +46,16 @@ final class SaleReturnPostingService
         }
         $seenSaleLineIds = [];
         foreach ($payload['lines'] as $line) {
-            $id = $line['sale_line_id'] ?? null;
-            if ((! is_int($id) && (! is_string($id) || ctype_digit($id) === false))
-                || (int) $id < 1
-                || (string) (int) $id !== ltrim((string) $id, '0') && ltrim((string) $id, '0') !== '') {
+            $id = filter_var($line['sale_line_id'] ?? null, FILTER_VALIDATE_INT, [
+                'options' => ['min_range' => 1],
+            ]);
+            if ($id === false) {
                 throw new InvalidArgumentException('Each return line requires a valid sale line ID.');
             }
-            if (isset($seenSaleLineIds[(int) $id])) {
+            if (isset($seenSaleLineIds[$id])) {
                 throw new InvalidArgumentException('A sale line may appear only once in a return.');
             }
-            $seenSaleLineIds[(int) $id] = true;
+            $seenSaleLineIds[$id] = true;
         }
 
         return DB::transaction(function () use ($payload, $idempotencyKey): Sale {
