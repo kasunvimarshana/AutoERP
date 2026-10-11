@@ -97,6 +97,31 @@ final class RentalIncidentServiceTest extends TestCase
         });
     }
 
+    public function test_recording_user_can_select_only_running_charts_from_their_vehicle_use(): void
+    {
+        $this->custodyFixture(function ($context, $use, $facts): void {
+            $chart = app(RunningChartService::class)->create(
+                $context, $use->id, $use->row_version, $facts,
+            );
+            $service = app(RentalIncidentService::class);
+            $options = $service->runningChartOptions($context, $use->id, 10);
+
+            self::assertSame(1, $options->total());
+            self::assertSame($chart->id, $options->items()[0]->id);
+
+            $otherId = OrganizationUnitFixture::create([
+                'tenant_id' => $context->tenantId,
+                'code' => 'OTHER-INCIDENT-CHART', 'name' => 'Other incident chart branch',
+            ]);
+            $otherContext = new \\Modules\\VehicleRental\\Data\\AgreementContext(
+                $context->tenantId, $otherId, $context->actorId,
+            );
+
+            $this->expectException(\\Illuminate\\Database\\Eloquent\\ModelNotFoundException::class);
+            $service->runningChartOptions($otherContext, $use->id, 10);
+        });
+    }
+
     public function test_chart_must_belong_to_selected_vehicle_use(): void
     {
         $this->custodyFixture(function ($context, $use): void {

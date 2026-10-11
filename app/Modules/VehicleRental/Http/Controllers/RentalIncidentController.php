@@ -10,6 +10,7 @@ use Modules\VehicleRental\Http\Requests\AgreementRequest;
 use Modules\VehicleRental\Http\Resources\RentalIncidentResource;
 use Modules\VehicleRental\Http\Resources\RentalIncidentHistoryResource;
 use Modules\VehicleRental\Http\Resources\IncidentVehicleUseOptionResource;
+use Modules\VehicleRental\Http\Resources\IncidentRunningChartOptionResource;
 use Modules\VehicleRental\Services\RentalIncidentService;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -21,6 +22,13 @@ final class RentalIncidentController
     {
         return IncidentVehicleUseOptionResource::collection($this->incidents->vehicleUseOptions(
             $request->context(), $request->validated('search'), $request->perPage(),
+        ));
+    }
+
+    public function runningChartOptions(AgreementRequest $request, int $use): AnonymousResourceCollection
+    {
+        return IncidentRunningChartOptionResource::collection($this->incidents->runningChartOptions(
+            $request->context(), $use, $request->perPage(),
         ));
     }
 

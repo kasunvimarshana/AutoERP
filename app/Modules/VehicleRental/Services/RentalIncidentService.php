@@ -45,6 +45,20 @@ final class RentalIncidentService
             ->orderByDesc('id')->paginate($perPage);
     }
 
+    public function runningChartOptions(AgreementContext $context, int $vehicleUseId, int $perPage): LengthAwarePaginator
+    {
+        $this->authorization->assertIncident($context, IncidentPermission::Record);
+        $this->contextValidation->assertContext($context);
+
+        VehicleUse::query()->forContext($context->tenantId, $context->organizationUnitId)
+            ->findOrFail($vehicleUseId);
+
+        return RunningChart::query()->forContext($context->tenantId, $context->organizationUnitId)
+            ->where('vehicle_use_id', $vehicleUseId)
+            ->orderByDesc('id')
+            ->paginate($perPage);
+    }
+
     public function list(AgreementContext $context, int $perPage): LengthAwarePaginator
     {
         $this->authorization->assertIncident($context, IncidentPermission::View);

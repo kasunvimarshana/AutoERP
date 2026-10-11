@@ -26,6 +26,7 @@ Route::prefix('api/v1/vehicle-rental')->middleware([
     Route::get('driver-employees', [DriverDirectoryController::class, 'index']);
     Route::prefix('incidents')->group(function (): void {
         Route::get('vehicle-use-options', [RentalIncidentController::class, 'vehicleUseOptions']);
+        Route::get('vehicle-uses/{use}/running-chart-options', [RentalIncidentController::class, 'runningChartOptions'])->whereNumber('use');
         Route::get('/', [RentalIncidentController::class, 'index']);
         Route::post('/', [RentalIncidentController::class, 'store']);
         Route::get('{incident}', [RentalIncidentController::class, 'show'])->whereNumber('incident');
