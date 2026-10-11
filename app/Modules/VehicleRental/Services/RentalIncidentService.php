@@ -17,6 +17,7 @@ use Modules\VehicleRental\Enums\IncidentReviewAction;
 use Modules\VehicleRental\Enums\IncidentStatus;
 use Modules\VehicleRental\Enums\IncidentType;
 use Modules\VehicleRental\Models\RentalIncident;
+use Modules\VehicleRental\Models\RentalIncidentEvent;
 use Modules\VehicleRental\Models\RunningChart;
 use Modules\VehicleRental\Models\VehicleUse;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
@@ -173,14 +174,15 @@ final class RentalIncidentService
 
     private function recordEvent(RentalIncident $incident, AgreementContext $context, string $action, ?string $reason): void
     {
-        DB::table('vehicle_rental_incident_events')->insert([
+        $event = new RentalIncidentEvent();
+        $event->forceFill([
             'tenant_id' => $context->tenantId,
             'incident_id' => $incident->getKey(),
             'actor_id' => $context->actorId,
             'action' => $action,
             'reason' => $reason,
-            'snapshot' => json_encode($incident->attributesToArray(), JSON_THROW_ON_ERROR),
+            'snapshot' => $incident->attributesToArray(),
             'recorded_at' => now(),
-        ]);
+        ])->save();
     }
 }

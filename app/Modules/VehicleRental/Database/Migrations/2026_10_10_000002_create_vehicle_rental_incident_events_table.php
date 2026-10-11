@@ -20,6 +20,7 @@ return new class extends Migration
             $table->text('reason')->nullable();
             $table->json('snapshot');
             $table->timestamp('recorded_at');
+            $table->unique(['id', 'tenant_id'], 'vrie_tenant_uk');
             $table->index(['tenant_id', 'incident_id', 'id'], 'vrie_history_ix');
             $table->foreign(['incident_id', 'tenant_id'], 'vrie_incident_fk')->references(['id', 'tenant_id'])->on('vehicle_rental_incidents')->restrictOnDelete();
             $table->foreign(['actor_id', 'tenant_id'], 'vrie_actor_fk')->references(['id', 'tenant_id'])->on('users')->restrictOnDelete();

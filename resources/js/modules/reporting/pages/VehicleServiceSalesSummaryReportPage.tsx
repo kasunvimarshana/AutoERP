@@ -248,15 +248,6 @@ function ComboItemComponents({ components }: { components: NonNullable<VehicleSe
     );
 }
 
-function Amount({ label, value, emphasized = false }: { label: string; value: string; emphasized?: boolean }) {
-    return (
-        <div>
-            <div className="text-xs text-slate-500">{label}</div>
-            <div className={`mt-1 tabular-nums ${emphasized ? 'font-semibold text-emerald-800' : 'font-medium text-slate-800'}`}>{formatMoney(value)}</div>
-        </div>
-    );
-}
-
 function JobRow({ job }: { job: VehicleServiceSalesSummaryJob }) {
     const [expanded, setExpanded] = useState(false);
     const loss = job.profit.startsWith('-');
