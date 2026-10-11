@@ -161,6 +161,24 @@ final class SellingWorkflowTest extends TestCase
                     'quantity' => '2.000000',
                 ]],
             ];
+            foreach (['0.000000', '-1.000000'] as $invalidQuantity) {
+                $invalidPayload = $salePayload;
+                $invalidPayload['lines'][0]['quantity'] = $invalidQuantity;
+
+                try {
+                    app(SalePostingService::class)->create(
+                        $invalidPayload, 'selling-test-invalid-sale-'.Str::uuid(),
+                    );
+                    $this->fail('A non-positive sale quantity must not post an invoice or issue stock.');
+                } catch (InvalidArgumentException $exception) {
+                    $this->assertStringContainsString('Sale quantity must be positive', $exception->getMessage());
+                }
+
+                $this->assertDatabaseCount('sales', 0);
+                $this->assertDatabaseCount('invoices', 0);
+                $this->assertSame('5.000000', (string) InventoryStockBalance::query()->firstOrFail()->quantity_on_hand);
+            }
+
             $saleKey = 'selling-test-sale-'.Str::uuid();
             $sale = app(SalePostingService::class)->create($salePayload, $saleKey);
             $duplicateSale = app(SalePostingService::class)->create($salePayload, $saleKey);

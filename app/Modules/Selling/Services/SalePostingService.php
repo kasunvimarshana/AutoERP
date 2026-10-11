@@ -126,6 +126,10 @@ final class SalePostingService
             foreach (array_values($payload['lines']) as $index => $lineData) {
                 $item = $this->inventoryValidation->item($tenantId, $organizationUnitId, (int) $lineData['item_id']);
                 $this->inventoryValidation->assertStockable($item);
+                $quantity = $this->math->normalize((string) $lineData['quantity']);
+                if ($this->math->compare($quantity, self::ZERO) <= 0) {
+                    throw new InvalidArgumentException('Sale quantity must be positive.');
+                }
                 $variantId = isset($lineData['item_variant_id']) ? (int) $lineData['item_variant_id'] : null;
                 $variant = $this->inventoryValidation->variant($item, $variantId);
                 $batchId = isset($lineData['batch_id']) ? (int) $lineData['batch_id'] : null;
@@ -136,7 +140,6 @@ final class SalePostingService
                 if ($uomId < 1) {
                     throw new InvalidArgumentException('Each sale item must have a valid unit of measure.');
                 }
-                $quantity = $this->math->normalize((string) $lineData['quantity']);
                 $price = $this->prices->resolvePrice($item, ItemPriceResolutionService::CONTEXT_SALES, $uomId, $organizationUnitId, $currencyId, (string) $payload['sale_date'], $variantId);
                 if (! $price->hasAmount()) {
                     throw new InvalidArgumentException('A current sales price is not configured for '.$item->name.'.');
