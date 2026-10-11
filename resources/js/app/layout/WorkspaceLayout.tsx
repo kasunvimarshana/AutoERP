@@ -91,16 +91,17 @@ export function WorkspaceLayout({ sections, homePath, workspaceLabel, mode }: Wo
         : activeModuleId ?? moduleIds[0] ?? null;
     const mobileOpen = mobileOpenLocationKey === location.key;
 
+    const reloadPendingApprovalCount = pendingApprovalCount.reload;
     useEffect(() => {
         if (!canViewPendingApprovalCount) return undefined;
-        const refreshCount = () => pendingApprovalCount.reload();
+        const refreshCount = () => reloadPendingApprovalCount();
         window.addEventListener(PURCHASE_ORDER_APPROVALS_CHANGED_EVENT, refreshCount);
         const intervalId = window.setInterval(refreshCount, PENDING_APPROVAL_COUNT_REFRESH_INTERVAL_MS);
         return () => {
             window.removeEventListener(PURCHASE_ORDER_APPROVALS_CHANGED_EVENT, refreshCount);
             window.clearInterval(intervalId);
         };
-    }, [canViewPendingApprovalCount, pendingApprovalCount.reload]);
+    }, [canViewPendingApprovalCount, reloadPendingApprovalCount]);
 
     function updateCollapsed(next: boolean) {
         setCollapsed(next);
