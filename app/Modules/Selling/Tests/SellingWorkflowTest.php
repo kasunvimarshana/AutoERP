@@ -255,6 +255,23 @@ final class SellingWorkflowTest extends TestCase
             $this->assertDatabaseCount('sale_returns', 0);
             $this->assertSame('3.000000', (string) InventoryStockBalance::query()->firstOrFail()->quantity_on_hand);
 
+            $duplicateLinePayload = $returnPayload;
+            $duplicateLinePayload['lines'][] = [
+                'sale_line_id' => (int) $sale->lines->first()->getKey(),
+                'quantity' => '0.500000',
+            ];
+            try {
+                app(SaleReturnPostingService::class)->create(
+                    $duplicateLinePayload, 'selling-test-duplicate-return-'.Str::uuid(),
+                );
+                $this->fail('Duplicate sale lines must not create duplicate return or credit records.');
+            } catch (InvalidArgumentException $exception) {
+                $this->assertStringContainsString('only once in a return', $exception->getMessage());
+            }
+            $this->assertDatabaseCount('sale_returns', 0);
+            $this->assertDatabaseCount('sale_return_lines', 0);
+            $this->assertSame('3.000000', (string) InventoryStockBalance::query()->firstOrFail()->quantity_on_hand);
+
             foreach (['0.000000', '-1.000000'] as $invalidQuantity) {
                 $invalidReturnPayload = $returnPayload;
                 $invalidReturnPayload['lines'][0]['quantity'] = $invalidQuantity;

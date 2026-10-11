@@ -44,6 +44,19 @@ final class SaleReturnPostingService
         if (! isset($payload['lines']) || ! is_array($payload['lines']) || $payload['lines'] === []) {
             throw new InvalidArgumentException('Return requires at least one line.');
         }
+        $seenSaleLineIds = [];
+        foreach ($payload['lines'] as $line) {
+            $id = $line['sale_line_id'] ?? null;
+            if ((! is_int($id) && (! is_string($id) || ctype_digit($id) === false))
+                || (int) $id < 1
+                || (string) (int) $id !== ltrim((string) $id, '0') && ltrim((string) $id, '0') !== '') {
+                throw new InvalidArgumentException('Each return line requires a valid sale line ID.');
+            }
+            if (isset($seenSaleLineIds[(int) $id])) {
+                throw new InvalidArgumentException('A sale line may appear only once in a return.');
+            }
+            $seenSaleLineIds[(int) $id] = true;
+        }
 
         return DB::transaction(function () use ($payload, $idempotencyKey): Sale {
             $sale = Sale::query()->lockForUpdate()->findOrFail((int) $payload['sale_id']);
