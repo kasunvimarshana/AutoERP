@@ -27,6 +27,7 @@ use Modules\Item\Models\Item;
 use Modules\Item\Services\ItemAuthorizationService;
 use Modules\Item\Services\ItemCreationService;
 use Modules\Item\Services\ItemPriceService;
+use Modules\Selling\Http\Controllers\SaleController;
 use Modules\Selling\Services\SalePostingService;
 use Modules\Selling\Services\SaleReturnPostingService;
 use Modules\Selling\Services\SellingAuthorizationService;
@@ -43,6 +44,15 @@ use Tests\TestCase;
 final class SellingWorkflowTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_sale_return_route_uses_the_selling_service_type(): void
+    {
+        $method = new \ReflectionMethod(SaleController::class, 'storeReturn');
+        $type = $method->getParameters()[1]->getType();
+
+        self::assertInstanceOf(\ReflectionNamedType::class, $type);
+        self::assertSame(SaleReturnPostingService::class, $type->getName());
+    }
 
     public function test_sales_list_uses_a_concrete_scoped_request(): void
     {
