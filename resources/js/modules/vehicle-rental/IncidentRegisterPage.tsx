@@ -14,9 +14,10 @@ import { Textarea } from '@/shared/components/Textarea';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import type { PaginationMeta } from '@/shared/types/pagination';
 import { formatBusinessDate } from '@/shared/utils/businessDate';
-import type { IncidentVehicleUseOption } from './incidentEvidence';
+import type { IncidentRunningChartOption, IncidentVehicleUseOption } from './incidentEvidence';
+import { CHART_LABELS, type RunningChartStatus } from './runningCharts';
 import { IncidentReviewAction, IncidentStatus, IncidentType, INCIDENT_PERMISSION, INCIDENT_TYPE_LABELS, type RentalIncident } from './incidentEvidence';
-import { listIncidentVehicleUseOptions, listRentalIncidents, recordRentalIncident, reviewRentalIncident } from './incidentEvidenceApi';
+import { listIncidentVehicleUseOptions, listIncidentRunningCharts, listRentalIncidents, recordRentalIncident, reviewRentalIncident } from './incidentEvidenceApi';
 import { IncidentHistoryPanel } from './IncidentHistoryPanel';
 
 export default function IncidentRegisterPage() {
@@ -38,6 +39,11 @@ export default function IncidentRegisterPage() {
     const [useMeta, setUseMeta] = useState<PaginationMeta>();
     const [usesLoading, setUsesLoading] = useState(false);
     const [selectedUse, setSelectedUse] = useState('');
+    const [chartPage, setChartPage] = useState(1);
+    const [charts, setCharts] = useState<IncidentRunningChartOption[]>([]);
+    const [chartMeta, setChartMeta] = useState<PaginationMeta>();
+    const [chartsLoading, setChartsLoading] = useState(false);
+    const [selectedChart, setSelectedChart] = useState('');
     const [type, setType] = useState<IncidentType | ''>('');
     const [occurredOn, setOccurredOn] = useState('');
     const [evidenceReference, setEvidenceReference] = useState('');
@@ -72,6 +78,26 @@ export default function IncidentRegisterPage() {
         return () => controller.abort();
     }, [canRecord, query, vehiclePage]);
 
+    useEffect(() => {
+        setCharts([]);
+        setChartMeta(undefined);
+        if (!canRecord || !selectedUse) {
+            setChartsLoading(false);
+            return;
+        }
+        const controller = new AbortController();
+        setChartsLoading(true);
+        listIncidentRunningCharts(Number(selectedUse), chartPage, controller.signal)
+            .then(result => {
+                if (!controller.signal.aborted) { setCharts(result.data); setChartMeta(result.meta); }
+            })
+            .catch(failure => {
+                if (!controller.signal.aborted) { setCharts([]); setChartMeta(undefined); setError(toApiError(failure)); }
+            })
+            .finally(() => { if (!controller.signal.aborted) setChartsLoading(false); });
+        return () => controller.abort();
+    }, [canRecord, selectedUse, chartPage]);
+
     function reload() { setLoading(true); setRevision(value => value + 1); }
     async function create(event: FormEvent) {
         event.preventDefault();
@@ -82,10 +108,11 @@ export default function IncidentRegisterPage() {
             await recordRentalIncident({
                 vehicle_use_id: selectedAssignment.id,
                 expected_use_version: selectedAssignment.row_version,
+                running_chart_id: selectedChart ? Number(selectedChart) : null,
                 incident_type: type, occurred_on: occurredOn,
                 evidence_reference: evidenceReference.trim(), description: description.trim(),
             });
-            setSelectedUse(''); setType(''); setOccurredOn(''); setEvidenceReference(''); setDescription('');
+            setSelectedUse(''); setSelectedChart(''); setChartPage(1); setType(''); setOccurredOn(''); setEvidenceReference(''); setDescription('');
             setPage(1); reload();
         } catch (failure) { setError(toApiError(failure)); }
         finally { setBusy(false); }
@@ -107,13 +134,26 @@ export default function IncidentRegisterPage() {
             <form aria-label="Record rental incident" className="space-y-3" onSubmit={create}>
                 <div className="flex flex-wrap items-end gap-2">
                     <Input label="Find a vehicle use (vehicle, agreement or party)" value={vehicleSearch} onChange={event => setVehicleSearch(event.target.value)} />
-                    <Button type="button" variant="secondary" onClick={() => { setSelectedUse(''); setVehiclePage(1); setQuery(vehicleSearch.trim()); }}>Find assignments</Button>
+                    <Button type="button" variant="secondary" onClick={() => { setSelectedUse(''); setSelectedChart(''); setChartPage(1); setVehiclePage(1); setQuery(vehicleSearch.trim()); }}>Find assignments</Button>
                 </div>
                 <Select label="Vehicle assignment" required placeholder="Select a vehicle and customer agreement"
                     options={uses.map(use => ({ value: String(use.id), label: `${use.vehicle_label} — ${use.customer_agreement_reference ?? 'No agreement'} — ${use.customer_party_name ?? 'Unnamed party'}` }))}
-                    value={selectedUse} disabled={usesLoading || busy} onChange={event => setSelectedUse(event.target.value)} error={error?.fields.vehicle_use_id?.[0]} />
+                    value={selectedUse} disabled={usesLoading || busy} onChange={event => { setSelectedUse(event.target.value); setSelectedChart(''); setChartPage(1); }} error={error?.fields.vehicle_use_id?.[0]} />
                 {usesLoading && <LoadingState label="Finding vehicle assignments…" />}
-                <Pagination meta={useMeta} disabled={busy || usesLoading} onPageChange={next => { setSelectedUse(''); setVehiclePage(next); }} />
+                <Pagination meta={useMeta} disabled={busy || usesLoading} onPageChange={next => { setSelectedUse(''); setSelectedChart(''); setChartPage(1); setVehiclePage(next); }} />
+                {selectedUse && <>
+                    <Select label="Running Chart (optional)" placeholder="No Running Chart linked"
+                        options={charts.map(chart => ({
+                            value: String(chart.id),
+                            label: `${chart.reference} — ${CHART_LABELS[chart.status as RunningChartStatus]}`,
+                        }))}
+                        value={selectedChart} disabled={chartsLoading || busy}
+                        onChange={event => setSelectedChart(event.target.value)}
+                        error={error?.fields.running_chart_id?.[0]} />
+                    {chartsLoading && <LoadingState label="Finding Running Charts…" />}
+                    <Pagination meta={chartMeta} disabled={busy || chartsLoading}
+                        onPageChange={next => { setSelectedChart(''); setChartPage(next); }} />
+                </>}
                 <div className="grid gap-3 md:grid-cols-2">
                     <Select label="Incident category" required value={type}
                         options={Object.values(IncidentType).map(value => ({ value, label: INCIDENT_TYPE_LABELS[value] }))}
@@ -138,6 +178,7 @@ export default function IncidentRegisterPage() {
                     <p className="text-sm">{formatBusinessDate(incident.occurred_on)} · {incident.reference}</p>
                     <p className="text-sm">Customer agreement: {incident.vehicle.customer_agreement ?? 'Not recorded'} · Owner agreement: {incident.vehicle.owner_agreement ?? 'Company supply'}</p>
                     <p className="text-sm">Evidence: {incident.evidence_reference}</p>
+                    {incident.running_chart && <p className="text-sm">Running Chart: {incident.running_chart}</p>}
                     <p>{incident.description}</p>
                     {canReview && incident.status === IncidentStatus.Recorded &&
                         <Button type="button" variant="secondary" disabled={busy} onClick={() => { setReviewing(incident); setReviewReason(''); }}>Review evidence</Button>}

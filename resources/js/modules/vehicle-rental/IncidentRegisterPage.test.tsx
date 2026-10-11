@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@/shared/api/apiError';
 import IncidentRegisterPage from './IncidentRegisterPage';
 import { IncidentStatus, IncidentType, IncidentReviewAction, type RentalIncident } from './incidentEvidence';
-import { incidentHistory, listIncidentVehicleUseOptions, listRentalIncidents, recordRentalIncident, reviewRentalIncident } from './incidentEvidenceApi';
+import { incidentHistory, listIncidentVehicleUseOptions, listIncidentRunningCharts, listRentalIncidents, recordRentalIncident, reviewRentalIncident } from './incidentEvidenceApi';
 
 vi.mock('@/modules/auth/AuthProvider', () => ({
     useAuth: () => ({
@@ -18,6 +18,7 @@ vi.mock('@/modules/auth/AuthProvider', () => ({
 }));
 vi.mock('./incidentEvidenceApi', () => ({
     listIncidentVehicleUseOptions: vi.fn(),
+    listIncidentRunningCharts: vi.fn(),
     incidentHistory: vi.fn(),
     listRentalIncidents: vi.fn(),
     recordRentalIncident: vi.fn(),
@@ -43,6 +44,7 @@ const incident: RentalIncident = {
 beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(listIncidentVehicleUseOptions).mockResolvedValue({ data: [assignment] });
+    vi.mocked(listIncidentRunningCharts).mockResolvedValue({ data: [{ id: 5, reference: 'RUN-005', status: 'draft' }] });
     vi.mocked(incidentHistory).mockResolvedValue({ data: [
         { action: 'recorded', reason: null, recorded_at: '2026-09-07T10:00:00Z', actor: { name: 'Test Operator' } },
     ] });
@@ -71,12 +73,34 @@ describe('Rental incident evidence register', () => {
         await waitFor(() => expect(recordRentalIncident).toHaveBeenCalledWith({
             vehicle_use_id: 27,
             expected_use_version: 4,
+            running_chart_id: null,
             incident_type: IncidentType.Fuel,
             occurred_on: '2026-09-07',
             evidence_reference: 'RECEIPT-27',
             description: 'Receipt supplied by driver',
         }));
         expect(screen.getByText(/Confirmation verifies the record only/)).toBeInTheDocument();
+    });
+
+    it('links the selected Running Chart instead of losing optional chart evidence', async () => {
+        render(<IncidentRegisterPage />);
+        await screen.findByText('CAR-101 · Fuel');
+        fireEvent.change(screen.getByLabelText('Vehicle assignment'), { target: { value: String(assignment.id) } });
+        expect(await screen.findByRole('option', { name: 'RUN-005 — Draft' })).toBeInTheDocument();
+
+        fireEvent.change(screen.getByLabelText('Running Chart (optional)'), { target: { value: '5' } });
+        fireEvent.change(screen.getByLabelText('Incident category'), { target: { value: IncidentType.Fuel } });
+        fireEvent.change(screen.getByLabelText('Business date of incident'), { target: { value: '2026-09-07' } });
+        fireEvent.change(screen.getByLabelText('Evidence / document reference'), { target: { value: 'RECEIPT-27' } });
+        fireEvent.change(screen.getByLabelText('What happened? Record the factual evidence.'), { target: { value: 'Receipt supplied by driver' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Record evidence' }));
+
+        await waitFor(() => expect(recordRentalIncident).toHaveBeenCalledWith(expect.objectContaining({
+            vehicle_use_id: 27,
+            expected_use_version: 4,
+            running_chart_id: 5,
+        })));
+        expect(listIncidentRunningCharts).toHaveBeenCalledWith(27, 1, expect.any(AbortSignal));
     });
 
     it('loads actor-labelled history only when requested', async () => {

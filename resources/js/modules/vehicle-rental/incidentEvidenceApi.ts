@@ -1,12 +1,18 @@
 import { apiClient } from '@/shared/api/apiClient';
 import type { ApiCollection, ApiResource } from '@/shared/types/api';
 import { PAGE_SIZE } from './agreements';
-import { INCIDENT_API, type IncidentFormData, type IncidentVehicleUseOption, type IncidentHistoryEvent, type RentalIncident, IncidentReviewAction } from './incidentEvidence';
+import { INCIDENT_API, type IncidentFormData, type IncidentVehicleUseOption, type IncidentRunningChartOption, type IncidentHistoryEvent, type RentalIncident, IncidentReviewAction } from './incidentEvidence';
 
 export const listIncidentVehicleUseOptions = (search: string, page: number, signal?: AbortSignal) =>
     apiClient.get<ApiCollection<IncidentVehicleUseOption>>(`${INCIDENT_API}/vehicle-use-options`, {
         params: { search: search || undefined, page, per_page: PAGE_SIZE }, signal,
     }).then(result => result.data);
+
+export const listIncidentRunningCharts = (vehicleUseId: number, page: number, signal?: AbortSignal) =>
+    apiClient.get<ApiCollection<IncidentRunningChartOption>>(
+        `${INCIDENT_API}/vehicle-uses/${vehicleUseId}/running-chart-options`,
+        { params: { page, per_page: PAGE_SIZE }, signal },
+    ).then(result => result.data);
 
 export const listRentalIncidents = (page: number, signal?: AbortSignal) =>
     apiClient.get<ApiCollection<RentalIncident>>(INCIDENT_API, { params: { page, per_page: PAGE_SIZE }, signal }).then(result => result.data);

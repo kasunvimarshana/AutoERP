@@ -51,6 +51,12 @@ export interface RentalIncident {
     reviewed_at: string | null;
 }
 
+export interface IncidentRunningChartOption {
+    id: number;
+    reference: string;
+    status: string;
+}
+
 export interface IncidentVehicleUseOption {
     id: number;
     row_version: number;
@@ -62,6 +68,7 @@ export interface IncidentVehicleUseOption {
 export interface IncidentFormData {
     vehicle_use_id: number;
     expected_use_version: number;
+    running_chart_id: number | null;
     incident_type: IncidentType;
     occurred_on: string;
     evidence_reference: string;
