@@ -100,6 +100,9 @@ final class SaleReturnPostingService
                     ->sum('quantity'));
                 $remaining = $this->math->sub((string) $line->quantity, $alreadyReturned);
                 $quantity = $this->math->normalize((string) $lineData['quantity']);
+                if ($this->math->compare($quantity, self::ZERO) <= 0) {
+                    throw new InvalidArgumentException('Return quantity must be positive.');
+                }
                 if ($this->math->compare($quantity, $remaining) > 0) {
                     throw new InvalidArgumentException('Return quantity cannot exceed the unreturned quantity sold.');
                 }

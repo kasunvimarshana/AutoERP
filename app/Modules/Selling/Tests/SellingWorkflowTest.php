@@ -205,6 +205,23 @@ final class SellingWorkflowTest extends TestCase
                     'quantity' => '1.000000',
                 ]],
             ];
+            foreach (['0.000000', '-1.000000'] as $invalidQuantity) {
+                $invalidReturnPayload = $returnPayload;
+                $invalidReturnPayload['lines'][0]['quantity'] = $invalidQuantity;
+
+                try {
+                    app(SaleReturnPostingService::class)->create(
+                        $invalidReturnPayload, 'selling-test-invalid-return-'.Str::uuid(),
+                    );
+                    $this->fail('A non-positive return quantity must not create a credit or return stock.');
+                } catch (InvalidArgumentException $exception) {
+                    $this->assertStringContainsString('quantity must be positive', $exception->getMessage());
+                }
+
+                $this->assertDatabaseCount('sale_returns', 0);
+                $this->assertSame('3.000000', (string) InventoryStockBalance::query()->firstOrFail()->quantity_on_hand);
+            }
+
             $returnKey = 'selling-test-return-'.Str::uuid();
             $sale = app(SaleReturnPostingService::class)->create($returnPayload, $returnKey);
             $duplicateReturn = app(SaleReturnPostingService::class)->create($returnPayload, $returnKey);
