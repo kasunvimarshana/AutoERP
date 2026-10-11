@@ -1704,12 +1704,13 @@ final class VehicleServiceEngineTest extends TestCase
         $first = $this->createJob($context);
         $second = $this->createJob($context);
         $this->line($first, VehicleServiceLineSourceType::ServiceItem, $context['service'], '1.000000', '20.000000');
-        $this->line($second, VehicleServiceLineSourceType::ServiceItem, $context['service'], '1.000000', '20.000000');
         $organizationId = OrganizationUnitFixture::create([
             'tenant_id' => $context['tenant_id'], 'code' => 'WORKSHOP-BRANCH', 'name' => 'Workshop Branch',
         ]);
         // Existing jobs may belong to different branches while referring to one tenant-wide vehicle.
         DB::table('vehicle_service_jobs')->where('id', $second->getKey())->update(['organization_unit_id' => $organizationId]);
+        // Attach this branch's operational line after moving the legacy test fixture.
+        $this->line($this->refreshJob($second), VehicleServiceLineSourceType::ServiceItem, $context['service'], '1.000000', '20.000000');
         $this->changeStatus($first, VehicleServiceJobStatus::InProgress);
         $this->changeStatus($second, VehicleServiceJobStatus::InProgress);
         $this->changeStatus($first, VehicleServiceJobStatus::Completed);
