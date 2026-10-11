@@ -41,6 +41,9 @@ final class SaleReturnPostingService
         if (trim($idempotencyKey) === '') {
             throw new InvalidArgumentException('Return idempotency key is required.');
         }
+        if (! isset($payload['lines']) || ! is_array($payload['lines']) || $payload['lines'] === []) {
+            throw new InvalidArgumentException('Return requires at least one line.');
+        }
 
         return DB::transaction(function () use ($payload, $idempotencyKey): Sale {
             $sale = Sale::query()->lockForUpdate()->findOrFail((int) $payload['sale_id']);

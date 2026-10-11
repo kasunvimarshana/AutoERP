@@ -161,6 +161,19 @@ final class SellingWorkflowTest extends TestCase
                     'quantity' => '2.000000',
                 ]],
             ];
+            try {
+                app(SalePostingService::class)->create(
+                    array_replace($salePayload, ['lines' => []]),
+                    'selling-test-empty-sale-'.Str::uuid(),
+                );
+                $this->fail('An empty sale must not post an invoice or issue stock.');
+            } catch (InvalidArgumentException $exception) {
+                $this->assertStringContainsString('requires at least one line', $exception->getMessage());
+            }
+            $this->assertDatabaseCount('sales', 0);
+            $this->assertDatabaseCount('invoices', 0);
+            $this->assertSame('5.000000', (string) InventoryStockBalance::query()->firstOrFail()->quantity_on_hand);
+
             foreach (['0.000000', '-1.000000'] as $invalidQuantity) {
                 $invalidPayload = $salePayload;
                 $invalidPayload['lines'][0]['quantity'] = $invalidQuantity;
@@ -230,6 +243,18 @@ final class SellingWorkflowTest extends TestCase
                     'quantity' => '1.000000',
                 ]],
             ];
+            try {
+                app(SaleReturnPostingService::class)->create(
+                    array_replace($returnPayload, ['lines' => []]),
+                    'selling-test-empty-return-'.Str::uuid(),
+                );
+                $this->fail('An empty return must not post a credit note.');
+            } catch (InvalidArgumentException $exception) {
+                $this->assertStringContainsString('requires at least one line', $exception->getMessage());
+            }
+            $this->assertDatabaseCount('sale_returns', 0);
+            $this->assertSame('3.000000', (string) InventoryStockBalance::query()->firstOrFail()->quantity_on_hand);
+
             foreach (['0.000000', '-1.000000'] as $invalidQuantity) {
                 $invalidReturnPayload = $returnPayload;
                 $invalidReturnPayload['lines'][0]['quantity'] = $invalidQuantity;

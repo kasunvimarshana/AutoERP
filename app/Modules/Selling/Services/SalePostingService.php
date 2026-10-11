@@ -61,6 +61,9 @@ final class SalePostingService
         if (trim($idempotencyKey) === '') {
             throw new InvalidArgumentException('Sale idempotency key is required.');
         }
+        if (! isset($payload['lines']) || ! is_array($payload['lines']) || $payload['lines'] === []) {
+            throw new InvalidArgumentException('Sale requires at least one line.');
+        }
 
         return DB::transaction(function () use ($payload, $idempotencyKey): Sale {
             $tenantId = (int) $payload['tenant_id'];
