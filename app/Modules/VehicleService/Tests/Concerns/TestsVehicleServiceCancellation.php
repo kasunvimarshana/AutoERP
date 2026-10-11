@@ -188,6 +188,7 @@ trait TestsVehicleServiceCancellation
         $context = $this->context();
         $actor = $this->cancellationActor($context, false);
         $job = $this->createJob($context);
+        $this->line($job, VehicleServiceLineSourceType::ServiceItem, $context['service'], '1.000000', '20.000000');
         $this->changeStatus($job, VehicleServiceJobStatus::InProgress);
         try {
             $this->cancelJob($job, $actor);

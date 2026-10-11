@@ -156,6 +156,16 @@ function methodsForKind(methods: VehicleServicePaymentMethod[], kind: DirectPaym
     return methods.filter((method) => paymentMethodKind(method) === kind);
 }
 
+function soleNonCashMethodKind(methods: VehicleServicePaymentMethod[]): DirectPaymentKind | null {
+    const directMethods = methods.filter((method) =>
+        DIRECT_PAYMENT_KINDS.some(({ kind }) => paymentMethodKind(method) === kind),
+    );
+    if (directMethods.length !== 1) return null;
+
+    const kind = paymentMethodKind(directMethods[0]);
+    return kind === 'cash' ? null : kind as DirectPaymentKind;
+}
+
 function selectedMethodForRow(row: PaymentRow, methods: VehicleServicePaymentMethod[]): VehicleServicePaymentMethod | undefined {
     const available = methodsForKind(methods, row.kind);
 
@@ -211,14 +221,10 @@ export default function VehicleServicePaymentPreparePage() {
     );
     useEffect(() => {
         const onlyInvoice = !invoiceId && eligibleInvoices.length === 1 ? eligibleInvoices[0] : undefined;
-        const directMethods = paymentMethods.filter((method) =>
-            DIRECT_PAYMENT_KINDS.some(({ kind }) => paymentMethodKind(method) === kind),
-        );
-        const soleMethod = directMethods.length === 1 ? directMethods[0] : undefined;
-        const soleKind = paymentMethodKind(soleMethod);
+        const soleKind = soleNonCashMethodKind(paymentMethods);
         const soleInvoice = eligibleInvoices.find((candidate) => candidate.invoice_id === Number(invoiceId))
             ?? onlyInvoice;
-        const prefillNonCash = Boolean(soleMethod && soleKind !== 'cash' && soleInvoice);
+        const prefillNonCash = Boolean(soleKind && soleInvoice);
         if (!onlyInvoice && !prefillNonCash) return;
 
         let cancelled = false;
@@ -344,10 +350,14 @@ export default function VehicleServicePaymentPreparePage() {
                                     placeholder={eligibleInvoices.length > 0 ? 'Select posted invoice' : 'No payable posted invoices'}
                                     disabled={Boolean(createdPayment)}
                                     onChange={(event) => {
+                                        const selectedInvoice = eligibleInvoices.find((candidate) => String(candidate.invoice_id) === event.target.value);
+                                        const prefillKind = soleNonCashMethodKind(paymentMethods);
                                         setInvoiceId(event.target.value);
                                         setRows((current) => current.map((row) => ({
                                             ...row,
-                                            amount: ZERO_AMOUNT,
+                                            amount: selectedInvoice && row.kind === prefillKind
+                                                ? (selectedInvoice.balance_due ?? selectedInvoice.invoice_total)
+                                                : ZERO_AMOUNT,
                                             cashReceivedAmount: '',
                                         })));
                                         setCreditCheckFeedback(null);

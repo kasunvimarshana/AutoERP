@@ -92,6 +92,7 @@ describe('VehicleServicePaymentPreparePage', () => {
 
         expect(await screen.findByText('Payment for JOB-1')).toBeInTheDocument();
         await user.selectOptions(screen.getByLabelText('Invoice'), '11');
+        expect(screen.getByLabelText('Bank transfer amount')).toHaveValue('100.000000');
         expect(screen.queryByLabelText('Internal bank account')).not.toBeInTheDocument();
         await user.type(screen.getByLabelText('Reference details'), 'TRX-100');
         await user.click(screen.getByText('Additional transaction details'));
@@ -197,6 +198,7 @@ describe('VehicleServicePaymentPreparePage', () => {
 
         expect(await screen.findByText('Payment for JOB-1')).toBeInTheDocument();
         await user.selectOptions(screen.getByLabelText('Invoice'), '11');
+        expect(screen.getByLabelText('Cheque amount')).toHaveValue('100.000000');
         expect(screen.getByLabelText('Cheque amount')).toBeInTheDocument();
         await user.click(screen.getByText('Additional transaction details'));
         await user.type(screen.getByLabelText('Cheque number'), 'CHQ-14');
@@ -231,6 +233,7 @@ describe('VehicleServicePaymentPreparePage', () => {
 
         expect(await screen.findByText('Payment for JOB-1')).toBeInTheDocument();
         await user.selectOptions(screen.getByLabelText('Invoice'), '11');
+        expect(screen.getByLabelText('Wallet amount')).toHaveValue('100.000000');
         expect(screen.getByLabelText('Wallet amount')).toBeInTheDocument();
         await user.click(screen.getByText('Additional transaction details'));
         await user.type(screen.getByLabelText('Wallet reference'), 'WLT-15');

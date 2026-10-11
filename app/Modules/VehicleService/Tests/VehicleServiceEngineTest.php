@@ -905,6 +905,7 @@ final class VehicleServiceEngineTest extends TestCase
     {
         $context = $this->context();
         $job = $this->createJob($context);
+        $this->line($job, VehicleServiceLineSourceType::ServiceItem, $context['service'], '1.000000', '20.000000');
         $this->changeStatus($job, VehicleServiceJobStatus::Inspected);
         $this->changeStatus($this->refreshJob($job), VehicleServiceJobStatus::InProgress);
         $this->changeStatus($this->refreshJob($job), VehicleServiceJobStatus::Completed);
@@ -1702,6 +1703,8 @@ final class VehicleServiceEngineTest extends TestCase
         $context = $this->context();
         $first = $this->createJob($context);
         $second = $this->createJob($context);
+        $this->line($first, VehicleServiceLineSourceType::ServiceItem, $context['service'], '1.000000', '20.000000');
+        $this->line($second, VehicleServiceLineSourceType::ServiceItem, $context['service'], '1.000000', '20.000000');
         $organizationId = OrganizationUnitFixture::create([
             'tenant_id' => $context['tenant_id'], 'code' => 'WORKSHOP-BRANCH', 'name' => 'Workshop Branch',
         ]);

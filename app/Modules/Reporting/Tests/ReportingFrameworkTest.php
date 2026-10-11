@@ -181,7 +181,7 @@ final class ReportingFrameworkTest extends TestCase
             'inventory.stock-balance' => ['reports.inventory.report', 'landscape'],
             'purchase.orders' => ['reports.purchase.report', 'portrait'],
             'vehicle-service.jobs' => ['reports.vehicle-service.report', 'portrait'],
-            'vehicle-service.employee-commissions' => ['reports.vehicle-service.report', 'portrait'],
+            'vehicle-service.employee-commissions' => ['reports.vehicle-service.report', 'landscape'],
             'vehicle-service.profitability' => ['reports.vehicle-service.report', 'landscape'],
         ];
 
