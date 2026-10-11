@@ -113,11 +113,11 @@ final class RentalIncidentServiceTest extends TestCase
                 'tenant_id' => $context->tenantId,
                 'code' => 'OTHER-INCIDENT-CHART', 'name' => 'Other incident chart branch',
             ]);
-            $otherContext = new \\Modules\\VehicleRental\\Data\\AgreementContext(
+            $otherContext = new \Modules\VehicleRental\Data\AgreementContext(
                 $context->tenantId, $otherId, $context->actorId,
             );
 
-            $this->expectException(\\Illuminate\\Database\\Eloquent\\ModelNotFoundException::class);
+            $this->expectException(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
             $service->runningChartOptions($otherContext, $use->id, 10);
         });
     }
