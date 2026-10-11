@@ -15,7 +15,7 @@ import { toApiError, type ApiError } from '@/shared/api/apiError';
 import type { PaginationMeta } from '@/shared/types/pagination';
 import { formatBusinessDate } from '@/shared/utils/businessDate';
 import type { IncidentRunningChartOption, IncidentVehicleUseOption } from './incidentEvidence';
-import { CHART_LABELS, type RunningChartStatus } from './runningCharts';
+import { CHART_LABELS } from './runningCharts';
 import { IncidentReviewAction, IncidentStatus, IncidentType, INCIDENT_PERMISSION, INCIDENT_TYPE_LABELS, type RentalIncident } from './incidentEvidence';
 import { listIncidentVehicleUseOptions, listIncidentRunningCharts, listRentalIncidents, recordRentalIncident, reviewRentalIncident } from './incidentEvidenceApi';
 import { IncidentHistoryPanel } from './IncidentHistoryPanel';
@@ -145,7 +145,7 @@ export default function IncidentRegisterPage() {
                     <Select label="Running Chart (optional)" placeholder="No Running Chart linked"
                         options={charts.map(chart => ({
                             value: String(chart.id),
-                            label: `${chart.reference} — ${CHART_LABELS[chart.status as RunningChartStatus]}`,
+                            label: `${chart.reference} — ${CHART_LABELS[chart.status]}`,
                         }))}
                         value={selectedChart} disabled={chartsLoading || busy}
                         onChange={event => setSelectedChart(event.target.value)}
