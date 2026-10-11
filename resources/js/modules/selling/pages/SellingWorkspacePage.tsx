@@ -71,17 +71,27 @@ export default function SellingWorkspacePage() {
             setSale(null);
             setReturnQuantities({});
             setReturnReason('');
-            void getSale(Number(id), controller.signal).then(setSale).catch((failure: unknown) => setError(toApiError(failure)));
+            void getSale(Number(id), controller.signal)
+                .then((response) => { if (!controller.signal.aborted) setSale(response); })
+                .catch((failure: unknown) => { if (!controller.signal.aborted) setError(toApiError(failure)); });
         } else {
             setSale(null);
             if (isReturnsPage) {
                 void listSaleReturns({ page, search }, controller.signal)
-                    .then((response) => { setReturns(response.data); setListMeta(response.meta ?? null); })
-                    .catch((failure: unknown) => setError(toApiError(failure)));
+                    .then((response) => {
+                        if (controller.signal.aborted) return;
+                        setReturns(response.data);
+                        setListMeta(response.meta ?? null);
+                    })
+                    .catch((failure: unknown) => { if (!controller.signal.aborted) setError(toApiError(failure)); });
             } else if (!isCreatePage) {
                 void listSales({ page, search }, controller.signal)
-                    .then((response) => { setSales(response.data); setListMeta(response.meta ?? null); })
-                    .catch((failure: unknown) => setError(toApiError(failure)));
+                    .then((response) => {
+                        if (controller.signal.aborted) return;
+                        setSales(response.data);
+                        setListMeta(response.meta ?? null);
+                    })
+                    .catch((failure: unknown) => { if (!controller.signal.aborted) setError(toApiError(failure)); });
             }
         }
         return () => controller.abort();
