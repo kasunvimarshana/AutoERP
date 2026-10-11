@@ -107,6 +107,13 @@ These structures corroborate a dual-sided receivable/payable business with accou
 
 The four videos total approximately 1 hour 56 minutes 26 seconds. The workshop-focused video is supporting evidence for vehicle availability, maintenance and off-road boundaries only; it is not a source for Rental tariffs.
 
+
+### 2026-10-11 uploaded-source identity verification
+
+The newly attached `TACGL(20261011-122256).zip` has SHA-256 `79c240494943437978754169c3360bb7c6e35d911ef8263c4b2d6b6246384d77` and contains 452 non-directory entries. A fresh comparison against `TACGL.zip` (SHA-256 `0e0733fff720072af4c3aaa787995ff128bfa79060a37739d6d2ebbe18a25313`) confirms the same 452 normalized relative paths and matching **per-file SHA-256** values after removing the canonical ZIP's outer `TACGL/` directory. The separately supplied `TACGL.rar` matches the already registered SHA-256 `0001a91ab4dfdf31d60f669b30f1ccc2da475d7841b2ceea505ef97eff5bedbf`.
+
+All four videos uploaded on 2026-10-11 match the individual SHA-256 fingerprints in §2.2, as do the attached engineering rules relative to the repository root copies at the content level. This is an **identity/reuse verification**, not a claim that the videos were watched continuously again or that the password-protected nested backup was decrypted. It introduces **no new evidence for pricing, adjustment liability, VAT/withholding, free-kilometre pooling, or other monetary rules**. The open release gates in `docs/vehicle-rental/TODO.md` §R remain open; in particular, an incident must not automatically become a debit note, credit note, customer recovery or owner deduction without approved evidence and explicit policy.
+
 ### 2.3 Evidence classes
 
 Every rule in this document belongs to one of these classes:
