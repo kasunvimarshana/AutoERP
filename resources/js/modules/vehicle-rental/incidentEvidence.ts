@@ -1,4 +1,5 @@
 import { AGREEMENT_API } from './agreements';
+import type { RunningChartStatus } from './runningCharts';
 
 export const INCIDENT_REGISTER_PATH = '/vehicle-rental/incidents';
 export const INCIDENT_API = `${AGREEMENT_API}/incidents`;
@@ -54,7 +55,7 @@ export interface RentalIncident {
 export interface IncidentRunningChartOption {
     id: number;
     reference: string;
-    status: string;
+    status: RunningChartStatus;
 }
 
 export interface IncidentVehicleUseOption {
