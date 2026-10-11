@@ -19,6 +19,7 @@ use Modules\Selling\Http\Resources\SellingItemLookupResource;
 use Modules\Selling\Models\Sale;
 use Modules\Selling\Models\SaleReturn;
 use Modules\Selling\Services\SalePostingService;
+use Modules\Selling\Services\SaleReturnPostingService;
 use Modules\Selling\Services\SellingAuthorizationService;
 
 final class SaleController
