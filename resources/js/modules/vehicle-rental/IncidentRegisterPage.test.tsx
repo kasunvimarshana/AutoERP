@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@/shared/api/apiError';
 import IncidentRegisterPage from './IncidentRegisterPage';
 import { IncidentStatus, IncidentType, IncidentReviewAction, type RentalIncident } from './incidentEvidence';
+import { RunningChartStatus } from './runningCharts';
 import { incidentHistory, listIncidentVehicleUseOptions, listIncidentRunningCharts, listRentalIncidents, recordRentalIncident, reviewRentalIncident } from './incidentEvidenceApi';
 
 vi.mock('@/modules/auth/AuthProvider', () => ({
@@ -44,7 +45,7 @@ const incident: RentalIncident = {
 beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(listIncidentVehicleUseOptions).mockResolvedValue({ data: [assignment] });
-    vi.mocked(listIncidentRunningCharts).mockResolvedValue({ data: [{ id: 5, reference: 'RUN-005', status: 'draft' }] });
+    vi.mocked(listIncidentRunningCharts).mockResolvedValue({ data: [{ id: 5, reference: 'RUN-005', status: RunningChartStatus.Draft }] });
     vi.mocked(incidentHistory).mockResolvedValue({ data: [
         { action: 'recorded', reason: null, recorded_at: '2026-09-07T10:00:00Z', actor: { name: 'Test Operator' } },
     ] });
