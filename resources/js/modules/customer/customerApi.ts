@@ -55,10 +55,16 @@ export const changeCustomerStatus = (id: number, status: string, reason?: string
     apiClient.patch<ApiResource<Customer>>(`${endpoints.customers}/${id}/status`, { status, reason })
         .then((response) => response.data.data);
 
-export function searchCustomers(params: LookupLoadParams, kind = 'active'): Promise<LookupResult<CustomerSummary>> {
+export function searchCustomers(
+    params: LookupLoadParams,
+    kind: 'active' | 'all' | 'credit-allowed' = 'active',
+): Promise<LookupResult<CustomerSummary>> {
+    const lookupPath = kind === 'all'
+        ? `${endpoints.customers}/lookup`
+        : `${endpoints.customers}/lookup/${kind}`;
     const loader = createQueryCachedLookupLoader<CustomerSummary>({
         key: `lookup:customers:${kind}`,
-        load: (lookupParams) => requestLookup<CustomerSummary>(`${endpoints.customers}/lookup/${kind}`, lookupParams),
+        load: (lookupParams) => requestLookup<CustomerSummary>(lookupPath, lookupParams),
     });
 
     return loader(params);
