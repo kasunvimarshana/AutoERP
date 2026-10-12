@@ -5,19 +5,19 @@ declare(strict_types=1);
 namespace Modules\Finance\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
-use Modules\Finance\Http\Requests\ListFinanceRequest;
+use Modules\Finance\Http\Requests\CustomerOutstandingReportRequest;
 use Modules\Finance\Services\CustomerOutstandingReportService;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 final class CustomerOutstandingReportController
 {
-    public function index(ListFinanceRequest $request, CustomerOutstandingReportService $report): JsonResponse
+    public function index(CustomerOutstandingReportRequest $request, CustomerOutstandingReportService $report): JsonResponse
     {
         return response()->json($report->page($request));
     }
 
     public function invoices(
-        ListFinanceRequest $request,
+        CustomerOutstandingReportRequest $request,
         CustomerOutstandingReportService $report,
         int $customer,
     ): JsonResponse {
@@ -28,7 +28,7 @@ final class CustomerOutstandingReportController
         return response()->json($report->invoices($request, $customer));
     }
 
-    public function export(ListFinanceRequest $request, CustomerOutstandingReportService $report): StreamedResponse
+    public function export(CustomerOutstandingReportRequest $request, CustomerOutstandingReportService $report): StreamedResponse
     {
         $rows = $report->exportRows($request);
 

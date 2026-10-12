@@ -9,7 +9,7 @@ use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 use Modules\Customer\Models\Customer;
 use Modules\Finance\Enums\ReceivableAgingBucket;
-use Modules\Finance\Http\Requests\ListFinanceRequest;
+use Modules\Finance\Http\Requests\CustomerOutstandingReportRequest;
 
 final class CustomerOutstandingReportService
 {
@@ -20,7 +20,7 @@ final class CustomerOutstandingReportService
     private const CUSTOMER_NAME_EXPRESSION = "COALESCE(NULLIF(customers.display_name, ''), customers.name)";
 
     /** @return array<string, mixed> */
-    public function page(ListFinanceRequest $request): array
+    public function page(CustomerOutstandingReportRequest $request): array
     {
         $asOfDate = $this->asOfDate($request);
         $query = $this->baseQuery($request, $asOfDate);
@@ -46,7 +46,7 @@ final class CustomerOutstandingReportService
     }
 
     /** @return array<string, mixed> */
-    public function invoices(ListFinanceRequest $request, int $customerId): array
+    public function invoices(CustomerOutstandingReportRequest $request, int $customerId): array
     {
         $asOfDate = $this->asOfDate($request);
         $currencyCode = (string) $request->input('currency_code');
@@ -102,7 +102,7 @@ final class CustomerOutstandingReportService
     }
 
     /** @return iterable<object> */
-    public function exportRows(ListFinanceRequest $request): iterable
+    public function exportRows(CustomerOutstandingReportRequest $request): iterable
     {
         $asOfDate = $this->asOfDate($request);
 
@@ -112,7 +112,7 @@ final class CustomerOutstandingReportService
             ->lazy(500);
     }
 
-    private function baseQuery(ListFinanceRequest $request, string $asOfDate): Builder
+    private function baseQuery(CustomerOutstandingReportRequest $request, string $asOfDate): Builder
     {
         $query = DB::table('invoice_balances as balances')
             ->join('invoices', static function ($join): void {
@@ -136,13 +136,8 @@ final class CustomerOutstandingReportService
             $query->where('balances.organization_unit_id', $request->organizationUnitId());
         }
 
-        if ($request->filled('search')) {
-            $search = '%'.trim((string) $request->input('search')).'%';
-            $query->where(static fn (Builder $searchQuery): Builder => $searchQuery
-                ->where('customers.name', 'like', $search)
-                ->orWhere('customers.display_name', 'like', $search)
-                ->orWhere('customers.code', 'like', $search)
-                ->orWhere('customers.customer_number', 'like', $search));
+        if ($request->filled('customer_id')) {
+            $query->where('customers.id', (int) $request->input('customer_id'));
         }
 
         if ($request->filled('currency_code')) {
@@ -276,7 +271,7 @@ final class CustomerOutstandingReportService
     }
 
     /** @return array<string, mixed>|null */
-    private function customerIdentity(int $customerId, ListFinanceRequest $request): ?array
+    private function customerIdentity(int $customerId, CustomerOutstandingReportRequest $request): ?array
     {
         $customer = DB::table('customers')
             ->where('tenant_id', $request->tenantId())
@@ -295,7 +290,7 @@ final class CustomerOutstandingReportService
         ];
     }
 
-    private function asOfDate(ListFinanceRequest $request): string
+    private function asOfDate(CustomerOutstandingReportRequest $request): string
     {
         return CarbonImmutable::parse((string) $request->input('as_of_date', now()->toDateString()))->toDateString();
     }

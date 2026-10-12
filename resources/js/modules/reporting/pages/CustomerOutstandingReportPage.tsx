@@ -13,6 +13,8 @@ import { Select } from '@/shared/components/Select';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { formatMoney } from '@/shared/utils/formatMoney';
 import { getCustomerOutstanding, getCustomerOutstandingInvoices, downloadCustomerOutstandingCsv } from '@/modules/finance/financeApi';
+import { CustomerLookupSelect } from '@/modules/customer/components/CustomerLookupSelect';
+import type { CustomerSummary } from '@/modules/customer/customerTypes';
 import type {
     CustomerOutstandingInvoiceRow,
     CustomerOutstandingInvoicesResult,
@@ -39,6 +41,7 @@ const AGING_OPTIONS = [
 export default function CustomerOutstandingReportPage() {
     const [filters, setFilters] = useState<CustomerOutstandingParams>(INITIAL_FILTERS);
     const [draft, setDraft] = useState<CustomerOutstandingParams>(INITIAL_FILTERS);
+    const [draftCustomer, setDraftCustomer] = useState<CustomerSummary | null>(null);
     const [result, setResult] = useState<CustomerOutstandingReportResult | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<ApiError | null>(null);
@@ -96,7 +99,7 @@ export default function CustomerOutstandingReportPage() {
         event.preventDefault();
         setSelected(null);
         setInvoicePage(1);
-        setFilters({ ...draft, page: 1, per_page: 25 });
+        setFilters({ ...draft, customer_id: draftCustomer?.id, page: 1, per_page: 25 });
     }
 
     function selectCustomer(row: CustomerOutstandingRow) {
@@ -153,12 +156,12 @@ export default function CustomerOutstandingReportPage() {
                                 hint="Outstanding uses current invoice balances; this date sets the aging cutoff."
                                 onChange={(event) => setDraft((current) => ({ ...current, as_of_date: event.target.value || localDateToday() }))}
                             />
-                            <Input
+                            <CustomerLookupSelect
                                 label="Search customer"
-                                type="search"
-                                value={draft.search ?? ''}
+                                value={draftCustomer}
+                                onChange={setDraftCustomer}
                                 placeholder="Name, code, or customer number"
-                                onChange={(event) => setDraft((current) => ({ ...current, search: event.target.value || undefined }))}
+                                lookupKind="all"
                             />
                             <Select
                                 label="Aging bucket"
@@ -172,6 +175,7 @@ export default function CustomerOutstandingReportPage() {
                                 <Button type="button" variant="secondary" onClick={() => {
                                     setDraft(INITIAL_FILTERS);
                                     setFilters(INITIAL_FILTERS);
+                                    setDraftCustomer(null);
                                     setSelected(null);
                                     setInvoicePage(1);
                                 }}>Reset</Button>

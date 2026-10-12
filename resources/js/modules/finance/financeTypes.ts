@@ -228,7 +228,7 @@ export type ReceivableAgingBucket = 'current' | '1_30' | '31_60' | '61_90' | '90
 export interface CustomerOutstandingParams {
     page?: number;
     per_page?: number;
-    search?: string;
+    customer_id?: number;
     as_of_date?: string;
     aging_bucket?: ReceivableAgingBucket | '';
     currency_code?: string;
