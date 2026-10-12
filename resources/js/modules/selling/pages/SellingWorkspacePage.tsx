@@ -32,9 +32,12 @@ interface SaleDraftLine {
     dimensions: InventoryDimensionValue;
 }
 
-const today = businessDateInputValue();
-
 export default function SellingWorkspacePage() {
+    const { pathname } = useLocation();
+    return <SellingWorkspace key={pathname} />;
+}
+
+function SellingWorkspace() {
     const { id } = useParams();
     const location = useLocation();
     const navigate = useNavigate();
@@ -49,7 +52,7 @@ export default function SellingWorkspacePage() {
     const [warehouse, setWarehouse] = useState<NamedResource | null>(null);
     const [warehouseLocation, setWarehouseLocation] = useState<NamedResource | null>(null);
     const [resolvingSource, setResolvingSource] = useState(false);
-    const [saleDate, setSaleDate] = useState(today);
+    const [saleDate, setSaleDate] = useState(businessDateInputValue);
     const [dueDate, setDueDate] = useState('');
     const [lines, setLines] = useState<SaleDraftLine[]>([]);
     const [sales, setSales] = useState<SaleDocument[]>([]);
@@ -66,16 +69,11 @@ export default function SellingWorkspacePage() {
 
     useEffect(() => {
         const controller = new AbortController();
-        setError(null);
         if (id) {
-            setSale(null);
-            setReturnQuantities({});
-            setReturnReason('');
             void getSale(Number(id), controller.signal)
                 .then((response) => { if (!controller.signal.aborted) setSale(response); })
                 .catch((failure: unknown) => { if (!controller.signal.aborted) setError(toApiError(failure)); });
         } else {
-            setSale(null);
             if (isReturnsPage) {
                 void listSaleReturns({ page, search }, controller.signal)
                     .then((response) => {
@@ -201,7 +199,7 @@ export default function SellingWorkspacePage() {
         setError(null);
         try {
             const updated = await createSaleReturn(sale, {
-                return_date: today,
+                return_date: businessDateInputValue(),
                 reason: returnReason,
                 lines: Object.entries(returnQuantities)
                     .filter(([, quantity]) => Number(quantity) > 0)
@@ -277,7 +275,7 @@ export default function SellingWorkspacePage() {
             <ContentHeader title="Selling Returns" description="Review posted returns and open a sale to process another return." actions={canOpenSalesFromReturns && canCreateReturns ? <Link className="text-sm font-semibold text-sky-700" to="/selling">Find a sale to return</Link> : undefined} />
             <ErrorAlert error={error} />
             <Panel title="Return history">
-                <Input label="Search returns" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="Return number, sale number, or customer" />
+                <Input label="Search returns" value={search} onChange={(event) => { setError(null); setSearch(event.target.value); setPage(1); }} placeholder="Return number, sale number, or customer" />
                 <div className="mt-4">
                     <DataTable rows={returns} rowKey={(row) => row.id} emptyMessage="No returns match this search." columns={[
                         { key: 'number', header: 'Credit note', render: (row) => row.return_number },
@@ -294,8 +292,8 @@ export default function SellingWorkspacePage() {
                 {listMeta && <div className="mt-4 flex items-center justify-between text-sm text-slate-600">
                     <span>{listMeta.total} returns · Page {listMeta.current_page} of {listMeta.last_page}</span>
                     <div className="flex gap-2">
-                        <Button type="button" variant="secondary" disabled={page <= 1} onClick={() => setPage((current) => current - 1)}>Previous</Button>
-                        <Button type="button" variant="secondary" disabled={page >= listMeta.last_page} onClick={() => setPage((current) => current + 1)}>Next</Button>
+                        <Button type="button" variant="secondary" disabled={page <= 1} onClick={() => { setError(null); setPage((current) => current - 1); }}>Previous</Button>
+                        <Button type="button" variant="secondary" disabled={page >= listMeta.last_page} onClick={() => { setError(null); setPage((current) => current + 1); }}>Next</Button>
                     </div>
                 </div>}
             </Panel>
@@ -307,7 +305,7 @@ export default function SellingWorkspacePage() {
             <ContentHeader title="Selling List" description="Find posted sales, review invoices, or open a sale to process a return." actions={<Link className="rounded-md bg-sky-700 px-3 py-2 text-sm font-semibold text-white" to="/selling/create">Create selling</Link>} />
             <ErrorAlert error={error} />
             <Panel title="Sales">
-                <Input label="Search sales" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="Sale number or customer" />
+                <Input label="Search sales" value={search} onChange={(event) => { setError(null); setSearch(event.target.value); setPage(1); }} placeholder="Sale number or customer" />
                 <div className="mt-4">
                     <DataTable rows={sales} rowKey={(row) => row.id} emptyMessage="No sales match this search." columns={[
                         { key: 'sale', header: 'Sale', render: (row) => <Link className="font-medium text-sky-700" to={`/selling/sales/${row.id}`}>{row.sale_number}</Link> },
@@ -321,8 +319,8 @@ export default function SellingWorkspacePage() {
                 {listMeta && <div className="mt-4 flex items-center justify-between text-sm text-slate-600">
                     <span>{listMeta.total} sales · Page {listMeta.current_page} of {listMeta.last_page}</span>
                     <div className="flex gap-2">
-                        <Button type="button" variant="secondary" disabled={page <= 1} onClick={() => setPage((current) => current - 1)}>Previous</Button>
-                        <Button type="button" variant="secondary" disabled={page >= listMeta.last_page} onClick={() => setPage((current) => current + 1)}>Next</Button>
+                        <Button type="button" variant="secondary" disabled={page <= 1} onClick={() => { setError(null); setPage((current) => current - 1); }}>Previous</Button>
+                        <Button type="button" variant="secondary" disabled={page >= listMeta.last_page} onClick={() => { setError(null); setPage((current) => current + 1); }}>Next</Button>
                     </div>
                 </div>}
             </Panel>

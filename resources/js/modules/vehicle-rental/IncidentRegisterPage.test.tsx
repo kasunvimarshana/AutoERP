@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@/shared/api/apiError';
 import IncidentRegisterPage from './IncidentRegisterPage';
@@ -111,6 +111,28 @@ describe('Rental incident evidence register', () => {
         fireEvent.click(screen.getByRole('button', { name: 'View evidence history' }));
         expect(await screen.findByText(/Test Operator/)).toBeInTheDocument();
         expect(incidentHistory).toHaveBeenCalledWith(incident.id, 1, expect.any(AbortSignal));
+    });
+
+    it('ignores late Running Charts from the previously selected assignment', async () => {
+        const otherAssignment = { ...assignment, id: 28, vehicle_label: 'CAR-102' };
+        vi.mocked(listIncidentVehicleUseOptions).mockResolvedValue({ data: [assignment, otherAssignment] });
+        let completeOldCharts!: (value: Awaited<ReturnType<typeof listIncidentRunningCharts>>) => void;
+        vi.mocked(listIncidentRunningCharts)
+            .mockReturnValueOnce(new Promise(resolve => { completeOldCharts = resolve; }))
+            .mockResolvedValueOnce({ data: [{ id: 6, reference: 'RUN-006', status: RunningChartStatus.Draft }] });
+        render(<IncidentRegisterPage />);
+        await screen.findByRole('option', { name: /CAR-101 —/ });
+        fireEvent.change(screen.getByLabelText('Vehicle assignment'), { target: { value: '27' } });
+        await waitFor(() => expect(listIncidentRunningCharts).toHaveBeenCalledOnce());
+        const oldSignal = vi.mocked(listIncidentRunningCharts).mock.calls[0][2];
+
+        fireEvent.change(screen.getByLabelText('Vehicle assignment'), { target: { value: '28' } });
+        expect(await screen.findByRole('option', { name: 'RUN-006 — Draft' })).toBeInTheDocument();
+        await act(async () => completeOldCharts({ data: [{ id: 5, reference: 'RUN-005', status: RunningChartStatus.Draft }] }));
+
+        expect(oldSignal?.aborted).toBe(true);
+        expect(screen.queryByRole('option', { name: 'RUN-005 — Draft' })).not.toBeInTheDocument();
+        expect(screen.getByRole('option', { name: 'RUN-006 — Draft' })).toBeInTheDocument();
     });
 
     it('hides stale results when a later register load fails', async () => {

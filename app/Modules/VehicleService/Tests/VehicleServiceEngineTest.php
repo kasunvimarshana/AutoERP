@@ -70,8 +70,8 @@ use Modules\VehicleService\Services\VehicleServiceInventoryIntegrationService;
 use Modules\VehicleService\Services\VehicleServiceInvoiceIntegrationService;
 use Modules\VehicleService\Services\VehicleServiceJobDiscountService;
 use Modules\VehicleService\Services\VehicleServiceJobService;
-use Modules\VehicleService\Services\VehicleServiceLineService;
 use Modules\VehicleService\Services\VehicleServiceLineItemLookupService;
+use Modules\VehicleService\Services\VehicleServiceLineService;
 use Modules\VehicleService\Services\VehicleServicePaymentIntegrationService;
 use Modules\VehicleService\Services\VehicleServicePaymentOptionService;
 use Modules\VehicleService\Services\VehicleServiceStatusService;
@@ -915,7 +915,8 @@ final class VehicleServiceEngineTest extends TestCase
     {
         $context = $this->context();
         $job = $this->createJob($context);
-        $this->line($job, VehicleServiceLineSourceType::ServiceItem, $context['service'], '1.000000', '20.000000');
+        $line = $this->line($job, VehicleServiceLineSourceType::ServiceItem, $context['service'], '1.000000', '20.000000');
+        $this->assignEmployee($job, $line, new VehicleServiceEmployeeAssignmentData($context['employee_id']));
         $this->changeStatus($job, VehicleServiceJobStatus::Inspected);
         $this->changeStatus($this->refreshJob($job), VehicleServiceJobStatus::InProgress);
         $this->changeStatus($this->refreshJob($job), VehicleServiceJobStatus::Completed);

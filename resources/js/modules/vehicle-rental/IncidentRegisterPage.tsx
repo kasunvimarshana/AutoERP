@@ -13,8 +13,8 @@ import { StatusBadge } from '@/shared/components/StatusBadge';
 import { Textarea } from '@/shared/components/Textarea';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import type { PaginationMeta } from '@/shared/types/pagination';
+import { useApi } from '@/shared/hooks/useApi';
 import { formatBusinessDate } from '@/shared/utils/businessDate';
-import type { IncidentRunningChartOption, IncidentVehicleUseOption } from './incidentEvidence';
 import { CHART_LABELS } from './runningCharts';
 import { IncidentReviewAction, IncidentStatus, IncidentType, INCIDENT_PERMISSION, INCIDENT_TYPE_LABELS, type RentalIncident } from './incidentEvidence';
 import { listIncidentVehicleUseOptions, listIncidentRunningCharts, listRentalIncidents, recordRentalIncident, reviewRentalIncident } from './incidentEvidenceApi';
@@ -35,14 +35,8 @@ export default function IncidentRegisterPage() {
     const [vehicleSearch, setVehicleSearch] = useState('');
     const [query, setQuery] = useState('');
     const [vehiclePage, setVehiclePage] = useState(1);
-    const [uses, setUses] = useState<IncidentVehicleUseOption[]>([]);
-    const [useMeta, setUseMeta] = useState<PaginationMeta>();
-    const [usesLoading, setUsesLoading] = useState(false);
     const [selectedUse, setSelectedUse] = useState('');
     const [chartPage, setChartPage] = useState(1);
-    const [charts, setCharts] = useState<IncidentRunningChartOption[]>([]);
-    const [chartMeta, setChartMeta] = useState<PaginationMeta>();
-    const [chartsLoading, setChartsLoading] = useState(false);
     const [selectedChart, setSelectedChart] = useState('');
     const [type, setType] = useState<IncidentType | ''>('');
     const [occurredOn, setOccurredOn] = useState('');
@@ -51,6 +45,22 @@ export default function IncidentRegisterPage() {
     const [reviewing, setReviewing] = useState<RentalIncident | null>(null);
     const [historyId, setHistoryId] = useState<number | null>(null);
     const [reviewReason, setReviewReason] = useState('');
+    const vehicleUses = useApi(
+        signal => listIncidentVehicleUseOptions(query, vehiclePage, signal),
+        [query, vehiclePage],
+        canRecord,
+    );
+    const runningCharts = useApi(
+        signal => listIncidentRunningCharts(Number(selectedUse), chartPage, signal),
+        [selectedUse, chartPage],
+        canRecord && selectedUse !== '',
+    );
+    const uses = vehicleUses.data?.data ?? [];
+    const useMeta = vehicleUses.data?.meta;
+    const usesLoading = vehicleUses.loading;
+    const charts = runningCharts.data?.data ?? [];
+    const chartMeta = runningCharts.data?.meta;
+    const chartsLoading = runningCharts.loading;
 
     useEffect(() => {
         const controller = new AbortController();
@@ -66,37 +76,6 @@ export default function IncidentRegisterPage() {
             .finally(() => { if (!controller.signal.aborted) setLoading(false); });
         return () => controller.abort();
     }, [page, revision]);
-
-    useEffect(() => {
-        if (!canRecord) return;
-        const controller = new AbortController();
-        setUses([]); setUseMeta(undefined); setUsesLoading(true);
-        listIncidentVehicleUseOptions(query, vehiclePage, controller.signal)
-            .then(result => { if (!controller.signal.aborted) { setUses(result.data); setUseMeta(result.meta); } })
-            .catch(failure => { if (!controller.signal.aborted) setError(toApiError(failure)); })
-            .finally(() => { if (!controller.signal.aborted) setUsesLoading(false); });
-        return () => controller.abort();
-    }, [canRecord, query, vehiclePage]);
-
-    useEffect(() => {
-        setCharts([]);
-        setChartMeta(undefined);
-        if (!canRecord || !selectedUse) {
-            setChartsLoading(false);
-            return;
-        }
-        const controller = new AbortController();
-        setChartsLoading(true);
-        listIncidentRunningCharts(Number(selectedUse), chartPage, controller.signal)
-            .then(result => {
-                if (!controller.signal.aborted) { setCharts(result.data); setChartMeta(result.meta); }
-            })
-            .catch(failure => {
-                if (!controller.signal.aborted) { setCharts([]); setChartMeta(undefined); setError(toApiError(failure)); }
-            })
-            .finally(() => { if (!controller.signal.aborted) setChartsLoading(false); });
-        return () => controller.abort();
-    }, [canRecord, selectedUse, chartPage]);
 
     function reload() { setLoading(true); setRevision(value => value + 1); }
     async function create(event: FormEvent) {
@@ -129,7 +108,7 @@ export default function IncidentRegisterPage() {
 
     return <div className="space-y-5">
         <ContentHeader title="Rental incident evidence" description="Record fuel, toll, repair, damage and other rental evidence. Confirmation verifies the record only; it never creates an invoice, owner deduction or payment." />
-        <ErrorAlert error={error} inline />
+        <ErrorAlert error={error ?? vehicleUses.error ?? runningCharts.error} inline />
         {canRecord && <Panel title="Record new incident">
             <form aria-label="Record rental incident" className="space-y-3" onSubmit={create}>
                 <div className="flex flex-wrap items-end gap-2">

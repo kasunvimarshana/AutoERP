@@ -11,6 +11,10 @@ import { CustomerRelationHeader } from './CustomerRelationHeader';
 
 const empty: CustomerCreditProfile = { credit_limit: '0.000000', credit_period_days: null, warning_threshold_percent: '80.000000', credit_allowed: false, advance_allowed: true, allow_over_credit: false, allow_partial_payment: true, is_active: true };
 export default function CustomerCreditProfileTab({ customerId, canManage }: { customerId: number; canManage: boolean }) {
+    return <CustomerCreditProfileEditor key={customerId} customerId={customerId} canManage={canManage} />;
+}
+
+function CustomerCreditProfileEditor({ customerId, canManage }: { customerId: number; canManage: boolean }) {
     const [form, setForm] = useState<CustomerCreditProfile>(empty);
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
@@ -18,10 +22,6 @@ export default function CustomerCreditProfileTab({ customerId, canManage }: { cu
     const [profileExists, setProfileExists] = useState(false);
     useEffect(() => {
         const controller = new AbortController();
-        setLoading(true);
-        setError(null);
-        setForm(empty);
-        setProfileExists(false);
         getCustomerCreditProfile(customerId, controller.signal).then((profile) => {
             if (controller.signal.aborted) return;
             if (profile) {
