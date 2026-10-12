@@ -223,6 +223,62 @@ export interface AgingReport {
     rows: Array<Record<string, unknown>>;
 }
 
+export type ReceivableAgingBucket = 'current' | '1_30' | '31_60' | '61_90' | '90_plus';
+
+export interface CustomerOutstandingParams {
+    page?: number;
+    per_page?: number;
+    search?: string;
+    as_of_date?: string;
+    aging_bucket?: ReceivableAgingBucket | '';
+    currency_code?: string;
+}
+
+export interface CustomerOutstandingRow {
+    customer: { id: number; name: string; code: string; customer_number: string };
+    currency: { code: string };
+    invoice_count: number;
+    current: string;
+    days_1_30: string;
+    days_31_60: string;
+    days_61_90: string;
+    over_90: string;
+    outstanding_total: string;
+}
+
+export interface CustomerOutstandingReportResult {
+    as_of_date: string;
+    summary: {
+        customer_count: number;
+        overdue_invoice_count: number;
+        totals_by_currency: Array<{
+            currency: { code: string };
+            outstanding_total: string;
+            overdue_total: string;
+        }>;
+    };
+    data: CustomerOutstandingRow[];
+    meta: { current_page: number; from: number | null; last_page: number; per_page: number; to: number | null; total: number };
+}
+
+export interface CustomerOutstandingInvoiceRow {
+    invoice: { id: number; number: string; date: string; due_date: string; status: string };
+    currency: { code: string };
+    invoice_total: string;
+    paid_amount: string;
+    credit_allocated_amount: string;
+    outstanding_amount: string;
+    days_overdue: number;
+}
+
+export interface CustomerOutstandingInvoicesResult {
+    as_of_date: string;
+    customer: CustomerOutstandingRow['customer'] | null;
+    currency: { code: string };
+    data: CustomerOutstandingInvoiceRow[];
+    meta: CustomerOutstandingReportResult['meta'];
+}
+
 export interface BankReconciliation extends Record<string, unknown> {
     id: number;
     statement_reference: string;

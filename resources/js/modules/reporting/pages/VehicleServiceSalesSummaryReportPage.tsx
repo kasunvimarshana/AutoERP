@@ -164,6 +164,7 @@ function StockItemsPanel({ result }: { result: VehicleServiceSalesSummaryResult 
             <div className="mb-3 flex flex-wrap gap-x-5 gap-y-1 text-sm text-slate-600">
                 <span>{formatQuantity(stock.item_count)} item types</span>
                 <span>{formatQuantity(stock.quantity)} units sold</span>
+                <span>Revenue {formatMoney(stock.revenue)}</span>
                 <span>Profit {formatMoney(stock.profit)}</span>
             </div>
             <RankedItemsTable items={stock.items} kind="stock" />
@@ -180,6 +181,7 @@ function ComboItemsPanel({ result }: { result: VehicleServiceSalesSummaryResult 
                 <span>{formatQuantity(combo.item_count)} combo types</span>
                 <span>{formatQuantity(combo.quantity)} combos sold</span>
                 <span>{formatQuantity(combo.component_stock_quantity)} component stock units</span>
+                <span>Revenue {formatMoney(combo.revenue)}</span>
                 <span>Profit {formatMoney(combo.profit)}</span>
             </div>
             <RankedItemsTable items={combo.items} kind="combo" />

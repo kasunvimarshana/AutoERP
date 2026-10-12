@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Route;
 use Modules\Finance\Constants\FinancePermission;
 use Modules\Finance\Http\Controllers\FinanceConfigurationController;
 use Modules\Finance\Http\Controllers\FinanceController;
+use Modules\Finance\Http\Controllers\CustomerOutstandingReportController;
 
 $middleware = [
     'api',
@@ -84,6 +85,11 @@ Route::prefix('api/v1/finance')->middleware($middleware)->name('api.v1.finance.'
         Route::get('balance-sheet', [FinanceController::class, 'balanceSheet'])->name('balance-sheet');
         Route::get('cash-flow', [FinanceController::class, 'cashFlow'])->name('cash-flow');
         Route::get('ar-aging', [FinanceController::class, 'arAging'])->name('ar-aging');
+        Route::get('customer-outstanding', [CustomerOutstandingReportController::class, 'index'])->name('customer-outstanding.index');
+        Route::get('customer-outstanding/export', [CustomerOutstandingReportController::class, 'export'])->name('customer-outstanding.export');
+        Route::get('customer-outstanding/{customer}/invoices', [CustomerOutstandingReportController::class, 'invoices'])
+            ->whereNumber('customer')
+            ->name('customer-outstanding.invoices');
         Route::get('ap-aging', [FinanceController::class, 'apAging'])->name('ap-aging');
         Route::get('tax-liability', [FinanceController::class, 'taxLiability'])->name('tax-liability');
         Route::get('tax-reconciliation', [FinanceController::class, 'taxReconciliation'])->name('tax-reconciliation');

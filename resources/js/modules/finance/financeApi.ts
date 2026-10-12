@@ -11,6 +11,9 @@ import type {
     BankReconciliationPayload,
     Budget,
     BudgetPayload,
+    CustomerOutstandingParams,
+    CustomerOutstandingReportResult,
+    CustomerOutstandingInvoicesResult,
     FinanceAccount,
     FinanceAccountAssignment,
     FinanceAccountRole,
@@ -147,6 +150,31 @@ export async function getCashFlow(params: ListParams, signal?: AbortSignal) {
 export async function getArAging(params: ListParams, signal?: AbortSignal) {
     const response = await apiClient.get<ApiResource<AgingReport>>(`${endpoints.finance}/ar-aging`, { params, signal });
     return response.data.data;
+}
+
+export async function getCustomerOutstanding(params: CustomerOutstandingParams, signal?: AbortSignal) {
+    const response = await apiClient.get<CustomerOutstandingReportResult>(`${endpoints.finance}/customer-outstanding`, { params, signal });
+    return response.data;
+}
+
+export async function getCustomerOutstandingInvoices(
+    customerId: number,
+    params: CustomerOutstandingParams,
+    signal?: AbortSignal,
+) {
+    const response = await apiClient.get<CustomerOutstandingInvoicesResult>(
+        `${endpoints.finance}/customer-outstanding/${customerId}/invoices`,
+        { params, signal },
+    );
+    return response.data;
+}
+
+export async function downloadCustomerOutstandingCsv(params: CustomerOutstandingParams) {
+    const response = await apiClient.get<Blob>(`${endpoints.finance}/customer-outstanding/export`, {
+        params,
+        responseType: 'blob',
+    });
+    return response.data;
 }
 
 export async function getApAging(params: ListParams, signal?: AbortSignal) {

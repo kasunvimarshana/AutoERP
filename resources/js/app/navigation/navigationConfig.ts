@@ -991,6 +991,17 @@ export const tenantNavigationSections: NavigationSection[] = [
                         },
                     },
                     {
+                        id: "customer-outstanding-report",
+                        type: "link",
+                        label: "Customer Outstanding",
+                        to: "/reports/customer-outstanding",
+                        match: ["/reports/customer-outstanding"],
+                        access: {
+                            ...operationalAccess(["reporting", "finance"]),
+                            permissions: [reportingPermissions.view, financePermissions.reportsView],
+                        },
+                    },
+                    {
                         id: "all-reports",
                         type: "link",
                         label: "All Reports",

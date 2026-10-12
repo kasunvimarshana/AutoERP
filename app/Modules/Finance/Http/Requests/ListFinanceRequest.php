@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Modules\Finance\Http\Requests;
 
 use Modules\Core\Http\Requests\TenantScopedRequest;
+use Modules\Finance\Enums\ReceivableAgingBucket;
+use Illuminate\Validation\Rule;
 
 final class ListFinanceRequest extends TenantScopedRequest
 {
@@ -19,6 +21,9 @@ final class ListFinanceRequest extends TenantScopedRequest
             'account_id' => ['nullable', 'integer', 'min:1'],
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
+            'as_of_date' => ['nullable', 'date', 'before_or_equal:today'],
+            'aging_bucket' => ['nullable', Rule::enum(ReceivableAgingBucket::class)],
+            'currency_code' => ['nullable', 'string', 'size:3'],
             'status' => ['nullable', 'string', 'max:30'],
             'journal_type' => ['nullable', 'string', 'max:30'],
             'source_module' => ['nullable', 'string', 'max:100'],
