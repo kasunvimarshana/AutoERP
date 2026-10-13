@@ -10,7 +10,7 @@ import { Textarea } from '@/shared/components/Textarea';
 import type { NamedResource } from '@/shared/types/common';
 import { createManualSupplierReturn, type ManualPurchaseReturnPayload } from '../purchaseApi';
 import { decimalOr, todayDate } from '../purchaseFormUtils';
-import { ItemLookupSelect, SupplierLookupSelect, UomLookupSelect, WarehouseLocationLookupSelect, WarehouseLookupSelect } from './PurchaseLookups';
+import { CurrencyLookupSelect, ItemLookupSelect, SupplierLookupSelect, UomLookupSelect, WarehouseLocationLookupSelect, WarehouseLookupSelect } from './PurchaseLookups';
 
 interface ManualReturnLineState {
     clientLineKey: string;
@@ -35,6 +35,7 @@ function newLine(): ManualReturnLineState {
 export function ManualSupplierReturnForm() {
     const navigate = useNavigate();
     const [supplier, setSupplier] = useState<NamedResource | null>(null);
+    const [currency, setCurrency] = useState<NamedResource | null>(null);
     const [warehouse, setWarehouse] = useState<NamedResource | null>(null);
     const [warehouseLocation, setWarehouseLocation] = useState<NamedResource | null>(null);
     const [returnDate, setReturnDate] = useState(todayDate());
@@ -49,6 +50,7 @@ export function ManualSupplierReturnForm() {
         warehouse_id: warehouse?.id ?? 0,
         warehouse_location_id: warehouseLocation?.id,
         supplier_id: supplier?.id,
+        currency_id: currency?.id ?? 0,
         reason,
         return_type: 'manual_supplier_return',
         cost_basis: lines[0]?.costBasis ? decimalOr(lines[0].costBasis) : undefined,
@@ -94,6 +96,7 @@ export function ManualSupplierReturnForm() {
             <Panel title="Manual supplier return">
                 <div className="grid gap-4 md:grid-cols-3">
                     <SupplierLookupSelect value={supplier} onChange={setSupplier} error={errorFor('supplier_id')} />
+                    <CurrencyLookupSelect value={currency} onChange={setCurrency} error={errorFor('currency_id')} required />
                     <WarehouseLookupSelect value={warehouse} onChange={(value) => { setWarehouse(value); setWarehouseLocation(null); }} error={errorFor('warehouse_id')} />
                     <WarehouseLocationLookupSelect warehouseId={warehouse?.id ?? null} value={warehouseLocation} onChange={setWarehouseLocation} error={errorFor('warehouse_location_id')} />
                     <Input label="Return date" type="date" value={returnDate} error={errorFor('return_date')} onChange={(event) => setReturnDate(event.target.value)} />
