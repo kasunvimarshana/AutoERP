@@ -830,16 +830,16 @@ final class PurchaseEngineTest extends TestCase
         // No implicit conversion or fallback for unresolved historic currencies.
         $otherCurrencyId = CurrencyFixture::create();
         $this->withTenantExecutionContext($tenantId, function () use ($note, $invoice, $otherCurrencyId, $currencyId): void {
-            $note->currency_id = null;
-            $note->save();
+            DB::table('purchase_debit_notes')->where('id', $note->getKey())->update(['currency_id' => null]);
+            $note->refresh();
             try {
                 app(PurchaseDebitNoteService::class)->allocate($note, $invoice, '1.000000');
                 self::fail('Allocated an unresolved historical debit note.');
             } catch (InvalidArgumentException $error) {
                 self::assertSame('Purchase debit note and supplier invoice must have verified currencies before allocation.', $error->getMessage());
             } finally {
-                $note->currency_id = $currencyId;
-                $note->save();
+                DB::table('purchase_debit_notes')->where('id', $note->getKey())->update(['currency_id' => $currencyId]);
+                $note->refresh();
             }
 
             $invoice->currency_id = $otherCurrencyId;
@@ -856,6 +856,18 @@ final class PurchaseEngineTest extends TestCase
         });
         $this->assertSame('12.000000', (string) $note->refresh()->remaining_amount);
         $this->assertSame('49192.000000', (string) $invoice->refresh()->balance_due);
+
+        $this->withTenantExecutionContext($tenantId, function () use ($note, $otherCurrencyId): void {
+            try {
+                $note->currency_id = $otherCurrencyId;
+                $note->save();
+                self::fail('Allowed persisted debit note currency to be rewritten.');
+            } catch (\LogicException $error) {
+                self::assertSame('Purchase financial document currency cannot change after creation.', $error->getMessage());
+            } finally {
+                $note->refresh();
+            }
+        });
 
         // A supplier identifier is not sufficient: a purchase debit note must not
         // reduce the balance of an outbound document, even if its party matches.
