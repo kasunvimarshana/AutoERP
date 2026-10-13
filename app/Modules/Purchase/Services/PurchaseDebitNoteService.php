@@ -91,9 +91,20 @@ final class PurchaseDebitNoteService
         if ((int) $purchaseReturn->tenant_id !== $data->tenantId
             || $returnOrganizationUnitId !== $data->organizationUnitId
             || (int) $purchaseReturn->supplier_id !== $data->supplierId
-            || (string) $purchaseReturn->supplier_type !== (string) ($data->supplierType ?? 'supplier')
+            || (string) $purchaseReturn->supplier_type !== InvoicePartyType::Supplier->value
         ) {
             throw new InvalidArgumentException('Purchase debit note source return is outside the debit note scope.');
+        }
+
+        // A purchase return owns a single debit note, including one retained as
+        // historical evidence after soft deletion. The database unique constraint
+        // is authoritative for concurrent creators.
+        if (PurchaseDebitNote::withTrashed()
+            ->where('tenant_id', $data->tenantId)
+            ->where('purchase_return_id', $data->purchaseReturnId)
+            ->exists()
+        ) {
+            throw new InvalidArgumentException('Purchase return already has a debit note.');
         }
     }
 
