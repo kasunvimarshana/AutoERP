@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Invoice\Enums\InvoiceDirection;
+use Modules\Invoice\Enums\InvoicePartyType;
 use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Models\Invoice;
 use Modules\Invoice\Services\InvoiceBalanceService;
@@ -40,7 +41,7 @@ final class PurchaseDebitNoteService
         if ($data->supplierId === null) {
             throw new InvalidArgumentException('Purchase debit note supplier is required.');
         }
-        if ($data->supplierType !== 'supplier') {
+        if ($data->supplierType !== null && $data->supplierType !== InvoicePartyType::Supplier->value) {
             throw new InvalidArgumentException('Purchase debit notes must reference a supplier party.');
         }
         if (trim((string) $data->reason) === '') {
@@ -53,7 +54,7 @@ final class PurchaseDebitNoteService
         return PurchaseDebitNote::query()->create([
             'tenant_id' => $data->tenantId,
             'organization_unit_id' => $data->organizationUnitId,
-            'supplier_type' => $data->supplierType,
+            'supplier_type' => InvoicePartyType::Supplier->value,
             'supplier_id' => $data->supplierId,
             'purchase_return_id' => $data->purchaseReturnId,
             'source_type' => $data->sourceType,
@@ -207,7 +208,7 @@ final class PurchaseDebitNoteService
         }
 
         if ((int) $note->supplier_id !== (int) $invoice->party_id
-            || (string) $invoice->party_type !== 'supplier'
+            || (string) $invoice->party_type !== InvoicePartyType::Supplier->value
         ) {
             throw new InvalidArgumentException('Purchase debit note and invoice supplier does not match.');
         }
@@ -215,7 +216,7 @@ final class PurchaseDebitNoteService
         if ($invoice->direction !== InvoiceDirection::Inbound) {
             throw new InvalidArgumentException('Purchase debit notes can only be allocated to inbound supplier invoices.');
         }
-        if ($note->supplier_type !== 'supplier') {
+        if ($note->supplier_type !== InvoicePartyType::Supplier->value) {
             throw new InvalidArgumentException('Purchase debit note supplier type does not match the invoice party.');
         }
 
