@@ -1272,6 +1272,7 @@ final class PurchaseOrderApiTest extends TestCase
     {
         return array_replace_recursive([
             'tenant_id' => $context['tenant_id'],
+            'currency_id' => CurrencyFixture::create(),
             'organization_unit_id' => $context['organization_unit_id'],
             'return_date' => '2026-06-19',
             'return_type' => 'manual_supplier_return',
