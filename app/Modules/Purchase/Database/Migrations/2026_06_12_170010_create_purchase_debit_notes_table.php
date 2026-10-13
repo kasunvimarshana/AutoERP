@@ -17,6 +17,7 @@ return new class extends Migration
             $table->foreignId('organization_unit_id')->nullable();
             $table->string('supplier_type')->nullable();
             $table->unsignedBigInteger('supplier_id')->nullable();
+            $table->unsignedBigInteger('currency_id')->nullable();
             $table->foreignId('purchase_return_id')->nullable();
             $table->string('source_type')->nullable();
             $table->unsignedBigInteger('source_id')->nullable();
