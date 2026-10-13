@@ -46,6 +46,8 @@ export interface PurchaseReturnLine {
 
 export interface PurchaseReturn {
     id: number;
+    currency_id?: number | null;
+    currency?: NamedResource | null;
     row_version: number;
     return_number?: string;
     return_date?: string;
@@ -91,6 +93,7 @@ export interface ReferencedPurchaseReturnPayload {
 
 export interface ManualPurchaseReturnPayload {
     return_date: string;
+    currency_id: number;
     warehouse_id: number;
     warehouse_location_id?: number;
     supplier_id?: number;
