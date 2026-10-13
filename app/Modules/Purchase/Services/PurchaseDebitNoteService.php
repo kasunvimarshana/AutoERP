@@ -40,6 +40,9 @@ final class PurchaseDebitNoteService
         if ($data->supplierId === null) {
             throw new InvalidArgumentException('Purchase debit note supplier is required.');
         }
+        if ($data->supplierType !== 'supplier') {
+            throw new InvalidArgumentException('Purchase debit notes must reference a supplier party.');
+        }
         if (trim((string) $data->reason) === '') {
             throw new InvalidArgumentException('Purchase debit note reason is required.');
         }
@@ -211,6 +214,9 @@ final class PurchaseDebitNoteService
 
         if ($invoice->direction !== InvoiceDirection::Inbound) {
             throw new InvalidArgumentException('Purchase debit notes can only be allocated to inbound supplier invoices.');
+        }
+        if ($note->supplier_type !== 'supplier') {
+            throw new InvalidArgumentException('Purchase debit note supplier type does not match the invoice party.');
         }
 
         if (! in_array($invoiceStatus, [InvoiceStatus::Posted, InvoiceStatus::PartiallyPaid], true)) {
