@@ -65,7 +65,7 @@ export default function PurchaseDebitNoteDetailPage() {
                     { label: 'Workflow', value: <StatusBadge status={note.status} /> },
                     { label: 'Allocation', value: note.allocation_status?.replaceAll('_', ' ') ?? '-' },
                     { label: 'Supplier', value: note.supplier?.name ?? '-' },
-                    { label: 'Currency', value: note.currency?.code ?? (note.currency_id ? `#${note.currency_id}` : 'Unresolved — allocation blocked') },
+                    { label: 'Currency', value: note.currency?.code ?? (note.currency_id ? 'Currency code unavailable' : 'Unresolved — allocation blocked') },
                     { label: 'Amount', value: formatMoney(note.amount) },
                     { label: 'Allocated', value: formatMoney(note.allocated_amount) },
                     { label: 'Remaining', value: formatMoney(note.remaining_amount) },
