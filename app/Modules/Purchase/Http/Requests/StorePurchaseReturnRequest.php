@@ -20,6 +20,7 @@ final class StorePurchaseReturnRequest extends PurchaseRequest
             'return_number' => ['nullable', 'string', 'max:100'],
             'supplier_type' => ['prohibited'],
             'supplier_id' => ['prohibited'],
+            'currency_id' => ['prohibited'],
             'reason' => ['nullable', 'string', 'max:1000'],
             'return_type' => ['nullable', 'in:referenced'],
             'source_type' => ['prohibited'],
