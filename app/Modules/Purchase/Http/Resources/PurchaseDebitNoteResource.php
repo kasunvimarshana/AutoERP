@@ -22,6 +22,8 @@ final class PurchaseDebitNoteResource extends PurchaseResource
             'capabilities' => $this->arrayAttribute('capabilities'),
             'supplier_type' => $this->supplier_type,
             'supplier_id' => $this->supplier_id,
+            'currency_id' => $this->currency_id,
+            'currency' => $this->whenLoaded('currency', fn () => $this->summary($this->currency, ['code', 'name', 'symbol'])),
             'supplier' => $this->whenLoaded('supplier', fn () => $this->summary($this->supplier, ['supplier_number', 'code', 'name', 'display_name'])),
             'purchase_return_id' => $this->purchase_return_id,
             'purchase_return' => $this->whenLoaded('purchaseReturn', fn () => $this->summary($this->purchaseReturn, ['return_number', 'return_date', 'status'])),
