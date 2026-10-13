@@ -50,7 +50,7 @@ export default function PurchaseDebitNoteDetailPage() {
                 actions={<div className="flex gap-2">
                     {capabilities.can_approve && can(purchasePermissions.debitNotesApprove) && <Button loading={busy} onClick={() => void runAction('approve')}>Approve</Button>}
                     {capabilities.can_post && can(purchasePermissions.debitNotesPost) && <Button loading={busy} onClick={() => void runAction('post')}>Post</Button>}
-                    {capabilities.can_allocate && can(purchasePermissions.debitNotesAllocate) && compareDecimalStrings(note.remaining_amount ?? '0', '0') > 0 && <Button disabled={busy} onClick={() => {
+                    {capabilities.can_allocate && note.currency_id && can(purchasePermissions.debitNotesAllocate) && compareDecimalStrings(note.remaining_amount ?? '0', '0') > 0 && <Button disabled={busy} onClick={() => {
                         setError(null);
                         setInvoice(null);
                         setAmount(note.remaining_amount ?? '0.000000');
@@ -65,6 +65,7 @@ export default function PurchaseDebitNoteDetailPage() {
                     { label: 'Workflow', value: <StatusBadge status={note.status} /> },
                     { label: 'Allocation', value: note.allocation_status?.replaceAll('_', ' ') ?? '-' },
                     { label: 'Supplier', value: note.supplier?.name ?? '-' },
+                    { label: 'Currency', value: note.currency?.code ?? (note.currency_id ? `#${note.currency_id}` : 'Unresolved — allocation blocked') },
                     { label: 'Amount', value: formatMoney(note.amount) },
                     { label: 'Allocated', value: formatMoney(note.allocated_amount) },
                     { label: 'Remaining', value: formatMoney(note.remaining_amount) },
