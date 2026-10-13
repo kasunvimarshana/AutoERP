@@ -237,6 +237,23 @@ final class PurchaseOrderApiTest extends TestCase
             ->assertJsonValidationErrors(['expected_version']);
     }
 
+    public function test_manual_purchase_debit_note_rejects_non_supplier_party_type(): void
+    {
+        $context = $this->context();
+
+        $this->withAuth($context)->postJson('/api/v1/purchase/debit-notes', [
+            'tenant_id' => $context['tenant_id'],
+            'organization_unit_id' => $context['organization_unit_id'],
+            'debit_note_date' => '2026-06-10',
+            'supplier_type' => 'customer',
+            'supplier_id' => $context['supplier_id'],
+            'amount' => '10.000000',
+            'reason' => 'Invalid party discriminator',
+        ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['supplier_type']);
+    }
+
     public function test_manual_purchase_debit_note_rejects_client_source_fields(): void
     {
         $context = $this->context();
