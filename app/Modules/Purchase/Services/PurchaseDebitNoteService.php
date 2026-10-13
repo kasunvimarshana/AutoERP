@@ -134,6 +134,9 @@ final class PurchaseDebitNoteService
         if ($data->currencyId !== null) {
             throw new InvalidArgumentException('Purchase return debit note currency is determined by the source.');
         }
+        if ($purchaseReturn->currency_id !== null) {
+            return (int) $purchaseReturn->currency_id;
+        }
         if ((string) $purchaseReturn->source_type !== 'goods_receipt_note' || $purchaseReturn->source_id === null) {
             return null;
         }
