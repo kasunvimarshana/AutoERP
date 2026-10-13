@@ -11,6 +11,7 @@ use Modules\Core\Models\TenantOwnedModel;
 use Modules\Purchase\Enums\PurchaseReturnStatus;
 use Modules\Purchase\Enums\PurchaseReturnType;
 use Modules\Purchase\Models\Concerns\HasPurchaseRowVersion;
+use Modules\ReferenceData\Models\CurrencyModel;
 use Modules\Supplier\Models\Supplier;
 use Modules\Warehouse\Models\WarehouseLocationModel;
 use Modules\Warehouse\Models\WarehouseModel;
@@ -31,6 +32,7 @@ final class PurchaseReturn extends TenantOwnedModel
             'row_version' => 'integer',
             'organization_unit_id' => 'integer',
             'supplier_id' => 'integer',
+            'currency_id' => 'integer',
             'warehouse_id' => 'integer',
             'warehouse_location_id' => 'integer',
             'return_date' => 'date',
@@ -55,6 +57,11 @@ final class PurchaseReturn extends TenantOwnedModel
         return $this->hasMany(PurchaseReturnLine::class, 'purchase_return_id')
             ->orderBy('line_number')
             ->orderBy('id');
+    }
+
+    public function currency(): BelongsTo
+    {
+        return $this->belongsTo(CurrencyModel::class, 'currency_id');
     }
 
     public function supplier(): BelongsTo
