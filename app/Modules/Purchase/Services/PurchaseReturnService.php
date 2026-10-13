@@ -78,7 +78,15 @@ final class PurchaseReturnService
             }
 
             $sourceHeader = $referenced['header'] ?? null;
-            $sourceCurrencyId = $sourceHeader?->purchaseOrder?->currency_id;
+            $sourceOrder = $sourceHeader?->purchaseOrder;
+            if ($sourceOrder !== null
+                && ((int) $sourceOrder->tenant_id !== $data->tenantId
+                    || $sourceOrder->organization_unit_id !== $data->organizationUnitId
+                    || (int) $sourceOrder->supplier_id !== (int) $sourceHeader->supplier_id)
+            ) {
+                throw new InvalidArgumentException('Purchase return source order is outside the receipt scope.');
+            }
+            $sourceCurrencyId = $sourceOrder?->currency_id;
             $currencyId = $data->returnType === PurchaseReturnType::ManualSupplierReturn
                 ? $data->currencyId
                 : ($sourceCurrencyId === null ? null : (int) $sourceCurrencyId);
