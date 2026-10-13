@@ -7,6 +7,7 @@ namespace Modules\Purchase\Models;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use LogicException;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\Purchase\Enums\PurchaseReturnStatus;
 use Modules\Purchase\Enums\PurchaseReturnType;
@@ -22,6 +23,15 @@ final class PurchaseReturn extends TenantOwnedModel
     use SoftDeletes;
 
     protected $table = 'purchase_returns';
+
+    protected static function booted(): void
+    {
+        static::updating(static function (self $document): void {
+            if ($document->isDirty('currency_id')) {
+                throw new LogicException('Purchase financial document currency cannot change after creation.');
+            }
+        });
+    }
 
     protected $guarded = ['id'];
 
