@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Modules\Core\Models\TenantOwnedModel;
 use Modules\Purchase\Enums\PurchaseDebitNoteStatus;
+use Modules\ReferenceData\Models\CurrencyModel;
 use Modules\Purchase\Models\Concerns\HasPurchaseRowVersion;
 use Modules\Supplier\Models\Supplier;
 
@@ -27,6 +28,7 @@ final class PurchaseDebitNote extends TenantOwnedModel
             'row_version' => 'integer',
             'organization_unit_id' => 'integer',
             'supplier_id' => 'integer',
+            'currency_id' => 'integer',
             'purchase_return_id' => 'integer',
             'source_id' => 'integer',
             'debit_note_date' => 'date',
@@ -41,6 +43,11 @@ final class PurchaseDebitNote extends TenantOwnedModel
     public function purchaseReturn(): BelongsTo
     {
         return $this->belongsTo(PurchaseReturn::class, 'purchase_return_id');
+    }
+
+    public function currency(): BelongsTo
+    {
+        return $this->belongsTo(CurrencyModel::class, 'currency_id');
     }
 
     public function supplier(): BelongsTo
