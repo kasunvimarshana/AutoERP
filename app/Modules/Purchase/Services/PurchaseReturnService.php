@@ -71,10 +71,17 @@ final class PurchaseReturnService
                     );
                 }
             } else {
+                if ($data->currencyId !== null) {
+                    throw new InvalidArgumentException('Referenced purchase return currency is source controlled.');
+                }
                 $referenced = $this->resolveReferencedSource($data, lockSources: true);
             }
 
             $sourceHeader = $referenced['header'] ?? null;
+            $sourceCurrencyId = $sourceHeader?->purchaseOrder?->currency_id;
+            $currencyId = $data->returnType === PurchaseReturnType::ManualSupplierReturn
+                ? $data->currencyId
+                : ($sourceCurrencyId === null ? null : (int) $sourceCurrencyId);
             $headerCostBasis = $data->returnType === PurchaseReturnType::ManualSupplierReturn
                 ? ($data->costBasis ?? $this->firstManualLineCostBasis($data))
                 : null;
@@ -87,6 +94,7 @@ final class PurchaseReturnService
                 'supplier_id' => $data->returnType === PurchaseReturnType::ManualSupplierReturn
                     ? $data->supplierId
                     : $sourceHeader?->supplier_id,
+                'currency_id' => $currencyId,
                 'warehouse_id' => $data->returnType === PurchaseReturnType::ManualSupplierReturn
                     ? $data->warehouseId
                     : $sourceHeader?->warehouse_id,
@@ -870,6 +878,9 @@ final class PurchaseReturnService
         if ($data->supplierId === null) {
             throw new InvalidArgumentException('Unreferenced supplier return requires supplier.');
         }
+        if ($data->currencyId === null) {
+            throw new InvalidArgumentException('Unreferenced supplier return requires explicit currency.');
+        }
         if ($data->supplierType !== null && $data->supplierType !== 'supplier') {
             throw new InvalidArgumentException('Unreferenced supplier return supplier type is not supported.');
         }
@@ -878,6 +889,7 @@ final class PurchaseReturnService
         }
 
         $this->validator->supplier($data->tenantId, $data->organizationUnitId, $data->supplierId, 'supplier_id');
+        $this->validator->currency($data->tenantId, $data->organizationUnitId, $data->currencyId);
         if ($data->costBasis !== null) {
             $this->validator->assertNonNegative($data->costBasis, 'Unreferenced supplier return cost basis cannot be negative.');
         }
