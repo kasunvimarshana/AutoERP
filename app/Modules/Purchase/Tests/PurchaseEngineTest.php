@@ -806,6 +806,22 @@ final class PurchaseEngineTest extends TestCase
         $this->assertSame('12.000000', (string) $note->remaining_amount);
         $this->assertSame('49192.000000', (string) $invoice->refresh()->balance_due);
 
+        // A Purchase-owned debit note cannot masquerade as another party type,
+        // even when the supplied numeric supplier ID exists.
+        try {
+            $this->createDebitNote(new CreatePurchaseDebitNoteData(
+                tenantId: $tenantId,
+                debitNoteDate: '2026-06-09',
+                amount: '1.000000',
+                supplierType: 'customer',
+                supplierId: $supplierId,
+                reason: 'Invalid party discriminator',
+            ));
+            self::fail('Accepted a purchase debit note for a non-supplier party.');
+        } catch (InvalidArgumentException $error) {
+            self::assertSame('Purchase debit notes must reference a supplier party.', $error->getMessage());
+        }
+
         // A supplier identifier is not sufficient: a purchase debit note must not
         // reduce the balance of an outbound document, even if its party matches.
         $this->withTenantExecutionContext($tenantId, function () use ($invoice, $note): void {
@@ -820,6 +836,24 @@ final class PurchaseEngineTest extends TestCase
                 );
             } finally {
                 $invoice->forceFill(['direction' => InvoiceDirection::Inbound])->save();
+            }
+        });
+        $this->assertSame('12.000000', (string) $note->refresh()->remaining_amount);
+        $this->assertSame('49192.000000', (string) $invoice->refresh()->balance_due);
+
+        // Protect the allocation boundary even for a previously persisted,
+        // inconsistent note: no invoice credit may be applied.
+        $this->withTenantExecutionContext($tenantId, function () use ($note, $invoice): void {
+            $note->supplier_type = 'customer';
+            $note->save();
+            try {
+                app(PurchaseDebitNoteService::class)->allocate($note, $invoice, '1.000000');
+                self::fail('Allocated a debit note with a mismatched party type.');
+            } catch (InvalidArgumentException $error) {
+                self::assertSame('Purchase debit note supplier type does not match the invoice party.', $error->getMessage());
+            } finally {
+                $note->supplier_type = 'supplier';
+                $note->save();
             }
         });
         $this->assertSame('12.000000', (string) $note->refresh()->remaining_amount);
