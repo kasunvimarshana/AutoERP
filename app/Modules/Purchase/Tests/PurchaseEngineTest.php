@@ -949,6 +949,46 @@ final class PurchaseEngineTest extends TestCase
         $this->assertSame(PurchaseDebitNoteStatus::Draft, $note->status);
         $this->assertSame('9840.000000', (string) $note->amount);
         $this->assertSame(1, $returnMovementCount);
+
+        // Replaying the same source return cannot create a second financial note.
+        $this->withTenantExecutionContext($tenantId, function () use ($tenantId, $return, $note): void {
+            try {
+                app(PurchaseDebitNoteService::class)->create(new CreatePurchaseDebitNoteData(
+                    tenantId: $tenantId,
+                    debitNoteDate: '2026-06-07',
+                    amount: '1.000000',
+                    supplierType: 'supplier',
+                    supplierId: (int) $note->supplier_id,
+                    purchaseReturnId: (int) $return->getKey(),
+                    sourceType: PurchaseDebitNoteService::SOURCE_PURCHASE_RETURN,
+                    sourceId: (int) $return->getKey(),
+                    reason: 'Duplicate return credit',
+                ));
+                self::fail('Duplicate purchase return debit note was accepted.');
+            } catch (InvalidArgumentException $error) {
+                self::assertSame('Purchase return already has a debit note.', $error->getMessage());
+            }
+        });
+
+        $this->assertSame(1, $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): int => PurchaseDebitNote::query()->where('purchase_return_id', $return->getKey())->count(),
+        ));
+
+        // The unique index must also reject concurrent/direct writes that skip
+        // the service-level check. Manual notes with no source remain possible.
+        $this->expectException(\Illuminate\Database\QueryException::class);
+        DB::table('purchase_debit_notes')->insert([
+            'tenant_id' => $tenantId,
+            'purchase_return_id' => $return->getKey(),
+            'supplier_type' => 'supplier',
+            'supplier_id' => $note->supplier_id,
+            'debit_note_number' => 'DUP-'.$note->debit_note_number,
+            'debit_note_date' => '2026-06-07',
+            'status' => PurchaseDebitNoteStatus::Draft->value,
+            'amount' => '1.000000',
+            'remaining_amount' => '1.000000',
+        ]);
     }
 
     public function test_purchase_return_rejects_mixed_grn_lines_and_ignores_spoofed_supplier(): void
