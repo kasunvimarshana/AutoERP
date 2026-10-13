@@ -942,6 +942,11 @@ final class PurchaseEngineTest extends TestCase
     {
         [$tenantId, $warehouseId, $item] = $this->purchaseContext();
         $order = $this->createAdjustedOrder($tenantId, $warehouseId, $item);
+        $sourceCurrencyId = CurrencyFixture::create();
+        $this->withTenantExecutionContext($tenantId, function () use ($order, $sourceCurrencyId): void {
+            $order->currency_id = $sourceCurrencyId;
+            $order->save();
+        });
         [$grn] = $this->receiveOrderInTwoParts($order, $warehouseId, $item);
         $line = $grn->lines->first();
 
@@ -982,6 +987,7 @@ final class PurchaseEngineTest extends TestCase
         $this->assertSame(1, $debitNoteCount);
         $this->assertSame(PurchaseDebitNoteStatus::Draft, $note->status);
         $this->assertSame('9840.000000', (string) $note->amount);
+        $this->assertSame($sourceCurrencyId, $note->currency_id);
         $this->assertSame(1, $returnMovementCount);
 
         // Replaying the same source return cannot create a second financial note.
