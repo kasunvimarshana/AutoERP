@@ -7,9 +7,10 @@ namespace Modules\Finance\Services;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
-use Modules\Customer\Models\Customer;
 use Modules\Finance\Enums\ReceivableAgingBucket;
 use Modules\Finance\Http\Requests\CustomerOutstandingReportRequest;
+use Modules\Invoice\Enums\InvoicePartyType;
+use Modules\VehicleService\Enums\VehicleServiceInvoiceSettlementMode;
 
 final class CustomerOutstandingReportService
 {
@@ -65,6 +66,31 @@ final class CustomerOutstandingReportService
                 'balances.remaining_amount',
                 'invoices.currency_code_snapshot',
             ])
+            ->selectSub(
+                DB::table('invoice_sources')
+                    ->select('source_document_number')
+                    ->whereColumn('invoice_sources.invoice_id', 'invoices.id')
+                    ->whereColumn('invoice_sources.tenant_id', 'invoices.tenant_id')
+                    ->where('invoice_sources.source_type', 'vehicle_service_job')
+                    ->limit(1),
+                'service_job_number',
+            )
+            ->selectSub(
+                DB::table('vehicle_service_invoice_links')
+                    ->selectRaw('COUNT(*)')
+                    ->whereColumn('vehicle_service_invoice_links.invoice_id', 'invoices.id')
+                    ->whereColumn('vehicle_service_invoice_links.tenant_id', 'invoices.tenant_id')
+                    ->where('vehicle_service_invoice_links.settlement_mode', VehicleServiceInvoiceSettlementMode::Credit->value),
+                'confirmed_service_credit_count',
+            )
+            ->selectSub(
+                DB::table('invoice_document_snapshots')
+                    ->selectRaw('COUNT(*)')
+                    ->whereColumn('invoice_document_snapshots.invoice_id', 'invoices.id')
+                    ->whereColumn('invoice_document_snapshots.tenant_id', 'invoices.tenant_id')
+                    ->whereRaw('LOWER(invoice_document_snapshots.payment_mode) = ?', ['credit']),
+                'confirmed_document_credit_count',
+            )
             ->orderByRaw(self::DUE_DATE_EXPRESSION)
             ->orderBy('invoices.invoice_number');
 
@@ -76,6 +102,11 @@ final class CustomerOutstandingReportService
                 'date' => CarbonImmutable::parse($row->invoice_date)->toDateString(),
                 'due_date' => CarbonImmutable::parse($row->due_date ?? $row->invoice_date)->toDateString(),
                 'status' => (string) $row->invoice_status,
+                'service_job_number' => $row->service_job_number === null ? null : (string) $row->service_job_number,
+                'credit_basis' => (int) $row->confirmed_service_credit_count > 0
+                    || (int) $row->confirmed_document_credit_count > 0
+                    ? 'confirmed'
+                    : 'historical_inferred',
             ],
             'currency' => ['code' => $row->currency_code_snapshot ?: 'N/A'],
             'invoice_total' => (string) $row->grand_total,
@@ -124,11 +155,55 @@ final class CustomerOutstandingReportService
                     ->on('customers.tenant_id', '=', 'invoices.tenant_id');
             })
             ->where('balances.tenant_id', $request->tenantId())
-            ->where('invoices.party_type', Customer::class)
+            ->where('invoices.party_type', InvoicePartyType::Customer->value)
             ->where('invoices.direction', 'outbound')
             ->whereNotIn('invoices.status', ['cancelled', 'void'])
             ->where('balances.remaining_amount', '>', 0)
             ->where('invoices.invoice_date', '<=', $asOfDate);
+
+        $query->where(static function (Builder $creditQuery) use ($request): void {
+            $creditQuery->whereExists(static function (Builder $confirmedServiceCredit): void {
+                $confirmedServiceCredit->selectRaw('1')
+                    ->from('vehicle_service_invoice_links')
+                    ->whereColumn('vehicle_service_invoice_links.invoice_id', 'invoices.id')
+                    ->whereColumn('vehicle_service_invoice_links.tenant_id', 'invoices.tenant_id')
+                    ->where('vehicle_service_invoice_links.settlement_mode', VehicleServiceInvoiceSettlementMode::Credit->value);
+            })->orWhere(static function (Builder $historicalCredit) use ($request): void {
+                $historicalCredit->whereNotExists(static function (Builder $settlementMode): void {
+                    $settlementMode->selectRaw('1')
+                        ->from('vehicle_service_invoice_links')
+                        ->whereColumn('vehicle_service_invoice_links.invoice_id', 'invoices.id')
+                        ->whereColumn('vehicle_service_invoice_links.tenant_id', 'invoices.tenant_id')
+                        ->whereNotNull('vehicle_service_invoice_links.settlement_mode');
+                })->whereExists(static function (Builder $creditProfileQuery) use ($request): void {
+                    $creditProfileQuery->selectRaw('1')
+                        ->from('customer_credit_profiles')
+                        ->whereColumn('customer_credit_profiles.customer_id', 'customers.id')
+                        ->whereColumn('customer_credit_profiles.tenant_id', 'customers.tenant_id')
+                        ->where('customer_credit_profiles.tenant_id', $request->tenantId())
+                        ->where('customer_credit_profiles.credit_allowed', true)
+                        ->where('customer_credit_profiles.is_active', true);
+                })->where(static function (Builder $sourceQuery): void {
+                    $sourceQuery->whereExists(static function (Builder $serviceSource): void {
+                        $serviceSource->selectRaw('1')
+                            ->from('invoice_sources')
+                            ->whereColumn('invoice_sources.invoice_id', 'invoices.id')
+                            ->whereColumn('invoice_sources.tenant_id', 'invoices.tenant_id')
+                            ->where('invoice_sources.source_type', 'vehicle_service_job');
+                    })->orWhereExists(static function (Builder $documentSnapshot): void {
+                        $documentSnapshot->selectRaw('1')
+                            ->from('invoice_document_snapshots')
+                            ->whereColumn('invoice_document_snapshots.invoice_id', 'invoices.id')
+                            ->whereColumn('invoice_document_snapshots.tenant_id', 'invoices.tenant_id')
+                            ->whereRaw('LOWER(invoice_document_snapshots.payment_mode) = ?', ['credit']);
+                    });
+                });
+            });
+        });
+
+        if ($request->filled('date_from')) {
+            $query->where('invoices.invoice_date', '>=', $request->input('date_from'));
+        }
 
         if ($request->organizationUnitId() === null) {
             $query->whereNull('balances.organization_unit_id');
@@ -189,7 +264,7 @@ final class CustomerOutstandingReportService
             'customers.code as customer_code',
             'customers.customer_number',
         ])->selectRaw(self::CUSTOMER_NAME_EXPRESSION.' as customer_name')
-            ->select('invoices.currency_code_snapshot as currency_code')
+            ->addSelect('invoices.currency_code_snapshot as currency_code')
             ->selectRaw('COUNT(invoices.id) as invoice_count')
             ->selectRaw('SUM(balances.remaining_amount) as outstanding_total')
             ->selectRaw('SUM(CASE WHEN '.$dueDate.' >= ? THEN balances.remaining_amount ELSE 0 END) as current_amount', [$asOfDate])
@@ -292,7 +367,7 @@ final class CustomerOutstandingReportService
 
     private function asOfDate(CustomerOutstandingReportRequest $request): string
     {
-        return CarbonImmutable::parse((string) $request->input('as_of_date', now()->toDateString()))->toDateString();
+        return CarbonImmutable::parse((string) $request->input('date_to', now()->toDateString()))->toDateString();
     }
 
     private function daysOverdue(string $dueDate, string $asOfDate): int

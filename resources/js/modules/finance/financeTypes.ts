@@ -229,7 +229,8 @@ export interface CustomerOutstandingParams {
     page?: number;
     per_page?: number;
     customer_id?: number;
-    as_of_date?: string;
+    date_from?: string;
+    date_to?: string;
     aging_bucket?: ReceivableAgingBucket | '';
     currency_code?: string;
 }
@@ -262,7 +263,7 @@ export interface CustomerOutstandingReportResult {
 }
 
 export interface CustomerOutstandingInvoiceRow {
-    invoice: { id: number; number: string; date: string; due_date: string; status: string };
+    invoice: { id: number; number: string; date: string; due_date: string; status: string; service_job_number: string | null; credit_basis: 'confirmed' | 'historical_inferred' };
     currency: { code: string };
     invoice_total: string;
     paid_amount: string;

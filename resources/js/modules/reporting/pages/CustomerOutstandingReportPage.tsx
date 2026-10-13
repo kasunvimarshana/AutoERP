@@ -25,7 +25,7 @@ import type {
 } from '@/modules/finance/financeTypes';
 
 const INITIAL_FILTERS: CustomerOutstandingParams = {
-    as_of_date: localDateToday(),
+    date_to: localDateToday(),
     page: 1,
     per_page: 25,
 };
@@ -99,7 +99,12 @@ export default function CustomerOutstandingReportPage() {
         event.preventDefault();
         setSelected(null);
         setInvoicePage(1);
-        setFilters({ ...draft, customer_id: draftCustomer?.id, page: 1, per_page: 25 });
+        setFilters({
+            ...draft,
+            customer_id: draftCustomer?.id,
+            page: 1,
+            per_page: 25,
+        });
     }
 
     function selectCustomer(row: CustomerOutstandingRow) {
@@ -122,7 +127,7 @@ export default function CustomerOutstandingReportPage() {
             const url = URL.createObjectURL(file);
             const link = document.createElement('a');
             link.href = url;
-            link.download = `customer-outstanding-${filters.as_of_date}.csv`;
+            link.download = `customer-outstanding-${filters.date_from ?? 'all'}-to-${filters.date_to ?? localDateToday()}.csv`;
             document.body.appendChild(link);
             link.click();
             link.remove();
@@ -149,19 +154,28 @@ export default function CustomerOutstandingReportPage() {
                     <form onSubmit={applyFilters}>
                         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                             <Input
-                                label="Aging as of"
+                                label="Invoice date from"
                                 type="date"
-                                value={draft.as_of_date ?? ''}
+                                value={draft.date_from ?? ''}
+                                max={draft.date_to ?? localDateToday()}
+                                hint="Leave blank to include earlier invoices."
+                                onChange={(event) => setDraft((current) => ({ ...current, date_from: event.target.value || undefined }))}
+                            />
+                            <Input
+                                label="Invoice date to"
+                                type="date"
+                                value={draft.date_to ?? ''}
+                                min={draft.date_from}
                                 max={localDateToday()}
-                                hint="Outstanding uses current invoice balances; this date sets the aging cutoff."
-                                onChange={(event) => setDraft((current) => ({ ...current, as_of_date: event.target.value || localDateToday() }))}
+                                hint="This date is also used to calculate aging."
+                                onChange={(event) => setDraft((current) => ({ ...current, date_to: event.target.value || localDateToday() }))}
                             />
                             <CustomerLookupSelect
                                 label="Search customer"
                                 value={draftCustomer}
                                 onChange={setDraftCustomer}
                                 placeholder="Name, code, or customer number"
-                                lookupKind="all"
+                                lookupKind="credit-allowed"
                             />
                             <Select
                                 label="Aging bucket"
@@ -181,6 +195,7 @@ export default function CustomerOutstandingReportPage() {
                                 }}>Reset</Button>
                             </div>
                         </div>
+                        <p className="mt-3 text-xs text-slate-500">Older service invoices are estimated as credit from the customer’s current credit profile because their original choice was not saved. New credit choices are recorded with the invoice.</p>
                     </form>
                 </Panel>
 
@@ -289,6 +304,8 @@ function MobileValue({ label, value }: { label: string; value: ReactNode }) {
 
 const invoiceColumns = [
     { key: 'invoice', header: 'Invoice', render: (row: CustomerOutstandingInvoiceRow) => <Link className="font-semibold text-sky-700 hover:underline" to={`/invoices/${row.invoice.id}`}>{row.invoice.number}</Link> },
+    { key: 'service_job', header: 'Service job', render: (row: CustomerOutstandingInvoiceRow) => row.invoice.service_job_number ?? '—' },
+    { key: 'credit_basis', header: 'Credit record', render: (row: CustomerOutstandingInvoiceRow) => row.invoice.credit_basis === 'confirmed' ? 'Confirmed' : 'Historical estimate' },
     { key: 'date', header: 'Invoice date', render: (row: CustomerOutstandingInvoiceRow) => row.invoice.date },
     { key: 'due', header: 'Due date', render: (row: CustomerOutstandingInvoiceRow) => row.invoice.due_date },
     { key: 'total', header: 'Invoice total', render: (row: CustomerOutstandingInvoiceRow) => <MoneyDisplay value={row.invoice_total} currency={row.currency.code} />, className: 'text-right' },

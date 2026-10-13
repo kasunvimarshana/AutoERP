@@ -61,7 +61,7 @@ final class CustomerOutstandingReportController
             }
 
             fclose($output);
-        }, 'customer-outstanding-'.$request->input('as_of_date', now()->toDateString()).'.csv', [
+        }, 'customer-outstanding-'.($request->input('date_from') ?? 'all').'-to-'.$request->input('date_to', now()->toDateString()).'.csv', [
             'Content-Type' => 'text/csv; charset=UTF-8',
         ]);
     }
