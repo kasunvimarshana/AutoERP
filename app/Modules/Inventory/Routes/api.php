@@ -29,6 +29,9 @@ Route::prefix('api/v1/inventory')->middleware($middleware)->name('api.v1.invento
     Route::get('stock-balances', [StockController::class, 'balances'])
         ->middleware($requires(InventoryPermission::STOCK_VIEW))
         ->name('stock-balances.index');
+    Route::get('stock-balances/export', [StockController::class, 'exportBalances'])
+        ->middleware($requires(InventoryPermission::STOCK_VIEW))
+        ->name('stock-balances.export');
     Route::get('availability', [StockController::class, 'availability'])
         ->middleware($requires(InventoryPermission::STOCK_VIEW))
         ->name('availability');

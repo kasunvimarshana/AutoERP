@@ -126,6 +126,17 @@ export interface PaymentAllocationPayload {
     allocation_method?: string;
 }
 
+export interface PaymentAllocation extends Record<string, unknown> {
+    id: number;
+    row_version: number;
+    invoice_id: number;
+    invoice?: { id?: number; invoice_number?: string | null; name?: string | null } | null;
+    allocated_amount: string;
+    allocation_date?: string | null;
+    allocation_method?: string | null;
+    status: string;
+}
+
 export interface PaymentPayload {
     payment_type: string;
     direction: string;
@@ -148,7 +159,8 @@ export interface PaymentRefundPayload {
     refund_date: string;
     amount: string;
     reason: string;
-    payment_method_id?: number;
+    payment_method_id: number;
+    exchange_rate: string;
     reference_number?: string;
     external_bank_name?: string;
     external_bank_branch?: string;
@@ -197,8 +209,13 @@ export async function listUsablePaymentMethods(params: ListParams & { direction?
     return response.data;
 }
 
+export async function listUsableRefundPaymentMethods(params: ListParams & { direction?: string; method_type?: string }, signal?: AbortSignal) {
+    const response = await apiClient.get<ApiCollection<PaymentMethod>>(`${endpoints.payments}/refund-methods`, { params, signal });
+    return response.data;
+}
+
 export async function getPaymentAllocations(id: number, signal?: AbortSignal) {
-    const response = await apiClient.get<ApiResource<Record<string, unknown>[]>>(`${endpoints.payments}/${id}/allocations`, { signal });
+    const response = await apiClient.get<ApiResource<PaymentAllocation[]>>(`${endpoints.payments}/${id}/allocations`, { signal });
     return response.data.data;
 }
 
@@ -212,6 +229,23 @@ export async function allocatePayment(id: number, expectedVersion: number, alloc
         expected_version: expectedVersion,
         allocations,
     });
+    return response.data.data;
+}
+
+export async function reversePaymentAllocation(
+    paymentId: number,
+    allocationId: number,
+    payload: {
+        expected_payment_version: number;
+        expected_allocation_version: number;
+        reversal_date: string;
+        reason: string;
+    },
+) {
+    const response = await apiClient.post<ApiResource<Payment>>(
+        `${endpoints.payments}/${paymentId}/allocations/${allocationId}/reverse`,
+        payload,
+    );
     return response.data.data;
 }
 

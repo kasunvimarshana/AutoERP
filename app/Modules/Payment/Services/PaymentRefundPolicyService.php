@@ -4,14 +4,21 @@ declare(strict_types=1);
 
 namespace Modules\Payment\Services;
 
+use Illuminate\Database\Eloquent\Builder;
 use InvalidArgumentException;
+use Modules\Core\Services\DecimalMath;
 use Modules\Payment\DTOs\CreatePaymentData;
 use Modules\Payment\Enums\PaymentDirection;
+use Modules\Payment\Enums\PaymentDocumentStatus;
+use Modules\Payment\Enums\PaymentPostingStatus;
 use Modules\Payment\Enums\PaymentType;
 use Modules\Payment\Models\Payment;
+use Modules\Payment\Models\PaymentRefund;
 
 final class PaymentRefundPolicyService
 {
+    public function __construct(private readonly DecimalMath $math) {}
+
     public function originalForCreation(CreatePaymentData $data): Payment
     {
         if ($data->originalPaymentId === null) {
@@ -48,6 +55,54 @@ final class PaymentRefundPolicyService
         );
     }
 
+    public function originalForPosting(Payment $payment): Payment
+    {
+        if (! $payment->exists || $payment->getKey() === null) {
+            throw new InvalidArgumentException('Refund payment must be persisted before posting.');
+        }
+
+        $original = $this->originalForPayment($payment);
+        $linked = PaymentRefund::query()
+            ->where('tenant_id', (int) $payment->tenant_id)
+            ->where('payment_id', (int) $original->getKey())
+            ->where('refund_payment_id', (int) $payment->getKey())
+            ->exists();
+        if (! $linked) {
+            throw new InvalidArgumentException('Refund payment is missing its governed refund workflow link.');
+        }
+
+        return $original;
+    }
+
+    public function reservedUnpostedAmount(Payment $payment): string
+    {
+        $amount = (string) $payment->refunds()
+            ->whereHas('refundPayment', function (Builder $query): void {
+                $query
+                    ->whereNotIn('document_status', [
+                        PaymentDocumentStatus::Voided->value,
+                        PaymentDocumentStatus::Reversed->value,
+                    ])
+                    ->where('posting_status', '!=', PaymentPostingStatus::Posted->value);
+            })
+            ->sum('amount');
+
+        return $this->math->normalize($amount);
+    }
+
+    public function availableUnappliedAmount(Payment $payment): string
+    {
+        $available = $this->math->sub(
+            (string) $payment->unapplied_amount,
+            $this->reservedUnpostedAmount($payment),
+        );
+        if ($this->math->isNegative($available)) {
+            throw new InvalidArgumentException('Payment refund reservations exceed the unapplied payment amount.');
+        }
+
+        return $this->math->normalize($available);
+    }
+
     private function resolveOriginal(
         int $originalPaymentId,
         int $tenantId,
@@ -67,6 +122,16 @@ final class PaymentRefundPolicyService
             : PaymentType::from((string) $original->payment_type);
         if ($originalType === PaymentType::Refund) {
             throw new InvalidArgumentException('A refund payment cannot be refunded again.');
+        }
+
+        $documentStatus = $original->document_status instanceof PaymentDocumentStatus
+            ? $original->document_status
+            : PaymentDocumentStatus::from((string) $original->document_status);
+        $postingStatus = $original->posting_status instanceof PaymentPostingStatus
+            ? $original->posting_status
+            : PaymentPostingStatus::from((string) $original->posting_status);
+        if ($documentStatus !== PaymentDocumentStatus::Approved || $postingStatus !== PaymentPostingStatus::Posted) {
+            throw new InvalidArgumentException('The original payment must be approved and posted before it can be refunded.');
         }
 
         if ((int) $original->tenant_id !== $tenantId

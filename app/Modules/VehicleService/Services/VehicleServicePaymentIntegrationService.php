@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\VehicleService\Services;
 
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use LogicException;
 use Modules\Core\Services\DecimalMath;
@@ -25,6 +26,7 @@ use Modules\Payment\Services\PaymentMethodService;
 use Modules\Payment\Services\PaymentPostingService;
 use Modules\VehicleService\DTOs\VehicleServicePaymentData;
 use Modules\VehicleService\DTOs\VehicleServicePaymentLineData;
+use Modules\VehicleService\Enums\VehicleServiceInvoiceSettlementMode;
 use Modules\VehicleService\Enums\VehicleServiceJobStatus;
 use Modules\VehicleService\Models\VehicleServiceJob;
 use Modules\VehicleService\Models\VehicleServicePaymentLink;
@@ -42,6 +44,7 @@ final class VehicleServicePaymentIntegrationService
         private readonly PaymentMethodService $paymentMethods,
         private readonly PaymentPostingService $paymentPosting,
         private readonly VehicleServiceStatusService $statuses,
+        private readonly VehicleServicePaymentOptionService $paymentOptions,
     ) {}
 
     public function prepare(VehicleServiceJob $job, VehicleServicePaymentData $data): CreatePaymentData
@@ -167,6 +170,19 @@ final class VehicleServicePaymentIntegrationService
             $this->assertExpectedVersion($job, $data->expectedVersion);
 
             $payment = $this->payments->create($this->prepare($job, $data));
+            $invoiceLink = $job->invoiceLinks()
+                ->where('invoice_id', $data->invoiceId)
+                ->where('status', 'active')
+                ->lockForUpdate()
+                ->first();
+            if ($invoiceLink === null) {
+                throw new LogicException('The validated service invoice link disappeared before payment posting.');
+            }
+            if ($invoiceLink->settlement_mode === null) {
+                $invoiceLink->forceFill([
+                    'settlement_mode' => VehicleServiceInvoiceSettlementMode::Direct->value,
+                ])->save();
+            }
             $payment = $this->paymentLifecycle->submit($payment, (int) $payment->row_version, $data->createdBy);
             $payment = $this->paymentLifecycle->approve($payment, (int) $payment->row_version, $data->createdBy);
             $payment = $this->paymentPosting->post($payment, (int) $payment->row_version, $data->createdBy);
@@ -241,6 +257,38 @@ final class VehicleServicePaymentIntegrationService
         }
 
         return $job;
+    }
+
+    public function keepInvoiceOnCredit(VehicleServiceJob $job, int $invoiceId, ?int $expectedVersion): void
+    {
+        DB::transaction(function () use ($job, $invoiceId, $expectedVersion): void {
+            $job = VehicleServiceJob::query()->lockForUpdate()->findOrFail($job->getKey());
+            $this->assertExpectedVersion($job, $expectedVersion);
+
+            $link = $job->invoiceLinks()
+                ->where('invoice_id', $invoiceId)
+                ->where('status', 'active')
+                ->lockForUpdate()
+                ->with('invoice.balance')
+                ->first();
+            if ($link === null || $link->invoice === null
+                || in_array($link->invoice->status, [InvoiceStatus::Cancelled, InvoiceStatus::Void], true)
+                || $this->math->compare((string) $link->invoice->balance?->remaining_amount, '0.000000') <= 0) {
+                throw ValidationException::withMessages([
+                    'invoice_id' => ['Choose an active service invoice with an outstanding balance.'],
+                ]);
+            }
+
+            $assessment = $this->paymentOptions->creditAssessmentForConfirmation($job);
+            if (! $assessment['can_keep_on_credit']) {
+                throw ValidationException::withMessages([
+                    'credit' => [$assessment['warning'] ?? 'Credit is not available for this customer.'],
+                ]);
+            }
+
+            $link->forceFill(['settlement_mode' => VehicleServiceInvoiceSettlementMode::Credit->value])->save();
+            $this->bumpJobVersion($job);
+        }, 3);
     }
 
     private function billToCustomerId(VehicleServiceJob $job): int

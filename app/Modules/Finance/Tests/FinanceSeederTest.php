@@ -8,6 +8,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Modules\Core\Contracts\TenantExecutionContextInterface;
+use Modules\Finance\Constants\FinanceSystemAccountCode;
 use Modules\Finance\Database\Seeders\FinanceSeeder;
 use Modules\Finance\Enums\FinanceAccountRoleCode;
 use Modules\Finance\Enums\FinancePostingProfileCode;
@@ -42,6 +43,7 @@ final class FinanceSeederTest extends TestCase
             FinancePostingProfileCode::SupplierPayment->value,
             FinancePostingProfileCode::CustomerAdvance->value,
             FinancePostingProfileCode::SupplierAdvance->value,
+            FinancePostingProfileCode::RentalDeposit->value,
         ] as $profileCode) {
             $this->assertDatabaseHas('finance_posting_profiles', [
                 'tenant_id' => $tenantId,
@@ -65,7 +67,15 @@ final class FinanceSeederTest extends TestCase
         $this->assertActiveAssignment($tenantId, $organizationUnitId, FinanceAccountRoleCode::Payable->value, self::ACCOUNT_PAYABLE);
         $this->assertActiveAssignment($tenantId, $organizationUnitId, FinanceAccountRoleCode::SupplierAdvance->value, self::ACCOUNT_SUPPLIER_ADVANCE);
         $this->assertActiveAssignment($tenantId, $organizationUnitId, FinanceAccountRoleCode::CustomerAdvance->value, self::ACCOUNT_CUSTOMER_ADVANCE);
-        $this->assertSame(0, DB::table('finance_account_assignments')->whereNull('organization_unit_id')->count());
+
+        foreach ([
+            FinanceAccountRoleCode::CustomerDeposit->value => FinanceSystemAccountCode::CUSTOMER_SECURITY_DEPOSIT,
+            FinanceAccountRoleCode::RealizedFxGain->value => FinanceSystemAccountCode::REALIZED_FX_GAIN,
+            FinanceAccountRoleCode::RealizedFxLoss->value => FinanceSystemAccountCode::REALIZED_FX_LOSS,
+        ] as $roleCode => $accountCode) {
+            $this->assertGreaterThan(0, $this->accountId($tenantId, null, $accountCode));
+            $this->assertActiveAssignment($tenantId, null, $roleCode, $accountCode);
+        }
     }
 
     public function test_semantic_payment_and_withholding_profiles_have_complete_role_mappings(): void
@@ -83,24 +93,40 @@ final class FinanceSeederTest extends TestCase
                 FinanceAccountRoleCode::Bank->value,
                 FinanceAccountRoleCode::Receivable->value,
                 FinanceAccountRoleCode::CustomerAdvance->value,
+                FinanceAccountRoleCode::RealizedFxGain->value,
+                FinanceAccountRoleCode::RealizedFxLoss->value,
             ],
             FinancePostingProfileCode::SupplierPayment->value => [
                 FinanceAccountRoleCode::Cash->value,
                 FinanceAccountRoleCode::Bank->value,
                 FinanceAccountRoleCode::Payable->value,
                 FinanceAccountRoleCode::SupplierAdvance->value,
+                FinanceAccountRoleCode::RealizedFxGain->value,
+                FinanceAccountRoleCode::RealizedFxLoss->value,
             ],
             FinancePostingProfileCode::CustomerAdvance->value => [
                 FinanceAccountRoleCode::Cash->value,
                 FinanceAccountRoleCode::Bank->value,
                 FinanceAccountRoleCode::Receivable->value,
                 FinanceAccountRoleCode::CustomerAdvance->value,
+                FinanceAccountRoleCode::RealizedFxGain->value,
+                FinanceAccountRoleCode::RealizedFxLoss->value,
             ],
             FinancePostingProfileCode::SupplierAdvance->value => [
                 FinanceAccountRoleCode::Cash->value,
                 FinanceAccountRoleCode::Bank->value,
                 FinanceAccountRoleCode::Payable->value,
                 FinanceAccountRoleCode::SupplierAdvance->value,
+                FinanceAccountRoleCode::RealizedFxGain->value,
+                FinanceAccountRoleCode::RealizedFxLoss->value,
+            ],
+            FinancePostingProfileCode::RentalDeposit->value => [
+                FinanceAccountRoleCode::Cash->value,
+                FinanceAccountRoleCode::Bank->value,
+                FinanceAccountRoleCode::Receivable->value,
+                FinanceAccountRoleCode::CustomerDeposit->value,
+                FinanceAccountRoleCode::RealizedFxGain->value,
+                FinanceAccountRoleCode::RealizedFxLoss->value,
             ],
             FinancePostingProfileCode::PurchaseInvoice->value => [
                 FinanceAccountRoleCode::Expense->value,
@@ -179,7 +205,7 @@ final class FinanceSeederTest extends TestCase
 
     private function assertActiveAssignment(
         int $tenantId,
-        int $organizationUnitId,
+        ?int $organizationUnitId,
         string $roleCode,
         string $accountCode,
     ): void {
@@ -214,13 +240,16 @@ final class FinanceSeederTest extends TestCase
             ->value('id');
     }
 
-    private function accountId(int $tenantId, int $organizationUnitId, string $code): int
+    private function accountId(int $tenantId, ?int $organizationUnitId, string $code): int
     {
-        return (int) DB::table('finance_accounts')
+        $query = DB::table('finance_accounts')
             ->where('tenant_id', $tenantId)
-            ->where('organization_unit_id', $organizationUnitId)
-            ->where('code', $code)
-            ->value('id');
+            ->where('code', $code);
+        $organizationUnitId === null
+            ? $query->whereNull('organization_unit_id')
+            : $query->where('organization_unit_id', $organizationUnitId);
+
+        return (int) $query->value('id');
     }
 
     private function roleId(int $tenantId, string $code): int

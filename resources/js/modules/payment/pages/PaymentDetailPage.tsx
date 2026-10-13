@@ -6,7 +6,6 @@ import {
     getPaymentAllocations,
     getPaymentUnappliedBalance,
     postPayment,
-    refundPayment,
     reversePayment,
     submitPayment,
     voidPayment as voidPaymentAction,
@@ -30,10 +29,10 @@ import { formatDate } from '@/shared/utils/formatDate';
 import { humanize, readableRelation } from '@/shared/utils/object';
 import { Button, LinkButton } from '@/shared/components/Button';
 import { Input } from '@/shared/components/Input';
-import { DecimalInput } from '@/shared/components/DecimalInput';
-import { isPositiveDecimal } from '@/shared/utils/decimal';
 import { useDetailResourceStore } from '@/shared/state/useDetailResourceStore';
 import { PaymentAllocationPanel } from '../components/PaymentAllocationPanel';
+import { PaymentAllocationReversalPanel } from '../components/PaymentAllocationReversalPanel';
+import { PaymentRefundPanel } from '../components/PaymentRefundPanel';
 import { PaymentSettlementPanel } from '../components/PaymentSettlementPanel';
 
 type Tab = 'summary' | 'lines' | 'allocations' | 'unapplied' | 'refunds' | 'reversals' | 'history';
@@ -60,9 +59,6 @@ export default function PaymentDetailPage() {
     const paymentState = useDetailResourceStore(payment.data);
     const [actionError, setActionError] = useState<ApiError | null>(null);
     const [busy, setBusy] = useState(false);
-    const [refundAmount, setRefundAmount] = useState('0.000000');
-    const [refundDate, setRefundDate] = useState(today());
-    const [refundReason, setRefundReason] = useState('');
     const [reversalDate, setReversalDate] = useState(today());
     const [reversalReason, setReversalReason] = useState('');
     const [voidReason, setVoidReason] = useState('');
@@ -75,6 +71,7 @@ export default function PaymentDetailPage() {
     const chequeLine = value.lines?.find((line) => line.payment_method?.method_type === 'cheque') ?? null;
     const capabilities = value.capabilities ?? {};
     const canAllocate = Boolean(capabilities.can_allocate) && hasPaymentPermission(auth, paymentPermissions.allocate);
+    const canReverseAllocation = Boolean(capabilities.can_reverse_allocation) && hasPaymentPermission(auth, paymentPermissions.allocate);
     const canSettle = Boolean(capabilities.can_settle) && hasPaymentPermission(auth, paymentPermissions.settle);
     const canRefund = Boolean(capabilities.can_refund) && hasPaymentPermission(auth, paymentPermissions.refund);
     const canReverse = Boolean(capabilities.can_reverse) && hasPaymentPermission(auth, paymentPermissions.reverse);
@@ -83,7 +80,6 @@ export default function PaymentDetailPage() {
     const canPost = Boolean(capabilities.can_post) && hasPaymentPermission(auth, paymentPermissions.post);
     const canVoid = Boolean(capabilities.can_void) && hasPaymentPermission(auth, paymentPermissions.void);
     const canPrintCheque = Boolean(capabilities.can_print_cheque) && chequeLine?.id && hasPaymentPermission(auth, paymentPermissions.chequesPrint);
-    const refundValid = isPositiveDecimal(refundAmount) && refundReason.trim() !== '';
     const reversalValid = reversalReason.trim() !== '';
 
     async function refreshPaymentState() {
@@ -113,27 +109,6 @@ export default function PaymentDetailPage() {
             if (tabState.openedTabs.has('unapplied')) {
                 unapplied.reload();
             }
-        } catch (error) {
-            setActionError(toApiError(error));
-        } finally {
-            setBusy(false);
-        }
-    }
-
-    async function submitRefund() {
-        if (busy || !refundValid) return;
-        setBusy(true);
-        setActionError(null);
-        try {
-            await refundPayment(id, {
-                expected_version: value.row_version,
-                refund_date: refundDate,
-                amount: refundAmount,
-                reason: refundReason.trim(),
-            });
-            await refreshPaymentState();
-            setRefundAmount('0.000000');
-            setRefundReason('');
         } catch (error) {
             setActionError(toApiError(error));
         } finally {
@@ -202,16 +177,17 @@ export default function PaymentDetailPage() {
                 {tabState.activeTab === 'allocations' && <div>
                     {allocations.loading ? <LoadingState /> : allocations.error ? <ErrorAlert error={allocations.error} /> : <RecordTable rows={allocations.data ?? []} fields={['invoice', 'allocation_date', 'allocated_amount', 'invoice_balance_after', 'allocation_method', 'status']} rowKey={(row, index) => String(row.id ?? `${String(row.invoice ?? 'invoice')}-${String(row.allocation_date ?? index)}`)} />}
                     <PaymentAllocationPanel payment={value} enabled={canAllocate} onChanged={refreshPaymentState} />
+                    <PaymentAllocationReversalPanel
+                        payment={value}
+                        allocations={allocations.data ?? []}
+                        enabled={canReverseAllocation}
+                        onChanged={refreshPaymentState}
+                    />
                 </div>}
                 {tabState.activeTab === 'unapplied' && (unapplied.loading ? <LoadingState /> : unapplied.error ? <ErrorAlert error={unapplied.error} /> : <RecordTable rows={unapplied.data ? [unapplied.data] : []} fields={['balance_type', 'original_amount', 'allocated_amount', 'refunded_amount', 'remaining_amount', 'allocation_status', 'status']} rowKey={() => 'unapplied-balance'} />)}
                 {tabState.activeTab === 'refunds' && <div className="space-y-5">
                     <RecordTable rows={(value.refunds ?? []) as Record<string, unknown>[]} fields={['refund_number', 'refund_date', 'amount', 'refund_payment', 'reason', 'status']} rowKey={(row, index) => String(row.id ?? row.refund_number ?? `refund-${index}`)} />
-                    {canRefund && <div className="grid gap-4 md:grid-cols-[180px_180px_minmax(0,1fr)_auto] md:items-end">
-                        <Input label="Refund date" type="date" value={refundDate} onChange={(event) => setRefundDate(event.target.value)} />
-                        <DecimalInput label="Amount" value={refundAmount} onChange={(event) => setRefundAmount(event.target.value)} />
-                        <Input label="Reason *" value={refundReason} onChange={(event) => setRefundReason(event.target.value)} />
-                        <Button loading={busy} disabled={!refundValid} onClick={() => void submitRefund()}>Refund</Button>
-                    </div>}
+                    <PaymentRefundPanel payment={value} enabled={canRefund} onChanged={refreshPaymentState} />
                 </div>}
                 {tabState.activeTab === 'reversals' && <div className="space-y-5">
                     <RecordTable rows={(value.reversals ?? []) as Record<string, unknown>[]} fields={['reversal_number', 'reversal_date', 'original_amount', 'reversed_amount', 'reason', 'status']} rowKey={(row, index) => String(row.id ?? row.reversal_number ?? `reversal-${index}`)} />

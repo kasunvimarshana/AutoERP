@@ -26,6 +26,9 @@ final class PaymentServiceProvider extends ServiceProvider
             ->register('payment', PaymentPermission::descriptions());
 
         $this->loadRoutesFrom(__DIR__.'/../Routes/api.php');
-        $this->loadMigrationsFrom(__DIR__.'/../Database/Migrations');
+        $this->loadMigrationsFrom([
+            __DIR__.'/../Database/Migrations',
+            __DIR__.'/../Database/UpgradeMigrations',
+        ]);
     }
 }

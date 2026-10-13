@@ -3,6 +3,7 @@ import { DecimalInput } from '@/shared/components/DecimalInput';
 import { Input } from '@/shared/components/Input';
 import { Select } from '@/shared/components/Select';
 import type { PaymentMethod } from '../paymentApi';
+import { paymentMethodKind } from '../paymentLineInput';
 import { PaymentMethodFields } from './PaymentMethodFields';
 import { PaymentSummary } from './PaymentSummary';
 
@@ -23,13 +24,6 @@ interface PaymentLineTableProps {
     onMetadataChange: (key: number, field: string, value: string) => void;
     onAddLine: () => void;
     onRemoveLine: (key: number) => void;
-}
-
-function methodKind(method?: PaymentMethod): string {
-    const type = method?.method_type ?? '';
-    if (['bank_transfer', 'direct_debit'].includes(type)) return 'bank_transfer';
-    if (['digital_wallet', 'mobile_wallet'].includes(type)) return 'wallet';
-    return type || 'other';
 }
 
 function methodLabel(method: PaymentMethod): string {
@@ -55,7 +49,7 @@ export function PaymentLineTable({
         <div className="space-y-4">
             {lines.map((line) => {
                 const method = methods.find((row) => String(row.id) === line.paymentMethodId);
-                const kind = methodKind(method);
+                const kind = paymentMethodKind(method);
 
                 return (
                     <div key={line.key} className="rounded-lg border border-slate-200 bg-white p-4">

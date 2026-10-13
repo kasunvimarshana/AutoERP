@@ -26,6 +26,7 @@ final class PaymentAllocation extends TenantOwnedModel
             'invoice_id' => 'integer',
             'active_identity_slot' => 'integer',
             'invoice_date_snapshot' => 'date',
+            'invoice_exchange_rate_snapshot' => 'decimal:6',
             'invoice_total' => 'decimal:6',
             'invoice_balance_before' => 'decimal:6',
             'previously_allocated_amount' => 'decimal:6',

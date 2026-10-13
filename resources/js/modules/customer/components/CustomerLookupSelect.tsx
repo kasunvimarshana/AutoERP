@@ -32,6 +32,7 @@ export function CustomerLookupSelect({
     loadOnOpen,
     minSearchLength,
     dropdownPlacement,
+    lookupKind = 'active',
 }: {
     value: CustomerSummary | null;
     onChange: (customer: CustomerSummary | null) => void;
@@ -43,13 +44,14 @@ export function CustomerLookupSelect({
     loadOnOpen?: boolean;
     minSearchLength?: number;
     dropdownPlacement?: 'top' | 'bottom';
+    lookupKind?: 'active' | 'all' | 'credit-allowed';
 }) {
     return (
         <GenericLookupSelect
             label={label}
             value={value}
             onChange={onChange}
-            search={searchCustomers}
+            search={(params) => searchCustomers(params, lookupKind)}
             formatLabel={formatCustomerLookupLabel}
             renderOption={(customer) => renderCustomerLookupOption(customer)}
             error={error}

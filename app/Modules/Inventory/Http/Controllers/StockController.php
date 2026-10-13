@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Modules\Inventory\Http\Controllers;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Validation\ValidationException;
 use Modules\Inventory\DTOs\StockBalanceData;
 use Modules\Inventory\Enums\InventoryStockLevel;
 use Modules\Inventory\Http\Requests\InventoryLookupRequest;
@@ -19,10 +21,121 @@ use Modules\Inventory\Models\InventorySerialNumber;
 use Modules\Inventory\Models\InventoryStockBalance;
 use Modules\Inventory\Models\InventoryStockStateChange;
 use Modules\Inventory\Services\InventoryAvailabilityService;
+use Modules\Inventory\Services\HistoricalStockBalanceService;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 final class StockController extends InventoryQueryController
 {
-    public function balances(InventoryLookupRequest $request): AnonymousResourceCollection
+    public function balances(InventoryLookupRequest $request, HistoricalStockBalanceService $history): AnonymousResourceCollection
+    {
+        if ($this->hasHistoricalDate($request)) {
+            [$paginator, $summary] = $history->page($request, $this->asOfCutoff($request));
+
+            return StockBalanceResource::collection($paginator)->additional(['summary' => $summary]);
+        }
+
+        $query = $this->balanceQuery($request);
+
+        $summaryQuery = clone $query;
+        $summary = [
+            InventoryStockLevel::IN_STOCK->value => $this->stockLevelQuery(clone $summaryQuery, InventoryStockLevel::IN_STOCK)->count(),
+            InventoryStockLevel::LOW_STOCK->value => $this->stockLevelQuery(clone $summaryQuery, InventoryStockLevel::LOW_STOCK)->count(),
+            InventoryStockLevel::OUT_OF_STOCK->value => $this->stockLevelQuery(clone $summaryQuery, InventoryStockLevel::OUT_OF_STOCK)->count(),
+        ];
+
+        if ($request->filled('stock_level')) {
+            $this->stockLevelQuery($query, InventoryStockLevel::from((string) $request->input('stock_level')));
+        }
+
+        return StockBalanceResource::collection(
+            $query->orderBy('quantity_available')->orderBy('item_id')->paginate($request->perPage()),
+        )->additional(['summary' => $summary]);
+    }
+
+    public function exportBalances(InventoryLookupRequest $request, HistoricalStockBalanceService $history): StreamedResponse
+    {
+        $rows = $this->hasHistoricalDate($request)
+            ? $history->rows($request, $this->asOfCutoff($request))
+            : $this->balanceQuery($request, true)
+                ->orderBy('inventory_stock_balances.quantity_available')
+                ->orderBy('inventory_stock_balances.item_id')
+                ->lazy(500);
+
+        return response()->streamDownload(static function () use ($rows): void {
+            $output = fopen('php://output', 'wb');
+            if ($output === false) {
+                throw new \RuntimeException('Could not open the CSV output stream.');
+            }
+
+            fwrite($output, "\xEF\xBB\xBF");
+            fputcsv($output, [
+                'Item', 'Code', 'SKU', 'Batch number', 'Warehouse', 'Location', 'Available stock', 'Unit',
+                'Stock level', 'Reorder point', 'On hand', 'Reserved',
+            ], ',', '"', '');
+
+            foreach ($rows as $row) {
+                $available = (float) $row->quantity_available;
+                $reorderLevel = $row->item?->reorder_level;
+                $stockLevel = $available <= 0
+                    ? InventoryStockLevel::OUT_OF_STOCK
+                    : ($reorderLevel !== null && $available <= (float) $reorderLevel
+                        ? InventoryStockLevel::LOW_STOCK
+                        : InventoryStockLevel::IN_STOCK);
+
+                fputcsv($output, [
+                    self::safeCsvText($row->item?->name),
+                    self::safeCsvText($row->item?->code),
+                    self::safeCsvText($row->item?->sku),
+                    self::safeCsvText($row->batch?->batch_number),
+                    self::safeCsvText($row->warehouse?->name),
+                    self::safeCsvText($row->warehouseLocation?->name),
+                    $row->quantity_available,
+                    self::safeCsvText($row->baseUom?->symbol ?? $row->baseUom?->code ?? $row->baseUom?->name),
+                    match ($stockLevel) {
+                        InventoryStockLevel::IN_STOCK => 'In stock',
+                        InventoryStockLevel::LOW_STOCK => 'Low stock',
+                        InventoryStockLevel::OUT_OF_STOCK => 'Out of stock',
+                    },
+                    $reorderLevel,
+                    $row->quantity_on_hand,
+                    $row->quantity_reserved,
+                ], ',', '"', '');
+            }
+
+            fclose($output);
+        }, 'inventory-availability-'.($request->input('as_of') ?? now()->toDateString()).'.csv', [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+        ]);
+    }
+
+    private function hasHistoricalDate(InventoryLookupRequest $request): bool
+    {
+        if (! $request->filled('as_of')) {
+            return false;
+        }
+
+        $timezone = (string) $request->input('as_of_timezone', config('app.timezone'));
+        $asOf = (string) $request->input('as_of');
+        $today = CarbonImmutable::now($timezone)->toDateString();
+        if ($asOf > $today) {
+            throw ValidationException::withMessages([
+                'as_of' => ['The as-of date cannot be in the future.'],
+            ]);
+        }
+
+        return $asOf < $today;
+    }
+
+    private function asOfCutoff(InventoryLookupRequest $request): CarbonImmutable
+    {
+        $timezone = (string) $request->input('as_of_timezone', config('app.timezone'));
+
+        return CarbonImmutable::parse((string) $request->input('as_of'), $timezone)
+            ->endOfDay()
+            ->utc();
+    }
+
+    private function balanceQuery(InventoryLookupRequest $request, bool $applyStockLevel = false): Builder
     {
         $query = $this->scope(InventoryStockBalance::query(), $request)
             ->with(['item', 'baseUom', 'variant', 'warehouse', 'warehouseLocation', 'batch']);
@@ -42,20 +155,18 @@ final class StockController extends InventoryQueryController
                 ->orWhere('sku', 'like', $search));
         }
 
-        $summaryQuery = clone $query;
-        $summary = [
-            InventoryStockLevel::IN_STOCK->value => $this->stockLevelQuery(clone $summaryQuery, InventoryStockLevel::IN_STOCK)->count(),
-            InventoryStockLevel::LOW_STOCK->value => $this->stockLevelQuery(clone $summaryQuery, InventoryStockLevel::LOW_STOCK)->count(),
-            InventoryStockLevel::OUT_OF_STOCK->value => $this->stockLevelQuery(clone $summaryQuery, InventoryStockLevel::OUT_OF_STOCK)->count(),
-        ];
-
-        if ($request->filled('stock_level')) {
+        if ($applyStockLevel && $request->filled('stock_level')) {
             $this->stockLevelQuery($query, InventoryStockLevel::from((string) $request->input('stock_level')));
         }
 
-        return StockBalanceResource::collection(
-            $query->orderBy('quantity_available')->orderBy('item_id')->paginate($request->perPage()),
-        )->additional(['summary' => $summary]);
+        return $query;
+    }
+
+    private static function safeCsvText(?string $value): string
+    {
+        $value ??= '';
+
+        return preg_match('/^[=+\-@\t\r]/', $value) === 1 ? "'".$value : $value;
     }
 
     private function stockLevelQuery(Builder $query, InventoryStockLevel $stockLevel): Builder

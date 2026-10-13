@@ -6,6 +6,7 @@ namespace Modules\VehicleService\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Modules\Payment\Http\Resources\PaymentResource;
+use Modules\VehicleService\Http\Requests\KeepVehicleServiceInvoiceOnCreditRequest;
 use Modules\VehicleService\Http\Requests\ListVehicleServiceJobRequest;
 use Modules\VehicleService\Http\Requests\PrepareVehicleServicePaymentRequest;
 use Modules\VehicleService\Services\VehicleServicePaymentIntegrationService;
@@ -31,6 +32,20 @@ final class VehicleServicePaymentController extends VehicleServiceController
         return response()->json([
             'data' => $service->creditAssessmentForConfirmation($this->job($request, $job)),
         ]);
+    }
+
+    public function keepInvoiceOnCredit(
+        KeepVehicleServiceInvoiceOnCreditRequest $request,
+        int $job,
+        VehicleServicePaymentIntegrationService $service,
+    ): JsonResponse {
+        $service->keepInvoiceOnCredit(
+            $this->job($request, $job),
+            (int) $request->input('invoice_id'),
+            $request->expectedVersion(),
+        );
+
+        return response()->json(['data' => ['confirmed' => true]]);
     }
 
     public function store(

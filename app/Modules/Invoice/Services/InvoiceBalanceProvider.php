@@ -23,13 +23,14 @@ final class InvoiceBalanceProvider implements InvoiceBalanceProviderInterface
     {
         return Invoice::query()
             ->whereIn('id', array_values(array_unique($invoiceIds)))
-            ->get(['id', 'invoice_number', 'invoice_date', 'currency_code_snapshot'])
+            ->get(['id', 'invoice_number', 'invoice_date', 'currency_code_snapshot', 'exchange_rate'])
             ->mapWithKeys(fn (Invoice $invoice): array => [
                 (int) $invoice->getKey() => [
                     'id' => (int) $invoice->getKey(),
                     'invoice_number' => $invoice->invoice_number,
                     'invoice_date' => $invoice->invoice_date?->toDateString(),
                     'currency_code' => $invoice->currency_code_snapshot,
+                    'exchange_rate' => (string) $invoice->exchange_rate,
                     'name' => $invoice->invoice_number ?? 'Invoice',
                 ],
             ])
@@ -123,6 +124,7 @@ final class InvoiceBalanceProvider implements InvoiceBalanceProviderInterface
         ?int $organizationUnitId,
         string $partyType,
         int $partyId,
+        ?int $currencyId,
     ): array {
         $invoiceQuery = Invoice::query()
             ->join('invoice_balances', 'invoice_balances.invoice_id', '=', 'invoices.id')
@@ -130,13 +132,20 @@ final class InvoiceBalanceProvider implements InvoiceBalanceProviderInterface
             ->where('invoices.party_type', $partyType)
             ->where('invoices.party_id', $partyId)
             ->where('invoice_balances.remaining_amount', '>', '0')
-            ->whereNotIn('invoices.status', ['draft', 'cancelled', 'void'])
+            ->whereNotIn('invoices.status', [
+                InvoiceStatus::Draft->value,
+                InvoiceStatus::Cancelled->value,
+                InvoiceStatus::Void->value,
+            ])
             ->orderBy('invoices.invoice_date')
             ->orderBy('invoices.id');
 
         $organizationUnitId === null
             ? $invoiceQuery->whereNull('invoices.organization_unit_id')
             : $invoiceQuery->where('invoices.organization_unit_id', $organizationUnitId);
+        $currencyId === null
+            ? $invoiceQuery->whereNull('invoices.currency_id')
+            : $invoiceQuery->where('invoices.currency_id', $currencyId);
 
         return $invoiceQuery
             ->pluck('invoices.id')
@@ -163,12 +172,9 @@ final class InvoiceBalanceProvider implements InvoiceBalanceProviderInterface
             ? $query->whereNull('organization_unit_id')
             : $query->where('organization_unit_id', $organizationUnitId);
 
-        if ($currencyId !== null) {
-            $query->where(function ($scope) use ($currencyId): void {
-                $scope->whereNull('currency_id')
-                    ->orWhere('currency_id', $currencyId);
-            });
-        }
+        $currencyId === null
+            ? $query->whereNull('currency_id')
+            : $query->where('currency_id', $currencyId);
 
         $invoice = $query->firstOrFail();
         $this->statuses->assertCanSettle($invoice);

@@ -48,6 +48,20 @@ final class PaymentMethodController
         ], $request->tenantId(), $request->organizationUnitId(), $request->perPage()));
     }
 
+    public function usableForRefund(ListPaymentMethodRequest $request): AnonymousResourceCollection
+    {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), PaymentPermission::PAYMENTS_REFUND);
+
+        return PaymentMethodResource::collection($this->methods->paginate([
+            'effective' => true,
+            'active_only' => true,
+            'is_active' => true,
+            'direction' => $request->filled('direction') ? (string) $request->input('direction') : null,
+            'method_type' => $request->filled('method_type') ? (string) $request->input('method_type') : null,
+            'search' => $request->filled('search') ? (string) $request->input('search') : null,
+        ], $request->tenantId(), $request->organizationUnitId(), $request->perPage()));
+    }
+
     public function store(UpsertPaymentMethodRequest $request): JsonResponse
     {
         $this->authorization->assert($request->currentUserId(), $request->tenantId(), PaymentPermission::METHODS_CREATE);

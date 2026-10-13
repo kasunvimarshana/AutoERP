@@ -19,6 +19,7 @@ final class ListFinanceRequest extends TenantScopedRequest
             'account_id' => ['nullable', 'integer', 'min:1'],
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
+            'as_of_date' => ['nullable', 'date', 'before_or_equal:today'],
             'status' => ['nullable', 'string', 'max:30'],
             'journal_type' => ['nullable', 'string', 'max:30'],
             'source_module' => ['nullable', 'string', 'max:100'],

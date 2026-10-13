@@ -9,6 +9,7 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use Modules\Finance\Constants\FinanceSystemAccountCode;
 use Modules\Finance\Enums\FinanceAccountRoleCode;
 use Modules\Finance\Enums\FinancePostingProfileCode;
 use Modules\Finance\Models\FinanceAccount;
@@ -133,11 +134,14 @@ final class FinanceSeeder extends Seeder
             'GRNI' => ['Goods Received Not Invoiced', self::TYPE_LIABILITY],
             'TAX_PAYABLE' => ['Tax Payable', self::TYPE_LIABILITY],
             'CUSTOMER_ADVANCE' => ['Customer Advances', self::TYPE_LIABILITY],
+            'CUSTOMER_DEPOSIT' => ['Customer Security Deposits', self::TYPE_LIABILITY],
             'SALES' => ['Sales Revenue', self::TYPE_REVENUE],
             'SERVICE' => ['Service Revenue', self::TYPE_REVENUE],
+            'FX_GAIN' => ['Realized FX Gain', self::TYPE_REVENUE],
             'PURCHASE' => ['Purchase Expense', self::TYPE_EXPENSE],
             'COGS' => ['Cost of Goods Sold', self::TYPE_EXPENSE],
             'OPERATING_EXPENSE' => ['Operating Expense', self::TYPE_EXPENSE],
+            'FX_LOSS' => ['Realized FX Loss', self::TYPE_EXPENSE],
         ];
 
         $categories = [];
@@ -202,11 +206,14 @@ final class FinanceSeeder extends Seeder
             [self::ACCOUNT_GRNI, 'Goods Received Not Invoiced', self::TYPE_LIABILITY, 'GRNI', false, false, false],
             [self::ACCOUNT_TAX_PAYABLE, 'Tax Payable', self::TYPE_LIABILITY, 'TAX_PAYABLE', false, false, true],
             [self::ACCOUNT_CUSTOMER_ADVANCE, 'Customer Advances', self::TYPE_LIABILITY, 'CUSTOMER_ADVANCE', false, false, false],
+            [FinanceSystemAccountCode::CUSTOMER_SECURITY_DEPOSIT, 'Customer Security Deposits', self::TYPE_LIABILITY, 'CUSTOMER_DEPOSIT', false, false, false],
             [self::ACCOUNT_SALES_REVENUE, 'Sales Revenue', self::TYPE_REVENUE, 'SALES', false, false, false],
             [self::ACCOUNT_SERVICE_REVENUE, 'Service Revenue', self::TYPE_REVENUE, 'SERVICE', false, false, false],
+            [FinanceSystemAccountCode::REALIZED_FX_GAIN, 'Realized FX Gain', self::TYPE_REVENUE, 'FX_GAIN', false, false, false],
             [self::ACCOUNT_PURCHASE_EXPENSE, 'Purchase Expense', self::TYPE_EXPENSE, 'PURCHASE', false, false, false],
             [self::ACCOUNT_COST_OF_GOODS_SOLD, 'Cost of Goods Sold', self::TYPE_EXPENSE, 'COGS', false, false, false],
             [self::ACCOUNT_OPERATING_EXPENSE, 'Operating Expense', self::TYPE_EXPENSE, 'OPERATING_EXPENSE', false, false, false],
+            [FinanceSystemAccountCode::REALIZED_FX_LOSS, 'Realized FX Loss', self::TYPE_EXPENSE, 'FX_LOSS', false, false, false],
         ];
         $controlCategories = [
             'AR',
@@ -215,16 +222,27 @@ final class FinanceSeeder extends Seeder
             'INVENTORY',
             'SUPPLIER_ADVANCE',
             'CUSTOMER_ADVANCE',
+            'CUSTOMER_DEPOSIT',
         ];
 
         foreach ($accounts as [$code, $name, $typeCode, $categoryCode, $isCash, $isBank, $isTax]) {
+            $accountOrganizationUnitId = in_array(
+                $code,
+                [
+                    FinanceSystemAccountCode::CUSTOMER_SECURITY_DEPOSIT,
+                    FinanceSystemAccountCode::REALIZED_FX_GAIN,
+                    FinanceSystemAccountCode::REALIZED_FX_LOSS,
+                ],
+                true,
+            ) ? null : $organizationUnitId;
+
             FinanceAccount::query()->updateOrCreate(
                 ['tenant_id' => $tenantId, 'code' => $code],
                 [
-                    'organization_unit_id' => $organizationUnitId,
+                    'organization_unit_id' => $accountOrganizationUnitId,
                     'account_type_id' => $types[$typeCode]->getKey(),
                     'account_category_id' => $categories[$categoryCode]->getKey(),
-                    'parent_id' => $roots[$typeCode]->getKey(),
+                    'parent_id' => $accountOrganizationUnitId === null ? null : $roots[$typeCode]->getKey(),
                     'name' => $name,
                     'normal_balance' => $types[$typeCode]->normal_balance->value,
                     'is_control_account' => in_array($categoryCode, $controlCategories, true),
@@ -275,6 +293,8 @@ final class FinanceSeeder extends Seeder
                     FinanceAccountRoleCode::Bank->value => self::ACCOUNT_BANK,
                     FinanceAccountRoleCode::Receivable->value => self::ACCOUNT_RECEIVABLE,
                     FinanceAccountRoleCode::CustomerAdvance->value => self::ACCOUNT_CUSTOMER_ADVANCE,
+                    FinanceAccountRoleCode::RealizedFxGain->value => FinanceSystemAccountCode::REALIZED_FX_GAIN,
+                    FinanceAccountRoleCode::RealizedFxLoss->value => FinanceSystemAccountCode::REALIZED_FX_LOSS,
                 ],
             ],
             FinancePostingProfileCode::SupplierPayment->value => [
@@ -284,6 +304,8 @@ final class FinanceSeeder extends Seeder
                     FinanceAccountRoleCode::Bank->value => self::ACCOUNT_BANK,
                     FinanceAccountRoleCode::Payable->value => self::ACCOUNT_PAYABLE,
                     FinanceAccountRoleCode::SupplierAdvance->value => self::ACCOUNT_SUPPLIER_ADVANCE,
+                    FinanceAccountRoleCode::RealizedFxGain->value => FinanceSystemAccountCode::REALIZED_FX_GAIN,
+                    FinanceAccountRoleCode::RealizedFxLoss->value => FinanceSystemAccountCode::REALIZED_FX_LOSS,
                 ],
             ],
             FinancePostingProfileCode::CustomerAdvance->value => [
@@ -293,6 +315,8 @@ final class FinanceSeeder extends Seeder
                     FinanceAccountRoleCode::Bank->value => self::ACCOUNT_BANK,
                     FinanceAccountRoleCode::Receivable->value => self::ACCOUNT_RECEIVABLE,
                     FinanceAccountRoleCode::CustomerAdvance->value => self::ACCOUNT_CUSTOMER_ADVANCE,
+                    FinanceAccountRoleCode::RealizedFxGain->value => FinanceSystemAccountCode::REALIZED_FX_GAIN,
+                    FinanceAccountRoleCode::RealizedFxLoss->value => FinanceSystemAccountCode::REALIZED_FX_LOSS,
                 ],
             ],
             FinancePostingProfileCode::SupplierAdvance->value => [
@@ -302,6 +326,19 @@ final class FinanceSeeder extends Seeder
                     FinanceAccountRoleCode::Bank->value => self::ACCOUNT_BANK,
                     FinanceAccountRoleCode::Payable->value => self::ACCOUNT_PAYABLE,
                     FinanceAccountRoleCode::SupplierAdvance->value => self::ACCOUNT_SUPPLIER_ADVANCE,
+                    FinanceAccountRoleCode::RealizedFxGain->value => FinanceSystemAccountCode::REALIZED_FX_GAIN,
+                    FinanceAccountRoleCode::RealizedFxLoss->value => FinanceSystemAccountCode::REALIZED_FX_LOSS,
+                ],
+            ],
+            FinancePostingProfileCode::RentalDeposit->value => [
+                'name' => 'Rental Security Deposit',
+                'rules' => [
+                    FinanceAccountRoleCode::Cash->value => self::ACCOUNT_CASH,
+                    FinanceAccountRoleCode::Bank->value => self::ACCOUNT_BANK,
+                    FinanceAccountRoleCode::Receivable->value => self::ACCOUNT_RECEIVABLE,
+                    FinanceAccountRoleCode::CustomerDeposit->value => FinanceSystemAccountCode::CUSTOMER_SECURITY_DEPOSIT,
+                    FinanceAccountRoleCode::RealizedFxGain->value => FinanceSystemAccountCode::REALIZED_FX_GAIN,
+                    FinanceAccountRoleCode::RealizedFxLoss->value => FinanceSystemAccountCode::REALIZED_FX_LOSS,
                 ],
             ],
             FinancePostingProfileCode::ExpensePayment->value => [
@@ -381,7 +418,16 @@ final class FinanceSeeder extends Seeder
                     ],
                 );
 
-                $this->seedAccountAssignment($tenantId, $organizationUnitId, $role, $account);
+                $assignmentOrganizationUnitId = in_array(
+                    $lineKey,
+                    [
+                        FinanceAccountRoleCode::CustomerDeposit->value,
+                        FinanceAccountRoleCode::RealizedFxGain->value,
+                        FinanceAccountRoleCode::RealizedFxLoss->value,
+                    ],
+                    true,
+                ) ? null : $organizationUnitId;
+                $this->seedAccountAssignment($tenantId, $assignmentOrganizationUnitId, $role, $account);
                 FinancePostingProfileRule::query()->updateOrCreate(
                     [
                         'tenant_id' => $tenantId,

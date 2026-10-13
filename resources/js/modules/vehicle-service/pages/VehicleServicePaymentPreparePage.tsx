@@ -20,6 +20,7 @@ import { PaymentMethodFields } from '@/modules/payment/components/PaymentMethodF
 import {
     createVehicleServicePayment,
     checkVehicleServiceCredit,
+    keepVehicleServiceInvoiceOnCredit,
     getVehicleServiceJob,
     getVehicleServicePaymentOptions,
 } from '../vehicleServiceApi';
@@ -647,7 +648,7 @@ export default function VehicleServicePaymentPreparePage() {
                                     </Button>
                                 )
                             ) : (
-                                <Button type="button" loading={busy} disabled={!invoice || busy} onClick={async () => {
+                                <Button type="button" loading={busy} disabled={!invoice || !options.data || busy} onClick={async () => {
                                     setBusy(true);
                                     setCreditCheckFeedback(null);
                                     try {
@@ -665,6 +666,10 @@ export default function VehicleServicePaymentPreparePage() {
                                             setAcknowledgedCreditWarning(assessment.warning);
                                             return;
                                         }
+                                        await keepVehicleServiceInvoiceOnCredit(jobId, {
+                                            invoice_id: Number(invoiceId),
+                                            expected_version: options.data?.job_version ?? 0,
+                                        });
                                         navigate(`/vehicle-service/jobs/${jobId}`);
                                     } catch (requestError) {
                                         setCreditCheckFeedback({

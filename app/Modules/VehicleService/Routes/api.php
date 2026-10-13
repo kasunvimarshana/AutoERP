@@ -10,8 +10,8 @@ use Modules\VehicleService\Http\Controllers\VehicleServiceInventoryController;
 use Modules\VehicleService\Http\Controllers\VehicleServiceInvoiceController;
 use Modules\VehicleService\Http\Controllers\VehicleServiceJobController;
 use Modules\VehicleService\Http\Controllers\VehicleServiceJobDiscountController;
-use Modules\VehicleService\Http\Controllers\VehicleServiceLineItemLookupController;
 use Modules\VehicleService\Http\Controllers\VehicleServiceLineController;
+use Modules\VehicleService\Http\Controllers\VehicleServiceLineItemLookupController;
 use Modules\VehicleService\Http\Controllers\VehicleServicePaymentController;
 use Modules\VehicleService\Http\Controllers\VehicleServiceWorkforceController;
 
@@ -101,6 +101,10 @@ Route::prefix('api/v1/vehicle-service')->middleware($middleware)->name('api.v1.v
         Route::get('jobs/{job}/payments/options', [VehicleServicePaymentController::class, 'options'])->whereNumber('job')->name('payments.options');
         Route::post('jobs/{job}/payments/credit-check', [VehicleServicePaymentController::class, 'checkCredit'])->whereNumber('job')->name('payments.credit-check');
     });
+    Route::post('jobs/{job}/payments/credit', [VehicleServicePaymentController::class, 'keepInvoiceOnCredit'])
+        ->whereNumber('job')
+        ->middleware($requires(VehicleServicePermission::PAYMENTS_CREATE))
+        ->name('payments.credit');
     Route::post('jobs/{job}/payments', [VehicleServicePaymentController::class, 'store'])->whereNumber('job')->middleware($requires(VehicleServicePermission::PAYMENTS_CREATE))->name('payments.store');
 
     Route::middleware($requires(VehicleServicePermission::DOCUMENTS_VIEW))->group(function (): void {

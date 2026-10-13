@@ -22,6 +22,15 @@ export const checkVehicleServiceCredit = (jobId: number) =>
         `${jobs}/${jobId}/payments/credit-check`,
     ).then((response) => response.data.data);
 
+export const keepVehicleServiceInvoiceOnCredit = (
+    jobId: number,
+    payload: { invoice_id: number; expected_version: number },
+) =>
+    apiClient.post<ApiResource<{ confirmed: boolean }>>(
+        `${jobs}/${jobId}/payments/credit`,
+        payload,
+    ).then((response) => response.data.data);
+
 export const createVehicleServicePayment = (
     jobId: number,
     payload: VehicleServicePaymentPayload,

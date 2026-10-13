@@ -62,7 +62,6 @@ final class SalesSettlementBreakdownServiceTest extends TestCase
         self::assertSame('0.000000', $result['credits_applied']);
     }
 
-
     public function test_it_uses_invoice_fx_for_open_credit_and_payment_fx_for_realized_receipts(): void
     {
         $tenantId = $this->tenant();
@@ -160,8 +159,7 @@ final class SalesSettlementBreakdownServiceTest extends TestCase
         string $number,
         string $amount,
         string $exchangeRate = '1.000000',
-    ): int
-    {
+    ): int {
         return (int) DB::table('payments')->insertGetId([
             'tenant_id' => $tenantId,
             'organization_unit_id' => null,
@@ -214,6 +212,7 @@ final class SalesSettlementBreakdownServiceTest extends TestCase
             'invoice_id' => $invoiceId,
             'invoice_number_snapshot' => 'Snapshot '.$invoiceId,
             'invoice_date_snapshot' => '2026-07-15',
+            'invoice_exchange_rate_snapshot' => DB::table('invoices')->where('id', $invoiceId)->value('exchange_rate'),
             'invoice_total' => $amount,
             'invoice_balance_before' => $amount,
             'allocated_amount' => $amount,

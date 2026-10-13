@@ -20,17 +20,21 @@ final class PaymentAllocationReversalService
         private readonly PaymentAllocationFinanceService $allocationFinance,
     ) {}
 
-    public function reverseForInvoice(
+    public function reverse(
         Payment $payment,
-        int $invoiceId,
+        int $allocationId,
         int $expectedPaymentVersion,
+        int $expectedAllocationVersion,
+        string $reversalDate,
         string $reason,
         ?int $actorId = null,
     ): Payment {
         return DB::transaction(function () use (
             $payment,
-            $invoiceId,
+            $allocationId,
             $expectedPaymentVersion,
+            $expectedAllocationVersion,
+            $reversalDate,
             $reason,
             $actorId,
         ): Payment {
@@ -49,23 +53,31 @@ final class PaymentAllocationReversalService
             $this->allocationStates->assertAllocatable($payment);
 
             $allocation = $payment->allocations()
-                ->where('invoice_id', $invoiceId)
+                ->whereKey($allocationId)
                 ->where('status', AllocationStatus::Active->value)
                 ->lockForUpdate()
                 ->first();
             if (! $allocation instanceof PaymentAllocation) {
-                throw new InvalidArgumentException('Active payment allocation was not found for the selected invoice.');
+                throw new InvalidArgumentException('Active payment allocation was not found.');
+            }
+            if ($expectedAllocationVersion < 1 || (int) $allocation->row_version !== $expectedAllocationVersion) {
+                throw new InvalidArgumentException('Payment allocation was changed by another request. Reload it before reversing.');
+            }
+
+            $allocationDate = $allocation->allocation_date?->toDateString();
+            if ($allocationDate !== null && $reversalDate < $allocationDate) {
+                throw new InvalidArgumentException('Payment allocation reversal date cannot be before the allocation date.');
             }
 
             $this->allocationFinance->reverse(
                 $payment,
                 $allocation,
-                now()->toDateString(),
+                $reversalDate,
                 $reason,
                 $actorId,
             );
             $this->invoiceSettlements->reversePaymentAllocation(
-                $invoiceId,
+                (int) $allocation->invoice_id,
                 (string) $allocation->allocated_amount,
             );
             $allocation->forceFill([
@@ -75,17 +87,23 @@ final class PaymentAllocationReversalService
                 'metadata' => array_merge($allocation->metadata ?? [], [
                     'reversal' => [
                         'reason' => $reason,
+                        'reversal_date' => $reversalDate,
                         'reversed_at' => now()->toISOString(),
                         'reversed_by' => $actorId,
                     ],
                 ]),
             ])->save();
 
-            return $this->balances->sync(
+            $payment = $this->balances->sync(
                 $payment->refresh(),
                 'Payment allocation reversed: '.$reason,
                 $actorId,
-            )->loadMissing([
+            );
+            $payment->forceFill([
+                'row_version' => (int) $payment->row_version + 1,
+            ])->save();
+
+            return $payment->refresh()->loadMissing([
                 'lines',
                 'allocations',
                 'unappliedBalance',

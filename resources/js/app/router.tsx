@@ -310,6 +310,9 @@ const FinanceReportsPage = lazy(
 const BankReconciliationPage = lazy(
     () => import("@/modules/finance/pages/BankReconciliationPage"),
 );
+const CustomerOutstandingReportPage = lazy(
+    () => import("@/modules/reporting/pages/CustomerOutstandingReportPage"),
+);
 const FinanceReversalsPage = lazy(
     () => import("@/modules/finance/pages/FinanceReversalsPage"),
 );
@@ -916,6 +919,10 @@ const appRouter = createBrowserRouter(
                         <Route
                             path="/reports"
                             element={<ReportListPage />}
+                        />
+                        <Route
+                            path="/reports/customer-outstanding"
+                            element={<CustomerOutstandingReportPage />}
                         />
                         <Route
                             path="/reports/summary"
