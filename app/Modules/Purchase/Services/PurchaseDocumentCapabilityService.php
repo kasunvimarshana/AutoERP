@@ -123,11 +123,19 @@ final class PurchaseDocumentCapabilityService
     {
         $status = $this->statusValue($note->status);
         $hasRemaining = $this->positive((string) $note->remaining_amount);
+        $hasCurrency = $note->currency_id !== null;
+        $isPosted = $status === PurchaseDebitNoteStatus::Posted->value;
+        $allocationBlockCode = ! $isPosted ? 'not_posted' : (! $hasRemaining ? 'fully_allocated' : 'currency_unresolved');
+        $allocationBlockReason = ! $isPosted
+            ? 'Only posted purchase debit notes can be allocated.'
+            : (! $hasRemaining
+                ? 'Purchase debit note has no remaining amount to allocate.'
+                : 'Debit note currency must be verified before allocation.');
 
         return $this->resource([
             'can_approve' => $this->result($status === PurchaseDebitNoteStatus::Draft->value, 'not_draft', 'Only draft purchase debit notes can be approved.'),
             'can_post' => $this->result($status === PurchaseDebitNoteStatus::Approved->value, 'not_approved', 'Only approved purchase debit notes can be posted.'),
-            'can_allocate' => $this->result($status === PurchaseDebitNoteStatus::Posted->value && $hasRemaining, $status === PurchaseDebitNoteStatus::Posted->value ? 'fully_allocated' : 'not_posted', $status === PurchaseDebitNoteStatus::Posted->value ? 'Purchase debit note has no remaining amount to allocate.' : 'Only posted purchase debit notes can be allocated.'),
+            'can_allocate' => $this->result($isPosted && $hasRemaining && $hasCurrency, $allocationBlockCode, $allocationBlockReason),
             'read_only' => $this->result($status === PurchaseDebitNoteStatus::Posted->value, 'editable', 'Draft and approved purchase debit notes are editable.'),
         ]);
     }
