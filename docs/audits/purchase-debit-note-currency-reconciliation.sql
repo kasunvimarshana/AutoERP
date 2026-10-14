@@ -39,6 +39,7 @@ SELECT c.id AS allocation_id,
            WHEN n.supplier_id IS NULL OR i.party_id IS NULL
              OR n.supplier_type IS NULL OR i.party_type IS NULL
              OR n.supplier_id <> i.party_id OR n.supplier_type <> i.party_type
+             OR n.supplier_type <> 'supplier' OR i.party_type <> 'supplier'
                THEN 'supplier_mismatch'
            WHEN i.direction IS NULL OR i.direction <> 'inbound'
                THEN 'invoice_direction_mismatch'
@@ -63,6 +64,7 @@ WHERE c.credit_source_type = 'purchase_debit_note'
        OR n.supplier_id IS NULL OR i.party_id IS NULL
        OR n.supplier_type IS NULL OR i.party_type IS NULL
        OR n.supplier_id <> i.party_id OR n.supplier_type <> i.party_type
+             OR n.supplier_type <> 'supplier' OR i.party_type <> 'supplier'
        OR i.direction IS NULL OR i.direction <> 'inbound'
        OR n.currency_id IS NULL OR i.currency_id IS NULL
        OR n.currency_id <> i.currency_id
