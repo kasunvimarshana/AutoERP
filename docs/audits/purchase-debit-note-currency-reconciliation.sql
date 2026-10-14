@@ -28,6 +28,9 @@ SELECT c.id AS allocation_id,
        c.credit_source_id AS purchase_debit_note_id,
        c.invoice_id,
        c.allocated_amount,
+       c.organization_unit_id AS allocation_organization_unit_id,
+       n.organization_unit_id AS note_organization_unit_id,
+       i.organization_unit_id AS invoice_organization_unit_id,
        n.currency_id AS note_currency_id,
        i.currency_id AS invoice_currency_id,
        CASE
@@ -41,9 +44,12 @@ SELECT c.id AS allocation_id,
                THEN 'invoice_direction_mismatch'
            WHEN n.currency_id IS NULL OR i.currency_id IS NULL THEN 'unresolved_currency'
            WHEN n.currency_id <> i.currency_id THEN 'currency_mismatch'
-           WHEN NOT (n.organization_unit_id = i.organization_unit_id
-                     OR (n.organization_unit_id IS NULL AND i.organization_unit_id IS NULL))
-               THEN 'organization_mismatch'
+           WHEN ((n.organization_unit_id <> i.organization_unit_id
+                  OR (n.organization_unit_id IS NULL AND i.organization_unit_id IS NOT NULL)
+                  OR (n.organization_unit_id IS NOT NULL AND i.organization_unit_id IS NULL))
+             OR (c.organization_unit_id <> i.organization_unit_id
+                  OR (c.organization_unit_id IS NULL AND i.organization_unit_id IS NOT NULL)
+                  OR (c.organization_unit_id IS NOT NULL AND i.organization_unit_id IS NULL))) THEN 'organization_mismatch'
            ELSE 'other_scope_investigation'
        END AS review_reason
 FROM invoice_credit_allocations AS c
@@ -60,8 +66,12 @@ WHERE c.credit_source_type = 'purchase_debit_note'
        OR i.direction IS NULL OR i.direction <> 'inbound'
        OR n.currency_id IS NULL OR i.currency_id IS NULL
        OR n.currency_id <> i.currency_id
-       OR NOT (n.organization_unit_id = i.organization_unit_id
-               OR (n.organization_unit_id IS NULL AND i.organization_unit_id IS NULL))
+       OR ((n.organization_unit_id <> i.organization_unit_id
+                  OR (n.organization_unit_id IS NULL AND i.organization_unit_id IS NOT NULL)
+                  OR (n.organization_unit_id IS NOT NULL AND i.organization_unit_id IS NULL))
+             OR (c.organization_unit_id <> i.organization_unit_id
+                  OR (c.organization_unit_id IS NULL AND i.organization_unit_id IS NOT NULL)
+                  OR (c.organization_unit_id IS NOT NULL AND i.organization_unit_id IS NULL)))
   )
 ORDER BY c.tenant_id, c.id;
 
