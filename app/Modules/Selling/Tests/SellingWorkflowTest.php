@@ -27,6 +27,7 @@ use Modules\Item\Models\Item;
 use Modules\Item\Services\ItemAuthorizationService;
 use Modules\Item\Services\ItemCreationService;
 use Modules\Item\Services\ItemPriceService;
+use Modules\Selling\Http\Controllers\SaleController;
 use Modules\Selling\Services\SalePostingService;
 use Modules\Selling\Services\SaleReturnPostingService;
 use Modules\Selling\Services\SellingAuthorizationService;
@@ -43,6 +44,15 @@ use Tests\TestCase;
 final class SellingWorkflowTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_sale_return_route_uses_the_selling_service_type(): void
+    {
+        $method = new \ReflectionMethod(SaleController::class, 'storeReturn');
+        $type = $method->getParameters()[1]->getType();
+
+        self::assertInstanceOf(\ReflectionNamedType::class, $type);
+        self::assertSame(SaleReturnPostingService::class, $type->getName());
+    }
 
     public function test_sales_list_uses_a_concrete_scoped_request(): void
     {
@@ -151,11 +161,49 @@ final class SellingWorkflowTest extends TestCase
                     'quantity' => '2.000000',
                 ]],
             ];
+            try {
+                app(SalePostingService::class)->create(
+                    array_replace($salePayload, ['lines' => []]),
+                    'selling-test-empty-sale-'.Str::uuid(),
+                );
+                $this->fail('An empty sale must not post an invoice or issue stock.');
+            } catch (InvalidArgumentException $exception) {
+                $this->assertStringContainsString('requires at least one line', $exception->getMessage());
+            }
+            $this->assertDatabaseCount('sales', 0);
+            $this->assertDatabaseCount('invoices', 0);
+            $this->assertSame('5.000000', (string) InventoryStockBalance::query()->firstOrFail()->quantity_on_hand);
+
+            foreach (['0.000000', '-1.000000'] as $invalidQuantity) {
+                $invalidPayload = $salePayload;
+                $invalidPayload['lines'][0]['quantity'] = $invalidQuantity;
+
+                try {
+                    app(SalePostingService::class)->create(
+                        $invalidPayload, 'selling-test-invalid-sale-'.Str::uuid(),
+                    );
+                    $this->fail('A non-positive sale quantity must not post an invoice or issue stock.');
+                } catch (InvalidArgumentException $exception) {
+                    $this->assertStringContainsString('Sale quantity must be positive', $exception->getMessage());
+                }
+
+                $this->assertDatabaseCount('sales', 0);
+                $this->assertDatabaseCount('invoices', 0);
+                $this->assertSame('5.000000', (string) InventoryStockBalance::query()->firstOrFail()->quantity_on_hand);
+            }
+
             $saleKey = 'selling-test-sale-'.Str::uuid();
             $sale = app(SalePostingService::class)->create($salePayload, $saleKey);
             $duplicateSale = app(SalePostingService::class)->create($salePayload, $saleKey);
 
             $this->assertSame($sale->getKey(), $duplicateSale->getKey());
+            foreach ([$sale, $duplicateSale] as $responseSale) {
+                $this->assertTrue($responseSale->relationLoaded('warehouseLocation'));
+                $this->assertTrue($responseSale->invoice->relationLoaded('balance'));
+                $this->assertTrue($responseSale->lines->first()->relationLoaded('variant'));
+                $this->assertTrue($responseSale->lines->first()->relationLoaded('batch'));
+                $this->assertTrue($responseSale->lines->first()->relationLoaded('serialNumber'));
+            }
             $this->assertSame('posted', $sale->status);
             $this->assertSame(InvoiceStatus::Posted, $sale->invoice->status);
             $this->assertSame('200.000000', (string) $sale->invoice->grand_total);
@@ -195,11 +243,65 @@ final class SellingWorkflowTest extends TestCase
                     'quantity' => '1.000000',
                 ]],
             ];
+            try {
+                app(SaleReturnPostingService::class)->create(
+                    array_replace($returnPayload, ['lines' => []]),
+                    'selling-test-empty-return-'.Str::uuid(),
+                );
+                $this->fail('An empty return must not post a credit note.');
+            } catch (InvalidArgumentException $exception) {
+                $this->assertStringContainsString('requires at least one line', $exception->getMessage());
+            }
+            $this->assertDatabaseCount('sale_returns', 0);
+            $this->assertSame('3.000000', (string) InventoryStockBalance::query()->firstOrFail()->quantity_on_hand);
+
+            $duplicateLinePayload = $returnPayload;
+            $duplicateLinePayload['lines'][] = [
+                'sale_line_id' => (int) $sale->lines->first()->getKey(),
+                'quantity' => '0.500000',
+            ];
+            try {
+                app(SaleReturnPostingService::class)->create(
+                    $duplicateLinePayload, 'selling-test-duplicate-return-'.Str::uuid(),
+                );
+                $this->fail('Duplicate sale lines must not create duplicate return or credit records.');
+            } catch (InvalidArgumentException $exception) {
+                $this->assertStringContainsString('only once in a return', $exception->getMessage());
+            }
+            $this->assertDatabaseCount('sale_returns', 0);
+            $this->assertDatabaseCount('sale_return_lines', 0);
+            $this->assertSame('3.000000', (string) InventoryStockBalance::query()->firstOrFail()->quantity_on_hand);
+
+            foreach (['0.000000', '-1.000000'] as $invalidQuantity) {
+                $invalidReturnPayload = $returnPayload;
+                $invalidReturnPayload['lines'][0]['quantity'] = $invalidQuantity;
+
+                try {
+                    app(SaleReturnPostingService::class)->create(
+                        $invalidReturnPayload, 'selling-test-invalid-return-'.Str::uuid(),
+                    );
+                    $this->fail('A non-positive return quantity must not create a credit or return stock.');
+                } catch (InvalidArgumentException $exception) {
+                    $this->assertStringContainsString('quantity must be positive', $exception->getMessage());
+                }
+
+                $this->assertDatabaseCount('sale_returns', 0);
+                $this->assertSame('3.000000', (string) InventoryStockBalance::query()->firstOrFail()->quantity_on_hand);
+            }
+
             $returnKey = 'selling-test-return-'.Str::uuid();
             $sale = app(SaleReturnPostingService::class)->create($returnPayload, $returnKey);
             $duplicateReturn = app(SaleReturnPostingService::class)->create($returnPayload, $returnKey);
 
             $this->assertSame($sale->getKey(), $duplicateReturn->getKey());
+            foreach ([$sale, $duplicateReturn] as $responseSale) {
+                $this->assertTrue($responseSale->relationLoaded('warehouseLocation'));
+                $this->assertTrue($responseSale->invoice->relationLoaded('balance'));
+                $this->assertTrue($responseSale->relationLoaded('returns'));
+                $this->assertTrue($responseSale->lines->first()->relationLoaded('variant'));
+                $this->assertTrue($responseSale->lines->first()->relationLoaded('batch'));
+                $this->assertTrue($responseSale->lines->first()->relationLoaded('serialNumber'));
+            }
             $this->assertSame(1, $sale->returns->count());
             $this->assertSame('CRN-', substr((string) $sale->returns->first()->return_number, 0, 4));
             $this->assertSame('100.000000', (string) $sale->returns->first()->credit_amount);

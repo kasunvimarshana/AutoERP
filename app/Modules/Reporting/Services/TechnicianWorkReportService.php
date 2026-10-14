@@ -14,6 +14,7 @@ use Modules\Invoice\Models\Invoice;
 use Modules\Payment\Models\Payment;
 use Modules\Reporting\DTOs\ReportColumn;
 use Modules\Reporting\DTOs\ReportDefinition;
+use Modules\VehicleService\Enums\VehicleServiceJobStatus;
 use Modules\Vehicle\Models\Vehicle;
 use Modules\VehicleService\Models\VehicleServiceJob;
 use Modules\VehicleService\Models\VehicleServiceJobLine;
@@ -21,6 +22,8 @@ use Modules\VehicleService\Models\VehicleServiceLineEmployee;
 
 final class TechnicianWorkReportService
 {
+    private const ZERO_AMOUNT = '0.000000';
+
     public function __construct(private readonly DecimalMath $math) {}
 
     /**
@@ -223,20 +226,24 @@ final class TechnicianWorkReportService
         ): void {
             $assignedHours = $this->decimal($assignment->assigned_hours);
             $rate = $this->decimal($assignment->rate);
+            $job = $assignment->job;
             $totalAssignedHours = $this->math->add($totalAssignedHours, $assignedHours);
             $totalLabourAmount = $this->math->add($totalLabourAmount, $this->math->mul($assignedHours, $rate));
-            $totalTechnicianCommission = $this->math->add(
-                $totalTechnicianCommission,
-                $this->decimal($assignment->commission_amount),
-            );
+            if ($job?->status !== VehicleServiceJobStatus::Cancelled) {
+                $totalTechnicianCommission = $this->math->add(
+                    $totalTechnicianCommission,
+                    $this->decimal($assignment->commission_amount),
+                );
+            }
 
-            $job = $assignment->job;
             if ($job instanceof VehicleServiceJob && ! isset($seenJobs[$job->getKey()])) {
                 $seenJobs[$job->getKey()] = true;
-                $totalSupervisorCommission = $this->math->add(
-                    $totalSupervisorCommission,
-                    $this->decimal($job->supervisor_commission_amount),
-                );
+                if ($job->status !== VehicleServiceJobStatus::Cancelled) {
+                    $totalSupervisorCommission = $this->math->add(
+                        $totalSupervisorCommission,
+                        $this->decimal($job->supervisor_commission_amount),
+                    );
+                }
             }
         });
 
@@ -314,6 +321,7 @@ final class TechnicianWorkReportService
             : null;
         $assignedHours = $this->decimal($assignment->assigned_hours);
         $rate = $this->decimal($assignment->rate);
+        $jobWasCancelled = $job?->status === VehicleServiceJobStatus::Cancelled;
 
         return [
             'id' => (int) $assignment->getKey(),
@@ -335,10 +343,10 @@ final class TechnicianWorkReportService
             'line_total' => $this->decimal($line?->line_total),
             'commission_type' => $this->enumValue($assignment->commission_type),
             'commission_value' => $this->decimal($assignment->commission_value),
-            'commission_amount' => $this->decimal($assignment->commission_amount),
+            'commission_amount' => $jobWasCancelled ? self::ZERO_AMOUNT : $this->decimal($assignment->commission_amount),
             'supervisor' => $this->employeeResource($job?->supervisor),
             'supervisor_name' => (string) ($job?->supervisor?->display_name ?? ''),
-            'supervisor_commission_amount' => $this->decimal($job?->supervisor_commission_amount),
+            'supervisor_commission_amount' => $jobWasCancelled ? self::ZERO_AMOUNT : $this->decimal($job?->supervisor_commission_amount),
             'invoice_status' => $this->enumValue($invoice?->status),
             'invoice' => $this->invoiceResource($invoice),
             'payment_document_status' => $this->enumValue($payment?->document_status),

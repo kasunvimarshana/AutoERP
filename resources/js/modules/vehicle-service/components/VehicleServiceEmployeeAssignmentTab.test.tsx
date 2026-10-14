@@ -119,7 +119,7 @@ function refreshedJob(rowVersion: number): VehicleServiceJob {
 
 async function chooseAndAssignEmployee() {
     const user = userEvent.setup();
-    await user.click(await screen.findByRole('button', { name: 'Select one or more employees' }));
+    await user.click(await screen.findByRole('button', { name: /Select or add employees/ }));
     await user.click(screen.getByRole('button', { name: 'Choose Second technician' }));
     await user.click(screen.getByRole('button', { name: 'Assign selected employees (1)' }));
 }
@@ -162,11 +162,11 @@ describe('VehicleServiceEmployeeAssignmentTab', () => {
         const user = userEvent.setup();
         renderTab();
 
-        await user.click(await screen.findByRole('button', { name: 'Select one or more employees' }));
+        await user.click(await screen.findByRole('button', { name: /Select or add employees/ }));
         await user.click(screen.getByRole('button', { name: 'Choose Second technician' }));
         await user.click(screen.getByRole('button', { name: 'Choose Third technician' }));
 
-        expect(screen.getByRole('button', { name: '2 employees selected' })).toBeInTheDocument();
+        expect(screen.getByText(/2 employees selected · Commission is split/)).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Remove EMP-22 - Second technician' })).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Remove EMP-23 - Third technician' })).toBeInTheDocument();
         await user.click(screen.getByRole('button', { name: 'Assign selected employees (2)' }));
@@ -192,7 +192,7 @@ describe('VehicleServiceEmployeeAssignmentTab', () => {
         apiMocks.listEmployeeAssignableLines.mockReset().mockResolvedValue([{ ...line([]), parent_line_id: 90, parent_line: { id: 90, line_number: 1, description: 'ACID RAIN REMOVER L' }, commission_default: { commission_type: 'fixed', commission_value: '400.000000', locked: true } }]);
         renderTab();
         expect(await screen.findByRole('heading', { name: 'ACID RAIN REMOVER L' })).toBeInTheDocument();
-        expect(screen.getByText('Commission pool: 400.000000')).toBeInTheDocument();
+        expect(screen.getByText('Fixed 400')).toBeInTheDocument();
     });
 
     it('shows supervisor assignment first, locks it, and includes it automatically', async () => {

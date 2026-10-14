@@ -1,13 +1,13 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { lookupApi, type ItemLookupResource } from '@/shared/api/lookupApi';
+import { apiClient } from '@/shared/api/apiClient';
+import type { ItemLookupResource } from '@/shared/api/lookupApi';
 import {
     LineItemFields,
     isInventoryLineItem,
     lineSourceTypeForItem,
     lineValueWithItem,
-    searchVehicleServiceLineItems,
 } from './LineItemFields';
 import { emptyLineForm } from './lineForm';
 
@@ -73,26 +73,6 @@ describe('LineItemFields', () => {
         });
     });
 
-    it('combines eligible item searches, removes duplicates, and excludes unsupported items', async () => {
-        const stock = { id: 1, name: 'Oil', item_type: 'stock', is_stockable: true } satisfies ItemLookupResource;
-        const invalid = { id: 2, name: 'Invalid non-stock', item_type: 'non_stock', is_stockable: true } satisfies ItemLookupResource;
-        const service = { id: 3, name: 'Inspection', item_type: 'service' } satisfies ItemLookupResource;
-        vi.spyOn(lookupApi, 'untrackedStockableItems').mockResolvedValue({ data: [stock, invalid] });
-        vi.spyOn(lookupApi, 'serviceBatchItems').mockResolvedValue({ data: [] });
-        vi.spyOn(lookupApi, 'serviceItems').mockResolvedValue({ data: [service] });
-        vi.spyOn(lookupApi, 'labourItems').mockResolvedValue({ data: [] });
-        vi.spyOn(lookupApi, 'comboItems').mockResolvedValue({ data: [stock] });
-
-        const result = await searchVehicleServiceLineItems({
-            search: 'i',
-            page: 1,
-            perPage: 20,
-            signal: new AbortController().signal,
-        });
-
-        expect(result.data).toEqual([stock, service]);
-    });
-
     it('shows live reserved quantity and reorder warning for a batch item', async () => {
         const user = userEvent.setup();
         const batchItem = {
@@ -109,11 +89,9 @@ describe('LineItemFields', () => {
             reserved_stock_quantity: '1.000000',
             reorder_level: '6.000000',
         } satisfies ItemLookupResource;
-        vi.spyOn(lookupApi, 'untrackedStockableItems').mockResolvedValue({ data: [] });
-        vi.spyOn(lookupApi, 'serviceBatchItems').mockResolvedValue({ data: [batchItem] });
-        vi.spyOn(lookupApi, 'serviceItems').mockResolvedValue({ data: [] });
-        vi.spyOn(lookupApi, 'labourItems').mockResolvedValue({ data: [] });
-        vi.spyOn(lookupApi, 'comboItems').mockResolvedValue({ data: [] });
+        vi.spyOn(apiClient, 'get').mockResolvedValue({
+            data: { data: [batchItem], meta: { current_page: 1, last_page: 1, per_page: 20, total: 1 } },
+        } as never);
 
         render(<LineItemFields value={emptyLineForm()} error={null} onChange={vi.fn()} />);
         await user.type(screen.getByLabelText('Item'), 'cool');

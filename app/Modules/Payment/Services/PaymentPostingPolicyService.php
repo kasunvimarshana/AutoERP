@@ -97,7 +97,7 @@ final class PaymentPostingPolicyService
 
     private function refund(Payment $payment): PaymentPostingPolicyData
     {
-        $original = $this->refundPolicy->originalForPayment($payment);
+        $original = $this->refundPolicy->originalForPosting($payment);
         $originalPolicy = $this->resolve($original);
 
         return new PaymentPostingPolicyData(

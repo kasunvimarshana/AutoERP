@@ -46,7 +46,6 @@ export function SellingItemLookup({
             )}
             placeholder={warehouseId ? 'Search items...' : 'Choose a warehouse first'}
             disabled={warehouseId === null}
-            required
         />
     );
 }

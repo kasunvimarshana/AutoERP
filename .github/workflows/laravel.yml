@@ -21,8 +21,12 @@ jobs:
   backend-sqlite:
     name: Backend SQLite
     runs-on: ubuntu-latest
+    env:
+      APP_ENV: testing
     steps:
       - uses: actions/checkout@v4
+      - name: Prepare test environment
+        run: cp .env.example .env
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
@@ -31,6 +35,8 @@ jobs:
           coverage: none
       - name: Install Composer dependencies
         run: composer install --no-interaction --prefer-dist --optimize-autoloader --no-progress
+      - name: Audit Composer dependencies
+        run: composer security:audit
       - name: Run backend test suite on SQLite
         run: composer test
 
@@ -47,6 +53,7 @@ jobs:
           - 3306:3306
         options: --health-cmd="mysqladmin ping -h 127.0.0.1 -proot" --health-interval=10s --health-timeout=5s --health-retries=10
     env:
+      APP_ENV: testing
       DB_CONNECTION: mysql
       DB_HOST: 127.0.0.1
       DB_PORT: 3306
@@ -56,6 +63,8 @@ jobs:
       DB_URL: ""
     steps:
       - uses: actions/checkout@v4
+      - name: Prepare test environment
+        run: cp .env.example .env
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
@@ -78,6 +87,8 @@ jobs:
           cache: npm
       - name: Install Node dependencies
         run: npm ci
+      - name: Audit Node dependencies
+        run: npm run security:audit
       - name: Type check
         run: npm run typecheck
       - name: Lint

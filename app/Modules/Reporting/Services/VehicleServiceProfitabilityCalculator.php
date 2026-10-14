@@ -6,6 +6,7 @@ namespace Modules\Reporting\Services;
 
 use Modules\Core\Services\DecimalMath;
 use Modules\VehicleService\Enums\VehicleServiceJobStatus;
+use Modules\VehicleService\Enums\VehicleServiceLineSourceType;
 use Modules\VehicleService\Models\VehicleServiceJob;
 use WeakMap;
 
@@ -49,6 +50,10 @@ final class VehicleServiceProfitabilityCalculator
         $directCost = self::ZERO_AMOUNT;
 
         foreach ($job->lines as $line) {
+            if ($line->line_source_type === VehicleServiceLineSourceType::ComboParent) {
+                continue;
+            }
+
             $directCost = $this->math->add(
                 $directCost,
                 $this->math->mul((string) ($line->quantity ?? '0'), (string) ($line->unit_cost ?? '0')),

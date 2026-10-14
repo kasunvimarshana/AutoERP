@@ -237,6 +237,23 @@ final class PurchaseOrderApiTest extends TestCase
             ->assertJsonValidationErrors(['expected_version']);
     }
 
+    public function test_manual_purchase_debit_note_rejects_non_supplier_party_type(): void
+    {
+        $context = $this->context();
+
+        $this->withAuth($context)->postJson('/api/v1/purchase/debit-notes', [
+            'tenant_id' => $context['tenant_id'],
+            'organization_unit_id' => $context['organization_unit_id'],
+            'debit_note_date' => '2026-06-10',
+            'supplier_type' => 'customer',
+            'supplier_id' => $context['supplier_id'],
+            'amount' => '10.000000',
+            'reason' => 'Invalid party discriminator',
+        ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['supplier_type']);
+    }
+
     public function test_manual_purchase_debit_note_rejects_client_source_fields(): void
     {
         $context = $this->context();
@@ -254,6 +271,41 @@ final class PurchaseOrderApiTest extends TestCase
         ])
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['source_type', 'source_id']);
+    }
+
+    public function test_manual_purchase_debit_note_requires_valid_explicit_currency(): void
+    {
+        $context = $this->context();
+        $payload = [
+            'tenant_id' => $context['tenant_id'],
+            'organization_unit_id' => $context['organization_unit_id'],
+            'debit_note_date' => '2026-06-10',
+            'supplier_type' => 'supplier',
+            'supplier_id' => $context['supplier_id'],
+            'amount' => '10.000000',
+            'reason' => 'Verified manual adjustment',
+        ];
+
+        $this->withAuth($context)->postJson('/api/v1/purchase/debit-notes', $payload)
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['currency_id']);
+
+        $invalid = CurrencyFixture::create(['is_active' => false]);
+        $this->withAuth($context)->postJson('/api/v1/purchase/debit-notes', [
+            ...$payload,
+            'currency_id' => $invalid,
+        ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['currency_id']);
+
+        $currencyId = CurrencyFixture::create();
+        $this->withAuth($context)->postJson('/api/v1/purchase/debit-notes', [
+            ...$payload,
+            'currency_id' => $currencyId,
+        ])
+            ->assertCreated()
+            ->assertJsonPath('data.currency_id', $currencyId)
+            ->assertJsonPath('data.currency.id', $currencyId);
     }
 
     public function test_approve_cancel_and_close_purchase_orders(): void
@@ -1220,6 +1272,7 @@ final class PurchaseOrderApiTest extends TestCase
     {
         return array_replace_recursive([
             'tenant_id' => $context['tenant_id'],
+            'currency_id' => CurrencyFixture::create(),
             'organization_unit_id' => $context['organization_unit_id'],
             'return_date' => '2026-06-19',
             'return_type' => 'manual_supplier_return',

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Modules\Payment\Tests;
 
 use InvalidArgumentException;
+use Modules\Core\Services\DecimalMath;
 use Modules\Payment\Enums\PaymentDirection;
 use Modules\Payment\Enums\PaymentPostingProfile;
 use Modules\Payment\Enums\PaymentPostingRole;
@@ -80,7 +81,7 @@ final class PaymentPostingPolicyTest extends TestCase
 
     private function policy(): PaymentPostingPolicyService
     {
-        return new PaymentPostingPolicyService(new PaymentRefundPolicyService);
+        return new PaymentPostingPolicyService(new PaymentRefundPolicyService(new DecimalMath()));
     }
 
     private function payment(

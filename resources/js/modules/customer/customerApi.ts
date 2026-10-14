@@ -55,10 +55,16 @@ export const changeCustomerStatus = (id: number, status: string, reason?: string
     apiClient.patch<ApiResource<Customer>>(`${endpoints.customers}/${id}/status`, { status, reason })
         .then((response) => response.data.data);
 
-export function searchCustomers(params: LookupLoadParams, kind = 'active'): Promise<LookupResult<CustomerSummary>> {
+export function searchCustomers(
+    params: LookupLoadParams,
+    kind: 'active' | 'all' | 'credit-allowed' = 'active',
+): Promise<LookupResult<CustomerSummary>> {
+    const lookupPath = kind === 'all'
+        ? `${endpoints.customers}/lookup`
+        : `${endpoints.customers}/lookup/${kind}`;
     const loader = createQueryCachedLookupLoader<CustomerSummary>({
         key: `lookup:customers:${kind}`,
-        load: (lookupParams) => requestLookup<CustomerSummary>(`${endpoints.customers}/lookup/${kind}`, lookupParams),
+        load: (lookupParams) => requestLookup<CustomerSummary>(lookupPath, lookupParams),
     });
 
     return loader(params);
@@ -124,7 +130,7 @@ export const deleteCustomerDocument = (customerId: number, id: number) => apiCli
 
 export const getCustomerCreditProfile = (customerId: number, signal?: AbortSignal) =>
     apiClient.get<ApiResource<CustomerCreditProfile | null>>(relationPath(customerId, 'credit-profile'), { signal }).then((response) => response.data.data);
-export const updateCustomerCreditProfile = (customerId: number, payload: CustomerCreditProfile) =>
+export const updateCustomerCreditProfile = (customerId: number, payload: Omit<CustomerCreditProfile, 'id'>) =>
     apiClient.put<ApiResource<CustomerCreditProfile>>(relationPath(customerId, 'credit-profile'), payload).then((response) => response.data.data);
 
 export const listCustomerStatusHistory = (customerId: number, params: ListParams, signal?: AbortSignal) =>

@@ -30,7 +30,7 @@ final class FinancePostingContractTest extends TestCase
         $this->withTenantExecutionContext($tenantId, function () use ($tenantId): void {
             $contract = app(FinancePostingInterface::class);
             $request = new FinancePostingRequest(
-                source: new PostingSourceData('invoice', 1001, $tenantId),
+                source: new PostingSourceData('contract_test', 1001, $tenantId, sourceModule: 'finance'),
                 postingDate: '2026-06-06',
                 lines: [
                     new FinancePostingLine(null, 'Cash', debit: '1000.000000', description: 'Cash debit', profileKey: 'cash'),

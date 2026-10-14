@@ -41,6 +41,22 @@ final class SaleReturnPostingService
         if (trim($idempotencyKey) === '') {
             throw new InvalidArgumentException('Return idempotency key is required.');
         }
+        if (! isset($payload['lines']) || ! is_array($payload['lines']) || $payload['lines'] === []) {
+            throw new InvalidArgumentException('Return requires at least one line.');
+        }
+        $seenSaleLineIds = [];
+        foreach ($payload['lines'] as $line) {
+            $id = filter_var($line['sale_line_id'] ?? null, FILTER_VALIDATE_INT, [
+                'options' => ['min_range' => 1],
+            ]);
+            if ($id === false) {
+                throw new InvalidArgumentException('Each return line requires a valid sale line ID.');
+            }
+            if (isset($seenSaleLineIds[$id])) {
+                throw new InvalidArgumentException('A sale line may appear only once in a return.');
+            }
+            $seenSaleLineIds[$id] = true;
+        }
 
         return DB::transaction(function () use ($payload, $idempotencyKey): Sale {
             $sale = Sale::query()->lockForUpdate()->findOrFail((int) $payload['sale_id']);
@@ -69,7 +85,7 @@ final class SaleReturnPostingService
                 isset($payload['current_user_id']) ? (int) $payload['current_user_id'] : null,
             );
             if ($idempotency->status === IdempotencyStatus::Completed) {
-                return $sale->refresh()->load(['customer', 'warehouse', 'lines.item', 'lines.uom', 'invoice.balance', 'returns.lines']);
+                return $sale->refresh()->load(['customer', 'warehouse', 'warehouseLocation', 'lines.item', 'lines.variant', 'lines.uom', 'lines.batch', 'lines.serialNumber', 'invoice.balance', 'returns.lines']);
             }
             if (! $idempotency->wasRecentlyCreated || $idempotency->status !== IdempotencyStatus::InProgress) {
                 throw new InvalidArgumentException('Return request is already being processed.');
@@ -100,6 +116,9 @@ final class SaleReturnPostingService
                     ->sum('quantity'));
                 $remaining = $this->math->sub((string) $line->quantity, $alreadyReturned);
                 $quantity = $this->math->normalize((string) $lineData['quantity']);
+                if ($this->math->compare($quantity, self::ZERO) <= 0) {
+                    throw new InvalidArgumentException('Return quantity must be positive.');
+                }
                 if ($this->math->compare($quantity, $remaining) > 0) {
                     throw new InvalidArgumentException('Return quantity cannot exceed the unreturned quantity sold.');
                 }
@@ -172,7 +191,7 @@ final class SaleReturnPostingService
                 ['sale_id' => (int) $sale->getKey(), 'return_id' => (int) $return->getKey()],
             );
 
-            return $sale->refresh()->load(['customer', 'warehouse', 'lines.item', 'lines.uom', 'invoice.balance', 'returns.lines']);
+            return $sale->refresh()->load(['customer', 'warehouse', 'warehouseLocation', 'lines.item', 'lines.variant', 'lines.uom', 'lines.batch', 'lines.serialNumber', 'invoice.balance', 'returns.lines']);
         }, 3);
     }
 }

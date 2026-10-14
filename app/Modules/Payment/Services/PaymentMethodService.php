@@ -132,8 +132,8 @@ final class PaymentMethodService
 
     public function delete(PaymentMethod $method): void
     {
-        if ($method->lines()->exists() || $method->refunds()->exists()) {
-            throw new InvalidArgumentException('Payment methods used by payments or refunds cannot be deleted; deactivate the method instead.');
+        if ($method->lines()->exists()) {
+            throw new InvalidArgumentException('Payment methods used by payments cannot be deleted; deactivate the method instead.');
         }
 
         $method->delete();

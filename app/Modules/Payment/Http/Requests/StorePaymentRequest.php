@@ -30,7 +30,7 @@ final class StorePaymentRequest extends TenantScopedRequest
             ],
             'payment_type' => [
                 'required',
-                Rule::enum(PaymentType::class)->except(PaymentType::RentalReceipt),
+                Rule::enum(PaymentType::class)->except([PaymentType::RentalReceipt, PaymentType::Refund]),
             ],
             'direction' => ['required', Rule::enum(PaymentDirection::class)],
             'payment_date' => ['required', 'date'],

@@ -75,6 +75,7 @@ export interface EmployeeCommissionGroup {
     key: string;
     label: string;
     resource: NamedResource | EmployeeCommissionEmployee | null;
+    designation_name?: string | null;
     total_jobs: number;
     total_hours: string;
     total_labour_value: string;

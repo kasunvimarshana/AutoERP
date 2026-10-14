@@ -16,6 +16,7 @@ interface InvoiceBalanceProviderInterface
      *     invoice_number: string|null,
      *     invoice_date: string|null,
      *     currency_code: string|null,
+     *     exchange_rate: string,
      *     name: string
      * }>
      */
@@ -46,6 +47,7 @@ interface InvoiceBalanceProviderInterface
         ?int $organizationUnitId,
         string $partyType,
         int $partyId,
+        ?int $currencyId,
     ): array;
 
     public function validatePayableState(

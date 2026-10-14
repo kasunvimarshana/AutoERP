@@ -22,11 +22,9 @@ Route::prefix('api/v1/selling')->middleware($middleware)->name('api.v1.selling.'
         'tenant.feature:item',
         $requires(SellingAuthorizationService::SALES_CREATE),
     ])->name('items.lookup');
+    Route::get('returns', [SaleController::class, 'returns'])->middleware($requires(SellingAuthorizationService::RETURNS_VIEW))->name('returns.index');
     Route::get('sales', [SaleController::class, 'index'])->middleware($requires(SellingAuthorizationService::SALES_VIEW))->name('sales.index');
     Route::post('sales', [SaleController::class, 'store'])->middleware($requires(SellingAuthorizationService::SALES_CREATE))->name('sales.store');
-    Route::get('sales/{sale}', [SaleController::class, 'show'])->whereNumber('sale')->middleware([
-        $requires(SellingAuthorizationService::SALES_VIEW),
-        $requires(SellingAuthorizationService::RETURNS_VIEW),
-    ])->name('sales.show');
+    Route::get('sales/{sale}', [SaleController::class, 'show'])->whereNumber('sale')->middleware($requires(SellingAuthorizationService::SALES_VIEW))->name('sales.show');
     Route::post('sales/{sale}/returns', [SaleController::class, 'storeReturn'])->whereNumber('sale')->middleware($requires(SellingAuthorizationService::RETURNS_CREATE))->name('sales.returns.store');
 });

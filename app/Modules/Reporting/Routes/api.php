@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Route;
+use Modules\Finance\Constants\FinancePermission;
+use Modules\Reporting\Http\Controllers\CustomerOutstandingReportController;
 use Modules\Reporting\Http\Controllers\DashboardController;
 use Modules\Reporting\Http\Controllers\EmployeeCommissionReportController;
 use Modules\Reporting\Http\Controllers\OperationalReportController;
@@ -25,7 +27,19 @@ $requires = static fn (string $permission): string => $permissionMiddleware.':'.
 $exportFormats = ['html', 'csv', 'xlsx', 'pdf', 'print'];
 
 Route::prefix('api/v1/reports')->middleware($middleware)->name('api.v1.reports.')->group(function () use ($requires, $exportFormats): void {
-    Route::middleware($requires(ReportingAuthorizationService::REPORTS_VIEW))->group(function (): void {
+    Route::middleware($requires(ReportingAuthorizationService::REPORTS_VIEW))->group(function () use ($requires): void {
+        Route::middleware([
+            'tenant.feature:finance',
+            (string) config('core.current_organization_unit.middleware_alias', 'current.organization-unit').':required',
+            $requires(FinancePermission::REPORTS_VIEW),
+        ])->group(function (): void {
+            Route::get('customer-outstanding', [CustomerOutstandingReportController::class, 'index'])->name('customer-outstanding.index');
+            Route::get('customer-outstanding/export', [CustomerOutstandingReportController::class, 'export'])->name('customer-outstanding.export');
+            Route::get('customer-outstanding/{customer}/invoices', [CustomerOutstandingReportController::class, 'invoices'])
+                ->whereNumber('customer')
+                ->name('customer-outstanding.invoices');
+        });
+
         Route::get('/', [ReportController::class, 'index'])->name('index');
         Route::get('dashboard', DashboardController::class)->name('dashboard');
         Route::get('summary', [OperationalReportController::class, 'summary'])->name('summary');

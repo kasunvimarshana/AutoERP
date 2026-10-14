@@ -70,8 +70,10 @@ use Modules\VehicleService\Services\VehicleServiceInventoryIntegrationService;
 use Modules\VehicleService\Services\VehicleServiceInvoiceIntegrationService;
 use Modules\VehicleService\Services\VehicleServiceJobDiscountService;
 use Modules\VehicleService\Services\VehicleServiceJobService;
+use Modules\VehicleService\Services\VehicleServiceLineItemLookupService;
 use Modules\VehicleService\Services\VehicleServiceLineService;
 use Modules\VehicleService\Services\VehicleServicePaymentIntegrationService;
+use Modules\VehicleService\Services\VehicleServicePaymentOptionService;
 use Modules\VehicleService\Services\VehicleServiceStatusService;
 use Tests\Support\CurrencyFixture;
 use Tests\Support\FinancePostingFixture;
@@ -89,6 +91,33 @@ final class VehicleServiceEngineTest extends TestCase
     {
         parent::setUp();
         $this->trustTenantScopedRequestContextFromPayload();
+    }
+
+    public function test_line_item_search_prioritizes_name_prefixes_across_item_types(): void
+    {
+        $context = $this->context();
+        $this->withTenantExecutionContext((int) $context['tenant_id'], function () use ($context): void {
+            $context['stock']->forceFill(['name' => 'ACURA WIPER WASH'])->save();
+            $context['service']->forceFill(['name' => 'WASH & VACUUM'])->save();
+            $context['labour']->forceFill(['name' => 'WASH LABOUR'])->save();
+        });
+
+        $result = $this->withTenantExecutionContext(
+            (int) $context['tenant_id'],
+            fn (): array => app(VehicleServiceLineItemLookupService::class)->search(
+                tenantId: (int) $context['tenant_id'],
+                organizationUnitId: null,
+                search: 'wash',
+                page: 1,
+                perPage: 20,
+                includeBatchOptions: false,
+            ),
+        );
+
+        $this->assertSame(
+            ['WASH & VACUUM', 'WASH LABOUR', 'ACURA WIPER WASH'],
+            array_map(fn (array $option): string => (string) $option['model']->name, $result['options']),
+        );
     }
 
     public function test_create_service_job_inspection_and_mixed_lines_use_decimal_totals(): void
@@ -872,10 +901,22 @@ final class VehicleServiceEngineTest extends TestCase
         $this->assertStringNotContainsString('199,000 mi', $html);
     }
 
+    public function test_job_cannot_start_without_an_active_service_line(): void
+    {
+        $context = $this->context();
+        $job = $this->createJob($context);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Add at least one active job line before starting this service job.');
+        $this->changeStatus($job, VehicleServiceJobStatus::InProgress);
+    }
+
     public function test_status_workflow_rejects_invalid_transitions_and_records_history(): void
     {
         $context = $this->context();
         $job = $this->createJob($context);
+        $line = $this->line($job, VehicleServiceLineSourceType::ServiceItem, $context['service'], '1.000000', '20.000000');
+        $this->assignEmployee($job, $line, new VehicleServiceEmployeeAssignmentData($context['employee_id']));
         $this->changeStatus($job, VehicleServiceJobStatus::Inspected);
         $this->changeStatus($this->refreshJob($job), VehicleServiceJobStatus::InProgress);
         $this->changeStatus($this->refreshJob($job), VehicleServiceJobStatus::Completed);
@@ -1445,6 +1486,64 @@ final class VehicleServiceEngineTest extends TestCase
         $this->assertSame(2, $linkCount);
     }
 
+    public function test_card_brand_is_kept_on_the_vehicle_service_payment_line(): void
+    {
+        $context = $this->context();
+        $job = $this->createJob($context);
+        $this->line($job, VehicleServiceLineSourceType::ServiceItem, $context['service'], '1.000000', '250.000000');
+        $this->changeStatus($job, VehicleServiceJobStatus::InProgress);
+        $this->changeStatus($this->refreshJob($job), VehicleServiceJobStatus::Completed);
+        $invoice = $this->createServiceInvoice($this->refreshJob($job), '2026-06-07');
+        $method = $this->paymentMethod($context, PaymentMethodType::Card);
+        $this->paymentFinanceContext($context['tenant_id']);
+
+        $payment = $this->createServicePayment($this->refreshJob($job), new VehicleServicePaymentData(
+            expectedVersion: $this->currentJobVersion($job),
+            invoiceId: (int) $invoice->getKey(),
+            paymentDate: '2026-06-07',
+            lines: [new VehicleServicePaymentLineData(
+                amount: '250.000000',
+                paymentMethodId: (int) $method->getKey(),
+                cardBrand: 'visa',
+            )],
+        ));
+
+        $this->assertSame('visa', $payment->lines->first()?->metadata['card_brand'] ?? null);
+    }
+
+    public function test_payment_options_expose_credit_only_for_an_active_allowed_customer_profile(): void
+    {
+        $context = $this->context();
+        $job = $this->createJob($context);
+        DB::table('customer_credit_profiles')->insert([
+            'tenant_id' => $context['tenant_id'],
+            'organization_unit_id' => null,
+            'customer_id' => $context['customer_id'],
+            'credit_limit' => '25000.000000',
+            'credit_allowed' => true,
+            'is_active' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $options = $this->withTenantExecutionContext(
+            (int) $context['tenant_id'],
+            fn (): array => app(VehicleServicePaymentOptionService::class)->options($job),
+        );
+
+        $this->assertTrue($options['credit_allowed']);
+
+        DB::table('customer_credit_profiles')
+            ->where('customer_id', $context['customer_id'])
+            ->update(['is_active' => false]);
+        $inactiveOptions = $this->withTenantExecutionContext(
+            (int) $context['tenant_id'],
+            fn (): array => app(VehicleServicePaymentOptionService::class)->options($job),
+        );
+
+        $this->assertFalse($inactiveOptions['credit_allowed']);
+    }
+
     public function test_inventory_issue_rejects_line_ids_from_another_job(): void
     {
         $context = $this->context();
@@ -1615,11 +1714,14 @@ final class VehicleServiceEngineTest extends TestCase
         $context = $this->context();
         $first = $this->createJob($context);
         $second = $this->createJob($context);
+        $this->line($first, VehicleServiceLineSourceType::ServiceItem, $context['service'], '1.000000', '20.000000');
         $organizationId = OrganizationUnitFixture::create([
             'tenant_id' => $context['tenant_id'], 'code' => 'WORKSHOP-BRANCH', 'name' => 'Workshop Branch',
         ]);
         // Existing jobs may belong to different branches while referring to one tenant-wide vehicle.
         DB::table('vehicle_service_jobs')->where('id', $second->getKey())->update(['organization_unit_id' => $organizationId]);
+        // Attach this branch's operational line after moving the legacy test fixture.
+        $this->line($this->refreshJob($second), VehicleServiceLineSourceType::ServiceItem, $context['service'], '1.000000', '20.000000');
         $this->changeStatus($first, VehicleServiceJobStatus::InProgress);
         $this->changeStatus($second, VehicleServiceJobStatus::InProgress);
         $this->changeStatus($first, VehicleServiceJobStatus::Completed);
@@ -1828,14 +1930,14 @@ final class VehicleServiceEngineTest extends TestCase
         );
     }
 
-    private function paymentMethod(array $context): PaymentMethod
+    private function paymentMethod(array $context, PaymentMethodType $type = PaymentMethodType::Cash): PaymentMethod
     {
         return $this->withTenantExecutionContext(
             (int) $context['tenant_id'],
             fn (): PaymentMethod => app(PaymentMethodService::class)->create([
-                'code' => 'CASH-'.Str::upper(Str::random(5)),
-                'name' => 'Cash',
-                'method_type' => PaymentMethodType::Cash->value,
+                'code' => $type->value.'-'.Str::upper(Str::random(5)),
+                'name' => $type === PaymentMethodType::Card ? 'Card' : 'Cash',
+                'method_type' => $type->value,
                 'direction_allowed' => PaymentMethodDirection::Inbound->value,
                 'requires_reference' => false,
                 'requires_instrument_details' => false,

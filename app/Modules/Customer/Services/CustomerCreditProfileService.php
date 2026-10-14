@@ -21,6 +21,12 @@ final class CustomerCreditProfileService
         $this->validate($data);
 
         return DB::transaction(function () use ($customer, $data): CustomerCreditProfile {
+            Customer::query()
+                ->whereKey($customer->getKey())
+                ->where('tenant_id', (int) $customer->tenant_id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
             $profile = CustomerCreditProfile::query()
                 ->where('tenant_id', (int) $customer->tenant_id)
                 ->where('customer_id', (int) $customer->getKey())

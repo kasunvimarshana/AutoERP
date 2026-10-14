@@ -36,4 +36,9 @@ final class SellingAuthorizationService
             throw new AuthorizationException('This Selling action requires permission: '.$permission);
         }
     }
+
+    public function can(?int $userId, int $tenantId, string $permission): bool
+    {
+        return $userId !== null && $this->access->can($userId, $tenantId, $permission);
+    }
 }

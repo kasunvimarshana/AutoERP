@@ -91,6 +91,7 @@ final class InvoicePaymentMethodProviderTest extends TestCase
             'payment_id' => $paymentId,
             'invoice_id' => $invoiceId,
             'invoice_number_snapshot' => 'INV-'.$suffix,
+            'invoice_exchange_rate_snapshot' => '1.000000',
             'invoice_total' => '100.000000',
             'invoice_balance_before' => '100.000000',
             'allocated_amount' => '60.000000',

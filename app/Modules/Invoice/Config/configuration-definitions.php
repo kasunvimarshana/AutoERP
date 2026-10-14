@@ -18,6 +18,7 @@ return [
         'options' => [
             InvoicePrintLayout::StandardA4->value,
             InvoicePrintLayout::CompactA5->value,
+            InvoicePrintLayout::Continuous85By55->value,
         ],
         'runtime_mutable' => true,
         'inherit_organization_hierarchy' => true,

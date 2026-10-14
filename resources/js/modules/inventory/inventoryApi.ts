@@ -40,6 +40,10 @@ export type StockBalanceCollection = ApiCollection<StockBalance> & { summary: St
 export const listStockBalances = (params: ListParams, signal?: AbortSignal) =>
     apiClient.get<StockBalanceCollection>(`${endpoints.inventory}/stock-balances`, { params, signal }).then((response) => response.data);
 
+export const downloadStockBalancesCsv = (params: ListParams) =>
+    apiClient.get<Blob>(`${endpoints.inventory}/stock-balances/export`, { params, responseType: 'blob' })
+        .then((response) => response.data);
+
 export const getAvailability = (params: ListParams, signal?: AbortSignal) =>
     apiClient.get<ApiResource<InventoryAvailability>>(`${endpoints.inventory}/availability`, { params, signal }).then((response) => response.data.data);
 

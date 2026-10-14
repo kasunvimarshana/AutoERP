@@ -400,6 +400,8 @@ export interface InvoiceableGoodsReceiptLine extends GoodsReceiptLine {
 
 export interface PurchaseDebitNote {
     id: number;
+    currency_id?: number | null;
+    currency?: NamedResource | null;
     row_version: number;
     debit_note_number?: string;
     debit_note_date?: string;
@@ -426,6 +428,7 @@ export interface PurchaseDebitNote {
 
 export interface PurchaseDebitNotePayload {
     debit_note_date: string;
+    currency_id: number;
     debit_note_number?: string;
     supplier_type?: string;
     supplier_id: number;

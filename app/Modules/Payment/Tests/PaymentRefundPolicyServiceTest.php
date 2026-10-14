@@ -49,6 +49,24 @@ final class PaymentRefundPolicyServiceTest extends TestCase
         });
     }
 
+    public function test_refund_policy_rejects_original_payment_that_is_no_longer_posted(): void
+    {
+        $tenantId = $this->tenantId();
+        $this->withTenantExecutionContext($tenantId, function () use ($tenantId): void {
+            $original = $this->payment($tenantId, PaymentType::CustomerReceipt, PaymentDirection::Inbound);
+            $original->forceFill([
+                'document_status' => PaymentDocumentStatus::Reversed->value,
+                'posting_status' => PaymentPostingStatus::Reversed->value,
+            ])->save();
+            $refund = $this->unsavedRefund($tenantId, $original, currencyId: null);
+
+            $this->expectException(InvalidArgumentException::class);
+            $this->expectExceptionMessage('The original payment must be approved and posted before it can be refunded.');
+
+            app(PaymentRefundPolicyService::class)->originalForPayment($refund);
+        });
+    }
+
     public function test_posting_policy_rejects_currency_drift_from_the_original_payment(): void
     {
         $tenantId = $this->tenantId();

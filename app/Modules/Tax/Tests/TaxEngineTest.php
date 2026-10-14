@@ -1081,6 +1081,7 @@ final class TaxEngineTest extends TestCase
             'invoice_number_snapshot' => (string) $invoice->invoice_number,
             'invoice_date_snapshot' => $invoice->invoice_date?->toDateString(),
             'invoice_currency_code_snapshot' => null,
+            'invoice_exchange_rate_snapshot' => (string) $invoice->exchange_rate,
             'invoice_total' => (string) $invoice->grand_total,
             'invoice_balance_before' => (string) $invoice->grand_total,
             'previously_allocated_amount' => '0.000000',

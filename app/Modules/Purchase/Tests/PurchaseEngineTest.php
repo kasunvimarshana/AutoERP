@@ -75,6 +75,7 @@ use Modules\Purchase\Services\PurchaseInvoiceIntegrationService;
 use Modules\Purchase\Services\PurchaseOrderService;
 use Modules\Purchase\Services\PurchasePaymentIntegrationService;
 use Modules\Purchase\Services\PurchaseReturnService;
+use Tests\Support\CurrencyFixture;
 use Tests\Support\FinancePostingFixture;
 use Tests\TestCase;
 
@@ -535,6 +536,7 @@ final class PurchaseEngineTest extends TestCase
             supplierType: 'supplier',
             supplierId: $supplierId,
             reason: 'Manual supplier return',
+            currencyId: CurrencyFixture::create(),
             returnType: PurchaseReturnType::ManualSupplierReturn,
             costBasis: '10.000000',
             approvalRequired: false,
@@ -767,6 +769,7 @@ final class PurchaseEngineTest extends TestCase
     public function test_purchase_debit_note_supports_partial_and_full_invoice_allocation(): void
     {
         [$tenantId, $warehouseId, $item, $supplierId] = $this->purchaseContext();
+        $currencyId = CurrencyFixture::create();
         $order = $this->createAdjustedOrder($tenantId, $warehouseId, $item);
         [$grn] = $this->receiveOrderInTwoParts($order, $warehouseId, $item);
         $invoice = $this->createSupplierInvoice(
@@ -775,6 +778,7 @@ final class PurchaseEngineTest extends TestCase
                 invoiceDate: '2026-06-08',
                 supplierType: 'supplier',
                 supplierId: $supplierId,
+                currencyId: $currencyId,
                 sources: [
                     new PurchaseInvoiceSourceData(
                         'goods_receipt_note',
@@ -793,6 +797,7 @@ final class PurchaseEngineTest extends TestCase
             supplierType: 'supplier',
             supplierId: $supplierId,
             reason: 'Price dispute',
+            currencyId: $currencyId,
         ));
         $note = $this->withTenantExecutionContext($tenantId, function () use ($note, $invoice): PurchaseDebitNote {
             $debitNotes = app(PurchaseDebitNoteService::class);
@@ -805,6 +810,64 @@ final class PurchaseEngineTest extends TestCase
         $this->assertSame(PurchaseDebitNoteStatus::Posted, $note->status);
         $this->assertSame('12.000000', (string) $note->remaining_amount);
         $this->assertSame('49192.000000', (string) $invoice->refresh()->balance_due);
+
+        // A Purchase-owned debit note cannot masquerade as another party type,
+        // even when the supplied numeric supplier ID exists.
+        try {
+            $this->createDebitNote(new CreatePurchaseDebitNoteData(
+                tenantId: $tenantId,
+                debitNoteDate: '2026-06-09',
+                amount: '1.000000',
+                supplierType: 'customer',
+                supplierId: $supplierId,
+                reason: 'Invalid party discriminator',
+            ));
+            self::fail('Accepted a purchase debit note for a non-supplier party.');
+        } catch (InvalidArgumentException $error) {
+            self::assertSame('Purchase debit notes must reference a supplier party.', $error->getMessage());
+        }
+
+        // No implicit conversion or fallback for unresolved historic currencies.
+        $otherCurrencyId = CurrencyFixture::create();
+        $this->withTenantExecutionContext($tenantId, function () use ($note, $invoice, $otherCurrencyId, $currencyId): void {
+            DB::table('purchase_debit_notes')->where('id', $note->getKey())->update(['currency_id' => null]);
+            $note->refresh();
+            try {
+                app(PurchaseDebitNoteService::class)->allocate($note, $invoice, '1.000000');
+                self::fail('Allocated an unresolved historical debit note.');
+            } catch (InvalidArgumentException $error) {
+                self::assertSame('Purchase debit note and supplier invoice must have verified currencies before allocation.', $error->getMessage());
+            } finally {
+                DB::table('purchase_debit_notes')->where('id', $note->getKey())->update(['currency_id' => $currencyId]);
+                $note->refresh();
+            }
+
+            $invoice->currency_id = $otherCurrencyId;
+            $invoice->save();
+            try {
+                app(PurchaseDebitNoteService::class)->allocate($note, $invoice, '1.000000');
+                self::fail('Allocated a debit note in another currency.');
+            } catch (InvalidArgumentException $error) {
+                self::assertSame('Purchase debit note currency must match supplier invoice currency.', $error->getMessage());
+            } finally {
+                $invoice->currency_id = $currencyId;
+                $invoice->save();
+            }
+        });
+        $this->assertSame('12.000000', (string) $note->refresh()->remaining_amount);
+        $this->assertSame('49192.000000', (string) $invoice->refresh()->balance_due);
+
+        $this->withTenantExecutionContext($tenantId, function () use ($note, $otherCurrencyId): void {
+            try {
+                $note->currency_id = $otherCurrencyId;
+                $note->save();
+                self::fail('Allowed persisted debit note currency to be rewritten.');
+            } catch (\LogicException $error) {
+                self::assertSame('Purchase financial document currency cannot change after creation.', $error->getMessage());
+            } finally {
+                $note->refresh();
+            }
+        });
 
         // A supplier identifier is not sufficient: a purchase debit note must not
         // reduce the balance of an outbound document, even if its party matches.
@@ -820,6 +883,24 @@ final class PurchaseEngineTest extends TestCase
                 );
             } finally {
                 $invoice->forceFill(['direction' => InvoiceDirection::Inbound])->save();
+            }
+        });
+        $this->assertSame('12.000000', (string) $note->refresh()->remaining_amount);
+        $this->assertSame('49192.000000', (string) $invoice->refresh()->balance_due);
+
+        // Protect the allocation boundary even for a previously persisted,
+        // inconsistent note: no invoice credit may be applied.
+        $this->withTenantExecutionContext($tenantId, function () use ($note, $invoice): void {
+            $note->supplier_type = 'customer';
+            $note->save();
+            try {
+                app(PurchaseDebitNoteService::class)->allocate($note, $invoice, '1.000000');
+                self::fail('Allocated a debit note with a mismatched party type.');
+            } catch (InvalidArgumentException $error) {
+                self::assertSame('Purchase debit note supplier type does not match the invoice party.', $error->getMessage());
+            } finally {
+                $note->supplier_type = 'supplier';
+                $note->save();
             }
         });
         $this->assertSame('12.000000', (string) $note->refresh()->remaining_amount);
@@ -874,6 +955,11 @@ final class PurchaseEngineTest extends TestCase
     {
         [$tenantId, $warehouseId, $item] = $this->purchaseContext();
         $order = $this->createAdjustedOrder($tenantId, $warehouseId, $item);
+        $sourceCurrencyId = CurrencyFixture::create();
+        $this->withTenantExecutionContext($tenantId, function () use ($order, $sourceCurrencyId): void {
+            $order->currency_id = $sourceCurrencyId;
+            $order->save();
+        });
         [$grn] = $this->receiveOrderInTwoParts($order, $warehouseId, $item);
         $line = $grn->lines->first();
 
@@ -914,7 +1000,48 @@ final class PurchaseEngineTest extends TestCase
         $this->assertSame(1, $debitNoteCount);
         $this->assertSame(PurchaseDebitNoteStatus::Draft, $note->status);
         $this->assertSame('9840.000000', (string) $note->amount);
+        $this->assertSame($sourceCurrencyId, $note->currency_id);
         $this->assertSame(1, $returnMovementCount);
+
+        // Replaying the same source return cannot create a second financial note.
+        $this->withTenantExecutionContext($tenantId, function () use ($tenantId, $return, $note): void {
+            try {
+                app(PurchaseDebitNoteService::class)->create(new CreatePurchaseDebitNoteData(
+                    tenantId: $tenantId,
+                    debitNoteDate: '2026-06-07',
+                    amount: '1.000000',
+                    supplierType: 'supplier',
+                    supplierId: (int) $note->supplier_id,
+                    purchaseReturnId: (int) $return->getKey(),
+                    sourceType: PurchaseDebitNoteService::SOURCE_PURCHASE_RETURN,
+                    sourceId: (int) $return->getKey(),
+                    reason: 'Duplicate return credit',
+                ));
+                self::fail('Duplicate purchase return debit note was accepted.');
+            } catch (InvalidArgumentException $error) {
+                self::assertSame('Purchase return already has a debit note.', $error->getMessage());
+            }
+        });
+
+        $this->assertSame(1, $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): int => PurchaseDebitNote::query()->where('purchase_return_id', $return->getKey())->count(),
+        ));
+
+        // The unique index must also reject concurrent/direct writes that skip
+        // the service-level check. Manual notes with no source remain possible.
+        $this->expectException(\Illuminate\Database\QueryException::class);
+        DB::table('purchase_debit_notes')->insert([
+            'tenant_id' => $tenantId,
+            'purchase_return_id' => $return->getKey(),
+            'supplier_type' => 'supplier',
+            'supplier_id' => $note->supplier_id,
+            'debit_note_number' => 'DUP-'.$note->debit_note_number,
+            'debit_note_date' => '2026-06-07',
+            'status' => PurchaseDebitNoteStatus::Draft->value,
+            'amount' => '1.000000',
+            'remaining_amount' => '1.000000',
+        ]);
     }
 
     public function test_purchase_return_rejects_mixed_grn_lines_and_ignores_spoofed_supplier(): void
@@ -1192,6 +1319,7 @@ final class PurchaseEngineTest extends TestCase
     public function test_manual_return_debit_note_only_inventory_adjustment_only_and_payment_prepare_boundaries(): void
     {
         [$tenantId, $warehouseId, $item, $supplierId, $uomId] = $this->purchaseContext();
+        $currencyId = CurrencyFixture::create();
 
         $manualReturn = $this->createPurchaseReturn(new CreatePurchaseReturnData(
             tenantId: $tenantId,
@@ -1200,6 +1328,7 @@ final class PurchaseEngineTest extends TestCase
             supplierType: 'supplier',
             supplierId: $supplierId,
             reason: 'Unknown old receipt',
+            currencyId: $currencyId,
             returnType: PurchaseReturnType::ManualSupplierReturn,
             approvalRequired: false,
             affectsSupplierBalance: false,
@@ -1216,6 +1345,7 @@ final class PurchaseEngineTest extends TestCase
             supplierType: 'supplier',
             supplierId: $supplierId,
             reason: 'Price dispute',
+            currencyId: $currencyId,
         ));
         $this->assertSame('20.000000', (string) $note->amount);
         $debitMovementCount = $this->withTenantExecutionContext(

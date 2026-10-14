@@ -34,6 +34,7 @@ return new class extends Migration
             $table->timestamps();
 
             $table->index(['tenant_id', 'organization_unit_id'], 'inventory_state_changes_scope_ix');
+            $table->index(['tenant_id', 'organization_unit_id', 'occurred_at'], 'inventory_stock_state_changes_scope_time_ix');
             $table->index(['source_type', 'source_id'], 'inventory_state_changes_source_ix');
             $table->index(['item_id', 'warehouse_id'], 'inventory_state_changes_item_wh_ix');
             $table->index(['from_state', 'to_state'], 'inventory_state_changes_states_ix');

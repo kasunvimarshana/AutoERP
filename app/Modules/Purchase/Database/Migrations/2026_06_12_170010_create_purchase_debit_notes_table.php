@@ -17,6 +17,7 @@ return new class extends Migration
             $table->foreignId('organization_unit_id')->nullable();
             $table->string('supplier_type')->nullable();
             $table->unsignedBigInteger('supplier_id')->nullable();
+            $table->unsignedBigInteger('currency_id')->nullable();
             $table->foreignId('purchase_return_id')->nullable();
             $table->string('source_type')->nullable();
             $table->unsignedBigInteger('source_id')->nullable();
@@ -33,6 +34,7 @@ return new class extends Migration
             $table->softDeletes();
 
             $table->unique(['tenant_id', 'debit_note_number'], 'purchase_debit_notes_tenant_number_uk');
+            $table->unique(['tenant_id', 'purchase_return_id'], 'purchase_debit_notes_tenant_return_uk');
             $table->index(['tenant_id', 'organization_unit_id'], 'purchase_debit_notes_tenant_org_ix');
             $table->index(['supplier_type', 'supplier_id'], 'purchase_debit_notes_supplier_ix');
             $table->index('purchase_return_id', 'purchase_debit_notes_return_ix');

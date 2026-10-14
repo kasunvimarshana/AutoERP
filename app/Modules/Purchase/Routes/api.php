@@ -43,6 +43,7 @@ Route::prefix('api/v1/purchase')->middleware($middleware)->name('api.v1.purchase
     Route::get('eligible/outstanding-supplier-invoices', [PurchaseEligibilityController::class, 'outstandingSupplierInvoices'])->middleware($requires(PurchaseAuthorizationService::PAYMENTS_VIEW))->name('eligible.outstanding-supplier-invoices');
 
     Route::get('orders', [PurchaseOrderController::class, 'index'])->middleware($requires(PurchaseAuthorizationService::ORDERS_VIEW))->name('orders.index');
+    Route::get('orders/pending-approval-count', [PurchaseOrderController::class, 'pendingApprovalCount'])->middleware($requires(PurchaseAuthorizationService::ORDERS_APPROVE))->name('orders.pending-approval-count');
     Route::post('orders', [PurchaseOrderController::class, 'store'])->middleware($requires(PurchaseAuthorizationService::ORDERS_CREATE))->name('orders.store');
     Route::get('orders/{order}', [PurchaseOrderController::class, 'show'])->whereNumber('order')->middleware($requires(PurchaseAuthorizationService::ORDERS_VIEW))->name('orders.show');
     Route::get('orders/{order}/pdf', [PurchaseOrderController::class, 'pdf'])->whereNumber('order')->middleware($requires(PurchaseAuthorizationService::ORDERS_VIEW))->name('orders.pdf');

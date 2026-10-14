@@ -10,6 +10,7 @@ import { Panel } from '@/shared/components/Panel';
 import { EmployeeCommissionFilters } from '../components/EmployeeCommissionFilters';
 import { EmployeeCommissionSummary } from '../components/EmployeeCommissionSummary';
 import { EmployeeCommissionTable } from '../components/EmployeeCommissionTable';
+import { EmployeeCommissionEmployeeList } from '../components/EmployeeCommissionEmployeeList';
 import { ExportActions } from '../components/ExportActions';
 import { runEmployeeCommissionReport } from '../reportingApi';
 import type {
@@ -67,6 +68,7 @@ export default function EmployeeCommissionReportScreen() {
         [result?.groups],
     );
     const exportParams = useMemo(() => cleanParams(filters), [filters]);
+    const employeeSummaryView = (filters.group_by ?? 'employee') === 'employee';
 
     const apply = (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
@@ -112,18 +114,22 @@ export default function EmployeeCommissionReportScreen() {
                 {loading && !result ? (
                     <LoadingState label="Loading employee commissions..." />
                 ) : (
-                    <EmployeeCommissionTable
-                        rows={result?.data ?? []}
-                        groups={groups}
-                        sortKey={filters.sort}
-                        direction={filters.direction}
-                        onSort={sort}
-                    />
+                    employeeSummaryView ? (
+                        <EmployeeCommissionEmployeeList groups={result?.groups ?? []} params={exportParams} />
+                    ) : (
+                        <EmployeeCommissionTable
+                            rows={result?.data ?? []}
+                            groups={groups}
+                            sortKey={filters.sort}
+                            direction={filters.direction}
+                            onSort={sort}
+                        />
+                    )
                 )}
-                <Pagination
+                {!employeeSummaryView && <Pagination
                     meta={result?.meta}
                     onPageChange={(page) => setFilters((current) => ({ ...current, page }))}
-                />
+                />}
             </div>
         </>
     );

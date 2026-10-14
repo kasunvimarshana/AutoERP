@@ -10,11 +10,12 @@ import { Textarea } from '@/shared/components/Textarea';
 import type { NamedResource } from '@/shared/types/common';
 import { createPurchaseDebitNote } from '../purchaseApi';
 import { todayDate } from '../purchaseFormUtils';
-import { SupplierLookupSelect } from './PurchaseLookups';
+import { CurrencyLookupSelect, SupplierLookupSelect } from './PurchaseLookups';
 
 export function PurchaseDebitNoteForm() {
     const navigate = useNavigate();
     const [supplier, setSupplier] = useState<NamedResource | null>(null);
+    const [currency, setCurrency] = useState<NamedResource | null>(null);
     const [debitNoteDate, setDebitNoteDate] = useState(todayDate());
     const [amount, setAmount] = useState('0.000000');
     const [reason, setReason] = useState('');
@@ -33,6 +34,7 @@ export function PurchaseDebitNoteForm() {
                     debit_note_date: debitNoteDate,
                     supplier_type: 'supplier',
                     supplier_id: supplier?.id ?? 0,
+                    currency_id: currency?.id ?? 0,
                     amount: amount || '0.000000',
                     reason,
                 });
@@ -47,6 +49,7 @@ export function PurchaseDebitNoteForm() {
             <Panel title="Supplier debit note only">
                 <div className="grid gap-4 md:grid-cols-3">
                     <SupplierLookupSelect value={supplier} onChange={setSupplier} error={errorFor('supplier_id')} />
+                    <CurrencyLookupSelect value={currency} onChange={setCurrency} error={errorFor('currency_id')} required />
                     <Input label="Date" type="date" value={debitNoteDate} error={errorFor('debit_note_date')} onChange={(event) => setDebitNoteDate(event.target.value)} />
                     <DecimalInput label="Amount" value={amount} error={errorFor('amount')} onChange={(event) => setAmount(event.target.value)} />
                 </div>

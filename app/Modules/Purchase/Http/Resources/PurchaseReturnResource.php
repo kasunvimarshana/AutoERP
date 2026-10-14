@@ -24,6 +24,8 @@ final class PurchaseReturnResource extends PurchaseResource
             'supplier' => $this->whenLoaded('supplier', fn () => $this->summary($this->supplier, ['supplier_number', 'code', 'name', 'display_name'])),
             'warehouse' => $this->whenLoaded('warehouse', fn () => $this->summary($this->warehouse, ['code', 'name'])),
             'warehouse_location' => $this->whenLoaded('warehouseLocation', fn () => $this->summary($this->warehouseLocation, ['code', 'name'])),
+            'currency_id' => $this->currency_id,
+            'currency' => $this->whenLoaded('currency', fn () => $this->summary($this->currency, ['code', 'name', 'symbol'])),
             'approval_required' => (bool) $this->approval_required,
             'capabilities' => $this->arrayAttribute('capabilities'),
             'affects_supplier_balance' => (bool) $this->affects_supplier_balance,

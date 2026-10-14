@@ -1,4 +1,7 @@
 import { Link } from 'react-router-dom';
+import { hasPermission } from '@/modules/auth/accessControl';
+import { useAuth } from '@/modules/auth/AuthProvider';
+import { financePermissions } from '@/modules/finance/financePermissions';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
@@ -8,8 +11,12 @@ import { listReports } from '../reportingApi';
 import type { ReportDefinition } from '../reportingTypes';
 
 export default function ReportListPage() {
+    const auth = useAuth();
     const reports = useApi((signal) => listReports(signal), []);
     const grouped = groupReports(reports.data ?? []);
+    const sections = Object.entries(grouped);
+    if (!grouped.Finance) sections.push(['Finance', []]);
+    const canViewCustomerOutstanding = hasPermission(auth, financePermissions.reportsView);
 
     return (
         <>
@@ -17,9 +24,13 @@ export default function ReportListPage() {
             <ErrorAlert error={reports.error} />
             {reports.loading ? <LoadingState label="Loading reports..." /> : (
                 <div className="grid gap-5 xl:grid-cols-2">
-                    {Object.entries(grouped).map(([group, rows]) => (
+                    {sections.map(([group, rows]) => (
                         <Panel key={group} title={group}>
                             <div className="divide-y divide-slate-100">
+                                {group === 'Finance' && canViewCustomerOutstanding && <Link to="/reports/customer-outstanding" className="block px-1 py-3 hover:bg-slate-50">
+                                    <div className="font-semibold text-slate-900">Customer Outstanding</div>
+                                    <div className="text-sm text-slate-500">Customer balances by currency, aging, and invoice</div>
+                                </Link>}
                                 {rows.map((report) => (
                                     <Link key={report.key} to={reportPath(report.key)} className="block px-1 py-3 hover:bg-slate-50">
                                         <div className="font-semibold text-slate-900">{report.title}</div>

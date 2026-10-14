@@ -72,7 +72,10 @@ final class VehicleServiceJobController extends VehicleServiceController
 
     public function store(StoreVehicleServiceJobRequest $request, VehicleServiceJobService $service): JsonResponse
     {
-        return (new VehicleServiceJobResource($service->create($request->toData())))
+        return (new VehicleServiceJobResource($service->create(
+            $request->toData(),
+            $request->lineData(),
+        )))
             ->response()->setStatusCode(201);
     }
 

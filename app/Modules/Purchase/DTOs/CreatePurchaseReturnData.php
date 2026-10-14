@@ -30,5 +30,6 @@ final readonly class CreatePurchaseReturnData
         public ?array $auditMetadata = null,
         public ?int $createdBy = null,
         public array $lines = [],
+        public ?int $currencyId = null,
     ) {}
 }

@@ -18,5 +18,6 @@ final readonly class CreatePurchaseDebitNoteData
         public ?string $sourceType = null,
         public ?int $sourceId = null,
         public ?string $reason = null,
+        public ?int $currencyId = null,
     ) {}
 }

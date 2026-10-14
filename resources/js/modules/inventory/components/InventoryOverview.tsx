@@ -1,5 +1,6 @@
 import { useDeferredValue, useMemo, useState } from 'react';
 import { DataTable } from '@/shared/components/DataTable';
+import { Button } from '@/shared/components/Button';
 import { DetailGrid } from '@/shared/components/DetailGrid';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { Input } from '@/shared/components/Input';
@@ -15,6 +16,7 @@ import { searchWarehouses } from '@/shared/api/referenceApi';
 import { useApi } from '@/shared/hooks/useApi';
 import type { NamedResource } from '@/shared/types/common';
 import {
+    downloadStockBalancesCsv,
     listStateChanges,
     listStockBalances,
 } from '../inventoryApi';
@@ -109,7 +111,11 @@ export function AvailabilityTab() {
     const deferredSearch = useDeferredValue(search.trim());
     const [warehouse, setWarehouse] = useState<NamedResource | null>(null);
     const [stockLevel, setStockLevel] = useState<InventoryStockLevel | ''>('');
+    const [asOfDate, setAsOfDate] = useState(localDateToday);
+    const asOfTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     const [page, setPage] = useState(1);
+    const [exporting, setExporting] = useState(false);
+    const [exportError, setExportError] = useState<string | null>(null);
     const balances = useApi(
         (signal) => listStockBalances({
             page,
@@ -117,11 +123,40 @@ export function AvailabilityTab() {
             search: deferredSearch || undefined,
             warehouse_id: warehouse?.id,
             stock_level: stockLevel || undefined,
+            as_of: asOfDate,
+            as_of_timezone: asOfTimezone,
         }, signal),
-        [page, deferredSearch, warehouse?.id, stockLevel],
+        [page, deferredSearch, warehouse?.id, stockLevel, asOfDate, asOfTimezone],
     );
     const summary = balances.data?.summary ?? { in_stock: 0, low_stock: 0, out_of_stock: 0 };
     const total = summary.in_stock + summary.low_stock + summary.out_of_stock;
+
+    async function exportCsv() {
+        setExporting(true);
+        setExportError(null);
+
+        try {
+            const file = await downloadStockBalancesCsv({
+                search: deferredSearch || undefined,
+                warehouse_id: warehouse?.id,
+                stock_level: stockLevel || undefined,
+                as_of: asOfDate,
+                as_of_timezone: asOfTimezone,
+            });
+            const url = URL.createObjectURL(file);
+            const anchor = document.createElement('a');
+            anchor.href = url;
+            anchor.download = `inventory-availability-${asOfDate}.csv`;
+            document.body.appendChild(anchor);
+            anchor.click();
+            anchor.remove();
+            window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+        } catch {
+            setExportError('Could not export stock availability. Please try again.');
+        } finally {
+            setExporting(false);
+        }
+    }
 
     return (
         <div className="space-y-5">
@@ -133,7 +168,22 @@ export function AvailabilityTab() {
             </div>
 
             <Panel title="Available stock">
-                <div className="mb-5 grid gap-4 lg:grid-cols-3">
+                <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="text-sm text-slate-600">Export all stock lines matching the filters below.</p>
+                    <Button type="button" variant="secondary" loading={exporting} loadingLabel="Preparing CSV..." onClick={() => void exportCsv()}>
+                        Export CSV
+                    </Button>
+                </div>
+                {exportError && <p role="alert" className="mb-4 text-sm text-rose-700">{exportError}</p>}
+                <div className="mb-5 grid gap-4 lg:grid-cols-4">
+                    <Input
+                        label="As of date"
+                        type="date"
+                        value={asOfDate}
+                        max={localDateToday()}
+                        onChange={(event) => { setAsOfDate(event.target.value || localDateToday()); setPage(1); }}
+                        hint={asOfDate === localDateToday() ? 'Showing current stock for today.' : 'Showing stock at the end of this date.'}
+                    />
                     <Input
                         label="Search"
                         value={search}
@@ -173,12 +223,14 @@ export function AvailabilityTab() {
                             <div className="grid grid-cols-2 gap-3">
                                 <MobileStockDetail label="Available" value={<StockQuantity row={row} value={row.quantity_available} emphasis={row.stock_level} />} />
                                 <MobileStockDetail label="Reorder point" value={row.reorder_level == null ? 'Not set' : <StockQuantity row={row} value={row.reorder_level} />} />
+                                <MobileStockDetail label="Code / SKU" value={<ItemCode row={row} />} />
                                 <MobileStockDetail label="Warehouse" value={relation(row.warehouse)} />
                                 <MobileStockDetail label="Location" value={relation(row.warehouse_location)} />
                             </div>
                         )}
                         columns={[
                             { key: 'item', header: 'Item', render: (row) => <ItemIdentity row={row} /> },
+                            { key: 'code', header: 'Code / SKU', render: (row) => <ItemCode row={row} /> },
                             { key: 'location', header: 'Location', render: (row) => <LocationIdentity row={row} /> },
                             { key: 'available', header: 'Available stock', render: (row) => <StockQuantity row={row} value={row.quantity_available} emphasis={row.stock_level} />, className: 'text-right' },
                             { key: 'level', header: 'Stock level', render: (row) => <StockLevelBadge level={row.stock_level} /> },
@@ -221,15 +273,33 @@ function StockSummaryCard({ label, value, tone, active, onClick }: {
     );
 }
 
+function localDateToday(): string {
+    const today = new Date();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+
+    return `${today.getFullYear()}-${month}-${day}`;
+}
+
 function ItemIdentity({ row }: { row: StockBalance }) {
     const item = row.item;
 
     return (
         <div>
             <div className="font-semibold text-slate-900">{item?.name ?? 'Unknown item'}</div>
-            {item?.code && <div className="mt-0.5 text-xs text-slate-500">{item.code}</div>}
+            {row.batch?.batch_number && <div className="mt-0.5 text-xs text-slate-500">Batch: {row.batch.batch_number}</div>}
         </div>
     );
+}
+
+function ItemCode({ row }: { row: StockBalance }) {
+    const code = typeof row.item?.code === 'string'
+        ? row.item.code
+        : typeof row.item?.sku === 'string'
+            ? row.item.sku
+            : null;
+
+    return code ? <span>{code}</span> : <span className="text-slate-400">Not set</span>;
 }
 
 function LocationIdentity({ row }: { row: StockBalance }) {

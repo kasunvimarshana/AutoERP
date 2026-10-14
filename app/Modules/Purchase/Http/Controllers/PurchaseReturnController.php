@@ -161,6 +161,7 @@ final class PurchaseReturnController
     {
         return [
             'supplier',
+            'currency',
             'warehouse',
             'warehouseLocation',
             'sourceGoodsReceipt',

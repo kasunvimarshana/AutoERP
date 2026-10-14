@@ -35,6 +35,18 @@ export interface SaleDocument {
     returns?: Array<{ id: number; number: string; date: string; reason: string; credit_amount: string; credit_allocated_amount: string; credit_available_amount: string; lines: Array<{ sale_line_id: number; quantity: string; credit_amount: string }> }>;
 }
 
+export interface SaleReturnDocument {
+    id: number;
+    return_number: string;
+    return_date: string;
+    reason: string;
+    credit_amount: string;
+    credit_allocated_amount: string;
+    credit_available_amount: string;
+    sale: { id: number; sale_number: string; customer: string | null; invoice: { id: number; number: string; balance_due: string } | null };
+    lines: Array<{ item: string; quantity: string; credit_amount: string }>;
+}
+
 export interface SalePayload {
     customer_id: number;
     warehouse_id: number;
@@ -44,9 +56,14 @@ export interface SalePayload {
     lines: Array<{ item_id: number; uom_id: number; quantity: string; item_variant_id?: number; batch_id?: number; serial_number_id?: number }>;
 }
 
-export async function listSales(signal?: AbortSignal) {
-    const response = await apiClient.get<ApiCollection<SaleDocument>>('/api/v1/selling/sales', { signal, params: { per_page: 50 } });
-    return response.data.data;
+export async function listSales(params: { page?: number; per_page?: number; search?: string } = {}, signal?: AbortSignal) {
+    const response = await apiClient.get<ApiCollection<SaleDocument>>('/api/v1/selling/sales', { signal, params: { per_page: 25, ...params } });
+    return response.data;
+}
+
+export async function listSaleReturns(params: { page?: number; per_page?: number; search?: string } = {}, signal?: AbortSignal) {
+    const response = await apiClient.get<ApiCollection<SaleReturnDocument>>('/api/v1/selling/returns', { signal, params: { per_page: 25, ...params } });
+    return response.data;
 }
 
 export async function getSale(id: number, signal?: AbortSignal): Promise<SaleDocument> {

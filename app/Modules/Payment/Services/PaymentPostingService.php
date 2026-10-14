@@ -11,12 +11,14 @@ use Modules\Finance\Contracts\FinancePostingInterface;
 use Modules\Finance\DTOs\PostingContext;
 use Modules\Finance\DTOs\PostingLine;
 use Modules\Finance\DTOs\PostingSourceData;
+use Modules\Payment\Constants\PaymentRefundFinanceMetadata;
 use Modules\Payment\Enums\PaymentDirection;
 use Modules\Payment\Enums\PaymentDocumentStatus;
 use Modules\Payment\Enums\PaymentLifecycleDimension;
 use Modules\Payment\Enums\PaymentMethodType;
 use Modules\Payment\Enums\PaymentPostingRole;
 use Modules\Payment\Enums\PaymentPostingStatus;
+use Modules\Payment\Enums\PaymentType;
 use Modules\Payment\Models\Payment;
 use Modules\Payment\Models\PaymentLine;
 use Modules\Payment\Validators\PaymentValidationService;
@@ -29,7 +31,10 @@ final class PaymentPostingService
         private readonly PaymentValidationService $validator,
         private readonly PaymentLifecycleEventRecorder $events,
         private readonly PaymentAllocationService $allocations,
+        private readonly PaymentAllocationFinanceService $allocationFinance,
         private readonly PaymentPostingPolicyService $postingPolicy,
+        private readonly PaymentRefundFinanceService $refundFinance,
+        private readonly PaymentBalanceSynchronizer $balances,
     ) {}
 
     public function post(Payment $payment, int $expectedVersion, ?int $postedBy = null): Payment
@@ -79,14 +84,29 @@ final class PaymentPostingService
             );
 
             $result = $this->postings->post($this->postingContext($locked), $postedBy);
+            $metadata = is_array($locked->metadata) ? $locked->metadata : [];
+            $refundFxReference = $this->refundFinance->post($locked, $postedBy);
+            if ($refundFxReference !== null) {
+                $metadata[PaymentRefundFinanceMetadata::FX_POSTING_REFERENCE] = $refundFxReference;
+            }
+
             $locked->forceFill([
                 'finance_posting_reference' => $result->journalNumber,
+                'metadata' => $metadata,
                 'posting_correlation_key' => 'payment:'.$locked->getKey().':post',
                 'posting_status' => PaymentPostingStatus::Posted->value,
                 'posted_by' => $postedBy,
                 'posted_at' => now(),
                 'row_version' => (int) $locked->row_version + 1,
             ])->save();
+            $locked = $locked->refresh()->load('allocations');
+            foreach ($locked->allocations as $allocation) {
+                if ((string) ($allocation->status instanceof \BackedEnum ? $allocation->status->value : $allocation->status) !== 'active') {
+                    continue;
+                }
+
+                $this->allocationFinance->post($locked, $allocation, $postedBy);
+            }
             $locked = $locked->refresh();
             $this->events->record(
                 $locked,
@@ -96,6 +116,7 @@ final class PaymentPostingService
                 $postedBy,
                 'Payment posted to Finance as '.$result->journalNumber.'.',
             );
+            $this->synchronizeOriginalAfterRefundPosting($locked, $postedBy);
 
             return $locked->refresh()->load(['lines', 'allocations', 'unappliedBalance', 'lifecycleEvents']);
         });
@@ -118,7 +139,7 @@ final class PaymentPostingService
             postingDate: $payment->payment_date?->toDateString() ?? now()->toDateString(),
             currencyId: $payment->currency_id,
             exchangeRate: (string) $payment->exchange_rate,
-            lines: $this->postingLines($payment, $policy->allocatedRole, $policy->unappliedRole),
+            lines: $this->postingLines($payment, $policy->unappliedRole),
             description: 'Payment '.$payment->payment_number,
             postingProfileCode: $policy->postingProfileCode,
         );
@@ -127,7 +148,6 @@ final class PaymentPostingService
     /** @return list<PostingLine> */
     private function postingLines(
         Payment $payment,
-        PaymentPostingRole $allocatedRole,
         PaymentPostingRole $unappliedRole,
     ): array {
         $direction = $payment->direction instanceof PaymentDirection
@@ -145,14 +165,12 @@ final class PaymentPostingService
             foreach ($payment->lines as $line) {
                 $lines[] = $this->cashPostingLine($payment, $line, (string) $line->amount, '0.000000');
             }
-            $this->appendCounterpartyLine($lines, $payment, $allocatedAmount, '0.000000', $allocatedRole);
-            $this->appendCounterpartyLine($lines, $payment, $unappliedAmount, '0.000000', $unappliedRole);
+            $this->appendCounterpartyLine($lines, $payment, $totalAmount, '0.000000', $unappliedRole);
 
             return $this->creditCounterpartyLines($lines);
         }
 
-        $this->appendCounterpartyLine($lines, $payment, $allocatedAmount, '0.000000', $allocatedRole);
-        $this->appendCounterpartyLine($lines, $payment, $unappliedAmount, '0.000000', $unappliedRole);
+        $this->appendCounterpartyLine($lines, $payment, $totalAmount, '0.000000', $unappliedRole);
         foreach ($payment->lines as $line) {
             $lines[] = $this->cashPostingLine($payment, $line, '0.000000', (string) $line->amount);
         }
@@ -231,6 +249,30 @@ final class PaymentPostingService
         return (string) $line->payment_method_type_snapshot === PaymentMethodType::Cash->value
             ? PaymentPostingRole::Cash->value
             : PaymentPostingRole::Bank->value;
+    }
+
+    private function synchronizeOriginalAfterRefundPosting(Payment $payment, ?int $actorId): void
+    {
+        $type = $payment->payment_type instanceof PaymentType
+            ? $payment->payment_type
+            : PaymentType::from((string) $payment->payment_type);
+        if ($type !== PaymentType::Refund || $payment->original_payment_id === null) {
+            return;
+        }
+
+        $query = Payment::query()
+            ->where('tenant_id', $payment->tenant_id)
+            ->whereKey((int) $payment->original_payment_id)
+            ->lockForUpdate();
+        $payment->organization_unit_id === null
+            ? $query->whereNull('organization_unit_id')
+            : $query->where('organization_unit_id', $payment->organization_unit_id);
+        $original = $query->firstOrFail();
+
+        $original = $this->balances->sync($original, 'Refund payment posted.', $actorId);
+        $original->forceFill([
+            'row_version' => (int) $original->row_version + 1,
+        ])->save();
     }
 
     private function assertVersion(Payment $payment, int $expectedVersion): void

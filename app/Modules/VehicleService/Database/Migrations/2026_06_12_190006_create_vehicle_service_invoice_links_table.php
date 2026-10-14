@@ -19,6 +19,7 @@ return new class extends Migration
             $table->decimal('source_line_total', 20, 6);
             $table->decimal('allocated_adjustment_total', 20, 6)->default('0.000000');
             $table->decimal('invoice_total', 20, 6);
+            $table->string('settlement_mode', 20)->nullable();
             $table->string('status', 20)->default('active');
             $table->timestamps();
 

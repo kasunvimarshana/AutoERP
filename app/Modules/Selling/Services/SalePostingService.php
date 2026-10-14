@@ -61,6 +61,9 @@ final class SalePostingService
         if (trim($idempotencyKey) === '') {
             throw new InvalidArgumentException('Sale idempotency key is required.');
         }
+        if (! isset($payload['lines']) || ! is_array($payload['lines']) || $payload['lines'] === []) {
+            throw new InvalidArgumentException('Sale requires at least one line.');
+        }
 
         return DB::transaction(function () use ($payload, $idempotencyKey): Sale {
             $tenantId = (int) $payload['tenant_id'];
@@ -95,7 +98,7 @@ final class SalePostingService
                     throw new InvalidArgumentException('Completed sale request has no sale reference.');
                 }
 
-                return Sale::query()->with(['customer', 'warehouse', 'warehouseLocation', 'lines.item', 'lines.uom', 'invoice'])
+                return Sale::query()->with(['customer', 'warehouse', 'warehouseLocation', 'lines.item', 'lines.variant', 'lines.uom', 'lines.batch', 'lines.serialNumber', 'invoice.balance'])
                     ->where('tenant_id', $tenantId)->findOrFail((int) $saleId);
             }
             if (! $idempotency->wasRecentlyCreated || $idempotency->status !== IdempotencyStatus::InProgress) {
@@ -126,6 +129,10 @@ final class SalePostingService
             foreach (array_values($payload['lines']) as $index => $lineData) {
                 $item = $this->inventoryValidation->item($tenantId, $organizationUnitId, (int) $lineData['item_id']);
                 $this->inventoryValidation->assertStockable($item);
+                $quantity = $this->math->normalize((string) $lineData['quantity']);
+                if ($this->math->compare($quantity, self::ZERO) <= 0) {
+                    throw new InvalidArgumentException('Sale quantity must be positive.');
+                }
                 $variantId = isset($lineData['item_variant_id']) ? (int) $lineData['item_variant_id'] : null;
                 $variant = $this->inventoryValidation->variant($item, $variantId);
                 $batchId = isset($lineData['batch_id']) ? (int) $lineData['batch_id'] : null;
@@ -136,7 +143,6 @@ final class SalePostingService
                 if ($uomId < 1) {
                     throw new InvalidArgumentException('Each sale item must have a valid unit of measure.');
                 }
-                $quantity = $this->math->normalize((string) $lineData['quantity']);
                 $price = $this->prices->resolvePrice($item, ItemPriceResolutionService::CONTEXT_SALES, $uomId, $organizationUnitId, $currencyId, (string) $payload['sale_date'], $variantId);
                 if (! $price->hasAmount()) {
                     throw new InvalidArgumentException('A current sales price is not configured for '.$item->name.'.');
@@ -302,7 +308,7 @@ final class SalePostingService
             ])->save();
             $this->idempotency->complete($idempotency, ['sale_id' => (int) $sale->getKey(), 'invoice_id' => (int) $invoice->getKey()], ['sale_id' => (int) $sale->getKey(), 'invoice_id' => (int) $invoice->getKey()]);
 
-            return $sale->refresh()->load(['customer', 'warehouse', 'warehouseLocation', 'lines.item', 'lines.variant', 'lines.uom', 'invoice.balance']);
+            return $sale->refresh()->load(['customer', 'warehouse', 'warehouseLocation', 'lines.item', 'lines.variant', 'lines.uom', 'lines.batch', 'lines.serialNumber', 'invoice.balance']);
         }, 3);
     }
 }

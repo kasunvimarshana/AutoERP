@@ -570,6 +570,7 @@ final class EmployeeCommissionReportService
             ->selectRaw(
                 "{$key} as group_key, MAX({$label}) as group_label, "
                 .'MAX(commission_rows.employee_code) as group_code, '
+                .'MAX(commission_rows.designation_name) as group_designation_name, '
                 .'COUNT(DISTINCT commission_rows.job_id) as total_jobs, '
                 ."COUNT(DISTINCT CASE WHEN commission_rows.commission_status = 'earned' THEN commission_rows.job_id END) as completed_jobs, "
                 ."COALESCE(SUM(CASE WHEN commission_rows.commission_status <> 'cancelled' THEN commission_rows.assigned_hours ELSE 0 END), 0) as total_hours, "
@@ -598,6 +599,9 @@ final class EmployeeCommissionReportService
                             'code' => $resourceType === 'employee' ? (string) ($row->group_code ?? '') : '',
                             'name' => $label,
                         ],
+                    'designation_name' => $resourceType === 'employee'
+                        ? (trim((string) ($row->group_designation_name ?? '')) ?: null)
+                        : null,
                     'completed_jobs' => (int) $row->completed_jobs,
                     'total_jobs' => (int) $row->total_jobs,
                     'total_hours' => $this->decimal($row->total_hours),

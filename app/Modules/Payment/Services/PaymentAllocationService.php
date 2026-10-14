@@ -12,6 +12,7 @@ use Modules\Invoice\Contracts\InvoiceSettlementServiceInterface;
 use Modules\Invoice\DTOs\BalanceResultData;
 use Modules\Payment\DTOs\PaymentAllocationData;
 use Modules\Payment\Enums\AllocationStatus;
+use Modules\Payment\Enums\PaymentAllocationMethod;
 use Modules\Payment\Models\Payment;
 use Modules\Payment\Models\PaymentAllocation;
 use Modules\Payment\Validators\PaymentValidationService;
@@ -23,6 +24,7 @@ final class PaymentAllocationService
         private readonly PaymentValidationService $validator,
         private readonly PaymentAllocationStateService $allocationStates,
         private readonly PaymentBalanceSynchronizer $balances,
+        private readonly PaymentRefundPolicyService $refundPolicy,
         private readonly InvoiceBalanceProviderInterface $invoiceBalances,
         private readonly InvoiceSettlementServiceInterface $invoiceSettlements,
         private readonly PaymentAllocationFinanceService $allocationFinance,
@@ -166,8 +168,11 @@ final class PaymentAllocationService
         ?string $amount = null,
         ?int $actorId = null,
     ): Payment {
-        $method = strtolower(trim($method));
-        if (in_array($method, ['manual', 'specific_invoice'], true)) {
+        $allocationMethod = PaymentAllocationMethod::tryFrom(strtolower(trim($method)));
+        if (! $allocationMethod instanceof PaymentAllocationMethod) {
+            throw new InvalidArgumentException('Unsupported payment allocation method.');
+        }
+        if (in_array($allocationMethod, [PaymentAllocationMethod::Manual, PaymentAllocationMethod::SpecificInvoice], true)) {
             return $this->allocate(
                 $payment,
                 array_map(
@@ -175,7 +180,7 @@ final class PaymentAllocationService
                         invoiceId: $allocation->invoiceId,
                         allocatedAmount: $allocation->allocatedAmount,
                         allocationDate: $allocation->allocationDate,
-                        allocationMethod: $method,
+                        allocationMethod: $allocationMethod->value,
                         metadata: $allocation->metadata,
                     ),
                     $allocations,
@@ -184,7 +189,7 @@ final class PaymentAllocationService
                 $actorId,
             );
         }
-        if ($method !== 'fifo') {
+        if ($allocationMethod !== PaymentAllocationMethod::Fifo) {
             throw new InvalidArgumentException('Unsupported payment allocation method.');
         }
 
@@ -210,6 +215,7 @@ final class PaymentAllocationService
         }
         $this->assertNoExistingPaymentInvoiceAllocation($payment, $allocation->invoiceId);
         $snapshot = $this->invoiceSnapshot($allocation->invoiceId);
+        $this->assertAllocationDate($payment, $allocation, $snapshot['invoice_date_snapshot']);
 
         return $this->createAllocation([
             'tenant_id' => $payment->tenant_id,
@@ -249,6 +255,7 @@ final class PaymentAllocationService
         }
         $this->assertNoExistingPaymentInvoiceAllocation($payment, $allocation->invoiceId);
         $snapshot = $this->invoiceSnapshot($allocation->invoiceId);
+        $this->assertAllocationDate($payment, $allocation, $snapshot['invoice_date_snapshot']);
         $settlement = $this->invoiceSettlements->applyPaymentAllocation(
             $allocation->invoiceId,
             $allocation->allocatedAmount,
@@ -295,14 +302,19 @@ final class PaymentAllocationService
         }
 
         $invoiceNumber = trim((string) ($reference['invoice_number'] ?? ''));
+        $invoiceExchangeRate = trim((string) ($reference['exchange_rate'] ?? ''));
         if ($invoiceNumber === '') {
             throw new InvalidArgumentException('Invoice number is required for payment allocation history.');
+        }
+        if ($invoiceExchangeRate === '' || $this->math->compare($invoiceExchangeRate, '0') <= 0) {
+            throw new InvalidArgumentException('Invoice exchange rate is required for payment allocation history.');
         }
 
         return [
             'invoice_number_snapshot' => $invoiceNumber,
             'invoice_date_snapshot' => $reference['invoice_date'] ?? null,
             'invoice_currency_code_snapshot' => $reference['currency_code'] ?? null,
+            'invoice_exchange_rate_snapshot' => $reference['exchange_rate'] ?? null,
         ];
     }
 
@@ -322,9 +334,23 @@ final class PaymentAllocationService
         );
     }
 
+    private function assertAllocationDate(
+        Payment $payment,
+        PaymentAllocationData $allocation,
+        ?string $invoiceDate,
+    ): void {
+        $paymentDate = $payment->payment_date?->toDateString();
+        if ($paymentDate !== null && $allocation->allocationDate < $paymentDate) {
+            throw new InvalidArgumentException('Payment allocation date cannot be before the payment date.');
+        }
+        if ($invoiceDate !== null && $allocation->allocationDate < $invoiceDate) {
+            throw new InvalidArgumentException('Payment allocation date cannot be before the invoice date.');
+        }
+    }
+
     private function availableAmount(Payment $payment): string
     {
-        return $this->math->normalize((string) $payment->unapplied_amount);
+        return $this->refundPolicy->availableUnappliedAmount($payment);
     }
 
     private function assertNoExistingPaymentInvoiceAllocation(Payment $payment, int $invoiceId): void
@@ -355,6 +381,7 @@ final class PaymentAllocationService
             organizationUnitId: $payment->organization_unit_id,
             partyType: $payment->party_type,
             partyId: (int) $payment->party_id,
+            currencyId: $payment->currency_id === null ? null : (int) $payment->currency_id,
         ) as $invoiceBalance) {
             if ($this->math->isZero($remaining)) {
                 break;
@@ -367,7 +394,7 @@ final class PaymentAllocationService
                 invoiceId: $invoiceBalance->sourceId,
                 allocatedAmount: $allocatedAmount,
                 allocationDate: $allocationDate,
-                allocationMethod: 'fifo',
+                allocationMethod: PaymentAllocationMethod::Fifo->value,
             );
             $remaining = $this->math->sub($remaining, $allocatedAmount);
         }

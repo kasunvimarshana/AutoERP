@@ -159,7 +159,11 @@ export default function VehicleServiceJobDetailPage() {
             <ContentHeader title={job.job_number} description={`${job.customer?.name ?? 'Customer'} / ${job.vehicle?.name ?? 'Vehicle'}`} />
             <WorkflowHeader
                 status={<VehicleServiceStatusBadge status={job.status} />}
-                nextAction={nextAction ? <Button type="button" loading={busy} onClick={() => action(nextAction.action)}>{nextAction.label}</Button> : undefined}
+                nextAction={nextAction
+                    ? <Button type="button" loading={busy} onClick={() => action(nextAction.action)}>{nextAction.label}</Button>
+                    : job.status === 'completed'
+                        ? <LinkButton to={`/vehicle-service/jobs/${job.id}/invoice`}>Create & post invoice</LinkButton>
+                        : undefined}
                 historyAction={<Button type="button" variant="ghost" onClick={() => tabs.openTab('history')}>History</Button>}
                 secondaryActions={<>
                     {['draft', 'inspected', 'in_progress'].includes(job.status) && <LinkButton to={`/vehicle-service/jobs/${job.id}/edit`} variant="secondary">Edit</LinkButton>}
@@ -219,7 +223,7 @@ export default function VehicleServiceJobDetailPage() {
                     <Button type="button" variant="secondary" onClick={() => tabs.openTab('inspection')}>Open inspection</Button>
                     <Button type="button" variant="secondary" onClick={() => tabs.openTab('lines')}>Open job lines</Button>
                     <Button type="button" variant="secondary" onClick={() => tabs.openTab('workforce')}>Assign workforce</Button>
-                    {['completed', 'invoiced'].includes(job.status) && <LinkButton to={`/vehicle-service/jobs/${job.id}/invoice`} variant="secondary">Create & post invoice</LinkButton>}
+                    {job.status === 'completed' && <LinkButton to={`/vehicle-service/jobs/${job.id}/invoice`} variant="secondary">Create & post invoice</LinkButton>}
                     {(job.invoice_links ?? []).some((link) => link.status === 'active' && compareDecimalStrings(link.balance_due ?? '0', '0') > 0) && <LinkButton to={`/vehicle-service/jobs/${job.id}/payment`} variant="secondary">Receive payment</LinkButton>}
                 </div>
             </section>

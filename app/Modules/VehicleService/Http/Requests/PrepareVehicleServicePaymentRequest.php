@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Modules\VehicleService\Http\Requests;
 
+use Illuminate\Validation\Rule;
 use Modules\Core\Http\Requests\TenantScopedRequest;
+use Modules\Payment\Enums\PaymentCardBrand;
 use Modules\VehicleService\DTOs\VehicleServicePaymentData;
 use Modules\VehicleService\DTOs\VehicleServicePaymentLineData;
 use Modules\VehicleService\Http\Requests\Concerns\HasExpectedVehicleServiceJobVersion;
@@ -29,6 +31,7 @@ final class PrepareVehicleServicePaymentRequest extends TenantScopedRequest
             'lines.*.external_bank_branch' => ['nullable', 'string', 'max:150'],
             'lines.*.instrument_number' => ['nullable', 'string', 'max:150'],
             'lines.*.instrument_date' => ['nullable', 'date'],
+            'lines.*.card_brand' => ['nullable', 'string', Rule::enum(PaymentCardBrand::class)],
             'currency_id' => ['nullable', 'integer', 'min:1'],
             'exchange_rate' => ['nullable', 'decimal:0,6', 'gt:0'],
             'internal_bank_account_id' => ['prohibited'],
@@ -53,6 +56,7 @@ final class PrepareVehicleServicePaymentRequest extends TenantScopedRequest
                 externalBankBranch: $this->stringOrNullFrom($line, 'external_bank_branch'),
                 instrumentNumber: $this->stringOrNullFrom($line, 'instrument_number'),
                 instrumentDate: $this->stringOrNullFrom($line, 'instrument_date'),
+                cardBrand: $this->stringOrNullFrom($line, 'card_brand'),
             ), $this->input('lines', [])),
             currencyId: $this->filled('currency_id') ? (int) $this->input('currency_id') : null,
             exchangeRate: (string) $this->input('exchange_rate', '1.000000'),

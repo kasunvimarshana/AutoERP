@@ -56,8 +56,7 @@ final class VehicleUseService
     {
         $this->authorization->assertUse($context, true);
         $this->validation->assertContext($context);
-        $data = Validator::make($input, ['vehicle_id' => ['required', 'integer', 'min:1'], 'owner_agreement_id' => ['nullable', 'integer', 'min:1'],
-            'starts_at' => ['required', 'string'], 'ends_at' => ['present', 'nullable', 'string'], 'notes' => ['nullable', 'string', 'max:'.AgreementFields::NOTES_LENGTH]])->validate();
+        $data = $this->validatePlanInput($input);
         [$start, $end] = OperationalTime::plannedPeriod($data['starts_at'], $data['ends_at']);
 
         return DB::transaction(function () use ($context, $customerAgreement, $expectedAgreementVersion, $data, $start, $end, $replaces): VehicleUse {
@@ -170,19 +169,28 @@ final class VehicleUseService
     {
         $this->authorization->assertUse($context, true);
         $this->validation->assertContext($context);
-        Validator::make($input, ['vehicle_id' => ['required', 'integer', 'min:1'], 'reason' => ['required', 'string', 'max:'.AgreementFields::NOTES_LENGTH]])->validate();
+        $data = Validator::make($input, array_merge($this->planRules(), [
+            'reason' => ['required', 'string', 'max:'.AgreementFields::NOTES_LENGTH],
+            'return_odometer' => ['nullable', 'string', 'regex:'.AgreementFields::DECIMAL_PATTERN],
+            'handover_odometer' => ['nullable', 'string', 'regex:'.AgreementFields::DECIMAL_PATTERN],
+        ]))->validate();
+        if (trim($data['reason']) === '') {
+            throw ValidationException::withMessages(['reason' => ['Explain the vehicle replacement.']]);
+        }
+        // Validate the complete planned replacement period before mutating the existing custody record.
+        OperationalTime::plannedPeriod($data['starts_at'], $data['ends_at']);
 
-        return DB::transaction(function () use ($context, $id, $expectedVersion, $input): VehicleUse {
+        return DB::transaction(function () use ($context, $id, $expectedVersion, $data): VehicleUse {
             $previous = VehicleUse::query()->forContext($context->tenantId, $context->organizationUnitId)->findOrFail($id);
-            if ((int) $previous->vehicle_id === (int) $input['vehicle_id']) {
+            if ((int) $previous->vehicle_id === (int) $data['vehicle_id']) {
                 throw ValidationException::withMessages(['vehicle_id' => ['Select a different physical vehicle.']]);
             }
-            Vehicle::query()->where('tenant_id', $context->tenantId)->whereIn('id', [(int) $previous->vehicle_id, (int) $input['vehicle_id']])->orderBy('id')->lockForUpdate()->get();
-            $previous = $this->transition($context, $id, $expectedVersion, VehicleUseAction::ReturnVehicle, ['occurred_at' => $input['starts_at'] ?? null, 'odometer' => $input['return_odometer'] ?? null, 'reason' => $input['reason']]);
+            Vehicle::query()->where('tenant_id', $context->tenantId)->whereIn('id', [(int) $previous->vehicle_id, (int) $data['vehicle_id']])->orderBy('id')->lockForUpdate()->get();
+            $previous = $this->transition($context, $id, $expectedVersion, VehicleUseAction::ReturnVehicle, ['occurred_at' => $data['starts_at'], 'odometer' => $data['return_odometer'] ?? null, 'reason' => $data['reason']]);
             $customer = CustomerAgreement::query()->forContext($context->tenantId, $context->organizationUnitId)->lockForUpdate()->findOrFail($previous->customer_agreement_id);
-            $next = $this->plan($context, (int) $customer->id, $customer->row_version, $input, (int) $previous->id);
+            $next = $this->plan($context, (int) $customer->id, $customer->row_version, $data, (int) $previous->id);
 
-            return $this->transition($context, (int) $next->id, $next->row_version, VehicleUseAction::Handover, ['occurred_at' => $input['starts_at'], 'odometer' => $input['handover_odometer'] ?? null, 'reason' => $input['reason']]);
+            return $this->transition($context, (int) $next->id, $next->row_version, VehicleUseAction::Handover, ['occurred_at' => $data['starts_at'], 'odometer' => $data['handover_odometer'] ?? null, 'reason' => $data['reason']]);
         });
     }
 
@@ -221,6 +229,22 @@ final class VehicleUseService
         if ($agreement->status !== AgreementStatus::Active || $agreement->starts_on->toDateString() > $start || ($agreement->ends_on !== null && ($end === null || $agreement->ends_on->toDateString() < $end))) {
             throw ValidationException::withMessages(['agreement' => ['An active agreement must cover the complete selected period.']]);
         }
+    }
+
+    private function validatePlanInput(array $input): array
+    {
+        return Validator::make($input, $this->planRules())->validate();
+    }
+
+    private function planRules(): array
+    {
+        return [
+            'vehicle_id' => ['required', 'integer', 'min:1'],
+            'owner_agreement_id' => ['nullable', 'integer', 'min:1'],
+            'starts_at' => ['required', 'string'],
+            'ends_at' => ['present', 'nullable', 'string'],
+            'notes' => ['nullable', 'string', 'max:'.AgreementFields::NOTES_LENGTH],
+        ];
     }
 
     private function version(int $actual, int $expected): void

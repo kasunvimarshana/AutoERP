@@ -10,6 +10,8 @@ use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Finance\Contracts\FinancePaymentReversalInterface;
 use Modules\Invoice\Contracts\InvoiceSettlementServiceInterface;
+use Modules\Payment\Constants\PaymentAllocationFinanceMetadata;
+use Modules\Payment\Constants\PaymentRefundFinanceMetadata;
 use Modules\Payment\DTOs\PaymentReversalData;
 use Modules\Payment\Enums\AllocationStatus;
 use Modules\Payment\Enums\PaymentAllocationState;
@@ -32,6 +34,7 @@ final class PaymentReversalService
         private readonly PaymentLifecycleEventRecorder $events,
         private readonly PaymentBalanceSynchronizer $balances,
         private readonly PaymentAllocationFinanceService $allocationFinance,
+        private readonly PaymentRefundFinanceService $refundFinance,
     ) {}
 
     public function reverse(PaymentReversalData $data): PaymentReversal
@@ -66,19 +69,34 @@ final class PaymentReversalService
                 $data->reversedBy,
                 $data->reason,
             );
+            $metadata = is_array($payment->metadata) ? $payment->metadata : [];
+            $refundFxReversal = $this->refundFinance->reverse(
+                $payment,
+                $data->reversalDate,
+                $data->reversedBy,
+                $data->reason,
+            );
+            if ($refundFxReversal !== null) {
+                $metadata[PaymentRefundFinanceMetadata::FX_REVERSAL_REFERENCE] = $refundFxReversal;
+            }
 
             foreach ($payment->allocations()
                 ->where('status', AllocationStatus::Active->value)
                 ->orderBy('invoice_id')
                 ->orderBy('id')
                 ->get() as $allocation) {
-                $this->allocationFinance->reverse(
-                    $payment,
-                    $allocation,
-                    $data->reversalDate,
-                    $data->reason,
-                    $data->reversedBy,
-                );
+                // Older initial allocations were included in the main payment journal
+                // reversed above. Reverse a separate journal only when one was posted.
+                $allocationMetadata = is_array($allocation->metadata) ? $allocation->metadata : [];
+                if (trim((string) ($allocationMetadata[PaymentAllocationFinanceMetadata::POSTING_REFERENCE] ?? '')) !== '') {
+                    $this->allocationFinance->reverse(
+                        $payment,
+                        $allocation,
+                        $data->reversalDate,
+                        $data->reason,
+                        $data->reversedBy,
+                    );
+                }
                 $this->invoiceSettlements->reversePaymentAllocation(
                     (int) $allocation->invoice_id,
                     (string) $allocation->allocated_amount,
@@ -122,6 +140,7 @@ final class PaymentReversalService
                 'reversed_by' => $data->reversedBy,
                 'reversed_at' => now(),
                 'reversal_reason' => $data->reason,
+                'metadata' => $metadata,
                 'row_version' => (int) $payment->row_version + 1,
             ])->save();
             $payment = $payment->refresh();

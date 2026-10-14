@@ -92,6 +92,7 @@ export default function PurchaseReturnDetailPage() {
                         { label: 'Status', value: <StatusBadge status={row.status} /> },
                         { label: 'Type', value: row.return_type?.replaceAll('_', ' ') ?? '-' },
                         { label: 'Supplier', value: row.supplier?.name ?? '-' },
+                        { label: 'Currency', value: row.currency?.code ?? (row.currency_id ? 'Currency code unavailable' : 'Unresolved') },
                         { label: 'Warehouse', value: row.warehouse?.name ?? '-' },
                         { label: 'Affects payable', value: row.affects_supplier_balance ? 'Yes' : 'No' },
                         { label: 'Grand total', value: formatMoney(row.grand_total) },

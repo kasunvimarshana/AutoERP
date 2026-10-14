@@ -3,12 +3,13 @@ import { Button, LinkButton } from '@/shared/components/Button';
 import type { PurchaseOrder } from '../purchaseApi';
 import { purchaseOrderCapabilities } from '../purchaseCapabilities';
 
-export function PurchaseOrderActions({ order, busy, downloadingPdf, sharingWhatsApp, canUpdate = true, onDownloadPdf, onShareWhatsApp, onSubmit, onApprove, onCancel, onClose, onDelete }: {
+export function PurchaseOrderActions({ order, busy, downloadingPdf, sharingWhatsApp, canUpdate = true, className = '', onDownloadPdf, onShareWhatsApp, onSubmit, onApprove, onCancel, onClose, onDelete }: {
     order: PurchaseOrder;
     busy?: boolean;
     downloadingPdf?: boolean;
     sharingWhatsApp?: boolean;
     canUpdate?: boolean;
+    className?: string;
     onDownloadPdf?: () => void;
     onShareWhatsApp?: () => void;
     onSubmit?: () => void;
@@ -22,15 +23,15 @@ export function PurchaseOrderActions({ order, busy, downloadingPdf, sharingWhats
     const showDelete = canDelete && onDelete !== undefined;
 
     return (
-        <div className="flex flex-wrap justify-end gap-2">
-            {onDownloadPdf && <Button type="button" variant="secondary" loading={downloadingPdf} loadingLabel="Preparing PDF..." onClick={onDownloadPdf}>Download PDF</Button>}
-            {onShareWhatsApp && <Button type="button" variant="secondary" loading={sharingWhatsApp} loadingLabel="Opening WhatsApp..." onClick={onShareWhatsApp}>Share via WhatsApp</Button>}
-            {canEdit && canUpdate && <LinkButton to={`/purchase/orders/${order.id}/edit`} variant="secondary">Edit</LinkButton>}
-            {canSubmit && onSubmit && <Button type="button" variant="secondary" loading={busy} onClick={onSubmit}>Submit</Button>}
-            {canApprove && onApprove && <Button type="button" loading={busy} onClick={onApprove}>Approve</Button>}
-            {canClose && onClose && <Button type="button" variant="secondary" loading={busy} onClick={onClose}>Close</Button>}
+        <div className={`grid w-full grid-cols-2 gap-2 md:flex md:w-auto md:flex-wrap md:justify-end ${className}`}>
+            {onDownloadPdf && <Button className="w-full md:w-auto" type="button" variant="secondary" loading={downloadingPdf} loadingLabel="Preparing PDF..." onClick={onDownloadPdf}>Download PDF</Button>}
+            {onShareWhatsApp && <Button className="w-full md:w-auto" type="button" variant="secondary" loading={sharingWhatsApp} loadingLabel="Opening WhatsApp..." onClick={onShareWhatsApp}>Share via WhatsApp</Button>}
+            {canEdit && canUpdate && <LinkButton className="w-full md:w-auto" to={`/purchase/orders/${order.id}/edit`} variant="secondary">Edit</LinkButton>}
+            {canSubmit && onSubmit && <Button className="w-full md:w-auto" type="button" variant="secondary" loading={busy} onClick={onSubmit}>Submit</Button>}
+            {canApprove && onApprove && <Button className="w-full md:w-auto" type="button" loading={busy} onClick={onApprove}>Approve</Button>}
+            {canClose && onClose && <Button className="w-full md:w-auto" type="button" variant="secondary" loading={busy} onClick={onClose}>Close</Button>}
             {(showCancel || showDelete) && (
-                <ActionMenu>
+                <ActionMenu className="w-full md:w-auto" triggerClassName="w-full justify-center md:w-auto md:justify-start">
                     {showCancel && <Button className="w-full justify-start text-rose-700" type="button" variant="ghost" loading={busy} onClick={onCancel}>Cancel order</Button>}
                     {showDelete && <Button className="w-full justify-start text-rose-700" type="button" variant="ghost" loading={busy} onClick={onDelete}>Delete draft</Button>}
                 </ActionMenu>

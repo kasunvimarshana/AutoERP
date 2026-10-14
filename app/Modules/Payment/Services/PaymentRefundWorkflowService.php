@@ -25,10 +25,8 @@ final class PaymentRefundWorkflowService
     public function __construct(
         private readonly DecimalMath $math,
         private readonly PaymentCreationService $payments,
-        private readonly PaymentDocumentLifecycleService $lifecycle,
-        private readonly PaymentPostingService $posting,
         private readonly PaymentValidationService $validator,
-        private readonly PaymentBalanceSynchronizer $balances,
+        private readonly PaymentRefundPolicyService $refundPolicy,
     ) {}
 
     public function refund(PaymentRefundData $data): PaymentRefund
@@ -46,13 +44,19 @@ final class PaymentRefundWorkflowService
             if ($originalType === PaymentType::Refund) {
                 throw new InvalidArgumentException('A refund payment cannot be refunded again.');
             }
-            $this->validator->assertPositive($data->amount, 'Refund amount');
-            if ($this->math->compare($data->amount, (string) $original->unapplied_amount) > 0) {
-                throw new InvalidArgumentException('Refund cannot exceed the payment unapplied amount.');
+            $originalDate = $original->payment_date?->toDateString();
+            if ($originalDate !== null && $data->refundDate < $originalDate) {
+                throw new InvalidArgumentException('Refund date cannot be before the original payment date.');
             }
 
-            $paymentMethodId = $data->paymentMethodId ?? $original->lines->first()?->payment_method_id;
-            $method = $paymentMethodId === null ? null : PaymentMethod::query()->find($paymentMethodId);
+            $this->validator->assertPositive($data->amount, 'Refund amount');
+            $available = $this->refundPolicy->availableUnappliedAmount($original);
+            if ($this->math->compare($data->amount, $available) > 0) {
+                throw new InvalidArgumentException('Refund cannot exceed the unreserved payment amount.');
+            }
+
+            $paymentMethodId = $data->paymentMethodId;
+            $method = PaymentMethod::query()->find($paymentMethodId);
             $hasInstrumentDetails = trim((string) $data->instrumentNumber) !== ''
                 || trim((string) $data->externalBankName) !== ''
                 || trim((string) $data->instrumentDate) !== '';
@@ -78,7 +82,7 @@ final class PaymentRefundWorkflowService
                 sourceId: (int) $original->getKey(),
                 originalPaymentId: (int) $original->getKey(),
                 currencyId: $original->currency_id,
-                exchangeRate: (string) $original->exchange_rate,
+                exchangeRate: $data->exchangeRate,
                 referenceNumber: $data->referenceNumber,
                 notes: $data->reason,
                 createdBy: $data->refundedBy,
@@ -96,10 +100,6 @@ final class PaymentRefundWorkflowService
                 metadata: ['original_payment_id' => (int) $original->getKey()],
             ));
 
-            $refundPayment = $this->lifecycle->submit($refundPayment, (int) $refundPayment->row_version, $data->refundedBy);
-            $refundPayment = $this->lifecycle->approve($refundPayment, (int) $refundPayment->row_version, $data->refundedBy);
-            $refundPayment = $this->posting->post($refundPayment, (int) $refundPayment->row_version, $data->refundedBy);
-
             $refund = PaymentRefund::query()->create([
                 'tenant_id' => $original->tenant_id,
                 'organization_unit_id' => $original->organization_unit_id,
@@ -113,7 +113,6 @@ final class PaymentRefundWorkflowService
             ]);
 
             $original->forceFill(['row_version' => (int) $original->row_version + 1])->save();
-            $this->balances->sync($original->refresh(), 'Payment refund recorded.', $data->refundedBy);
 
             return $refund->refresh()->load('refundPayment');
         });

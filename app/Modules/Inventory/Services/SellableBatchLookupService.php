@@ -31,6 +31,8 @@ final class SellableBatchLookupService
         int $perPage,
         ?int $warehouseId = null,
         ?int $warehouseLocationId = null,
+        bool $prioritizeSearch = false,
+        ?int $page = null,
     ): LengthAwarePaginator {
         $balanceScope = function (Builder $query) use ($tenantId, $organizationUnitId, $warehouseId, $warehouseLocationId): void {
             $query->where('tenant_id', $tenantId);
@@ -46,7 +48,7 @@ final class SellableBatchLookupService
         };
 
         $query = InventoryBatch::query()
-            ->where('tenant_id', $tenantId)
+            ->where('inventory_batches.tenant_id', $tenantId)
             ->where('status', BatchStatus::Active->value)
             ->where(fn (Builder $expiry): Builder => $expiry
                 ->whereNull('expiry_date')
@@ -69,11 +71,40 @@ final class SellableBatchLookupService
                     ->orWhere('lot_number', 'like', "%{$search}%")
                     ->orWhereHas('item', fn (Builder $item): Builder => $item
                         ->where('code', 'like', "%{$search}%")
-                        ->orWhere('name', 'like', "%{$search}%"));
+                        ->orWhere('name', 'like', "%{$search}%")
+                        ->orWhere('sku', 'like', "%{$search}%")
+                        ->orWhere('barcode', 'like', "%{$search}%"));
             });
         }
 
-        $paginator = $query->orderBy('item_id')->orderBy('batch_number')->paginate(min($perPage, 50));
+        if ($prioritizeSearch && $search !== '') {
+            $term = mb_strtolower($search);
+            $prefix = $term.'%';
+            $query->join('items as lookup_items', 'lookup_items.id', '=', 'inventory_batches.item_id')
+                ->whereColumn('lookup_items.tenant_id', 'inventory_batches.tenant_id')
+                ->addSelect('inventory_batches.*')
+                ->orderByRaw(
+                    'CASE WHEN LOWER(lookup_items.name) = ? OR LOWER(lookup_items.code) = ? OR LOWER(lookup_items.sku) = ? '
+                    .'OR LOWER(lookup_items.barcode) = ? OR LOWER(inventory_batches.batch_number) = ? '
+                    .'OR LOWER(inventory_batches.lot_number) = ? THEN 0 '
+                    .'WHEN LOWER(lookup_items.name) LIKE ? OR LOWER(lookup_items.code) LIKE ? '
+                    .'OR LOWER(lookup_items.sku) LIKE ? OR LOWER(lookup_items.barcode) LIKE ? '
+                    .'OR LOWER(inventory_batches.batch_number) LIKE ? OR LOWER(inventory_batches.lot_number) LIKE ? THEN 1 '
+                    .'ELSE 2 END',
+                    [$term, $term, $term, $term, $term, $term, $prefix, $prefix, $prefix, $prefix, $prefix, $prefix],
+                )
+                ->orderBy('lookup_items.name')
+                ->orderBy('lookup_items.code')
+                ->orderBy('inventory_batches.batch_number')
+                ->orderBy('inventory_batches.id');
+
+            $paginator = $query->paginate(min($perPage, 50), ['*'], 'page', $page);
+        } else {
+            $paginator = $query
+                ->orderBy('item_id')
+                ->orderBy('batch_number')
+                ->paginate(min($perPage, 50), ['*'], 'page', $page);
+        }
         $currencyId = TenantModel::query()->whereKey($tenantId)->value('base_currency_id');
         $items = $paginator->getCollection()->pluck('item')->filter();
         $duplicateNames = $this->itemQueries->duplicateNames($items, $tenantId, $organizationUnitId);
