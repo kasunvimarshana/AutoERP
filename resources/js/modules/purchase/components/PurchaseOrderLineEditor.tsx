@@ -10,6 +10,7 @@ export { previewLineAmounts } from './purchaseLineModel';
 
 const purchaseOrderLineConfig: PurchaseLineEditorConfig = {
     unitLabel: 'Unit price',
+    stockItemsOnly: true,
     taxMode: 'manual',
     continuousCreate: true,
     emptyMessage: 'No purchase lines added. Add the first item to this order.',

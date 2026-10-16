@@ -7,6 +7,7 @@ import type {
 
 const purchaseOrderLineConfig: PurchaseLineEditorConfig = {
     unitLabel: 'Unit price',
+    stockItemsOnly: true,
     taxMode: 'manual',
     emptyMessage: 'No purchase lines added. Add the first item to this order.',
 };

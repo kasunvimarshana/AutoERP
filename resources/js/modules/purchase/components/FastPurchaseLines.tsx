@@ -51,6 +51,7 @@ export function blankFastPurchaseLine(): FastPurchaseLineRow {
 export function FastPurchaseLines({ rows, context, supplierId, currencyId, warehouseId, purchaseDate, previewLines = [], errorFor, errorIndexForLine, onChange }: FastPurchaseLinesProps) {
     const config: PurchaseLineEditorConfig = {
         unitLabel: 'Unit cost',
+        stockItemsOnly: true,
         taxMode: 'tax_group',
         taxGroupOptions: context?.tax_groups ?? [],
         defaultLine: { unit_price: '' },

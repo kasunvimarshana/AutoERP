@@ -219,6 +219,7 @@ final class PurchaseOrderWriteService
             $line->itemId,
             "lines.{$index}.item_id",
         );
+        $this->validator->assertStockItem($item, "lines.{$index}.item_id");
         $uomId = $line->orderedUomId ?? $line->uomId;
         if ($uomId === null) {
             throw new InvalidArgumentException('Purchase line UOM is required.');

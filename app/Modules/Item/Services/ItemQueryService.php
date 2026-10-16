@@ -64,6 +64,7 @@ final class ItemQueryService
     {
         $criteria['is_active'] = true;
         match ($kind) {
+            'stock' => [$criteria['item_type'] = ItemType::Stock->value, $criteria['is_stockable'] = true],
             'stockable' => $criteria['is_stockable'] = true,
             'untracked-stockable' => [$criteria['is_stockable'] = true, $criteria['tracking_type'] = TrackingType::None->value],
             'batch-tracked-stockable' => [$criteria['is_stockable'] = true, $criteria['tracking_types'] = [TrackingType::Batch->value, TrackingType::Lot->value]],
