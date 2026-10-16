@@ -15,7 +15,8 @@ import { openSameOriginUrl } from '@/shared/utils/safeNavigation';
 import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { compareDecimalStrings, nonNegativeDecimal, subtractDecimal, sumDecimals } from '@/shared/utils/decimal';
 import { formatMoney } from '@/shared/utils/formatMoney';
-import { getInvoiceSignedPrintLink } from '@/modules/invoice/invoiceApi';
+import { getInvoiceSignedPrintLink, getInvoiceWhatsAppShare } from '@/modules/invoice/invoiceApi';
+import { closePendingWhatsAppWindow, confirmPendingWhatsAppShare, navigateToWhatsApp, openPendingWhatsAppWindow } from '@/shared/utils/whatsAppNavigation';
 import { PaymentMethodFields } from '@/modules/payment/components/PaymentMethodFields';
 import {
     createVehicleServicePayment,
@@ -190,6 +191,8 @@ export default function VehicleServicePaymentPreparePage() {
     })));
     const [createdPayment, setCreatedPayment] = useState<VehicleServicePaymentCreated | null>(null);
     const [settledInvoice, setSettledInvoice] = useState<VehicleServiceInvoiceLink | null>(null);
+    const [sharingWhatsApp, setSharingWhatsApp] = useState(false);
+    const [whatsAppShareError, setWhatsAppShareError] = useState<ApiError | null>(null);
     const [busy, setBusy] = useState(false);
     const [creditCheckFeedback, setCreditCheckFeedback] = useState<{ kind: 'blocked' | 'warning'; message: string } | null>(null);
     const [acknowledgedCreditWarning, setAcknowledgedCreditWarning] = useState<string | null>(null);
@@ -242,6 +245,30 @@ export default function VehicleServicePaymentPreparePage() {
 
     const updateRow = (kind: DirectPaymentKind, update: Partial<PaymentRow>) => {
         setRows((current) => current.map((row) => row.kind === kind ? { ...row, ...update } : row));
+    };
+    const shareInvoiceViaWhatsApp = async () => {
+        if (!settledInvoice) return;
+
+        const pendingWindow = openPendingWhatsAppWindow();
+        setSharingWhatsApp(true);
+        setWhatsAppShareError(null);
+        try {
+            const share = await getInvoiceWhatsAppShare(settledInvoice.invoice_id);
+            if (share.recipient.verification_status !== 'verified'
+                && !confirmPendingWhatsAppShare(pendingWindow, 'This customer WhatsApp number has not been manually verified. Continue sharing anyway?')) {
+                closePendingWhatsAppWindow(pendingWindow);
+                return;
+            }
+
+            if (!navigateToWhatsApp(share.whatsapp_url, pendingWindow)) {
+                throw new Error('The server returned an invalid WhatsApp link.');
+            }
+        } catch (requestError) {
+            closePendingWhatsAppWindow(pendingWindow);
+            setWhatsAppShareError(toApiError(requestError));
+        } finally {
+            setSharingWhatsApp(false);
+        }
     };
     const payload = (): VehicleServicePaymentPayload => ({
         expected_version: options.data?.job_version ?? 0,
@@ -572,6 +599,7 @@ export default function VehicleServicePaymentPreparePage() {
                     </Panel>
 
                     <aside className="rounded-lg border border-blue-100 bg-blue-50 p-5 xl:sticky xl:top-5">
+                        <ErrorAlert error={whatsAppShareError} />
                         <p className="text-sm font-medium text-slate-700">Outstanding balance</p>
                         <p className="mt-1 text-2xl font-semibold tabular-nums text-slate-950">{formatMoney(outstanding)}</p>
                         <div className="my-5 border-t border-blue-200" />
@@ -604,20 +632,25 @@ export default function VehicleServicePaymentPreparePage() {
                         <div className="mt-6 flex flex-col gap-2">
                             {paymentMode === 'direct' ? (
                                 createdPayment && settledInvoice ? (
-                                    <Button type="button" onClick={async () => {
-                                        try {
-                                            const json = await getInvoiceSignedPrintLink(settledInvoice.invoice_id);
-                                            if (json.print_url) {
-                                                openSameOriginUrl(json.print_url);
-                                                return;
+                                    <>
+                                        <Button type="button" onClick={async () => {
+                                            try {
+                                                const json = await getInvoiceSignedPrintLink(settledInvoice.invoice_id);
+                                                if (json.print_url) {
+                                                    openSameOriginUrl(json.print_url);
+                                                    return;
+                                                }
+                                            } catch {
+                                                // Use the invoice print page when a signed link is unavailable.
                                             }
-                                        } catch {
-                                            // Use the invoice print page when a signed link is unavailable.
-                                        }
-                                        openSameOriginUrl(`/invoices/${settledInvoice.invoice_id}/print`);
-                                    }}>
-                                        Print bill
-                                    </Button>
+                                            openSameOriginUrl(`/invoices/${settledInvoice.invoice_id}/print`);
+                                        }}>
+                                            Print bill
+                                        </Button>
+                                        <Button type="button" variant="secondary" loading={sharingWhatsApp} loadingLabel="Opening WhatsApp..." onClick={() => void shareInvoiceViaWhatsApp()}>
+                                            Share via WhatsApp
+                                        </Button>
+                                    </>
                                 ) : (
                                     <Button type="submit" loading={busy} disabled={!canFinalize}>
                                         Finalize payment
