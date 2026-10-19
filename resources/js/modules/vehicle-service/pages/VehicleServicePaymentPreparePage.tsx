@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button, LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
@@ -174,7 +174,6 @@ function focusNextPaymentField(form: HTMLFormElement | null, current: HTMLElemen
 }
 
 export default function VehicleServicePaymentPreparePage() {
-    const navigate = useNavigate();
     const jobId = Number(useParams().id);
     const job = useApi((signal) => getVehicleServiceJob(jobId, signal), [jobId]);
     const options = useApi((signal) => getVehicleServicePaymentOptions(jobId, signal), [jobId]);
@@ -191,6 +190,7 @@ export default function VehicleServicePaymentPreparePage() {
     })));
     const [createdPayment, setCreatedPayment] = useState<VehicleServicePaymentCreated | null>(null);
     const [settledInvoice, setSettledInvoice] = useState<VehicleServiceInvoiceLink | null>(null);
+    const [creditedInvoice, setCreditedInvoice] = useState<VehicleServiceInvoiceLink | null>(null);
     const [sharingWhatsApp, setSharingWhatsApp] = useState(false);
     const [whatsAppShareError, setWhatsAppShareError] = useState<ApiError | null>(null);
     const [busy, setBusy] = useState(false);
@@ -229,7 +229,8 @@ export default function VehicleServicePaymentPreparePage() {
     }, [eligibleInvoices, invoiceId, paymentMethods]);
     const invoice = eligibleInvoices.find((link) => link.invoice_id === Number(invoiceId));
     const outstanding = invoice?.balance_due ?? ZERO_AMOUNT;
-    const paymentEntryDisabled = Boolean(createdPayment) || !invoice;
+    const completedInvoice = settledInvoice ?? creditedInvoice;
+    const paymentEntryDisabled = Boolean(createdPayment || creditedInvoice) || !invoice;
     const appliedAmounts = invoice
         ? calculateAppliedAmounts(rows, paymentMethods, outstanding)
         : rows.map(() => ZERO_AMOUNT);
@@ -246,14 +247,26 @@ export default function VehicleServicePaymentPreparePage() {
     const updateRow = (kind: DirectPaymentKind, update: Partial<PaymentRow>) => {
         setRows((current) => current.map((row) => row.kind === kind ? { ...row, ...update } : row));
     };
+    const printInvoice = async (targetInvoiceId: number) => {
+        try {
+            const json = await getInvoiceSignedPrintLink(targetInvoiceId);
+            if (json.print_url) {
+                openSameOriginUrl(json.print_url);
+                return;
+            }
+        } catch {
+            // Use the invoice print page when a signed link is unavailable.
+        }
+        openSameOriginUrl(`/invoices/${targetInvoiceId}/print`);
+    };
     const shareInvoiceViaWhatsApp = async () => {
-        if (!settledInvoice) return;
+        if (!completedInvoice) return;
 
         const pendingWindow = openPendingWhatsAppWindow();
         setSharingWhatsApp(true);
         setWhatsAppShareError(null);
         try {
-            const share = await getInvoiceWhatsAppShare(settledInvoice.invoice_id);
+            const share = await getInvoiceWhatsAppShare(completedInvoice.invoice_id);
             if (share.recipient.verification_status !== 'verified'
                 && !confirmPendingWhatsAppShare(pendingWindow, 'This customer WhatsApp number has not been manually verified. Continue sharing anyway?')) {
                 closePendingWhatsAppWindow(pendingWindow);
@@ -357,7 +370,7 @@ export default function VehicleServicePaymentPreparePage() {
                                         label: `${link.invoice_number ?? 'Invoice'} · balance ${formatMoney(link.balance_due ?? link.invoice_total)}`,
                                     }))}
                                     placeholder={eligibleInvoices.length > 0 ? 'Select posted invoice' : 'No payable posted invoices'}
-                                    disabled={Boolean(createdPayment)}
+                                    disabled={Boolean(createdPayment || creditedInvoice)}
                                     onChange={(event) => {
                                         setInvoiceId(event.target.value);
                                         setRows((current) => current.map((row) => ({
@@ -382,7 +395,7 @@ export default function VehicleServicePaymentPreparePage() {
                                 type="date"
                                 value={date}
                                 error={fieldError(error, 'payment_date')}
-                                disabled={Boolean(createdPayment)}
+                                disabled={Boolean(createdPayment || creditedInvoice)}
                                 onChange={(event) => { setDate(event.target.value); }}
                             />
                         </div>
@@ -396,7 +409,7 @@ export default function VehicleServicePaymentPreparePage() {
                                         name="payment-mode"
                                         value="direct"
                                         checked={paymentMode === 'direct'}
-                                        disabled={Boolean(createdPayment)}
+                                        disabled={Boolean(createdPayment || creditedInvoice)}
                                         onChange={() => { setPaymentMode('direct'); setCreditCheckFeedback(null); setAcknowledgedCreditWarning(null); }}
                                     />
                                     Direct Payment
@@ -408,7 +421,7 @@ export default function VehicleServicePaymentPreparePage() {
                                             name="payment-mode"
                                             value="credit"
                                             checked={paymentMode === 'credit'}
-                                            disabled={Boolean(createdPayment)}
+                                            disabled={Boolean(createdPayment || creditedInvoice)}
                                             onChange={() => { setPaymentMode('credit'); setCreditCheckFeedback(null); setAcknowledgedCreditWarning(null); }}
                                         />
                                         Credit Payment
@@ -596,6 +609,21 @@ export default function VehicleServicePaymentPreparePage() {
                                 </div>
                             </div>
                         )}
+                        {creditedInvoice && (
+                            <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+                                <p className="text-sm font-semibold text-emerald-900">Invoice kept on customer credit</p>
+                                <p className="mt-1 text-sm text-emerald-800">
+                                    {creditedInvoice.invoice_number ?? 'Invoice'} remains outstanding on the customer account.
+                                </p>
+                                <div className="mt-4">
+                                    <DetailGrid items={[
+                                        { label: 'Invoice', value: creditedInvoice.invoice_number ?? '-' },
+                                        { label: 'Invoice total', value: formatMoney(creditedInvoice.invoice_total) },
+                                        { label: 'Outstanding balance', value: formatMoney(creditedInvoice.balance_due ?? creditedInvoice.invoice_total) },
+                                    ]} />
+                                </div>
+                            </div>
+                        )}
                     </Panel>
 
                     <aside className="rounded-lg border border-blue-100 bg-blue-50 p-5 xl:sticky xl:top-5">
@@ -633,18 +661,7 @@ export default function VehicleServicePaymentPreparePage() {
                             {paymentMode === 'direct' ? (
                                 createdPayment && settledInvoice ? (
                                     <>
-                                        <Button type="button" onClick={async () => {
-                                            try {
-                                                const json = await getInvoiceSignedPrintLink(settledInvoice.invoice_id);
-                                                if (json.print_url) {
-                                                    openSameOriginUrl(json.print_url);
-                                                    return;
-                                                }
-                                            } catch {
-                                                // Use the invoice print page when a signed link is unavailable.
-                                            }
-                                            openSameOriginUrl(`/invoices/${settledInvoice.invoice_id}/print`);
-                                        }}>
+                                        <Button type="button" onClick={() => void printInvoice(settledInvoice.invoice_id)}>
                                             Print bill
                                         </Button>
                                         <Button type="button" variant="secondary" loading={sharingWhatsApp} loadingLabel="Opening WhatsApp..." onClick={() => void shareInvoiceViaWhatsApp()}>
@@ -656,8 +673,20 @@ export default function VehicleServicePaymentPreparePage() {
                                         Finalize payment
                                     </Button>
                                 )
+                            ) : creditedInvoice ? (
+                                <>
+                                    <Button type="button" onClick={() => void printInvoice(creditedInvoice.invoice_id)}>
+                                        Print bill
+                                    </Button>
+                                    <Button type="button" variant="secondary" loading={sharingWhatsApp} loadingLabel="Opening WhatsApp..." onClick={() => void shareInvoiceViaWhatsApp()}>
+                                        Share via WhatsApp
+                                    </Button>
+                                </>
                             ) : (
                                 <Button type="button" loading={busy} disabled={!invoice || !options.data || busy} onClick={async () => {
+                                    const targetInvoice = invoice;
+                                    if (!targetInvoice) return;
+
                                     setBusy(true);
                                     setCreditCheckFeedback(null);
                                     try {
@@ -676,10 +705,12 @@ export default function VehicleServicePaymentPreparePage() {
                                             return;
                                         }
                                         await keepVehicleServiceInvoiceOnCredit(jobId, {
-                                            invoice_id: Number(invoiceId),
+                                            invoice_id: targetInvoice.invoice_id,
                                             expected_version: options.data?.job_version ?? 0,
                                         });
-                                        navigate(`/vehicle-service/jobs/${jobId}`);
+                                        setCreditedInvoice(targetInvoice);
+                                        options.reload();
+                                        job.reload();
                                     } catch (requestError) {
                                         setCreditCheckFeedback({
                                             kind: 'blocked',
