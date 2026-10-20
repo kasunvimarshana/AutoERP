@@ -47,7 +47,8 @@ const SERVICE_MILEAGE_INTERVAL = '5000';
 const DISABLED_MILEAGE_CLASS = 'disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 disabled:opacity-100';
 const today = businessDateInputValue;
 const decimal = (value: string, fallback = ZERO_AMOUNT) => value.trim() || fallback;
-const tracksMileage = (jobType: VehicleServiceJobType): boolean => MILEAGE_TRACKED_JOB_TYPES.includes(jobType);
+const tracksMileage = (jobType: VehicleServiceJobType | ''): boolean =>
+    jobType !== '' && MILEAGE_TRACKED_JOB_TYPES.includes(jobType);
 const suggestedNextServiceMileage = (odometerReading: string): string => {
     const value = odometerReading.trim();
 
@@ -92,7 +93,7 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
     const [form, setForm] = useState({
         job_date: job?.job_date ?? today(),
         expected_delivery_date: job?.expected_delivery_date ?? '',
-        type: job?.type ?? JOB_TYPE.FULL_SERVICE,
+        type: (job?.type ?? '') as VehicleServiceJobType | '',
         supervisor_commission_type: (job?.supervisor_commission_type ?? null) as CommissionType | null,
         supervisor_commission_value: (job?.supervisor_commission_value ?? null) as string | null,
         odometer_reading: job && !tracksMileage(job.type) ? '' : job?.odometer_reading ?? '',
@@ -112,6 +113,11 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
     const [editingDraftLine, setEditingDraftLine] = useState<DraftJobLine | null>(null);
     const [removeDraftLineId, setRemoveDraftLineId] = useState<number | null>(null);
     const formGuard = useMutationFormGuard(submitting);
+    const mileageHint = form.type === ''
+        ? 'Select a job type to determine mileage requirements.'
+        : !tracksMileage(form.type)
+            ? `Not applicable to ${JOB_TYPE_OPTIONS.find((option) => option.value === form.type)?.label}.`
+            : undefined;
     const updateForm = useCallback((next: Parameters<typeof setForm>[0]) => {
         formGuard.markDirty();
         setForm(next);
@@ -142,11 +148,11 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
         };
     };
 
-    const payload = (): VehicleServiceJobPayload => ({
+    const payload = (type: VehicleServiceJobType): VehicleServiceJobPayload => ({
         expected_version: job?.row_version,
         job_date: form.job_date,
         expected_delivery_date: form.expected_delivery_date || undefined,
-        type: form.type,
+        type,
         customer_id: customer?.id ?? 0,
         bill_to_customer_id: billToCustomer?.id ?? customer?.id ?? 0,
         vehicle_id: vehicle?.id ?? 0,
@@ -154,7 +160,7 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
         ...supervisorCommissionPayload(),
         odometer_reading: form.odometer_reading || undefined,
         next_service_mileage: form.next_service_mileage || undefined,
-        manual_job_card: form.manual_job_card || undefined,
+        manual_job_card: form.manual_job_card.trim() || undefined,
         fuel_level: form.fuel_level || undefined,
         priority: form.priority || undefined,
         customer_complaint: form.customer_complaint,
@@ -177,7 +183,7 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
         }
     }, [form.odometer_reading, form.type, formGuard, updateForm]);
 
-    const applyJobType = useCallback((next: VehicleServiceJobType) => {
+    const applyJobType = useCallback((next: VehicleServiceJobType | '') => {
         updateForm((current) => ({
             ...current,
             type: next,
@@ -199,14 +205,18 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
             <form className="space-y-5" onSubmit={async (event) => {
                 event.preventDefault();
                 setAttemptedSubmit(true);
-                if (supervisor === null) return;
+                const selectedType = form.type;
+                if (supervisor === null || selectedType === '' || !form.manual_job_card.trim()) {
+                    setActiveTab('details');
+                    return;
+                }
 
                 setSubmitting(true);
                 setError(null);
                 try {
                     const saved = job
-                        ? await updateVehicleServiceJob(job.id, payload())
-                        : await createVehicleServiceJob(payload());
+                        ? await updateVehicleServiceJob(job.id, payload(selectedType))
+                        : await createVehicleServiceJob(payload(selectedType));
                     formGuard.markSaved();
                     navigate(`/vehicle-service/jobs/${saved.id}`);
                 } catch (requestError) {
@@ -296,7 +306,7 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
                             label="Odometer"
                             value={form.odometer_reading}
                             error={errorFor('odometer_reading')}
-                            hint={!tracksMileage(form.type) ? `Not applicable to ${JOB_TYPE_OPTIONS.find((option) => option.value === form.type)?.label}.` : undefined}
+                            hint={mileageHint}
                             className={DISABLED_MILEAGE_CLASS}
                             required={tracksMileage(form.type)}
                             disabled={!tracksMileage(form.type)}
@@ -306,13 +316,28 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
                             label="Next Service Mileage"
                             value={form.next_service_mileage}
                             error={errorFor('next_service_mileage')}
-                            hint={!tracksMileage(form.type) ? `Not applicable to ${JOB_TYPE_OPTIONS.find((option) => option.value === form.type)?.label}.` : undefined}
+                            hint={mileageHint}
                             className={DISABLED_MILEAGE_CLASS}
                             disabled={!tracksMileage(form.type)}
                             onChange={(event) => updateForm({ ...form, next_service_mileage: event.target.value })}
                         />
-                        <Input label="Manual Job Card" value={form.manual_job_card} error={errorFor('manual_job_card')} onChange={(event) => updateForm({ ...form, manual_job_card: event.target.value })} />
-                        <Select label="Type" value={form.type} options={JOB_TYPE_OPTIONS} error={errorFor('type')} onChange={(event) => applyJobType(event.target.value as VehicleServiceJobType)} />
+                        <Input
+                            label="Manual Job Card"
+                            value={form.manual_job_card}
+                            error={errorFor('manual_job_card') || (attemptedSubmit && !form.manual_job_card.trim() ? 'Manual Job Card is required.' : undefined)}
+                            required
+                            onInvalid={() => setAttemptedSubmit(true)}
+                            onChange={(event) => updateForm({ ...form, manual_job_card: event.target.value })}
+                        />
+                        <Select
+                            label="Type"
+                            value={form.type}
+                            options={JOB_TYPE_OPTIONS}
+                            error={errorFor('type') || (attemptedSubmit && !form.type ? 'Select a job type.' : undefined)}
+                            required
+                            onInvalid={() => setAttemptedSubmit(true)}
+                            onChange={(event) => applyJobType(event.target.value as VehicleServiceJobType | '')}
+                        />
                     </div>
                     {vehicle && <div className="mt-4 grid gap-3 rounded-lg border border-sky-100 bg-sky-50 p-4 text-sm sm:grid-cols-2 xl:grid-cols-5">
                         <VehicleContext label="Registration" value={vehicle.registration_number ?? vehicle.name} />
