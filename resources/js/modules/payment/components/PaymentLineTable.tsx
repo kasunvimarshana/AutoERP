@@ -6,6 +6,8 @@ import type { PaymentMethod } from '../paymentApi';
 import { PaymentMethodFields } from './PaymentMethodFields';
 import { PaymentSummary } from './PaymentSummary';
 
+export const PAYMENT_AMOUNT_FRACTION_DIGITS = 2;
+
 export type PaymentLineDraft = {
     key: number;
     paymentMethodId: string;
@@ -67,7 +69,7 @@ export function PaymentLineTable({
                                 placeholder={methodsLoading ? 'Loading methods...' : 'Configured method'}
                                 onChange={(event) => onLineChange(line.key, { paymentMethodId: event.target.value, metadata: {} })}
                             />
-                            <DecimalInput label="Amount" value={line.amount} onChange={(event) => onLineChange(line.key, { amount: event.target.value })} />
+                            <DecimalInput label="Amount" maxFractionDigits={PAYMENT_AMOUNT_FRACTION_DIGITS} value={line.amount} onChange={(event) => onLineChange(line.key, { amount: event.target.value })} />
                             <Input label="Line reference" value={line.reference} onChange={(event) => onLineChange(line.key, { reference: event.target.value })} />
                             <Button type="button" variant="danger" disabled={lines.length === 1} onClick={() => onRemoveLine(line.key)}>Remove</Button>
                         </div>

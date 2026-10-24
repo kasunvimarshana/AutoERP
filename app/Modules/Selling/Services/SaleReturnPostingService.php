@@ -8,12 +8,19 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
+use Modules\Finance\Contracts\FinancePostingInterface;
+use Modules\Finance\DTOs\PostingContext;
+use Modules\Finance\DTOs\PostingLine;
+use Modules\Finance\DTOs\PostingSourceData;
+use Modules\Finance\Enums\FinanceAccountRoleCode;
+use Modules\Finance\Enums\FinancePostingProfileCode;
 use Modules\Idempotency\Enums\IdempotencyStatus;
 use Modules\Idempotency\Services\IdempotencyService;
 use Modules\Inventory\DTOs\StockMovementData;
 use Modules\Inventory\Enums\InventoryDirection;
 use Modules\Inventory\Enums\InventoryMovementType;
 use Modules\Inventory\Services\StockMovementService;
+use Modules\Invoice\Constants\InvoiceTaxMetadata;
 use Modules\Invoice\Enums\InvoiceStatus;
 use Modules\Invoice\Models\Invoice;
 use Modules\Invoice\Services\InvoiceBalanceService;
@@ -28,11 +35,14 @@ final class SaleReturnPostingService
 
     private const IDEMPOTENCY_OPERATION = 'selling.return.create';
 
+    private const QUANTITY_FRACTION_SCALE = 12;
+
     public function __construct(
         private readonly DecimalMath $math,
         private readonly StockMovementService $stockMovements,
         private readonly InvoiceBalanceService $invoiceBalances,
         private readonly IdempotencyService $idempotency,
+        private readonly FinancePostingInterface $finance,
     ) {}
 
     /** @param array<string, mixed> $payload */
@@ -69,7 +79,10 @@ final class SaleReturnPostingService
                 isset($payload['current_user_id']) ? (int) $payload['current_user_id'] : null,
             );
             if ($idempotency->status === IdempotencyStatus::Completed) {
-                return $sale->refresh()->load(['customer', 'warehouse', 'lines.item', 'lines.uom', 'invoice.balance', 'returns.lines']);
+                $sale = $sale->refresh()->load(['customer', 'warehouse', 'lines.item', 'lines.uom', 'invoice.balance', 'returns.lines']);
+                $sale->returns->loadSum('postedRefundPayments as refunded_amount', 'total_amount');
+
+                return $sale;
             }
             if (! $idempotency->wasRecentlyCreated || $idempotency->status !== IdempotencyStatus::InProgress) {
                 throw new InvalidArgumentException('Return request is already being processed.');
@@ -89,6 +102,9 @@ final class SaleReturnPostingService
                 'created_by' => $payload['current_user_id'] ?? null,
             ]);
             $creditAmount = self::ZERO;
+            $revenueAmount = self::ZERO;
+            $taxAmount = self::ZERO;
+            $withholdingAmount = self::ZERO;
             foreach ($payload['lines'] as $lineData) {
                 $line = SaleLine::query()->with(['item'])->lockForUpdate()->findOrFail((int) $lineData['sale_line_id']);
                 if ((int) $line->sale_id !== (int) $sale->getKey() || (int) $line->tenant_id !== (int) $sale->tenant_id) {
@@ -109,14 +125,22 @@ final class SaleReturnPostingService
                     ->where('source_line_id', $line->getKey())
                     ->lockForUpdate()
                     ->firstOrFail();
-                $credit = $this->math->mul(
-                    $this->math->div($quantity, (string) $line->quantity, 12),
-                    (string) $invoiceLine->line_total,
-                );
-                $baseQuantity = $this->math->mul(
-                    $this->math->div($quantity, (string) $line->quantity, 12),
-                    (string) $line->base_quantity,
-                );
+                $fraction = $this->math->div($quantity, (string) $line->quantity, self::QUANTITY_FRACTION_SCALE);
+                $wholeLine = $this->math->compare($quantity, (string) $line->quantity) === 0;
+                $lineWithholding = (string) (($invoiceLine->metadata ?? [])[InvoiceTaxMetadata::WITHHOLDING_AMOUNT] ?? self::ZERO);
+                $gross = $wholeLine
+                    ? (string) $invoiceLine->line_total
+                    : $this->math->mul($fraction, (string) $invoiceLine->line_total);
+                $tax = $wholeLine
+                    ? (string) $invoiceLine->tax_amount
+                    : $this->math->mul($fraction, (string) $invoiceLine->tax_amount);
+                $withholding = $wholeLine
+                    ? $lineWithholding
+                    : $this->math->mul($fraction, $lineWithholding);
+                $credit = $this->math->sub($gross, $withholding);
+                $baseQuantity = $wholeLine
+                    ? (string) $line->base_quantity
+                    : $this->math->mul($fraction, (string) $line->base_quantity);
                 $returnLine = SaleReturnLine::query()->create([
                     'tenant_id' => $sale->tenant_id,
                     'organization_unit_id' => $sale->organization_unit_id,
@@ -150,7 +174,45 @@ final class SaleReturnPostingService
                 $returnLine->inventory_movement_id = $movement->getKey();
                 $returnLine->save();
                 $creditAmount = $this->math->add($creditAmount, $credit);
+                $revenueAmount = $this->math->add($revenueAmount, $this->math->sub($gross, $tax));
+                $taxAmount = $this->math->add($taxAmount, $tax);
+                $withholdingAmount = $this->math->add($withholdingAmount, $withholding);
             }
+
+            $postingLines = [];
+            foreach ([
+                [FinanceAccountRoleCode::Revenue, $revenueAmount, self::ZERO],
+                [FinanceAccountRoleCode::TaxPayable, $taxAmount, self::ZERO],
+                [FinanceAccountRoleCode::WithholdingReceivable, self::ZERO, $withholdingAmount],
+                [FinanceAccountRoleCode::Receivable, self::ZERO, $creditAmount],
+            ] as [$role, $debit, $credit]) {
+                if ($this->math->isZero($debit) && $this->math->isZero($credit)) {
+                    continue;
+                }
+                $postingLines[] = new PostingLine(
+                    debit: $debit,
+                    credit: $credit,
+                    description: 'Sales return '.$return->return_number,
+                    profileKey: $role->value,
+                );
+            }
+            $this->finance->post(new PostingContext(
+                source: new PostingSourceData(
+                    sourceType: 'sale_return',
+                    sourceId: (int) $return->getKey(),
+                    tenantId: (int) $sale->tenant_id,
+                    organizationUnitId: $sale->organization_unit_id,
+                    sourceModule: 'selling',
+                    sourceNumber: (string) $return->return_number,
+                    sourceDate: (string) $payload['return_date'],
+                ),
+                postingDate: (string) $payload['return_date'],
+                currencyId: $invoice->currency_id,
+                exchangeRate: (string) $invoice->exchange_rate,
+                lines: $postingLines,
+                description: 'Sales return '.$return->return_number,
+                postingProfileCode: FinancePostingProfileCode::SalesInvoice->value,
+            ), isset($payload['current_user_id']) ? (int) $payload['current_user_id'] : null);
 
             $balance = $invoice->balance()->lockForUpdate()->firstOrFail();
             $creditApplied = $this->math->compare($creditAmount, (string) $balance->remaining_amount) < 0
@@ -172,7 +234,10 @@ final class SaleReturnPostingService
                 ['sale_id' => (int) $sale->getKey(), 'return_id' => (int) $return->getKey()],
             );
 
-            return $sale->refresh()->load(['customer', 'warehouse', 'lines.item', 'lines.uom', 'invoice.balance', 'returns.lines']);
+            $sale = $sale->refresh()->load(['customer', 'warehouse', 'lines.item', 'lines.uom', 'invoice.balance', 'returns.lines']);
+            $sale->returns->loadSum('postedRefundPayments as refunded_amount', 'total_amount');
+
+            return $sale;
         }, 3);
     }
 }

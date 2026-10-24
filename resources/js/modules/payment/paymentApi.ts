@@ -47,6 +47,8 @@ export interface PaymentLine {
     external_bank_branch?: string | null;
     instrument_number?: string | null;
     card_brand?: 'visa' | 'master' | 'amex' | null;
+    cash_received_amount?: string | null;
+    cash_change_amount?: string | null;
     instrument_date?: string | null;
     deposit_date?: string | null;
     realized_date?: string | null;
@@ -109,6 +111,8 @@ export interface PaymentLinePayload {
     payment_method_id: number;
     reference_number?: string;
     amount: string;
+    cash_received_amount?: string;
+    card_brand?: 'visa' | 'master' | 'amex';
     instrument_direction?: 'received' | 'issued';
     external_bank_name?: string;
     external_bank_branch?: string;
@@ -166,11 +170,19 @@ export async function listPayments(params: ListParams, signal?: AbortSignal) {
 }
 
 export async function createPayment(payload: PaymentPayload) {
-    const fingerprint = paymentPayloadFingerprint(payload);
+    return createPaymentAt(payload, endpoints.payments);
+}
+
+export async function finalizeSellingPayment(payload: PaymentPayload) {
+    return createPaymentAt(payload, `${endpoints.payments}/selling-settlement`);
+}
+
+async function createPaymentAt(payload: PaymentPayload, url: string) {
+    const fingerprint = `${url}:${paymentPayloadFingerprint(payload)}`;
     const idempotencyKey = paymentCreateKeys.get(fingerprint) ?? createPaymentIdempotencyKey();
     retainPaymentCreateKey(fingerprint, idempotencyKey);
 
-    const response = await apiClient.post<ApiResource<Payment>>(endpoints.payments, payload, {
+    const response = await apiClient.post<ApiResource<Payment>>(url, payload, {
         headers: {
             [PAYMENT_IDEMPOTENCY_HEADER]: idempotencyKey,
         },

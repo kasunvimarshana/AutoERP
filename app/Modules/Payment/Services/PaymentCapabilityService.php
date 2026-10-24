@@ -11,6 +11,7 @@ use Modules\Payment\Enums\PaymentAllocationState;
 use Modules\Payment\Enums\PaymentDocumentStatus;
 use Modules\Payment\Enums\PaymentMethodType;
 use Modules\Payment\Enums\PaymentPostingStatus;
+use Modules\Payment\Enums\PaymentType;
 use Modules\Payment\Models\Payment;
 
 final class PaymentCapabilityService
@@ -32,6 +33,7 @@ final class PaymentCapabilityService
         $posted = $document === PaymentDocumentStatus::Approved && $posting === PaymentPostingStatus::Posted;
         $hasPostingReference = trim((string) $payment->finance_posting_reference) !== '';
         $terminal = in_array($document, [PaymentDocumentStatus::Voided, PaymentDocumentStatus::Reversed], true);
+        $isRefund = $payment->payment_type === PaymentType::Refund;
         $hasActiveAllocations = $payment->relationLoaded('allocations')
             ? $payment->allocations->contains(fn ($row): bool => $this->stateValue($row->status) === AllocationStatus::Active->value)
             : $payment->allocations()->where('status', AllocationStatus::Active->value)->exists();
@@ -54,10 +56,12 @@ final class PaymentCapabilityService
                 $payment->lines()->count() < 1 ? 'Payment requires at least one line.' : null,
             ])),
             'can_allocate' => array_values(array_filter([
+                $isRefund ? 'Refund payments cannot be allocated to invoices.' : null,
                 ! $posted ? 'Only posted payments can be allocated to invoices.' : null,
                 $this->math->compare((string) $payment->unapplied_amount, '0.000000') <= 0 ? 'Payment has no unapplied amount.' : null,
             ])),
             'can_refund' => array_values(array_filter([
+                $isRefund ? 'A refund payment cannot be refunded again.' : null,
                 ! $posted ? 'Only posted payments can be refunded.' : null,
                 $this->math->compare((string) $payment->unapplied_amount, '0.000000') <= 0 ? 'Payment has no refundable unapplied amount.' : null,
             ])),

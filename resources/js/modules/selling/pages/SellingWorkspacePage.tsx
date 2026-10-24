@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { Button } from '@/shared/components/Button';
+import { Button, LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
 import { DataTable } from '@/shared/components/DataTable';
 import { DecimalInput } from '@/shared/components/DecimalInput';
@@ -14,13 +14,16 @@ import { businessDateInputValue } from '@/shared/utils/businessDate';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { hasPermission } from '@/modules/auth/accessControl';
 import { useAuth } from '@/modules/auth/AuthProvider';
+import { useTenantRouteAccess } from '@/modules/auth/useTenantRouteAccess';
 import { CustomerLookupSelect } from '@/modules/customer/components/CustomerLookupSelect';
+import { listPaymentMethods, type PaymentMethod } from '@/modules/payment/paymentApi';
+import { hasPaymentPermission, paymentPermissions } from '@/modules/payment/paymentPermissions';
 import { InventoryDimensionFields, emptyInventoryDimensions, type InventoryDimensionValue } from '@/modules/inventory/components/InventoryDimensionFields';
 import { compareDecimalStrings, multiplyDecimal, subtractDecimal, sumDecimals } from '@/shared/utils/decimal';
 import type { ItemLookupResource } from '@/shared/api/lookupApi';
 import type { CustomerSummary } from '@/modules/customer/customerTypes';
 import type { NamedResource } from '@/shared/types/common';
-import { searchSellingWarehouses, searchSellingLocations, getSellingWarehouseSource, createSale, createSaleReturn, getSale, listSales, listSaleReturns, type SaleDocument, type SalePayload, type SaleReturnDocument } from '../sellingApi';
+import { searchSellingWarehouses, searchSellingLocations, getSellingWarehouseSource, createSale, createSaleReturn, refundSaleReturn, getSale, listSales, listSaleReturns, type SaleDocument, type SalePayload, type SaleReturnDocument } from '../sellingApi';
 import type { PaginationMeta } from '@/shared/types/pagination';
 import { sellingPermissions } from '../sellingPermissions';
 import { SellingItemLookup } from '../components/SellingItemLookup';
@@ -34,6 +37,10 @@ interface SaleDraftLine {
 
 const today = businessDateInputValue();
 
+function sellingPaymentPath(invoiceId: number): string {
+    return `/payments/create?invoice_id=${invoiceId}&view=selling`;
+}
+
 export default function SellingWorkspacePage() {
     const { id } = useParams();
     const location = useLocation();
@@ -42,6 +49,15 @@ export default function SellingWorkspacePage() {
     const canViewReturns = hasPermission(auth, sellingPermissions.returnsView);
     const canCreateReturns = hasPermission(auth, sellingPermissions.returnsCreate);
     const canProcessReturns = canViewReturns && canCreateReturns;
+    const canRefundReturns = canViewReturns
+        && hasPaymentPermission(auth, paymentPermissions.refund)
+        && hasPaymentPermission(auth, paymentPermissions.methodsView);
+    const canViewPayments = hasPaymentPermission(auth, paymentPermissions.view);
+    const canOpenPaymentEntry = useTenantRouteAccess('/payments/create');
+    const canViewPaymentMethods = useTenantRouteAccess('/payments/methods');
+    const canViewInvoices = useTenantRouteAccess('/invoices');
+    const canReceivePayment = canOpenPaymentEntry && canViewPaymentMethods && canViewInvoices
+        && hasPermission(auth, sellingPermissions.salesCreate);
     const canOpenSalesFromReturns = hasPermission(auth, sellingPermissions.salesView);
     const isCreatePage = location.pathname === '/selling/create';
     const isReturnsPage = location.pathname === '/selling/returns';
@@ -60,6 +76,17 @@ export default function SellingWorkspacePage() {
     const [sale, setSale] = useState<SaleDocument | null>(null);
     const [returnQuantities, setReturnQuantities] = useState<Record<number, string>>({});
     const [returnReason, setReturnReason] = useState('');
+    const [refundReturnId, setRefundReturnId] = useState<number | null>(null);
+    const [refundAmount, setRefundAmount] = useState('');
+    const [refundMethodId, setRefundMethodId] = useState('');
+    const [refundDate, setRefundDate] = useState(today);
+    const [refundReference, setRefundReference] = useState('');
+    const [refundBankName, setRefundBankName] = useState('');
+    const [refundInstrumentNumber, setRefundInstrumentNumber] = useState('');
+    const [refundInstrumentDate, setRefundInstrumentDate] = useState('');
+    const [refundReason, setRefundReason] = useState('');
+    const [refundMethods, setRefundMethods] = useState<PaymentMethod[]>([]);
+    const [refundedPayment, setRefundedPayment] = useState<{ id: number; payment_number: string } | null>(null);
     const [error, setError] = useState<ApiError | null>(null);
     const [busy, setBusy] = useState(false);
     const sourceRequest = useRef<AbortController | null>(null);
@@ -71,6 +98,8 @@ export default function SellingWorkspacePage() {
             setSale(null);
             setReturnQuantities({});
             setReturnReason('');
+            setRefundReturnId(null);
+            setRefundedPayment(null);
             void getSale(Number(id), controller.signal).then(setSale).catch((failure: unknown) => setError(toApiError(failure)));
         } else {
             setSale(null);
@@ -86,6 +115,15 @@ export default function SellingWorkspacePage() {
         }
         return () => controller.abort();
     }, [id, isCreatePage, isReturnsPage, page, search]);
+
+    useEffect(() => {
+        if (!id || !canRefundReturns) return;
+        const controller = new AbortController();
+        void listPaymentMethods({ direction: 'outbound', is_active: true, per_page: 100 }, controller.signal)
+            .then((response) => setRefundMethods(response.data.filter((method) => ['cash', 'card', 'bank_transfer'].includes(method.method_type))))
+            .catch((failure: unknown) => { if (!controller.signal.aborted) setError(toApiError(failure)); });
+        return () => controller.abort();
+    }, [id, canRefundReturns]);
 
     useEffect(() => {
         if (id || !isCreatePage) return;
@@ -113,6 +151,8 @@ export default function SellingWorkspacePage() {
         const alreadyReturned = sumDecimals((sale.returns ?? []).flatMap((saleReturn) => saleReturn.lines.filter((returnLine) => returnLine.sale_line_id === line.id).map((returnLine) => returnLine.quantity)));
         return compareDecimalStrings(returnQuantities[line.id] ?? '0', subtractDecimal(line.quantity, alreadyReturned)) > 0;
     }) ?? false;
+    const selectedRefundReturn = sale?.returns?.find((item) => item.id === refundReturnId);
+    const selectedRefundMethod = refundMethods.find((method) => method.id === Number(refundMethodId));
     const locationSearch = useCallback(
         (params: Parameters<typeof searchSellingLocations>[0]) => searchSellingLocations(params, warehouse?.id),
         [warehouse?.id],
@@ -140,7 +180,9 @@ export default function SellingWorkspacePage() {
         setError(null);
         try {
             const created = await createSale(payload);
-            navigate(`/selling/sales/${created.id}`);
+            navigate(canReceivePayment && created.invoice && compareDecimalStrings(created.invoice.balance_due, '0') > 0
+                ? sellingPaymentPath(created.invoice.id)
+                : `/selling/sales/${created.id}`);
         } catch (failure) {
             setError(toApiError(failure));
         } finally {
@@ -207,6 +249,41 @@ export default function SellingWorkspacePage() {
         }
     }
 
+    async function submitRefund(event: React.FormEvent<HTMLFormElement>) {
+        event.preventDefault();
+        if (!sale || !selectedRefundReturn || !selectedRefundMethod || busy
+            || compareDecimalStrings(refundAmount || '0', '0') <= 0
+            || compareDecimalStrings(refundAmount, selectedRefundReturn.refundable_amount) > 0) return;
+        setBusy(true);
+        setError(null);
+        try {
+            const payment = await refundSaleReturn(selectedRefundReturn.id, {
+                refund_date: refundDate,
+                amount: refundAmount,
+                expected_refundable_amount: selectedRefundReturn.refundable_amount,
+                payment_method_id: selectedRefundMethod.id,
+                ...(refundReference.trim() ? { reference_number: refundReference.trim() } : {}),
+                ...(refundBankName.trim() ? { external_bank_name: refundBankName.trim() } : {}),
+                ...(refundInstrumentNumber.trim() ? { instrument_number: refundInstrumentNumber.trim() } : {}),
+                ...(refundInstrumentDate ? { instrument_date: refundInstrumentDate } : {}),
+                reason: refundReason.trim(),
+            });
+            setSale(await getSale(sale.id));
+            setRefundedPayment(payment);
+            setRefundReturnId(null);
+            setRefundAmount('');
+            setRefundReference('');
+            setRefundBankName('');
+            setRefundInstrumentNumber('');
+            setRefundInstrumentDate('');
+            setRefundReason('');
+        } catch (failure) {
+            setError(toApiError(failure));
+        } finally {
+            setBusy(false);
+        }
+    }
+
     if (id && !sale) {
         return <><ContentHeader title="Sales invoice" /><ErrorAlert error={error} /></>;
     }
@@ -214,7 +291,10 @@ export default function SellingWorkspacePage() {
     if (sale) {
         return (
             <>
-                <ContentHeader title={`Sale ${sale.sale_number}`} description="Posted sale and its linked customer invoice." actions={<Link className="text-sm font-medium text-sky-700" to="/selling">Back to Selling list</Link>} />
+                <ContentHeader title={`Sale ${sale.sale_number}`} description="Posted sale and its linked customer invoice." actions={<>
+                    {canReceivePayment && sale.invoice && compareDecimalStrings(sale.invoice.balance_due, '0') > 0 && <LinkButton to={sellingPaymentPath(sale.invoice.id)}>Receive payment</LinkButton>}
+                    <LinkButton variant="secondary" to="/selling/sales">Back to Selling list</LinkButton>
+                </>} />
                 <ErrorAlert error={error} />
                 <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
                     <div className="space-y-5">
@@ -230,7 +310,6 @@ export default function SellingWorkspacePage() {
                             {sale.invoice && <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-md bg-slate-50 px-4 py-3 text-sm">
                                 <div><span className="font-semibold">Invoice {sale.invoice.number}</span><span className="ml-3 text-slate-600">Balance due {sale.invoice.balance_due}</span></div>
                                 <div className="flex gap-4">
-                                    {compareDecimalStrings(sale.invoice.balance_due, '0') > 0 && <Link className="font-semibold text-emerald-700" to={`/payments/create?invoice_id=${sale.invoice.id}`}>Receive payment</Link>}
                                     <Link className="font-semibold text-sky-700" to={`/invoices/${sale.invoice.id}`}>Open invoice</Link>
                                 </div>
                             </div>}
@@ -241,10 +320,48 @@ export default function SellingWorkspacePage() {
                                 { key: 'date', header: 'Date', render: (row) => row.date },
                                 { key: 'reason', header: 'Reason', render: (row) => row.reason },
                                 { key: 'credit', header: 'Credit', render: (row) => row.credit_amount },
-                                { key: 'available', header: 'Unapplied credit', render: (row) => row.credit_available_amount },
+                                { key: 'available', header: 'Refundable', render: (row) => row.refundable_amount },
+                                ...(canRefundReturns ? [{ key: 'refund', header: 'Action', render: (row: NonNullable<SaleDocument['returns']>[number]) => compareDecimalStrings(row.refundable_amount, '0') > 0
+                                    ? <Button type="button" variant="secondary" onClick={() => {
+                                        setRefundReturnId(row.id);
+                                        setRefundAmount(row.refundable_amount);
+                                        setRefundReason(`Refund for ${row.number}`);
+                                        setRefundedPayment(null);
+                                    }}>Refund</Button>
+                                    : <span className="text-slate-500">Settled</span> }] : []),
                             ]} />
                         </Panel> : null}
                     </div>
+                    <div className="space-y-5">
+                    {refundedPayment && <Panel title="Refund posted">
+                        <p className="text-sm text-emerald-800">Refund {refundedPayment.payment_number} was posted successfully.</p>
+                        {canViewPayments && <Link className="mt-2 inline-block text-sm font-semibold text-sky-700" to={`/payments/${refundedPayment.id}`}>Open payment</Link>}
+                    </Panel>}
+                    {canRefundReturns && selectedRefundReturn && <Panel title={`Refund ${selectedRefundReturn.number}`}>
+                        <form className="space-y-4" onSubmit={(event) => void submitRefund(event)}>
+                            <p className="text-sm text-slate-600">Refundable credit: {selectedRefundReturn.refundable_amount}. This posts an outbound payment to the customer.</p>
+                            <DecimalInput label="Refund amount" required maxFractionDigits={2} value={refundAmount} onChange={(event) => setRefundAmount(event.target.value)} />
+                            <Input label="Refund date" type="date" required min={selectedRefundReturn.date} value={refundDate} onChange={(event) => setRefundDate(event.target.value)} />
+                            <label className="block text-sm font-medium text-slate-700">Payment method
+                                <select className="mt-1 block w-full rounded-md border border-slate-300 bg-white px-3 py-2" required value={refundMethodId} onChange={(event) => setRefundMethodId(event.target.value)}>
+                                    <option value="">Select method</option>
+                                    {refundMethods.map((method) => <option key={method.id} value={method.id}>{method.name}</option>)}
+                                </select>
+                            </label>
+                            {refundMethods.length === 0 && <p className="text-sm text-amber-700">Configure an outbound cash, card, or bank transfer method before refunding.</p>}
+                            <Input label="Payment reference" required={Boolean(selectedRefundMethod?.requires_reference)} value={refundReference} onChange={(event) => setRefundReference(event.target.value)} />
+                            {selectedRefundMethod?.requires_instrument_details && <>
+                                <Input label="Bank name" value={refundBankName} onChange={(event) => setRefundBankName(event.target.value)} />
+                                <Input label="Transaction or instrument number" required value={refundInstrumentNumber} onChange={(event) => setRefundInstrumentNumber(event.target.value)} />
+                                <Input label="Instrument date" type="date" value={refundInstrumentDate} onChange={(event) => setRefundInstrumentDate(event.target.value)} />
+                            </>}
+                            <Textarea label="Refund reason" required value={refundReason} onChange={(event) => setRefundReason(event.target.value)} />
+                            <div className="flex gap-2">
+                                <Button type="submit" loading={busy} disabled={!selectedRefundMethod || compareDecimalStrings(refundAmount || '0', '0') <= 0 || compareDecimalStrings(refundAmount || '0', selectedRefundReturn.refundable_amount) > 0}>Post refund</Button>
+                                <Button type="button" variant="secondary" disabled={busy} onClick={() => setRefundReturnId(null)}>Cancel</Button>
+                            </div>
+                        </form>
+                    </Panel>}
                     {canProcessReturns && <Panel title="Create a return">
                         <form className="space-y-4" onSubmit={(event) => void submitReturn(event)}>
                             <p className="text-sm leading-5 text-slate-600">Returned stock is received into this sale’s warehouse. The credit note is applied to the invoice balance where an amount remains.</p>
@@ -257,6 +374,7 @@ export default function SellingWorkspacePage() {
                             <Button type="submit" loading={busy} disabled={quantityTotal === 0 || returnExceedsRemaining || !returnReason.trim()}>Post return and credit note</Button>
                         </form>
                     </Panel>}
+                    </div>
                 </div>
             </>
         );
@@ -278,7 +396,7 @@ export default function SellingWorkspacePage() {
                         { key: 'customer', header: 'Customer', render: (row) => row.sale.customer ?? 'Customer' },
                         { key: 'reason', header: 'Reason', render: (row) => row.reason },
                         { key: 'credit', header: 'Credit', render: (row) => row.credit_amount },
-                        { key: 'available', header: 'Available credit', render: (row) => row.credit_available_amount },
+                        { key: 'available', header: 'Refundable credit', render: (row) => row.refundable_amount },
                     ]} />
                 </div>
                 {listMeta && <div className="mt-4 flex items-center justify-between text-sm text-slate-600">

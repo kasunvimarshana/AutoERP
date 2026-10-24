@@ -2,6 +2,7 @@ import { DetailGrid } from '@/shared/components/DetailGrid';
 import { MoneyDisplay } from '@/shared/components/MoneyDisplay';
 import { formatDate } from '@/shared/utils/formatDate';
 import { readableRelation } from '@/shared/utils/object';
+import { tracksVehicleServiceMileage } from '../vehicleServiceTypes';
 import type { VehicleServiceJob } from '../vehicleServiceTypes';
 import { VehicleServiceStatusBadge } from './VehicleServiceStatusBadge';
 
@@ -19,7 +20,7 @@ export function VehicleServiceSummaryPanel({ job }: {
                 { label: 'Make / model', value: `${job.vehicle?.make?.name ?? '-'} / ${job.vehicle?.model?.name ?? '-'}` },
                 { label: 'Registered owner', value: readableRelation(currentCustomerOwner) },
                 { label: 'Supervisor', value: readableRelation(job.supervisor) },
-                ...(['full_service', 'oil_change'].includes(job.type) ? [
+                ...(tracksVehicleServiceMileage(job.type) ? [
                     { label: 'Odometer', value: job.odometer_reading ?? '-' },
                     { label: 'Next service mileage', value: job.next_service_mileage ?? '-' },
                 ] : []),

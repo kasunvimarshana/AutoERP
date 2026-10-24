@@ -97,6 +97,20 @@ final class PaymentPostingPolicyService
 
     private function refund(Payment $payment): PaymentPostingPolicyData
     {
+        if ($payment->source_type === PaymentSourceType::SaleReturn->value) {
+            if ($this->direction($payment) !== PaymentDirection::Outbound || $payment->party_type !== 'customer'
+                || $payment->original_payment_id !== null) {
+                throw new InvalidArgumentException('Sale return refunds must be outbound customer payments.');
+            }
+
+            return new PaymentPostingPolicyData(
+                PaymentPostingProfile::CustomerSettlement->value,
+                PaymentPostingRole::Receivable,
+                PaymentPostingRole::Receivable,
+                PaymentPostingRole::Receivable,
+            );
+        }
+
         $original = $this->refundPolicy->originalForPayment($payment);
         $originalPolicy = $this->resolve($original);
 

@@ -8,6 +8,7 @@ use Modules\Payment\Http\Controllers\ChequePrintController;
 use Modules\Payment\Http\Controllers\ChequeTemplateController;
 use Modules\Payment\Http\Controllers\PaymentController;
 use Modules\Payment\Http\Controllers\PaymentMethodController;
+use Modules\Selling\Services\SellingAuthorizationService;
 
 $middleware = [
     'api',
@@ -41,6 +42,11 @@ Route::prefix('api/v1/payments')->middleware($middleware)->name('api.v1.payments
 
     Route::get('/', [PaymentController::class, 'index'])->middleware($requires(PaymentPermission::PAYMENTS_VIEW))->name('index');
     Route::post('/', [PaymentController::class, 'store'])->middleware($requires(PaymentPermission::PAYMENTS_CREATE))->name('store');
+    Route::post('selling-settlement', [PaymentController::class, 'finalizeSellingPayment'])->middleware([
+        'tenant.feature:selling',
+        $requires(PaymentPermission::PAYMENTS_CREATE),
+        $requires(SellingAuthorizationService::SALES_CREATE),
+    ])->name('selling-settlement.store');
     Route::get('{payment}', [PaymentController::class, 'show'])->whereNumber('payment')->middleware($requires(PaymentPermission::PAYMENTS_VIEW))->name('show');
     Route::post('{payment}/submit-approval', [PaymentController::class, 'submitForApproval'])->whereNumber('payment')->middleware($requires(PaymentPermission::PAYMENTS_SUBMIT))->name('submit-approval');
     Route::post('{payment}/approve', [PaymentController::class, 'approve'])->whereNumber('payment')->middleware($requires(PaymentPermission::PAYMENTS_APPROVE))->name('approve');

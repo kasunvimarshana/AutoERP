@@ -9,6 +9,7 @@ use Modules\Core\Http\Requests\TenantScopedRequest;
 use Modules\Payment\Constants\PaymentIdempotency;
 use Modules\Payment\DTOs\CreatePaymentData;
 use Modules\Payment\DTOs\PaymentLineData;
+use Modules\Payment\Enums\PaymentCardBrand;
 use Modules\Payment\Enums\PaymentDirection;
 use Modules\Payment\Enums\PaymentType;
 use Modules\Payment\Http\Requests\Concerns\BuildsPaymentAllocations;
@@ -98,6 +99,9 @@ final class StorePaymentRequest extends TenantScopedRequest
             'lines.*.payment_method_id' => ['required', 'integer', 'min:1'],
             'lines.*.reference_number' => ['nullable', 'string', 'max:150'],
             'lines.*.amount' => ['required', 'decimal:0,6', 'gt:0'],
+            'lines.*.cash_received_amount' => ['nullable', 'decimal:0,6', 'gt:0'],
+            'lines.*.cash_change_amount' => ['prohibited'],
+            'lines.*.card_brand' => ['nullable', Rule::enum(PaymentCardBrand::class)],
             'lines.*.instrument_direction' => ['nullable', Rule::in(['received', 'issued'])],
             'lines.*.external_bank_name' => ['nullable', 'string', 'max:150'],
             'lines.*.external_bank_branch' => ['nullable', 'string', 'max:150'],
@@ -128,6 +132,10 @@ final class StorePaymentRequest extends TenantScopedRequest
             externalBankBranch: $row['external_bank_branch'] ?? null,
             instrumentNumber: $row['instrument_number'] ?? null,
             instrumentDate: $row['instrument_date'] ?? null,
+            metadata: array_filter([
+                'cash_received_amount' => $row['cash_received_amount'] ?? null,
+                'card_brand' => $row['card_brand'] ?? null,
+            ], static fn (mixed $value): bool => $value !== null),
         ), $this->input('lines'));
     }
 

@@ -25,6 +25,7 @@ import {
     createVehicleServiceJob,
     updateVehicleServiceJob,
 } from '../vehicleServiceApi';
+import { tracksVehicleServiceMileage } from '../vehicleServiceTypes';
 import type { CommissionType, VehicleServiceJob, VehicleServiceJobLine, VehicleServiceJobPayload, VehicleServiceJobType } from '../vehicleServiceTypes';
 import { VehicleServiceQuickVehicleModal } from './VehicleServiceQuickVehicleModal';
 
@@ -34,21 +35,20 @@ const JOB_TYPE = {
     FULL_SERVICE: 'full_service',
     BODY_WASH: 'body_wash',
     OIL_CHANGE: 'oil_change',
+    WHEEL_ALIGNMENT: 'wheel_alignment',
     ACCESSORIES: 'accessories',
 } as const satisfies Record<string, VehicleServiceJobType>;
 const JOB_TYPE_OPTIONS = [
     { value: JOB_TYPE.FULL_SERVICE, label: 'Full Service' },
     { value: JOB_TYPE.BODY_WASH, label: 'Body Wash' },
     { value: JOB_TYPE.OIL_CHANGE, label: 'Oil Change' },
+    { value: JOB_TYPE.WHEEL_ALIGNMENT, label: 'Wheel Alignment' },
     { value: JOB_TYPE.ACCESSORIES, label: 'Accessories' },
 ];
-const MILEAGE_TRACKED_JOB_TYPES: VehicleServiceJobType[] = [JOB_TYPE.FULL_SERVICE, JOB_TYPE.OIL_CHANGE];
 const SERVICE_MILEAGE_INTERVAL = '5000';
 const DISABLED_MILEAGE_CLASS = 'disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 disabled:opacity-100';
 const today = businessDateInputValue;
 const decimal = (value: string, fallback = ZERO_AMOUNT) => value.trim() || fallback;
-const tracksMileage = (jobType: VehicleServiceJobType | ''): boolean =>
-    jobType !== '' && MILEAGE_TRACKED_JOB_TYPES.includes(jobType);
 const suggestedNextServiceMileage = (odometerReading: string): string => {
     const value = odometerReading.trim();
 
@@ -96,8 +96,8 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
         type: (job?.type ?? '') as VehicleServiceJobType | '',
         supervisor_commission_type: (job?.supervisor_commission_type ?? null) as CommissionType | null,
         supervisor_commission_value: (job?.supervisor_commission_value ?? null) as string | null,
-        odometer_reading: job && !tracksMileage(job.type) ? '' : job?.odometer_reading ?? '',
-        next_service_mileage: job && !tracksMileage(job.type) ? '' : job?.next_service_mileage ?? '',
+        odometer_reading: job && !tracksVehicleServiceMileage(job.type) ? '' : job?.odometer_reading ?? '',
+        next_service_mileage: job && !tracksVehicleServiceMileage(job.type) ? '' : job?.next_service_mileage ?? '',
         manual_job_card: job?.manual_job_card ?? '',
         fuel_level: job?.fuel_level ?? '',
         priority: job?.priority ?? 'normal',
@@ -115,7 +115,7 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
     const formGuard = useMutationFormGuard(submitting);
     const mileageHint = form.type === ''
         ? 'Select a job type to determine mileage requirements.'
-        : !tracksMileage(form.type)
+        : !tracksVehicleServiceMileage(form.type)
             ? `Not applicable to ${JOB_TYPE_OPTIONS.find((option) => option.value === form.type)?.label}.`
             : undefined;
     const updateForm = useCallback((next: Parameters<typeof setForm>[0]) => {
@@ -174,7 +174,7 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
         setVehicle(value);
         setCustomer(nextCustomer);
         setBillToCustomer(nextCustomer);
-        if (value?.odometer_reading && !form.odometer_reading && tracksMileage(form.type)) {
+        if (value?.odometer_reading && !form.odometer_reading && tracksVehicleServiceMileage(form.type)) {
             updateForm((current) => ({
                 ...current,
                 odometer_reading: value.odometer_reading ?? '',
@@ -308,8 +308,8 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
                             error={errorFor('odometer_reading')}
                             hint={mileageHint}
                             className={DISABLED_MILEAGE_CLASS}
-                            required={tracksMileage(form.type)}
-                            disabled={!tracksMileage(form.type)}
+                            required={tracksVehicleServiceMileage(form.type)}
+                            disabled={!tracksVehicleServiceMileage(form.type)}
                             onChange={(event) => applyOdometerReading(event.target.value)}
                         />
                         <DecimalInput
@@ -318,7 +318,7 @@ export function VehicleServiceJobForm({ job }: { job?: VehicleServiceJob }) {
                             error={errorFor('next_service_mileage')}
                             hint={mileageHint}
                             className={DISABLED_MILEAGE_CLASS}
-                            disabled={!tracksMileage(form.type)}
+                            disabled={!tracksVehicleServiceMileage(form.type)}
                             onChange={(event) => updateForm({ ...form, next_service_mileage: event.target.value })}
                         />
                         <Input

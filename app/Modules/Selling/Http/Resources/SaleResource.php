@@ -7,12 +7,15 @@ namespace Modules\Selling\Http\Resources;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Modules\Selling\Models\Sale;
+use Modules\Selling\Services\SaleReturnRefundService;
 
 /** @mixin Sale */
 final class SaleResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
+        $credits = app(SaleReturnRefundService::class);
+
         return [
             'id' => $this->getKey(),
             'row_version' => (int) $this->row_version,
@@ -71,7 +74,9 @@ final class SaleResource extends JsonResource
                 'reason' => $return->reason,
                 'credit_amount' => (string) $return->credit_amount,
                 'credit_allocated_amount' => (string) $return->credit_allocated_amount,
-                'credit_available_amount' => (string) $return->credit_available_amount,
+                'credit_available_amount' => $credits->refundableAmount($return),
+                'refunded_amount' => $credits->refundedAmount($return),
+                'refundable_amount' => $credits->refundableAmount($return),
                 'lines' => $return->lines->map(static fn ($line): array => [
                     'sale_line_id' => (int) $line->sale_line_id,
                     'quantity' => (string) $line->quantity,

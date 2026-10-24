@@ -9,16 +9,20 @@ use Modules\Inventory\Services\WarehouseItemAvailabilityLookup;
 use Modules\Item\Services\ItemAuthorizationService;
 use Modules\Item\Services\ItemPriceResolutionService;
 use Modules\Item\Services\ItemQueryService;
+use Modules\Payment\Http\Resources\PaymentResource;
 use Modules\Selling\Http\Requests\SaleItemLookupRequest;
 use Modules\Selling\Http\Requests\SaleQueryRequest;
 use Modules\Selling\Http\Requests\StoreSaleRequest;
 use Modules\Selling\Http\Requests\StoreSaleReturnRequest;
+use Modules\Selling\Http\Requests\StoreSaleReturnRefundRequest;
 use Modules\Selling\Http\Resources\SaleResource;
 use Modules\Selling\Http\Resources\SaleReturnResource;
 use Modules\Selling\Http\Resources\SellingItemLookupResource;
 use Modules\Selling\Models\Sale;
 use Modules\Selling\Models\SaleReturn;
 use Modules\Selling\Services\SalePostingService;
+use Modules\Selling\Services\SaleReturnRefundService;
+use Modules\Selling\Services\SaleReturnPostingService;
 use Modules\Selling\Services\SellingAuthorizationService;
 
 final class SaleController
@@ -96,6 +100,7 @@ final class SaleController
     {
         $query = SaleReturn::query()
             ->with(['sale.customer', 'sale.invoice.balance', 'lines.saleLine.item'])
+            ->withSum('postedRefundPayments as refunded_amount', 'total_amount')
             ->where('tenant_id', $request->tenantId())
             ->where('organization_unit_id', $request->organizationUnitId())
             ->when($request->filled('search'), function ($query) use ($request): void {
@@ -121,6 +126,7 @@ final class SaleController
 
         if ($authorization->can($request->currentUserId(), $request->tenantId(), SellingAuthorizationService::RETURNS_VIEW)) {
             $model->load('returns.lines');
+            $model->returns->loadSum('postedRefundPayments as refunded_amount', 'total_amount');
         }
 
         return new SaleResource($model);
@@ -138,5 +144,12 @@ final class SaleController
         $sale = $service->create($request->payload(), (string) $request->header('Idempotency-Key'));
 
         return new SaleResource($sale);
+    }
+
+    public function refundReturn(StoreSaleReturnRefundRequest $request, SaleReturnRefundService $service): PaymentResource
+    {
+        $payment = $service->refund($request->payload(), (string) $request->header('Idempotency-Key'));
+
+        return new PaymentResource($payment);
     }
 }

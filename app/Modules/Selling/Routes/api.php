@@ -27,4 +27,9 @@ Route::prefix('api/v1/selling')->middleware($middleware)->name('api.v1.selling.'
     Route::post('sales', [SaleController::class, 'store'])->middleware($requires(SellingAuthorizationService::SALES_CREATE))->name('sales.store');
     Route::get('sales/{sale}', [SaleController::class, 'show'])->whereNumber('sale')->middleware($requires(SellingAuthorizationService::SALES_VIEW))->name('sales.show');
     Route::post('sales/{sale}/returns', [SaleController::class, 'storeReturn'])->whereNumber('sale')->middleware($requires(SellingAuthorizationService::RETURNS_CREATE))->name('sales.returns.store');
+    Route::post('returns/{return}/refunds', [SaleController::class, 'refundReturn'])->whereNumber('return')->middleware([
+        'tenant.feature:payment',
+        $requires(SellingAuthorizationService::RETURNS_VIEW),
+        $requires('payments.refund'),
+    ])->name('returns.refunds.store');
 });

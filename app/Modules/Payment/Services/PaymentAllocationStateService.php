@@ -10,6 +10,7 @@ use Modules\Payment\Enums\PaymentAllocationState;
 use Modules\Payment\Enums\PaymentDocumentStatus;
 use Modules\Payment\Enums\PaymentLifecycleDimension;
 use Modules\Payment\Enums\PaymentPostingStatus;
+use Modules\Payment\Enums\PaymentType;
 use Modules\Payment\Models\Payment;
 
 final class PaymentAllocationStateService
@@ -21,6 +22,10 @@ final class PaymentAllocationStateService
 
     public function assertAllocatable(Payment $payment): void
     {
+        if ($payment->payment_type === PaymentType::Refund) {
+            throw new InvalidArgumentException('Refund payments cannot be allocated to invoices.');
+        }
+
         $document = $payment->document_status instanceof PaymentDocumentStatus
             ? $payment->document_status
             : PaymentDocumentStatus::from((string) $payment->document_status);

@@ -25,6 +25,7 @@ use Modules\Payment\Services\PaymentPostingService;
 use Modules\Payment\Services\PaymentRefundWorkflowService;
 use Modules\Payment\Services\PaymentReversalService;
 use Modules\Payment\Services\PaymentSettlementService;
+use Modules\Payment\Services\SellingPaymentFinalizationService;
 
 final class PaymentController
 {
@@ -55,6 +56,11 @@ final class PaymentController
     public function store(StorePaymentRequest $request, PaymentCreationService $service): PaymentResource
     {
         return new PaymentResource($service->create($request->toData()));
+    }
+
+    public function finalizeSellingPayment(StorePaymentRequest $request, SellingPaymentFinalizationService $service): PaymentResource
+    {
+        return new PaymentResource($service->finalize($request->toData()));
     }
 
     public function show(

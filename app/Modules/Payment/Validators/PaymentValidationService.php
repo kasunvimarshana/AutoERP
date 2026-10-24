@@ -13,6 +13,8 @@ use Modules\Payment\DTOs\CreatePaymentData;
 use Modules\Payment\DTOs\PaymentAllocationData;
 use Modules\Payment\DTOs\PaymentLineData;
 use Modules\Payment\Enums\PaymentDirection;
+use Modules\Payment\Enums\PaymentCardBrand;
+use Modules\Payment\Enums\PaymentMethodType;
 use Modules\Payment\Enums\PaymentPostingRole;
 use Modules\Payment\Enums\PaymentSourceType;
 use Modules\Payment\Enums\PaymentType;
@@ -58,14 +60,16 @@ final class PaymentValidationService
 
             $this->assertPositive($line->amount, 'Payment line amount');
             $this->assertNonNegative($line->clearedAmount, 'Payment line cleared amount');
+            $method = $this->resolvePaymentMethod($line->paymentMethodId);
             $this->validatePaymentMethod(
-                $this->resolvePaymentMethod($line->paymentMethodId),
+                $method,
                 $data->tenantId,
                 $data->organizationUnitId,
                 $data->direction,
                 $line->referenceNumber ?? $data->referenceNumber,
                 $this->hasInstrumentDetails($line),
             );
+            $this->validateTenderDetails($line, $method, $data->direction);
         }
 
         foreach ($data->allocations as $allocation) {
@@ -167,13 +171,19 @@ final class PaymentValidationService
         }
 
         if ($data->paymentType === PaymentType::Refund) {
-            if ($data->originalPaymentId === null
-                || $data->sourceType !== PaymentSourceType::PaymentRefund->value
-                || $data->allocations !== []
-            ) {
-                throw new InvalidArgumentException('Refund payment requires an original payment, refund source identity, and no direct allocations.');
+            if ($data->allocations !== []) {
+                throw new InvalidArgumentException('Refund payment cannot allocate an invoice directly.');
             }
-            $this->refundPolicy->originalForCreation($data);
+            if ($data->sourceType === PaymentSourceType::SaleReturn->value) {
+                if ($data->originalPaymentId !== null || $data->sourceId === null
+                    || $data->direction !== PaymentDirection::Outbound || $data->partyType !== 'customer') {
+                    throw new InvalidArgumentException('Sale return refund requires an outbound customer payment linked to a return.');
+                }
+            } elseif ($data->sourceType === PaymentSourceType::PaymentRefund->value && $data->originalPaymentId !== null) {
+                $this->refundPolicy->originalForCreation($data);
+            } else {
+                throw new InvalidArgumentException('Refund payment requires a supported refund source.');
+            }
         } elseif ($data->originalPaymentId !== null) {
             throw new InvalidArgumentException('Only refund payments can reference an original payment.');
         }
@@ -235,6 +245,33 @@ final class PaymentValidationService
         }
 
         return $method;
+    }
+
+    private function validateTenderDetails(PaymentLineData $line, ?PaymentMethod $method, PaymentDirection $direction): void
+    {
+        $metadata = $line->metadata ?? [];
+        $methodType = $method?->method_type;
+        $methodType = $methodType instanceof PaymentMethodType
+            ? $methodType
+            : PaymentMethodType::tryFrom((string) $methodType);
+
+        if (array_key_exists('cash_received_amount', $metadata)) {
+            if ($methodType !== PaymentMethodType::Cash || $direction !== PaymentDirection::Inbound) {
+                throw new InvalidArgumentException('Cash received is only valid for an inbound cash payment method.');
+            }
+            if (! is_string($metadata['cash_received_amount'])
+                || $this->math->compare($metadata['cash_received_amount'], $line->amount) < 0) {
+                throw new InvalidArgumentException('Cash received must cover the applied cash amount.');
+            }
+        }
+
+        if (array_key_exists('card_brand', $metadata)) {
+            if ($methodType !== PaymentMethodType::Card
+                || ! is_string($metadata['card_brand'])
+                || PaymentCardBrand::tryFrom($metadata['card_brand']) === null) {
+                throw new InvalidArgumentException('A valid card brand requires a card payment method.');
+            }
+        }
     }
 
     private function hasInstrumentDetails(PaymentLineData $line): bool
