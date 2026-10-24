@@ -16,6 +16,7 @@ use Modules\Inventory\Enums\InventoryDirection;
 use Modules\Inventory\Enums\InventoryMovementType;
 use Modules\Inventory\Models\InventoryMovement;
 use Modules\Inventory\Models\InventoryReservation;
+use Modules\Inventory\Services\BatchTrackingService;
 use Modules\Inventory\Services\StockAvailabilityService;
 use Modules\Inventory\Services\StockMovementService;
 use Modules\Invoice\Enums\InvoiceStatus;
@@ -91,6 +92,7 @@ final class VehicleServiceEngineTest extends TestCase
     public function test_line_item_search_prioritizes_name_prefixes_across_item_types(): void
     {
         $context = $this->context();
+        $this->receiveStock($context, '1.000000');
         $this->withTenantExecutionContext((int) $context['tenant_id'], function () use ($context): void {
             $context['stock']->forceFill(['name' => 'ACURA WIPER WASH'])->save();
             $context['service']->forceFill(['name' => 'WASH & VACUUM'])->save();
@@ -113,6 +115,94 @@ final class VehicleServiceEngineTest extends TestCase
             ['WASH & VACUUM', 'WASH LABOUR', 'ACURA WIPER WASH'],
             array_map(fn (array $option): string => (string) $option['model']->name, $result['options']),
         );
+    }
+
+    public function test_line_item_search_hides_unavailable_stock_without_hiding_other_item_types(): void
+    {
+        $context = $this->context();
+        $tenantId = (int) $context['tenant_id'];
+        $this->withTenantExecutionContext($tenantId, function () use ($context): void {
+            $context['stock']->forceFill(['name' => 'FILTERABLE STOCK'])->save();
+            $context['service']->forceFill(['name' => 'FILTERABLE SERVICE'])->save();
+            $context['labour']->forceFill(['name' => 'FILTERABLE LABOUR'])->save();
+        });
+
+        $search = fn (string $term): array => $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): array => app(VehicleServiceLineItemLookupService::class)->search(
+                tenantId: $tenantId,
+                organizationUnitId: null,
+                search: $term,
+                page: 1,
+                perPage: 1,
+                includeBatchOptions: false,
+            ),
+        );
+
+        $unavailable = $search('FILTERABLE STOCK');
+        $this->assertSame([], $unavailable['options']);
+        $this->assertSame(0, $unavailable['meta']['total']);
+        $this->assertTrue($unavailable['meta']['unavailable_stock_matches']);
+        $this->assertFalse($search('UNKNOWN ITEM')['meta']['unavailable_stock_matches']);
+
+        $otherTypes = $search('FILTERABLE');
+        $this->assertSame(2, $otherTypes['meta']['total']);
+        $this->assertFalse($otherTypes['meta']['unavailable_stock_matches']);
+
+        $this->receiveStock($context, '1.000000');
+        $available = $search('FILTERABLE STOCK');
+        $this->assertSame(1, $available['meta']['total']);
+        $this->assertSame((int) $context['stock']->getKey(), (int) $available['options'][0]['model']->getKey());
+        $this->assertFalse($available['meta']['unavailable_stock_matches']);
+
+        $job = $this->createJob($context);
+        $this->line($job, VehicleServiceLineSourceType::InventoryItem, $context['stock'], '1.000000', '20.000000');
+        $this->assertSame([], $search('FILTERABLE STOCK')['options']);
+    }
+
+    public function test_line_item_search_only_returns_batches_with_available_stock(): void
+    {
+        $context = $this->context();
+        $tenantId = (int) $context['tenant_id'];
+        $item = $this->item($tenantId, 'BATCH-LOOKUP', ItemType::Stock, true, $context['uom_id'], TrackingType::Batch);
+        $batch = $this->withTenantExecutionContext(
+            $tenantId,
+            fn () => app(BatchTrackingService::class)->create($tenantId, (int) $item->getKey(), 'BATCH-LOOKUP-ONE'),
+        );
+        $search = fn (): array => $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): array => app(VehicleServiceLineItemLookupService::class)->search(
+                tenantId: $tenantId,
+                organizationUnitId: null,
+                search: 'BATCH-LOOKUP',
+                page: 1,
+                perPage: 20,
+                includeBatchOptions: true,
+            ),
+        );
+
+        $unavailable = $search();
+        $this->assertSame([], $unavailable['options']);
+        $this->assertTrue($unavailable['meta']['unavailable_stock_matches']);
+
+        $this->withTenantExecutionContext($tenantId, function () use ($context, $item, $batch): void {
+            app(StockMovementService::class)->record(new StockMovementData(
+                tenantId: (int) $context['tenant_id'],
+                movementDate: '2026-06-07',
+                movementType: InventoryMovementType::Receipt,
+                direction: InventoryDirection::In,
+                itemId: (int) $item->getKey(),
+                warehouseId: $context['warehouse_id'],
+                warehouseLocationId: $context['warehouse_location_id'],
+                quantity: '1.000000',
+                unitCost: '10.000000',
+                batchId: (int) $batch->getKey(),
+            ));
+        });
+
+        $available = $search();
+        $this->assertSame(1, $available['meta']['total']);
+        $this->assertSame((int) $batch->getKey(), (int) $available['options'][0]['model']->getKey());
     }
 
     public function test_create_service_job_inspection_and_mixed_lines_use_decimal_totals(): void

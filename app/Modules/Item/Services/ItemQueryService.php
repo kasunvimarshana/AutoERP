@@ -9,6 +9,7 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use InvalidArgumentException;
@@ -35,6 +36,23 @@ final class ItemQueryService
     {
         $query = $this->baseQuery($tenantId, $organizationUnitId)->with($this->summaryRelations());
         $this->applyCriteria($query, $criteria);
+        if (! empty($criteria['require_available_stock'])) {
+            $query->whereIn('items.id', function (QueryBuilder $balances) use ($tenantId, $organizationUnitId): void {
+                $balances->from('inventory_stock_balances')
+                    ->select('item_id')
+                    ->where('tenant_id', $tenantId);
+                if ($organizationUnitId === null) {
+                    $balances->whereNull('organization_unit_id');
+                } else {
+                    $balances->where(function (QueryBuilder $scope) use ($organizationUnitId): void {
+                        $scope->whereNull('organization_unit_id')
+                            ->orWhere('organization_unit_id', $organizationUnitId);
+                    });
+                }
+                $balances->groupBy('item_id')
+                    ->havingRaw('SUM(quantity_available) > 0');
+            });
+        }
 
         if ($relevanceSearch !== null && trim($relevanceSearch) !== '') {
             $this->applySearchRelevance($query, $relevanceSearch);
@@ -61,6 +79,7 @@ final class ItemQueryService
         string $kind,
         bool $prioritizeSearch = false,
         ?int $page = null,
+        bool $requireAvailableStock = false,
     ): LengthAwarePaginator
     {
         $criteria['is_active'] = true;
@@ -73,6 +92,9 @@ final class ItemQueryService
             'service', 'labour', 'combo', 'package' => $criteria['item_type'] = $kind,
             default => null,
         };
+        if ($requireAvailableStock) {
+            $criteria['require_available_stock'] = true;
+        }
 
         $paginator = $this->paginate(
             $criteria,

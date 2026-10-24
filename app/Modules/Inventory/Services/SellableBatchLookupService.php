@@ -6,6 +6,7 @@ namespace Modules\Inventory\Services;
 
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Modules\Core\Services\DecimalMath;
 use Modules\Inventory\Enums\BatchStatus;
 use Modules\Inventory\Models\InventoryBatch;
@@ -34,7 +35,7 @@ final class SellableBatchLookupService
         bool $prioritizeSearch = false,
         ?int $page = null,
     ): LengthAwarePaginator {
-        $balanceScope = function (Builder $query) use ($tenantId, $organizationUnitId, $warehouseId, $warehouseLocationId): void {
+        $balanceScope = function (Builder|QueryBuilder $query) use ($tenantId, $organizationUnitId, $warehouseId, $warehouseLocationId): void {
             $query->where('tenant_id', $tenantId);
             $organizationUnitId === null
                 ? $query->whereNull('organization_unit_id')
@@ -60,9 +61,12 @@ final class SellableBatchLookupService
             ->with(['item.baseUom', 'variant'])
             ->withSum(['stockBalances as available_stock_quantity' => $balanceScope], 'quantity_available')
             ->withSum(['stockBalances as reserved_stock_quantity' => $balanceScope], 'quantity_reserved')
-            ->whereHas('stockBalances', function (Builder $balance) use ($balanceScope): void {
+            ->whereIn('inventory_batches.id', function (QueryBuilder $balance) use ($balanceScope): void {
+                $balance->from('inventory_stock_balances')
+                    ->select('batch_id');
                 $balanceScope($balance);
-                $balance->where('quantity_available', '>', 0);
+                $balance->groupBy('batch_id')
+                    ->havingRaw('SUM(quantity_available) > 0');
             });
 
         if ($search !== '') {

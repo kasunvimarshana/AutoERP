@@ -22,7 +22,7 @@ final class VehicleServiceLineItemLookupService
     /**
      * @return array{
      *     options: list<array{type: 'item'|'batch', model: Item|InventoryBatch}>,
-     *     meta: array{current_page: int, from: int|null, last_page: int, per_page: int, to: int|null, total: int}
+     *     meta: array{current_page: int, from: int|null, last_page: int, per_page: int, to: int|null, total: int, unavailable_stock_matches: bool}
      * }
      */
     public function search(
@@ -53,6 +53,7 @@ final class VehicleServiceLineItemLookupService
                 $kind,
                 prioritizeSearch: true,
                 page: 1,
+                requireAvailableStock: $kind === 'untracked-stockable',
             );
 
             foreach ($results->getCollection() as $item) {
@@ -84,6 +85,8 @@ final class VehicleServiceLineItemLookupService
         $options = $this->deduplicate($options);
         usort($options, fn (array $left, array $right): int => $this->compare($left, $right, $search));
 
+        $unavailableStockMatches = $total === 0 && $page === 1
+            && $this->hasUnavailableStockMatches($tenantId, $organizationUnitId, $search, $includeBatchOptions);
         $total = min($total, self::MAX_RESULTS);
         $offset = ($page - 1) * $perPage;
         $pageOptions = array_slice($options, $offset, $perPage);
@@ -98,8 +101,30 @@ final class VehicleServiceLineItemLookupService
                 'per_page' => $perPage,
                 'to' => $count === 0 ? null : $offset + $count,
                 'total' => $total,
+                'unavailable_stock_matches' => $unavailableStockMatches,
             ],
         ];
+    }
+
+    private function hasUnavailableStockMatches(
+        int $tenantId,
+        ?int $organizationUnitId,
+        string $search,
+        bool $includeBatchOptions,
+    ): bool {
+        $criteria = ['search' => $search];
+        $untracked = $this->items->lookup($criteria, $tenantId, $organizationUnitId, 1, 'untracked-stockable');
+        if ($untracked->total() > 0) {
+            return true;
+        }
+
+        if (! $includeBatchOptions) {
+            return false;
+        }
+
+        $tracked = $this->items->lookup($criteria, $tenantId, $organizationUnitId, 1, 'batch-tracked-stockable');
+
+        return $tracked->total() > 0;
     }
 
     /**
