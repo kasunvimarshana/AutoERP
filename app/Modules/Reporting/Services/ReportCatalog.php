@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Modules\Reporting\Services;
 
+use Illuminate\Database\Eloquent\Builder;
 use InvalidArgumentException;
 use Modules\Core\Services\DecimalMath;
 use Modules\Customer\Models\Customer;
@@ -14,6 +15,7 @@ use Modules\Finance\Models\FinanceBudget;
 use Modules\Finance\Models\FinanceJournalEntry;
 use Modules\Finance\Models\FinanceLedgerEntry;
 use Modules\Hr\Models\HrEmployee;
+use Modules\Inventory\Enums\ValuationLayerStatus;
 use Modules\Inventory\Models\InventoryAllocation;
 use Modules\Inventory\Models\InventoryAllocationIssue;
 use Modules\Inventory\Models\InventoryBatch;
@@ -61,6 +63,7 @@ final class ReportCatalog
         private readonly VehicleServiceProfitabilityCalculator $profitability,
         private readonly DecimalMath $math,
         private readonly VehicleServiceHistoryReportService $vehicleServiceHistory,
+        private readonly InventoryAgingRows $inventoryAgingRows,
     ) {}
 
     /**
@@ -198,22 +201,8 @@ final class ReportCatalog
                 $this->money('unit_cost', 'Unit Cost', false), $this->money('remaining_value', 'Remaining Value'),
                 $this->col('status', 'Status', format: 'enum', sort: 'status'),
             ], ['item.code', 'item.name', 'warehouse.name', 'batch.batch_number'], ['item', 'warehouse', 'batch']),
-            $this->inventory('inventory.valuation', 'Inventory Valuation Report', InventoryValuationLayer::class, [
-                $this->itemCol(), $this->col('warehouse', 'Warehouse', 'warehouse.name'), $this->col('batch', 'Batch', 'batch.batch_number'),
-                $this->col('valuation_method', 'Method', format: 'enum', sort: 'valuation_method'),
-                $this->qty('remaining_quantity', 'Quantity'), $this->money('unit_cost', 'Unit Cost', false),
-                $this->money('remaining_value', 'Value'), $this->col('status', 'Status', format: 'enum', sort: 'status'),
-            ], ['item.code', 'item.name', 'warehouse.name', 'batch.batch_number'], ['item', 'warehouse', 'batch']),
-            $this->inventory('inventory.aging', 'Inventory Aging Report', InventoryValuationLayer::class, [
-                $this->itemCol(), $this->col('warehouse', 'Warehouse', 'warehouse.name'), $this->col('batch', 'Batch', 'batch.batch_number'),
-                $this->col('created_at', 'Receipt Date', format: 'date', sort: 'created_at'),
-                new ReportColumn(
-                    key: 'age_days',
-                    label: 'Age Days',
-                    value: static fn (InventoryValuationLayer $layer): int => (int) $layer->created_at?->startOfDay()->diffInDays(now()->startOfDay()),
-                ),
-                $this->qty('remaining_quantity', 'Remaining Qty'), $this->money('remaining_value', 'Remaining Value'),
-            ], ['item.code', 'item.name', 'warehouse.name', 'batch.batch_number'], ['item', 'warehouse', 'batch'], 'created_at'),
+            $this->inventoryValuation(),
+            $this->inventoryAging(),
             $this->inventory('inventory.valuation-consumption', 'Valuation Consumption', InventoryValuationConsumption::class, [
                 $this->col('movement', 'Issue Movement', 'issueMovement.movement_number'),
                 $this->col('item', 'Item', 'valuationLayer.item.name'),
@@ -446,6 +435,79 @@ final class ReportCatalog
     private function inventory(string $key, string $title, string $model, array $columns, array $search, array $relations = [], ?string $dateColumn = null): ReportDefinition
     {
         return $this->definition($key, $title, 'Inventory', $model, $columns, $search, $relations, $dateColumn);
+    }
+
+    private function inventoryValuation(): ReportDefinition
+    {
+        return new ReportDefinition(
+            key: 'inventory.valuation',
+            title: 'Inventory Valuation Report',
+            group: 'Inventory',
+            model: InventoryValuationLayer::class,
+            columns: [
+                $this->itemCol(), $this->col('warehouse', 'Warehouse', 'warehouse.name'), $this->col('batch', 'Batch', 'batch.batch_number'),
+                $this->qty('remaining_quantity', 'Quantity'), $this->money('unit_cost', 'Unit Cost', false),
+                $this->ageDaysColumn('Item Age (days)'), $this->money('remaining_value', 'Value'), $this->col('status', 'Status', format: 'enum', sort: 'status'),
+            ],
+            search: ['item.code', 'item.name'],
+            relations: ['item', 'warehouse', 'batch', 'movement'],
+            filters: [new ReportFilter(
+                key: 'status',
+                label: 'Status (optional)',
+                field: 'status',
+                type: 'select',
+                options: array_map(
+                    static fn (ValuationLayerStatus $status): array => ['value' => $status->value, 'label' => ucfirst($status->value)],
+                    ValuationLayerStatus::cases(),
+                ),
+            )],
+            dateColumn: 'movement.posted_at',
+            defaultSort: 'id',
+            searchLabel: 'Item Search',
+            dateFilterHint: 'Date range and Item Age use the first stock entry posting date in UTC. Quantities and values are current; weighted-average balances can include later receipts.',
+        );
+    }
+
+    private function inventoryAging(): ReportDefinition
+    {
+        return new ReportDefinition(
+            key: 'inventory.aging',
+            title: 'Item Wise Ageing Report',
+            group: 'Inventory',
+            model: InventoryValuationLayer::class,
+            columns: [
+                $this->itemCol(),
+                new ReportColumn('document', 'Document', path: 'source_document_label', format: 'link', hrefPath: 'source_document_url'),
+                new ReportColumn(
+                    key: 'transaction_at',
+                    label: 'Transaction Date (UTC)',
+                    format: 'datetime',
+                    value: static fn (InventoryValuationLayer $layer): ?string => $layer->movement?->posted_at?->copy()->utc()->toDateTimeString(),
+                ),
+                $this->money('unit_cost', 'Cost Price', false),
+                $this->qty('original_quantity', 'Received Qty', false),
+                $this->qty('remaining_quantity', 'Stock', false),
+                $this->ageDaysColumn('Days'),
+                $this->col('warehouse', 'Warehouse', 'warehouse.name'),
+                $this->col('location', 'Location', 'warehouseLocation.name'),
+            ],
+            search: ['item.code', 'item.name'],
+            relations: ['item', 'warehouse', 'warehouseLocation', 'movement'],
+            filters: [
+                new ReportFilter('warehouse_id', 'Warehouse', 'warehouse_id'),
+                new ReportFilter('warehouse_location_id', 'Location', 'warehouse_location_id'),
+            ],
+            dateColumn: 'movement.posted_at',
+            scope: static fn (Builder $query): Builder => $query
+                ->where('status', ValuationLayerStatus::Open->value)
+                ->where('remaining_quantity', '>', 0),
+            searchLabel: 'Item Search',
+            dateFilterHint: 'Dates and Days use UTC and the first stock entry posting time. Stock is the quantity remaining today. Weighted-average rows show pooled received qty and current average cost.',
+            prepareRows: function (array $layers): void {
+                $this->inventoryAgingRows->prepare($layers);
+            },
+            excludedFilterKeys: ['warehouse_id', 'warehouse_location_id'],
+        );
     }
 
     private function inventoryFlow(string $key, string $title, string $model, string $dateColumn, string $quantityColumn): ReportDefinition
@@ -872,6 +934,15 @@ final class ReportCatalog
     private function itemCol(): ReportColumn
     {
         return $this->col('item', 'Item', 'item.name');
+    }
+
+    private function ageDaysColumn(string $label): ReportColumn
+    {
+        return new ReportColumn(
+            key: 'age_days',
+            label: $label,
+            value: static fn (InventoryValuationLayer $layer): int => (int) ($layer->movement?->posted_at ?? $layer->created_at)?->copy()->utc()->startOfDay()->diffInDays(now('UTC')->startOfDay()),
+        );
     }
 
     private function filter(string $key, string $label, string $field): ReportFilter

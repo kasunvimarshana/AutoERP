@@ -190,9 +190,24 @@ final class VehicleServiceHistoryReportService
                 'description' => (string) ($line->description ?: $line->item?->name ?: 'Service line'),
                 'quantity' => (string) $line->quantity,
                 'uom' => $line->uom?->code ?? $line->uom?->name,
+                'unit_price' => (string) $line->unit_price,
+                'discount_amount' => (string) $line->discount_amount,
+                'tax_amount' => (string) $line->tax_amount,
+                'charge_amount' => (string) $line->charge_amount,
+                'line_total' => (string) $line->line_total,
+                'is_billable' => (bool) $line->is_billable,
+                'status' => $line->status instanceof \BackedEnum ? $line->status->value : (string) $line->status,
                 'employees' => $line->employeeAssignments->map(fn ($assignment) => $this->employee($assignment->employee))->filter()->values()->all(),
             ];
         })->values();
+        $invoices = $job->invoiceLinks
+            ->filter(fn ($link): bool => $link->invoice !== null)
+            ->map(fn ($link): array => [
+                'id' => (int) $link->invoice->getKey(),
+                'number' => (string) $link->invoice->invoice_number,
+                'status' => $link->invoice->status instanceof \BackedEnum ? $link->invoice->status->value : (string) $link->invoice->status,
+            ])
+            ->values();
         $invoiceTotal = $job->invoiceLinks->sum(fn ($link) => (float) ($link->invoice?->grand_total ?? $link->invoice_total ?? 0));
         $paidTotal = $job->invoiceLinks->sum(fn ($link) => (float) ($link->invoice?->paid_total ?? 0));
         $balanceDue = $job->invoiceLinks->sum(fn ($link) => (float) ($link->invoice?->balance_due ?? 0));
@@ -223,6 +238,9 @@ final class VehicleServiceHistoryReportService
             'recommended_work' => $job->inspection?->recommended_work,
             'work_summary' => $lines->pluck('description')->implode(', '),
             'lines' => $lines->all(),
+            'job_discount_amount' => (string) $job->job_discount_amount,
+            'job_total' => (string) $job->grand_total,
+            'invoices' => $invoices->all(),
             'invoice_total' => number_format($invoiceTotal, 6, '.', ''),
             'paid_total' => number_format($paidTotal, 6, '.', ''),
             'balance_due' => number_format($balanceDue, 6, '.', ''),
@@ -266,6 +284,9 @@ final class VehicleServiceHistoryReportService
             'recommended_work' => null,
             'work_summary' => $lines->pluck('description')->implode(', '),
             'lines' => $lines->all(),
+            'job_discount_amount' => null,
+            'job_total' => null,
+            'invoices' => [],
             'invoice_total' => '0.000000',
             'paid_total' => '0.000000',
             'balance_due' => '0.000000',

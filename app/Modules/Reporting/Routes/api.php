@@ -5,7 +5,10 @@ declare(strict_types=1);
 use Illuminate\Support\Facades\Route;
 use Modules\Reporting\Http\Controllers\DashboardController;
 use Modules\Reporting\Http\Controllers\EmployeeCommissionReportController;
+use Modules\Reporting\Http\Controllers\GoodsReceiptSummaryReportController;
+use Modules\Reporting\Http\Controllers\InventoryAgingLookupController;
 use Modules\Reporting\Http\Controllers\OperationalReportController;
+use Modules\Reporting\Http\Controllers\PaymentMethodWiseSummaryReportController;
 use Modules\Reporting\Http\Controllers\ReportController;
 use Modules\Reporting\Http\Controllers\TechnicianWorkReportController;
 use Modules\Reporting\Http\Controllers\VehicleRentalReportController;
@@ -30,14 +33,21 @@ Route::prefix('api/v1/reports')->middleware($middleware)->name('api.v1.reports.'
         Route::get('/', [ReportController::class, 'index'])->name('index');
         Route::get('dashboard', DashboardController::class)->name('dashboard');
         Route::get('summary', [OperationalReportController::class, 'summary'])->name('summary');
+        Route::get('payment-method-wise-summary', [PaymentMethodWiseSummaryReportController::class, 'index'])->name('payment-method-wise-summary');
+        Route::get('inventory-aging/warehouses', [InventoryAgingLookupController::class, 'warehouses'])->name('inventory-aging.warehouses');
+        Route::get('inventory-aging/locations', [InventoryAgingLookupController::class, 'locations'])->name('inventory-aging.locations');
         Route::get('expenses', [OperationalReportController::class, 'expenses'])->name('expenses');
         Route::get('purchase/detailed', [OperationalReportController::class, 'detailedPurchase'])->name('purchase.detailed');
         Route::get('purchase/grn-payables', [OperationalReportController::class, 'grnPayables'])->name('purchase.grn-payables');
+        Route::get('purchase/goods-receipt-summary', [GoodsReceiptSummaryReportController::class, 'index'])->name('purchase.goods-receipt-summary');
         Route::get('vehicle-service/detailed', [OperationalReportController::class, 'detailedVehicleService'])->name('vehicle-service.detailed');
         Route::get('vehicle-service/employee-incentives', [OperationalReportController::class, 'employeeIncentives'])->name('vehicle-service.employee-incentives');
         Route::get('vehicle-service/technician-work', [TechnicianWorkReportController::class, 'index'])->name('vehicle-service.technician-work');
         Route::get('vehicle-service/employee-commissions', [EmployeeCommissionReportController::class, 'index'])
             ->name('vehicle-service.employee-commissions');
+        Route::get('vehicle-service/employee-commissions/employees/{employeeId}/jobs', [EmployeeCommissionReportController::class, 'employeeJobs'])
+            ->whereNumber('employeeId')
+            ->name('vehicle-service.employee-commissions.employee-jobs');
         Route::get('vehicle-service/service-history', [VehicleServiceHistoryReportController::class, 'index'])
             ->name('vehicle-service.service-history');
         Route::get('vehicle-service/sales-summary', [VehicleServiceSalesSummaryReportController::class, 'index'])
@@ -56,6 +66,9 @@ Route::prefix('api/v1/reports')->middleware($middleware)->name('api.v1.reports.'
     });
 
     Route::middleware($requires(ReportingAuthorizationService::REPORTS_EXPORT))->group(function () use ($exportFormats): void {
+        Route::get('payment-method-wise-summary/export/{format}', [PaymentMethodWiseSummaryReportController::class, 'export'])
+            ->whereIn('format', $exportFormats)
+            ->name('payment-method-wise-summary.export');
         Route::get('expenses/export/{format}', [OperationalReportController::class, 'exportExpenses'])
             ->whereIn('format', $exportFormats)
             ->name('expenses.export');
@@ -65,6 +78,9 @@ Route::prefix('api/v1/reports')->middleware($middleware)->name('api.v1.reports.'
         Route::get('purchase/grn-payables/export/{format}', [OperationalReportController::class, 'exportGrnPayables'])
             ->whereIn('format', $exportFormats)
             ->name('purchase.grn-payables.export');
+        Route::get('purchase/goods-receipt-summary/export/{format}', [GoodsReceiptSummaryReportController::class, 'export'])
+            ->whereIn('format', $exportFormats)
+            ->name('purchase.goods-receipt-summary.export');
         Route::get('vehicle-service/detailed/export/{format}', [OperationalReportController::class, 'exportDetailedVehicleService'])
             ->whereIn('format', $exportFormats)
             ->name('vehicle-service.detailed.export');
@@ -77,6 +93,9 @@ Route::prefix('api/v1/reports')->middleware($middleware)->name('api.v1.reports.'
         Route::get('vehicle-service/employee-commissions/export/{format}', [EmployeeCommissionReportController::class, 'export'])
             ->whereIn('format', $exportFormats)
             ->name('vehicle-service.employee-commissions.export');
+        Route::get('vehicle-service/employee-commissions/incentive-summary/export/{format}', [EmployeeCommissionReportController::class, 'exportIncentiveSummary'])
+            ->whereIn('format', $exportFormats)
+            ->name('vehicle-service.employee-commissions.incentive-summary.export');
         Route::get('vehicle-service/service-history/export/{format}', [VehicleServiceHistoryReportController::class, 'export'])
             ->whereIn('format', $exportFormats)
             ->name('vehicle-service.service-history.export');

@@ -189,18 +189,45 @@ function ServiceJobCard({ job }: { job: VehicleServiceHistoryRow }) {
                         <LineList title="Service items" lines={job.lines} />
                     </div>
                 ) : (
-                    <div className="grid gap-5 px-5 py-5 lg:grid-cols-2">
-                        <Detail label="Inspection notes" value={job.inspection_notes} />
-                        <Detail label="Diagnosis" value={job.diagnosis} />
-                        <Detail label="Recommended work" value={job.recommended_work} />
-                        <Detail label="Technicians" value={job.technician_names} />
-                        <Detail label="Supervisor" value={job.supervisor_name} />
-                        <LineList title="Work performed" lines={work} />
-                        <LineList title="Parts used" lines={parts} />
-                        <div className="grid gap-3 border-t border-slate-200 pt-4 sm:grid-cols-3 lg:col-span-2">
-                            <Metric label="Invoice total" value={formatMoney(job.invoice_total)} />
+                    <div className="space-y-6 px-5 py-5">
+                        <section className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-200 pb-4" aria-label="Linked invoices">
+                            <div>
+                                <h3 className="text-sm font-semibold text-slate-900">Invoices</h3>
+                                <p className="mt-1 text-xs text-slate-500">Open an invoice to see its billed quantities and payments.</p>
+                            </div>
+                            {job.invoices.length ? (
+                                <div className="flex flex-wrap gap-2">
+                                    {job.invoices.map((invoice) => (
+                                        <Link key={invoice.id} to={`/invoices/${invoice.id}`} className="rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-700 underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500">
+                                            {invoice.number} <span className="ml-1 font-normal text-slate-600">({humanize(invoice.status)})</span>
+                                        </Link>
+                                    ))}
+                                </div>
+                            ) : <span className="text-sm text-slate-500">Not invoiced</span>}
+                        </section>
+                        <div className="grid gap-5">
+                            <PricedLineList title="Work performed" lines={work} />
+                            <PricedLineList title="Parts used" lines={parts} />
+                        </div>
+                        {Number(job.job_discount_amount) > 0 && (
+                            <div className="flex justify-between gap-4 border-t border-slate-200 pt-4 text-sm">
+                                <span className="font-medium text-slate-600">Job discount</span>
+                                <span className="font-semibold tabular-nums text-slate-900">−{formatMoney(job.job_discount_amount)}</span>
+                            </div>
+                        )}
+                        <div className="grid gap-3 border-t border-slate-200 pt-4 sm:grid-cols-2 lg:grid-cols-4">
+                            <Metric label="Job total" value={formatMoney(job.job_total)} />
+                            <Metric label="Invoiced" value={formatMoney(job.invoice_total)} />
                             <Metric label="Paid" value={formatMoney(job.paid_total)} />
                             <Metric label="Balance" value={formatMoney(job.balance_due)} />
+                        </div>
+                        <p className="text-xs text-slate-500">Line totals include tax and charges. Invoiced may be lower when only some work has been billed.</p>
+                        <div className="grid gap-5 border-t border-slate-200 pt-4 lg:grid-cols-2">
+                            <Detail label="Inspection notes" value={job.inspection_notes} />
+                            <Detail label="Diagnosis" value={job.diagnosis} />
+                            <Detail label="Recommended work" value={job.recommended_work} />
+                            <Detail label="Technicians" value={job.technician_names} />
+                            <Detail label="Supervisor" value={job.supervisor_name} />
                         </div>
                     </div>
                 )}
@@ -219,4 +246,47 @@ function Detail({ label, value }: { label: string; value?: string | null }) {
 
 function LineList({ title, lines }: { title: string; lines: VehicleServiceHistoryRow['lines'] }) {
     return <div><div className="text-sm font-medium text-slate-500">{title}</div>{lines.length ? <ul className="mt-2 divide-y divide-slate-100 text-sm text-slate-800">{lines.map((line) => <li className="flex items-start justify-between gap-4 py-2 first:pt-0" key={line.id}><span>{line.description}</span><span className="shrink-0 tabular-nums text-slate-500">{formatQuantity(line.quantity)} {line.uom ?? ''}</span></li>)}</ul> : <p className="mt-1 text-sm text-slate-500">Not recorded</p>}</div>;
+}
+
+function PricedLineList({ title, lines }: { title: string; lines: VehicleServiceHistoryRow['lines'] }) {
+    return (
+        <section>
+            <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
+            {lines.length ? (
+                <div className="mt-2 overflow-x-auto rounded-lg border border-slate-200">
+                    <table className="w-full min-w-[580px] text-left text-sm">
+                        <thead className="bg-slate-50 text-xs text-slate-600">
+                            <tr>
+                                <th scope="col" className="px-3 py-2 font-semibold">Item / work</th>
+                                <th scope="col" className="px-3 py-2 text-right font-semibold">Qty</th>
+                                <th scope="col" className="px-3 py-2 text-right font-semibold">Unit price</th>
+                                <th scope="col" className="px-3 py-2 text-right font-semibold">Discount</th>
+                                <th scope="col" className="px-3 py-2 text-right font-semibold">Line total</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                            {lines.map((line) => <tr key={line.id} className="align-top">
+                                <th scope="row" className="px-3 py-3 font-medium text-slate-900">
+                                    {line.description}
+                                    {line.is_billable === false && <span className="ml-2 text-xs font-normal text-slate-500">Not billable</span>}
+                                    {line.status === 'cancelled' && <span className="ml-2 text-xs font-normal text-rose-700">Cancelled</span>}
+                                    {(Number(line.tax_amount) > 0 || Number(line.charge_amount) > 0) && (
+                                        <span className="mt-1 block text-xs font-normal text-slate-500">
+                                            {Number(line.tax_amount) > 0 && `Tax ${formatMoney(line.tax_amount)}`}
+                                            {Number(line.tax_amount) > 0 && Number(line.charge_amount) > 0 && ' · '}
+                                            {Number(line.charge_amount) > 0 && `Charges ${formatMoney(line.charge_amount)}`}
+                                        </span>
+                                    )}
+                                </th>
+                                <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums text-slate-700">{formatQuantity(line.quantity)} {line.uom ?? ''}</td>
+                                <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums text-slate-700">{formatMoney(line.unit_price)}</td>
+                                <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums text-slate-700">{formatMoney(line.discount_amount)}</td>
+                                <td className="whitespace-nowrap px-3 py-3 text-right font-semibold tabular-nums text-slate-900">{formatMoney(line.line_total)}</td>
+                            </tr>)}
+                        </tbody>
+                    </table>
+                </div>
+            ) : <p className="mt-2 text-sm text-slate-500">Not recorded</p>}
+        </section>
+    );
 }

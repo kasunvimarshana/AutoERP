@@ -9,6 +9,7 @@ use Modules\Inventory\Http\Controllers\AllocationController;
 use Modules\Inventory\Http\Controllers\BatchController;
 use Modules\Inventory\Http\Controllers\OpeningStockImportController;
 use Modules\Inventory\Http\Controllers\ReservationController;
+use Modules\Inventory\Http\Controllers\StockCardController;
 use Modules\Inventory\Http\Controllers\StockController;
 use Modules\Inventory\Http\Controllers\StockCountController;
 use Modules\Inventory\Http\Controllers\TransferController;
@@ -26,6 +27,12 @@ $permissionMiddleware = (string) config('user.tenant.permission_middleware_alias
 $requires = static fn (string $permission): string => $permissionMiddleware.':'.$permission;
 
 Route::prefix('api/v1/inventory')->middleware($middleware)->name('api.v1.inventory.')->group(function () use ($requires): void {
+    Route::get('stock-card', [StockCardController::class, 'show'])
+        ->middleware($requires(InventoryPermission::STOCK_VIEW))
+        ->name('stock-card.show');
+    Route::get('stock-card/export', [StockCardController::class, 'export'])
+        ->middleware($requires(InventoryPermission::STOCK_VIEW))
+        ->name('stock-card.export');
     Route::get('stock-balances', [StockController::class, 'balances'])
         ->middleware($requires(InventoryPermission::STOCK_VIEW))
         ->name('stock-balances.index');

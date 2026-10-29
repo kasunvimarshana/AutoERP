@@ -25,6 +25,8 @@ final class ReportRunRequest extends TenantScopedRequest
             'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
             'filters' => ['nullable', 'array'],
             'filters.*' => ['nullable'],
+            'filters.warehouse_id' => ['nullable', 'integer', 'min:1'],
+            'filters.warehouse_location_id' => ['nullable', 'integer', 'min:1'],
         ];
     }
 

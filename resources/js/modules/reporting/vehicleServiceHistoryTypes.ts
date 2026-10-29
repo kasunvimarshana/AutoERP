@@ -18,7 +18,20 @@ export interface VehicleServiceHistoryLine {
     description: string;
     quantity: string;
     uom?: string | null;
+    unit_price?: string;
+    discount_amount?: string;
+    tax_amount?: string;
+    charge_amount?: string;
+    line_total?: string;
+    is_billable?: boolean;
+    status?: string;
     employees: NamedResource[];
+}
+
+export interface VehicleServiceHistoryInvoice {
+    id: number;
+    number: string;
+    status: string;
 }
 
 export interface VehicleServiceHistoryRow {
@@ -46,6 +59,9 @@ export interface VehicleServiceHistoryRow {
     recommended_work: string | null;
     work_summary: string;
     lines: VehicleServiceHistoryLine[];
+    job_discount_amount: string | null;
+    job_total: string | null;
+    invoices: VehicleServiceHistoryInvoice[];
     invoice_total: string;
     paid_total: string;
     balance_due: string;

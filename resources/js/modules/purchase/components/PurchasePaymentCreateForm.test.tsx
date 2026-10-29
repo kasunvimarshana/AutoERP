@@ -36,6 +36,7 @@ describe('PurchasePaymentCreateForm', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         purchaseApiMocks.getPurchasePaymentContext.mockResolvedValue({
+            default_currency: { id: 6, code: 'LKR', name: 'Sri Lankan Rupee' },
             payment_methods: [{ id: 1, name: 'Cash', method_type: 'cash' }],
         });
         purchaseApiMocks.listOutstandingSupplierInvoices.mockResolvedValue(collection([invoice()]));
@@ -75,8 +76,10 @@ describe('PurchasePaymentCreateForm', () => {
         );
 
         expect(screen.queryByRole('button', { name: /load outstanding invoices/i })).not.toBeInTheDocument();
+        expect(await screen.findByText('LKR')).toBeInTheDocument();
 
         await userEvent.click(screen.getByRole('button', { name: 'Select Supplier' }));
+        expect(screen.getByText('LKR')).toBeInTheDocument();
         await userEvent.click(screen.getByRole('tab', { name: /Invoice Allocations/ }));
 
         await waitFor(() => expect(purchaseApiMocks.listOutstandingSupplierInvoices).toHaveBeenCalledWith(
@@ -86,6 +89,35 @@ describe('PurchasePaymentCreateForm', () => {
         const invoiceLinks = await screen.findAllByRole('link', { name: 'SI-42' });
         expect(invoiceLinks[0]).toHaveAttribute('href', '/purchase/invoices/42');
         expect(screen.getByText('1-1 of 2')).toBeInTheDocument();
+    });
+
+    it('keeps allocations for multiple invoices while searching invoice numbers', async () => {
+        purchaseApiMocks.listOutstandingSupplierInvoices.mockImplementation(async ({ search }: { search?: string }) => (
+            collection(search ? [invoice(43, 'SI-43', '50.000000')] : [invoice(), invoice(43, 'SI-43', '50.000000')])
+        ));
+
+        render(
+            <TestRouter initialEntries={['/purchase/payments/create']}>
+                <PurchasePaymentCreateForm />
+            </TestRouter>,
+        );
+
+        await userEvent.click(screen.getByRole('button', { name: 'Select Supplier' }));
+        await userEvent.click(screen.getByRole('tab', { name: /Invoice Allocations/ }));
+        await screen.findAllByRole('link', { name: 'SI-43' });
+
+        const allocationInputs = screen.getAllByLabelText('Allocation');
+        fireEvent.change(allocationInputs[0], { target: { value: '100.000000' } });
+        fireEvent.change(allocationInputs[1], { target: { value: '50.000000' } });
+
+        expect(screen.getByRole('tab', { name: 'Invoice Allocations (2)' })).toBeInTheDocument();
+        fireEvent.change(screen.getByRole('searchbox', { name: 'Search invoices' }), { target: { value: 'SI-43' } });
+
+        await waitFor(() => expect(purchaseApiMocks.listOutstandingSupplierInvoices).toHaveBeenCalledWith(
+            expect.objectContaining({ supplier_id: 11, search: 'SI-43' }),
+            expect.any(AbortSignal),
+        ));
+        expect(screen.getByRole('tab', { name: 'Invoice Allocations (2)' })).toBeInTheDocument();
     });
 
     it('previews a purchase payment without creating it', async () => {
@@ -131,6 +163,7 @@ describe('PurchasePaymentCreateForm', () => {
         expect(invoiceApiMocks.getInvoice).toHaveBeenCalledTimes(1);
         expect(screen.getByText('Supplier A')).toBeInTheDocument();
         expect(screen.getByText('USD')).toBeInTheDocument();
+        expect(screen.queryByText('LKR')).not.toBeInTheDocument();
     });
 
     it('loads a different query source once in the same mounted payment form', async () => {

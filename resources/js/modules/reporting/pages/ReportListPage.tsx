@@ -21,6 +21,7 @@ export default function ReportListPage() {
     return (
         <>
             <ContentHeader title="Reports" description="Operational and financial reports from existing AutoERP data." />
+            <Link to="/reports/payment-method-wise-summary" className="mb-5 block rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm font-semibold text-sky-900 hover:bg-sky-100">Payment Method Wise Summary — daily receipts and new credit sales</Link>
             <ErrorAlert error={reports.error} />
             {reports.loading ? <LoadingState label="Loading reports..." /> : (
                 <div className="grid gap-5 xl:grid-cols-2">
@@ -56,6 +57,7 @@ function groupReports(reports: ReportDefinition[]): Record<string, ReportDefinit
 function reportPath(key: string): string {
     if (key === 'purchase/detailed') return '/reports/purchase/detailed';
     if (key === 'purchase/grn-payables') return '/reports/purchase/grn-payables';
+    if (key === 'purchase/goods-receipt-summary') return '/reports/purchase/goods-receipt-summary';
     if (key === 'vehicle-service/detailed') return '/reports/vehicle-service/detailed';
     if (key === 'vehicle-service/employee-incentives') return '/reports/vehicle-service/employee-incentives';
     if (key === 'vehicle-service.technician-work') return '/reports/vehicle-service/technician-work';

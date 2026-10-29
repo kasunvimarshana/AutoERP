@@ -261,6 +261,7 @@ final class PurchaseOrderApiTest extends TestCase
         $context = $this->context();
         $approveId = $this->withAuth($context)->postJson('/api/v1/purchase/orders', $this->payload($context))->json('data.id');
         $cancelId = $this->withAuth($context)->postJson('/api/v1/purchase/orders', $this->payload($context))->json('data.id');
+        $approvedCancelId = $this->withAuth($context)->postJson('/api/v1/purchase/orders', $this->payload($context))->json('data.id');
         $closeId = $this->withAuth($context)->postJson('/api/v1/purchase/orders', $this->payload($context))->json('data.id');
 
         $this->withAuth($context)->patchJson('/api/v1/purchase/orders/'.$approveId.'/submit', $this->actionPayload($context, 'purchase_orders', (int) $approveId))
@@ -272,7 +273,17 @@ final class PurchaseOrderApiTest extends TestCase
 
         $this->withAuth($context)->patchJson('/api/v1/purchase/orders/'.$cancelId.'/cancel', $this->actionPayload($context, 'purchase_orders', (int) $cancelId))
             ->assertOk()
-            ->assertJsonPath('data.status', 'cancelled');
+            ->assertJsonPath('data.status', 'cancelled')
+            ->assertJsonPath('data.cancelled_by.id', $context['user_id']);
+        self::assertNotNull(DB::table('purchase_orders')->where('id', $cancelId)->value('cancelled_at'));
+
+        $this->withAuth($context)->patchJson('/api/v1/purchase/orders/'.$approvedCancelId.'/submit', $this->actionPayload($context, 'purchase_orders', (int) $approvedCancelId))->assertOk();
+        $this->withAuth($context)->patchJson('/api/v1/purchase/orders/'.$approvedCancelId.'/approve', $this->actionPayload($context, 'purchase_orders', (int) $approvedCancelId))->assertOk();
+        $this->withAuth($context)->patchJson('/api/v1/purchase/orders/'.$approvedCancelId.'/cancel', $this->actionPayload($context, 'purchase_orders', (int) $approvedCancelId))
+            ->assertOk()
+            ->assertJsonPath('data.status', 'cancelled')
+            ->assertJsonPath('data.approved_by.id', $context['user_id'])
+            ->assertJsonPath('data.cancelled_by.id', $context['user_id']);
 
         $this->withAuth($context)->patchJson('/api/v1/purchase/orders/'.$closeId.'/submit', $this->actionPayload($context, 'purchase_orders', (int) $closeId))->assertOk();
         $this->withAuth($context)->patchJson('/api/v1/purchase/orders/'.$closeId.'/approve', $this->actionPayload($context, 'purchase_orders', (int) $closeId))->assertOk();
@@ -538,6 +549,18 @@ final class PurchaseOrderApiTest extends TestCase
             ->assertJsonPath('data.defaults.warehouse_id', $context['warehouse_id'])
             ->assertJsonPath('data.defaults.warehouse_location_id', $locationId)
             ->assertJsonPath('data.defaults.warehouse_location_source', 'warehouse_default');
+    }
+
+    public function test_supplier_payment_context_exposes_tenant_default_currency(): void
+    {
+        $context = $this->context();
+        $currencyId = $this->createCurrency('BASE-'.Str::upper(Str::random(4)));
+        DB::table('tenants')->where('id', $context['tenant_id'])->update(['base_currency_id' => $currencyId]);
+
+        $this->withAuth($context)->getJson('/api/v1/purchase/payments/context')
+            ->assertOk()
+            ->assertJsonPath('data.default_currency.id', $currencyId)
+            ->assertJsonPath('data.default_currency.name', DB::table('currencies')->where('id', $currencyId)->value('name'));
     }
 
     public function test_referenced_purchase_return_http_contract_derives_backend_controlled_fields(): void

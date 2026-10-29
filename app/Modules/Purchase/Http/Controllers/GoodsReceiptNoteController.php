@@ -92,7 +92,7 @@ final class GoodsReceiptNoteController
         $grn = $service->create($request->toData())->load($this->relations());
         $this->audit->recordDocumentEvent(PurchaseAuditEvent::GOODS_RECEIPT_CREATED, 'goods_receipt_note', $grn);
 
-        return new GoodsReceiptNoteResource($this->presentation->prepareGoodsReceipt($grn));
+        return new GoodsReceiptNoteResource($this->presentation->prepareGoodsReceipt($grn, includeRelatedInvoices: true));
     }
 
     public function show(ListPurchaseDocumentRequest $request, int $grn): GoodsReceiptNoteResource
@@ -103,7 +103,7 @@ final class GoodsReceiptNoteController
             ->with($this->relations())
             ->findOrFail($grn);
 
-        return new GoodsReceiptNoteResource($this->presentation->prepareGoodsReceipt($grn));
+        return new GoodsReceiptNoteResource($this->presentation->prepareGoodsReceipt($grn, includeRelatedInvoices: true));
     }
 
     public function post(PurchaseActionRequest $request, int $grn, PurchaseGoodsReceiptPostingCoordinator $coordinator): GoodsReceiptNoteResource
@@ -119,7 +119,7 @@ final class GoodsReceiptNoteController
         )->load($this->relations());
         $this->audit->recordDocumentEvent(PurchaseAuditEvent::GOODS_RECEIPT_POSTED, 'goods_receipt_note', $updated, $before);
 
-        return new GoodsReceiptNoteResource($this->presentation->prepareGoodsReceipt($updated));
+        return new GoodsReceiptNoteResource($this->presentation->prepareGoodsReceipt($updated, includeRelatedInvoices: true));
     }
 
     public function reverse(PurchaseActionRequest $request, int $grn, PurchaseGoodsReceiptPostingCoordinator $coordinator): GoodsReceiptNoteResource
@@ -137,7 +137,7 @@ final class GoodsReceiptNoteController
         );
         $this->audit->recordDocumentEvent(PurchaseAuditEvent::GOODS_RECEIPT_REVERSED, 'goods_receipt_note', $updated, $before);
 
-        return new GoodsReceiptNoteResource($this->presentation->prepareGoodsReceipt($updated));
+        return new GoodsReceiptNoteResource($this->presentation->prepareGoodsReceipt($updated, includeRelatedInvoices: true));
     }
 
     private function relations(): array

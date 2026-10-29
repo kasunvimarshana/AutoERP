@@ -52,6 +52,7 @@ final class PurchaseOrder extends TenantOwnedModel
             'returned_quantity' => 'decimal:6',
             'submitted_at' => 'datetime',
             'approved_at' => 'datetime',
+            'cancelled_at' => 'datetime',
             'closed_at' => 'datetime',
         ]);
     }
@@ -91,6 +92,11 @@ final class PurchaseOrder extends TenantOwnedModel
         return $this->belongsTo(UserModel::class, 'created_by');
     }
 
+    public function submittedBy(): BelongsTo
+    {
+        return $this->belongsTo(UserModel::class, 'submitted_by');
+    }
+
     public function approvedBy(): BelongsTo
     {
         return $this->belongsTo(UserModel::class, 'approved_by');
@@ -99,6 +105,11 @@ final class PurchaseOrder extends TenantOwnedModel
     public function closedBy(): BelongsTo
     {
         return $this->belongsTo(UserModel::class, 'closed_by');
+    }
+
+    public function cancelledBy(): BelongsTo
+    {
+        return $this->belongsTo(UserModel::class, 'cancelled_by');
     }
 
     public function adjustments(): HasMany

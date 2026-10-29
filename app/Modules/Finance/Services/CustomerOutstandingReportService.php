@@ -7,10 +7,10 @@ namespace Modules\Finance\Services;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
+use Modules\Core\Services\DecimalMath;
 use Modules\Finance\Enums\ReceivableAgingBucket;
 use Modules\Finance\Http\Requests\CustomerOutstandingReportRequest;
 use Modules\Invoice\Enums\InvoicePartyType;
-use Modules\VehicleService\Enums\VehicleServiceInvoiceSettlementMode;
 
 final class CustomerOutstandingReportService
 {
@@ -20,15 +20,29 @@ final class CustomerOutstandingReportService
 
     private const CUSTOMER_NAME_EXPRESSION = "COALESCE(NULLIF(customers.display_name, ''), customers.name)";
 
+    public function __construct(
+        private readonly CustomerOutstandingAsOfBalances $historicalBalances,
+        private readonly CustomerOutstandingLocationScope $locations,
+        private readonly DecimalMath $math,
+    ) {}
+
+    /** @return array<int, array{id: int, name: string}> */
+    public function locations(CustomerOutstandingReportRequest $request): array
+    {
+        return $this->locations->options($request);
+    }
+
     /** @return array<string, mixed> */
     public function page(CustomerOutstandingReportRequest $request): array
     {
         $asOfDate = $this->asOfDate($request);
+        $this->historicalBalances->assertHistoricalCoverage($request, $asOfDate, $this->locations);
         $query = $this->baseQuery($request, $asOfDate);
         $groups = $this->groupedQuery(clone $query, $asOfDate);
         $paginator = $groups
-            ->orderByDesc('outstanding_total')
+            ->orderBy('locations.name')
             ->orderBy('customer_name')
+            ->orderBy('invoices.currency_code_snapshot')
             ->paginate($request->perPage());
 
         return [
@@ -50,6 +64,7 @@ final class CustomerOutstandingReportService
     public function invoices(CustomerOutstandingReportRequest $request, int $customerId): array
     {
         $asOfDate = $this->asOfDate($request);
+        $this->historicalBalances->assertHistoricalCoverage($request, $asOfDate, $this->locations);
         $currencyCode = (string) $request->input('currency_code');
         $query = $this->baseQuery($request, $asOfDate)
             ->where('customers.id', $customerId)
@@ -59,7 +74,6 @@ final class CustomerOutstandingReportService
                 'invoices.invoice_number',
                 'invoices.invoice_date',
                 'invoices.due_date',
-                'invoices.status as invoice_status',
                 'invoices.grand_total',
                 'balances.paid_amount',
                 'balances.credit_allocated_amount',
@@ -75,22 +89,6 @@ final class CustomerOutstandingReportService
                     ->limit(1),
                 'service_job_number',
             )
-            ->selectSub(
-                DB::table('vehicle_service_invoice_links')
-                    ->selectRaw('COUNT(*)')
-                    ->whereColumn('vehicle_service_invoice_links.invoice_id', 'invoices.id')
-                    ->whereColumn('vehicle_service_invoice_links.tenant_id', 'invoices.tenant_id')
-                    ->where('vehicle_service_invoice_links.settlement_mode', VehicleServiceInvoiceSettlementMode::Credit->value),
-                'confirmed_service_credit_count',
-            )
-            ->selectSub(
-                DB::table('invoice_document_snapshots')
-                    ->selectRaw('COUNT(*)')
-                    ->whereColumn('invoice_document_snapshots.invoice_id', 'invoices.id')
-                    ->whereColumn('invoice_document_snapshots.tenant_id', 'invoices.tenant_id')
-                    ->whereRaw('LOWER(invoice_document_snapshots.payment_mode) = ?', ['credit']),
-                'confirmed_document_credit_count',
-            )
             ->orderByRaw(self::DUE_DATE_EXPRESSION)
             ->orderBy('invoices.invoice_number');
 
@@ -101,24 +99,20 @@ final class CustomerOutstandingReportService
                 'number' => (string) $row->invoice_number,
                 'date' => CarbonImmutable::parse($row->invoice_date)->toDateString(),
                 'due_date' => CarbonImmutable::parse($row->due_date ?? $row->invoice_date)->toDateString(),
-                'status' => (string) $row->invoice_status,
                 'service_job_number' => $row->service_job_number === null ? null : (string) $row->service_job_number,
-                'credit_basis' => (int) $row->confirmed_service_credit_count > 0
-                    || (int) $row->confirmed_document_credit_count > 0
-                    ? 'confirmed'
-                    : 'historical_inferred',
             ],
             'currency' => ['code' => $row->currency_code_snapshot ?: 'N/A'],
             'invoice_total' => (string) $row->grand_total,
             'paid_amount' => (string) $row->paid_amount,
             'credit_allocated_amount' => (string) $row->credit_allocated_amount,
             'outstanding_amount' => (string) $row->remaining_amount,
+            'invoice_age_days' => $this->invoiceAgeDays($row->invoice_date, $asOfDate),
             'days_overdue' => $this->daysOverdue($row->due_date ?? $row->invoice_date, $asOfDate),
         ])->values();
 
         return [
             'as_of_date' => $asOfDate,
-            'customer' => $this->customerIdentity($customerId, $request),
+            'customer' => $paginator->total() > 0 ? $this->customerIdentity($customerId, $request) : null,
             'currency' => ['code' => $currencyCode],
             'data' => $rows,
             'meta' => [
@@ -132,20 +126,127 @@ final class CustomerOutstandingReportService
         ];
     }
 
-    /** @return iterable<object> */
+    /** @return iterable<array<string, string>> */
     public function exportRows(CustomerOutstandingReportRequest $request): iterable
     {
         $asOfDate = $this->asOfDate($request);
+        $this->historicalBalances->assertHistoricalCoverage($request, $asOfDate, $this->locations);
+        $this->locations->assertAccessible($request);
 
-        return $this->groupedQuery($this->baseQuery($request, $asOfDate), $asOfDate)
-            ->orderBy('customer_name')
-            ->orderBy('currency_code')
+        return $this->streamExportRows($request, $asOfDate);
+    }
+
+    /** @return iterable<array<string, string>> */
+    private function streamExportRows(CustomerOutstandingReportRequest $request, string $asOfDate): iterable
+    {
+        $query = $this->baseQuery($request, $asOfDate);
+        $summary = $this->summary(clone $query, $asOfDate);
+        $invoices = $query
+            ->select([
+                'locations.id as location_id',
+                'locations.name as location_name',
+                'customers.id as customer_id',
+                'invoices.invoice_number',
+                'invoices.invoice_date',
+                'invoices.due_date',
+                'invoices.currency_code_snapshot',
+                'balances.remaining_amount',
+            ])
+            ->selectRaw(self::CUSTOMER_NAME_EXPRESSION.' as customer_name')
+            ->orderBy('locations.name')
+            ->orderBy('customers.name')
+            ->orderBy('invoices.currency_code_snapshot')
+            ->orderBy('invoices.invoice_date')
+            ->orderBy('invoices.invoice_number')
             ->lazy(500);
+
+        $currentLocation = null;
+        $currentCustomer = null;
+        $customerName = '';
+        $customerCurrency = '';
+        $customerTotal = '0.000000';
+        foreach ($invoices as $invoice) {
+            $locationKey = (string) ($invoice->location_id ?? 'unassigned');
+            $currency = (string) ($invoice->currency_code_snapshot ?: 'N/A');
+            $customerKey = $locationKey.'|'.$invoice->customer_id.'|'.$currency;
+            if ($currentCustomer !== null && $customerKey !== $currentCustomer) {
+                yield $this->exportTotal('customer_total', '', "{$customerName} total", $customerCurrency, $customerTotal);
+                $customerTotal = '0.000000';
+            }
+            if ($currentLocation !== null && $locationKey !== $currentLocation) {
+                foreach ($this->exportLocationTotals($summary['totals_by_location'], $currentLocation) as $total) {
+                    yield $total;
+                }
+            }
+
+            $currentLocation = $locationKey;
+            $currentCustomer = $customerKey;
+            $customerName = (string) $invoice->customer_name;
+            $customerCurrency = $currency;
+            $customerTotal = $this->math->add($customerTotal, (string) $invoice->remaining_amount);
+            yield [
+                'row_type' => 'invoice',
+                'location' => (string) ($invoice->location_name ?? 'Unassigned'),
+                'customer' => $customerName,
+                'invoice' => (string) $invoice->invoice_number,
+                'invoice_date' => (string) $invoice->invoice_date,
+                'invoice_age_days' => (string) $this->invoiceAgeDays($invoice->invoice_date, $asOfDate),
+                'due_days' => (string) $this->daysOverdue($invoice->due_date ?? $invoice->invoice_date, $asOfDate),
+                'currency' => $currency,
+                'balance' => (string) $invoice->remaining_amount,
+            ];
+        }
+        if ($currentCustomer !== null) {
+            yield $this->exportTotal('customer_total', '', "{$customerName} total", $customerCurrency, $customerTotal);
+        }
+        if ($currentLocation !== null) {
+            foreach ($this->exportLocationTotals($summary['totals_by_location'], $currentLocation) as $total) {
+                yield $total;
+            }
+        }
+        foreach ($summary['totals_by_currency'] as $total) {
+            yield $this->exportTotal('grand_total', 'Grand total', '', $total['currency']['code'], $total['outstanding_total']);
+        }
+    }
+
+    /** @param iterable<array<string, mixed>> $totals @return iterable<array<string, string>> */
+    private function exportLocationTotals(iterable $totals, string $locationKey): iterable
+    {
+        foreach ($totals as $total) {
+            if ((string) ($total['location']['id'] ?? 'unassigned') !== $locationKey) {
+                continue;
+            }
+
+            yield $this->exportTotal(
+                'location_total',
+                $total['location']['name'].' total',
+                '',
+                $total['currency']['code'],
+                $total['outstanding_total'],
+            );
+        }
+    }
+
+    /** @return array<string, string> */
+    private function exportTotal(string $type, string $location, string $customer, string $currency, string $balance): array
+    {
+        return [
+            'row_type' => $type,
+            'location' => $location,
+            'customer' => $customer,
+            'invoice' => '',
+            'invoice_date' => '',
+            'invoice_age_days' => '',
+            'due_days' => '',
+            'currency' => $currency,
+            'balance' => $balance,
+        ];
     }
 
     private function baseQuery(CustomerOutstandingReportRequest $request, string $asOfDate): Builder
     {
-        $query = DB::table('invoice_balances as balances')
+        $query = DB::query()
+            ->fromSub($this->historicalBalances->balances($request->tenantId(), $asOfDate), 'balances')
             ->join('invoices', static function ($join): void {
                 $join->on('invoices.id', '=', 'balances.invoice_id')
                     ->on('invoices.tenant_id', '=', 'balances.tenant_id');
@@ -154,62 +255,30 @@ final class CustomerOutstandingReportService
                 $join->on('customers.id', '=', 'invoices.party_id')
                     ->on('customers.tenant_id', '=', 'invoices.tenant_id');
             })
+            ->leftJoin('organization_units as locations', static function ($join): void {
+                $join->on('locations.id', '=', 'balances.organization_unit_id')
+                    ->on('locations.tenant_id', '=', 'balances.tenant_id');
+            })
             ->where('balances.tenant_id', $request->tenantId())
             ->where('invoices.party_type', InvoicePartyType::Customer->value)
             ->where('invoices.direction', 'outbound')
-            ->whereNotIn('invoices.status', ['cancelled', 'void'])
+            ->leftJoinSub($this->historicalBalances->invoiceReversalDates($request->tenantId()), 'invoice_reversals', 'invoice_reversals.invoice_id', '=', 'invoices.id')
+            ->whereNotIn('invoices.status', ['draft', 'approved'])
+            ->where(function (Builder $query) use ($asOfDate): void {
+                $query->whereNotIn('invoices.status', ['cancelled', 'void', 'reversed'])
+                    ->orWhere(function (Builder $cancelled) use ($asOfDate): void {
+                        $cancelled->whereIn('invoices.status', ['cancelled', 'void'])
+                            ->whereDate('invoices.cancelled_at', '>', $asOfDate);
+                    })
+                    ->orWhere(function (Builder $reversed) use ($asOfDate): void {
+                        $reversed->where('invoices.status', 'reversed')
+                            ->where('invoice_reversals.reversal_date', '>', $asOfDate);
+                    });
+            })
             ->where('balances.remaining_amount', '>', 0)
             ->where('invoices.invoice_date', '<=', $asOfDate);
 
-        $query->where(static function (Builder $creditQuery) use ($request): void {
-            $creditQuery->whereExists(static function (Builder $confirmedServiceCredit): void {
-                $confirmedServiceCredit->selectRaw('1')
-                    ->from('vehicle_service_invoice_links')
-                    ->whereColumn('vehicle_service_invoice_links.invoice_id', 'invoices.id')
-                    ->whereColumn('vehicle_service_invoice_links.tenant_id', 'invoices.tenant_id')
-                    ->where('vehicle_service_invoice_links.settlement_mode', VehicleServiceInvoiceSettlementMode::Credit->value);
-            })->orWhere(static function (Builder $historicalCredit) use ($request): void {
-                $historicalCredit->whereNotExists(static function (Builder $settlementMode): void {
-                    $settlementMode->selectRaw('1')
-                        ->from('vehicle_service_invoice_links')
-                        ->whereColumn('vehicle_service_invoice_links.invoice_id', 'invoices.id')
-                        ->whereColumn('vehicle_service_invoice_links.tenant_id', 'invoices.tenant_id')
-                        ->whereNotNull('vehicle_service_invoice_links.settlement_mode');
-                })->whereExists(static function (Builder $creditProfileQuery) use ($request): void {
-                    $creditProfileQuery->selectRaw('1')
-                        ->from('customer_credit_profiles')
-                        ->whereColumn('customer_credit_profiles.customer_id', 'customers.id')
-                        ->whereColumn('customer_credit_profiles.tenant_id', 'customers.tenant_id')
-                        ->where('customer_credit_profiles.tenant_id', $request->tenantId())
-                        ->where('customer_credit_profiles.credit_allowed', true)
-                        ->where('customer_credit_profiles.is_active', true);
-                })->where(static function (Builder $sourceQuery): void {
-                    $sourceQuery->whereExists(static function (Builder $serviceSource): void {
-                        $serviceSource->selectRaw('1')
-                            ->from('invoice_sources')
-                            ->whereColumn('invoice_sources.invoice_id', 'invoices.id')
-                            ->whereColumn('invoice_sources.tenant_id', 'invoices.tenant_id')
-                            ->where('invoice_sources.source_type', 'vehicle_service_job');
-                    })->orWhereExists(static function (Builder $documentSnapshot): void {
-                        $documentSnapshot->selectRaw('1')
-                            ->from('invoice_document_snapshots')
-                            ->whereColumn('invoice_document_snapshots.invoice_id', 'invoices.id')
-                            ->whereColumn('invoice_document_snapshots.tenant_id', 'invoices.tenant_id')
-                            ->whereRaw('LOWER(invoice_document_snapshots.payment_mode) = ?', ['credit']);
-                    });
-                });
-            });
-        });
-
-        if ($request->filled('date_from')) {
-            $query->where('invoices.invoice_date', '>=', $request->input('date_from'));
-        }
-
-        if ($request->organizationUnitId() === null) {
-            $query->whereNull('balances.organization_unit_id');
-        } else {
-            $query->where('balances.organization_unit_id', $request->organizationUnitId());
-        }
+        $this->locations->apply($query, $request);
 
         if ($request->filled('customer_id')) {
             $query->where('customers.id', (int) $request->input('customer_id'));
@@ -258,6 +327,8 @@ final class CustomerOutstandingReportService
         $dueDate = self::DUE_DATE_EXPRESSION;
 
         return $query->select([
+            'locations.id as location_id',
+            'locations.name as location_name',
             'customers.id as customer_id',
             'customers.name as registered_name',
             'customers.display_name',
@@ -284,6 +355,8 @@ final class CustomerOutstandingReportService
                 CarbonImmutable::parse($asOfDate)->subDays(90)->toDateString(),
             ])
             ->groupBy([
+                'locations.id',
+                'locations.name',
                 'customers.id',
                 'customers.name',
                 'customers.display_name',
@@ -316,11 +389,28 @@ final class CustomerOutstandingReportService
                 'overdue_total' => (string) $row->overdue_total,
             ])
             ->values();
+        $totalsByLocation = (clone $query)
+            ->select([
+                'locations.id as location_id',
+                'locations.name as location_name',
+                'invoices.currency_code_snapshot as currency_code',
+            ])
+            ->selectRaw('SUM(balances.remaining_amount) as outstanding_total')
+            ->groupBy('locations.id', 'locations.name', 'invoices.currency_code_snapshot')
+            ->orderBy('locations.name')
+            ->get()
+            ->map(fn (object $row): array => [
+                'location' => ['id' => $row->location_id === null ? null : (int) $row->location_id, 'name' => (string) ($row->location_name ?? 'Unassigned')],
+                'currency' => ['code' => $row->currency_code ?: 'N/A'],
+                'outstanding_total' => (string) $row->outstanding_total,
+            ])
+            ->values();
 
         return [
             'customer_count' => $customerCount,
             'overdue_invoice_count' => $overdueInvoiceCount,
             'totals_by_currency' => $totalsByCurrency,
+            'totals_by_location' => $totalsByLocation,
         ];
     }
 
@@ -328,6 +418,10 @@ final class CustomerOutstandingReportService
     private function customerRow(object $row): array
     {
         return [
+            'location' => [
+                'id' => $row->location_id === null ? null : (int) $row->location_id,
+                'name' => (string) ($row->location_name ?? 'Unassigned'),
+            ],
             'customer' => [
                 'id' => (int) $row->customer_id,
                 'name' => (string) $row->customer_name,
@@ -367,7 +461,12 @@ final class CustomerOutstandingReportService
 
     private function asOfDate(CustomerOutstandingReportRequest $request): string
     {
-        return CarbonImmutable::parse((string) $request->input('date_to', now()->toDateString()))->toDateString();
+        return CarbonImmutable::parse((string) $request->input('as_of_date', $request->reportToday()))->toDateString();
+    }
+
+    private function invoiceAgeDays(string $invoiceDate, string $asOfDate): int
+    {
+        return (int) CarbonImmutable::parse($invoiceDate)->diffInDays(CarbonImmutable::parse($asOfDate));
     }
 
     private function daysOverdue(string $dueDate, string $asOfDate): int

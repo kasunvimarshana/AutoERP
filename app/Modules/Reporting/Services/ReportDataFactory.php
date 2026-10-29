@@ -35,7 +35,7 @@ final class ReportDataFactory
             rows: $rows,
             summary: $this->summaries->build($definition, $rows),
             branding: $this->branding->resolve($tenantId, $organizationUnitId),
-            filters: $this->filters($input),
+            filters: $this->filters($input, $definition->excludedFilterKeys),
             generatedAt: new DateTimeImmutable,
             template: $this->templates->resolve($definition),
             mode: $mode,
@@ -48,7 +48,7 @@ final class ReportDataFactory
      * @param  array<string, mixed>  $input
      * @return array<int, array{label: string, value: string}>
      */
-    private function filters(array $input): array
+    private function filters(array $input, array $excludedFilterKeys): array
     {
         $excluded = ['tenant_id', 'organization_unit_id', 'page', 'per_page', 'direction'];
         $filters = [];
@@ -60,7 +60,7 @@ final class ReportDataFactory
 
             if ($key === 'filters' && is_array($value)) {
                 foreach ($value as $filterKey => $filterValue) {
-                    if ($filterValue !== null && $filterValue !== '') {
+                    if (! in_array((string) $filterKey, $excludedFilterKeys, true) && $filterValue !== null && $filterValue !== '') {
                         $filters[] = [
                             'label' => $this->label((string) $filterKey),
                             'value' => $this->plain($filterValue),

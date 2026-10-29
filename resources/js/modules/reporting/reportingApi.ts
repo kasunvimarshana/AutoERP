@@ -1,6 +1,12 @@
 import { apiClient } from '@/shared/api/apiClient';
 import { endpoints } from '@/shared/api/endpoints';
+import { requestLookup } from '@/shared/api/lookupRequest';
 import type { ApiResource } from '@/shared/types/api';
+import type { PurchaseOrderDetailResult } from './purchaseOrderDetailTypes';
+import type { EmployeeCommissionJobsResult } from './employeeReportResultTypes';
+import type { GoodsReceiptSummaryParams, GoodsReceiptSummaryResult } from './goodsReceiptSummaryTypes';
+import type { NamedResource } from '@/shared/types/common';
+import type { LookupLoadParams, LookupResult } from '@/shared/types/lookup';
 import type {
     EmployeeCommissionReportParams,
     OperationalReportParams,
@@ -21,11 +27,21 @@ import type {
     ExpenseReportResult,
     VehicleServiceSalesSummaryParams,
     VehicleServiceSalesSummaryResult,
+    PaymentMethodWiseParams,
+    PaymentMethodWiseResult,
 } from './reportingTypes';
 
 export async function listReports(signal?: AbortSignal): Promise<ReportDefinition[]> {
     const response = await apiClient.get<ApiResource<ReportDefinition[]>>(endpoints.reports, { signal });
     return response.data.data;
+}
+
+export function searchAgingWarehouses(params: LookupLoadParams): Promise<LookupResult<NamedResource>> {
+    return requestLookup<NamedResource>(`${endpoints.reports}/inventory-aging/warehouses`, params);
+}
+
+export function searchAgingLocations(params: LookupLoadParams, warehouseId?: number): Promise<LookupResult<NamedResource>> {
+    return requestLookup<NamedResource>(`${endpoints.reports}/inventory-aging/locations`, params, { warehouse_id: warehouseId });
 }
 
 export async function getReport(key: string, signal?: AbortSignal): Promise<ReportDefinition> {
@@ -41,7 +57,7 @@ export async function runReport(key: string, params: ReportParams, signal?: Abor
 export async function exportReport(
     key: string,
     format: ReportFormat,
-    params: ReportParams | TechnicianWorkReportParams | EmployeeCommissionReportParams | OperationalReportParams | GrnPayablesReportParams | VehicleServiceHistoryParams | ExpenseReportParams,
+    params: ReportParams | TechnicianWorkReportParams | EmployeeCommissionReportParams | OperationalReportParams | GrnPayablesReportParams | GoodsReceiptSummaryParams | VehicleServiceHistoryParams | ExpenseReportParams | PaymentMethodWiseParams,
     previewWindow?: Window | null,
 ): Promise<void> {
     const response = await apiClient.get<Blob>(`${endpoints.reports}/${key}/export/${format}`, {
@@ -108,6 +124,11 @@ export async function runEmployeeCommissionReport(params: EmployeeCommissionRepo
     return response.data;
 }
 
+export async function getEmployeeCommissionJobs(employeeId: number, params: EmployeeCommissionReportParams, signal?: AbortSignal): Promise<EmployeeCommissionJobsResult> {
+    const response = await apiClient.get<EmployeeCommissionJobsResult>(`${endpoints.reports}/vehicle-service/employee-commissions/employees/${employeeId}/jobs`, { params, signal });
+    return response.data;
+}
+
 export async function runVehicleServiceHistoryReport(params: VehicleServiceHistoryParams, signal?: AbortSignal): Promise<VehicleServiceHistoryResult> {
     const response = await apiClient.get<VehicleServiceHistoryResult>(`${endpoints.reports}/vehicle-service/service-history`, { params, signal });
     return response.data;
@@ -120,6 +141,16 @@ export async function runVehicleServiceSalesSummaryReport(params: VehicleService
 
 export async function runOperationalReport(key: string, params: OperationalReportParams, signal?: AbortSignal): Promise<OperationalReportResult> {
     const response = await apiClient.get<OperationalReportResult>(`${endpoints.reports}/${key}`, { params, signal });
+    return response.data;
+}
+
+export async function runPurchaseOrderDetailReport(params: OperationalReportParams, signal?: AbortSignal): Promise<PurchaseOrderDetailResult> {
+    const response = await apiClient.get<PurchaseOrderDetailResult>(`${endpoints.reports}/purchase/detailed`, { params, signal });
+    return response.data;
+}
+
+export async function runGoodsReceiptSummaryReport(params: GoodsReceiptSummaryParams, signal?: AbortSignal): Promise<GoodsReceiptSummaryResult> {
+    const response = await apiClient.get<GoodsReceiptSummaryResult>(`${endpoints.reports}/purchase/goods-receipt-summary`, { params, signal });
     return response.data;
 }
 
@@ -144,6 +175,14 @@ export async function runSummaryReport(
         signal,
     });
 
+    return response.data.data;
+}
+
+export async function runPaymentMethodWiseSummaryReport(
+    params: PaymentMethodWiseParams,
+    signal?: AbortSignal,
+): Promise<PaymentMethodWiseResult> {
+    const response = await apiClient.get<ApiResource<PaymentMethodWiseResult>>(`${endpoints.reports}/payment-method-wise-summary`, { params, signal });
     return response.data.data;
 }
 

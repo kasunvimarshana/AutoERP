@@ -14,6 +14,7 @@ final class ReportDefinitionRegistry
         private readonly ExpenseReportService $expenses,
         private readonly DetailedPurchaseReportService $detailedPurchase,
         private readonly GrnPayablesReportService $grnPayables,
+        private readonly GoodsReceiptSummaryReportService $goodsReceiptSummary,
         private readonly DetailedVehicleServiceReportService $detailedVehicleService,
     ) {}
 
@@ -56,6 +57,7 @@ final class ReportDefinitionRegistry
             $this->expenses->definition(),
             $this->detailedPurchase->definition(),
             $this->grnPayables->definition(),
+            $this->goodsReceiptSummary->definition(),
             $this->detailedVehicleService->definition(),
         ];
     }

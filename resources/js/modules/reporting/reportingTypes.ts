@@ -8,6 +8,7 @@ export type {
     ReportRow,
 } from './genericReportTypes';
 export type { PaymentLifecycleFilterParams } from './paymentLifecycleTypes';
+export type { PaymentMethodWiseParams, PaymentMethodWiseResult, PaymentMethodWiseSource } from './paymentMethodWiseSummaryTypes';
 export type {
     TechnicianWorkReportParams,
     TechnicianWorkReportResult,

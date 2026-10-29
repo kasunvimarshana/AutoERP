@@ -6,9 +6,10 @@ import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { ApiError, toApiError } from '@/shared/api/apiError';
 import { exportReport } from '../reportingApi';
 import { reportingPermissions } from '../reportingPermissions';
-import type { EmployeeCommissionReportParams, GrnPayablesReportParams, OperationalReportParams, ReportFormat, ReportParams, TechnicianWorkReportParams, VehicleServiceHistoryParams } from '../reportingTypes';
+import type { EmployeeCommissionReportParams, GrnPayablesReportParams, OperationalReportParams, PaymentMethodWiseParams, ReportFormat, ReportParams, TechnicianWorkReportParams, VehicleServiceHistoryParams } from '../reportingTypes';
+import type { GoodsReceiptSummaryParams } from '../goodsReceiptSummaryTypes';
 
-export function ExportActions({ reportKey, params }: { reportKey: string; params: ReportParams | TechnicianWorkReportParams | EmployeeCommissionReportParams | OperationalReportParams | GrnPayablesReportParams | VehicleServiceHistoryParams }) {
+export function ExportActions({ reportKey, params }: { reportKey: string; params: ReportParams | TechnicianWorkReportParams | EmployeeCommissionReportParams | OperationalReportParams | GrnPayablesReportParams | GoodsReceiptSummaryParams | VehicleServiceHistoryParams | PaymentMethodWiseParams }) {
     const auth = useAuth();
     const [busy, setBusy] = useState<ReportFormat | null>(null);
     const [error, setError] = useState<ApiError | null>(null);

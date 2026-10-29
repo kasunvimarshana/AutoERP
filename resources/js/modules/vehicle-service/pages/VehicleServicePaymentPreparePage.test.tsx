@@ -9,7 +9,6 @@ const apiMocks = vi.hoisted(() => ({
     createVehicleServicePayment: vi.fn(),
     getVehicleServiceJob: vi.fn(),
     getVehicleServicePaymentOptions: vi.fn(),
-    prepareVehicleServicePayment: vi.fn(),
 }));
 
 const invoiceApiMocks = vi.hoisted(() => ({
@@ -40,13 +39,6 @@ describe('VehicleServicePaymentPreparePage', () => {
                 requires_instrument_details: false,
             }],
         });
-        apiMocks.prepareVehicleServicePayment.mockResolvedValue({
-            paymentType: 'service_receipt',
-            direction: 'inbound',
-            paymentDate: '2026-06-20',
-            lines: [{ amount: '100.000000', paymentMethodId: 3 }],
-            allocations: [{ invoiceId: 11, allocatedAmount: '100.000000' }],
-        });
         apiMocks.createVehicleServicePayment.mockResolvedValue({
             id: 99,
             payment_number: 'PAY-99',
@@ -64,13 +56,9 @@ describe('VehicleServicePaymentPreparePage', () => {
         const user = userEvent.setup();
         renderPage();
 
-        expect(await screen.findByText('Payment for JOB-1')).toBeInTheDocument();
-        const selects = screen.getAllByRole('combobox');
-        await user.selectOptions(selects[0], '11');
-        await user.selectOptions(selects[1], '3');
+        expect(await screen.findByRole('heading', { name: 'Record payment' })).toBeInTheDocument();
+        expect(screen.getByRole('combobox', { name: 'Invoice number' })).toHaveValue('11');
         await user.type(screen.getByLabelText('Cash received'), '100');
-        await user.click(screen.getByRole('button', { name: 'Review payment' }));
-        await screen.findByText('Payment is ready to finalize');
         await user.click(screen.getByRole('button', { name: 'Finalize payment' }));
 
         await waitFor(() => expect(apiMocks.createVehicleServicePayment).toHaveBeenCalledWith(9, expect.objectContaining({
@@ -85,6 +73,50 @@ describe('VehicleServicePaymentPreparePage', () => {
         expect(await screen.findByText('Payment created and allocated successfully')).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Print bill' })).toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'Finalize payment' })).not.toBeInTheDocument();
+    });
+
+    it('preselects only a payable invoice from the link when the job has several invoices', async () => {
+        const twoInvoiceJob = job();
+        twoInvoiceJob.invoice_links.push({
+            id: 2,
+            invoice_id: 12,
+            invoice_number: 'INV-12',
+            invoice_total: '50.000000',
+            balance_due: '50.000000',
+            invoice_status: 'posted',
+            status: 'active',
+            can_receive_payment: true,
+        });
+        apiMocks.getVehicleServiceJob.mockResolvedValue(twoInvoiceJob);
+
+        const user = userEvent.setup();
+        renderPage('/vehicle-service/jobs/9/payment?invoice_id=12');
+
+        expect(await screen.findByRole('combobox', { name: 'Invoice number' })).toHaveValue('12');
+        await user.type(screen.getByLabelText('Cash received'), '50');
+        await user.click(screen.getByRole('button', { name: 'Finalize payment' }));
+
+        await waitFor(() => expect(apiMocks.createVehicleServicePayment).toHaveBeenCalledWith(9, expect.objectContaining({ invoice_id: 12 })));
+    });
+
+    it('keeps normal invoice selection when no valid linked invoice was requested', async () => {
+        const twoInvoiceJob = job();
+        twoInvoiceJob.invoice_links.push({
+            id: 2,
+            invoice_id: 12,
+            invoice_number: 'INV-12',
+            invoice_total: '50.000000',
+            balance_due: '50.000000',
+            invoice_status: 'posted',
+            status: 'active',
+            can_receive_payment: true,
+        });
+        apiMocks.getVehicleServiceJob.mockResolvedValue(twoInvoiceJob);
+
+        renderPage('/vehicle-service/jobs/9/payment?invoice_id=999');
+
+        expect(await screen.findByRole('combobox', { name: 'Invoice number' })).toHaveValue('');
+        expect(screen.getByRole('button', { name: 'Finalize payment' })).toBeDisabled();
     });
 
     it('uses transaction instrument details without exposing an internal Finance account', async () => {
@@ -103,16 +135,16 @@ describe('VehicleServicePaymentPreparePage', () => {
         const user = userEvent.setup();
         renderPage();
 
-        expect(await screen.findByText('Payment for JOB-1')).toBeInTheDocument();
-        const selects = screen.getAllByRole('combobox');
-        await user.selectOptions(selects[0], '11');
-        await user.selectOptions(selects[1], '4');
+        expect(await screen.findByRole('heading', { name: 'Record payment' })).toBeInTheDocument();
         expect(screen.queryByLabelText('Internal bank account')).not.toBeInTheDocument();
-        await user.type(screen.getByLabelText('Transfer reference'), 'TRX-100');
+        const bankReference = screen.getAllByLabelText('Reference details').find((field) => !field.hasAttribute('disabled'));
+        if (!bankReference) throw new Error('Bank reference field unavailable');
+        await user.type(bankReference, 'TRX-100');
+        await user.click(screen.getByText('Additional transaction details'));
         await user.type(screen.getByLabelText('External bank'), 'Customer Bank');
-        await user.click(screen.getByRole('button', { name: 'Review payment' }));
+        await user.click(screen.getByRole('button', { name: 'Finalize payment' }));
 
-        await waitFor(() => expect(apiMocks.prepareVehicleServicePayment).toHaveBeenCalledWith(9, expect.objectContaining({
+        await waitFor(() => expect(apiMocks.createVehicleServicePayment).toHaveBeenCalledWith(9, expect.objectContaining({
             expected_version: 7,
             lines: [expect.objectContaining({
                 payment_method_id: 4,
@@ -121,20 +153,14 @@ describe('VehicleServicePaymentPreparePage', () => {
                 external_bank_name: 'Customer Bank',
             })],
         })));
-        expect(await screen.findByText('Payment is ready to finalize')).toBeInTheDocument();
     });
 
     it('prints the settled invoice from the same page after payment completion', async () => {
         const user = userEvent.setup();
         renderPage();
 
-        expect(await screen.findByText('Payment for JOB-1')).toBeInTheDocument();
-        const selects = screen.getAllByRole('combobox');
-        await user.selectOptions(selects[0], '11');
-        await user.selectOptions(selects[1], '3');
+        expect(await screen.findByRole('heading', { name: 'Record payment' })).toBeInTheDocument();
         await user.type(screen.getByLabelText('Cash received'), '100');
-        await user.click(screen.getByRole('button', { name: 'Review payment' }));
-        await screen.findByText('Payment is ready to finalize');
         await user.click(screen.getByRole('button', { name: 'Finalize payment' }));
 
         await screen.findByText('Payment created and allocated successfully');
@@ -149,13 +175,10 @@ describe('VehicleServicePaymentPreparePage', () => {
         const user = userEvent.setup();
         renderPage();
 
-        expect(await screen.findByText('Payment for JOB-1')).toBeInTheDocument();
-        const selects = screen.getAllByRole('combobox');
-        await user.selectOptions(selects[0], '11');
-        await user.selectOptions(selects[1], '3');
+        expect(await screen.findByRole('heading', { name: 'Record payment' })).toBeInTheDocument();
         const receivedField = screen.getByLabelText('Cash received');
         await user.type(receivedField, '500');
-        expect(screen.getByText('Cash amount').parentElement).toHaveTextContent(/500\.00/);
+        expect(screen.getByText('Cash amount applied').parentElement).toHaveTextContent(/500\.00/);
         expect(screen.getByText('Change to return').parentElement).toHaveTextContent(/0\.00/);
 
         await user.clear(receivedField);
@@ -165,11 +188,11 @@ describe('VehicleServicePaymentPreparePage', () => {
         expect(screen.getByText(/4,000\.00/)).toBeInTheDocument();
         expect(screen.queryByText(/5,000\.00/)).not.toBeInTheDocument();
 
-        await user.click(screen.getByRole('button', { name: 'Review payment' }));
-        await waitFor(() => expect(apiMocks.prepareVehicleServicePayment).toHaveBeenCalledWith(9, expect.objectContaining({
+        await user.click(screen.getByRole('button', { name: 'Finalize payment' }));
+        await waitFor(() => expect(apiMocks.createVehicleServicePayment).toHaveBeenCalledWith(9, expect.objectContaining({
             lines: [{ amount: '1000.000000', payment_method_id: 3, reference_number: undefined }],
         })));
-        expect(JSON.stringify(apiMocks.prepareVehicleServicePayment.mock.calls[0])).not.toContain('5000');
+        expect(JSON.stringify(apiMocks.createVehicleServicePayment.mock.calls[0])).not.toContain('5000');
     });
 
     it('shows card brands as radio choices and submits the selected brand', async () => {
@@ -188,16 +211,13 @@ describe('VehicleServicePaymentPreparePage', () => {
         const user = userEvent.setup();
         renderPage();
 
-        expect(await screen.findByText('Payment for JOB-1')).toBeInTheDocument();
-        const selects = screen.getAllByRole('combobox');
-        await user.selectOptions(selects[0], '11');
-        await user.selectOptions(selects[1], '8');
+        expect(await screen.findByRole('heading', { name: 'Record payment' })).toBeInTheDocument();
         await user.click(screen.getByRole('radio', { name: 'VISA' }));
-        await user.clear(screen.getByLabelText('Amount'));
-        await user.type(screen.getByLabelText('Amount'), '75');
-        await user.click(screen.getByRole('button', { name: 'Review payment' }));
+        await user.clear(screen.getByLabelText('Card amount'));
+        await user.type(screen.getByLabelText('Card amount'), '75');
+        await user.click(screen.getByRole('button', { name: 'Finalize payment' }));
 
-        await waitFor(() => expect(apiMocks.prepareVehicleServicePayment).toHaveBeenCalledWith(9, expect.objectContaining({
+        await waitFor(() => expect(apiMocks.createVehicleServicePayment).toHaveBeenCalledWith(9, expect.objectContaining({
             lines: [expect.objectContaining({ amount: '75', payment_method_id: 8, card_brand: 'visa' })],
         })));
     });
@@ -211,17 +231,17 @@ describe('VehicleServicePaymentPreparePage', () => {
         const user = userEvent.setup();
         renderPage();
 
-        expect(await screen.findByRole('radio', { name: 'Credit Payment' })).toBeInTheDocument();
-        await user.click(screen.getByRole('radio', { name: 'Credit Payment' }));
+        expect(await screen.findByRole('radio', { name: 'Credit payment' })).toBeInTheDocument();
+        await user.click(screen.getByRole('radio', { name: 'Credit payment' }));
         expect(screen.getByText(/will remain on this customer account/)).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Keep invoice on credit' })).toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'Finalize payment' })).not.toBeInTheDocument();
     });
 });
 
-function renderPage() {
+function renderPage(path = '/vehicle-service/jobs/9/payment') {
     return render(
-        <TestRouter initialEntries={['/vehicle-service/jobs/9/payment']}>
+        <TestRouter initialEntries={[path]}>
             <Routes>
                 <Route path="/vehicle-service/jobs/:id/payment" element={<VehicleServicePaymentPreparePage />} />
             </Routes>

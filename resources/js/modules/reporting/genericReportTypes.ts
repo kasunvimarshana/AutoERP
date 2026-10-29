@@ -21,6 +21,8 @@ export interface ReportDefinition {
     title: string;
     group: string;
     description?: string;
+    search_label?: string;
+    date_filter_hint?: string | null;
     columns: ReportColumn[];
     filters: ReportFilter[];
     supports_date_range: boolean;

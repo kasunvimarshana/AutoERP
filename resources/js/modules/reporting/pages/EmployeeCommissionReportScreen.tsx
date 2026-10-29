@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useAuth } from '@/modules/auth/AuthProvider';
 import { toApiError, type ApiError } from '@/shared/api/apiError';
 import { LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
@@ -34,9 +35,11 @@ const defaultFilters: EmployeeCommissionReportParams = {
     direction: 'desc',
     date_from: localDate(currentMonthStart),
     date_to: localDate(today),
+    period_view: true,
 };
 
 export default function EmployeeCommissionReportScreen() {
+    const { organizationUnit } = useAuth();
     const [searchParams] = useSearchParams();
     const initialFilters = useMemo(() => reportInitialFilters(searchParams), [searchParams]);
     const [filters, setFilters] = useState(() => initialFilters);
@@ -104,12 +107,15 @@ export default function EmployeeCommissionReportScreen() {
                         onReset={reset}
                     />
                 </Panel>
-                {result && <EmployeeCommissionSummary result={result} />}
+                {filters.period_view && <p className="text-sm text-slate-600">
+                    {organizationUnit?.name ? `${organizationUnit.name} · ` : ''}{filters.date_from || 'All dates'} to {filters.date_to || 'today'}: EOM eligible incentive uses the completion date; pending uses the job date. Use a full month for an EOM review. Eligible does not mean paid.
+                </p>}
+                {result && <EmployeeCommissionSummary result={result} periodView={filters.period_view} />}
                 <div className="flex items-center justify-between gap-3">
                     <span className="text-sm text-slate-500">
                         {loading ? 'Refreshing...' : `${result?.summary.total_employees ?? 0} employees · ${result?.meta?.total ?? 0} commission entries`}
                     </span>
-                    <ExportActions reportKey={reportKey} params={exportParams} />
+                    <ExportActions reportKey={filters.period_view && employeeSummaryView ? `${reportKey}/incentive-summary` : reportKey} params={exportParams} />
                 </div>
                 {loading && !result ? (
                     <LoadingState label="Loading employee commissions..." />

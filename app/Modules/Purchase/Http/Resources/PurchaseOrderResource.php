@@ -52,8 +52,12 @@ final class PurchaseOrderResource extends PurchaseResource
             'grand_total' => (string) $this->grand_total,
             'notes' => $this->notes,
             'created_by' => $this->whenLoaded('createdBy', fn () => $this->userSummary($this->createdBy)),
+            'submitted_by' => $this->whenLoaded('submittedBy', fn () => $this->userSummary($this->submittedBy)),
+            'submitted_at' => $this->submitted_at?->toISOString(),
             'approved_by' => $this->whenLoaded('approvedBy', fn () => $this->userSummary($this->approvedBy)),
             'approved_at' => $this->approved_at?->toISOString(),
+            'cancelled_by' => $this->whenLoaded('cancelledBy', fn () => $this->userSummary($this->cancelledBy)),
+            'cancelled_at' => $this->cancelled_at?->toISOString(),
             'closed_by' => $this->whenLoaded('closedBy', fn () => $this->userSummary($this->closedBy)),
             'closed_at' => $this->closed_at?->toISOString(),
             'received_quantity' => (string) ($this->received_quantity ?? '0.000000'),
@@ -79,5 +83,4 @@ final class PurchaseOrderResource extends PurchaseResource
             'email' => $user->email ?? null,
         ];
     }
-
 }

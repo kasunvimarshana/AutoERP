@@ -11,7 +11,6 @@ vi.mock('../components/ExportActions', () => ({
     ExportActions: ({ reportKey }: { reportKey: string }) => <div data-testid="export-actions">{reportKey}</div>,
 }));
 vi.mock('@/modules/purchase/components/PurchaseLookups', () => ({
-    SupplierLookupSelect: () => <div data-testid="supplier-lookup" />,
     ItemLookupSelect: () => <div data-testid="item-lookup" />,
 }));
 vi.mock('@/shared/components/LookupSelect', () => ({ LookupSelect: () => null }));
@@ -23,21 +22,21 @@ describe('OperationalReportPage', () => {
         vi.clearAllMocks();
         apiMocks.runOperationalReport.mockResolvedValue({
             report: {
-                key: 'purchase/detailed',
-                title: 'Detailed Purchase Report',
-                group: 'Purchase',
-                description: 'Line-level purchase details.',
+                key: 'vehicle-service/detailed',
+                title: 'Detailed Vehicle Service Report',
+                group: 'Vehicle Service',
+                description: 'Line-level vehicle service details.',
                 columns: [
-                    { key: 'purchase_order_number', label: 'PO number', sortable: true, format: 'text' },
+                    { key: 'job_number', label: 'Job number', sortable: true, format: 'text' },
                     { key: 'line_total', label: 'Line total', sortable: true, format: 'money' },
                 ],
                 filters: [],
                 supports_date_range: true,
-                default_sort: 'purchase_order_date',
+                default_sort: 'job_date',
                 default_direction: 'desc',
             },
             data: [
-                { id: 1, purchase_order_number: 'PO-1001', line_total: '123456789012345.500000' },
+                { id: 1, job_number: 'JOB-1001', line_total: '123456789012345.500000' },
             ],
             summary: {
                 total_orders: 1,
@@ -53,19 +52,19 @@ describe('OperationalReportPage', () => {
             },
         });
     });
-    it('loads the detailed Purchase report and applies server-side filters', async () => {
+    it('loads the detailed vehicle service report and applies server-side filters', async () => {
         const user = userEvent.setup();
         render(
             <TestRouter>
-                <OperationalReportPage reportKey="purchase/detailed" kind="purchase" />
+                <OperationalReportPage reportKey="vehicle-service/detailed" kind="vehicle-service" />
             </TestRouter>,
         );
-        expect(await screen.findByRole('heading', { name: 'Detailed Purchase Report' })).toBeInTheDocument();
-        expect(screen.getAllByText('PO-1001').length).toBeGreaterThan(0);
+        expect(await screen.findByRole('heading', { name: 'Detailed Vehicle Service Report' })).toBeInTheDocument();
+        expect(screen.getAllByText('JOB-1001').length).toBeGreaterThan(0);
         expect(screen.getAllByText('123,456,789,012,345.50').length).toBeGreaterThan(0);
-        expect(screen.getByTestId('export-actions')).toHaveTextContent('purchase/detailed');
+        expect(screen.getByTestId('export-actions')).toHaveTextContent('vehicle-service/detailed');
         expect(apiMocks.runOperationalReport).toHaveBeenCalledWith(
-            'purchase/detailed',
+            'vehicle-service/detailed',
             { page: 1, per_page: 25 },
             expect.any(AbortSignal),
         );
@@ -73,7 +72,7 @@ describe('OperationalReportPage', () => {
         await user.click(screen.getByRole('button', { name: 'Apply filters' }));
         await waitFor(() => {
             expect(apiMocks.runOperationalReport).toHaveBeenLastCalledWith(
-                'purchase/detailed',
+                'vehicle-service/detailed',
                 expect.objectContaining({ page: 1, per_page: 25, search: 'brake' }),
                 expect.any(AbortSignal),
             );

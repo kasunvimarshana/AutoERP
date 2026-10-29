@@ -86,6 +86,7 @@ Route::prefix('api/v1/finance')->middleware($middleware)->name('api.v1.finance.'
         Route::get('cash-flow', [FinanceController::class, 'cashFlow'])->name('cash-flow');
         Route::get('ar-aging', [FinanceController::class, 'arAging'])->name('ar-aging');
         Route::get('customer-outstanding', [CustomerOutstandingReportController::class, 'index'])->name('customer-outstanding.index');
+        Route::get('customer-outstanding/locations', [CustomerOutstandingReportController::class, 'locations'])->name('customer-outstanding.locations');
         Route::get('customer-outstanding/export', [CustomerOutstandingReportController::class, 'export'])->name('customer-outstanding.export');
         Route::get('customer-outstanding/{customer}/invoices', [CustomerOutstandingReportController::class, 'invoices'])
             ->whereNumber('customer')

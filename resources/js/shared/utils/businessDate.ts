@@ -12,6 +12,10 @@ export function configureBusinessTimeZone(timeZone?: string | null): void {
     configuredTimeZone = isValidTimeZone(timeZone) ? timeZone : null;
 }
 
+export function businessTimeZone(): string {
+    return configuredTimeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
+}
+
 export function businessDateInputValue(date = new Date(), timeZone = configuredTimeZone): string {
     const parts = dateParts(date, timeZone);
     return `${parts.year}-${pad(parts.month)}-${pad(parts.day)}`;

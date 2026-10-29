@@ -16,6 +16,7 @@ export interface EmployeeCommissionReportParams extends PaymentLifecycleFilterPa
     group_by?: EmployeeCommissionGroupBy;
     date_from?: string;
     date_to?: string;
+    period_view?: boolean;
     employee_id?: number | null;
     department_id?: number | null;
     designation_id?: number | null;

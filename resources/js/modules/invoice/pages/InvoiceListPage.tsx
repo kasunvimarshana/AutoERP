@@ -8,7 +8,7 @@ import { ContentHeader } from '@/shared/components/ContentHeader';
 import { Input } from '@/shared/components/Input';
 import { DataTable, type DataColumn } from '@/shared/components/DataTable';
 import { Pagination } from '@/shared/components/Pagination';
-import { StatusBadge } from '@/shared/components/StatusBadge';
+import { InvoiceStatusBadge } from '../components/InvoiceStatusBadge';
 import { MoneyDisplay } from '@/shared/components/MoneyDisplay';
 import { ErrorAlert } from '@/shared/components/ErrorAlert';
 import { LoadingState } from '@/shared/components/LoadingState';
@@ -64,7 +64,7 @@ export function InvoiceListWorkspace({ viewKey: forcedViewKey, renderHeader, row
         { key: 'type', header: 'Type', render: (row) => `${row.invoice_type ?? '-'} / ${row.direction ?? '-'}` },
         { key: 'total', header: 'Total', render: (row) => <MoneyDisplay value={row.grand_total} /> },
         { key: 'balance', header: 'Balance', render: (row) => <MoneyDisplay value={row.balance_due ?? (row.balance?.remaining_amount as string)} /> },
-        { key: 'status', header: 'Status', render: (row) => <StatusBadge status={row.status} /> },
+        { key: 'status', header: 'Status', render: (row) => <InvoiceStatusBadge invoice={row} /> },
     ];
     return (
         <>

@@ -504,6 +504,17 @@ export const tenantNavigationSections: NavigationSection[] = [
                             permissions: [reportingPermissions.view],
                         },
                     },
+                    {
+                        id: "inventory-stock-card",
+                        type: "link",
+                        label: "Stock Card",
+                        to: "/inventory/stock-card",
+                        match: ["/inventory/stock-card"],
+                        access: {
+                            ...operationalAccess(["inventory"]),
+                            permissions: [inventoryPermissions.stockView],
+                        },
+                    },
                 ],
             },
             {
@@ -974,6 +985,17 @@ export const tenantNavigationSections: NavigationSection[] = [
                         label: "Summary Reports",
                         to: "/reports/summary",
                         match: ["/reports/summary"],
+                        access: {
+                            ...operationalAccess(["reporting"]),
+                            permissions: [reportingPermissions.view],
+                        },
+                    },
+                    {
+                        id: "payment-method-wise-summary",
+                        type: "link",
+                        label: "Payment Method Wise Summary",
+                        to: "/reports/payment-method-wise-summary",
+                        match: ["/reports/payment-method-wise-summary"],
                         access: {
                             ...operationalAccess(["reporting"]),
                             permissions: [reportingPermissions.view],

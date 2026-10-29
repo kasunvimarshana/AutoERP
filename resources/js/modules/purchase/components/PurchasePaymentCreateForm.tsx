@@ -78,7 +78,7 @@ export function PurchasePaymentCreateForm({ mode = 'create' }: { mode?: 'create'
     const mountedRef = useRef(true);
     const unmountCancelTimerRef = useRef<number | null>(null);
     const [supplier, setSupplierState] = useState<NamedResource | null>(null);
-    const [currency, setCurrencyState] = useState<NamedResource | null>(null);
+    const [currencyOverride, setCurrencyOverride] = useState<NamedResource | null | undefined>(undefined);
     const [paymentDate, setPaymentDate] = useState(todayDate());
     const [referenceNumber, setReferenceNumber] = useState('');
     const [amount, setAmount] = useState('0.000000');
@@ -93,6 +93,8 @@ export function PurchasePaymentCreateForm({ mode = 'create' }: { mode?: 'create'
     const [busy, setBusy] = useState(false);
     const debouncedInvoiceSearch = useDebounce(invoiceSearch);
     const paymentContext = useApi((signal) => getPurchasePaymentContext(signal), []);
+    const defaultCurrency = paymentContext.data?.default_currency ?? null;
+    const currency = currencyOverride === undefined ? defaultCurrency : currencyOverride;
     const invoiceResult = useApi((signal) => listOutstandingSupplierInvoices({
         supplier_id: supplier?.id,
         search: debouncedInvoiceSearch || undefined,
@@ -144,7 +146,7 @@ export function PurchasePaymentCreateForm({ mode = 'create' }: { mode?: 'create'
                 setAmount(balance);
                 setPaymentRows([blankPaymentMethodRow(balance)]);
                 setSupplierState(namedResourceFromInvoiceSnapshot(invoice.party));
-                setCurrencyState(namedResourceFromInvoiceSnapshot(invoice.currency));
+                setCurrencyOverride(namedResourceFromInvoiceSnapshot(invoice.currency));
                 setSourceNotice(`Loaded supplier invoice ${invoice.invoice_number ?? 'Invoice number unavailable'}.`);
                 return;
             }
@@ -153,7 +155,7 @@ export function PurchasePaymentCreateForm({ mode = 'create' }: { mode?: 'create'
             if (!mountedRef.current || isStaleSourceRequest(sourceRequestRef.current, command.key, controller, generation, sourceGenerationRef.current)) return;
 
             setSupplierState(order.supplier ?? null);
-            setCurrencyState(order.currency ?? null);
+            setCurrencyOverride(order.currency ?? null);
             setSourceNotice(`${order.purchase_order_number ?? 'Selected purchase order'} is selected. Create payment from an eligible supplier invoice generated from this purchase flow.`);
         } catch (requestError) {
             if (!mountedRef.current || isStaleSourceRequest(sourceRequestRef.current, command.key, controller, generation, sourceGenerationRef.current)) return;
@@ -212,7 +214,7 @@ export function PurchasePaymentCreateForm({ mode = 'create' }: { mode?: 'create'
         if (next?.id !== supplier?.id) {
             setAllocations({});
             setAllocatedInvoices({});
-            setCurrencyState(null);
+            setCurrencyOverride(undefined);
         }
     };
 
@@ -229,7 +231,7 @@ export function PurchasePaymentCreateForm({ mode = 'create' }: { mode?: 'create'
         } else if (next?.id !== currency?.id) {
             cancelSourceRequest();
         }
-        setCurrencyState(next);
+        setCurrencyOverride(next);
     };
 
     const updateAllocation = async (invoice: Invoice, nextAmount: string) => {
@@ -246,7 +248,7 @@ export function PurchasePaymentCreateForm({ mode = 'create' }: { mode?: 'create'
             const nextAllocations = { [invoice.id]: nextAmount };
             setAllocations(nextAllocations);
             setAllocatedInvoices({ [invoice.id]: invoice });
-            setCurrencyState(namedResourceFromInvoiceSnapshot(invoice.currency));
+            setCurrencyOverride(namedResourceFromInvoiceSnapshot(invoice.currency));
             syncAmountWithAllocations(nextAllocations);
             return;
         }
@@ -256,7 +258,7 @@ export function PurchasePaymentCreateForm({ mode = 'create' }: { mode?: 'create'
         if (isPositiveDecimal(nextAmount)) {
             nextAllocatedInvoices[invoice.id] = invoice;
             if (invoice.currency && (!currency || currency.id !== invoice.currency.id)) {
-                setCurrencyState(namedResourceFromInvoiceSnapshot(invoice.currency));
+                setCurrencyOverride(namedResourceFromInvoiceSnapshot(invoice.currency));
             }
         } else {
             delete nextAllocatedInvoices[invoice.id];

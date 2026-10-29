@@ -29,7 +29,7 @@ final class EloquentReportDataProvider implements ReportDataProvider
         array $input,
         int $limit,
     ): array {
-        return $this->queries->rows(
+        return $this->formatRows(
             $definition,
             $this->queries->query($definition, $tenantId, $organizationUnitId, $input)->limit($limit)->get(),
         );
@@ -37,6 +37,11 @@ final class EloquentReportDataProvider implements ReportDataProvider
 
     public function formatRows(ReportDefinition $definition, iterable $rows): array
     {
-        return $this->queries->rows($definition, $rows);
+        $models = is_array($rows) ? $rows : iterator_to_array($rows);
+        if ($definition->prepareRows !== null) {
+            ($definition->prepareRows)($models);
+        }
+
+        return $this->queries->rows($definition, $models);
     }
 }

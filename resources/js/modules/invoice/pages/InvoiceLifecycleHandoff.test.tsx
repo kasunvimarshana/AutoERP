@@ -38,7 +38,7 @@ describe('invoice lifecycle handoff', () => {
         expect(detail).toContain("const isServiceInvoice = value.invoice_type === 'service' && value.direction === 'outbound';");
         expect(detail).toContain('const canSettleServiceInvoice = hasVehicleServiceJobContext');
         expect(detail).toContain('Pay this invoice');
-        expect(detail).toContain('to={`/vehicle-service/jobs/${vehicleServiceJobId}/payment`}');
+        expect(detail).toContain('to={`/vehicle-service/jobs/${vehicleServiceJobId}/payment?invoice_id=${id}`}');
     });
 
     it('derives supplier invoice context from the Purchase-owned route', () => {

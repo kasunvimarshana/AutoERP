@@ -229,13 +229,15 @@ export interface CustomerOutstandingParams {
     page?: number;
     per_page?: number;
     customer_id?: number;
-    date_from?: string;
-    date_to?: string;
+    location_id?: number;
+    as_of_date?: string;
+    timezone?: string;
     aging_bucket?: ReceivableAgingBucket | '';
     currency_code?: string;
 }
 
 export interface CustomerOutstandingRow {
+    location: { id: number | null; name: string };
     customer: { id: number; name: string; code: string; customer_number: string };
     currency: { code: string };
     invoice_count: number;
@@ -257,18 +259,24 @@ export interface CustomerOutstandingReportResult {
             outstanding_total: string;
             overdue_total: string;
         }>;
+        totals_by_location: Array<{
+            location: { id: number | null; name: string };
+            currency: { code: string };
+            outstanding_total: string;
+        }>;
     };
     data: CustomerOutstandingRow[];
     meta: { current_page: number; from: number | null; last_page: number; per_page: number; to: number | null; total: number };
 }
 
 export interface CustomerOutstandingInvoiceRow {
-    invoice: { id: number; number: string; date: string; due_date: string; status: string; service_job_number: string | null; credit_basis: 'confirmed' | 'historical_inferred' };
+    invoice: { id: number; number: string; date: string; due_date: string; service_job_number: string | null };
     currency: { code: string };
     invoice_total: string;
     paid_amount: string;
     credit_allocated_amount: string;
     outstanding_amount: string;
+    invoice_age_days: number;
     days_overdue: number;
 }
 

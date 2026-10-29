@@ -1,7 +1,7 @@
 import type { ApiCollection } from '@/shared/types/api';
 import type { ReportDefinition, ReportRow } from './genericReportTypes';
 
-export type OperationalReportKind = 'purchase' | 'vehicle-service' | 'employee-incentive';
+export type OperationalReportKind = 'vehicle-service' | 'employee-incentive';
 
 export interface OperationalReportParams {
     page?: number;

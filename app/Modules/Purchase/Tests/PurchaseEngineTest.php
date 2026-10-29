@@ -73,6 +73,7 @@ use Modules\Purchase\Services\PurchaseFinancePreparationService;
 use Modules\Purchase\Services\PurchaseInvoiceIntegrationService;
 use Modules\Purchase\Services\PurchaseOrderService;
 use Modules\Purchase\Services\PurchasePaymentIntegrationService;
+use Modules\Purchase\Services\PurchaseRelatedDocumentService;
 use Modules\Purchase\Services\PurchaseReturnService;
 use Tests\Support\FinancePostingFixture;
 use Tests\TestCase;
@@ -309,6 +310,16 @@ final class PurchaseEngineTest extends TestCase
             fn (): string => (string) $grn->lines()->firstOrFail()->invoiced_quantity,
         );
         $this->assertSame('40.000000', $invoicedQuantity);
+
+        $linkedInvoices = $this->withTenantExecutionContext(
+            $tenantId,
+            fn (): array => app(PurchaseRelatedDocumentService::class)->supplierInvoicesForGoodsReceipt($grn),
+        );
+        $this->assertSame(
+            [$invoiceOne->invoice_number, $invoiceTwo->invoice_number],
+            array_column($linkedInvoices, 'number'),
+        );
+        $this->assertSame('/purchase/invoices/'.$invoiceOne->getKey(), $linkedInvoices[0]['url']);
     }
 
     public function test_example_40_percent_grn_invoice_allocates_adjustments(): void

@@ -14,6 +14,7 @@ import { PLATFORM_PERMISSION } from "./access/platformPermissions";
 import { RouteErrorPage } from "./errors/RouteErrorPage";
 import { tenantPermissions } from "@/modules/tenant/tenantPermissions";
 import { expensePermissions } from "@/modules/expense/expensePermissions";
+import { inventoryPermissions } from "@/modules/inventory/inventoryPermissions";
 
 const LoginPage = lazy(() => import("@/modules/auth/LoginPage"));
 const AuditLogListPage = lazy(() => import("@/modules/audit/AuditLogListPage"));
@@ -130,6 +131,9 @@ const ItemBrandDetailPage = lazy(
 );
 const InventoryPage = lazy(
     () => import("@/modules/inventory/pages/InventoryPage"),
+);
+const StockCardPage = lazy(
+    () => import("@/modules/inventory/pages/StockCardPage"),
 );
 const WarehouseListPage = lazy(
     () => import("@/modules/warehouse/WarehouseListPage"),
@@ -327,14 +331,24 @@ const ReportListPage = lazy(
     () => import("@/modules/reporting/pages/ReportListPage"),
 );
 const ReportPage = lazy(() => import("@/modules/reporting/pages/ReportPage"));
+const InventoryAgingReportPage = lazy(() => import("@/modules/reporting/pages/InventoryAgingReportPage"));
 const SummaryReportPage = lazy(
     () => import("@/modules/reporting/pages/SummaryReportPage"),
+);
+const PaymentMethodWiseSummaryReportPage = lazy(
+    () => import("@/modules/reporting/pages/PaymentMethodWiseSummaryReportPage"),
 );
 const ExpenseReportPage = lazy(
     () => import("@/modules/reporting/pages/ExpenseReportPage"),
 );
 const GrnPayablesReportPage = lazy(
     () => import("@/modules/reporting/pages/GrnPayablesReportPage"),
+);
+const GoodsReceiptSummaryReportPage = lazy(
+    () => import("@/modules/reporting/pages/GoodsReceiptSummaryReportPage"),
+);
+const PurchaseOrderDetailReportPage = lazy(
+    () => import("@/modules/reporting/pages/PurchaseOrderDetailReportPage"),
 );
 const TechnicianWorkReportPage = lazy(
     () => import("@/modules/reporting/pages/TechnicianWorkReportPage"),
@@ -628,6 +642,7 @@ const appRouter = createBrowserRouter(
                             element={<ItemBrandDetailPage />}
                         />
                         <Route path="/inventory" element={<InventoryPage />} />
+                        <Route path="/inventory/stock-card" element={<PermissionRoute permission={inventoryPermissions.stockView}><StockCardPage /></PermissionRoute>} />
                         <Route path="/warehouses" element={<WarehouseListPage />} />
                         <Route
                             path="/warehouses/create"
@@ -924,19 +939,24 @@ const appRouter = createBrowserRouter(
                             element={<SummaryReportPage />}
                         />
                         <Route
+                            path="/reports/payment-method-wise-summary"
+                            element={<PaymentMethodWiseSummaryReportPage />}
+                        />
+                        <Route
                             path="/reports/expenses"
                             element={<ExpenseReportPage />}
                         />
                         <Route
                             path="/reports/purchase/detailed"
-                            element={<OperationalReportPage
-                                    reportKey="purchase/detailed"
-                                    kind="purchase"
-                                />}
+                            element={<PurchaseOrderDetailReportPage />}
                         />
                         <Route
                             path="/reports/purchase/grn-payables"
                             element={<GrnPayablesReportPage />}
+                        />
+                        <Route
+                            path="/reports/purchase/goods-receipt-summary"
+                            element={<GoodsReceiptSummaryReportPage />}
                         />
                         <Route
                             path="/reports/vehicle-service/detailed"
@@ -967,6 +987,10 @@ const appRouter = createBrowserRouter(
                         <Route
                             path="/reports/vehicle-service/sales-summary"
                             element={<VehicleServiceSalesSummaryReportPage />}
+                        />
+                        <Route
+                            path="/reports/inventory.aging"
+                            element={<InventoryAgingReportPage />}
                         />
                         <Route
                             path="/reports/:key"

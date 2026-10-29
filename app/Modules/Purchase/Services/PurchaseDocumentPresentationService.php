@@ -56,7 +56,7 @@ final class PurchaseDocumentPresentationService
         }
     }
 
-    public function prepareGoodsReceipt(GoodsReceiptNote $grn): GoodsReceiptNote
+    public function prepareGoodsReceipt(GoodsReceiptNote $grn, bool $includeRelatedInvoices = false): GoodsReceiptNote
     {
         $grn->loadMissing('lines.purchaseOrderLine');
         if ($grn->relationLoaded('adjustments')) {
@@ -65,6 +65,9 @@ final class PurchaseDocumentPresentationService
         $grn->setAttribute('invoice_status', $this->balances->goodsReceiptInvoiceStatus($grn->lines));
         $grn->setAttribute('return_status', $this->balances->goodsReceiptReturnStatus($grn->lines));
         $grn->setAttribute('capabilities', $this->capabilities->forGoodsReceipt($grn));
+        $grn->setAttribute('linked_invoices', $includeRelatedInvoices
+            ? $this->relatedDocuments->supplierInvoicesForGoodsReceipt($grn)
+            : []);
 
         foreach ($grn->lines as $line) {
             if (! $line instanceof GoodsReceiptNoteLine) {

@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import EmployeeCommissionReportPage from './EmployeeCommissionReportPage';
 const apiMocks = vi.hoisted(() => ({
     runEmployeeCommissionReport: vi.fn(),
+    getEmployeeCommissionJobs: vi.fn(),
 }));
 vi.mock('../reportingApi', () => apiMocks);
 vi.mock('../components/ExportActions', () => ({
@@ -24,6 +25,20 @@ vi.mock('@/modules/hr/hrApi', () => ({
 describe('EmployeeCommissionReportPage', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        apiMocks.getEmployeeCommissionJobs.mockResolvedValue({
+            data: [{
+                job: { id: 10, number: 'JOB-001' },
+                job_date: '2026-06-20',
+                last_earned_at: '2026-06-20 12:00:00',
+                customer_name: 'Kasun Customer',
+                vehicle_label: 'CAB-1234',
+                entry_count: 2,
+                earned_commission: '50.000000',
+                pending_commission: '0.000000',
+                total_commission: '50.000000',
+            }],
+            meta: { current_page: 1, from: 1, last_page: 1, per_page: 10, to: 1, total: 1 },
+        });
         apiMocks.runEmployeeCommissionReport.mockResolvedValue({
             report: {
                 key: 'vehicle-service/employee-commissions',
@@ -126,8 +141,8 @@ describe('EmployeeCommissionReportPage', () => {
         expect(await screen.findByRole('heading', { name: 'Employee Commission Report' })).toBeInTheDocument();
         expect(screen.getAllByText('Nimal Supervisor').length).toBeGreaterThan(0);
         expect(screen.getAllByText(/50/).length).toBeGreaterThan(0);
-        expect(screen.getByText('Earned commission')).toBeInTheDocument();
-        expect(screen.getByTestId('export-actions')).toHaveTextContent('vehicle-service/employee-commissions');
+        expect(screen.getAllByText('EOM eligible (earned)').length).toBeGreaterThan(0);
+        expect(screen.getByTestId('export-actions')).toHaveTextContent('vehicle-service/employee-commissions/incentive-summary');
         await user.click(screen.getByRole('button', { name: 'More filters' }));
         await user.selectOptions(screen.getByLabelText('Commission source'), 'supervisor');
         await user.click(screen.getByRole('button', { name: 'Apply filters' }));
@@ -137,6 +152,35 @@ describe('EmployeeCommissionReportPage', () => {
                 expect.any(AbortSignal),
             );
         });
+    });
+
+    it('expands an employee into one job row and keeps commission entries available', async () => {
+        const user = userEvent.setup();
+        render(<TestRouter><EmployeeCommissionReportPage /></TestRouter>);
+
+        await user.click(await screen.findByRole('button', { name: /Nimal Supervisor/ }));
+        await waitFor(() => expect(apiMocks.getEmployeeCommissionJobs).toHaveBeenCalledWith(
+            5,
+            expect.objectContaining({ period_view: true, page: 1 }),
+            expect.any(AbortSignal),
+        ));
+        expect(await screen.findByText('2 commission entries')).toBeInTheDocument();
+        expect(screen.getByText('View commission entries')).toBeInTheDocument();
+    });
+
+    it('retains the existing job-date report mode', async () => {
+        const user = userEvent.setup();
+        render(<TestRouter><EmployeeCommissionReportPage /></TestRouter>);
+
+        await screen.findByRole('heading', { name: 'Employee Commission Report' });
+        await user.selectOptions(screen.getByLabelText('Date basis'), 'job_date');
+        await user.click(screen.getByRole('button', { name: 'Apply filters' }));
+
+        await waitFor(() => expect(apiMocks.runEmployeeCommissionReport).toHaveBeenLastCalledWith(
+            expect.objectContaining({ period_view: false }),
+            expect.any(AbortSignal),
+        ));
+        expect(screen.getByTestId('export-actions')).toHaveTextContent('vehicle-service/employee-commissions');
     });
 
     it('loads dashboard drill-down date and employee search context from the URL', async () => {

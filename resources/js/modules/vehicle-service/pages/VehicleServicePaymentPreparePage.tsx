@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { fieldError, toApiError, type ApiError } from '@/shared/api/apiError';
 import { Button, LinkButton } from '@/shared/components/Button';
 import { ContentHeader } from '@/shared/components/ContentHeader';
@@ -175,9 +175,11 @@ function focusNextPaymentField(form: HTMLFormElement | null, current: HTMLElemen
 
 export default function VehicleServicePaymentPreparePage() {
     const jobId = Number(useParams().id);
+    const [searchParams] = useSearchParams();
+    const requestedInvoiceId = Number(searchParams.get('invoice_id'));
     const job = useApi((signal) => getVehicleServiceJob(jobId, signal), [jobId]);
     const options = useApi((signal) => getVehicleServicePaymentOptions(jobId, signal), [jobId]);
-    const [invoiceId, setInvoiceId] = useState('');
+    const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
     const [date, setDate] = useState(businessDateInputValue());
     const [paymentMode, setPaymentMode] = useState<PaymentMode>('direct');
     const [rows, setRows] = useState<PaymentRow[]>(DIRECT_PAYMENT_KINDS.map(({ kind }) => ({
@@ -207,12 +209,9 @@ export default function VehicleServicePaymentPreparePage() {
         ),
         [job.data?.invoice_links],
     );
+    const requestedInvoice = eligibleInvoices.find((link) => link.invoice_id === requestedInvoiceId);
+    const invoiceId = selectedInvoiceId ?? String(requestedInvoice?.invoice_id ?? (eligibleInvoices.length === 1 ? eligibleInvoices[0].invoice_id : ''));
     useEffect(() => {
-        if (!invoiceId && eligibleInvoices.length === 1) {
-            const [onlyInvoice] = eligibleInvoices;
-            setInvoiceId(String(onlyInvoice.invoice_id));
-        }
-
         const directMethods = paymentMethods.filter((method) =>
             DIRECT_PAYMENT_KINDS.some(({ kind }) => paymentMethodKind(method) === kind),
         );
@@ -377,7 +376,7 @@ export default function VehicleServicePaymentPreparePage() {
                                     placeholder={eligibleInvoices.length > 0 ? 'Select posted invoice' : 'No payable posted invoices'}
                                     disabled={Boolean(createdPayment || creditedInvoice)}
                                     onChange={(event) => {
-                                        setInvoiceId(event.target.value);
+                                        setSelectedInvoiceId(event.target.value);
                                         setRows((current) => current.map((row) => ({
                                             ...row,
                                             amount: ZERO_AMOUNT,

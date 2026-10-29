@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { Route, Routes } from 'react-router-dom';
 import { TestRouter } from '@/test/TestRouter';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -60,6 +60,25 @@ describe('Purchase navigation flows', () => {
         expect(screen.getByText('partially returned')).toBeInTheDocument();
         expect(screen.getByRole('link', { name: 'Create invoice' })).toHaveAttribute('href', '/purchase/invoices/create?goods_receipt_id=77');
         expect(screen.getByRole('link', { name: 'Create return' })).toHaveAttribute('href', '/purchase/returns/create?goods_receipt_id=77');
+    });
+    it('shows linked supplier invoices when the GRN is fully invoiced', async () => {
+        purchaseApiMocks.getGoodsReceipt.mockResolvedValue({
+            ...goodsReceipt(),
+            invoice_status: 'invoiced',
+            capabilities: { can_invoice: false, can_return: true, can_post: false, can_reverse: false },
+            linked_invoices: [{ id: 42, number: 'PURCHASE-2026-000002', status: 'posted', url: '/purchase/invoices/42' }],
+        });
+        render(
+            <TestRouter initialEntries={['/purchase/goods-receipts/77']}>
+                <Routes>
+                    <Route path="/purchase/goods-receipts/:id" element={<GoodsReceiptDetailPage />} />
+                </Routes>
+            </TestRouter>,
+        );
+
+        fireEvent.click(await screen.findByRole('tab', { name: 'Linked documents' }));
+        expect(screen.getByRole('link', { name: 'PURCHASE-2026-000002' })).toHaveAttribute('href', '/purchase/invoices/42');
+        expect(screen.queryByRole('link', { name: 'Create supplier invoice' })).not.toBeInTheDocument();
     });
     it('uses the backend capability reason when a permitted GRN action is blocked', async () => {
         authMock.permissions = ['purchase.goods_receipts.reverse'];

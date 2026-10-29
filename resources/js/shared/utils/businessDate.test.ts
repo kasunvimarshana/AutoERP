@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import {
     businessDateInputValue,
+    businessTimeZone,
     businessDateTimeInputValue,
     configureBusinessTimeZone,
     formatBusinessDateTime,
@@ -13,6 +14,7 @@ describe('business date utilities', () => {
         configureBusinessTimeZone('Asia/Colombo');
         const instant = new Date('2026-06-15T20:00:00.000Z');
 
+        expect(businessTimeZone()).toBe('Asia/Colombo');
         expect(businessDateInputValue(instant)).toBe('2026-06-16');
         expect(businessDateTimeInputValue(instant)).toBe('2026-06-16T01:30');
     });

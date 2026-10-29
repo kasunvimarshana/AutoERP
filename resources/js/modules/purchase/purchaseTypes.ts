@@ -339,6 +339,7 @@ export interface GoodsReceipt {
     status?: GoodsReceiptStatus | string;
     workflow_status?: GoodsReceiptStatus | string;
     invoice_status?: InvoiceProgressStatus;
+    linked_invoices?: Array<{ id: number; number: string; status: string; url: string }>;
     return_status?: ReturnProgressStatus;
     capabilities?: PurchaseCapabilityDetails<'can_post' | 'can_invoice' | 'can_return' | 'can_reverse' | 'read_only'> & {
         can_post?: boolean;

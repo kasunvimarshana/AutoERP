@@ -56,14 +56,16 @@ final class PurchaseOrderStatusService
         });
     }
 
-    public function cancel(PurchaseOrder $order, ?int $expectedVersion = null): PurchaseOrder
+    public function cancel(PurchaseOrder $order, int $cancelledBy, ?int $expectedVersion = null): PurchaseOrder
     {
-        return DB::transaction(function () use ($order, $expectedVersion): PurchaseOrder {
+        return DB::transaction(function () use ($order, $cancelledBy, $expectedVersion): PurchaseOrder {
             $locked = $this->lock($order, ['lines']);
             $this->assertExpectedVersion($locked, $expectedVersion);
             $this->assertCancellable($locked);
             $this->transitions->assertPurchaseOrderTransition($locked->status, PurchaseOrderStatus::Cancelled);
             $locked->status = PurchaseOrderStatus::Cancelled;
+            $locked->cancelled_by = $cancelledBy;
+            $locked->cancelled_at = now();
             $locked->save();
 
             return $locked;
@@ -128,5 +130,4 @@ final class PurchaseOrderStatusService
 
         return $locked;
     }
-
 }
