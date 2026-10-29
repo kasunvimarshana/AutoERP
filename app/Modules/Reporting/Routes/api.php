@@ -10,6 +10,7 @@ use Modules\Reporting\Http\Controllers\InventoryAgingLookupController;
 use Modules\Reporting\Http\Controllers\OperationalReportController;
 use Modules\Reporting\Http\Controllers\PaymentMethodWiseSummaryReportController;
 use Modules\Reporting\Http\Controllers\ReportController;
+use Modules\Reporting\Http\Controllers\StockBalanceReportController;
 use Modules\Reporting\Http\Controllers\TechnicianWorkReportController;
 use Modules\Reporting\Http\Controllers\VehicleRentalReportController;
 use Modules\Reporting\Http\Controllers\VehicleServiceHistoryReportController;
@@ -34,6 +35,8 @@ Route::prefix('api/v1/reports')->middleware($middleware)->name('api.v1.reports.'
         Route::get('dashboard', DashboardController::class)->name('dashboard');
         Route::get('summary', [OperationalReportController::class, 'summary'])->name('summary');
         Route::get('payment-method-wise-summary', [PaymentMethodWiseSummaryReportController::class, 'index'])->name('payment-method-wise-summary');
+        Route::get('inventory.stock-balance/run', [StockBalanceReportController::class, 'index'])->name('inventory.stock-balance.run');
+        Route::get('inventory.stock-balance/details', [StockBalanceReportController::class, 'details'])->name('inventory.stock-balance.details');
         Route::get('payment-method-wise-summary/documents', [PaymentMethodWiseSummaryReportController::class, 'documents'])->name('payment-method-wise-summary.documents');
         Route::get('inventory-aging/warehouses', [InventoryAgingLookupController::class, 'warehouses'])->name('inventory-aging.warehouses');
         Route::get('inventory-aging/locations', [InventoryAgingLookupController::class, 'locations'])->name('inventory-aging.locations');
@@ -67,6 +70,9 @@ Route::prefix('api/v1/reports')->middleware($middleware)->name('api.v1.reports.'
     });
 
     Route::middleware($requires(ReportingAuthorizationService::REPORTS_EXPORT))->group(function () use ($exportFormats): void {
+        Route::get('inventory.stock-balance/export/{format}', [StockBalanceReportController::class, 'export'])
+            ->whereIn('format', $exportFormats)
+            ->name('inventory.stock-balance.export');
         Route::get('payment-method-wise-summary/export/{format}', [PaymentMethodWiseSummaryReportController::class, 'export'])
             ->whereIn('format', $exportFormats)
             ->name('payment-method-wise-summary.export');

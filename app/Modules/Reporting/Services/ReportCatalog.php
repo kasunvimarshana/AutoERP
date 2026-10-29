@@ -140,13 +140,6 @@ final class ReportCatalog
                 $this->col('is_active', 'Active', format: 'boolean', sort: 'is_active'),
             ], ['code', 'name', 'warehouse_type']),
 
-            $this->inventory('inventory.stock-balance', 'Stock Balance', InventoryStockBalance::class, [
-                $this->itemCol(), $this->col('warehouse', 'Warehouse', 'warehouse.name'), $this->col('location', 'Location', 'warehouseLocation.name'),
-                $this->col('uom', 'UOM', 'item.baseUom.code'),
-                $this->col('batch', 'Batch', 'batch.batch_number'), $this->qty('quantity_on_hand', 'On Hand'), $this->qty('quantity_reserved', 'Reserved'),
-                $this->qty('quantity_allocated', 'Allocated'), $this->qty('quantity_available', 'Available'), $this->qty('quantity_in_transit', 'In Transit'),
-                $this->qty('quantity_damaged', 'Damaged'), $this->qty('quantity_quarantine', 'Quarantine'), $this->qty('quantity_expired', 'Expired'), $this->money('total_value', 'Value'),
-            ], ['item.code', 'item.name', 'warehouse.name', 'batch.batch_number'], ['item', 'item.baseUom', 'warehouse', 'warehouseLocation', 'batch']),
             $this->inventory('inventory.low-stock', 'Low Stock Report', InventoryStockBalance::class, [
                 $this->itemCol(), $this->col('warehouse', 'Warehouse', 'warehouse.name'), $this->col('location', 'Location', 'warehouseLocation.name'),
                 $this->qty('quantity_available', 'Available'), $this->col('uom', 'UOM', 'item.baseUom.code'),

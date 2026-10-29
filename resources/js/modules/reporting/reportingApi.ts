@@ -5,6 +5,7 @@ import type { ApiResource } from '@/shared/types/api';
 import type { PurchaseOrderDetailResult } from './purchaseOrderDetailTypes';
 import type { EmployeeCommissionJobsResult } from './employeeReportResultTypes';
 import type { GoodsReceiptSummaryParams, GoodsReceiptSummaryResult } from './goodsReceiptSummaryTypes';
+import type { StockBalanceDetail, StockBalanceReportParams, StockBalanceReportResult, StockBalanceReportRow } from './stockBalanceReportTypes';
 import type { PaymentMethodWiseDay } from './paymentMethodWiseSummaryTypes';
 import type { NamedResource } from '@/shared/types/common';
 import type { LookupLoadParams, LookupResult } from '@/shared/types/lookup';
@@ -184,6 +185,22 @@ export async function runPaymentMethodWiseSummaryReport(
     signal?: AbortSignal,
 ): Promise<PaymentMethodWiseResult> {
     const response = await apiClient.get<ApiResource<PaymentMethodWiseResult>>(`${endpoints.reports}/payment-method-wise-summary`, { params, signal });
+    return response.data.data;
+}
+
+export async function runStockBalanceReport(params: StockBalanceReportParams, signal?: AbortSignal): Promise<StockBalanceReportResult> {
+    const response = await apiClient.get<StockBalanceReportResult>(`${endpoints.reports}/inventory.stock-balance/run`, { params, signal });
+    return response.data;
+}
+
+export async function loadStockBalanceDetails(row: StockBalanceReportRow, signal?: AbortSignal): Promise<StockBalanceDetail[]> {
+    const response = await apiClient.get<ApiResource<StockBalanceDetail[]>>(`${endpoints.reports}/inventory.stock-balance/details`, {
+        params: {
+            item_id: row.item_id, item_variant_id: row.item_variant_id ?? undefined,
+            base_uom_id: row.base_uom_id ?? undefined, warehouse_id: row.warehouse_id,
+            location_id: row.location_id ?? undefined,
+        }, signal,
+    });
     return response.data.data;
 }
 

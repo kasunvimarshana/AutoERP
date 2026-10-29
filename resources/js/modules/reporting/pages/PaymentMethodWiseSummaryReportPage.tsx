@@ -90,14 +90,14 @@ export default function PaymentMethodWiseSummaryReportPage() {
                     New credit sales are original sales recorded on credit. Later collections appear on their payment date and reduce invoice outstanding; the two totals are shown separately to avoid double counting.
                 </div>
                 <Panel title="Daily summary">
-                    <div className="overflow-x-auto">
+                    <div className="max-h-[75vh] overflow-auto print:max-h-none print:overflow-visible">
                         <table className="min-w-full border-collapse text-sm">
                             <thead className="bg-slate-50 text-left text-slate-600">
                                 <tr>
-                                    <th className="px-3 py-3">Date</th>
-                                    {result.methods.map((method) => <th key={method.key} className="px-3 py-3 text-right">{method.name}</th>)}
-                                    <th className="px-3 py-3 text-right">Receipts total</th>
-                                    <th className="px-3 py-3 text-right">New credit sales</th>
+                                    <th className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50 px-3 py-3">Date</th>
+                                    {result.methods.map((method) => <th key={method.key} className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50 px-3 py-3 text-right">{method.name}</th>)}
+                                    <th className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50 px-3 py-3 text-right">Receipts total</th>
+                                    <th className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50 px-3 py-3 text-right">New credit sales</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">

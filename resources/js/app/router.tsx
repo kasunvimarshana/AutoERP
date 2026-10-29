@@ -332,6 +332,7 @@ const ReportListPage = lazy(
 );
 const ReportPage = lazy(() => import("@/modules/reporting/pages/ReportPage"));
 const InventoryAgingReportPage = lazy(() => import("@/modules/reporting/pages/InventoryAgingReportPage"));
+const StockBalanceReportPage = lazy(() => import("@/modules/reporting/pages/StockBalanceReportPage"));
 const SummaryReportPage = lazy(
     () => import("@/modules/reporting/pages/SummaryReportPage"),
 );
@@ -991,6 +992,10 @@ const appRouter = createBrowserRouter(
                         <Route
                             path="/reports/inventory.aging"
                             element={<InventoryAgingReportPage />}
+                        />
+                        <Route
+                            path="/reports/inventory.stock-balance"
+                            element={<StockBalanceReportPage />}
                         />
                         <Route
                             path="/reports/:key"

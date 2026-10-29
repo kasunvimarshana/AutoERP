@@ -1,0 +1,9 @@
+# Stock Balance R3 UI review and plan
+
+Reviewed the ten-page R3 Stock Balance sample and the existing `inventory.stock-balance` report definition, generic report page, stock-balance model, and Inventory stock availability calculation. This is a design review only; application code and database data were not changed.
+
+R3 presents Item ID, Description, AVG. Sale Qty, and Current Stock, grouped under a location. The current AutoERP report uses the generic report screen and shows item, warehouse, location, UOM, batch, eight stock-state quantities, and value in a wide table. It has no AVG. Sale Qty metric. Its generic Status filter is not a field on `inventory_stock_balances`; a dedicated screen should replace that filter with meaningful inventory controls.
+
+Proposed focused screen: item name as the primary wide column with code beneath; two prominent numeric columns for Current stock (`quantity_on_hand`) and Available to sell (`quantity_available`), with low/zero-stock emphasis based on the existing reorder-level rule and text labels alongside color. Search by item name/code, guided warehouse/location selectors, and an include-zero-stock control. Show one item/UOM row per selected location by aggregating underlying batch balances, while an inline expansion reveals batch and reserved/allocated/damaged/quarantined/expired details. Keep optional value and other technical stock states in the expansion or a separate detailed view. Use the same grouping in exports. Stock quantities must remain separate by UOM and location. Display a clear current-balance timestamp; historical as-of views are a different calculation.
+
+AVG. Sale Qty requires a verified period and source definition before implementation. Existing stock balances do not store it, and no Reporting calculation for that metric was found. Do not label `quantity_available` as average sales or infer an undocumented period.

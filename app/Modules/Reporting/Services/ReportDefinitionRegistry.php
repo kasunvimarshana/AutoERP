@@ -15,6 +15,7 @@ final class ReportDefinitionRegistry
         private readonly DetailedPurchaseReportService $detailedPurchase,
         private readonly GrnPayablesReportService $grnPayables,
         private readonly GoodsReceiptSummaryReportService $goodsReceiptSummary,
+        private readonly StockBalanceReportService $stockBalance,
         private readonly DetailedVehicleServiceReportService $detailedVehicleService,
     ) {}
 
@@ -58,6 +59,7 @@ final class ReportDefinitionRegistry
             $this->detailedPurchase->definition(),
             $this->grnPayables->definition(),
             $this->goodsReceiptSummary->definition(),
+            $this->stockBalance->definition(),
             $this->detailedVehicleService->definition(),
         ];
     }
