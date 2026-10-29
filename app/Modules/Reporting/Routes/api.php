@@ -34,6 +34,7 @@ Route::prefix('api/v1/reports')->middleware($middleware)->name('api.v1.reports.'
         Route::get('dashboard', DashboardController::class)->name('dashboard');
         Route::get('summary', [OperationalReportController::class, 'summary'])->name('summary');
         Route::get('payment-method-wise-summary', [PaymentMethodWiseSummaryReportController::class, 'index'])->name('payment-method-wise-summary');
+        Route::get('payment-method-wise-summary/documents', [PaymentMethodWiseSummaryReportController::class, 'documents'])->name('payment-method-wise-summary.documents');
         Route::get('inventory-aging/warehouses', [InventoryAgingLookupController::class, 'warehouses'])->name('inventory-aging.warehouses');
         Route::get('inventory-aging/locations', [InventoryAgingLookupController::class, 'locations'])->name('inventory-aging.locations');
         Route::get('expenses', [OperationalReportController::class, 'expenses'])->name('expenses');

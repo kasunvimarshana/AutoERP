@@ -84,6 +84,21 @@ final class PaymentMethodWiseSummaryReportTest extends TestCase
         self::assertSame('60.000000', $reports->run($tenantId, null, '2026-10-05', '2026-10-05', PaymentMethodWiseSummaryReportService::SOURCE_SELLING)['totals'][0]['receipts']);
         self::assertSame('40.000000', $reports->run($tenantId, null, '2026-10-05', '2026-10-05', PaymentMethodWiseSummaryReportService::SOURCE_SERVICE)['totals'][0]['receipts']);
         self::assertSame('180.000000', $reports->exportRows($all)[2]['credit_sales']);
+        self::assertArrayNotHasKey('documents', $all['days'][0]);
+
+        $creditDocuments = $reports->run($tenantId, null, '2026-10-01', '2026-10-01', PaymentMethodWiseSummaryReportService::SOURCE_ALL, true)['days'][0]['documents'];
+        self::assertSame(['INV-SELL-PMW', 'INV-SERVICE-PMW'], array_column(array_column($creditDocuments, 'invoice'), 'number'));
+        self::assertSame(['credit_sale', 'credit_sale'], array_column($creditDocuments, 'type'));
+
+        $receiptDocuments = $reports->run($tenantId, null, '2026-10-05', '2026-10-05', PaymentMethodWiseSummaryReportService::SOURCE_ALL, true)['days'][0]['documents'];
+        self::assertCount(2, $receiptDocuments);
+        self::assertSame('PAY-PMW', $receiptDocuments[0]['payment']['number']);
+        self::assertSame('INV-SELL-PMW', $receiptDocuments[0]['invoice']['number']);
+        self::assertSame('60.000000', $receiptDocuments[0]['amount']);
+        self::assertSame('42.000000', $receiptDocuments[0]['methods']['CASH']);
+        self::assertSame('18.000000', $receiptDocuments[0]['methods']['CARD']);
+        self::assertSame('INV-SERVICE-PMW', $receiptDocuments[1]['invoice']['number']);
+        self::assertSame('40.000000', $receiptDocuments[1]['amount']);
 
         DB::table('invoices')->whereIn('id', [$sellingInvoiceId, $serviceInvoiceId])->update(['status' => 'paid', 'balance_due' => '0.000000']);
         self::assertSame('180.000000', $reports->run($tenantId, null, '2026-10-01', '2026-10-05', PaymentMethodWiseSummaryReportService::SOURCE_ALL)['totals'][0]['credit_sales']);

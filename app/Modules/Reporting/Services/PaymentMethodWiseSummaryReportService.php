@@ -45,7 +45,7 @@ final class PaymentMethodWiseSummaryReportService
     ) {}
 
     /** @return array<string, mixed> */
-    public function run(int $tenantId, ?int $organizationUnitId, string $dateFrom, string $dateTo, string $source): array
+    public function run(int $tenantId, ?int $organizationUnitId, string $dateFrom, string $dateTo, string $source, bool $includeDocuments = false): array
     {
         $brand = $this->branding->resolve($tenantId, $organizationUnitId);
         $defaultCurrency = (string) ($brand['currency_code'] ?? '');
@@ -67,8 +67,11 @@ final class PaymentMethodWiseSummaryReportService
             $this->scope($sales, 'sales.organization_unit_id', $organizationUnitId);
             $this->scope($sales, 'invoices.organization_unit_id', $organizationUnitId);
 
-            foreach ($sales->get(['invoices.invoice_date', 'invoices.currency_code_snapshot', 'invoices.grand_total']) as $sale) {
-                $this->addCredit($days, (string) $sale->invoice_date, (string) ($sale->currency_code_snapshot ?: $defaultCurrency), (string) $sale->grand_total);
+            foreach ($sales->get(['invoices.id', 'invoices.invoice_number', 'invoices.invoice_date', 'invoices.currency_code_snapshot', 'invoices.grand_total']) as $sale) {
+                $this->addCredit($days, (string) $sale->invoice_date, (string) ($sale->currency_code_snapshot ?: $defaultCurrency), (string) $sale->grand_total, $includeDocuments ? [
+                    'type' => 'credit_sale', 'invoice' => ['id' => (int) $sale->id, 'number' => (string) $sale->invoice_number],
+                    'payment' => null, 'amount' => (string) $sale->grand_total, 'methods' => [],
+                ] : null);
             }
         }
 
@@ -87,8 +90,11 @@ final class PaymentMethodWiseSummaryReportService
             $this->scope($service, 'links.organization_unit_id', $organizationUnitId);
             $this->scope($service, 'invoices.organization_unit_id', $organizationUnitId);
 
-            foreach ($service->get(['invoices.invoice_date', 'invoices.currency_code_snapshot', 'links.invoice_total']) as $invoice) {
-                $this->addCredit($days, (string) $invoice->invoice_date, (string) ($invoice->currency_code_snapshot ?: $defaultCurrency), (string) $invoice->invoice_total);
+            foreach ($service->get(['invoices.id', 'invoices.invoice_number', 'invoices.invoice_date', 'invoices.currency_code_snapshot', 'links.invoice_total']) as $invoice) {
+                $this->addCredit($days, (string) $invoice->invoice_date, (string) ($invoice->currency_code_snapshot ?: $defaultCurrency), (string) $invoice->invoice_total, $includeDocuments ? [
+                    'type' => 'credit_sale', 'invoice' => ['id' => (int) $invoice->id, 'number' => (string) $invoice->invoice_number],
+                    'payment' => null, 'amount' => (string) $invoice->invoice_total, 'methods' => [],
+                ] : null);
             }
         }
 
@@ -116,7 +122,8 @@ final class PaymentMethodWiseSummaryReportService
             ->orderBy('lines.line_number')
             ->select([
                 'allocations.id as allocation_id', 'allocations.allocated_amount',
-                'payments.payment_date', 'payments.total_amount',
+                'payments.id as payment_id', 'payments.payment_number', 'payments.payment_date', 'payments.total_amount',
+                'invoices.id as invoice_id', 'invoices.invoice_number',
                 'invoices.currency_code_snapshot', 'lines.payment_method_code_snapshot',
                 'lines.payment_method_name_snapshot', 'lines.amount as line_amount',
             ]);
@@ -156,14 +163,14 @@ final class PaymentMethodWiseSummaryReportService
         $allocationId = null;
         foreach ($receipts->cursor() as $row) {
             if ($allocationId !== null && $allocationId !== (int) $row->allocation_id) {
-                $this->addAllocation($days, $methods, $allocationRows, $defaultCurrency);
+                $this->addAllocation($days, $methods, $allocationRows, $defaultCurrency, $includeDocuments);
                 $allocationRows = [];
             }
             $allocationId = (int) $row->allocation_id;
             $allocationRows[] = $row;
         }
         if ($allocationRows !== []) {
-            $this->addAllocation($days, $methods, $allocationRows, $defaultCurrency);
+            $this->addAllocation($days, $methods, $allocationRows, $defaultCurrency, $includeDocuments);
         }
 
         ksort($days);
@@ -228,14 +235,18 @@ final class PaymentMethodWiseSummaryReportService
     }
 
     /** @param array<string, array<string, mixed>> $days */
-    private function addCredit(array &$days, string $date, string $currency, string $amount): void
+    private function addCredit(array &$days, string $date, string $currency, string $amount, ?array $document): void
     {
         $day = &$this->day($days, $date, $currency);
         $day['credit_sales'] = $this->math->add($day['credit_sales'], $amount);
+        if ($document !== null) {
+            $document['amount'] = $this->math->normalize($amount);
+            $day['documents'][] = $document;
+        }
     }
 
     /** @param array<string, array<string, mixed>> $days @param array<string, string> $methods @param list<object> $rows */
-    private function addAllocation(array &$days, array &$methods, array $rows, string $defaultCurrency): void
+    private function addAllocation(array &$days, array &$methods, array $rows, string $defaultCurrency, bool $includeDocuments): void
     {
         $first = $rows[0];
         $remaining = $this->math->normalize((string) $first->allocated_amount);
@@ -246,6 +257,7 @@ final class PaymentMethodWiseSummaryReportService
 
         $day = &$this->day($days, (string) $first->payment_date, (string) ($first->currency_code_snapshot ?: $defaultCurrency));
         $day['receipts'] = $this->math->add($day['receipts'], $remaining);
+        $documentMethods = [];
         $lastIndex = count($rows) - 1;
         foreach ($rows as $index => $row) {
             $amount = $index === $lastIndex
@@ -257,7 +269,19 @@ final class PaymentMethodWiseSummaryReportService
             $key = (string) $row->payment_method_code_snapshot;
             $methods[$key] = (string) $row->payment_method_name_snapshot;
             $day['methods'][$key] = $this->math->add($day['methods'][$key] ?? self::ZERO, $amount);
+            if ($includeDocuments) {
+                $documentMethods[$key] = $this->math->add($documentMethods[$key] ?? self::ZERO, $amount);
+            }
             $remaining = $this->math->sub($remaining, $amount);
+        }
+        if ($includeDocuments) {
+            $day['documents'][] = [
+                'type' => 'receipt',
+                'invoice' => ['id' => (int) $first->invoice_id, 'number' => (string) $first->invoice_number],
+                'payment' => ['id' => (int) $first->payment_id, 'number' => (string) $first->payment_number],
+                'amount' => $this->math->normalize((string) $first->allocated_amount),
+                'methods' => $documentMethods,
+            ];
         }
     }
 

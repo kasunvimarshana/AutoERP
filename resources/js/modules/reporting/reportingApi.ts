@@ -5,6 +5,7 @@ import type { ApiResource } from '@/shared/types/api';
 import type { PurchaseOrderDetailResult } from './purchaseOrderDetailTypes';
 import type { EmployeeCommissionJobsResult } from './employeeReportResultTypes';
 import type { GoodsReceiptSummaryParams, GoodsReceiptSummaryResult } from './goodsReceiptSummaryTypes';
+import type { PaymentMethodWiseDay } from './paymentMethodWiseSummaryTypes';
 import type { NamedResource } from '@/shared/types/common';
 import type { LookupLoadParams, LookupResult } from '@/shared/types/lookup';
 import type {
@@ -183,6 +184,17 @@ export async function runPaymentMethodWiseSummaryReport(
     signal?: AbortSignal,
 ): Promise<PaymentMethodWiseResult> {
     const response = await apiClient.get<ApiResource<PaymentMethodWiseResult>>(`${endpoints.reports}/payment-method-wise-summary`, { params, signal });
+    return response.data.data;
+}
+
+export async function loadPaymentMethodWiseDocuments(
+    params: PaymentMethodWiseParams,
+    date: string,
+    signal?: AbortSignal,
+): Promise<PaymentMethodWiseDay[]> {
+    const response = await apiClient.get<ApiResource<PaymentMethodWiseDay[]>>(`${endpoints.reports}/payment-method-wise-summary/documents`, {
+        params: { ...params, date_from: date, date_to: date }, signal,
+    });
     return response.data.data;
 }
 

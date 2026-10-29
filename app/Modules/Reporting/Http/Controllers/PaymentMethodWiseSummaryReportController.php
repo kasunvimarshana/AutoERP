@@ -6,6 +6,7 @@ namespace Modules\Reporting\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
+use Illuminate\Validation\ValidationException;
 use Modules\Reporting\Http\Requests\PaymentMethodWiseSummaryReportRequest;
 use Modules\Reporting\Services\PaymentMethodWiseSummaryReportService;
 use Modules\Reporting\Services\ReportExport;
@@ -24,6 +25,23 @@ final class PaymentMethodWiseSummaryReportController
         $this->authorization->assert($request->currentUserId(), $request->tenantId(), ReportingAuthorizationService::REPORTS_VIEW);
 
         return response()->json(['data' => $this->result($request)]);
+    }
+
+    public function documents(PaymentMethodWiseSummaryReportRequest $request): JsonResponse
+    {
+        $this->authorization->assert($request->currentUserId(), $request->tenantId(), ReportingAuthorizationService::REPORTS_VIEW);
+        if ($request->validated('date_from') !== $request->validated('date_to')) {
+            throw ValidationException::withMessages(['date_to' => 'Select one date to view its documents.']);
+        }
+
+        return response()->json(['data' => $this->reports->run(
+            $request->tenantId(),
+            $request->organizationUnitId(),
+            (string) $request->validated('date_from'),
+            (string) $request->validated('date_to'),
+            (string) ($request->validated('source') ?? PaymentMethodWiseSummaryReportService::SOURCE_ALL),
+            true,
+        )['days']]);
     }
 
     public function export(PaymentMethodWiseSummaryReportRequest $request, string $format): Response
