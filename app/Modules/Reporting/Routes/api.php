@@ -70,6 +70,9 @@ Route::prefix('api/v1/reports')->middleware($middleware)->name('api.v1.reports.'
     });
 
     Route::middleware($requires(ReportingAuthorizationService::REPORTS_EXPORT))->group(function () use ($exportFormats): void {
+        Route::get('vehicle-service/sales-summary/export/{format}', [VehicleServiceSalesSummaryReportController::class, 'export'])
+            ->whereIn('format', $exportFormats)
+            ->name('vehicle-service.sales-summary.export');
         Route::get('inventory.stock-balance/export/{format}', [StockBalanceReportController::class, 'export'])
             ->whereIn('format', $exportFormats)
             ->name('inventory.stock-balance.export');

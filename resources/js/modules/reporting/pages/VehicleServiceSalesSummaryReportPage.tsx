@@ -11,6 +11,7 @@ import { formatQuantity } from '@/shared/utils/formatQuantity';
 import { ItemLookupSelect } from '@/modules/item/components/ItemLookupSelect';
 import type { ItemSummary } from '@/modules/item/itemTypes';
 import { runVehicleServiceSalesSummaryReport } from '../reportingApi';
+import { ExportActions } from '../components/ExportActions';
 import type {
     VehicleServiceSalesSummaryCombo,
     VehicleServiceSalesSummaryCostLine,
@@ -106,6 +107,7 @@ export default function VehicleServiceSalesSummaryReportPage() {
                     <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">
                         <span>{formatQuantity(result.summary.job_count)} jobs in this period</span>
                         <span>Collected: <strong className="font-semibold text-slate-900">{formatMoney(result.summary.collected)}</strong></span>
+                        <ExportActions reportKey="vehicle-service/sales-summary" params={{ ...filters, item_id: item?.id }} />
                     </div>
 
                     <section className="grid gap-4 lg:grid-cols-2" aria-label="Stock and combo performance">
@@ -256,15 +258,6 @@ function ComboItemComponents({ components }: { components: NonNullable<VehicleSe
                     <span className="tabular-nums text-slate-700">Cost {formatMoney(component.cost)}</span>
                 </div>)}
             </div>
-        </div>
-    );
-}
-
-function Amount({ label, value, emphasized = false }: { label: string; value: string; emphasized?: boolean }) {
-    return (
-        <div>
-            <div className="text-xs text-slate-500">{label}</div>
-            <div className={`mt-1 tabular-nums ${emphasized ? 'font-semibold text-emerald-800' : 'font-medium text-slate-800'}`}>{formatMoney(value)}</div>
         </div>
     );
 }

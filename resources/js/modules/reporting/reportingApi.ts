@@ -59,7 +59,7 @@ export async function runReport(key: string, params: ReportParams, signal?: Abor
 export async function exportReport(
     key: string,
     format: ReportFormat,
-    params: ReportParams | TechnicianWorkReportParams | EmployeeCommissionReportParams | OperationalReportParams | GrnPayablesReportParams | GoodsReceiptSummaryParams | VehicleServiceHistoryParams | ExpenseReportParams | PaymentMethodWiseParams,
+    params: ReportParams | TechnicianWorkReportParams | EmployeeCommissionReportParams | OperationalReportParams | GrnPayablesReportParams | GoodsReceiptSummaryParams | VehicleServiceHistoryParams | VehicleServiceSalesSummaryParams | ExpenseReportParams | PaymentMethodWiseParams,
     previewWindow?: Window | null,
 ): Promise<void> {
     const response = await apiClient.get<Blob>(`${endpoints.reports}/${key}/export/${format}`, {

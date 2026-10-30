@@ -8,8 +8,9 @@ import { exportReport } from '../reportingApi';
 import { reportingPermissions } from '../reportingPermissions';
 import type { EmployeeCommissionReportParams, GrnPayablesReportParams, OperationalReportParams, PaymentMethodWiseParams, ReportFormat, ReportParams, TechnicianWorkReportParams, VehicleServiceHistoryParams } from '../reportingTypes';
 import type { GoodsReceiptSummaryParams } from '../goodsReceiptSummaryTypes';
+import type { VehicleServiceSalesSummaryParams } from '../vehicleServiceSalesSummaryTypes';
 
-export function ExportActions({ reportKey, params }: { reportKey: string; params: ReportParams | TechnicianWorkReportParams | EmployeeCommissionReportParams | OperationalReportParams | GrnPayablesReportParams | GoodsReceiptSummaryParams | VehicleServiceHistoryParams | PaymentMethodWiseParams }) {
+export function ExportActions({ reportKey, params }: { reportKey: string; params: ReportParams | TechnicianWorkReportParams | EmployeeCommissionReportParams | OperationalReportParams | GrnPayablesReportParams | GoodsReceiptSummaryParams | VehicleServiceHistoryParams | PaymentMethodWiseParams | VehicleServiceSalesSummaryParams }) {
     const auth = useAuth();
     const [busy, setBusy] = useState<ReportFormat | null>(null);
     const [error, setError] = useState<ApiError | null>(null);
