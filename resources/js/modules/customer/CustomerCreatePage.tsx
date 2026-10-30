@@ -17,6 +17,7 @@ import { closePendingWhatsAppWindow, navigateToWhatsApp, openPendingWhatsAppWind
 import { selectWhatsAppVerificationPhone } from '@/shared/utils/whatsAppVerificationTarget';
 import { startCustomerWhatsAppVerification } from './customerApi';
 import { createCustomer, createCustomerWithRelations } from './customerApi';
+import { CustomerPhoneConflictAlert } from './components/CustomerPhoneConflictAlert';
 import { defaultCustomerPayload, loadCustomerCreationDefaults } from './customerCreateDefaults';
 import type { CustomerPayload, CustomerWithRelationsPayload } from './customerTypes';
 import { CustomerForm } from './components/CustomerForm';
@@ -125,6 +126,7 @@ export default function CustomerCreatePage() {
                 description="Start with the customer profile. Add related records now only when they are available."
             />
             <ErrorAlert error={error} title="Customer could not be saved" />
+            <CustomerPhoneConflictAlert error={error} />
             {loadingDefaults && <LoadingState label="Preparing customer defaults..." />}
             {!loadingDefaults && initialCustomer !== null && (
             <form className="mx-auto max-w-6xl space-y-5" onSubmit={(event) => {

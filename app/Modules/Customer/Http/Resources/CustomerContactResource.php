@@ -13,6 +13,7 @@ final class CustomerContactResource extends JsonResource
     {
         return [
             'id' => (int) $this->getKey(),
+            'row_version' => (int) $this->row_version,
             'contact_name' => $this->contact_name,
             'designation' => $this->designation,
             'department' => $this->department,

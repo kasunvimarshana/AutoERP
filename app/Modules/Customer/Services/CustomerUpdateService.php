@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Customer\Services;
 
-use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Modules\Customer\DTOs\UpdateCustomerData;
 use Modules\Customer\Enums\CustomerStatus;
@@ -21,11 +20,12 @@ final class CustomerUpdateService
         private readonly CustomerBankAccountService $bankAccounts,
         private readonly CustomerCategoryService $categories,
         private readonly CustomerDocumentService $documents,
+        private readonly CustomerPhoneService $phones,
     ) {}
 
     public function update(Customer $customer, UpdateCustomerData $data): Customer
     {
-        return DB::transaction(function () use ($customer, $data): Customer {
+        return $this->phones->write((int) $customer->tenant_id, function () use ($customer, $data): Customer {
             $customer = Customer::query()
                 ->whereKey($customer->getKey())
                 ->where('tenant_id', (int) $customer->tenant_id)
@@ -77,6 +77,13 @@ final class CustomerUpdateService
             }
 
             $customer->fill($attributes);
+            if (in_array('phone', $data->provided, true) || in_array('mobile', $data->provided, true)) {
+                $this->phones->assertCustomerNumber($customer->phone, $customer->mobile);
+            }
+            $this->phones->assertAvailable((int) $customer->tenant_id, $customer->organization_unit_id, (int) $customer->id, [
+                'phone' => $customer->phone,
+                'mobile' => $customer->mobile,
+            ]);
             $customer->setAttribute('row_version', ((int) $customer->row_version) + 1);
             $customer->save();
 
@@ -104,6 +111,6 @@ final class CustomerUpdateService
                 'documents',
                 'creditProfile',
             ]);
-        }, 3);
+        });
     }
 }

@@ -5,14 +5,75 @@ declare(strict_types=1);
 namespace Tests\Unit\Reporting;
 
 use DateTimeImmutable;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 use Modules\Reporting\DTOs\ReportData;
+use Modules\Reporting\Enums\VehicleServiceSalesSummaryExportSection;
+use Modules\Reporting\Http\Requests\VehicleServiceSalesSummaryReportRequest;
 use Modules\Reporting\Services\ReportExport;
 use Modules\Reporting\Services\VehicleServiceSalesSummaryExport;
 use Tests\TestCase;
 
 class VehicleServiceSalesSummaryExportTest extends TestCase
 {
+    public function test_section_exports_isolate_rankings_and_keep_combo_components_without_job_totals(): void
+    {
+        $stock = [
+            'item' => ['code' => 'FILTER', 'name' => 'Oil filter'], 'quantity' => '2', 'job_count' => 1,
+            'sales_amount' => '200.555', 'cost' => '100.125', 'profit' => '100.43',
+        ];
+        $combo = [
+            'item' => ['code' => 'SVC', 'name' => 'Oil service'], 'quantity' => '1', 'job_count' => 1,
+            'sales_amount' => '300', 'cost' => '150', 'stock_cost' => '100', 'profit' => '150',
+            'components' => [['item' => ['code' => 'OIL', 'name' => 'Engine oil'], 'quantity' => '2.5', 'kind' => 'stock', 'cost' => '100']],
+        ];
+        $result = ['summary' => ['stock' => ['items' => [$stock]], 'combo' => ['items' => [$combo]]]];
+        $document = new VehicleServiceSalesSummaryExport;
+        $stockRows = $document->rows($result, VehicleServiceSalesSummaryExportSection::Stock);
+        $comboRows = $document->rows($result, VehicleServiceSalesSummaryExportSection::Combo);
+        self::assertCount(1, $stockRows);
+        self::assertSame('FILTER — Oil filter', $stockRows[0]['reference']);
+        self::assertSame('200.555', $stockRows[0]['revenue']);
+        self::assertSame('100.125', $stockRows[0]['direct_cost']);
+        self::assertCount(2, $comboRows);
+        self::assertSame('SVC — Oil service', $comboRows[0]['reference']);
+        self::assertSame('SVC — Oil service > OIL — Engine oil', $comboRows[1]['reference']);
+        self::assertArrayNotHasKey('revenue', $comboRows[1]);
+        foreach ([VehicleServiceSalesSummaryExportSection::Stock, VehicleServiceSalesSummaryExportSection::Combo] as $section) {
+            $definition = $document->definition($section);
+            self::assertStringEndsWith('/'.$section->value, $definition->key);
+            self::assertNotContains('commission', array_column($definition->columns, 'key'));
+            self::assertNotContains('collected', array_column($definition->columns, 'key'));
+            $report = new ReportData(
+                definition: $definition,
+                rows: $document->rows($result, $section),
+                summary: [],
+                branding: ['tenant_name' => 'Test tenant', 'company_name' => 'Test company'],
+                filters: [],
+                generatedAt: new DateTimeImmutable('2026-10-31'),
+                template: 'reports.vehicle-service.report',
+            );
+            foreach (['csv', 'xlsx', 'pdf'] as $format) {
+                $response = app(ReportExport::class)->response($format, $report);
+                self::assertSame(200, $response->getStatusCode());
+                self::assertNotEmpty($response->getContent());
+            }
+        }
+        config(['reporting.export_row_limit' => 1]);
+        self::assertCount(1, $document->rows($result, VehicleServiceSalesSummaryExportSection::Stock));
+        $this->expectException(ValidationException::class);
+        $document->rows($result, VehicleServiceSalesSummaryExportSection::Combo);
+    }
+
+    public function test_export_section_accepts_only_supported_choices(): void
+    {
+        $rules = (new VehicleServiceSalesSummaryReportRequest)->rules();
+        foreach ([null, 'full', 'stock', 'combo'] as $section) {
+            self::assertTrue(Validator::make(['tenant_id' => 1, 'export_section' => $section], $rules)->passes());
+        }
+        self::assertTrue(Validator::make(['tenant_id' => 1, 'export_section' => 'invalid'], $rules)->fails());
+    }
+
     public function test_exports_summary_rankings_jobs_and_components_without_exposing_ids_or_recalculating_amounts(): void
     {
         $component = ['item' => ['id' => 88, 'code' => 'OIL', 'name' => 'Engine oil'], 'kind' => 'stock', 'quantity' => '2.5', 'cost' => '30.125'];

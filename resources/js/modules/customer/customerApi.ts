@@ -96,7 +96,7 @@ export const createCustomerContact = (customerId: number, payload: CustomerConta
     apiClient.post<ApiResource<CustomerContact>>(relationPath(customerId, 'contacts'), payload).then((response) => response.data.data);
 export const updateCustomerContact = (customerId: number, id: number, payload: CustomerContactPayload) =>
     apiClient.put<ApiResource<CustomerContact>>(`${relationPath(customerId, 'contacts')}/${id}`, payload).then((response) => response.data.data);
-export const deleteCustomerContact = (customerId: number, id: number) => apiClient.delete(`${relationPath(customerId, 'contacts')}/${id}`);
+export const deleteCustomerContact = (customerId: number, id: number, rowVersion: number) => apiClient.delete(`${relationPath(customerId, 'contacts')}/${id}`, { data: { row_version: rowVersion } });
 
 export const listCustomerAddresses = (customerId: number, params: ListParams, signal?: AbortSignal) =>
     apiClient.get<ApiCollection<CustomerAddress>>(relationPath(customerId, 'addresses'), { params, signal }).then((response) => response.data);

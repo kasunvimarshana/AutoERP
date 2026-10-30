@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Modules\Customer\Services;
 
-use Illuminate\Support\Facades\DB;
 use Modules\Customer\DTOs\CreateCustomerData;
 use Modules\Customer\DTOs\CustomerCreditProfileData;
 use Modules\Customer\Models\Customer;
@@ -22,14 +21,16 @@ final class CustomerCreationService
         private readonly CustomerDocumentService $documents,
         private readonly CustomerCreditProfileService $creditProfiles,
         private readonly CustomerStatusService $statuses,
+        private readonly CustomerPhoneService $phones,
     ) {}
 
     public function create(CreateCustomerData $data): Customer
     {
-        $code = $data->code ?? $this->numbers->nextCode($data->tenantId);
-        $this->validator->validateCreate($data, $code);
-
-        return DB::transaction(function () use ($data, $code): Customer {
+        return $this->phones->write($data->tenantId, function () use ($data): Customer {
+            $this->phones->assertCustomerNumber($data->phone, $data->mobile);
+            $code = $data->code ?? $this->numbers->nextCode($data->tenantId);
+            $this->validator->validateCreate($data, $code);
+            $this->phones->assertAvailable($data->tenantId, $data->organizationUnitId, null, ['phone' => $data->phone, 'mobile' => $data->mobile]);
             $customer = Customer::query()->create([
                 'tenant_id' => $data->tenantId,
                 'organization_unit_id' => $data->organizationUnitId,
@@ -59,8 +60,8 @@ final class CustomerCreationService
                 'approved_at' => $data->status->value === 'active' ? now() : null,
             ]);
 
-            foreach ($data->contacts as $contact) {
-                $this->contacts->create($customer, $contact);
+            foreach ($data->contacts as $index => $contact) {
+                $this->contacts->create($customer, $contact, "contacts.{$index}.");
             }
             foreach ($data->addresses as $address) {
                 $this->addresses->create($customer, $address);

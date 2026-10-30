@@ -12,6 +12,7 @@ import { Select } from '@/shared/components/Select';
 import { WhatsAppVerificationPanel } from '@/shared/components/WhatsAppVerificationPanel';
 import { customerTypes, type CustomerPayload, type CustomerSummary } from '@/modules/customer/customerTypes';
 import { CustomerLookupSelect } from '@/modules/customer/components/CustomerLookupSelect';
+import { CustomerPhoneConflictAlert } from '@/modules/customer/components/CustomerPhoneConflictAlert';
 import { confirmCustomerWhatsAppVerification, createCustomer, getCustomerWhatsAppVerification, startCustomerWhatsAppVerification } from '@/modules/customer/customerApi';
 import {
     DEFAULT_CUSTOMER_STATUS,
@@ -217,6 +218,7 @@ export function VehicleServiceQuickVehicleModal({
                 }}
             >
                 <ErrorAlert error={error} title="Vehicle could not be registered" />
+                <CustomerPhoneConflictAlert error={error} />
 
                 <Panel title="Vehicle details">
                     <div className="grid gap-4 md:grid-cols-2">
@@ -344,6 +346,7 @@ export function VehicleServiceQuickVehicleModal({
                                 onChange={(event) => setCustomerPayload((current) => ({ ...current, phone: event.target.value || null }))}
                                 error={customerError(error, 'phone', 'customer.phone')}
                             />
+                            <p className="text-sm text-slate-500 md:col-span-2">Enter a phone number or a WhatsApp number to add this customer.</p>
                             <div className="md:col-span-2">
                                 <Input
                                     label="Email"

@@ -38,6 +38,7 @@ abstract class CustomerContactRequest extends TenantScopedRequest
             isPrimary: $this->boolean('is_primary'),
             isActive: $this->boolean('is_active', true),
             notes: $this->nullableString('notes'),
+            rowVersion: $this->filled('row_version') ? (int) $this->input('row_version') : null,
         );
     }
 

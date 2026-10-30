@@ -10,7 +10,9 @@ import type { EmployeeCommissionReportParams, GrnPayablesReportParams, Operation
 import type { GoodsReceiptSummaryParams } from '../goodsReceiptSummaryTypes';
 import type { VehicleServiceSalesSummaryParams } from '../vehicleServiceSalesSummaryTypes';
 
-export function ExportActions({ reportKey, params }: { reportKey: string; params: ReportParams | TechnicianWorkReportParams | EmployeeCommissionReportParams | OperationalReportParams | GrnPayablesReportParams | GoodsReceiptSummaryParams | VehicleServiceHistoryParams | PaymentMethodWiseParams | VehicleServiceSalesSummaryParams }) {
+const defaultFormats: ReportFormat[] = ['html', 'print', 'pdf', 'xlsx', 'csv'];
+
+export function ExportActions({ reportKey, params, formats = defaultFormats, compact = false }: { reportKey: string; params: ReportParams | TechnicianWorkReportParams | EmployeeCommissionReportParams | OperationalReportParams | GrnPayablesReportParams | GoodsReceiptSummaryParams | VehicleServiceHistoryParams | PaymentMethodWiseParams | VehicleServiceSalesSummaryParams; formats?: ReportFormat[]; compact?: boolean }) {
     const auth = useAuth();
     const [busy, setBusy] = useState<ReportFormat | null>(null);
     const [error, setError] = useState<ApiError | null>(null);
@@ -41,16 +43,23 @@ export function ExportActions({ reportKey, params }: { reportKey: string; params
         }
     };
 
+    const actions = (
+        <div className="flex flex-wrap gap-2">
+            {formats.map((format) => (
+                <Button key={format} type="button" variant="secondary" loading={busy === format} onClick={() => void run(format)}>
+                    {label(format)}
+                </Button>
+            ))}
+        </div>
+    );
+
     return (
         <div className="space-y-2">
             <ErrorAlert error={error} />
-            <div className="flex flex-wrap gap-2">
-                {(['html', 'print', 'pdf', 'xlsx', 'csv'] as ReportFormat[]).map((format) => (
-                    <Button key={format} type="button" variant="secondary" loading={busy === format} onClick={() => void run(format)}>
-                        {label(format)}
-                    </Button>
-                ))}
-            </div>
+            {compact ? <details className="relative">
+                <summary className="cursor-pointer rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600">Export</summary>
+                <div className="absolute right-0 z-10 mt-2 min-w-max rounded-lg border border-slate-200 bg-white p-3 shadow-lg">{actions}</div>
+            </details> : actions}
         </div>
     );
 }

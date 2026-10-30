@@ -19,9 +19,11 @@ import type {
     VehicleServiceSalesSummaryParams,
     VehicleServiceSalesSummaryRankedItem,
     VehicleServiceSalesSummaryResult,
+    ReportFormat,
 } from '../reportingTypes';
 
 type DatePreset = 'today' | 'week' | 'month' | 'custom';
+const sectionExportFormats: ReportFormat[] = ['xlsx', 'pdf', 'csv'];
 
 export default function VehicleServiceSalesSummaryReportPage() {
     const [draftItem, setDraftItem] = useState<ItemSummary | null>(null);
@@ -111,8 +113,8 @@ export default function VehicleServiceSalesSummaryReportPage() {
                     </div>
 
                     <section className="grid gap-4 lg:grid-cols-2" aria-label="Stock and combo performance">
-                        <StockItemsPanel result={result} />
-                        <ComboItemsPanel result={result} />
+                        <StockItemsPanel result={result} params={{ ...filters, item_id: item?.id }} />
+                        <ComboItemsPanel result={result} params={{ ...filters, item_id: item?.id }} />
                     </section>
                     {Number(result.summary.other_service_revenue) !== 0 && (
                         <p className="text-sm text-slate-500">Other service and labour sales included in total revenue: <strong className="font-semibold text-slate-700">{formatMoney(result.summary.other_service_revenue)}</strong></p>
@@ -158,11 +160,15 @@ function Metric({ label, value, tone, detail }: { label: string; value: string; 
     );
 }
 
-function StockItemsPanel({ result }: { result: VehicleServiceSalesSummaryResult }) {
+function StockItemsPanel({ result, params }: { result: VehicleServiceSalesSummaryResult; params: VehicleServiceSalesSummaryParams }) {
     const stock = result.summary.stock;
     return (
-        <Panel className="border-l-4 border-l-blue-600" title="Stock item performance">
-            <p className="-mt-2 mb-3 text-sm text-slate-500">Ranked by quantity sold. Profit is sales less stock cost, before commission.</p>
+        <Panel className="border-l-4 border-l-blue-600">
+            <div className="mb-3 flex items-center justify-between gap-3">
+                <h2 className="font-semibold text-slate-900">Stock item performance</h2>
+                <ExportActions reportKey="vehicle-service/sales-summary" params={{ ...params, export_section: 'stock' }} formats={sectionExportFormats} compact />
+            </div>
+            <p className="mb-3 text-sm text-slate-500">Ranked by quantity sold. Profit is sales less stock cost, before commission.</p>
             <div className="mb-3 flex flex-wrap gap-x-5 gap-y-1 text-sm text-slate-600">
                 <span>{formatQuantity(stock.item_count)} item types</span>
                 <span>{formatQuantity(stock.quantity)} units sold</span>
@@ -174,11 +180,15 @@ function StockItemsPanel({ result }: { result: VehicleServiceSalesSummaryResult 
     );
 }
 
-function ComboItemsPanel({ result }: { result: VehicleServiceSalesSummaryResult }) {
+function ComboItemsPanel({ result, params }: { result: VehicleServiceSalesSummaryResult; params: VehicleServiceSalesSummaryParams }) {
     const combo = result.summary.combo;
     return (
-        <Panel className="border-l-4 border-l-violet-600" title="Combo item performance">
-            <p className="-mt-2 mb-3 text-sm text-slate-500">Ranked by quantity sold. Profit is combo sales less all component costs, before commission.</p>
+        <Panel className="border-l-4 border-l-violet-600">
+            <div className="mb-3 flex items-center justify-between gap-3">
+                <h2 className="font-semibold text-slate-900">Combo item performance</h2>
+                <ExportActions reportKey="vehicle-service/sales-summary" params={{ ...params, export_section: 'combo' }} formats={sectionExportFormats} compact />
+            </div>
+            <p className="mb-3 text-sm text-slate-500">Ranked by quantity sold. Profit is combo sales less all component costs, before commission.</p>
             <div className="mb-3 flex flex-wrap gap-x-5 gap-y-1 text-sm text-slate-600">
                 <span>{formatQuantity(combo.item_count)} combo types</span>
                 <span>{formatQuantity(combo.quantity)} combos sold</span>

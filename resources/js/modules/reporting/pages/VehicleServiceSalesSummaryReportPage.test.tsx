@@ -6,7 +6,7 @@ import VehicleServiceSalesSummaryReportPage from './VehicleServiceSalesSummaryRe
 
 const mocks = vi.hoisted(() => ({ run: vi.fn(), exports: vi.fn() }));
 vi.mock('../reportingApi', () => ({ runVehicleServiceSalesSummaryReport: mocks.run }));
-vi.mock('../components/ExportActions', () => ({ ExportActions: (props: unknown) => { mocks.exports(props); return <div>Export options</div>; } }));
+vi.mock('../components/ExportActions', () => ({ ExportActions: (props: { params: { export_section?: string } }) => { mocks.exports(props); return <div>Export {props.params.export_section ?? 'full'}</div>; } }));
 vi.mock('@/modules/item/components/ItemLookupSelect', () => ({
     ItemLookupSelect: ({ onChange }: { onChange: (item: { id: number; name: string }) => void }) => <button type="button" onClick={() => onChange({ id: 42, name: 'Engine oil' })}>Choose oil</button>,
 }));
@@ -20,7 +20,9 @@ describe('VehicleServiceSalesSummaryReportPage exports', () => {
         } });
         const user = userEvent.setup();
         render(<TestRouter><VehicleServiceSalesSummaryReportPage /></TestRouter>);
-        await screen.findByText('Export options');
+        await screen.findByText('Export full');
+        expect(screen.getByText('Export stock')).toBeInTheDocument();
+        expect(screen.getByText('Export combo')).toBeInTheDocument();
         await user.click(screen.getByRole('button', { name: 'Choose oil' }));
         await user.clear(screen.getByLabelText('From'));
         await user.type(screen.getByLabelText('From'), '2026-10-01');
@@ -29,8 +31,15 @@ describe('VehicleServiceSalesSummaryReportPage exports', () => {
         await waitFor(() => expect(mocks.exports.mock.lastCall?.[0]).toMatchObject({
             reportKey: 'vehicle-service/sales-summary', params: { date_from: '2026-10-01', item_id: 42 },
         }));
+        expect(mocks.exports.mock.calls.slice(-3).map(([props]) => props)).toMatchObject([
+            { params: { date_from: '2026-10-01', item_id: 42 } },
+            { params: { date_from: '2026-10-01', item_id: 42, export_section: 'stock' }, formats: ['xlsx', 'pdf', 'csv'], compact: true },
+            { params: { date_from: '2026-10-01', item_id: 42, export_section: 'combo' }, formats: ['xlsx', 'pdf', 'csv'], compact: true },
+        ]);
         mocks.run.mockReturnValue(new Promise(() => {}));
         await user.click(screen.getByRole('button', { name: 'Reset' }));
-        expect(screen.queryByText('Export options')).not.toBeInTheDocument();
+        expect(screen.queryByText('Export full')).not.toBeInTheDocument();
+        expect(screen.queryByText('Export stock')).not.toBeInTheDocument();
+        expect(screen.queryByText('Export combo')).not.toBeInTheDocument();
     });
 });

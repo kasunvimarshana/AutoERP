@@ -22,6 +22,7 @@ final class CustomerContact extends TenantOwnedModel
             'tenant_id' => 'integer',
             'organization_unit_id' => 'integer',
             'customer_id' => 'integer',
+            'row_version' => 'integer',
             'is_primary' => 'boolean',
             'is_active' => 'boolean',
         ]);

@@ -7,6 +7,7 @@ namespace Modules\Reporting\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
 use Modules\Item\Models\Item;
+use Modules\Reporting\Enums\VehicleServiceSalesSummaryExportSection;
 use Modules\Reporting\Http\Requests\VehicleServiceSalesSummaryReportRequest;
 use Modules\Reporting\Services\ReportExport;
 use Modules\Reporting\Services\ReportingAuthorizationService;
@@ -42,7 +43,8 @@ final class VehicleServiceSalesSummaryReportController
             'organization_unit_id' => $request->organizationUnitId(),
         ];
         $result = $this->reports->run($input);
-        unset($input['item_id']);
+        $section = VehicleServiceSalesSummaryExportSection::from($request->validated('export_section') ?? VehicleServiceSalesSummaryExportSection::Full->value);
+        unset($input['item_id'], $input['export_section']);
         if ($request->validated('item_id') !== null) {
             $item = Item::query()
                 ->where('tenant_id', $request->tenantId())
@@ -52,8 +54,8 @@ final class VehicleServiceSalesSummaryReportController
 
         return $this->exports->export(
             $format,
-            $this->document->definition(),
-            $this->document->rows($result),
+            $this->document->definition($section),
+            $this->document->rows($result, $section),
             $request->tenantId(),
             $request->organizationUnitId(),
             $input,
